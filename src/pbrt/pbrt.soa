@@ -1,0 +1,68 @@
+// -*- mode: c++ -*-
+// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
+// The pbrt source code is licensed under the Apache License, Version 2.0.
+// SPDX: Apache-2.0
+
+flat int;
+flat Float;
+flat bool;
+flat BxDFHandle;
+flat MediumHandle;
+flat LayeredBxDFConfig;
+
+soa SampledSpectrum;
+soa SampledWavelengths;
+
+soa FloatInterval {
+    Float low, high;
+};
+
+soa Point2f { Float x, y; };
+soa Point2i { int x, y; };
+soa Point3f { Float x, y, z; };
+soa Vector3f { Float x, y, z; };
+soa Normal3f { Float x, y, z; };
+soa Point3fi { FloatInterval x, y, z; };
+
+soa Ray {
+    Point3f o;
+    Vector3f d;
+    Float time;
+    MediumHandle medium;
+};
+
+soa SubsurfaceInteraction {
+    Point3fi pi;
+    Normal3f n;
+    Vector3f dpdu, dpdv;
+    Normal3f ns;
+    Vector3f dpdus, dpdvs;
+};
+
+soa Frame {
+    Vector3f x, y, z;
+};
+
+soa VisibleSurface {
+    bool set;
+    Point3f p;
+    Normal3f n, ns;
+    Float time;
+    Float dzdx, dzdy;
+    SampledSpectrum albedo;
+};
+
+soa MediumInterface {
+    MediumHandle inside, outside;
+};
+
+soa TabulatedBSSRDF {
+    Point3f po;
+    Vector3f wo;
+    Float time;
+    Normal3f ns;
+    Vector3f ss, ts;
+    Float eta;
+    const BSSRDFTable *table;
+    SampledSpectrum sigma_t, rho;
+};

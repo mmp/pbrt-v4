@@ -1,0 +1,15 @@
+BasedOnStyle: Google
+AccessModifierOffset: -2
+IndentCaseLabels: false
+PointerBindsToType: false
+Standard: Cpp11
+IndentWidth: 4
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AllowShortLambdasOnASingleLine: All
+AlwaysBreakBeforeMultilineStrings: false
+IncludeBlocks: Preserve
+AllowAllConstructorInitializersOnNextLine: true
+MaxEmptyLinesToKeep: 1
+ColumnLimit: 90
