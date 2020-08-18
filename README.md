@@ -1,6 +1,8 @@
 pbrt, Version 4 (Early Release)
 ===============================
 
+![](images/teaser-transparent-machines.png height="300px")
+
 This is an early release of pbrt-v4, the rendering system that will be
 described in the (eventually) forthcoming fourth edition of *Physically
 Based Rendering: From Theory to Implementation*.  (We hope to have an
