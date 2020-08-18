@@ -622,9 +622,6 @@ endif ()
 ######################
 # pbrt_lib
 
-add_library (pbrt_soa_generated STATIC ${PBRT_SOA_GENERATED})
-set_target_properties (pbrt_soa_generated PROPERTIES LINKER_LANGUAGE CXX)
-
 add_library (pbrt_lib STATIC
   ${CMAKE_CURRENT_BINARY_DIR}/rgbspectrum_srgb.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/rgbspectrum_dci_p3.cpp
@@ -640,6 +637,7 @@ add_library (pbrt_lib STATIC
   )
 add_library (pbrt::pbrt_lib ALIAS pbrt_lib)
 
+add_library (pbrt_soa_generated STATIC src/pbrt/soa_empty.cpp ${PBRT_SOA_GENERATED})
 add_dependencies (pbrt_lib pbrt_soa_generated)
 
 target_compile_definitions (pbrt_lib PRIVATE ${PBRT_DEFINITIONS})
