@@ -949,13 +949,29 @@ bool Image::Write(const std::string &name, const ImageMetadata &metadata) const 
     if (HasExtension(name, "exr"))
         return WriteEXR(name, metadata);
 
+    if (NChannels() > 4) {
+        Error("%s: unable to write an %d channel image in this format.", name,
+              NChannels());
+        return false;
+    }
+
+    const Image *image = this;
+    Image rgbImage;
+    if (NChannels() == 4) {
+        ImageChannelDesc desc = GetChannelDesc({"R", "G", "B", "A"});
+        if (desc) {
+            rgbImage = SelectChannels(GetChannelDesc({"R", "G", "B"}));
+            image = &rgbImage;
+        } else {
+            Error("%s: unable to write an 4 channel image that is not RGBA.", name);
+            return false;
+        }
+    }
     if (NChannels() == 3 && *metadata.GetColorSpace() != *RGBColorSpace::sRGB)
         Warning("%s: writing image with non-sRGB color space to a format that "
                 "doesn't store color spaces.",
                 name);
 
-    const Image *image = this;
-    Image rgbImage;
     if (NChannels() == 3) {
         // Order as RGB
         ImageChannelDesc desc = GetChannelDesc({"R", "G", "B"});
