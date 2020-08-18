@@ -2180,6 +2180,7 @@ void BDPTIntegrator::Render() {
 
                 // FIXME: leaks
                 weightFilms[BufferIndex(s, t)] = new RGBFilm(
+                    Sensor::CreateDefault(),
                     camera.GetFilm().FullResolution(),
                     Bounds2i(Point2i(0, 0), camera.GetFilm().FullResolution()),
                     new BoxFilter,  // FIXME: leaks

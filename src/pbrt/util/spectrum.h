@@ -63,6 +63,7 @@ class SpectrumHandle : public TaggedPointer<ConstantSpectrum, DenselySampledSpec
 
 // Spectrum Function Declarations
 Float SpectrumToY(SpectrumHandle s);
+Float SpectrumToPhotometric(SpectrumHandle s);
 XYZ SpectrumToXYZ(SpectrumHandle s);
 
 PBRT_CPU_GPU

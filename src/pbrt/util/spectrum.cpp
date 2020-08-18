@@ -69,6 +69,13 @@ Float SpectrumToY(SpectrumHandle s) {
     return y / CIE_Y_integral;
 }
 
+Float SpectrumToPhotometric(SpectrumHandle s) {
+    Float y = 0;
+    for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda)
+        y += Spectra::Y()(lambda) * s(lambda);
+    return y / (Lambda_max - Lambda_min + 1) * 683;
+}
+
 // Spectrum Method Definitions
 Float PiecewiseLinearSpectrum::operator()(Float lambda) const {
     // Handle _PiecewiseLinearSpectrum_ corner cases

@@ -1289,11 +1289,11 @@ LightHandle LightHandle::Create(const std::string &name,
         std::vector<Point3f> portal = parameters.GetPoint3fArray("portal");
         std::string filename = ResolveFilename(parameters.GetOneString("filename", ""));
 
-        if (L.empty() && filename.empty())
+        if (L.empty() && filename.empty()) {
             // Default: color space's std illuminant
             light = alloc.new_object<UniformInfiniteLight>(
                 renderFromLight, &colorSpace->illuminant, alloc);
-        else if (!L.empty()) {
+        } else if (!L.empty()) {
             if (!filename.empty())
                 ErrorExit(loc, "Can't specify both emission \"L\" and "
                                "\"filename\" with InfiniteAreaLight");
@@ -1301,6 +1301,8 @@ LightHandle LightHandle::Create(const std::string &name,
             if (!portal.empty())
                 ErrorExit(loc, "Portals are not supported for InfiniteAreaLights "
                                "without \"filename\".");
+
+            scale /= SpectrumToPhotometric(L[0]);
 
             L[0].Scale(scale);
             light = alloc.new_object<UniformInfiniteLight>(renderFromLight, L[0], alloc);

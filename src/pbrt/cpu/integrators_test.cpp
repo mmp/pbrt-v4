@@ -268,7 +268,7 @@ std::vector<TestIntegrator> GetIntegrators() {
         // Path tracing integrators
         for (auto &sampler : GetSamplers(resolution)) {
             FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
-            RGBFilm *film = new RGBFilm(resolution,
+            RGBFilm *film = new RGBFilm(Sensor::CreateDefault(), resolution,
                                         Bounds2i(Point2i(0, 0), resolution), filter, 1.,
                                         inTestDir("test.exr"), 1., RGBColorSpace::sRGB);
             PerspectiveCamera *camera = new PerspectiveCamera(
@@ -286,7 +286,7 @@ std::vector<TestIntegrator> GetIntegrators() {
 
         for (auto &sampler : GetSamplers(resolution)) {
             FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
-            RGBFilm *film = new RGBFilm(resolution,
+            RGBFilm *film = new RGBFilm(Sensor::CreateDefault(), resolution,
                                         Bounds2i(Point2i(0, 0), resolution), filter, 1.,
                                         inTestDir("test.exr"), 1., RGBColorSpace::sRGB);
             OrthographicCamera *camera = new OrthographicCamera(
@@ -305,7 +305,7 @@ std::vector<TestIntegrator> GetIntegrators() {
         // Volume path tracing integrators
         for (auto &sampler : GetSamplers(resolution)) {
             FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
-            RGBFilm *film = new RGBFilm(resolution,
+            RGBFilm *film = new RGBFilm(Sensor::CreateDefault(), resolution,
                                         Bounds2i(Point2i(0, 0), resolution), filter, 1.,
                                         inTestDir("test.exr"), 1., RGBColorSpace::sRGB);
             PerspectiveCamera *camera = new PerspectiveCamera(
@@ -322,7 +322,7 @@ std::vector<TestIntegrator> GetIntegrators() {
         }
         for (auto &sampler : GetSamplers(resolution)) {
             FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
-            RGBFilm *film = new RGBFilm(resolution,
+            RGBFilm *film = new RGBFilm(Sensor::CreateDefault(), resolution,
                                         Bounds2i(Point2i(0, 0), resolution), filter, 1.,
                                         inTestDir("test.exr"), 1., RGBColorSpace::sRGB);
             OrthographicCamera *camera = new OrthographicCamera(
@@ -341,7 +341,7 @@ std::vector<TestIntegrator> GetIntegrators() {
         // Simple path (perspective only, still sample light and BSDFs). Yolo
         for (auto &sampler : GetSamplers(resolution)) {
             FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
-            RGBFilm *film = new RGBFilm(resolution,
+            RGBFilm *film = new RGBFilm(Sensor::CreateDefault(), resolution,
                                         Bounds2i(Point2i(0, 0), resolution), filter, 1.,
                                         inTestDir("test.exr"), 1., RGBColorSpace::sRGB);
             PerspectiveCamera *camera = new PerspectiveCamera(
@@ -360,7 +360,7 @@ std::vector<TestIntegrator> GetIntegrators() {
         // BDPT
         for (auto &sampler : GetSamplers(resolution)) {
             FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
-            RGBFilm *film = new RGBFilm(resolution,
+            RGBFilm *film = new RGBFilm(Sensor::CreateDefault(), resolution,
                                         Bounds2i(Point2i(0, 0), resolution), filter, 1.,
                                         inTestDir("test.exr"), 1., RGBColorSpace::sRGB);
             PerspectiveCamera *camera = new PerspectiveCamera(
@@ -380,7 +380,7 @@ std::vector<TestIntegrator> GetIntegrators() {
         // MLT
         {
             FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
-            RGBFilm *film = new RGBFilm(resolution,
+            RGBFilm *film = new RGBFilm(Sensor::CreateDefault(), resolution,
                                         Bounds2i(Point2i(0, 0), resolution), filter, 1.,
                                         inTestDir("test.exr"), 1., RGBColorSpace::sRGB);
             PerspectiveCamera *camera = new PerspectiveCamera(
