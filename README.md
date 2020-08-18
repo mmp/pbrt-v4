@@ -71,7 +71,6 @@ Major changes include:
     each pixel is now available. (This is particularly useful for denoising and ML training.)
   * Path regularization (optionally).
   * A bilinear patch primitive has been added ([Reshetov 2019](https://link.springer.com/chapter/10.1007/978-1-4842-4427-2_8)).
-  * Accurate modeling of film response in cameras and photometric lighting controls thanks to a contribution from Anders Langlands and Luca Fascione.
   * Various improvements to ray--shape intersection precision.
   * Most of the low-level sampling code has been factored out into
     stand-alone functions for easier reuse.  Also, functions that invert
