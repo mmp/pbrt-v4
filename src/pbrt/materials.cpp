@@ -267,7 +267,7 @@ CoatedConductorMaterial *CoatedConductorMaterial::Create(
     SpectrumTextureHandle conductorEta = parameters.GetSpectrumTexture(
         "conductor.eta", GetNamedSpectrum("metal-Cu-eta"), SpectrumType::General, alloc);
     SpectrumTextureHandle k = parameters.GetSpectrumTexture(
-        "condcutor.k", GetNamedSpectrum("metal-Cu-k"), SpectrumType::General, alloc);
+        "conductor.k", GetNamedSpectrum("metal-Cu-k"), SpectrumType::General, alloc);
 
     LayeredBxDFConfig config;
     config.maxDepth = parameters.GetOneInt("maxdepth", config.maxDepth);
