@@ -1,6 +1,8 @@
 pbrt, Version 4 (Early Release)
 ===============================
 
+![Transparent Machines frame, via @beeple](images/teaser-transparent-machines.png)
+
 This is an early release of pbrt-v4, the rendering system that will be
 described in the (eventually) forthcoming fourth edition of *Physically
 Based Rendering: From Theory to Implementation*.  (We hope to have an
@@ -14,7 +16,8 @@ system will be useful to some people in its current form and that any bugs
 in the current implementation might be found now, allowing us to correct
 them before the book is final.
 
-A number of scenes for pbrt-v4 are [available in a git repository](TODO).
+A number of scenes for pbrt-v4 are [available in a git
+repository](https://github.com/mmp/pbrt-v4-scenes).
 
 Features
 --------
@@ -68,7 +71,6 @@ Major changes include:
     each pixel is now available. (This is particularly useful for denoising and ML training.)
   * Path regularization (optionally).
   * A bilinear patch primitive has been added ([Reshetov 2019](https://link.springer.com/chapter/10.1007/978-1-4842-4427-2_8)).
-  * Accurate modeling of film response in cameras and photometric lighting controls thanks to a contribution from Anders Langlands and Luca Fascione.
   * Various improvements to ray--shape intersection precision.
   * Most of the low-level sampling code has been factored out into
     stand-alone functions for easier reuse.  Also, functions that invert
@@ -122,7 +124,9 @@ tracker](https://github.com/mmp/pbrt-v4/issues) to report bugs in pbrt-v4.
 bugs in the initial release.)
 
 We are always happy to receive pull requests that fix bugs, including any
-bugs you find yourself or open issues in the issue tracker.
+bugs you find yourself or open issues in the issue tracker.  We are also
+happy to hear suggestions about improvements to the implementations of the
+various algorithms.
 
 Note, however, that in the interests of finishing the book in a finite
 amount of time, the functionality of pbrt-v4 is basically fixed at this
@@ -178,7 +182,6 @@ the `--gpu` command-line option is given.  Note that when rendering with
 the GPU, the `--spp` command-line flag can be helpful to easily crank up
 the number of samples per pixel. Also, it's extra fun to use *tev* to watch
 rendering progress.
-
 
 To denoise images using the OptiX denoiser, set the scene's "Film" type to
 be "gbuffer" when rendering and use EXR for the image format; a "deep"
