@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: configure
-      run: cmake
+      run: cmake .
     - name: make
       run: make -j20
     - name: run unit tests
