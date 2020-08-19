@@ -353,7 +353,7 @@ class ProjectionLight : public LightBase {
     // ProjectionLight Public Methods
     ProjectionLight(const Transform &renderFromLight, const MediumInterface &medium,
                     Image image, const RGBColorSpace *colorSpace, Float scale, Float fov,
-                    Allocator alloc);
+                    Float power, Allocator alloc);
 
     static ProjectionLight *Create(const Transform &renderFromLight, MediumHandle medium,
                                    const ParameterDictionary &parameters,
@@ -546,7 +546,7 @@ class UniformInfiniteLight : public LightBase {
   public:
     // UniformInfiniteLight Public Methods
     UniformInfiniteLight(const Transform &renderFromLight, SpectrumHandle Lemit,
-                         Allocator alloc);
+                         Float scale, Allocator alloc);
 
     void Preprocess(const Bounds3f &sceneBounds) {
         sceneBounds.BoundingSphere(&sceneCenter, &sceneRadius);
@@ -582,6 +582,7 @@ class UniformInfiniteLight : public LightBase {
     DenselySampledSpectrum Lemit;
     Point3f sceneCenter;
     Float sceneRadius;
+    Float scale;
 };
 
 // ImageInfiniteLight Definition

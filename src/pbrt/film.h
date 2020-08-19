@@ -37,13 +37,14 @@ class Sensor {
                           Float whiteBalanceTemp, const FileLoc *loc, Allocator alloc);
 
     static Sensor *CreateDefault() {
-        return Create("cie1931", RGBColorSpace::sRGB, 1.0, 1.0, 100, 100.0 * Pi, 6500, nullptr, Allocator());
+        return Create("cie1931", RGBColorSpace::sRGB, 1.0, 1.0, 100, 100.0 * Pi, 6500,
+                      nullptr, Allocator());
     }
 
     Sensor(SpectrumHandle r_bar, SpectrumHandle g_bar, SpectrumHandle b_bar,
-           const RGBColorSpace* outputColorSpace, const SquareMatrix<3> &XYZFromCameraRGB,
-           Float exposureTime, Float fNumber, Float ISO, Float C, const DenselySampledSpectrum& whiteIlluminant,
-           Allocator alloc);
+           const RGBColorSpace *outputColorSpace, const SquareMatrix<3> &XYZFromCameraRGB,
+           Float exposureTime, Float fNumber, Float ISO, Float C,
+           const DenselySampledSpectrum &whiteIlluminant, Allocator alloc);
 
     PBRT_CPU_GPU
     RGB ToCameraRGB(const SampledSpectrum &L, const SampledWavelengths &lambda) const {
@@ -51,13 +52,12 @@ class Sensor {
         RGB rgb(SafeDiv(r_bar.Sample(lambda) * L, pdf).Average(),
                 SafeDiv(g_bar.Sample(lambda) * L, pdf).Average(),
                 SafeDiv(b_bar.Sample(lambda) * L, pdf).Average());
-        return rgb / g_integral * cameraRGBWhiteNorm;
+        return rgb * cameraRGBWhiteNorm;
     }
 
     PBRT_CPU_GPU
     Float ImagingRatio() const {
-        return Pi * exposureTime * ISO /
-               (C * fNumber * fNumber);
+        return Pi * exposureTime * ISO * K_m / (C * fNumber * fNumber);
     }
 
     // Sensor Public Members
@@ -66,7 +66,6 @@ class Sensor {
   private:
     // Sensor Private Members
     DenselySampledSpectrum r_bar, g_bar, b_bar;
-    Float g_integral;
     RGB cameraRGBWhiteNorm;
     Float exposureTime;
     Float fNumber;
@@ -200,8 +199,8 @@ class RGBFilm : public FilmBase {
     }
 
     RGBFilm() = default;
-    RGBFilm(const Sensor* sensor, const Point2i &resolution, const Bounds2i &pixelBounds, FilterHandle filter,
-            Float diagonal, const std::string &filename, Float scale,
+    RGBFilm(const Sensor *sensor, const Point2i &resolution, const Bounds2i &pixelBounds,
+            FilterHandle filter, Float diagonal, const std::string &filename, Float scale,
             const RGBColorSpace *colorSpace, Float maxComponentValue = Infinity,
             bool writeFP16 = true, Allocator allocator = {});
 
@@ -231,7 +230,7 @@ class RGBFilm : public FilmBase {
     };
 
     // RGBFilm Private Members
-    const Sensor* sensor;
+    const Sensor *sensor;
     Array2D<Pixel> pixels;
     Float scale;
     const RGBColorSpace *colorSpace;
@@ -245,9 +244,9 @@ class RGBFilm : public FilmBase {
 class GBufferFilm : public FilmBase {
   public:
     // GBufferFilm Public Methods
-    GBufferFilm(const Point2i &resolution, const Bounds2i &pixelBounds,
-                FilterHandle filter, Float diagonal, const std::string &filename,
-                Float scale, const RGBColorSpace *colorSpace,
+    GBufferFilm(const Sensor *sensor, const Point2i &resolution,
+                const Bounds2i &pixelBounds, FilterHandle filter, Float diagonal,
+                const std::string &filename, Float scale, const RGBColorSpace *colorSpace,
                 Float maxComponentValue = Infinity, bool writeFP16 = true,
                 Allocator alloc = {});
 
@@ -310,6 +309,7 @@ class GBufferFilm : public FilmBase {
 
     // GBufferFilm Private Members
     Array2D<Pixel> pixels;
+    const Sensor* sensor;
     Float scale;
     const RGBColorSpace *colorSpace;
     Float maxComponentValue;

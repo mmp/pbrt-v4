@@ -30,6 +30,8 @@ static constexpr int NSpectrumSamples = 4;
 
 static constexpr Float CIE_Y_integral = 106.856895;
 
+static constexpr Float K_m = 683;
+
 // SpectrumHandle Definition
 class BlackbodySpectrum;
 class ConstantSpectrum;
@@ -688,6 +690,8 @@ inline const DenselySampledSpectrum &Z() {
 #endif
 }
 
+// CIE D spectrum, switching to blackbody below 4000K
+DenselySampledSpectrum D(Float temperature, Allocator alloc = {});
 }  // namespace Spectra
 
 // Spectral Function Declarations

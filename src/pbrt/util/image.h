@@ -155,6 +155,7 @@ struct ImageMetadata {
     pstd::optional<Point2i> fullResolution;
     pstd::optional<int> samplesPerPixel;
     pstd::optional<float> estimatedVariance, MSE;
+    pstd::optional<float> illuminance;
     pstd::optional<const RGBColorSpace *> colorSpace;
     std::map<std::string, std::vector<std::string>> stringVectors;
 

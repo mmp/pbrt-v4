@@ -144,7 +144,7 @@ TEST(ProjectionLight, Power) {
 
         ProjectionLight light(Transform(), MediumInterface(), std::move(image),
                               RGBColorSpace::sRGB, 10 /* scale */, 30 /* fov */,
-                              Allocator());
+                              -1 /* power */, Allocator());
 
         SampledSpectrum phi = light.Phi(lambda);
 
@@ -167,8 +167,8 @@ TEST(ProjectionLight, Sampling) {
 
         SampledWavelengths lambda = SampledWavelengths::SampleUniform(0.5);
         ProjectionLight light(Transform(), MediumInterface(), std::move(image),
-                              RGBColorSpace::sRGB, 10. /* scale */, 30 /* fov */,
-                              Allocator());
+                              RGBColorSpace::sRGB, 10 /* scale */, 30 /* fov */,
+                              -1 /* power */, Allocator());
 
         testPhiVsSampled(LightHandle(&light), lambda);
     }

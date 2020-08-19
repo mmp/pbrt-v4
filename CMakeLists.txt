@@ -103,7 +103,7 @@ if (CMAKE_CUDA_COMPILER)
 
     # This seems to be necessary starting with 3.17.1, but gives an error
     # about 17 being an unsupported version earlier...
-    if (${CMAKE_VERSION} VERSION_GREATER "3.17.0")
+    if (${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.17.0")
         set (CMAKE_CUDA_STANDARD 17)
     endif ()
 

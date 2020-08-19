@@ -1854,11 +1854,45 @@ int makeenv(int argc, char *argv[]) {
             }
     });
 
+    // Upper hemisphere illuminance calculation for converting map to physical
+    // units
+    // TODO: Integrate this with the loop above? At least parallelize it...
+    //
+    // PhysLight code contributed by Anders Langlands and Luca Fascione
+    // Copyright © 2020, Weta Digital, Ltd.
+    // SPDX-License-Identifier: Apache-2.0
+    float illuminance = 0;
+    if (latlongImage.NChannels() < 3) {
+        // TODO? We could probably support float images here too, but
+        // ImageInfiniteLight requires RGB anyway...
+        fprintf(stderr, "WARNING: Need at least 3 (RGB) channels for illuminance calculation");
+    } else {
+        int ye = latlongImage.Resolution().y / 2;
+        int ys = 0;
+        int xs = 0;
+        int xe = latlongImage.Resolution().x;
+        for (int y = ys; y < ye; ++y) {
+            float v = (float(y) + 0.5f) / float(latlongImage.Resolution().y);
+            float theta = (v - 0.5f) * Pi;
+            float cosTheta = std::cos(theta);
+            float sinTheta = std::sin(theta);
+            for (int x = xs; x < xe; ++x) {
+                // TODO: other colour spaces
+                ImageChannelValues values = latlongImage.GetChannels({x, y});
+                illuminance += (values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722)
+                    * std::abs(cosTheta) * std::abs(sinTheta);
+            }
+        }
+        illuminance /= float(ye-ys) * float(xe-xs);
+        illuminance *= Pi*Pi;
+    }
+
     ImageMetadata equiRectMetadata;
     equiRectMetadata.cameraFromWorld = latlong.metadata.cameraFromWorld;
     equiRectMetadata.NDCFromWorld = latlong.metadata.NDCFromWorld;
     equiRectMetadata.colorSpace = latlong.metadata.colorSpace;
     equiRectMetadata.stringVectors = latlong.metadata.stringVectors;
+    equiRectMetadata.illuminance = illuminance;
     equiRectImage.Write(outFilename, equiRectMetadata);
 
     return 0;
