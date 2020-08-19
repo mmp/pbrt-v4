@@ -52,9 +52,6 @@ class SpectrumHandle : public TaggedPointer<ConstantSpectrum, DenselySampledSpec
     Float operator()(Float lambda) const;
 
     PBRT_CPU_GPU
-    void Scale(Float s);
-
-    PBRT_CPU_GPU
     Float MaxValue() const;
 
     PBRT_CPU_GPU
@@ -334,9 +331,6 @@ class ConstantSpectrum {
   public:
     // ConstantSpectrum Public Methods
     PBRT_CPU_GPU
-    void Scale(Float s) { c *= s; }
-
-    PBRT_CPU_GPU
     SampledSpectrum Sample(const SampledWavelengths &) const;
 
     PBRT_CPU_GPU
@@ -366,12 +360,6 @@ class DenselySampledSpectrum {
           values(lambda_max - lambda_min + 1, alloc) {}
     DenselySampledSpectrum(SpectrumHandle s, Allocator alloc)
         : DenselySampledSpectrum(s, Lambda_min, Lambda_max, alloc) {}
-
-    PBRT_CPU_GPU
-    void Scale(Float s) {
-        for (Float &v : values)
-            v *= s;
-    }
 
     PBRT_CPU_GPU
     SampledSpectrum Sample(const SampledWavelengths &lambda) const {
@@ -474,8 +462,6 @@ class RGBReflectanceSpectrum {
     PBRT_CPU_GPU
     Float operator()(Float lambda) const { return scale * rsp(lambda); }
     PBRT_CPU_GPU
-    void Scale(Float s) { scale *= s; }
-    PBRT_CPU_GPU
     Float MaxValue() const { return scale * rsp.MaxValue(); }
 
     PBRT_CPU_GPU
@@ -508,8 +494,6 @@ class RGBSpectrum {
     RGBSpectrum(const RGBColorSpace &cs, const RGB &rgb);
 
     PBRT_CPU_GPU
-    void Scale(Float s) { scale *= s; }
-    PBRT_CPU_GPU
     Float operator()(Float lambda) const {
         return scale * rsp(lambda) * (*illuminant)(lambda);
     }
@@ -539,30 +523,27 @@ class RGBSpectrum {
 class BlackbodySpectrum {
   public:
     // BlackbodySpectrum Public Methods
-    BlackbodySpectrum(Float T, Float scale) : T(T), scale(scale) {
+    BlackbodySpectrum(Float T) : T(T) {
         // Compute blackbody normalization constant for given temperature
         Float lambdaMax = Float(2.8977721e-3 / T * 1e9);
         normalizationFactor = 1 / Blackbody(lambdaMax, T);
     }
 
     PBRT_CPU_GPU
-    void Scale(Float s) { scale *= s; }
-
-    PBRT_CPU_GPU
     Float operator()(Float lambda) const {
-        return scale * Blackbody(lambda, T) * normalizationFactor;
+        return Blackbody(lambda, T) * normalizationFactor;
     }
 
     PBRT_CPU_GPU
     SampledSpectrum Sample(const SampledWavelengths &lambda) const {
         SampledSpectrum s;
         for (int i = 0; i < NSpectrumSamples; ++i)
-            s[i] = scale * Blackbody(lambda[i], T) * normalizationFactor;
+            s[i] = Blackbody(lambda[i], T) * normalizationFactor;
         return s;
     }
 
     PBRT_CPU_GPU
-    Float MaxValue() const { return scale; }
+    Float MaxValue() const { return 1.f; }
 
     std::string ToString() const;
     std::string ParameterType() const;
@@ -570,7 +551,7 @@ class BlackbodySpectrum {
 
   private:
     // BlackbodySpectrum Private Members
-    Float T, scale;
+    Float T;
     Float normalizationFactor;
 };
 
@@ -704,11 +685,6 @@ inline const DenselySampledSpectrum &Z();
 inline Float SpectrumHandle::operator()(Float lambda) const {
     auto op = [&](auto ptr) { return (*ptr)(lambda); };
     return Dispatch(op);
-}
-
-inline void SpectrumHandle::Scale(Float scale) {
-    auto s = [&](auto ptr) { return ptr->Scale(scale); };
-    return Dispatch(s);
 }
 
 inline SampledSpectrum SpectrumHandle::Sample(const SampledWavelengths &lambda) const {

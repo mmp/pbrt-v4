@@ -89,7 +89,7 @@ std::vector<TestScene> GetScenes() {
 
         static ConstantSpectrum I(Pi);
         std::vector<LightHandle> lights;
-        lights.push_back(new PointLight(identity, MediumInterface(), &I, Allocator()));
+        lights.push_back(new PointLight(identity, MediumInterface(), &I, 1.f, Allocator()));
 
         scenes.push_back({bvh, lights, "Sphere, 1 light, Kd = 0.5", 1.0});
     }
@@ -113,10 +113,10 @@ std::vector<TestScene> GetScenes() {
 
         static ConstantSpectrum I(Pi / 4);
         std::vector<LightHandle> lights;
-        lights.push_back(new PointLight(identity, MediumInterface(), &I, Allocator()));
-        lights.push_back(new PointLight(identity, MediumInterface(), &I, Allocator()));
-        lights.push_back(new PointLight(identity, MediumInterface(), &I, Allocator()));
-        lights.push_back(new PointLight(identity, MediumInterface(), &I, Allocator()));
+        lights.push_back(new PointLight(identity, MediumInterface(), &I, 1.f, Allocator()));
+        lights.push_back(new PointLight(identity, MediumInterface(), &I, 1.f, Allocator()));
+        lights.push_back(new PointLight(identity, MediumInterface(), &I, 1.f, Allocator()));
+        lights.push_back(new PointLight(identity, MediumInterface(), &I, 1.f, Allocator()));
 
         scenes.push_back({bvh, lights, "Sphere, 1 light, Kd = 0.5", 1.0});
     }

@@ -62,6 +62,8 @@ class ParameterDictionary {
 
     // For --upgrade only
     pstd::optional<RGB> GetOneRGB(const std::string &name) const;
+    // Unfortunately, this is most easily done here...
+    Float UpgradeBlackbody(const std::string &name);
     void RemoveFloat(const std::string &);
     void RemoveInt(const std::string &);
     void RemoveBool(const std::string &);

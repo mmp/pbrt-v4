@@ -23,7 +23,7 @@ using namespace pbrt;
 TEST(SpotLight, Power) {
     static ConstantSpectrum I(10.);
     Transform id;
-    SpotLight light(id, MediumInterface(), &I, 60 /* total width */,
+    SpotLight light(id, MediumInterface(), &I, 1.f /* scale */, 60 /* total width */,
                     40 /* falloff start */, Allocator());
 
     SampledWavelengths lambda = SampledWavelengths::SampleUniform(0.5);
@@ -48,8 +48,9 @@ TEST(SpotLight, Sampling) {
     int widthStart[][2] = {{50, 0}, {40, 10}, {60, 5}, {70, 70}};
     Transform id;
     for (auto ws : widthStart) {
-        SpotLight light(id, MediumInterface(), &I, ws[0] /* total width */,
-                        ws[1] /* falloff start */, Allocator());
+        SpotLight light(id, MediumInterface(), &I, 1.f /* scale */,
+                        ws[0] /* total width */, ws[1] /* falloff start */,
+                        Allocator());
 
         RNG rng;
         for (int i = 0; i < 100; ++i) {
@@ -88,7 +89,7 @@ TEST(GoniometricLight, Power) {
     SampledWavelengths lambda = SampledWavelengths::SampleUniform(0.5);
     static ConstantSpectrum I(10.);
     Transform id;
-    GoniometricLight light(id, MediumInterface(), &I, std::move(image),
+    GoniometricLight light(id, MediumInterface(), &I, 1.f, std::move(image),
                            RGBColorSpace::sRGB, Allocator());
 
     SampledSpectrum phi = light.Phi(lambda);
@@ -131,7 +132,7 @@ TEST(GoniometricLight, Sampling) {
 
     static ConstantSpectrum I(10.);
     static Transform id;
-    GoniometricLight light(id, MediumInterface(), &I, std::move(image),
+    GoniometricLight light(id, MediumInterface(), &I, 1.f, std::move(image),
                            RGBColorSpace::sRGB, Allocator());
     SampledWavelengths lambda = SampledWavelengths::SampleUniform(0.5);
     testPhiVsSampled(LightHandle(&light), lambda);
