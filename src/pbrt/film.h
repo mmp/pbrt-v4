@@ -151,13 +151,11 @@ class RGBFilm : public FilmBase {
         // First convert to sensor exposure, H, then to camera RGB
         SampledSpectrum H = L * sensor->ImagingRatio();
         RGB rgb = sensor->ToCameraRGB(H, lambda);
-        // RGB rgb = L.ToRGB(lambda, *colorSpace) ;
 
         // Optionally clamp sensor RGB value
         Float m = std::max({rgb.r, rgb.g, rgb.b});
         if (m > maxComponentValue) {
             H *= maxComponentValue / m;
-            // L *= maxComponentValue / m;
             rgb *= maxComponentValue / m;
         }
 

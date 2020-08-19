@@ -312,6 +312,8 @@ pbrt::SpectrumHandle MakeSpectrumFromInterleaved(pstd::span<const Float> samples
     return spec;
 }
 
+// Compute RGB reflectance of spectrum s in rgb space defined by r, g, b curves
+// under illuminant illum
 RGB SpectrumToCameraRGB(SpectrumHandle s, const DenselySampledSpectrum &illum,
                         const DenselySampledSpectrum &r, const DenselySampledSpectrum &g,
                         const DenselySampledSpectrum &b) {
@@ -326,6 +328,8 @@ RGB SpectrumToCameraRGB(SpectrumHandle s, const DenselySampledSpectrum &illum,
     return rgb / g_integral;
 }
 
+// Compute normalized (such that g=1) colour of illum in RGB space defined by
+// r, g, b curves
 RGB IlluminantToCameraRGB(const DenselySampledSpectrum &illum,
                           const DenselySampledSpectrum &r,
                           const DenselySampledSpectrum &g,
@@ -372,6 +376,8 @@ SquareMatrix<3> LinearLeastSquares(Float A[][3], Float B[][3], int rows) {
     return Transpose(*AtAi * AtB);
 }
 
+// Solve a 3x3 matrix that transforms from some space defined by the given 
+// r, g, b curves with whitepoint srcw to CIE XYZ with whitepoint dstw
 SquareMatrix<3> SolveCameraMatrix(SpectrumHandle r, SpectrumHandle g, SpectrumHandle b,
                                   const DenselySampledSpectrum &srcw,
                                   const DenselySampledSpectrum &dstw,
@@ -382,13 +388,8 @@ SquareMatrix<3> SolveCameraMatrix(SpectrumHandle r, SpectrumHandle g, SpectrumHa
     RGB src_white = IlluminantToCameraRGB(srcw, r, g, b);
     RGB dst_white = IlluminantToCameraRGB(dstw, r, g, b);
 
-    Warning("src white %s", src_white.ToString());
-    Warning("dst white %s", dst_white.ToString());
-
-    Warning("srcw Y %f", IlluminantToY(srcw, r, g, b));
-    Warning("dstw Y %f", IlluminantToY(dstw, r, g, b));
-
-    // account for brightness difference in whites
+    // account for perceptual brightness difference in whites by scaling the
+    // target swatches by the relative difference between them
     Float srcy = IlluminantToY(srcw, r, g, b);
     Float dsty = IlluminantToY(dstw, r, g, b);
 
@@ -432,7 +433,8 @@ Sensor::Sensor(SpectrumHandle r_bar, SpectrumHandle g_bar, SpectrumHandle b_bar,
     if (XYZFromCameraRGB.IsIdentity()) {
         cameraRGBWhiteNorm = RGB(1, 1, 1);
     } else {
-        // Compute RGB of illuminant in sensor's RGB space
+        // Compute RGB of illuminant in sensor's RGB space and scale to match
+        // CIE Y so that we maintain same brightness
         cameraRGBWhiteNorm = RGB(CIE_Y_integral, CIE_Y_integral, CIE_Y_integral) / white;
     }
 }
@@ -1043,9 +1045,9 @@ GBufferFilm *GBufferFilm::Create(const ParameterDictionary &parameters,
     Sensor *sensor = Sensor::Create(sensorName, colorSpace, exposureTime, fNumber, ISO, C,
                                     whiteBalanceTemp, loc, alloc);
 
-    return alloc.new_object<GBufferFilm>(sensor, fullResolution, pixelBounds, filter, diagonal,
-                                         filename, scale, colorSpace, maxComponentValue,
-                                         writeFP16, alloc);
+    return alloc.new_object<GBufferFilm>(sensor, fullResolution, pixelBounds, filter,
+                                         diagonal, filename, scale, colorSpace,
+                                         maxComponentValue, writeFP16, alloc);
 }
 
 FilmHandle FilmHandle::Create(const std::string &name,

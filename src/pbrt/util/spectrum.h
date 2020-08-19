@@ -531,6 +531,10 @@ class RGBSpectrum {
     std::string ParameterType() const;
     std::string ParameterString() const;
 
+    const DenselySampledSpectrum* Illluminant() const {
+        return illuminant;
+    }
+
   private:
     // RGBSpectrum Private Members
     RGB rgb;
@@ -571,9 +575,11 @@ class BlackbodySpectrum {
     std::string ParameterType() const;
     std::string ParameterString() const;
 
+    Float scale;
+
   private:
     // BlackbodySpectrum Private Members
-    Float T, scale;
+    Float T;
     Float normalizationFactor;
 };
 

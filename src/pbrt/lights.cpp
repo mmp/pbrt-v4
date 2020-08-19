@@ -107,9 +107,11 @@ PointLight *PointLight::Create(const Transform &renderFromLight, MediumHandle me
                                                  SpectrumType::General, alloc);
     Float sc = parameters.GetOneFloat("scale", 1);
 
+    sc /= SpectrumToPhotometric(I);
+
     Float phi_v = parameters.GetOneFloat("power", -1);
     if (phi_v > 0) {
-        Float k_e = 4 * Pi * SpectrumToPhotometric(I);
+        Float k_e = 4 * Pi;
         sc *= phi_v / k_e;
     }
 
@@ -175,12 +177,15 @@ DistantLight *DistantLight::Create(const Transform &renderFromLight,
     Transform t(m);
     Transform finalRenderFromLight = renderFromLight * t;
 
+    // Scale the light spectrum to be equivalent to 1 nit
+    sc /= SpectrumToPhotometric(L);
+
     // Adjust scale to meet target illuminance value
     // Like for IBLs we measure illuminance as incident on an upward-facing
     // patch.
     Float E_v = parameters.GetOneFloat("illuminance", -1);
     if (E_v > 0) {
-        Float k_e = SpectrumToY(L) * -w.y;
+        Float k_e = -w.y;
         sc *= E_v / k_e;
     }
     L.Scale(sc);
@@ -722,7 +727,6 @@ DiffuseAreaLight *DiffuseAreaLight::Create(const Transform &renderFromLight,
     SpectrumHandle L =
         parameters.GetOneSpectrum("L", nullptr, SpectrumType::General, alloc);
     Float scale = parameters.GetOneFloat("scale", 1);
-    Float power = parameters.GetOneFloat("power", -1);
     bool twoSided = parameters.GetOneBool("twosided", false);
 
     std::string filename = ResolveFilename(parameters.GetOneString("filename", ""));

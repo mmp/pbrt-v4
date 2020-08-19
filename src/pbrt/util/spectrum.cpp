@@ -70,9 +70,26 @@ Float SpectrumToY(SpectrumHandle s) {
 }
 
 Float SpectrumToPhotometric(SpectrumHandle s) {
+    // We have to handle RGBSpectrum separately here as it's composed of an
+    // illuminant spectrum and an RGB multiplier. We only want to consider the
+    // illuminant for the sake of this calculation, and we should consider the
+    // RGB separately for the purposes of target power/illuminance computation
+    // in the lights themselves (but we currently don't)
+    if (s.Is<RGBSpectrum>()) {
+        s = s.Cast<RGBSpectrum>()->Illluminant();
+    } 
+
     Float y = 0;
     for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda)
         y += Spectra::Y()(lambda) * s(lambda);
+
+    // Similarly, the Blackbody contains a scale factor so we'll need to 
+    // divide that out of the integral
+    if (s.Is<BlackbodySpectrum>()) {
+        BlackbodySpectrum* b = s.Cast<BlackbodySpectrum>();
+        y /= b->scale;
+    }
+    
     return y * K_m;
 }
 

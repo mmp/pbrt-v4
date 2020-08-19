@@ -87,7 +87,11 @@ std::vector<TestScene> GetScenes() {
             new GeometricPrimitive(sphere, material, nullptr, mediumInterface)));
         PrimitiveHandle bvh(new BVHAccel(std::move(prims)));
 
-        static ConstantSpectrum I(Pi);
+        // We have to do this little dance here to make sure the spectrum is
+        // properly normalized (this is usually all handled inside *Light::Create())
+        ConstantSpectrum I(1);
+        I.Scale(1.0 / SpectrumToPhotometric(&I));
+        I.Scale(Pi);
         std::vector<LightHandle> lights;
         lights.push_back(new PointLight(identity, MediumInterface(), &I, Allocator()));
 
@@ -111,7 +115,11 @@ std::vector<TestScene> GetScenes() {
             new GeometricPrimitive(sphere, material, nullptr, mediumInterface)));
         PrimitiveHandle bvh(new BVHAccel(std::move(prims)));
 
-        static ConstantSpectrum I(Pi / 4);
+        // We have to do this little dance here to make sure the spectrum is
+        // properly normalized (this is usually all handled inside *Light::Create())
+        ConstantSpectrum I(1);
+        I.Scale(1.0 / SpectrumToPhotometric(&I));
+        I.Scale(Pi/4);
         std::vector<LightHandle> lights;
         lights.push_back(new PointLight(identity, MediumInterface(), &I, Allocator()));
         lights.push_back(new PointLight(identity, MediumInterface(), &I, Allocator()));
@@ -132,7 +140,11 @@ std::vector<TestScene> GetScenes() {
         FloatTextureHandle sigma = alloc.new_object<FloatConstantTexture>(0.);
         const MaterialHandle material = new DiffuseMaterial(Kd, sigma, nullptr);
 
-        static ConstantSpectrum Le(0.5);
+        // We have to do this little dance here to make sure the spectrum is
+        // properly normalized (this is usually all handled inside *Light::Create())
+        ConstantSpectrum Le(1);
+        Le.Scale(1.0 / SpectrumToPhotometric(&Le));
+        Le.Scale(0.5);
         LightHandle areaLight =
             new DiffuseAreaLight(identity, MediumInterface(), &Le, 1.f, sphere, Image(),
                                  nullptr, false, Allocator());
