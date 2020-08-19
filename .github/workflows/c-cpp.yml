@@ -1,4 +1,4 @@
-name: C/C++ CI
+name: ci
 
 on:
   push:
@@ -20,10 +20,19 @@ jobs:
     - name: Get cmake
       uses: lukka/get-cmake@latest
   
-    - name: Build with CMake
-      uses: lukka/run-cmake@v2
-      with:
-        buildDirectory: ${{ runner.workspace }}/build
-          
-    - name: run unit tests
-      run: ${{ runner.workspace }}/build/pbrt_test
+    - name: Install Ninja
+      uses: seanmiddleditch/gha-setup-ninja@master
+
+    - name: Configure
+      run: |
+        mkdir build
+        cd build
+        cmake -G Ninja
+      
+    - name: Build
+      run: cmake --build build --parallel
+     
+    - name: Test
+      run: |
+        cd build
+        ./pbrt_test
