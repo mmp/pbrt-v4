@@ -123,14 +123,14 @@ tracker](https://github.com/mmp/pbrt-v4/issues) to report bugs in pbrt-v4.
 (We have pre-populated it with a number of issues corresponding to known
 bugs in the initial release.)
 
-We are always happy to receive pull requests that fix bugs, including any
-bugs you find yourself or open issues in the issue tracker.  We are also
-happy to hear suggestions about improvements to the implementations of the
-various algorithms.
+We are always happy to receive pull requests that fix bugs, including bugs
+you find yourself or fixes for open issues in the issue tracker.  We are
+also happy to hear suggestions about improvements to the implementations of
+the various algorithms we have implemented.
 
 Note, however, that in the interests of finishing the book in a finite
 amount of time, the functionality of pbrt-v4 is basically fixed at this
-point.  We therefore will not be merging PRs that make major changes to the
+point.  We therefore will not be accepting PRs that make major changes to the
 system's operation or structure (but feel free to keep them in your own
 forks!).  Also, don't bother sending PRs for anything marked "TODO" or
 "FIXME" in the source code; we'll take care of those as we finish polishing
@@ -169,7 +169,7 @@ These requirements are effectively what makes it possible to bring pbrt to
 the GPU with limited changes to the core system.  As a practical matter,
 these capabilities are only available via CUDA and OptiX on NVIDIA GPUs
 today, though we'd be happy to see pbrt running on any other GPUs that
-provide those capabilities.
+provided those capabilities.
 
 pbrt's GPU path specifically requires CUDA 11.0 and OptiX 7.1.  The build
 scripts will automatically attempt to find a CUDA compiler, looking in the
@@ -185,7 +185,7 @@ rendering progress.
 
 To denoise images using the OptiX denoiser, set the scene's "Film" type to
 be "gbuffer" when rendering and use EXR for the image format; a "deep"
-image will be generated with auxilary channels like albedo and normal that
+image will be generated with auxiliary channels like albedo and normal that
 are useful for the denoiser.  The resulting EXR can be denoised using
 ```bash
 $ imgtool denoise-optix noisy.exr --outfile denoised.exr
