@@ -13,11 +13,17 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+      
     - name: Checkout submodules
       uses: textbook/git-checkout-submodule-action@master
-    - name: configure
-      run: cmake .
-    - name: make
-      run: make -j20
+      
+    - name: Get cmake
+      uses lukka/get-cmake@latest
+  
+    - name: Build with CMake
+      uses: lukka/run-cmake@v2
+      with:
+        buildDirectory: ${{ runner.workspace }}/build
+          
     - name: run unit tests
-      run: ./pbrt_test
+      run: ${{ runner.workspace }}/build/pbrt_test
