@@ -619,6 +619,8 @@ if (PBRT_CUDA_ENABLED)
   set (PBRT_SOA_GENERATED ${PBRT_SOA_GENERATED} ${CMAKE_CURRENT_BINARY_DIR}/gpu_workitems_soa.h)
 endif ()
 
+add_custom_target (pbrt_soa_generated DEPENDS ${PBRT_SOA_GENERATED})
+
 ######################
 # pbrt_lib
 
@@ -627,6 +629,7 @@ add_library (pbrt_lib STATIC
   ${CMAKE_CURRENT_BINARY_DIR}/rgbspectrum_dci_p3.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/rgbspectrum_rec2020.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/rgbspectrum_aces.cpp
+  ${PBRT_SOA_GENERATED}
   ${PBRT_SOURCE}
   ${PBRT_UTIL_SOURCE}
   ${PBRT_GPU_SOURCE}
@@ -637,7 +640,6 @@ add_library (pbrt_lib STATIC
   )
 add_library (pbrt::pbrt_lib ALIAS pbrt_lib)
 
-add_library (pbrt_soa_generated STATIC src/pbrt/soa_empty.cpp ${PBRT_SOA_GENERATED})
 add_dependencies (pbrt_lib pbrt_soa_generated)
 
 target_compile_definitions (pbrt_lib PRIVATE ${PBRT_DEFINITIONS})
@@ -678,9 +680,9 @@ if (PBRT_CUDA_ENABLED)
   add_library (pbrt_embedded_ptx_lib STATIC
       ${PBRT_EMBEDDED_PTX}
       )
+  add_dependencies (pbrt_embedded_ptx_lib pbrt_soa_generated)
   set (ALL_PBRT_LIBS ${ALL_PBRT_LIBS} pbrt_embedded_ptx_lib)
 endif()
-
 
 if (WIN32)
   set (ALL_PBRT_LIBS ${ALL_PBRT_LIBS} dbghelp wsock32 ws2_32)
