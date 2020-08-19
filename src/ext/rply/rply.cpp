@@ -1,5 +1,4 @@
 
-// ext/rply.cpp*
 /* ----------------------------------------------------------------------
  * RPly library, read/write PLY files
  * Diego Nehab, IMPA
@@ -17,6 +16,8 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stddef.h>
+
+#include <zlib.h>
 
 #include "rply.h"
 
@@ -196,7 +197,8 @@ typedef struct t_ply_ {
     long ncomments;
     char *obj_info;
     long nobj_infos;
-    FILE *fp;
+    FILE *fp;     // Either fp or gzfp (but not both) should be non-null
+    gzFile gzfp;
     int rn;
     char buffer[BUFFERSIZE];
     size_t buffer_first, buffer_token, buffer_last;
@@ -312,7 +314,10 @@ static int BREFILL(p_ply ply) {
     ply->buffer_last = size;
     ply->buffer_first = ply->buffer_token = 0;
     /* fill remaining with new data */
-    size = fread(ply->buffer + size, 1, BUFFERSIZE - size - 1, ply->fp);
+    if (ply->fp)
+        size = fread(ply->buffer + size, 1, BUFFERSIZE - size - 1, ply->fp);
+    else
+        size = gzread(ply->gzfp, ply->buffer + size, BUFFERSIZE - size - 1);
     /* place sentinel so we can use str* functions with buffer */
     ply->buffer[BUFFERSIZE - 1] = '\0';
     /* check if read failed */
@@ -356,6 +361,7 @@ static int ply_read_header_magic(p_ply ply) {
 p_ply ply_open(const char *name, p_ply_error_cb error_cb, long idata,
                void *pdata) {
     FILE *fp = NULL;
+    gzFile gzfp = NULL;
     p_ply ply = ply_alloc();
     if (error_cb == NULL) error_cb = ply_error_cb;
     if (!ply) {
@@ -372,18 +378,30 @@ p_ply ply_open(const char *name, p_ply_error_cb error_cb, long idata,
         return NULL;
     }
     assert(name);
-    fp = fopen(name, "rb");
-    if (!fp) {
-        error_cb(ply, "Unable to open file");
-        free(ply);
-        return NULL;
+    // Is it gzipped?
+    if (strcasestr(name, ".gz") - name + 3 == strlen(name)) {
+         gzfp = gzopen(name, "rb");
+         if (!gzfp) {
+            error_cb(ply, "Unable to open file");
+            free(ply);
+            return NULL;
+        }
+    }
+    else {
+        fp = fopen(name, "rb");
+        if (!fp) {
+            error_cb(ply, "Unable to open file");
+            free(ply);
+            return NULL;
+        }
     }
     ply->fp = fp;
+    ply->gzfp = gzfp;
     return ply;
 }
 
 int ply_read_header(p_ply ply) {
-    assert(ply && ply->fp && ply->io_mode == PLY_READ);
+    assert(ply && (ply->fp || ply->gzfp) && ply->io_mode == PLY_READ);
     if (!ply_read_header_magic(ply)) return 0;
     if (!ply_read_word(ply)) return 0;
     /* parse file format */
@@ -429,7 +447,7 @@ long ply_set_read_cb(p_ply ply, const char *element_name,
 int ply_read(p_ply ply) {
     long i;
     p_ply_argument argument;
-    assert(ply && ply->fp && ply->io_mode == PLY_READ);
+    assert(ply && (ply->fp || ply->gzfp) && ply->io_mode == PLY_READ);
     argument = &ply->argument;
     /* for each element type */
     for (i = 0; i < ply->nelements; i++) {
@@ -476,6 +494,7 @@ p_ply ply_create(const char *name, e_ply_storage_mode storage_mode,
         ply->odriver = &ply_odriver_binary_reverse;
     ply->storage_mode = storage_mode;
     ply->fp = fp;
+    ply->gzfp = nullptr;  // gzipped writing isn't implemented...
     ply->error_cb = error_cb;
     return ply;
 }
@@ -672,7 +691,7 @@ int ply_write(p_ply ply, double value) {
 
 int ply_close(p_ply ply) {
     long i;
-    assert(ply && ply->fp);
+    assert(ply && (ply->fp || ply->gzfp));
     assert(ply->element || ply->nelements == 0);
     assert(!ply->element || ply->nelements > 0);
     /* write last chunk to file */
@@ -681,7 +700,8 @@ int ply_close(p_ply ply) {
         ply_ferror(ply, "Error closing up");
         return 0;
     }
-    fclose(ply->fp);
+    if (ply->fp) fclose(ply->fp);
+    if (ply->gzfp) gzclose(ply->gzfp);
     /* free all memory used by handle */
     if (ply->element) {
         for (i = 0; i < ply->nelements; i++) {
@@ -947,7 +967,7 @@ static int ply_check_word(p_ply ply) {
 
 static int ply_read_word(p_ply ply) {
     size_t t = 0;
-    assert(ply && ply->fp && ply->io_mode == PLY_READ);
+    assert(ply && (ply->fp || ply->gzfp) && ply->io_mode == PLY_READ);
     /* skip leading blanks */
     while (1) {
         t = strspn(BFIRST(ply), " \n\r\t");
@@ -1005,7 +1025,7 @@ static int ply_check_line(p_ply ply) {
 
 static int ply_read_line(p_ply ply) {
     const char *end = NULL;
-    assert(ply && ply->fp && ply->io_mode == PLY_READ);
+    assert(ply && (ply->fp || ply->gzfp) && ply->io_mode == PLY_READ);
     /* look for a end of line */
     end = strchr(BFIRST(ply), '\n');
     /* if we didn't reach the end of the buffer, we are done */
@@ -1041,7 +1061,7 @@ static int ply_read_line(p_ply ply) {
 static int ply_read_chunk(p_ply ply, void *anybuffer, size_t size) {
     char *buffer = (char *)anybuffer;
     size_t i = 0;
-    assert(ply && ply->fp && ply->io_mode == PLY_READ);
+    assert(ply && (ply->fp || ply->gzfp) && ply->io_mode == PLY_READ);
     assert(ply->buffer_first <= ply->buffer_last);
     while (i < size) {
         if (ply->buffer_first < ply->buffer_last) {
@@ -1050,7 +1070,10 @@ static int ply_read_chunk(p_ply ply, void *anybuffer, size_t size) {
             i++;
         } else {
             ply->buffer_first = 0;
-            ply->buffer_last = fread(ply->buffer, 1, BUFFERSIZE, ply->fp);
+            if (ply->fp)
+                ply->buffer_last = fread(ply->buffer, 1, BUFFERSIZE, ply->fp);
+            else
+                ply->buffer_last = gzread(ply->gzfp, ply->buffer, BUFFERSIZE);
             if (ply->buffer_last <= 0) return 0;
         }
     }
@@ -1186,7 +1209,7 @@ static p_ply_property ply_grow_property(p_ply ply, p_ply_element element) {
 }
 
 static int ply_read_header_format(p_ply ply) {
-    assert(ply && ply->fp && ply->io_mode == PLY_READ);
+    assert(ply && (ply->fp || ply->gzfp) && ply->io_mode == PLY_READ);
     if (strcmp(BWORD(ply), "format")) return 0;
     if (!ply_read_word(ply)) return 0;
     ply->storage_mode =
@@ -1205,7 +1228,7 @@ static int ply_read_header_format(p_ply ply) {
 }
 
 static int ply_read_header_comment(p_ply ply) {
-    assert(ply && ply->fp && ply->io_mode == PLY_READ);
+    assert(ply && (ply->fp || ply->gzfp) && ply->io_mode == PLY_READ);
     if (strcmp(BWORD(ply), "comment")) return 0;
     if (!ply_read_line(ply)) return 0;
     if (!ply_add_comment(ply, BLINE(ply))) return 0;
@@ -1214,7 +1237,7 @@ static int ply_read_header_comment(p_ply ply) {
 }
 
 static int ply_read_header_obj_info(p_ply ply) {
-    assert(ply && ply->fp && ply->io_mode == PLY_READ);
+    assert(ply && (ply->fp || ply->gzfp) && ply->io_mode == PLY_READ);
     if (strcmp(BWORD(ply), "obj_info")) return 0;
     if (!ply_read_line(ply)) return 0;
     if (!ply_add_obj_info(ply, BLINE(ply))) return 0;
@@ -1255,7 +1278,7 @@ static int ply_read_header_property(p_ply ply) {
 static int ply_read_header_element(p_ply ply) {
     p_ply_element element = NULL;
     long dummy;
-    assert(ply && ply->fp && ply->io_mode == PLY_READ);
+    assert(ply && (ply->fp || ply->gzfp) && ply->io_mode == PLY_READ);
     if (strcmp(BWORD(ply), "element")) return 0;
     /* allocate room for new element */
     element = ply_grow_element(ply);
