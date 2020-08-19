@@ -31,7 +31,6 @@ jobs:
       
     - name: Build
       run: cmake --build build --parallel
-      working-directory: build
       
     - name: Test
       run: ./pbrt_test
