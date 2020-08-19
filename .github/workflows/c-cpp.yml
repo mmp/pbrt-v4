@@ -1,0 +1,21 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: [ ubuntu-latest, macos-latest, windows-latest ]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: configure
+      run: cmake
+    - name: make
+      run: make -j20
+    - name: run unit tests
+      run: ./pbrt_test
