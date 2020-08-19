@@ -27,12 +27,12 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake -G Ninja
+        cmake -G Ninja ..
       
     - name: Build
       run: cmake --build build --parallel
-     
+      working-directory: build
+      
     - name: Test
-      run: |
-        cd build
-        ./pbrt_test
+      run: ./pbrt_test
+      working-directory: build
