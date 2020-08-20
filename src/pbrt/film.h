@@ -104,12 +104,13 @@ class FilmBase {
   public:
     // FilmBase Public Methods
     FilmBase(const Point2i &resolution, const Bounds2i &pixelBounds, FilterHandle filter,
-             Float diagonal, const std::string &filename)
+             Float diagonal, const Sensor *sensor, const std::string &filename)
         : fullResolution(resolution),
           diagonal(diagonal * .001),
           filter(filter),
           filename(filename),
-          pixelBounds(pixelBounds) {
+          pixelBounds(pixelBounds),
+          sensor(sensor) {
         CHECK(!pixelBounds.IsEmpty());
         CHECK_GE(pixelBounds.pMin.x, 0);
         CHECK_LE(pixelBounds.pMax.x, resolution.x);
@@ -127,6 +128,8 @@ class FilmBase {
     Float Diagonal() const { return diagonal; }
     PBRT_CPU_GPU
     Bounds2i PixelBounds() const { return pixelBounds; }
+    PBRT_CPU_GPU
+    const Sensor *GetSensor() const { return sensor; }
     std::string GetFilename() const { return filename; }
 
     std::string BaseToString() const;
@@ -141,6 +144,7 @@ class FilmBase {
     FilterHandle filter;
     std::string filename;
     Bounds2i pixelBounds;
+    const Sensor *sensor;
 };
 
 // RGBFilm Definition
@@ -231,7 +235,6 @@ class RGBFilm : public FilmBase {
     };
 
     // RGBFilm Private Members
-    const Sensor *sensor;
     Array2D<Pixel> pixels;
     Float scale;
     const RGBColorSpace *colorSpace;
@@ -310,7 +313,6 @@ class GBufferFilm : public FilmBase {
 
     // GBufferFilm Private Members
     Array2D<Pixel> pixels;
-    const Sensor* sensor;
     Float scale;
     const RGBColorSpace *colorSpace;
     Float maxComponentValue;
@@ -374,6 +376,12 @@ inline void FilmHandle::AddSample(const Point2i &pFilm, SampledSpectrum L,
         return ptr->AddSample(pFilm, L, lambda, visibleSurface, weight);
     };
     return Dispatch(add);
+}
+
+PBRT_CPU_GPU
+inline const Sensor *FilmHandle::GetSensor() const {
+    auto filter = [&](auto ptr) { return ptr->GetSensor(); };
+    return Dispatch(filter);
 }
 
 }  // namespace pbrt

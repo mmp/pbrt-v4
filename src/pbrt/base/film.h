@@ -18,6 +18,7 @@ namespace pbrt {
 class VisibleSurface;
 class RGBFilm;
 class GBufferFilm;
+class Sensor;
 
 // FilmHandle Definition
 class FilmHandle : public TaggedPointer<RGBFilm, GBufferFilm> {
@@ -52,6 +53,8 @@ class FilmHandle : public TaggedPointer<RGBFilm, GBufferFilm> {
                              FilterHandle filter, Allocator alloc);
 
     PBRT_CPU_GPU inline FilterHandle GetFilter() const;
+
+    PBRT_CPU_GPU inline const Sensor *GetSensor() const;
 
     std::string GetFilename() const;
 

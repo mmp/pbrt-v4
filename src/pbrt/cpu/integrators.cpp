@@ -2741,6 +2741,13 @@ void SPPMIntegrator::Render() {
         // TODO: size this
         perThreadScratchBuffers.push_back(ScratchBuffer(nPixels * 1024));
 
+    const Sensor *sensor = camera.GetFilm().GetSensor();
+    auto ToSensorRGB = [&](const SampledSpectrum &L,
+                           const SampledWavelengths &lambda) -> RGB {
+        SampledSpectrum H = L * sensor->ImagingRatio();
+        return sensor->ToCameraRGB(H, lambda);
+    };
+
     for (int iter = 0; iter < nIterations; ++iter) {
         // Generate SPPM visible points
         // Sample wavelengths for SPPM pass
@@ -2783,7 +2790,7 @@ void SPPMIntegrator::Render() {
                             if (depth == 0) {
                                 for (const auto &light : infiniteLights) {
                                     SampledSpectrum L = beta * light.Le(ray, lambda);
-                                    pixel.Ld += L.ToRGB(lambda, *colorSpace);
+                                    pixel.Ld += ToSensorRGB(L, lambda);
                                 }
                             }
 
@@ -2811,11 +2818,11 @@ void SPPMIntegrator::Render() {
                         Vector3f wo = -ray.d;
                         if (depth == 0 || specularBounce) {
                             SampledSpectrum L = beta * isect.Le(wo, lambda);
-                            pixel.Ld += L.ToRGB(lambda, *colorSpace);
+                            pixel.Ld += ToSensorRGB(L, lambda);
                         }
                         SampledSpectrum Ld = SampleLd(isect, bsdf, lambda, tileSampler,
                                                       &directLightSampler);
-                        pixel.Ld += (beta * Ld).ToRGB(lambda, *colorSpace);
+                        pixel.Ld += ToSensorRGB(beta * Ld, lambda);
 
                         // Possibly create visible point and end camera path
                         if (bsdf.IsDiffuse() ||
@@ -3049,7 +3056,7 @@ void SPPMIntegrator::Render() {
                 SampledSpectrum Phi;
                 for (int j = 0; j < NSpectrumSamples; ++j)
                     Phi[j] = p.Phi[j];
-                RGB rgb = (p.vp.beta * Phi).ToRGB(lambda, *colorSpace);
+                RGB rgb = ToSensorRGB(p.vp.beta * Phi, lambda);
                 p.tau = (p.tau + rgb) * (Rnew * Rnew) / (p.radius * p.radius);
                 p.N = Nnew;
                 p.radius = Rnew;
