@@ -1,6 +1,9 @@
 // pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
+// PhysLight code contributed by Anders Langlands and Luca Fascione
+// Copyright © 2020, Weta Digital, Ltd.
+// SPDX-License-Identifier: Apache-2.0
 
 #ifndef PBRT_UTIL_SPECTRUM_H
 #define PBRT_UTIL_SPECTRUM_H
@@ -29,6 +32,8 @@ constexpr Float Lambda_min = 360, Lambda_max = 830;
 static constexpr int NSpectrumSamples = 4;
 
 static constexpr Float CIE_Y_integral = 106.856895;
+
+static constexpr Float K_m = 683;
 
 // SpectrumHandle Definition
 class BlackbodySpectrum;
@@ -60,6 +65,7 @@ class SpectrumHandle : public TaggedPointer<ConstantSpectrum, DenselySampledSpec
 
 // Spectrum Function Declarations
 Float SpectrumToY(SpectrumHandle s);
+Float SpectrumToPhotometric(SpectrumHandle s);
 XYZ SpectrumToXYZ(SpectrumHandle s);
 
 PBRT_CPU_GPU
@@ -512,6 +518,10 @@ class RGBSpectrum {
     std::string ParameterType() const;
     std::string ParameterString() const;
 
+    const DenselySampledSpectrum* Illluminant() const {
+        return illuminant;
+    }
+
   private:
     // RGBSpectrum Private Members
     RGB rgb;
@@ -668,6 +678,8 @@ inline const DenselySampledSpectrum &Z() {
 #endif
 }
 
+// CIE D spectrum, switching to blackbody below 4000K
+DenselySampledSpectrum D(Float temperature, Allocator alloc = {});
 }  // namespace Spectra
 
 // Spectral Function Declarations

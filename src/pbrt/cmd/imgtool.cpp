@@ -21,6 +21,7 @@
 #include <pbrt/util/spectrum.h>
 #include <pbrt/util/string.h>
 #include <pbrt/util/vecmath.h>
+#include <pbrt/util/progressreporter.h>
 
 extern "C" {
 #include <skymodel/ArHosekSkyModel.h>

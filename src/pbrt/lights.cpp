@@ -1,6 +1,9 @@
 // pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
+// PhysLight code contributed by Anders Langlands and Luca Fascione
+// Copyright © 2020, Weta Digital, Ltd.
+// SPDX-License-Identifier: Apache-2.0
 
 #include <pbrt/lights.h>
 
@@ -108,6 +111,14 @@ PointLight *PointLight::Create(const Transform &renderFromLight, MediumHandle me
                                                  SpectrumType::General, alloc);
     Float sc = parameters.GetOneFloat("scale", 1);
 
+    sc /= SpectrumToPhotometric(I);
+
+    Float phi_v = parameters.GetOneFloat("power", -1);
+    if (phi_v > 0) {
+        Float k_e = 4 * Pi;
+        sc *= phi_v / k_e;
+    }
+
     Point3f from = parameters.GetOnePoint3f("from", Point3f(0, 0, 0));
     Transform tf = Translate(Vector3f(from.x, from.y, from.z));
     Transform finalRenderFromLight(renderFromLight * tf);
@@ -170,6 +181,18 @@ DistantLight *DistantLight::Create(const Transform &renderFromLight,
     Transform t(m);
     Transform finalRenderFromLight = renderFromLight * t;
 
+    // Scale the light spectrum to be equivalent to 1 nit
+    sc /= SpectrumToPhotometric(L);
+
+    // Adjust scale to meet target illuminance value
+    // Like for IBLs we measure illuminance as incident on an upward-facing
+    // patch.
+    Float E_v = parameters.GetOneFloat("illuminance", -1);
+    if (E_v > 0) {
+        Float k_e = -w.y;
+        sc *= E_v / k_e;
+    }
+
     return alloc.new_object<DistantLight>(finalRenderFromLight, L, sc, alloc);
 }
 
@@ -179,7 +202,7 @@ STAT_MEMORY_COUNTER("Memory/Light image and distributions", imageBytes);
 ProjectionLight::ProjectionLight(const Transform &renderFromLight,
                                  const MediumInterface &mediumInterface, Image im,
                                  const RGBColorSpace *imageColorSpace, Float scale,
-                                 Float fov, Allocator alloc)
+                                 Float fov, Float phi_v, Allocator alloc)
     : LightBase(LightType::DeltaPosition, renderFromLight, mediumInterface),
       image(std::move(im)),
       imageColorSpace(imageColorSpace),
@@ -218,6 +241,27 @@ ProjectionLight::ProjectionLight(const Transform &renderFromLight,
     };
     Array2D<Float> d = image.GetSamplingDistribution(dwdA, screenBounds);
     distrib = PiecewiseConstant2D(d, screenBounds);
+
+    // scale radiance to 1 nit
+    scale /= SpectrumToPhotometric(&imageColorSpace->illuminant);
+    // scale to target photometric power if requested
+    if (phi_v > 0) {
+        Float sum = 0;
+        RGB luminance = imageColorSpace->LuminanceVector();
+        for (int v = 0; v < image.Resolution().y; ++v)
+            for (int u = 0; u < image.Resolution().x; ++u) {
+                Point2f ps = screenBounds.Lerp(
+                    {(u + .5f) / image.Resolution().x, (v + .5f) / image.Resolution().y});
+                Vector3f w = Vector3f(LightFromScreen(Point3f(ps.x, ps.y, 0)));
+                w = Normalize(w);
+                Float dwdA = Pow<3>(w.z);
+
+                for (int c = 0; c < 3; ++c)
+                    sum += image.GetChannel({u, v}, c) * luminance[c] * dwdA;
+            }
+
+        scale *= phi_v / (A * sum / (image.Resolution().x * image.Resolution().y));
+    }
 
     imageBytes += image.BytesUsed() + distrib.BytesUsed();
 }
@@ -357,6 +401,7 @@ ProjectionLight *ProjectionLight::Create(const Transform &renderFromLight,
                                          const ParameterDictionary &parameters,
                                          const FileLoc *loc, Allocator alloc) {
     Float scale = parameters.GetOneFloat("scale", 1);
+    Float power = parameters.GetOneFloat("power", -1);
     Float fov = parameters.GetOneFloat("fov", 90.);
 
     std::string texname = ResolveFilename(parameters.GetOneString("filename", ""));
@@ -375,8 +420,9 @@ ProjectionLight *ProjectionLight::Create(const Transform &renderFromLight,
     Transform flip = Scale(1, -1, 1);
     Transform renderFromLightFlipY = renderFromLight * flip;
 
-    return alloc.new_object<ProjectionLight>(
-        renderFromLightFlipY, medium, std::move(image), colorSpace, scale, fov, alloc);
+    return alloc.new_object<ProjectionLight>(renderFromLightFlipY, medium,
+                                             std::move(image), colorSpace, scale, fov,
+                                             power, alloc);
 }
 
 // GoniometricLight Method Definitions
@@ -513,6 +559,23 @@ GoniometricLight *GoniometricLight::Create(const Transform &renderFromLight,
                       "%s: has neither \"R\", \"G\", and \"B\" or \"Y\" "
                       "channels.",
                       texname);
+    }
+
+    sc /= SpectrumToPhotometric(I);
+
+    Float phi_v = parameters.GetOneFloat("power", -1);
+    if (phi_v > 0) {
+        WrapMode2D wrapMode(WrapMode::Repeat, WrapMode::Clamp);
+        // integrate over speherical coordinates [0,Pi], [0,2pi]
+        Float sumY = 0;
+        int width = image.Resolution().x, height = image.Resolution().y;
+        for (int v = 0; v < height; ++v) {
+            Float sinTheta = std::sin(Pi * Float(v + .5f) / Float(height));
+            for (int u = 0; u < width; ++u)
+                sumY += sinTheta * image.GetChannels({u, v}, wrapMode).Average();
+        }
+        Float k_e = 2 * Pi * Pi * sumY / (width * height);
+        sc *= phi_v / k_e;
     }
 
     const Float swapYZ[4][4] = {1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1};
@@ -686,6 +749,39 @@ DiffuseAreaLight *DiffuseAreaLight::Create(const Transform &renderFromLight,
         imageColorSpace = im.metadata.GetColorSpace();
     } else if (L == nullptr)
         L = &colorSpace->illuminant;
+
+    // scale so that radiance is equivalent to 1 nit
+    scale /= SpectrumToPhotometric(L);
+
+    Float phi_v = parameters.GetOneFloat("power", -1.0f);
+    if (phi_v > 0) {
+        // k_e is the emissive power of the light as defined by the spectral
+        // distribution and texture and is used to normalize the emitted
+        // radiance such that the user-defined power will be the actual power
+        // emitted by the light.
+        Float k_e;
+        // Get the appropriate luminance vector from the image colour space
+        RGB lum = imageColorSpace->LuminanceVector();
+        // we need to know which channels correspond to R, G and B
+        // we know that the channelDesc is valid as we would have exited in the
+        // block above otherwise
+        ImageChannelDesc channelDesc = image.GetChannelDesc({"R", "G", "B"});
+        if (image) {
+            k_e = 0;
+            // Assume no distortion in the mapping, FWIW...
+            for (int y = 0; y < image.Resolution().y; ++y)
+                for (int x = 0; x < image.Resolution().x; ++x) {
+                    for (int c = 0; c < 3; ++c)
+                        k_e += image.GetChannel({x, y}, c) * lum[c];
+                }
+            k_e /= image.Resolution().x * image.Resolution().y;
+        }
+
+        k_e *= (twoSided ? 2 : 1) * shape.Area() * Pi;
+
+        // now multiply up scale to hit the target power
+        scale *= phi_v / k_e;
+    }
 
     return alloc.new_object<DiffuseAreaLight>(renderFromLight, medium, L, scale, shape,
                                               std::move(image), imageColorSpace, twoSided,
@@ -1221,6 +1317,17 @@ SpotLight *SpotLight::Create(const Transform &renderFromLight, MediumHandle medi
     Transform t = Translate(Vector3f(from.x, from.y, from.z)) * Inverse(dirToZ);
     Transform finalRenderFromLight = renderFromLight * t;
 
+    sc /= SpectrumToPhotometric(I);
+
+    Float phi_v = parameters.GetOneFloat("power", -1);
+    if (phi_v > 0) {
+        Float cosFalloffEnd = std::cos(Radians(coneangle));
+        Float cosFalloffStart = std::cos(Radians(coneangle - conedelta));
+        Float k_e =
+            2 * Pi * ((1 - cosFalloffStart) + (cosFalloffStart - cosFalloffEnd) / 2);
+        sc *= phi_v / k_e;
+    }
+
     return alloc.new_object<SpotLight>(finalRenderFromLight, medium, I, sc, coneangle,
                                        coneangle - conedelta, alloc);
 }
@@ -1294,12 +1401,23 @@ LightHandle LightHandle::Create(const std::string &name,
         Float scale = parameters.GetOneFloat("scale", 1);
         std::vector<Point3f> portal = parameters.GetPoint3fArray("portal");
         std::string filename = ResolveFilename(parameters.GetOneString("filename", ""));
+        Float E_v = parameters.GetOneFloat("illuminance", -1);
 
-        if (L.empty() && filename.empty())
+        if (L.empty() && filename.empty()) {
+            // Scale the light spectrum to be equivalent to 1 nit
+            scale /= SpectrumToPhotometric(&colorSpace->illuminant);
+            if (E_v > 0) {
+                // If the scene specifies desired illuminance, first calculate
+                // the illuminance from a uniform hemispherical emission
+                // of L_v then use this to scale the emission spectrum.
+                Float k_e = Pi;
+                scale *= E_v / k_e;
+            }
+
             // Default: color space's std illuminant
             light = alloc.new_object<UniformInfiniteLight>(
                 renderFromLight, &colorSpace->illuminant, scale, alloc);
-        else if (!L.empty()) {
+        } else if (!L.empty()) {
             if (!filename.empty())
                 ErrorExit(loc, "Can't specify both emission \"L\" and "
                                "\"filename\" with InfiniteAreaLight");
@@ -1308,8 +1426,18 @@ LightHandle LightHandle::Create(const std::string &name,
                 ErrorExit(loc, "Portals are not supported for InfiniteAreaLights "
                                "without \"filename\".");
 
-            light = alloc.new_object<UniformInfiniteLight>(renderFromLight, L[0], scale,
-                                                           alloc);
+            // Scale the light spectrum to be equivalent to 1 nit
+            scale /= SpectrumToPhotometric(L[0]);
+
+            if (E_v > 0) {
+                // If the scene specifies desired illuminance, first calculate
+                // the illuminance from a uniform hemispherical emission
+                // of L_v then use this to scale the emission spectrum.
+                Float k_e = Pi;
+                scale *= E_v / k_e;
+            }
+
+            light = alloc.new_object<UniformInfiniteLight>(renderFromLight, L[0], scale, alloc);
         } else {
             ImageAndMetadata imageAndMetadata = Image::Read(filename, alloc);
             const RGBColorSpace *colorSpace = imageAndMetadata.metadata.GetColorSpace();
@@ -1321,6 +1449,42 @@ LightHandle LightHandle::Create(const std::string &name,
                           "%s: image provided to \"infinite\" light must "
                           "have R, G, and B channels.",
                           filename);
+
+            // Scale the light spectrum to be equivalent to 1 nit
+            scale /= SpectrumToPhotometric(&colorSpace->illuminant);
+
+            if (E_v > 0) {
+                // Upper hemisphere illuminance calculation for converting map to physical
+                // units
+                float illuminance = 0;
+                const Image& image = imageAndMetadata.image;
+                int ye = image.Resolution().y / 2;
+                int ys = 0;
+                int xs = 0;
+                int xe = image.Resolution().x;
+                RGB lum = imageAndMetadata.metadata.GetColorSpace()->LuminanceVector();
+                for (int y = ys; y < ye; ++y) {
+                    float v = (float(y) + 0.5f) / float(image.Resolution().y);
+                    float theta = (v - 0.5f) * Pi;
+                    float cosTheta = std::cos(theta);
+                    float sinTheta = std::sin(theta);
+                    for (int x = xs; x < xe; ++x) {
+                        ImageChannelValues values = image.GetChannels({x, y});
+                        for (int c = 0; c < 3; ++c) {
+                            illuminance +=
+                                values[c] * lum[c] * std::abs(cosTheta) * std::abs(sinTheta);
+                        }
+                    }
+                }
+                illuminance /= float(ye - ys) * float(xe - xs);
+                illuminance *= Pi * Pi;
+
+                // scaling factor is just the ratio of the target
+                // illuminance and the illuminance of the map multiplied by
+                // the illuminant spectrum
+                Float k_e = illuminance;
+                scale *= E_v / k_e;
+            }
             Image image = imageAndMetadata.image.SelectChannels(channelDesc, alloc);
 
             if (!portal.empty()) {
@@ -1330,10 +1494,11 @@ LightHandle LightHandle::Create(const std::string &name,
                 light = alloc.new_object<PortalImageInfiniteLight>(
                     renderFromLight, std::move(image), colorSpace, scale, filename,
                     portal, alloc);
-            } else
+            } else {
                 light = alloc.new_object<ImageInfiniteLight>(renderFromLight,
                                                              std::move(image), colorSpace,
                                                              scale, filename, alloc);
+            }
         }
     } else
         ErrorExit(loc, "%s: light type unknown.", name);

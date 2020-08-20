@@ -1,6 +1,9 @@
 // pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
+// PhysLight code contributed by Anders Langlands and Luca Fascione
+// Copyright © 2020, Weta Digital, Ltd.
+// SPDX-License-Identifier: Apache-2.0
 
 #include <pbrt/film.h>
 
@@ -24,6 +27,451 @@
 #include <pbrt/util/transform.h>
 
 namespace pbrt {
+
+namespace {
+// Swatch set for solving the camera->xyz matrix
+const Float trainingSwatches[24][72] = {
+    {380.000000, 0.051500,   390.000000, 0.056500,   400.000000, 0.063000,   410.000000,
+     0.065000,   420.000000, 0.063000,   430.000000, 0.060500,   440.000000, 0.058500,
+     450.000000, 0.057500,   460.000000, 0.057000,   470.000000, 0.057000,   480.000000,
+     0.058000,   490.000000, 0.060000,   500.000000, 0.063000,   510.000000, 0.067500,
+     520.000000, 0.073000,   530.000000, 0.076500,   540.000000, 0.078500,   550.000000,
+     0.081500,   560.000000, 0.089000,   570.000000, 0.101500,   580.000000, 0.117000,
+     590.000000, 0.131500,   600.000000, 0.140500,   610.000000, 0.146500,   620.000000,
+     0.152500,   630.000000, 0.160500,   640.000000, 0.170500,   650.000000, 0.183500,
+     660.000000, 0.196000,   670.000000, 0.206000,   680.000000, 0.214000,   690.000000,
+     0.221000,   700.000000, 0.232000,   710.000000, 0.246000,   720.000000, 0.265000,
+     730.000000, 0.290500},
+    {380.000000, 0.110000,   390.000000, 0.142000,   400.000000, 0.178500,   410.000000,
+     0.194000,   420.000000, 0.198500,   430.000000, 0.202000,   440.000000, 0.208000,
+     450.000000, 0.218500,   460.000000, 0.234000,   470.000000, 0.256500,   480.000000,
+     0.281000,   490.000000, 0.301000,   500.000000, 0.315000,   510.000000, 0.327000,
+     520.000000, 0.318500,   530.000000, 0.292000,   540.000000, 0.282500,   550.000000,
+     0.288000,   560.000000, 0.286000,   570.000000, 0.297000,   580.000000, 0.348500,
+     590.000000, 0.427500,   600.000000, 0.491000,   610.000000, 0.527500,   620.000000,
+     0.548000,   630.000000, 0.563000,   640.000000, 0.576000,   650.000000, 0.592500,
+     660.000000, 0.608500,   670.000000, 0.624500,   680.000000, 0.645000,   690.000000,
+     0.669000,   700.000000, 0.695500,   710.000000, 0.722500,   720.000000, 0.739500,
+     730.000000, 0.758500},
+    {380.000000, 0.121500,   390.000000, 0.175500,   400.000000, 0.258500,   410.000000,
+     0.313000,   420.000000, 0.330000,   430.000000, 0.333500,   440.000000, 0.334000,
+     450.000000, 0.331000,   460.000000, 0.322500,   470.000000, 0.310500,   480.000000,
+     0.295500,   490.000000, 0.280500,   500.000000, 0.264500,   510.000000, 0.246500,
+     520.000000, 0.228000,   530.000000, 0.211000,   540.000000, 0.198500,   550.000000,
+     0.188000,   560.000000, 0.176000,   570.000000, 0.164500,   580.000000, 0.156000,
+     590.000000, 0.151000,   600.000000, 0.146000,   610.000000, 0.142500,   620.000000,
+     0.139000,   630.000000, 0.135500,   640.000000, 0.133000,   650.000000, 0.132500,
+     660.000000, 0.132000,   670.000000, 0.131000,   680.000000, 0.127500,   690.000000,
+     0.124000,   700.000000, 0.119500,   710.000000, 0.117000,   720.000000, 0.118500,
+     730.000000, 0.124500},
+    {380.000000, 0.049500,   390.000000, 0.051500,   400.000000, 0.053000,   410.000000,
+     0.053000,   420.000000, 0.054000,   430.000000, 0.055500,   440.000000, 0.057000,
+     450.000000, 0.059500,   460.000000, 0.061500,   470.000000, 0.063500,   480.000000,
+     0.066000,   490.000000, 0.068500,   500.000000, 0.076500,   510.000000, 0.103500,
+     520.000000, 0.150000,   530.000000, 0.179500,   540.000000, 0.180500,   550.000000,
+     0.163500,   560.000000, 0.143000,   570.000000, 0.129500,   580.000000, 0.122000,
+     590.000000, 0.115000,   600.000000, 0.106500,   610.000000, 0.101500,   620.000000,
+     0.101000,   630.000000, 0.103000,   640.000000, 0.103000,   650.000000, 0.103500,
+     660.000000, 0.104500,   670.000000, 0.107500,   680.000000, 0.118500,   690.000000,
+     0.143000,   700.000000, 0.181000,   710.000000, 0.215500,   720.000000, 0.234000,
+     730.000000, 0.244000},
+    {380.000000, 0.133500,   390.000000, 0.197500,   400.000000, 0.311000,   410.000000,
+     0.396500,   420.000000, 0.427000,   430.000000, 0.434500,   440.000000, 0.435000,
+     450.000000, 0.430000,   460.000000, 0.420000,   470.000000, 0.404000,   480.000000,
+     0.380000,   490.000000, 0.354000,   500.000000, 0.326500,   510.000000, 0.297500,
+     520.000000, 0.262500,   530.000000, 0.230000,   540.000000, 0.212500,   550.000000,
+     0.208500,   560.000000, 0.201500,   570.000000, 0.195000,   580.000000, 0.199500,
+     590.000000, 0.211500,   600.000000, 0.224500,   610.000000, 0.237500,   620.000000,
+     0.242000,   630.000000, 0.250500,   640.000000, 0.274000,   650.000000, 0.315500,
+     660.000000, 0.366000,   670.000000, 0.406000,   680.000000, 0.428000,   690.000000,
+     0.435000,   700.000000, 0.439000,   710.000000, 0.444000,   720.000000, 0.449000,
+     730.000000, 0.460000},
+    {380.000000, 0.123000,   390.000000, 0.173000,   400.000000, 0.249500,   410.000000,
+     0.300000,   420.000000, 0.321000,   430.000000, 0.336500,   440.000000, 0.354000,
+     450.000000, 0.378000,   460.000000, 0.413500,   470.000000, 0.463000,   480.000000,
+     0.516500,   490.000000, 0.556000,   500.000000, 0.574500,   510.000000, 0.577000,
+     520.000000, 0.569000,   530.000000, 0.550000,   540.000000, 0.521500,   550.000000,
+     0.484000,   560.000000, 0.440500,   570.000000, 0.396000,   580.000000, 0.348000,
+     590.000000, 0.300500,   600.000000, 0.256000,   610.000000, 0.227500,   620.000000,
+     0.212500,   630.000000, 0.205500,   640.000000, 0.200500,   650.000000, 0.198000,
+     660.000000, 0.201000,   670.000000, 0.209500,   680.000000, 0.222500,   690.000000,
+     0.233500,   700.000000, 0.242000,   710.000000, 0.241500,   720.000000, 0.236500,
+     730.000000, 0.237000},
+    {380.000000, 0.053500,   390.000000, 0.054000,   400.000000, 0.053500,   410.000000,
+     0.053500,   420.000000, 0.053000,   430.000000, 0.053500,   440.000000, 0.053500,
+     450.000000, 0.053500,   460.000000, 0.054000,   470.000000, 0.055000,   480.000000,
+     0.056500,   490.000000, 0.059000,   500.000000, 0.064500,   510.000000, 0.078500,
+     520.000000, 0.105500,   530.000000, 0.137000,   540.000000, 0.172000,   550.000000,
+     0.213500,   560.000000, 0.272500,   570.000000, 0.357500,   580.000000, 0.448000,
+     590.000000, 0.520500,   600.000000, 0.559500,   610.000000, 0.573500,   620.000000,
+     0.578500,   630.000000, 0.582500,   640.000000, 0.585500,   650.000000, 0.591500,
+     660.000000, 0.597000,   670.000000, 0.605500,   680.000000, 0.617500,   690.000000,
+     0.630500,   700.000000, 0.641500,   710.000000, 0.648000,   720.000000, 0.648000,
+     730.000000, 0.652000},
+    {380.000000, 0.110500,   390.000000, 0.157000,   400.000000, 0.230000,   410.000000,
+     0.289500,   420.000000, 0.325500,   430.000000, 0.354500,   440.000000, 0.380500,
+     450.000000, 0.393500,   460.000000, 0.383000,   470.000000, 0.353500,   480.000000,
+     0.308500,   490.000000, 0.253500,   500.000000, 0.205500,   510.000000, 0.167500,
+     520.000000, 0.137500,   530.000000, 0.116500,   540.000000, 0.105000,   550.000000,
+     0.097500,   560.000000, 0.090000,   570.000000, 0.084500,   580.000000, 0.083500,
+     590.000000, 0.085000,   600.000000, 0.085500,   610.000000, 0.084500,   620.000000,
+     0.084000,   630.000000, 0.086500,   640.000000, 0.094000,   650.000000, 0.104500,
+     660.000000, 0.116000,   670.000000, 0.124500,   680.000000, 0.131500,   690.000000,
+     0.142000,   700.000000, 0.160500,   710.000000, 0.182000,   720.000000, 0.207500,
+     730.000000, 0.235500},
+    {380.000000, 0.096000,   390.000000, 0.119000,   400.000000, 0.137500,   410.000000,
+     0.139500,   420.000000, 0.135500,   430.000000, 0.132000,   440.000000, 0.130500,
+     450.000000, 0.128500,   460.000000, 0.125500,   470.000000, 0.122500,   480.000000,
+     0.117000,   490.000000, 0.109500,   500.000000, 0.104000,   510.000000, 0.100000,
+     520.000000, 0.094500,   530.000000, 0.091000,   540.000000, 0.092000,   550.000000,
+     0.097500,   560.000000, 0.102000,   570.000000, 0.110000,   580.000000, 0.156500,
+     590.000000, 0.269500,   600.000000, 0.407000,   610.000000, 0.508500,   620.000000,
+     0.561500,   630.000000, 0.585000,   640.000000, 0.594500,   650.000000, 0.599000,
+     660.000000, 0.600000,   670.000000, 0.599500,   680.000000, 0.601500,   690.000000,
+     0.603500,   700.000000, 0.606500,   710.000000, 0.605500,   720.000000, 0.604000,
+     730.000000, 0.603000},
+    {380.000000, 0.096500,   390.000000, 0.125500,   400.000000, 0.161500,   410.000000,
+     0.184000,   420.000000, 0.192000,   430.000000, 0.181500,   440.000000, 0.163000,
+     450.000000, 0.141500,   460.000000, 0.119500,   470.000000, 0.101000,   480.000000,
+     0.086500,   490.000000, 0.075000,   500.000000, 0.066500,   510.000000, 0.060500,
+     520.000000, 0.057000,   530.000000, 0.053500,   540.000000, 0.051500,   550.000000,
+     0.052000,   560.000000, 0.053500,   570.000000, 0.053000,   580.000000, 0.051500,
+     590.000000, 0.052500,   600.000000, 0.058500,   610.000000, 0.073500,   620.000000,
+     0.097500,   630.000000, 0.122500,   640.000000, 0.145000,   650.000000, 0.169000,
+     660.000000, 0.193500,   670.000000, 0.222000,   680.000000, 0.256500,   690.000000,
+     0.295500,   700.000000, 0.337000,   710.000000, 0.375500,   720.000000, 0.412000,
+     730.000000, 0.450000},
+    {380.000000, 0.058500,   390.000000, 0.060000,   400.000000, 0.061000,   410.000000,
+     0.062000,   420.000000, 0.063000,   430.000000, 0.065000,   440.000000, 0.068500,
+     450.000000, 0.075000,   460.000000, 0.085000,   470.000000, 0.104500,   480.000000,
+     0.137000,   490.000000, 0.188500,   500.000000, 0.270000,   510.000000, 0.380000,
+     520.000000, 0.480000,   530.000000, 0.532500,   540.000000, 0.547000,   550.000000,
+     0.539500,   560.000000, 0.520500,   570.000000, 0.495500,   580.000000, 0.462500,
+     590.000000, 0.422000,   600.000000, 0.377500,   610.000000, 0.346500,   620.000000,
+     0.329000,   630.000000, 0.321500,   640.000000, 0.316000,   650.000000, 0.314500,
+     660.000000, 0.319000,   670.000000, 0.332000,   680.000000, 0.349500,   690.000000,
+     0.365500,   700.000000, 0.377500,   710.000000, 0.380000,   720.000000, 0.375500,
+     730.000000, 0.377000},
+    {380.000000, 0.061500,   390.000000, 0.063000,   400.000000, 0.064000,   410.000000,
+     0.064000,   420.000000, 0.064000,   430.000000, 0.064000,   440.000000, 0.065000,
+     450.000000, 0.066500,   460.000000, 0.068000,   470.000000, 0.072500,   480.000000,
+     0.081500,   490.000000, 0.091500,   500.000000, 0.105000,   510.000000, 0.135500,
+     520.000000, 0.199500,   530.000000, 0.289000,   540.000000, 0.378500,   550.000000,
+     0.443500,   560.000000, 0.490500,   570.000000, 0.536000,   580.000000, 0.576000,
+     590.000000, 0.608000,   600.000000, 0.626000,   610.000000, 0.636000,   620.000000,
+     0.642500,   630.000000, 0.648000,   640.000000, 0.653500,   650.000000, 0.660000,
+     660.000000, 0.663500,   670.000000, 0.665500,   680.000000, 0.671000,   690.000000,
+     0.677000,   700.000000, 0.684500,   710.000000, 0.689000,   720.000000, 0.691000,
+     730.000000, 0.694500},
+    {380.000000, 0.067500,   390.000000, 0.087500,   400.000000, 0.119000,   410.000000,
+     0.160500,   420.000000, 0.204000,   430.000000, 0.244000,   440.000000, 0.286000,
+     450.000000, 0.322000,   460.000000, 0.323000,   470.000000, 0.290000,   480.000000,
+     0.235000,   490.000000, 0.175000,   500.000000, 0.125000,   510.000000, 0.090000,
+     520.000000, 0.068000,   530.000000, 0.054000,   540.000000, 0.047000,   550.000000,
+     0.043500,   560.000000, 0.041000,   570.000000, 0.039500,   580.000000, 0.039000,
+     590.000000, 0.039000,   600.000000, 0.038500,   610.000000, 0.039500,   620.000000,
+     0.039500,   630.000000, 0.040500,   640.000000, 0.041500,   650.000000, 0.042000,
+     660.000000, 0.043500,   670.000000, 0.044500,   680.000000, 0.045000,   690.000000,
+     0.045500,   700.000000, 0.048000,   710.000000, 0.051500,   720.000000, 0.056500,
+     730.000000, 0.064500},
+    {380.000000, 0.053500,   390.000000, 0.055000,   400.000000, 0.056000,   410.000000,
+     0.057000,   420.000000, 0.058000,   430.000000, 0.060500,   440.000000, 0.063000,
+     450.000000, 0.068000,   460.000000, 0.076500,   470.000000, 0.092000,   480.000000,
+     0.119000,   490.000000, 0.159000,   500.000000, 0.213000,   510.000000, 0.275500,
+     520.000000, 0.330500,   530.000000, 0.348500,   540.000000, 0.336000,   550.000000,
+     0.308000,   560.000000, 0.271500,   570.000000, 0.234000,   580.000000, 0.197000,
+     590.000000, 0.161500,   600.000000, 0.129500,   610.000000, 0.108000,   620.000000,
+     0.096500,   630.000000, 0.091000,   640.000000, 0.087000,   650.000000, 0.084500,
+     660.000000, 0.084000,   670.000000, 0.086000,   680.000000, 0.090000,   690.000000,
+     0.095000,   700.000000, 0.100500,   710.000000, 0.102000,   720.000000, 0.102000,
+     730.000000, 0.101500},
+    {380.000000, 0.051000,   390.000000, 0.050500,   400.000000, 0.049500,   410.000000,
+     0.048500,   420.000000, 0.048000,   430.000000, 0.048000,   440.000000, 0.048000,
+     450.000000, 0.048000,   460.000000, 0.047000,   470.000000, 0.046000,   480.000000,
+     0.044500,   490.000000, 0.044000,   500.000000, 0.044500,   510.000000, 0.045000,
+     520.000000, 0.045500,   530.000000, 0.046000,   540.000000, 0.047000,   550.000000,
+     0.048500,   560.000000, 0.052000,   570.000000, 0.058500,   580.000000, 0.072000,
+     590.000000, 0.106500,   600.000000, 0.185000,   610.000000, 0.322000,   620.000000,
+     0.476500,   630.000000, 0.589500,   640.000000, 0.649000,   650.000000, 0.680500,
+     660.000000, 0.695000,   670.000000, 0.702500,   680.000000, 0.712000,   690.000000,
+     0.719500,   700.000000, 0.726500,   710.000000, 0.730000,   720.000000, 0.730500,
+     730.000000, 0.733500},
+    {380.000000, 0.056000,   390.000000, 0.054000,   400.000000, 0.052500,   410.000000,
+     0.052500,   420.000000, 0.052500,   430.000000, 0.053500,   440.000000, 0.054500,
+     450.000000, 0.057000,   460.000000, 0.063000,   470.000000, 0.078000,   480.000000,
+     0.114000,   490.000000, 0.177000,   500.000000, 0.264000,   510.000000, 0.365000,
+     520.000000, 0.468500,   530.000000, 0.551500,   540.000000, 0.606500,   550.000000,
+     0.640000,   560.000000, 0.666000,   570.000000, 0.690000,   580.000000, 0.709000,
+     590.000000, 0.724500,   600.000000, 0.734000,   610.000000, 0.742500,   620.000000,
+     0.749500,   630.000000, 0.756500,   640.000000, 0.763000,   650.000000, 0.770500,
+     660.000000, 0.774500,   670.000000, 0.776000,   680.000000, 0.780500,   690.000000,
+     0.784500,   700.000000, 0.791000,   710.000000, 0.794500,   720.000000, 0.794500,
+     730.000000, 0.798000},
+    {380.000000, 0.131500,   390.000000, 0.187000,   400.000000, 0.283000,   410.000000,
+     0.344500,   420.000000, 0.360500,   430.000000, 0.352000,   440.000000, 0.330500,
+     450.000000, 0.302000,   460.000000, 0.271500,   470.000000, 0.243500,   480.000000,
+     0.213500,   490.000000, 0.186000,   500.000000, 0.165500,   510.000000, 0.147500,
+     520.000000, 0.125500,   530.000000, 0.106500,   540.000000, 0.101000,   550.000000,
+     0.104500,   560.000000, 0.105000,   570.000000, 0.110500,   580.000000, 0.139000,
+     590.000000, 0.199000,   600.000000, 0.284500,   610.000000, 0.397000,   620.000000,
+     0.519000,   630.000000, 0.621500,   640.000000, 0.691500,   650.000000, 0.737000,
+     660.000000, 0.763000,   670.000000, 0.777000,   680.000000, 0.787000,   690.000000,
+     0.795500,   700.000000, 0.803500,   710.000000, 0.809500,   720.000000, 0.812000,
+     730.000000, 0.819000},
+    {380.000000, 0.100500,   390.000000, 0.137500,   400.000000, 0.193500,   410.000000,
+     0.237000,   420.000000, 0.259500,   430.000000, 0.283500,   440.000000, 0.316000,
+     450.000000, 0.352500,   460.000000, 0.390500,   470.000000, 0.430000,   480.000000,
+     0.452000,   490.000000, 0.450500,   500.000000, 0.428000,   510.000000, 0.388500,
+     520.000000, 0.338000,   530.000000, 0.282500,   540.000000, 0.229500,   550.000000,
+     0.182500,   560.000000, 0.143500,   570.000000, 0.116000,   580.000000, 0.099000,
+     590.000000, 0.089000,   600.000000, 0.081000,   610.000000, 0.075500,   620.000000,
+     0.073500,   630.000000, 0.073000,   640.000000, 0.073000,   650.000000, 0.074000,
+     660.000000, 0.076000,   670.000000, 0.077000,   680.000000, 0.075500,   690.000000,
+     0.074500,   700.000000, 0.072500,   710.000000, 0.071500,   720.000000, 0.074500,
+     730.000000, 0.080500},
+    {380.000000, 0.171000,   390.000000, 0.250000,   400.000000, 0.416000,   410.000000,
+     0.665500,   420.000000, 0.825500,   430.000000, 0.870000,   440.000000, 0.880000,
+     450.000000, 0.885000,   460.000000, 0.889000,   470.000000, 0.892000,   480.000000,
+     0.893500,   490.000000, 0.896000,   500.000000, 0.897000,   510.000000, 0.898000,
+     520.000000, 0.899000,   530.000000, 0.898500,   540.000000, 0.899000,   550.000000,
+     0.900000,   560.000000, 0.900000,   570.000000, 0.902000,   580.000000, 0.901000,
+     590.000000, 0.901000,   600.000000, 0.900500,   610.000000, 0.902000,   620.000000,
+     0.904500,   630.000000, 0.905000,   640.000000, 0.905500,   650.000000, 0.906000,
+     660.000000, 0.906500,   670.000000, 0.905000,   680.000000, 0.905000,   690.000000,
+     0.906500,   700.000000, 0.907500,   710.000000, 0.908000,   720.000000, 0.908000,
+     730.000000, 0.909000},
+    {380.000000, 0.160500,   390.000000, 0.233500,   400.000000, 0.368500,   410.000000,
+     0.518000,   420.000000, 0.573500,   430.000000, 0.584000,   440.000000, 0.587500,
+     450.000000, 0.589000,   460.000000, 0.588500,   470.000000, 0.586500,   480.000000,
+     0.584500,   490.000000, 0.584000,   500.000000, 0.584500,   510.000000, 0.584500,
+     520.000000, 0.586000,   530.000000, 0.586000,   540.000000, 0.586500,   550.000000,
+     0.586500,   560.000000, 0.586500,   570.000000, 0.588500,   580.000000, 0.589000,
+     590.000000, 0.589000,   600.000000, 0.587500,   610.000000, 0.585500,   620.000000,
+     0.584000,   630.000000, 0.581500,   640.000000, 0.579000,   650.000000, 0.577000,
+     660.000000, 0.575000,   670.000000, 0.573000,   680.000000, 0.571500,   690.000000,
+     0.569500,   700.000000, 0.568000,   710.000000, 0.567000,   720.000000, 0.565000,
+     730.000000, 0.564000},
+    {380.000000, 0.141000,   390.000000, 0.199000,   400.000000, 0.280500,   410.000000,
+     0.338500,   420.000000, 0.353500,   430.000000, 0.358000,   440.000000, 0.361000,
+     450.000000, 0.362500,   460.000000, 0.362000,   470.000000, 0.359500,   480.000000,
+     0.358000,   490.000000, 0.357000,   500.000000, 0.357000,   510.000000, 0.357500,
+     520.000000, 0.358500,   530.000000, 0.358500,   540.000000, 0.359500,   550.000000,
+     0.359500,   560.000000, 0.359500,   570.000000, 0.361000,   580.000000, 0.361500,
+     590.000000, 0.361000,   600.000000, 0.359500,   610.000000, 0.358500,   620.000000,
+     0.356000,   630.000000, 0.353500,   640.000000, 0.351500,   650.000000, 0.349500,
+     660.000000, 0.347000,   670.000000, 0.344500,   680.000000, 0.342500,   690.000000,
+     0.340500,   700.000000, 0.338000,   710.000000, 0.336500,   720.000000, 0.334500,
+     730.000000, 0.333000},
+    {380.000000, 0.109000,   390.000000, 0.140500,   400.000000, 0.173000,   410.000000,
+     0.189500,   420.000000, 0.194000,   430.000000, 0.196500,   440.000000, 0.199000,
+     450.000000, 0.199500,   460.000000, 0.199000,   470.000000, 0.197500,   480.000000,
+     0.196500,   490.000000, 0.196500,   500.000000, 0.196500,   510.000000, 0.197000,
+     520.000000, 0.197000,   530.000000, 0.197500,   540.000000, 0.197500,   550.000000,
+     0.197500,   560.000000, 0.197500,   570.000000, 0.198500,   580.000000, 0.198500,
+     590.000000, 0.198500,   600.000000, 0.197500,   610.000000, 0.196500,   620.000000,
+     0.195500,   630.000000, 0.193500,   640.000000, 0.192000,   650.000000, 0.190000,
+     660.000000, 0.189000,   670.000000, 0.187500,   680.000000, 0.186500,   690.000000,
+     0.185000,   700.000000, 0.183000,   710.000000, 0.182000,   720.000000, 0.181000,
+     730.000000, 0.180000},
+    {380.000000, 0.071000,   390.000000, 0.080500,   400.000000, 0.087500,   410.000000,
+     0.090500,   420.000000, 0.091500,   430.000000, 0.092000,   440.000000, 0.093500,
+     450.000000, 0.093500,   460.000000, 0.092500,   470.000000, 0.092000,   480.000000,
+     0.091500,   490.000000, 0.091500,   500.000000, 0.091000,   510.000000, 0.091500,
+     520.000000, 0.091500,   530.000000, 0.091500,   540.000000, 0.091500,   550.000000,
+     0.091500,   560.000000, 0.091500,   570.000000, 0.091500,   580.000000, 0.091500,
+     590.000000, 0.091000,   600.000000, 0.090500,   610.000000, 0.090000,   620.000000,
+     0.089000,   630.000000, 0.088000,   640.000000, 0.088000,   650.000000, 0.087000,
+     660.000000, 0.086500,   670.000000, 0.086000,   680.000000, 0.085000,   690.000000,
+     0.085000,   700.000000, 0.084000,   710.000000, 0.083500,   720.000000, 0.083000,
+     730.000000, 0.083000},
+    {380.000000, 0.031500,   390.000000, 0.032500,   400.000000, 0.033500,   410.000000,
+     0.034500,   420.000000, 0.034500,   430.000000, 0.034500,   440.000000, 0.034000,
+     450.000000, 0.034000,   460.000000, 0.033500,   470.000000, 0.033500,   480.000000,
+     0.033000,   490.000000, 0.033000,   500.000000, 0.033000,   510.000000, 0.033000,
+     520.000000, 0.033000,   530.000000, 0.033000,   540.000000, 0.033000,   550.000000,
+     0.033000,   560.000000, 0.032500,   570.000000, 0.032500,   580.000000, 0.032500,
+     590.000000, 0.032500,   600.000000, 0.032500,   610.000000, 0.032500,   620.000000,
+     0.032500,   630.000000, 0.032500,   640.000000, 0.032500,   650.000000, 0.032500,
+     660.000000, 0.032500,   670.000000, 0.032500,   680.000000, 0.032500,   690.000000,
+     0.032000,   700.000000, 0.032000,   710.000000, 0.032000,   720.000000, 0.032000,
+     730.000000, 0.032500}};
+
+// FIXME: use the one in spectrum.cpp
+pbrt::SpectrumHandle MakeSpectrumFromInterleaved(pstd::span<const Float> samples,
+                                                 Allocator alloc) {
+    CHECK_EQ(0, samples.size() % 2);
+    int n = samples.size() / 2;
+    std::vector<Float> lambda(n), v(n);
+    for (size_t i = 0; i < n; ++i) {
+        lambda[i] = samples[2 * i];
+        v[i] = samples[2 * i + 1];
+        if (i > 0)
+            CHECK_GT(lambda[i], lambda[i - 1]);
+    }
+
+    SpectrumHandle spec =
+        alloc.new_object<pbrt::PiecewiseLinearSpectrum>(lambda, v, alloc);
+
+    return spec;
+}
+
+// Compute RGB reflectance of spectrum s in rgb space defined by r, g, b curves
+// under illuminant illum
+RGB SpectrumToCameraRGB(SpectrumHandle s, const DenselySampledSpectrum &illum,
+                        const DenselySampledSpectrum &r, const DenselySampledSpectrum &g,
+                        const DenselySampledSpectrum &b) {
+    RGB rgb(0, 0, 0);
+    Float g_integral = 0;
+    for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda) {
+        g_integral += g(lambda) * illum(lambda);
+        rgb.r += r(lambda) * s(lambda) * illum(lambda);
+        rgb.g += g(lambda) * s(lambda) * illum(lambda);
+        rgb.b += b(lambda) * s(lambda) * illum(lambda);
+    }
+    return rgb / g_integral;
+}
+
+// Compute normalized (such that g=1) colour of illum in RGB space defined by
+// r, g, b curves
+RGB IlluminantToCameraRGB(const DenselySampledSpectrum &illum,
+                          const DenselySampledSpectrum &r,
+                          const DenselySampledSpectrum &g,
+                          const DenselySampledSpectrum &b) {
+    RGB rgb(0, 0, 0);
+    Float g_integral = 0;
+    for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda) {
+        rgb.r += r(lambda) * illum(lambda);
+        rgb.g += g(lambda) * illum(lambda);
+        rgb.b += b(lambda) * illum(lambda);
+    }
+    return rgb / rgb.g;
+}
+
+Float IlluminantToY(const DenselySampledSpectrum &illum,
+                    const DenselySampledSpectrum &g) {
+    Float y = 0;
+    for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda) {
+        y += g(lambda) * illum(lambda);
+    }
+    return y;
+}
+
+// Solve a linear least squares system to find a 3x3 matrix that transforms A
+// to B where A and B are `rows`x3 matrices.
+SquareMatrix<3> LinearLeastSquares(Float A[][3], Float B[][3], int rows) {
+    SquareMatrix<3> AtA, AtB;
+    memset(&AtA, 0, sizeof(SquareMatrix<3>));
+    memset(&AtB, 0, sizeof(SquareMatrix<3>));
+
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            for (int r = 0; r < rows; ++r) {
+                AtA[i][j] += A[r][i] * A[r][j];
+                AtB[i][j] += A[r][i] * B[r][j];
+            }
+        }
+    }
+
+    auto AtAi = Inverse(AtA);
+    if (!AtAi.has_value()) {
+        ErrorExit("Camera matrix could not be solved");
+    }
+    return Transpose(*AtAi * AtB);
+}
+
+// Solve a 3x3 matrix that transforms from some space defined by the given
+// r, g, b curves with whitepoint srcw to CIE XYZ with whitepoint dstw
+SquareMatrix<3> SolveCameraMatrix(SpectrumHandle r, SpectrumHandle g, SpectrumHandle b,
+                                  const DenselySampledSpectrum &srcw,
+                                  const DenselySampledSpectrum &dstw,
+                                  Allocator alloc = {}) {
+    Float A_data[24][3];
+    Float B_data[24][3];
+
+    RGB src_white = IlluminantToCameraRGB(srcw, r, g, b);
+    RGB dst_white = IlluminantToCameraRGB(dstw, r, g, b);
+
+    // account for perceptual brightness difference in whites by scaling the
+    // target swatches by the relative difference between the whitepoint in
+    // camera space and in CIE XYZ
+    Float srcG = IlluminantToY(srcw, g);
+    Float srcY = IlluminantToY(srcw, Spectra::Y());
+
+    for (int i = 0; i < 24; ++i) {
+        SpectrumHandle s = MakeSpectrumFromInterleaved(trainingSwatches[i], alloc);
+        RGB a = SpectrumToCameraRGB(s, srcw, r, g, b) / dst_white;
+        RGB b = SpectrumToCameraRGB(s, dstw, Spectra::X(), Spectra::Y(), Spectra::Z()) *
+                (srcY / srcG);
+        for (int c = 0; c < 3; ++c) {
+            A_data[i][c] = a[c];
+            B_data[i][c] = b[c];
+        }
+    }
+
+    return LinearLeastSquares(A_data, B_data, 24);
+}
+}  // namespace
+
+// Sensor Method Definitions
+Sensor::Sensor(SpectrumHandle r_bar, SpectrumHandle g_bar, SpectrumHandle b_bar,
+               const RGBColorSpace *outputColorSpace,
+               const SquareMatrix<3> &XYZFromCameraRGB, Float exposureTime, Float fNumber,
+               Float ISO, Float C, const DenselySampledSpectrum &whiteIlluminant,
+               Allocator alloc)
+    : r_bar(r_bar, alloc),
+      g_bar(g_bar, alloc),
+      b_bar(b_bar, alloc),
+      XYZFromCameraRGB(XYZFromCameraRGB),
+      exposureTime(exposureTime),
+      fNumber(fNumber),
+      ISO(ISO),
+      C(C) {
+    // Compute white normalization factor for sensor
+    RGB white;
+    for (Float l = Lambda_min; l <= Lambda_max; ++l) {
+        white.r += r_bar(l) * whiteIlluminant(l);
+        white.g += g_bar(l) * whiteIlluminant(l);
+        white.b += b_bar(l) * whiteIlluminant(l);
+    }
+    white /= white.g;
+
+    if (XYZFromCameraRGB.IsIdentity()) {
+        cameraRGBWhiteNorm = RGB(1, 1, 1);
+    } else {
+        // Compute RGB of illuminant in sensor's RGB space and scale to match
+        // CIE Y so that we maintain same brightness
+        // cameraRGBWhiteNorm = RGB(CIE_Y_integral, CIE_Y_integral, CIE_Y_integral) /
+        // white;
+        cameraRGBWhiteNorm = RGB(1, 1, 1) / white;
+    }
+}
+
+Sensor *Sensor::Create(const std::string &name, const RGBColorSpace *colorSpace,
+                       Float exposureTime, Float fNumber, Float ISO, Float C,
+                       Float whiteBalanceTemp, const FileLoc *loc, Allocator alloc) {
+    if (name == "cie1931") {
+        return alloc.new_object<Sensor>(&Spectra::X(), &Spectra::Y(), &Spectra::Z(),
+                                        colorSpace, SquareMatrix<3>(), exposureTime,
+                                        fNumber, ISO, C, colorSpace->illuminant, alloc);
+    } else {
+        SpectrumHandle r = GetNamedSpectrum(name + "_r");
+        SpectrumHandle g = GetNamedSpectrum(name + "_g");
+        SpectrumHandle b = GetNamedSpectrum(name + "_b");
+
+        if (!r || !g || !b) {
+            ErrorExit(loc, "%s: unknown sensor type", name);
+        }
+
+        auto whiteIlluminant = Spectra::D(whiteBalanceTemp);
+        Warning("whiteIlluminant: %s", whiteIlluminant.ToString());
+        SquareMatrix<3> XYZFromCameraRGB =
+            SolveCameraMatrix(r, g, b, whiteIlluminant, colorSpace->illuminant);
+        Warning("camera matrix: %s", XYZFromCameraRGB.ToString());
+        return alloc.new_object<Sensor>(r, g, b, colorSpace, XYZFromCameraRGB,
+                                        exposureTime, fNumber, ISO, C,
+                                        colorSpace->illuminant, alloc);
+    }
+}
 
 void FilmHandle::AddSplat(const Point2f &p, SampledSpectrum v,
                           const SampledWavelengths &lambda) {
@@ -93,11 +541,13 @@ std::string VisibleSurface::ToString() const {
 STAT_MEMORY_COUNTER("Memory/Film pixels", filmPixelMemory);
 
 // RGBFilm Method Definitions
-RGBFilm::RGBFilm(const Point2i &resolution, const Bounds2i &pixelBounds,
-                 FilterHandle filter, Float diagonal, const std::string &filename,
-                 Float scale, const RGBColorSpace *colorSpace, Float maxComponentValue,
-                 bool writeFP16, Allocator allocator)
+RGBFilm::RGBFilm(const Sensor *sensor, const Point2i &resolution,
+                 const Bounds2i &pixelBounds, FilterHandle filter, Float diagonal,
+                 const std::string &filename, Float scale,
+                 const RGBColorSpace *colorSpace, Float maxComponentValue, bool writeFP16,
+                 Allocator allocator)
     : FilmBase(resolution, pixelBounds, filter, diagonal, filename),
+      sensor(sensor),
       pixels(pixelBounds, allocator),
       scale(scale),
       colorSpace(colorSpace),
@@ -107,6 +557,7 @@ RGBFilm::RGBFilm(const Point2i &resolution, const Bounds2i &pixelBounds,
     CHECK(!pixelBounds.IsEmpty());
     CHECK(colorSpace != nullptr);
     filmPixelMemory += pixelBounds.Area() * sizeof(Pixel);
+    outputRGBFromCameraRGB = colorSpace->RGBFromXYZ * sensor->XYZFromCameraRGB;
 }
 
 SampledWavelengths RGBFilm::SampleWavelengths(Float u) const {
@@ -116,7 +567,9 @@ SampledWavelengths RGBFilm::SampleWavelengths(Float u) const {
 void RGBFilm::AddSplat(const Point2f &p, SampledSpectrum v,
                        const SampledWavelengths &lambda) {
     CHECK(!v.HasNaNs());
-    RGB rgb = v.ToRGB(lambda, *colorSpace);
+    // First convert to sensor exposure, H, then to camera RGB
+    SampledSpectrum H = v * sensor->ImagingRatio();
+    RGB rgb = sensor->ToCameraRGB(H, lambda);
     // Optionally clamp splat sensor RGB value
     Float m = std::max({rgb.r, rgb.g, rgb.b});
     if (m > maxComponentValue)
@@ -274,19 +727,39 @@ RGBFilm *RGBFilm::Create(const ParameterDictionary &parameters, FilterHandle fil
     Float maxComponentValue = parameters.GetOneFloat("maxcomponentvalue", Infinity);
     bool writeFP16 = parameters.GetOneBool("savefp16", true);
 
-    return alloc.new_object<RGBFilm>(fullResolution, pixelBounds, filter, diagonal,
-                                     filename, scale, colorSpace, maxComponentValue,
-                                     writeFP16, alloc);
+    // Imaging ratio parameters
+    // The defaults here represent a "passthrough" setup such that the imaging
+    // ratio will be exactly 1. This is a useful default since scenes that
+    // weren't authored with a physical camera in mind will render as expected.
+    Float exposureTime = parameters.GetOneFloat("exposuretime", 1.);
+    Float fNumber = parameters.GetOneFloat("fnumber", 1.);
+    Float ISO = parameters.GetOneFloat("iso", 100.);
+    // Note: in the talk we mention using 312.5 for historical reasons. The
+    // choice of 100 * Pi here just means that the other parameters make nice
+    // "round" numbers like 1 and 100.
+    Float C = parameters.GetOneFloat("c", 100.0 * Pi);
+    Float whiteBalanceTemp = parameters.GetOneFloat("whitebalance", 6500);
+
+    std::string sensorName = parameters.GetOneString("sensor", "cie1931");
+    Sensor *sensor = Sensor::Create(sensorName, colorSpace, exposureTime, fNumber, ISO, C,
+                                    whiteBalanceTemp, loc, alloc);
+
+    return alloc.new_object<RGBFilm>(sensor, fullResolution, pixelBounds, filter,
+                                     diagonal, filename, scale, colorSpace,
+                                     maxComponentValue, writeFP16, alloc);
 }
 
 // GBufferFilm Method Definitions
 void GBufferFilm::AddSample(const Point2i &pFilm, SampledSpectrum L,
                             const SampledWavelengths &lambda,
                             const VisibleSurface *visibleSurface, Float weight) {
-    RGB rgb = L.ToRGB(lambda, *colorSpace);
+    // First convert to sensor exposure, H, then to camera RGB
+    SampledSpectrum H = L * sensor->ImagingRatio();
+    RGB rgb = sensor->ToCameraRGB(H, lambda);
+
     Float m = std::max({rgb.r, rgb.g, rgb.b});
     if (m > maxComponentValue) {
-        L *= maxComponentValue / m;
+        H *= maxComponentValue / m;
         rgb *= maxComponentValue / m;
     }
 
@@ -294,7 +767,7 @@ void GBufferFilm::AddSample(const Point2i &pFilm, SampledSpectrum L,
     if (visibleSurface && *visibleSurface) {
         // Update variance estimates.
         // TODO: store channels independently?
-        p.rgbVarianceEstimator.Add(L.y(lambda));
+        p.rgbVarianceEstimator.Add(H.y(lambda));
 
         p.pSum += weight * visibleSurface->p;
 
@@ -316,11 +789,13 @@ void GBufferFilm::AddSample(const Point2i &pFilm, SampledSpectrum L,
     p.weightSum += weight;
 }
 
-GBufferFilm::GBufferFilm(const Point2i &resolution, const Bounds2i &pixelBounds,
-                         FilterHandle filter, Float diagonal, const std::string &filename,
-                         Float scale, const RGBColorSpace *colorSpace,
-                         Float maxComponentValue, bool writeFP16, Allocator alloc)
+GBufferFilm::GBufferFilm(const Sensor *sensor, const Point2i &resolution,
+                         const Bounds2i &pixelBounds, FilterHandle filter, Float diagonal,
+                         const std::string &filename, Float scale,
+                         const RGBColorSpace *colorSpace, Float maxComponentValue,
+                         bool writeFP16, Allocator alloc)
     : FilmBase(resolution, pixelBounds, filter, diagonal, filename),
+      sensor(sensor),
       pixels(pixelBounds, alloc),
       scale(scale),
       colorSpace(colorSpace),
@@ -339,7 +814,10 @@ void GBufferFilm::AddSplat(const Point2f &p, SampledSpectrum v,
                            const SampledWavelengths &lambda) {
     // NOTE: same code as RGBFilm::AddSplat()...
     CHECK(!v.HasNaNs());
-    RGB rgb = v.ToRGB(lambda, *colorSpace);
+    // First convert to sensor exposure, H, then to camera RGB
+    SampledSpectrum H = v * sensor->ImagingRatio();
+    RGB rgb = sensor->ToCameraRGB(H, lambda);
+
     Float m = std::max({rgb.r, rgb.g, rgb.b});
     if (m > maxComponentValue)
         rgb *= maxComponentValue / m;
@@ -559,9 +1037,26 @@ GBufferFilm *GBufferFilm::Create(const ParameterDictionary &parameters,
     Float scale = parameters.GetOneFloat("scale", 1.);
     bool writeFP16 = parameters.GetOneBool("savefp16", true);
 
-    return alloc.new_object<GBufferFilm>(fullResolution, pixelBounds, filter, diagonal,
-                                         filename, scale, colorSpace, maxComponentValue,
-                                         writeFP16, alloc);
+    // Imaging ratio parameters
+    // The defaults here represent a "passthrough" setup such that the imaging
+    // ratio will be exactly 1. This is a useful default since scenes that
+    // weren't authored with a physical camera in mind will render as expected.
+    Float exposureTime = parameters.GetOneFloat("exposuretime", 1.);
+    Float fNumber = parameters.GetOneFloat("fnumber", 1.);
+    Float ISO = parameters.GetOneFloat("iso", 100.);
+    // Note: in the talk we mention using 312.5 for historical reasons. The
+    // choice of 100 * Pi here just means that the other parameters make nice
+    // "round" numbers like 1 and 100.
+    Float C = parameters.GetOneFloat("c", 100.0 * Pi);
+    Float whiteBalanceTemp = parameters.GetOneFloat("whitebalance", 6500);
+
+    std::string sensorName = parameters.GetOneString("sensor", "cie1931");
+    Sensor *sensor = Sensor::Create(sensorName, colorSpace, exposureTime, fNumber, ISO, C,
+                                    whiteBalanceTemp, loc, alloc);
+
+    return alloc.new_object<GBufferFilm>(sensor, fullResolution, pixelBounds, filter,
+                                         diagonal, filename, scale, colorSpace,
+                                         maxComponentValue, writeFP16, alloc);
 }
 
 FilmHandle FilmHandle::Create(const std::string &name,
