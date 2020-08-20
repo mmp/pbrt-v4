@@ -8,6 +8,7 @@
  * at the end of this file.
  * ---------------------------------------------------------------------- */
 #include <stdio.h>
+#include <cctype>
 #include <ctype.h>
 #include <assert.h>
 #include <string.h>
@@ -379,7 +380,10 @@ p_ply ply_open(const char *name, p_ply_error_cb error_cb, long idata,
     }
     assert(name);
     // Is it gzipped?
-    if (strcasestr(name, ".gz") - name + 3 == strlen(name)) {
+    if (strlen(name) > 3 &&
+        name[strlen(name)-3] == '.' &&
+        std::tolower(name[strlen(name)-2]) == 'g' &&
+        std::tolower(name[strlen(name)-1]) == 'z') {
          gzfp = gzopen(name, "rb");
          if (!gzfp) {
             error_cb(ply, "Unable to open file");
