@@ -556,8 +556,6 @@ class BlackbodySpectrum {
     std::string ParameterType() const;
     std::string ParameterString() const;
 
-    Float scale;
-
   private:
     // BlackbodySpectrum Private Members
     Float T;

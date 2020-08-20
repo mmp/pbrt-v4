@@ -90,10 +90,9 @@ std::vector<TestScene> GetScenes() {
         // We have to do this little dance here to make sure the spectrum is
         // properly normalized (this is usually all handled inside *Light::Create())
         ConstantSpectrum I(1);
-        I.Scale(1.0 / SpectrumToPhotometric(&I));
-        I.Scale(Pi);
+        Float scale = Pi / SpectrumToPhotometric(&I);
         std::vector<LightHandle> lights;
-        lights.push_back(new PointLight(identity, MediumInterface(), &I, 1.f, Allocator()));
+        lights.push_back(new PointLight(identity, MediumInterface(), &I, scale, Allocator()));
 
         scenes.push_back({bvh, lights, "Sphere, 1 light, Kd = 0.5", 1.0});
     }
@@ -118,13 +117,12 @@ std::vector<TestScene> GetScenes() {
         // We have to do this little dance here to make sure the spectrum is
         // properly normalized (this is usually all handled inside *Light::Create())
         ConstantSpectrum I(1);
-        I.Scale(1.0 / SpectrumToPhotometric(&I));
-        I.Scale(Pi/4);
+        Float scale = Pi / (4 * SpectrumToPhotometric(&I));
         std::vector<LightHandle> lights;
-        lights.push_back(new PointLight(identity, MediumInterface(), &I, 1.f, Allocator()));
-        lights.push_back(new PointLight(identity, MediumInterface(), &I, 1.f, Allocator()));
-        lights.push_back(new PointLight(identity, MediumInterface(), &I, 1.f, Allocator()));
-        lights.push_back(new PointLight(identity, MediumInterface(), &I, 1.f, Allocator()));
+        lights.push_back(new PointLight(identity, MediumInterface(), &I, scale, Allocator()));
+        lights.push_back(new PointLight(identity, MediumInterface(), &I, scale, Allocator()));
+        lights.push_back(new PointLight(identity, MediumInterface(), &I, scale, Allocator()));
+        lights.push_back(new PointLight(identity, MediumInterface(), &I, scale, Allocator()));
 
         scenes.push_back({bvh, lights, "Sphere, 1 light, Kd = 0.5", 1.0});
     }
@@ -143,10 +141,9 @@ std::vector<TestScene> GetScenes() {
         // We have to do this little dance here to make sure the spectrum is
         // properly normalized (this is usually all handled inside *Light::Create())
         ConstantSpectrum Le(1);
-        Le.Scale(1.0 / SpectrumToPhotometric(&Le));
-        Le.Scale(0.5);
+        Float scale = 0.5 / SpectrumToPhotometric(&Le);
         LightHandle areaLight =
-            new DiffuseAreaLight(identity, MediumInterface(), &Le, 1.f, sphere, Image(),
+            new DiffuseAreaLight(identity, MediumInterface(), &Le, scale, sphere, Image(),
                                  nullptr, false, Allocator());
 
         std::vector<LightHandle> lights;

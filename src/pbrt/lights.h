@@ -586,7 +586,6 @@ class UniformInfiniteLight : public LightBase {
   private:
     // UniformInfiniteLight Private Members
     DenselySampledSpectrum Lemit;
-    Float scale;
     Point3f sceneCenter;
     Float sceneRadius;
     Float scale;

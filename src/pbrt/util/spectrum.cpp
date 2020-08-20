@@ -83,13 +83,6 @@ Float SpectrumToPhotometric(SpectrumHandle s) {
     for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda)
         y += Spectra::Y()(lambda) * s(lambda);
 
-    // Similarly, the Blackbody contains a scale factor so we'll need to 
-    // divide that out of the integral
-    if (s.Is<BlackbodySpectrum>()) {
-        BlackbodySpectrum* b = s.Cast<BlackbodySpectrum>();
-        y /= b->scale;
-    }
-    
     return y * K_m;
 }
 
@@ -1746,11 +1739,11 @@ DenselySampledSpectrum D(Float temperature, Allocator alloc) {
     Float cct = temperature * 1.4388 / 1.4380;
     if (cct < 4000) {
         // CIE D ill-defined, use blackbody
+        BlackbodySpectrum bb = BlackbodySpectrum(cct);
         DenselySampledSpectrum blackbody = DenselySampledSpectrum::SampleFunction([=](Float lambda) {
-            return Blackbody(lambda, cct);
+            return bb(lambda);
         });
 
-        blackbody.Scale(1.0 / SpectrumToY(SpectrumHandle(&blackbody)));
         return blackbody;
     }
 

@@ -344,8 +344,8 @@ RGB IlluminantToCameraRGB(const DenselySampledSpectrum &illum,
     return rgb / rgb.g;
 }
 
-Float IlluminantToY(const DenselySampledSpectrum &illum, const DenselySampledSpectrum &r,
-                    const DenselySampledSpectrum &g, const DenselySampledSpectrum &b) {
+Float IlluminantToY(const DenselySampledSpectrum &illum,
+                    const DenselySampledSpectrum &g) {
     Float y = 0;
     for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda) {
         y += g(lambda) * illum(lambda);
@@ -376,7 +376,7 @@ SquareMatrix<3> LinearLeastSquares(Float A[][3], Float B[][3], int rows) {
     return Transpose(*AtAi * AtB);
 }
 
-// Solve a 3x3 matrix that transforms from some space defined by the given 
+// Solve a 3x3 matrix that transforms from some space defined by the given
 // r, g, b curves with whitepoint srcw to CIE XYZ with whitepoint dstw
 SquareMatrix<3> SolveCameraMatrix(SpectrumHandle r, SpectrumHandle g, SpectrumHandle b,
                                   const DenselySampledSpectrum &srcw,
@@ -389,15 +389,16 @@ SquareMatrix<3> SolveCameraMatrix(SpectrumHandle r, SpectrumHandle g, SpectrumHa
     RGB dst_white = IlluminantToCameraRGB(dstw, r, g, b);
 
     // account for perceptual brightness difference in whites by scaling the
-    // target swatches by the relative difference between them
-    Float srcy = IlluminantToY(srcw, r, g, b);
-    Float dsty = IlluminantToY(dstw, r, g, b);
+    // target swatches by the relative difference between the whitepoint in
+    // camera space and in CIE XYZ
+    Float srcG = IlluminantToY(srcw, g);
+    Float srcY = IlluminantToY(srcw, Spectra::Y());
 
     for (int i = 0; i < 24; ++i) {
         SpectrumHandle s = MakeSpectrumFromInterleaved(trainingSwatches[i], alloc);
         RGB a = SpectrumToCameraRGB(s, srcw, r, g, b) / dst_white;
         RGB b = SpectrumToCameraRGB(s, dstw, Spectra::X(), Spectra::Y(), Spectra::Z()) *
-                (dsty / srcy);
+                (srcY / srcG);
         for (int c = 0; c < 3; ++c) {
             A_data[i][c] = a[c];
             B_data[i][c] = b[c];
@@ -429,13 +430,16 @@ Sensor::Sensor(SpectrumHandle r_bar, SpectrumHandle g_bar, SpectrumHandle b_bar,
         white.g += g_bar(l) * whiteIlluminant(l);
         white.b += b_bar(l) * whiteIlluminant(l);
     }
+    white /= white.g;
 
     if (XYZFromCameraRGB.IsIdentity()) {
         cameraRGBWhiteNorm = RGB(1, 1, 1);
     } else {
         // Compute RGB of illuminant in sensor's RGB space and scale to match
         // CIE Y so that we maintain same brightness
-        cameraRGBWhiteNorm = RGB(CIE_Y_integral, CIE_Y_integral, CIE_Y_integral) / white;
+        // cameraRGBWhiteNorm = RGB(CIE_Y_integral, CIE_Y_integral, CIE_Y_integral) /
+        // white;
+        cameraRGBWhiteNorm = RGB(1, 1, 1) / white;
     }
 }
 
@@ -456,8 +460,10 @@ Sensor *Sensor::Create(const std::string &name, const RGBColorSpace *colorSpace,
         }
 
         auto whiteIlluminant = Spectra::D(whiteBalanceTemp);
+        Warning("whiteIlluminant: %s", whiteIlluminant.ToString());
         SquareMatrix<3> XYZFromCameraRGB =
             SolveCameraMatrix(r, g, b, whiteIlluminant, colorSpace->illuminant);
+        Warning("camera matrix: %s", XYZFromCameraRGB.ToString());
         return alloc.new_object<Sensor>(r, g, b, colorSpace, XYZFromCameraRGB,
                                         exposureTime, fNumber, ISO, C,
                                         colorSpace->illuminant, alloc);
