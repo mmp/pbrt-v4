@@ -244,7 +244,7 @@ ProjectionLight::ProjectionLight(const Transform &renderFromLight,
     // scale to target photometric power if requested
     if (phi_v > 0) {
         Float sum = 0;
-        RGB luminance(0.2126, 0.7152, 0.0722);
+        RGB luminance = imageColorSpace->LuminanceVector();
         for (int v = 0; v < image.Resolution().y; ++v)
             for (int u = 0; u < image.Resolution().x; ++u) {
                 Point2f ps = screenBounds.Lerp(
@@ -253,11 +253,8 @@ ProjectionLight::ProjectionLight(const Transform &renderFromLight,
                 w = Normalize(w);
                 Float dwdA = Pow<3>(w.z);
 
-                RGB rgb;
                 for (int c = 0; c < 3; ++c)
-                    rgb[c] = image.GetChannel({u, v}, c);
-
-                sum += rgb.r * 0.2126 + rgb.g * 0.7152 + rgb.b * 0.0722 * dwdA;
+                    sum += image.GetChannel({u, v}, c) * luminance[c] * dwdA;
             }
 
         scale *= phi_v / (A * sum / (image.Resolution().x * image.Resolution().y));
@@ -759,8 +756,12 @@ DiffuseAreaLight *DiffuseAreaLight::Create(const Transform &renderFromLight,
         // radiance such that the user-defined power will be the actual power
         // emitted by the light.
         Float k_e;
-        // FIXME: get the appropriate row from the image colourspace
-        Float lum[3] = {0.2126, 0.7152, 0.0722};
+        // Get the appropriate luminance vector from the image colour space
+        RGB lum = imageColorSpace->LuminanceVector();
+        // we need to know which channels correspond to R, G and B
+        // we know that the channelDesc is valid as we would have exited in the
+        // block above otherwise
+        ImageChannelDesc channelDesc = image.GetChannelDesc({"R", "G", "B"});
         if (image) {
             k_e = 0;
             // Assume no distortion in the mapping, FWIW...

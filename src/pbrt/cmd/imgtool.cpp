@@ -21,6 +21,7 @@
 #include <pbrt/util/spectrum.h>
 #include <pbrt/util/string.h>
 #include <pbrt/util/vecmath.h>
+#include <pbrt/util/progressreporter.h>
 
 extern "C" {
 #include <skymodel/ArHosekSkyModel.h>
@@ -1862,29 +1863,34 @@ int makeenv(int argc, char *argv[]) {
     // Copyright © 2020, Weta Digital, Ltd.
     // SPDX-License-Identifier: Apache-2.0
     float illuminance = 0;
-    if (latlongImage.NChannels() < 3) {
+    ImageChannelDesc channelDesc = latlongImage.GetChannelDesc({"R", "G", "B"});
+    if (!channelDesc) {
         // TODO? We could probably support float images here too, but
         // ImageInfiniteLight requires RGB anyway...
-        fprintf(stderr, "WARNING: Need at least 3 (RGB) channels for illuminance calculation");
+        fprintf(stderr, "Image \"%s\" does not have RGB channels\n", inFilename.c_str());
     } else {
+        Timer timer;
         int ye = latlongImage.Resolution().y / 2;
         int ys = 0;
         int xs = 0;
         int xe = latlongImage.Resolution().x;
+        RGB lum = latlong.metadata.GetColorSpace()->LuminanceVector();
         for (int y = ys; y < ye; ++y) {
             float v = (float(y) + 0.5f) / float(latlongImage.Resolution().y);
             float theta = (v - 0.5f) * Pi;
             float cosTheta = std::cos(theta);
             float sinTheta = std::sin(theta);
             for (int x = xs; x < xe; ++x) {
-                // TODO: other colour spaces
                 ImageChannelValues values = latlongImage.GetChannels({x, y});
-                illuminance += (values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722)
-                    * std::abs(cosTheta) * std::abs(sinTheta);
+                for (int c = 0; c < 3; ++c) {
+                    illuminance +=
+                        values[c] * lum[c] * std::abs(cosTheta) * std::abs(sinTheta);
+                }
             }
         }
-        illuminance /= float(ye-ys) * float(xe-xs);
-        illuminance *= Pi*Pi;
+        illuminance /= float(ye - ys) * float(xe - xs);
+        illuminance *= Pi * Pi;
+        printf("Illuminance calculation took %.3fs\n", timer.ElapsedSeconds());
     }
 
     ImageMetadata equiRectMetadata;
