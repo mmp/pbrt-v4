@@ -200,8 +200,8 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                                                         : s.mediumInterface.inside;
 
                 int pixelIndex = rayQueues[depth & 1]->pixelIndex[s.rayIndex];
-                shadowRayQueue->Push(ShadowRayWorkItem{ray, 1 - ShadowEpsilon, lambda, Ld,
-                                                       pdfUni, pdfNEE, pixelIndex});
+                shadowRayQueue->Push(ray, 1 - ShadowEpsilon, lambda, Ld, pdfUni, pdfNEE,
+                                     pixelIndex);
             }
         });
 

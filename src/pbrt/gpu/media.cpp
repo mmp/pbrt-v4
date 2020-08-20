@@ -263,9 +263,8 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                     Ray ray(ms.p, ls.pLight.p() - ms.p, time, ms.medium);
 
                     // Enqueue shadow ray
-                    shadowRayQueue->Push(ShadowRayWorkItem{ray, 1 - ShadowEpsilon,
-                                                           ms.lambda, Ld, pdfUni, pdfNEE,
-                                                           ms.pixelIndex});
+                    shadowRayQueue->Push(ray, 1 - ShadowEpsilon, ms.lambda, Ld,
+                                         pdfUni, pdfNEE, ms.pixelIndex);
 
                     DBG("Enqueued medium shadow ray depth %d "
                         "Ld %f %f %f %f pdfUni %f %f %f %f "

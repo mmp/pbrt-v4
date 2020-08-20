@@ -160,8 +160,6 @@ struct ShadowRayWorkItem {
     int pixelIndex;
 };
 
-using ShadowRayQueue = WorkQueue<ShadowRayWorkItem>;
-
 template <typename Material>
 struct MaterialEvalWorkItem {
     PBRT_CPU_GPU
@@ -230,8 +228,6 @@ struct GetBSSRDFAndProbeRayWorkItem {
     MediumInterface mediumInterface;
     int rayIndex;
 };
-
-using GetBSSRDFAndProbeRayQueue = WorkQueue<GetBSSRDFAndProbeRayWorkItem>;
 
 struct SubsurfaceScatterWorkItem {
     Point3f p0, p1;
@@ -343,6 +339,46 @@ class RayQueue : public WorkQueue<RayWorkItem> {
         this->anyNonSpecularBounces[index] = anyNonSpecularBounces;
         this->isSpecularBounce[index] = isSpecularBounce;
         this->etaScale[index] = etaScale;
+        return index;
+    }
+};
+
+class ShadowRayQueue : public WorkQueue<ShadowRayWorkItem> {
+public:
+    using WorkQueue::WorkQueue;
+
+    PBRT_CPU_GPU
+    void Push(const Ray &ray, Float tMax, SampledWavelengths lambda,
+              SampledSpectrum Ld, SampledSpectrum pdfUni, SampledSpectrum pdfNEE,
+              int pixelIndex) {
+        WorkQueue<ShadowRayWorkItem>::Push(
+            ShadowRayWorkItem{ray, tMax, lambda, Ld, pdfUni, pdfNEE, pixelIndex});
+    }
+};
+
+class GetBSSRDFAndProbeRayQueue : public WorkQueue<GetBSSRDFAndProbeRayWorkItem> {
+public:
+    using WorkQueue::WorkQueue;
+
+    PBRT_CPU_GPU
+    int Push(MaterialHandle material, SampledWavelengths lambda,
+             SampledSpectrum beta, SampledSpectrum pdfUni,
+             Point3f p, Vector3f wo, Normal3f n, Normal3f ns,
+             Vector3f dpdus, Point2f uv, MediumInterface mediumInterface,
+             int rayIndex) {
+        int index = size.fetch_add(1, cuda::std::memory_order_relaxed);
+        this->material[index] = material;
+        this->lambda[index] = lambda;
+        this->beta[index] = beta;
+        this->pdfUni[index] = pdfUni;
+        this->p[index] = p;
+        this->wo[index] = wo;
+        this->n[index] = n;
+        this->ns[index] = ns;
+        this->dpdus[index] = dpdus;
+        this->uv[index] = uv;
+        this->mediumInterface[index] = mediumInterface;
+        this->rayIndex[index] = rayIndex;
         return index;
     }
 };

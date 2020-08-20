@@ -141,12 +141,14 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 if (beta) {
                     if (bsdfSample.IsTransmission() &&
                         material->HasSubsurfaceScattering()) {
-                        // There's a BSSRDF and sampled ray scattered into
-                        // the surface; enqueue a work item for subsurface
-                        // scattering rather than tracing the ray.
-                        bssrdfEvalQueue->Push(GetBSSRDFAndProbeRayWorkItem{
-                            material, lambda, beta, pdfUni, Point3f(me.pi), wo, me.n, ns,
-                            dpdus, me.uv, me.mediumInterface, me.rayIndex});
+                        // There's a BSSRDF and the sampled ray scattered
+                        // into the surface; enqueue a work item for
+                        // subsurface scattering rather than tracing the
+                        // ray.
+                        bssrdfEvalQueue->Push(material, lambda, beta, pdfUni,
+                                              Point3f(me.pi), wo, me.n, ns,
+                                              dpdus, me.uv, me.mediumInterface,
+                                              me.rayIndex);
                     } else {
                         Ray ray = SpawnRay(me.pi, me.n, me.time, wi);
                         if (haveMedia)
@@ -166,8 +168,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
 
                         DBG("Spawned indirect ray at depth %d from prev ray index %d. "
                             "Specular %d Beta %f %f %f %f pdfUni %f %f %f %f pdfNEE %f "
-                            "%f %f %f "
-                            "beta/pdfUni %f %f %f %f\n",
+                            "%f %f %f beta/pdfUni %f %f %f %f\n",
                             depth + 1, int(me.rayIndex), int(bsdfSample.IsSpecular()),
                             beta[0], beta[1], beta[2], beta[3], pdfUni[0], pdfUni[1],
                             pdfUni[2], pdfUni[3], pdfNEE[0], pdfNEE[1], pdfNEE[2],
@@ -224,8 +225,9 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                     ray.medium = Dot(ray.d, me.n) > 0 ? me.mediumInterface.outside
                                                       : me.mediumInterface.inside;
 
-                shadowRayQueue->Push(ShadowRayWorkItem{ray, 1 - ShadowEpsilon, lambda, Ld,
-                                                       pdfUni, pdfNEE, me.pixelIndex});
+                shadowRayQueue->Push(ray, 1 - ShadowEpsilon, lambda, Ld,
+                                     pdfUni, pdfNEE, me.pixelIndex);
+
                 DBG("ray index %d spawned shadow ray depth %d Ld %f %f %f %f "
                     "new beta %f %f %f %f beta/uni %f %f %f %f Ld/uni %f %f %f %f\n",
                     me.rayIndex, depth, Ld[0], Ld[1], Ld[2], Ld[3], beta[0], beta[1],
