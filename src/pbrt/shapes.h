@@ -946,7 +946,7 @@ class Triangle {
         Vector3f dp02 = p0 - p2, dp12 = p1 - p2;
 
         Float determinant = DifferenceOfProducts(duv02[0], duv12[1], duv02[1], duv12[0]);
-        bool degenerateUV = std::abs(determinant) < 1e-12;
+        bool degenerateUV = std::abs(determinant) < 1e-9;
         if (!degenerateUV) {
             Float invdet = 1 / determinant;
             dpdu = DifferenceOfProducts(duv12[1], dp02, duv02[1], dp12) * invdet;
@@ -1036,7 +1036,7 @@ class Triangle {
 
                 Float determinant =
                     DifferenceOfProducts(duv02[0], duv12[1], duv02[1], duv12[0]);
-                bool degenerateUV = std::abs(determinant) < 1e-32;
+                bool degenerateUV = std::abs(determinant) < 1e-9;
                 if (degenerateUV) {
                     // We can still compute dndu and dndv, with respect to the
                     // same arbitrary coordinate system we use to compute dpdu

@@ -106,6 +106,11 @@ void SurfaceInteraction::ComputeDifferentials(const RayDifferential &ray,
 
     dudy = DifferenceOfProducts(a11, b0y, a01, b1y) * invDet;
     dvdy = DifferenceOfProducts(a00, b1y, a01, b0y) * invDet;
+
+    dudx = std::isfinite(dudx) ? Clamp(dudx, -1e8f, 1e8f) : 0.f;
+    dvdx = std::isfinite(dvdx) ? Clamp(dvdx, -1e8f, 1e8f) : 0.f;
+    dudy = std::isfinite(dudy) ? Clamp(dudy, -1e8f, 1e8f) : 0.f;
+    dvdy = std::isfinite(dvdy) ? Clamp(dvdy, -1e8f, 1e8f) : 0.f;
 }
 
 RayDifferential SurfaceInteraction::SpawnRay(const RayDifferential &rayi,
@@ -158,6 +163,19 @@ RayDifferential SurfaceInteraction::SpawnRay(const RayDifferential &rayi,
             rd.ryDirection = wi - eta * dwody + Vector3f(mu * dndy + dmudy * ns);
         }
     }
+    // Squash potentially troublesome differentials
+    // After many specuar bounces (e.g. the Transparent Machines scenes),
+    // differentials can drift off to have large magnitudes, which ends up
+    // leaving a trail of Infs and NaNs in their wake. We'll disable the
+    // differentials when this seems to be happening.
+    //
+    // TODO: this is unsatisfying and would be nice to address in a more
+    // principled way.
+    if (LengthSquared(rd.rxDirection) > 1e16f || LengthSquared(rd.ryDirection) > 1e16f ||
+        LengthSquared(Vector3f(rd.rxOrigin)) > 1e16f ||
+        LengthSquared(Vector3f(rd.ryOrigin)) > 1e16f)
+        rd.hasDifferentials = false;
+
     return rd;
 }
 
