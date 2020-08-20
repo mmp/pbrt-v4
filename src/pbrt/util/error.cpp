@@ -67,10 +67,8 @@ void Error(const FileLoc *loc, const char *message) {
 
 void ErrorExit(const FileLoc *loc, const char *message) {
     processError("Error", loc, message);
-    // This is annoying, but gives a cleaner exit.
-    ParallelCleanup();
     DisconnectFromDisplayServer();
-    exit(1);
+    std::quick_exit(1);
 }
 
 int LastError() {
