@@ -1450,22 +1450,39 @@ LightHandle LightHandle::Create(const std::string &name,
             scale /= SpectrumToPhotometric(&colorSpace->illuminant);
 
             if (E_v > 0) {
-                if (imageAndMetadata.metadata.illuminance) {
-                    // scaling factor is just the ratio of the target
-                    // illuminance and the illuminance of the map multiplied by
-                    // the illuminant spectrum
-                    Float k_e = *imageAndMetadata.metadata.illuminance;
-                    scale *= E_v / k_e;
-
-                } else {
-                    ErrorExit(loc,
-                              "infinite light specifies an image and an "
-                              "illuminance target, but image \"%s\" metadata does "
-                              "not "
-                              "contain illuminance. Did you run imgtool makeenv on "
-                              "the image?",
-                              filename);
+                // Upper hemisphere illuminance calculation for converting map to physical
+                // units
+                // PhysLight code contributed by Anders Langlands and Luca Fascione
+                // Copyright © 2020, Weta Digital, Ltd.
+                // SPDX-License-Identifier: Apache-2.0
+                float illuminance = 0;
+                const Image& image = imageAndMetadata.image;
+                int ye = image.Resolution().y / 2;
+                int ys = 0;
+                int xs = 0;
+                int xe = image.Resolution().x;
+                RGB lum = imageAndMetadata.metadata.GetColorSpace()->LuminanceVector();
+                for (int y = ys; y < ye; ++y) {
+                    float v = (float(y) + 0.5f) / float(image.Resolution().y);
+                    float theta = (v - 0.5f) * Pi;
+                    float cosTheta = std::cos(theta);
+                    float sinTheta = std::sin(theta);
+                    for (int x = xs; x < xe; ++x) {
+                        ImageChannelValues values = image.GetChannels({x, y});
+                        for (int c = 0; c < 3; ++c) {
+                            illuminance +=
+                                values[c] * lum[c] * std::abs(cosTheta) * std::abs(sinTheta);
+                        }
+                    }
                 }
+                illuminance /= float(ye - ys) * float(xe - xs);
+                illuminance *= Pi * Pi;
+
+                // scaling factor is just the ratio of the target
+                // illuminance and the illuminance of the map multiplied by
+                // the illuminant spectrum
+                Float k_e = illuminance;
+                scale *= E_v / k_e;
             }
             Image image = imageAndMetadata.image.SelectChannels(channelDesc, alloc);
 

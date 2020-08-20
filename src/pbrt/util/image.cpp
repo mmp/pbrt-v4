@@ -80,10 +80,10 @@ std::string ImageChannelDesc::ToString() const {
 std::string ImageMetadata::ToString() const {
     return StringPrintf("[ ImageMetadata renderTimeSeconds: %s cameraFromWorld: %s "
                         "NDCFromWorld: %s pixelBounds: %s fullResolution: %s "
-                        "samplesPerPixel: %s estimatedVariance: %s illuminance: %s MSE: %s "
+                        "samplesPerPixel: %s estimatedVariance: %s MSE: %s "
                         "colorSpace: %s ]",
                         renderTimeSeconds, cameraFromWorld, NDCFromWorld, pixelBounds,
-                        fullResolution, samplesPerPixel, estimatedVariance, illuminance, MSE,
+                        fullResolution, samplesPerPixel, estimatedVariance, MSE,
                         colorSpace);
 }
 
@@ -1080,11 +1080,6 @@ static ImageAndMetadata ReadEXR(const std::string &name, Allocator alloc) {
         if (varianceAttrib != nullptr)
             metadata.estimatedVariance = varianceAttrib->value();
 
-        const Imf::FloatAttribute *illuminanceAttrib =
-            file.header().findTypedAttribute<Imf::FloatAttribute>("illuminance");
-        if (illuminanceAttrib != nullptr)
-            metadata.illuminance = illuminanceAttrib->value();
-
         const Imf::FloatAttribute *mseAttrib =
             file.header().findTypedAttribute<Imf::FloatAttribute>("MSE");
         if (mseAttrib != nullptr)
@@ -1209,9 +1204,6 @@ bool Image::WriteEXR(const std::string &name, const ImageMetadata &metadata) con
         if (metadata.estimatedVariance)
             header.insert("estimatedVariance",
                           Imf::FloatAttribute(*metadata.estimatedVariance));
-        if (metadata.illuminance)
-            header.insert("illuminance",
-                          Imf::FloatAttribute(*metadata.illuminance));
         if (metadata.MSE)
             header.insert("MSE", Imf::FloatAttribute(*metadata.MSE));
         for (const auto &iter : metadata.stringVectors)
