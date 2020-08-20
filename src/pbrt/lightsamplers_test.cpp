@@ -24,7 +24,8 @@ TEST(BVHLightSampling, OneSpot) {
     Transform id;
     std::vector<LightHandle> lights;
     ConstantSpectrum one(1.f);
-    lights.push_back(new SpotLight(id, MediumInterface(), &one, 45.f /* total width */,
+    lights.push_back(new SpotLight(id, MediumInterface(), &one, 1.f /* scale */,
+                                   45.f /* total width */,
                                    44.f /* falloff start */, Allocator()));
     BVHLightSampler distrib(lights, Allocator());
 
@@ -66,7 +67,7 @@ TEST(BVHLightSampling, Point) {
         Vector3f p(Lerp(rng.Uniform<Float>(), -5, 5), Lerp(rng.Uniform<Float>(), -5, 5),
                    Lerp(rng.Uniform<Float>(), -5, 5));
         lights.push_back(
-            new PointLight(Translate(p), MediumInterface(), &one, Allocator()));
+            new PointLight(Translate(p), MediumInterface(), &one, 1.f, Allocator()));
         lightToIndex[lights.back()] = i;
     }
     BVHLightSampler distrib(lights, Allocator());
@@ -117,7 +118,7 @@ TEST(BVHLightSampling, PointVaryPower) {
         lightSpectra.push_back(std::make_unique<ConstantSpectrum>(lightPower.back()));
         sumPower += lightPower.back();
         lights.push_back(new PointLight(Translate(p), MediumInterface(),
-                                        lightSpectra.back().get(), Allocator()));
+                                        lightSpectra.back().get(), 1.f, Allocator()));
         lightToIndex[lights.back()] = i;
     }
     BVHLightSampler distrib(lights, Allocator());
@@ -259,7 +260,7 @@ static std::tuple<std::vector<LightHandle>, std::vector<ShapeHandle>> randomLigh
                        Lerp(rng.Uniform<Float>(), -5, 5));
             lights.push_back(new PointLight(Translate(p), MediumInterface(),
                                             alloc.new_object<ConstantSpectrum>(r()),
-                                            Allocator()));
+                                            1.f, Allocator()));
         }
     }
 

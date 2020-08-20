@@ -1587,6 +1587,9 @@ void FormattingScene::LightSource(const std::string &name, ParsedParameterVector
             }
         }
 
+        totalScale *= dict.UpgradeBlackbody("I");
+        totalScale *= dict.UpgradeBlackbody("L");
+
         // Do this after we've handled infinite "L" with a map, since
         // it removes the "mapname" parameter from the dictionary.
         extra += upgradeMapname(*this, &dict);
@@ -1615,6 +1618,8 @@ void FormattingScene::AreaLightSource(const std::string &name,
             return;
         }
 
+        totalScale *= dict.UpgradeBlackbody("L");
+
         if (name == "area")
             Printf("%sAreaLightSource \"diffuse\"\n", indent());
         else
@@ -1624,7 +1629,7 @@ void FormattingScene::AreaLightSource(const std::string &name,
         Printf("%sAreaLightSource \"%s\"\n", indent(), name);
 
     if (totalScale != 1)
-        Printf("%s\"float scale\" [%f]", indent(1), totalScale);
+        Printf("%s\"float scale\" [%f]\n", indent(1), totalScale);
     std::cout << extra << dict.ToParameterList(catIndentCount);
 }
 

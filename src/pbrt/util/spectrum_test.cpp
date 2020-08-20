@@ -93,10 +93,10 @@ TEST(Spectrum, MaxValue) {
                   {Float(1.5), Float(2.6), Float(10.1), Float(5.3), Float(7.7)})
                   .MaxValue());
 
-    EXPECT_GT(BlackbodySpectrum(5000, 1).MaxValue(), .9999);
-    EXPECT_LT(BlackbodySpectrum(5000, 1).MaxValue(), 1.0001);
+    EXPECT_GT(BlackbodySpectrum(5000).MaxValue(), .9999);
+    EXPECT_LT(BlackbodySpectrum(5000).MaxValue(), 1.0001);
 
-    BlackbodySpectrum bb(5000, 1);
+    BlackbodySpectrum bb(5000);
     EXPECT_GT(DenselySampledSpectrum(&bb).MaxValue(), .9999);
     EXPECT_LT(DenselySampledSpectrum(&bb).MaxValue(), 1.0001);
 

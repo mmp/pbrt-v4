@@ -171,7 +171,7 @@ pstd::optional<SpectrumHandle> PiecewiseLinearSpectrum::Read(const std::string &
 }
 
 std::string BlackbodySpectrum::ToString() const {
-    return StringPrintf("[ BlackbodySpectrum T: %f scale: %f ]", T, scale);
+    return StringPrintf("[ BlackbodySpectrum T: %f ]", T);
 }
 
 std::string BlackbodySpectrum::ParameterType() const {
@@ -179,7 +179,7 @@ std::string BlackbodySpectrum::ParameterType() const {
 }
 
 std::string BlackbodySpectrum::ParameterString() const {
-    return StringPrintf("%f %f", T, scale);
+    return StringPrintf("%f", T);
 }
 
 SampledSpectrum ConstantSpectrum::Sample(const SampledWavelengths &) const {
@@ -1544,12 +1544,12 @@ pbrt::SpectrumHandle MakeSpectrumFromInterleaved(pstd::span<const Float> samples
             CHECK_GT(lambda[i], lambda[i - 1]);
     }
 
-    SpectrumHandle spec =
+    PiecewiseLinearSpectrum *spec =
         alloc.new_object<pbrt::PiecewiseLinearSpectrum>(lambda, v, alloc);
 
     if (normalize)
         // Normalize to have luminance of 1.
-        spec.Scale(1 / SpectrumToY(spec));
+        spec->Scale(1 / SpectrumToY(spec));
 
     return spec;
 }

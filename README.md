@@ -113,7 +113,9 @@ release build is the default; provide `-DCMAKE_BUILD_TYPE=Debug` to cmake
 for a debug build.
 
 pbrt should build on any system that has C++ compiler with support for
-C++17. We welcome PRs that make it build on more systems.
+C++17; we have verified that it builds on Ubuntu 20.04, MacOS 10.14, and
+Windows 10.  We welcome PRs that fix any issues that prevent it from
+building on other systems.
 
 Bug Reports and PRs
 -------------------
@@ -171,11 +173,11 @@ these capabilities are only available via CUDA and OptiX on NVIDIA GPUs
 today, though we'd be happy to see pbrt running on any other GPUs that
 provided those capabilities.
 
-pbrt's GPU path specifically requires CUDA 11.0 and OptiX 7.1.  The build
+pbrt's GPU path currently requires CUDA 11.0 and OptiX 7.1.  The build
 scripts will automatically attempt to find a CUDA compiler, looking in the
 usual places; the cmake output will indicate whether it was successful.  It
-is necessary to set the cmake `PBRT_OPTIX7_PATH` configuration option to
-point at an OptiX 7.1 install.
+is necessary to manually set the cmake `PBRT_OPTIX7_PATH` configuration
+option to point at an OptiX 7.1 install.
 
 Even when compiled with GPU support, pbrt uses the CPU by default unless
 the `--gpu` command-line option is given.  Note that when rendering with
@@ -183,10 +185,11 @@ the GPU, the `--spp` command-line flag can be helpful to easily crank up
 the number of samples per pixel. Also, it's extra fun to use *tev* to watch
 rendering progress.
 
-To denoise images using the OptiX denoiser, set the scene's "Film" type to
-be "gbuffer" when rendering and use EXR for the image format; a "deep"
-image will be generated with auxiliary channels like albedo and normal that
-are useful for the denoiser.  The resulting EXR can be denoised using
+If you'd like to use the OptiX denoiser to denoise rendered images, set the
+scene's "Film" type to be "gbuffer" when rendering and use EXR for the
+image format; a "deep" image will be generated with auxiliary channels like
+albedo and normal that are useful for the denoiser.  The resulting EXR can
+be denoised using:
 ```bash
 $ imgtool denoise-optix noisy.exr --outfile denoised.exr
 ```

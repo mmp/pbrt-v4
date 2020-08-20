@@ -393,9 +393,9 @@ std::vector<SpectrumHandle> ParameterDictionary::extractSpectrumArray(
             });
     else if (param.type == "blackbody")
         return returnArray<SpectrumHandle>(
-            param.numbers, param, 2,
+            param.numbers, param, 1,
             [this, &alloc](const double *v, const FileLoc *loc) -> SpectrumHandle {
-                return alloc.new_object<BlackbodySpectrum>(v[0], v[1]);
+                return alloc.new_object<BlackbodySpectrum>(v[0]);
             });
     else if (param.type == "spectrum" && !param.numbers.empty()) {
         if (param.numbers.size() % 2 != 0)
@@ -499,6 +499,20 @@ pstd::optional<RGB> ParameterDictionary::GetOneRGB(const std::string &name) cons
         }
     }
     return {};
+}
+
+Float ParameterDictionary::UpgradeBlackbody(const std::string &name) {
+    Float scale = 1;
+    for (ParsedParameter *p : params) {
+        if (p->name == name && p->type == "blackbody") {
+            if (p->numbers.size() != 2)
+                ErrorExit(&p->loc,
+                          "Expected two values for legacy \"blackbody\" parameter.");
+            scale *= p->numbers[1];
+            p->numbers.pop_back();
+        }
+    }
+    return scale;
 }
 
 void ParameterDictionary::remove(const std::string &name, const char *typeName) {

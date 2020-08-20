@@ -165,13 +165,11 @@ HomogeneousMedium *HomogeneousMedium::Create(const ParameterDictionary &paramete
     if (Le == nullptr)
         Le = alloc.new_object<ConstantSpectrum>(0.f);
 
-    Float scale = parameters.GetOneFloat("scale", 1.f);
-    sig_a.Scale(scale);
-    sig_s.Scale(scale);
+    Float sigScale = parameters.GetOneFloat("scale", 1.f);
 
     Float g = parameters.GetOneFloat("g", 0.0f);
 
-    return alloc.new_object<HomogeneousMedium>(sig_a, sig_s, Le, g, alloc);
+    return alloc.new_object<HomogeneousMedium>(sig_a, sig_s, sigScale, Le, g, alloc);
 }
 
 std::string HomogeneousMedium::ToString() const {
@@ -184,7 +182,7 @@ STAT_MEMORY_COUNTER("Memory/Volume grids", volumeGridBytes);
 
 // GridDensityMedium Method Definitions
 GridDensityMedium::GridDensityMedium(SpectrumHandle sigma_a, SpectrumHandle sigma_s,
-                                     SpectrumHandle Le, Float g,
+                                     Float sigScale, SpectrumHandle Le, Float g,
                                      const Transform &renderFromMedium,
                                      pstd::optional<SampledGrid<Float>> dgrid,
                                      pstd::optional<SampledGrid<RGB>> rgbgrid,
@@ -192,6 +190,7 @@ GridDensityMedium::GridDensityMedium(SpectrumHandle sigma_a, SpectrumHandle sigm
                                      SampledGrid<Float> Legrid, Allocator alloc)
     : sigma_a_spec(sigma_a, alloc),
       sigma_s_spec(sigma_s, alloc),
+      sigScale(sigScale),
       Le_spec(Le, alloc),
       phase(g),
       mediumFromRender(Inverse(renderFromMedium)),
@@ -289,9 +288,7 @@ GridDensityMedium *GridDensityMedium::Create(const ParameterDictionary &paramete
                                                   RGB(2.55f, 3.21f, 3.77f));
     }
 
-    Float scale = parameters.GetOneFloat("scale", 1.f);
-    sig_a.Scale(scale);
-    sig_s.Scale(scale);
+    Float sigScale = parameters.GetOneFloat("scale", 1.f);
 
     Float g = parameters.GetOneFloat("g", 0.0f);
 
@@ -341,8 +338,9 @@ GridDensityMedium *GridDensityMedium::Create(const ParameterDictionary &paramete
     Transform MediumFromData =
         Translate(Vector3f(p0)) * Scale(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z);
     return alloc.new_object<GridDensityMedium>(
-        sig_a, sig_s, Le, g, renderFromMedium * MediumFromData, std::move(densityGrid),
-        std::move(rgbDensityGrid), colorSpace, std::move(LeGrid), alloc);
+        sig_a, sig_s, sigScale, Le, g, renderFromMedium * MediumFromData,
+        std::move(densityGrid), std::move(rgbDensityGrid), colorSpace, std::move(LeGrid),
+        alloc);
 }
 
 std::string GridDensityMedium::ToString() const {

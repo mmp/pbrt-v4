@@ -1677,7 +1677,7 @@ int whitebalance(int argc, char *argv[]) {
         }
         srcWhite = SpectrumToXYZ(illum).xy();
     } else if (temperature > 0) {
-        BlackbodySpectrum bb(temperature, 1.f);
+        BlackbodySpectrum bb(temperature);
         srcWhite = SpectrumToXYZ(&bb).xy();
     } else
         srcWhite = Point2f(xy[0], xy[1]);

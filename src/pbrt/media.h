@@ -76,10 +76,11 @@ struct MediumSample {
 class HomogeneousMedium {
   public:
     // HomogeneousMedium Public Methods
-    HomogeneousMedium(SpectrumHandle sigma_a, SpectrumHandle sigma_s, SpectrumHandle Le,
-                      Float g, Allocator alloc)
+    HomogeneousMedium(SpectrumHandle sigma_a, SpectrumHandle sigma_s, Float sigScale,
+                      SpectrumHandle Le, Float g, Allocator alloc)
         : sigma_a_spec(sigma_a, alloc),
           sigma_s_spec(sigma_s, alloc),
+          sigScale(sigScale),
           Le_spec(Le, alloc),
           phase(g) {}
 
@@ -94,8 +95,8 @@ class HomogeneousMedium {
         Ray rayp(ray.o, Normalize(ray.d));
 
         // Compute _SampledSpectrum_ scattering properties for medium
-        SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
-        SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
+        SampledSpectrum sigma_a = sigScale * sigma_a_spec.Sample(lambda);
+        SampledSpectrum sigma_s = sigScale * sigma_s_spec.Sample(lambda);
         SampledSpectrum sigma_t = sigma_a + sigma_s;
         SampledSpectrum sigma_maj = sigma_t;
 
@@ -126,6 +127,7 @@ class HomogeneousMedium {
   private:
     // HomogeneousMedium Private Data
     DenselySampledSpectrum sigma_a_spec, sigma_s_spec, Le_spec;
+    Float sigScale;
     HGPhaseFunction phase;
 };
 
@@ -133,8 +135,8 @@ class HomogeneousMedium {
 class GridDensityMedium {
   public:
     // GridDensityMedium Public Methods
-    GridDensityMedium(SpectrumHandle sigma_a, SpectrumHandle sigma_s, SpectrumHandle Le,
-                      Float g, const Transform &renderFromMedium,
+    GridDensityMedium(SpectrumHandle sigma_a, SpectrumHandle sigma_s, Float sigScale,
+                      SpectrumHandle Le, Float g, const Transform &renderFromMedium,
                       pstd::optional<SampledGrid<Float>> densityGrid,
                       pstd::optional<SampledGrid<RGB>> rgbDensityGrid,
                       const RGBColorSpace *colorSpace, SampledGrid<Float> LeScaleGrid,
@@ -161,8 +163,8 @@ class GridDensityMedium {
         DCHECK_LE(tMax, raytMax);
 
         // Sample spectra for grid medium scattering
-        SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
-        SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
+        SampledSpectrum sigma_a = sigScale * sigma_a_spec.Sample(lambda);
+        SampledSpectrum sigma_s = sigScale * sigma_s_spec.Sample(lambda);
         SampledSpectrum sigma_t = sigma_a + sigma_s;
 
         // Set up 3D DDA for ray through grid
@@ -279,6 +281,7 @@ class GridDensityMedium {
 
     // GridDensityMedium Private Members
     DenselySampledSpectrum sigma_a_spec, sigma_s_spec;
+    Float sigScale;
     HGPhaseFunction phase;
     Transform mediumFromRender, renderFromMedium;
     pstd::optional<SampledGrid<Float>> densityGrid;

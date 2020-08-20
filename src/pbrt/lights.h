@@ -253,9 +253,10 @@ class PointLight : public LightBase {
   public:
     // PointLight Public Methods
     PointLight(const Transform &renderFromLight, const MediumInterface &mediumInterface,
-               SpectrumHandle I, Allocator alloc)
+               SpectrumHandle I, Float scale, Allocator alloc)
         : LightBase(LightType::DeltaPosition, renderFromLight, mediumInterface),
-          I(I, alloc) {}
+          I(I, alloc),
+          scale(scale) {}
 
     static PointLight *Create(const Transform &renderFromLight, MediumHandle medium,
                               const ParameterDictionary &parameters,
@@ -284,8 +285,8 @@ class PointLight : public LightBase {
                            LightSamplingMode mode) const {
         Point3f p = renderFromLight(Point3f(0, 0, 0));
         Vector3f wi = Normalize(p - ctx.p());
-        return LightLiSample(this, I.Sample(lambda) / DistanceSquared(p, ctx.p()), wi, 1,
-                             Interaction(p, 0 /* time */, &mediumInterface));
+        return LightLiSample(this, scale * I.Sample(lambda) / DistanceSquared(p, ctx.p()),
+                             wi, 1, Interaction(p, 0 /* time */, &mediumInterface));
     }
 
     PBRT_CPU_GPU
@@ -294,13 +295,15 @@ class PointLight : public LightBase {
   private:
     // PointLight Private Members
     DenselySampledSpectrum I;
+    Float scale;
 };
 
 // DistantLight Definition
 class DistantLight : public LightBase {
   public:
     // DistantLight Public Methods
-    DistantLight(const Transform &renderFromLight, SpectrumHandle L, Allocator alloc);
+    DistantLight(const Transform &renderFromLight, SpectrumHandle L, Float scale,
+                 Allocator alloc);
 
     static DistantLight *Create(const Transform &renderFromLight,
                                 const ParameterDictionary &parameters,
@@ -336,13 +339,14 @@ class DistantLight : public LightBase {
                            LightSamplingMode mode) const {
         Vector3f wi = Normalize(renderFromLight(Vector3f(0, 0, 1)));
         Point3f pOutside = ctx.p() + wi * (2 * sceneRadius);
-        return LightLiSample(this, Lemit.Sample(lambda), wi, 1,
+        return LightLiSample(this, scale * Lemit.Sample(lambda), wi, 1,
                              Interaction(pOutside, 0 /* time */, &mediumInterface));
     }
 
   private:
     // DistantLight Private Members
     DenselySampledSpectrum Lemit;
+    Float scale;
     Point3f sceneCenter;
     Float sceneRadius;
 };
@@ -405,7 +409,8 @@ class GoniometricLight : public LightBase {
     // GoniometricLight Public Methods
     GoniometricLight(const Transform &renderFromLight,
                      const MediumInterface &mediumInterface, SpectrumHandle I,
-                     Image image, const RGBColorSpace *imageColorSpace, Allocator alloc);
+                     Float scale, Image image, const RGBColorSpace *imageColorSpace,
+                     Allocator alloc);
 
     static GoniometricLight *Create(const Transform &renderFromLight, MediumHandle medium,
                                     const ParameterDictionary &parameters,
@@ -442,12 +447,13 @@ class GoniometricLight : public LightBase {
     SampledSpectrum Scale(Vector3f wl, const SampledWavelengths &lambda) const {
         Float theta = SphericalTheta(wl), phi = SphericalPhi(wl);
         Point2f st(phi * Inv2Pi, theta * InvPi);
-        return I.Sample(lambda) * image.LookupNearestChannel(st, 0);
+        return scale * I.Sample(lambda) * image.LookupNearestChannel(st, 0);
     }
 
   private:
     // GoniometricLight Private Members
     DenselySampledSpectrum I;
+    Float scale;
     Image image;
     const RGBColorSpace *imageColorSpace;
     WrapMode2D wrapMode;
@@ -580,6 +586,7 @@ class UniformInfiniteLight : public LightBase {
   private:
     // UniformInfiniteLight Private Members
     DenselySampledSpectrum Lemit;
+    Float scale;
     Point3f sceneCenter;
     Float sceneRadius;
     Float scale;
@@ -775,7 +782,8 @@ class SpotLight : public LightBase {
   public:
     // SpotLight Public Methods
     SpotLight(const Transform &renderFromLight, const MediumInterface &m,
-              SpectrumHandle I, Float totalWidth, Float falloffStart, Allocator alloc);
+              SpectrumHandle I, Float scale, Float totalWidth, Float falloffStart,
+              Allocator alloc);
 
     static SpotLight *Create(const Transform &renderFromLight, MediumHandle medium,
                              const ParameterDictionary &parameters,
@@ -813,6 +821,7 @@ class SpotLight : public LightBase {
   private:
     // SpotLight Private Members
     DenselySampledSpectrum I;
+    Float scale;
     Float cosFalloffStart, cosFalloffEnd;
 };
 

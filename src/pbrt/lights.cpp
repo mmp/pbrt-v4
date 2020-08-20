@@ -75,19 +75,20 @@ LightBounds Union(const LightBounds &a, const LightBounds &b) {
 
 // PointLight Method Definitions
 SampledSpectrum PointLight::Phi(const SampledWavelengths &lambda) const {
-    return 4 * Pi * I.Sample(lambda);
+    return 4 * Pi * scale * I.Sample(lambda);
 }
 
 LightBounds PointLight::Bounds() const {
     Point3f p = renderFromLight(Point3f(0, 0, 0));
-    return LightBounds(p, Vector3f(0, 0, 1), 4 * Pi * I.MaxValue(), Pi, Pi / 2, false);
+    return LightBounds(p, Vector3f(0, 0, 1), 4 * Pi * scale * I.MaxValue(), Pi, Pi / 2,
+                       false);
 }
 
 LightLeSample PointLight::SampleLe(const Point2f &u1, const Point2f &u2,
                                    SampledWavelengths &lambda, Float time) const {
     Point3f p = renderFromLight(Point3f(0, 0, 0));
     Ray ray(p, SampleUniformSphere(u1), time, mediumInterface.outside);
-    return LightLeSample(I.Sample(lambda), ray, 1, UniformSpherePDF());
+    return LightLeSample(scale * I.Sample(lambda), ray, 1, UniformSpherePDF());
 }
 
 void PointLight::PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const {
@@ -96,7 +97,7 @@ void PointLight::PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const {
 }
 
 std::string PointLight::ToString() const {
-    return StringPrintf("[ PointLight %s I: %s ]", BaseToString(), I);
+    return StringPrintf("[ PointLight %s I: %s scale: %f ]", BaseToString(), I, scale);
 }
 
 PointLight *PointLight::Create(const Transform &renderFromLight, MediumHandle medium,
@@ -115,23 +116,22 @@ PointLight *PointLight::Create(const Transform &renderFromLight, MediumHandle me
         sc *= phi_v / k_e;
     }
 
-    I.Scale(sc);
-
     Point3f from = parameters.GetOnePoint3f("from", Point3f(0, 0, 0));
     Transform tf = Translate(Vector3f(from.x, from.y, from.z));
     Transform finalRenderFromLight(renderFromLight * tf);
 
-    return alloc.new_object<PointLight>(finalRenderFromLight, medium, I, alloc);
+    return alloc.new_object<PointLight>(finalRenderFromLight, medium, I, sc, alloc);
 }
 
 // DistantLight Method Definitions
 DistantLight::DistantLight(const Transform &renderFromLight, SpectrumHandle Lemit,
-                           Allocator alloc)
+                           Float scale, Allocator alloc)
     : LightBase(LightType::DeltaDirection, renderFromLight, MediumInterface()),
-      Lemit(Lemit, alloc) {}
+      Lemit(Lemit, alloc),
+      scale(scale) {}
 
 SampledSpectrum DistantLight::Phi(const SampledWavelengths &lambda) const {
-    return Lemit.Sample(lambda) * Pi * sceneRadius * sceneRadius;
+    return scale * Lemit.Sample(lambda) * Pi * sceneRadius * sceneRadius;
 }
 
 LightLeSample DistantLight::SampleLe(const Point2f &u1, const Point2f &u2,
@@ -145,8 +145,8 @@ LightLeSample DistantLight::SampleLe(const Point2f &u1, const Point2f &u2,
     // Compute _DistantLight_ light ray
     Ray ray(pDisk + sceneRadius * w, -w, time);
 
-    return LightLeSample(Lemit.Sample(lambda), ray, 1 / (Pi * sceneRadius * sceneRadius),
-                         1);
+    return LightLeSample(scale * Lemit.Sample(lambda), ray,
+                         1 / (Pi * sceneRadius * sceneRadius), 1);
 }
 
 void DistantLight::PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const {
@@ -155,7 +155,8 @@ void DistantLight::PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const {
 }
 
 std::string DistantLight::ToString() const {
-    return StringPrintf("[ DistantLight %s Lemit: %s ]", BaseToString(), Lemit);
+    return StringPrintf("[ DistantLight %s Lemit: %s scale: %f ]", BaseToString(), Lemit,
+                        scale);
 }
 
 DistantLight *DistantLight::Create(const Transform &renderFromLight,
@@ -188,9 +189,8 @@ DistantLight *DistantLight::Create(const Transform &renderFromLight,
         Float k_e = -w.y;
         sc *= E_v / k_e;
     }
-    L.Scale(sc);
 
-    return alloc.new_object<DistantLight>(finalRenderFromLight, L, alloc);
+    return alloc.new_object<DistantLight>(finalRenderFromLight, L, sc, alloc);
 }
 
 STAT_MEMORY_COUNTER("Memory/Light image and distributions", imageBytes);
@@ -425,10 +425,11 @@ ProjectionLight *ProjectionLight::Create(const Transform &renderFromLight,
 // GoniometricLight Method Definitions
 GoniometricLight::GoniometricLight(const Transform &renderFromLight,
                                    const MediumInterface &mediumInterface,
-                                   SpectrumHandle I, Image im,
+                                   SpectrumHandle I, Float scale, Image im,
                                    const RGBColorSpace *imageColorSpace, Allocator alloc)
     : LightBase(LightType::DeltaPosition, renderFromLight, mediumInterface),
       I(I, alloc),
+      scale(scale),
       image(std::move(im)),
       imageColorSpace(imageColorSpace),
       wrapMode(WrapMode::Repeat, WrapMode::Clamp),
@@ -469,7 +470,8 @@ LightBounds GoniometricLight::Bounds() const {
             weightedMaxImageSum +=
                 sinTheta * image.GetChannels({u, v}, wrapMode).MaxValue();
     }
-    Float phi = I.MaxValue() * 2 * Pi * Pi * weightedMaxImageSum / (width * height);
+    Float phi =
+        scale * I.MaxValue() * 2 * Pi * Pi * weightedMaxImageSum / (width * height);
 
     Point3f p = renderFromLight(Point3f(0, 0, 0));
     // Bound it as an isotropic point light.
@@ -485,7 +487,7 @@ SampledSpectrum GoniometricLight::Phi(const SampledWavelengths &lambda) const {
         for (int u = 0; u < width; ++u)
             sumY += sinTheta * image.GetChannels({u, v}, wrapMode).Average();
     }
-    return I.Sample(lambda) * 2 * Pi * Pi * sumY / (width * height);
+    return scale * I.Sample(lambda) * 2 * Pi * Pi * sumY / (width * height);
 }
 
 LightLeSample GoniometricLight::SampleLe(const Point2f &u1, const Point2f &u2,
@@ -510,7 +512,8 @@ void GoniometricLight::PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) cons
 }
 
 std::string GoniometricLight::ToString() const {
-    return StringPrintf("[ GoniometricLight %s I: %s ]", BaseToString(), I);
+    return StringPrintf("[ GoniometricLight %s I: %s scale: %f ]", BaseToString(), I,
+                        scale);
 }
 
 GoniometricLight *GoniometricLight::Create(const Transform &renderFromLight,
@@ -572,13 +575,11 @@ GoniometricLight *GoniometricLight::Create(const Transform &renderFromLight,
         sc *= phi_v / k_e;
     }
 
-    I.Scale(sc);
-
     const Float swapYZ[4][4] = {1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1};
     Transform t(swapYZ);
     Transform finalRenderFromLight = renderFromLight * t;
 
-    return alloc.new_object<GoniometricLight>(finalRenderFromLight, medium, I,
+    return alloc.new_object<GoniometricLight>(finalRenderFromLight, medium, I, sc,
                                               std::move(image), imageColorSpace, alloc);
 }
 
@@ -794,14 +795,14 @@ UniformInfiniteLight::UniformInfiniteLight(const Transform &renderFromLight,
 
 SampledSpectrum UniformInfiniteLight::Le(const Ray &ray,
                                          const SampledWavelengths &lambda) const {
-    return Lemit.Sample(lambda) * scale;
+    return scale * Lemit.Sample(lambda);
 }
 
 SampledSpectrum UniformInfiniteLight::Phi(const SampledWavelengths &lambda) const {
     // TODO: is there another Pi or so for the hemisphere?
     // pi r^2 for disk
     // 2pi for cosine-weighted sphere
-    return 2 * Pi * Pi * Sqr(sceneRadius) * Lemit.Sample(lambda) * scale;
+    return 2 * Pi * Pi * Sqr(sceneRadius) * scale * Lemit.Sample(lambda);
 }
 
 LightLiSample UniformInfiniteLight::SampleLi(LightSampleContext ctx, Point2f u,
@@ -810,7 +811,7 @@ LightLiSample UniformInfiniteLight::SampleLi(LightSampleContext ctx, Point2f u,
     Vector3f wi = SampleUniformSphere(u);
     Float pdf = UniformSpherePDF();
     return LightLiSample(
-        this, Lemit.Sample(lambda) * scale, wi, pdf,
+        this, scale * Lemit.Sample(lambda), wi, pdf,
         Interaction(ctx.p() + wi * (2 * sceneRadius), 0 /* time */, &mediumInterface));
 }
 
@@ -833,7 +834,7 @@ LightLeSample UniformInfiniteLight::SampleLe(const Point2f &u1, const Point2f &u
     Float pdfPos = 1 / (Pi * Sqr(sceneRadius));
     Float pdfDir = UniformSpherePDF();
 
-    return LightLeSample(Lemit.Sample(lambda) * scale, ray, pdfPos, pdfDir);
+    return LightLeSample(scale * Lemit.Sample(lambda), ray, pdfPos, pdfDir);
 }
 
 void UniformInfiniteLight::PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
@@ -1186,9 +1187,10 @@ std::string PortalImageInfiniteLight::ToString() const {
 // SpotLight Method Definitions
 SpotLight::SpotLight(const Transform &renderFromLight,
                      const MediumInterface &mediumInterface, SpectrumHandle I,
-                     Float totalWidth, Float falloffStart, Allocator alloc)
+                     Float scale, Float totalWidth, Float falloffStart, Allocator alloc)
     : LightBase(LightType::DeltaPosition, renderFromLight, mediumInterface),
       I(I, alloc),
+      scale(scale),
       cosFalloffEnd(std::cos(Radians(totalWidth))),
       cosFalloffStart(std::cos(Radians(falloffStart))) {
     CHECK_LE(falloffStart, totalWidth);
@@ -1200,7 +1202,8 @@ LightLiSample SpotLight::SampleLi(LightSampleContext ctx, Point2f u,
     Point3f p = renderFromLight(Point3f(0, 0, 0));
     Vector3f wi = Normalize(p - ctx.p());
     Vector3f wl = Normalize(renderFromLight.ApplyInverse(-wi));
-    SampledSpectrum L = I.Sample(lambda) * Falloff(wl) / DistanceSquared(p, ctx.p());
+    SampledSpectrum L =
+        scale * I.Sample(lambda) * Falloff(wl) / DistanceSquared(p, ctx.p());
     if (!L)
         return {};
     return LightLiSample(this, L, wi, 1, Interaction(p, 0 /* time */, &mediumInterface));
@@ -1222,7 +1225,7 @@ LightBounds SpotLight::Bounds() const {
     Vector3f w = Normalize(renderFromLight(Vector3f(0, 0, 1)));
     // As in Phi()
 #if 0
-    Float phi = I.MaxValue() * 2 * Pi * ((1 - cosFalloffStart) +
+    Float phi = scale * I.MaxValue() * 2 * Pi * ((1 - cosFalloffStart) +
                                           (cosFalloffStart - cosFalloffEnd) / 2);
 #else
     // cf. room-subsurf-from-kd.pbrt test: we sorta kinda actually want to
@@ -1231,7 +1234,7 @@ LightBounds SpotLight::Bounds() const {
     // light's cone, so inside the cone, it doesn't matter if the overall
     // power is low; it's more accurate to effectively treat it as a point
     // light source.
-    Float phi = I.MaxValue() * 4 * Pi;
+    Float phi = scale * I.MaxValue() * 4 * Pi;
 #endif
 
     return LightBounds(p, w, phi, 0.f, std::acos(cosFalloffEnd), false);
@@ -1242,7 +1245,7 @@ SampledSpectrum SpotLight::Phi(const SampledWavelengths &lambda) const {
     // See notes/sample-spotlight.nb for the falloff part:
     // int_start^end smoothstep(cost, end, start) sin theta dtheta =
     //  (cosStart - cosEnd) / 2
-    return I.Sample(lambda) * 2 * Pi *
+    return scale * I.Sample(lambda) * 2 * Pi *
            ((1 - cosFalloffStart) + (cosFalloffStart - cosFalloffEnd) / 2);
 }
 
@@ -1271,7 +1274,7 @@ LightLeSample SpotLight::SampleLe(const Point2f &u1, const Point2f &u2,
     }
 
     Ray ray = renderFromLight(Ray(Point3f(0, 0, 0), wl, time, mediumInterface.outside));
-    return LightLeSample(I.Sample(lambda) * Falloff(wl), ray, 1, pdfDir);
+    return LightLeSample(scale * I.Sample(lambda) * Falloff(wl), ray, 1, pdfDir);
 }
 
 void SpotLight::PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
@@ -1322,9 +1325,7 @@ SpotLight *SpotLight::Create(const Transform &renderFromLight, MediumHandle medi
         sc *= phi_v / k_e;
     }
 
-    I.Scale(sc);
-
-    return alloc.new_object<SpotLight>(finalRenderFromLight, medium, I, coneangle,
+    return alloc.new_object<SpotLight>(finalRenderFromLight, medium, I, sc, coneangle,
                                        coneangle - conedelta, alloc);
 }
 
