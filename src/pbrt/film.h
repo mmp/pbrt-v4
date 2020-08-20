@@ -1,6 +1,9 @@
 // pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
+// PhysLight code contributed by Anders Langlands and Luca Fascione
+// Copyright © 2020, Weta Digital, Ltd.
+// SPDX-License-Identifier: Apache-2.0
 
 #ifndef PBRT_FILM_H
 #define PBRT_FILM_H

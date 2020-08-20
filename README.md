@@ -63,6 +63,7 @@ Major changes include:
     sampling ([Hart et al. 2019](https://onlinelibrary.wiley.com/doi/abs/10.1111/cgf.14060)).
   * An implementation of Bitterli et al's environment light [portal sampling](https://benedikt-bitterli.me/pmems.html)
     technique is included.
+  * Rendering can now be performed in absolute physical units with modelling of real cameras as per [Langlands & Fascione 2020](https://github.com/wetadigital/physlight). Code contributed by Anders Langlands & Luca Fascione Copyright © 2020, Weta Digital, Ltd.
 * And also...
   * Various improvements have been made to the `Sampler` classes, including
     better randomization and a new sampler that implements pmj02bn sampling ([Christensen et

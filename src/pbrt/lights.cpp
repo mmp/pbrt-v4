@@ -1,6 +1,9 @@
 // pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
+// PhysLight code contributed by Anders Langlands and Luca Fascione
+// Copyright © 2020, Weta Digital, Ltd.
+// SPDX-License-Identifier: Apache-2.0
 
 #include <pbrt/lights.h>
 
@@ -1453,9 +1456,6 @@ LightHandle LightHandle::Create(const std::string &name,
             if (E_v > 0) {
                 // Upper hemisphere illuminance calculation for converting map to physical
                 // units
-                // PhysLight code contributed by Anders Langlands and Luca Fascione
-                // Copyright © 2020, Weta Digital, Ltd.
-                // SPDX-License-Identifier: Apache-2.0
                 float illuminance = 0;
                 const Image& image = imageAndMetadata.image;
                 int ye = image.Resolution().y / 2;
