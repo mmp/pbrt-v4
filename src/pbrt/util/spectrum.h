@@ -1,12 +1,13 @@
 // pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
-// PhysLight code contributed by Anders Langlands and Luca Fascione
-// Copyright © 2020, Weta Digital, Ltd.
-// SPDX-License-Identifier: Apache-2.0
 
 #ifndef PBRT_UTIL_SPECTRUM_H
 #define PBRT_UTIL_SPECTRUM_H
+
+// PhysLight code contributed by Anders Langlands and Luca Fascione
+// Copyright © 2020, Weta Digital, Ltd.
+// SPDX-License-Identifier: Apache-2.0
 
 #include <pbrt/pbrt.h>
 
@@ -32,7 +33,6 @@ constexpr Float Lambda_min = 360, Lambda_max = 830;
 static constexpr int NSpectrumSamples = 4;
 
 static constexpr Float CIE_Y_integral = 106.856895;
-
 static constexpr Float K_m = 683;
 
 // SpectrumHandle Definition
@@ -70,6 +70,11 @@ XYZ SpectrumToXYZ(SpectrumHandle s);
 
 PBRT_CPU_GPU
 Float Blackbody(Float lambda, Float T);
+
+namespace Spectra {
+DenselySampledSpectrum D(Float temperature, Allocator alloc);
+}  // namespace Spectra
+Float SpectrumToPhotometric(SpectrumHandle s);
 
 // SampledSpectrum Definition
 class SampledSpectrum {
@@ -457,6 +462,28 @@ class PiecewiseLinearSpectrum {
     static pstd::optional<SpectrumHandle> Read(const std::string &filename,
                                                Allocator alloc);
 
+    static PiecewiseLinearSpectrum *FromInterleaved(pstd::span<const Float> samples,
+                                                    bool normalize, Allocator alloc) {
+        CHECK_EQ(0, samples.size() % 2);
+        int n = samples.size() / 2;
+        std::vector<Float> lambda(n), v(n);
+        for (size_t i = 0; i < n; ++i) {
+            lambda[i] = samples[2 * i];
+            v[i] = samples[2 * i + 1];
+            if (i > 0)
+                CHECK_GT(lambda[i], lambda[i - 1]);
+        }
+
+        PiecewiseLinearSpectrum *spec =
+            alloc.new_object<pbrt::PiecewiseLinearSpectrum>(lambda, v, alloc);
+
+        if (normalize)
+            // Normalize to have luminance of 1.
+            spec->Scale(1 / SpectrumToY(spec));
+
+        return spec;
+    }
+
   private:
     // PiecewiseLinearSpectrum Private Members
     pstd::vector<Float> lambdas, values;
@@ -507,6 +534,9 @@ class RGBSpectrum {
     Float MaxValue() const { return scale * rsp.MaxValue() * illuminant->MaxValue(); }
 
     PBRT_CPU_GPU
+    const DenselySampledSpectrum *Illluminant() const { return illuminant; }
+
+    PBRT_CPU_GPU
     SampledSpectrum Sample(const SampledWavelengths &lambda) const {
         SampledSpectrum s;
         for (int i = 0; i < NSpectrumSamples; ++i)
@@ -517,10 +547,6 @@ class RGBSpectrum {
     std::string ToString() const;
     std::string ParameterType() const;
     std::string ParameterString() const;
-
-    const DenselySampledSpectrum* Illluminant() const {
-        return illuminant;
-    }
 
   private:
     // RGBSpectrum Private Members
@@ -678,8 +704,6 @@ inline const DenselySampledSpectrum &Z() {
 #endif
 }
 
-// CIE D spectrum, switching to blackbody below 4000K
-DenselySampledSpectrum D(Float temperature, Allocator alloc = {});
 }  // namespace Spectra
 
 // Spectral Function Declarations

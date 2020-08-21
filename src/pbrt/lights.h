@@ -1,12 +1,13 @@
 // pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
-// PhysLight code contributed by Anders Langlands and Luca Fascione
-// Copyright © 2020, Weta Digital, Ltd.
-// SPDX-License-Identifier: Apache-2.0
 
 #ifndef PBRT_LIGHTS_H
 #define PBRT_LIGHTS_H
+
+// PhysLight code contributed by Anders Langlands and Luca Fascione
+// Copyright © 2020, Weta Digital, Ltd.
+// SPDX-License-Identifier: Apache-2.0
 
 #include <pbrt/pbrt.h>
 
@@ -589,9 +590,9 @@ class UniformInfiniteLight : public LightBase {
   private:
     // UniformInfiniteLight Private Members
     DenselySampledSpectrum Lemit;
+    Float scale;
     Point3f sceneCenter;
     Float sceneRadius;
-    Float scale;
 };
 
 // ImageInfiniteLight Definition

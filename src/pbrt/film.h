@@ -1,12 +1,13 @@
 // pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
-// PhysLight code contributed by Anders Langlands and Luca Fascione
-// Copyright © 2020, Weta Digital, Ltd.
-// SPDX-License-Identifier: Apache-2.0
 
 #ifndef PBRT_FILM_H
 #define PBRT_FILM_H
+
+// PhysLight code contributed by Anders Langlands and Luca Fascione
+// Copyright © 2020, Weta Digital, Ltd.
+// SPDX-License-Identifier: Apache-2.0
 
 #include <pbrt/pbrt.h>
 
@@ -30,6 +31,12 @@
 #include <vector>
 
 namespace pbrt {
+
+// Camera Matrix Function Declarations
+SquareMatrix<3> SolveCameraMatrix(SpectrumHandle r, SpectrumHandle g, SpectrumHandle b,
+                                  const DenselySampledSpectrum &srcw,
+                                  const DenselySampledSpectrum &dstw,
+                                  Allocator alloc = {});
 
 // Sensor Definition
 class Sensor {
@@ -70,10 +77,7 @@ class Sensor {
     // Sensor Private Members
     DenselySampledSpectrum r_bar, g_bar, b_bar;
     RGB cameraRGBWhiteNorm;
-    Float exposureTime;
-    Float fNumber;
-    Float ISO;
-    Float C;
+    Float exposureTime, fNumber, ISO, C;
 };
 
 // VisibleSurface Definition
@@ -158,7 +162,6 @@ class RGBFilm : public FilmBase {
         // First convert to sensor exposure, H, then to camera RGB
         SampledSpectrum H = L * sensor->ImagingRatio();
         RGB rgb = sensor->ToCameraRGB(H, lambda);
-
         // Optionally clamp sensor RGB value
         Float m = std::max({rgb.r, rgb.g, rgb.b});
         if (m > maxComponentValue) {
@@ -289,6 +292,8 @@ class GBufferFilm : public FilmBase {
         // Scale pixel value by _scale_
         rgb *= scale;
 
+        rgb = Mul<RGB>(outputRGBFromCameraRGB, rgb);
+
         return rgb;
     }
 
@@ -318,6 +323,7 @@ class GBufferFilm : public FilmBase {
     Float maxComponentValue;
     bool writeFP16;
     Float filterIntegral;
+    SquareMatrix<3> outputRGBFromCameraRGB;
 };
 
 PBRT_CPU_GPU

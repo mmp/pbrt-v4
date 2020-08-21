@@ -1,6 +1,7 @@
 // pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
+
 // PhysLight code contributed by Anders Langlands and Luca Fascione
 // Copyright © 2020, Weta Digital, Ltd.
 // SPDX-License-Identifier: Apache-2.0
@@ -28,6 +29,72 @@
 
 namespace pbrt {
 
+void FilmHandle::AddSplat(const Point2f &p, SampledSpectrum v,
+                          const SampledWavelengths &lambda) {
+    auto splat = [&](auto ptr) { return ptr->AddSplat(p, v, lambda); };
+    return Dispatch(splat);
+}
+
+void FilmHandle::WriteImage(ImageMetadata metadata, Float splatScale) {
+    auto write = [&](auto ptr) { return ptr->WriteImage(metadata, splatScale); };
+    return DispatchCPU(write);
+}
+
+Image FilmHandle::GetImage(ImageMetadata *metadata, Float splatScale) {
+    auto get = [&](auto ptr) { return ptr->GetImage(metadata, splatScale); };
+    return DispatchCPU(get);
+}
+
+std::string FilmHandle::ToString() const {
+    if (ptr() == nullptr)
+        return "(nullptr)";
+
+    auto ts = [&](auto ptr) { return ptr->ToString(); };
+    return DispatchCPU(ts);
+}
+
+std::string FilmHandle::GetFilename() const {
+    auto get = [&](auto ptr) { return ptr->GetFilename(); };
+    return DispatchCPU(get);
+}
+
+// FilmBase Method Definitions
+std::string FilmBase::BaseToString() const {
+    return StringPrintf("fullResolution: %s diagonal: %f filter: %s filename: %s "
+                        "pixelBounds: %s",
+                        fullResolution, diagonal, filter, filename, pixelBounds);
+}
+
+Bounds2f FilmBase::SampleBounds() const {
+    return Bounds2f(Point2f(pixelBounds.pMin) - filter.Radius() + Vector2f(0.5f, 0.5f),
+                    Point2f(pixelBounds.pMax) + filter.Radius() - Vector2f(0.5f, 0.5f));
+}
+
+// VisibleSurface Method Definitions
+VisibleSurface::VisibleSurface(const SurfaceInteraction &si,
+                               const CameraTransform &cameraTransform,
+                               const SampledSpectrum &albedo,
+                               const SampledWavelengths &lambda)
+    : albedo(albedo) {
+    set = true;
+    // Initialize geometric _VisibleSurface_ members
+    Transform cameraFromRender = cameraTransform.CameraFromRender(si.time);
+    p = cameraFromRender(si.p());
+    Vector3f wo = cameraFromRender(si.wo);
+    n = FaceForward(cameraFromRender(si.n), wo);
+    ns = FaceForward(cameraFromRender(si.shading.n), wo);
+    time = si.time;
+    dzdx = cameraFromRender(si.dpdx).z;
+    dzdy = cameraFromRender(si.dpdy).z;
+}
+
+std::string VisibleSurface::ToString() const {
+    return StringPrintf("[ VisibleSurface set: %s p: %s n: %s ns: %s dzdx: %f dzdy: %f "
+                        "time: %f albedo: %s ]",
+                        set, p, n, ns, dzdx, dzdy, time, albedo);
+}
+
+// Camera Matrix Pieces
 namespace {
 // Swatch set for solving the camera->xyz matrix
 const Float trainingSwatches[24][72] = {
@@ -296,25 +363,6 @@ const Float trainingSwatches[24][72] = {
      0.032000,   700.000000, 0.032000,   710.000000, 0.032000,   720.000000, 0.032000,
      730.000000, 0.032500}};
 
-// FIXME: use the one in spectrum.cpp
-pbrt::SpectrumHandle MakeSpectrumFromInterleaved(pstd::span<const Float> samples,
-                                                 Allocator alloc) {
-    CHECK_EQ(0, samples.size() % 2);
-    int n = samples.size() / 2;
-    std::vector<Float> lambda(n), v(n);
-    for (size_t i = 0; i < n; ++i) {
-        lambda[i] = samples[2 * i];
-        v[i] = samples[2 * i + 1];
-        if (i > 0)
-            CHECK_GT(lambda[i], lambda[i - 1]);
-    }
-
-    SpectrumHandle spec =
-        alloc.new_object<pbrt::PiecewiseLinearSpectrum>(lambda, v, alloc);
-
-    return spec;
-}
-
 // Compute RGB reflectance of spectrum s in rgb space defined by r, g, b curves
 // under illuminant illum
 RGB SpectrumToCameraRGB(SpectrumHandle s, const DenselySampledSpectrum &illum,
@@ -379,12 +427,13 @@ SquareMatrix<3> LinearLeastSquares(Float A[][3], Float B[][3], int rows) {
     return Transpose(*AtAi * AtB);
 }
 
+}  // namespace
+
 // Solve a 3x3 matrix that transforms from some space defined by the given
 // r, g, b curves with whitepoint srcw to CIE XYZ with whitepoint dstw
 SquareMatrix<3> SolveCameraMatrix(SpectrumHandle r, SpectrumHandle g, SpectrumHandle b,
                                   const DenselySampledSpectrum &srcw,
-                                  const DenselySampledSpectrum &dstw,
-                                  Allocator alloc = {}) {
+                                  const DenselySampledSpectrum &dstw, Allocator alloc) {
     Float A_data[24][3];
     Float B_data[24][3];
 
@@ -398,7 +447,8 @@ SquareMatrix<3> SolveCameraMatrix(SpectrumHandle r, SpectrumHandle g, SpectrumHa
     Float srcY = IlluminantToY(srcw, Spectra::Y());
 
     for (int i = 0; i < 24; ++i) {
-        SpectrumHandle s = MakeSpectrumFromInterleaved(trainingSwatches[i], alloc);
+        SpectrumHandle s =
+            PiecewiseLinearSpectrum::FromInterleaved(trainingSwatches[i], false, alloc);
         RGB a = SpectrumToCameraRGB(s, srcw, r, g, b) / dst_white;
         RGB b = SpectrumToCameraRGB(s, dstw, Spectra::X(), Spectra::Y(), Spectra::Z()) *
                 (srcY / srcG);
@@ -410,9 +460,34 @@ SquareMatrix<3> SolveCameraMatrix(SpectrumHandle r, SpectrumHandle g, SpectrumHa
 
     return LinearLeastSquares(A_data, B_data, 24);
 }
-}  // namespace
 
 // Sensor Method Definitions
+Sensor *Sensor::Create(const std::string &name, const RGBColorSpace *colorSpace,
+                       Float exposureTime, Float fNumber, Float ISO, Float C,
+                       Float whiteBalanceTemp, const FileLoc *loc, Allocator alloc) {
+    if (name == "cie1931") {
+        return alloc.new_object<Sensor>(&Spectra::X(), &Spectra::Y(), &Spectra::Z(),
+                                        colorSpace, SquareMatrix<3>(), exposureTime,
+                                        fNumber, ISO, C, colorSpace->illuminant, alloc);
+    } else {
+        SpectrumHandle r = GetNamedSpectrum(name + "_r");
+        SpectrumHandle g = GetNamedSpectrum(name + "_g");
+        SpectrumHandle b = GetNamedSpectrum(name + "_b");
+
+        if (!r || !g || !b)
+            ErrorExit(loc, "%s: unknown sensor type", name);
+
+        auto whiteIlluminant = Spectra::D(whiteBalanceTemp, alloc);
+        LOG_VERBOSE("whiteIlluminant: %s", whiteIlluminant.ToString());
+        SquareMatrix<3> XYZFromCameraRGB =
+            SolveCameraMatrix(r, g, b, whiteIlluminant, colorSpace->illuminant);
+        LOG_VERBOSE("camera matrix: %s", XYZFromCameraRGB.ToString());
+        return alloc.new_object<Sensor>(r, g, b, colorSpace, XYZFromCameraRGB,
+                                        exposureTime, fNumber, ISO, C,
+                                        colorSpace->illuminant, alloc);
+    }
+}
+
 Sensor::Sensor(SpectrumHandle r_bar, SpectrumHandle g_bar, SpectrumHandle b_bar,
                const RGBColorSpace *outputColorSpace,
                const SquareMatrix<3> &XYZFromCameraRGB, Float exposureTime, Float fNumber,
@@ -444,98 +519,6 @@ Sensor::Sensor(SpectrumHandle r_bar, SpectrumHandle g_bar, SpectrumHandle b_bar,
         // white;
         cameraRGBWhiteNorm = RGB(1, 1, 1) / white;
     }
-}
-
-Sensor *Sensor::Create(const std::string &name, const RGBColorSpace *colorSpace,
-                       Float exposureTime, Float fNumber, Float ISO, Float C,
-                       Float whiteBalanceTemp, const FileLoc *loc, Allocator alloc) {
-    if (name == "cie1931") {
-        return alloc.new_object<Sensor>(&Spectra::X(), &Spectra::Y(), &Spectra::Z(),
-                                        colorSpace, SquareMatrix<3>(), exposureTime,
-                                        fNumber, ISO, C, colorSpace->illuminant, alloc);
-    } else {
-        SpectrumHandle r = GetNamedSpectrum(name + "_r");
-        SpectrumHandle g = GetNamedSpectrum(name + "_g");
-        SpectrumHandle b = GetNamedSpectrum(name + "_b");
-
-        if (!r || !g || !b) {
-            ErrorExit(loc, "%s: unknown sensor type", name);
-        }
-
-        auto whiteIlluminant = Spectra::D(whiteBalanceTemp);
-        Warning("whiteIlluminant: %s", whiteIlluminant.ToString());
-        SquareMatrix<3> XYZFromCameraRGB =
-            SolveCameraMatrix(r, g, b, whiteIlluminant, colorSpace->illuminant);
-        Warning("camera matrix: %s", XYZFromCameraRGB.ToString());
-        return alloc.new_object<Sensor>(r, g, b, colorSpace, XYZFromCameraRGB,
-                                        exposureTime, fNumber, ISO, C,
-                                        colorSpace->illuminant, alloc);
-    }
-}
-
-void FilmHandle::AddSplat(const Point2f &p, SampledSpectrum v,
-                          const SampledWavelengths &lambda) {
-    auto splat = [&](auto ptr) { return ptr->AddSplat(p, v, lambda); };
-    return Dispatch(splat);
-}
-
-void FilmHandle::WriteImage(ImageMetadata metadata, Float splatScale) {
-    auto write = [&](auto ptr) { return ptr->WriteImage(metadata, splatScale); };
-    return DispatchCPU(write);
-}
-
-Image FilmHandle::GetImage(ImageMetadata *metadata, Float splatScale) {
-    auto get = [&](auto ptr) { return ptr->GetImage(metadata, splatScale); };
-    return DispatchCPU(get);
-}
-
-std::string FilmHandle::ToString() const {
-    if (ptr() == nullptr)
-        return "(nullptr)";
-
-    auto ts = [&](auto ptr) { return ptr->ToString(); };
-    return DispatchCPU(ts);
-}
-
-std::string FilmHandle::GetFilename() const {
-    auto get = [&](auto ptr) { return ptr->GetFilename(); };
-    return DispatchCPU(get);
-}
-
-// FilmBase Method Definitions
-std::string FilmBase::BaseToString() const {
-    return StringPrintf("fullResolution: %s diagonal: %f filter: %s filename: %s "
-                        "pixelBounds: %s",
-                        fullResolution, diagonal, filter, filename, pixelBounds);
-}
-
-Bounds2f FilmBase::SampleBounds() const {
-    return Bounds2f(Point2f(pixelBounds.pMin) - filter.Radius() + Vector2f(0.5f, 0.5f),
-                    Point2f(pixelBounds.pMax) + filter.Radius() - Vector2f(0.5f, 0.5f));
-}
-
-// VisibleSurface Method Definitions
-VisibleSurface::VisibleSurface(const SurfaceInteraction &si,
-                               const CameraTransform &cameraTransform,
-                               const SampledSpectrum &albedo,
-                               const SampledWavelengths &lambda)
-    : albedo(albedo) {
-    set = true;
-    // Initialize geometric _VisibleSurface_ members
-    Transform cameraFromRender = cameraTransform.CameraFromRender(si.time);
-    p = cameraFromRender(si.p());
-    Vector3f wo = cameraFromRender(si.wo);
-    n = FaceForward(cameraFromRender(si.n), wo);
-    ns = FaceForward(cameraFromRender(si.shading.n), wo);
-    time = si.time;
-    dzdx = cameraFromRender(si.dpdx).z;
-    dzdy = cameraFromRender(si.dpdy).z;
-}
-
-std::string VisibleSurface::ToString() const {
-    return StringPrintf("[ VisibleSurface set: %s p: %s n: %s ns: %s dzdx: %f dzdy: %f "
-                        "time: %f albedo: %s ]",
-                        set, p, n, ns, dzdx, dzdy, time, albedo);
 }
 
 STAT_MEMORY_COUNTER("Memory/Film pixels", filmPixelMemory);
@@ -755,7 +738,6 @@ void GBufferFilm::AddSample(const Point2i &pFilm, SampledSpectrum L,
     // First convert to sensor exposure, H, then to camera RGB
     SampledSpectrum H = L * sensor->ImagingRatio();
     RGB rgb = sensor->ToCameraRGB(H, lambda);
-
     Float m = std::max({rgb.r, rgb.g, rgb.b});
     if (m > maxComponentValue) {
         H *= maxComponentValue / m;
@@ -802,6 +784,7 @@ GBufferFilm::GBufferFilm(const Sensor *sensor, const Point2i &resolution,
       filterIntegral(filter.Integral()) {
     CHECK(!pixelBounds.IsEmpty());
     filmPixelMemory += pixelBounds.Area() * sizeof(Pixel);
+    outputRGBFromCameraRGB = colorSpace->RGBFromXYZ * sensor->XYZFromCameraRGB;
 }
 
 SampledWavelengths GBufferFilm::SampleWavelengths(Float u) const {
@@ -815,7 +798,6 @@ void GBufferFilm::AddSplat(const Point2f &p, SampledSpectrum v,
     // First convert to sensor exposure, H, then to camera RGB
     SampledSpectrum H = v * sensor->ImagingRatio();
     RGB rgb = sensor->ToCameraRGB(H, lambda);
-
     Float m = std::max({rgb.r, rgb.g, rgb.b});
     if (m > maxComponentValue)
         rgb *= maxComponentValue / m;

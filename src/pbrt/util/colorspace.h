@@ -13,8 +13,6 @@
 
 #include <string>
 
-#include "error.h"
-
 namespace pbrt {
 
 // RGBColorSpace Definition
@@ -49,14 +47,14 @@ class RGBColorSpace {
     std::string ToString() const;
 
     PBRT_CPU_GPU
-    RGB ToRGB(const XYZ &xyz) const { return Mul<RGB>(RGBFromXYZ, xyz); }
-    PBRT_CPU_GPU
-    XYZ ToXYZ(const RGB &rgb) const { return Mul<XYZ>(XYZFromRGB, rgb); }
-
-    PBRT_CPU_GPU
     RGB LuminanceVector() const {
         return RGB(XYZFromRGB[1][0], XYZFromRGB[1][1], XYZFromRGB[1][2]);
     }
+
+    PBRT_CPU_GPU
+    RGB ToRGB(const XYZ &xyz) const { return Mul<RGB>(RGBFromXYZ, xyz); }
+    PBRT_CPU_GPU
+    XYZ ToXYZ(const RGB &rgb) const { return Mul<XYZ>(XYZFromRGB, rgb); }
 
     static const RGBColorSpace *GetNamed(const std::string &name);
     static const RGBColorSpace *Lookup(Point2f r, Point2f g, Point2f b, Point2f w);

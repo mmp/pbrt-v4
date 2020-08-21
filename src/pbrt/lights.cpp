@@ -1,6 +1,7 @@
 // pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
+
 // PhysLight code contributed by Anders Langlands and Luca Fascione
 // Copyright © 2020, Weta Digital, Ltd.
 // SPDX-License-Identifier: Apache-2.0
@@ -1437,7 +1438,8 @@ LightHandle LightHandle::Create(const std::string &name,
                 scale *= E_v / k_e;
             }
 
-            light = alloc.new_object<UniformInfiniteLight>(renderFromLight, L[0], scale, alloc);
+            light = alloc.new_object<UniformInfiniteLight>(renderFromLight, L[0], scale,
+                                                           alloc);
         } else {
             ImageAndMetadata imageAndMetadata = Image::Read(filename, alloc);
             const RGBColorSpace *colorSpace = imageAndMetadata.metadata.GetColorSpace();
@@ -1457,7 +1459,7 @@ LightHandle LightHandle::Create(const std::string &name,
                 // Upper hemisphere illuminance calculation for converting map to physical
                 // units
                 float illuminance = 0;
-                const Image& image = imageAndMetadata.image;
+                const Image &image = imageAndMetadata.image;
                 int ye = image.Resolution().y / 2;
                 int ys = 0;
                 int xs = 0;
@@ -1471,8 +1473,8 @@ LightHandle LightHandle::Create(const std::string &name,
                     for (int x = xs; x < xe; ++x) {
                         ImageChannelValues values = image.GetChannels({x, y});
                         for (int c = 0; c < 3; ++c) {
-                            illuminance +=
-                                values[c] * lum[c] * std::abs(cosTheta) * std::abs(sinTheta);
+                            illuminance += values[c] * lum[c] * std::abs(cosTheta) *
+                                           std::abs(sinTheta);
                         }
                     }
                 }
@@ -1485,6 +1487,7 @@ LightHandle LightHandle::Create(const std::string &name,
                 Float k_e = illuminance;
                 scale *= E_v / k_e;
             }
+
             Image image = imageAndMetadata.image.SelectChannels(channelDesc, alloc);
 
             if (!portal.empty()) {
@@ -1494,11 +1497,10 @@ LightHandle LightHandle::Create(const std::string &name,
                 light = alloc.new_object<PortalImageInfiniteLight>(
                     renderFromLight, std::move(image), colorSpace, scale, filename,
                     portal, alloc);
-            } else {
+            } else
                 light = alloc.new_object<ImageInfiniteLight>(renderFromLight,
                                                              std::move(image), colorSpace,
                                                              scale, filename, alloc);
-            }
         }
     } else
         ErrorExit(loc, "%s: light type unknown.", name);

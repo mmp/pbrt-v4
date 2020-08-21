@@ -2180,8 +2180,7 @@ void BDPTIntegrator::Render() {
 
                 // FIXME: leaks
                 weightFilms[BufferIndex(s, t)] = new RGBFilm(
-                    Sensor::CreateDefault(),
-                    camera.GetFilm().FullResolution(),
+                    Sensor::CreateDefault(), camera.GetFilm().FullResolution(),
                     Bounds2i(Point2i(0, 0), camera.GetFilm().FullResolution()),
                     new BoxFilter,  // FIXME: leaks
                     camera.GetFilm().Diagonal() * 1000, filename, 1.f,
@@ -2740,7 +2739,6 @@ void SPPMIntegrator::Render() {
     for (int i = 0; i < MaxThreadIndex(); ++i)
         // TODO: size this
         perThreadScratchBuffers.push_back(ScratchBuffer(nPixels * 1024));
-
     const Sensor *sensor = camera.GetFilm().GetSensor();
     auto ToSensorRGB = [&](const SampledSpectrum &L,
                            const SampledWavelengths &lambda) -> RGB {
