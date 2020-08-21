@@ -346,10 +346,19 @@ std::unique_ptr<MIPMap> MIPMap::CreateFromFile(const std::string &filename,
     if (image.NChannels() != 1) {
         // Get the channels in a canonical order..
         ImageChannelDesc rgbaDesc = image.GetChannelDesc({"R", "G", "B", "A"});
-        if (rgbaDesc)
-            image = image.SelectChannels(rgbaDesc, alloc);
-        else {
-            ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
+        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
+        if (rgbaDesc) {
+            // Is alpha all ones?
+            bool allOne = true;
+            for (int y = 0; y < image.Resolution().y; ++y)
+                for (int x = 0; x < image.Resolution().x; ++x)
+                    if (image.GetChannels({x, y}, rgbaDesc)[3] != 1)
+                        allOne = false;
+            if (allOne)
+                image = image.SelectChannels(rgbDesc, alloc);
+            else
+                image = image.SelectChannels(rgbaDesc, alloc);
+        } else {
             if (rgbDesc)
                 image = image.SelectChannels(rgbDesc, alloc);
             else

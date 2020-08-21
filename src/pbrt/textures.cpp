@@ -1283,14 +1283,22 @@ GPUFloatImageTexture *GPUFloatImageTexture::Create(
 
         ImageAndMetadata immeta = Image::Read(filename);
         Image &image = immeta.image;
-        ImageChannelDesc alphaDesc = image.GetChannelDesc({"A"});
         bool convertedImage = false;
-        if (alphaDesc) {
-            image = image.SelectChannels(alphaDesc);
-            convertedImage = true;
-        } else {
+        if (image.NChannels() != 1) {
+            ImageChannelDesc rgbaDesc = image.GetChannelDesc({"R", "G", "B", "A"});
             ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
-            if (rgbDesc) {
+            auto allOnes = [&]() {
+                for (int y = 0; y < image.Resolution().y; ++y)
+                    for (int x = 0; x < image.Resolution().x; ++x)
+                        if (image.GetChannels({x, y}, rgbaDesc)[3] != 1)
+                            return false;
+                return true;
+            };
+            if (rgbaDesc && !allOnes()) {
+                ImageChannelDesc alphaDesc = image.GetChannelDesc({"A"});
+                image = image.SelectChannels(alphaDesc);
+                convertedImage = true;
+            } else if (rgbDesc) {
                 // Convert to one channel
                 Image avgImage(image.Format(), image.Resolution(), {"Y"},
                                image.Encoding());
@@ -1302,7 +1310,9 @@ GPUFloatImageTexture *GPUFloatImageTexture::Create(
 
                 image = std::move(avgImage);
                 convertedImage = true;
-            }
+            } else
+                ErrorExit(loc, "%s: %d channel image, without RGB channels.", filename,
+                          image.NChannels());
         }
 
         texArray = createSingleChannelTextureArray(image);
