@@ -52,14 +52,23 @@ pstd::optional<ShapeIntersection> GeometricPrimitive::Intersect(const Ray &r,
         return {};
     CHECK_LT(si->tHit, 1.001 * tMax);
     // Test intersection against alpha texture, if present
-    if (alpha && alpha.Evaluate(si->intr) == 0) {
-        // Ignore this hit and trace a new ray.
-        Ray rNext = si->intr.SpawnRay(r.d);
-        pstd::optional<ShapeIntersection> siNext = Intersect(rNext, tMax - si->tHit);
-        if (siNext)
-            // The returned t value has to account for both ray segments.
-            siNext->tHit += si->tHit;
-        return siNext;
+    if (alpha) {
+        if (Float a = alpha.Evaluate(si->intr); a < 1) {
+            Float u = (a == 0)
+                          ? 1.f
+                          : (uint32_t(Hash(r.o.x, r.o.y, r.o.z, r.d.x, r.d.y, r.d.z)) *
+                             0x1p-32f);
+            if (u > a) {
+                // Ignore this hit and trace a new ray.
+                Ray rNext = si->intr.SpawnRay(r.d);
+                pstd::optional<ShapeIntersection> siNext =
+                    Intersect(rNext, tMax - si->tHit);
+                if (siNext)
+                    // The returned t value has to account for both ray segments.
+                    siNext->tHit += si->tHit;
+                return siNext;
+            }
+        }
     }
 
     // Initialize _SurfaceInteraction_ after _Shape_ intersection

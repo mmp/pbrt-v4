@@ -287,7 +287,16 @@ static __forceinline__ __device__ bool alphaKilled(const TriangleMeshRecord &rec
 
     BasicTextureEvaluator eval;
     Float alpha = eval(rec.alphaTexture, *intr);
-    return alpha == 0;
+    if (alpha >= 1)
+        return false;
+    if (alpha == 0)
+        return true;
+    else {
+        float3 o = optixGetWorldRayOrigin();
+        float3 d = optixGetWorldRayDirection();
+        Float u = uint32_t(Hash(o.x, o.y, o.z, d.x, d.y, d.z)) * 0x1p-32f;
+        return u > alpha;
+    }
 }
 
 extern "C" __global__ void __closesthit__triangle() {
@@ -520,9 +529,18 @@ extern "C" __global__ void __intersection__quadric() {
 
         BasicTextureEvaluator eval;
         Float alpha = eval(rec.alphaTexture, intr);
-        if (alpha == 0)
-            // No hit
-            return;
+        if (alpha < 1) {
+            if (alpha == 0)
+                // No hit
+                return;
+
+            float3 o = optixGetWorldRayOrigin();
+            float3 d = optixGetWorldRayDirection();
+            Float u = uint32_t(Hash(o.x, o.y, o.z, d.x, d.y, d.z)) * 0x1p-32f;
+            if (u > alpha)
+                // no hit
+                return;
+        }
     }
 
     optixReportIntersection(isect->tHit, 0 /* hit kind */, FloatToBits(isect->pObj.x),
@@ -589,9 +607,18 @@ extern "C" __global__ void __intersection__bilinearPatch() {
         SurfaceInteraction intr = getBilinearPatchIntersection(isect->uv);
         BasicTextureEvaluator eval;
         Float alpha = eval(rec.alphaTexture, intr);
-        if (alpha == 0)
-            // No intersection
-            return;
+        if (alpha < 1) {
+            if (alpha == 0)
+                // No hit
+                return;
+
+            float3 o = optixGetWorldRayOrigin();
+            float3 d = optixGetWorldRayDirection();
+            Float u = uint32_t(Hash(o.x, o.y, o.z, d.x, d.y, d.z)) * 0x1p-32f;
+            if (u > alpha)
+                // no hit
+                return;
+        }
     }
 
     optixReportIntersection(isect->t, 0 /* hit kind */, FloatToBits(isect->uv[0]),
