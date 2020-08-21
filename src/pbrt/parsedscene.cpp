@@ -1382,6 +1382,7 @@ std::string FormattingScene::upgradeMaterial(std::string *name, ParameterDiction
                                 "material is not supported "
                                 "in pbrt-v4. Please edit the file manually.");
     } else if (*name == "mix") {
+        // Convert the amount to a scalar
         pstd::optional<RGB> rgb = dict->GetOneRGB("amount");
         if (rgb) {
             if (rgb->r == rgb->g && rgb->g == rgb->b)
@@ -1392,13 +1393,29 @@ std::string FormattingScene::upgradeMaterial(std::string *name, ParameterDiction
                         rgb->r, rgb->g, rgb->b, avg);
                 extra += indent(1) + StringPrintf("\"float amount\" [ %f ]\n", avg);
             }
-        } else if (!dict->GetSpectrumArray("amount", SpectrumType::General, {}).empty() ||
-                   !dict->GetTexture("amount").empty())
+        } else if (dict->GetSpectrumArray("amount", SpectrumType::General, {}).size() > 0)
             ErrorExitDeferred(
                 &loc, "Unable to update non-RGB spectrum \"amount\" to a scalar: %s",
                 dict->ToParameterDefinition("amount"));
 
         dict->RemoveSpectrum("amount");
+
+        // And rename...
+        std::string m1 = dict->GetOneString("namedmaterial1", "");
+        if (m1.empty())
+            ErrorExitDeferred(
+                &loc, "Didn't find \"namedmaterial1\" parameter for \"mix\" material.");
+        dict->RemoveString("namedmaterial1");
+
+        std::string m2 = dict->GetOneString("namedmaterial2", "");
+        if (m2.empty())
+            ErrorExitDeferred(
+                &loc, "Didn't find \"namedmaterial1\" parameter for \"mix\" material.");
+        dict->RemoveString("namedmaterial2");
+
+        // Note: swapped order vs pbrt-v3!
+        extra +=
+            indent(1) + StringPrintf("\"string materials\" [ \"%s\" \"%s\" ]\n", m2, m1);
     } else if (*name == "substrate") {
         *name = "coateddiffuse";
         removeParamSilentIfConstant("Ks", 1);

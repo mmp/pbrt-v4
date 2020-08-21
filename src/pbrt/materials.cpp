@@ -86,6 +86,20 @@ ThinDielectricMaterial *ThinDielectricMaterial::Create(
     return alloc.new_object<ThinDielectricMaterial>(etaF, etaS, displacement);
 }
 
+// MixMaterial Method Definitions
+std::string MixMaterial::ToString() const {
+    return StringPrintf("[ MixMaterial materials: [ %s %s ] amount: %s ]", materials[0],
+                        materials[1], amount);
+}
+
+MixMaterial *MixMaterial::Create(MaterialHandle materialHandles[2],
+                                 const TextureParameterDictionary &parameters,
+                                 const FileLoc *loc, Allocator alloc) {
+    FloatTextureHandle amount = parameters.GetFloatTexture("amount", 0.5f, alloc);
+
+    return alloc.new_object<MixMaterial>(materialHandles, amount);
+}
+
 // HairMaterial Method Definitions
 std::string HairMaterial::ToString() const {
     return StringPrintf("[ HairMaterial sigma_a: %s color: %s eumelanin: %s "
@@ -448,8 +462,22 @@ MaterialHandle MaterialHandle::Create(
         material = ConductorMaterial::Create(parameters, loc, alloc);
     else if (name == "measured")
         material = MeasuredMaterial::Create(parameters, loc, alloc);
-    else if (name == "subsurface") {
+    else if (name == "subsurface")
         material = SubsurfaceMaterial::Create(parameters, loc, alloc);
+    else if (name == "mix") {
+        std::vector<std::string> materials = parameters.GetStringArray("materials");
+        if (materials.size() != 2)
+            ErrorExit(
+                "Must provide two values for \"string materials\" for mix material.");
+
+        MaterialHandle materialHandles[2];
+        for (int i = 0; i < 2; ++i) {
+            auto iter = namedMaterials.find(materials[i]);
+            if (iter == namedMaterials.end())
+                ErrorExit("%s: named material not found.", materials[i]);
+            materialHandles[i] = iter->second;
+        }
+        material = MixMaterial::Create(materialHandles, parameters, loc, alloc);
     } else
         ErrorExit(loc, "%s: material type unknown.", name);
 

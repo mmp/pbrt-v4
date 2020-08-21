@@ -29,13 +29,14 @@ class HairMaterial;
 class MeasuredMaterial;
 class SubsurfaceMaterial;
 class ThinDielectricMaterial;
+class MixMaterial;
 
 // MaterialHandle Definition
 class MaterialHandle
     : public TaggedPointer<CoatedDiffuseMaterial, CoatedConductorMaterial,
                            ConductorMaterial, DielectricMaterial, DiffuseMaterial,
                            DiffuseTransmissionMaterial, HairMaterial, MeasuredMaterial,
-                           SubsurfaceMaterial, ThinDielectricMaterial> {
+                           SubsurfaceMaterial, ThinDielectricMaterial, MixMaterial> {
   public:
     // Material Interface
     using TaggedPointer::TaggedPointer;

@@ -54,6 +54,9 @@ class GPUPathIntegrator {
     template <typename Material, typename TextureEvaluator>
     void EvaluateMaterialAndBSDF(TextureEvaluator texEval, MaterialEvalQueue *evalQueue,
                                  int depth);
+    template <typename TextureEvaluator>
+    void ResolveMixMaterial(TextureEvaluator texEval,
+                            MaterialEvalQueue *evalQueue);
 
     void SampleDirect(int depth);
     template <typename BxDF>

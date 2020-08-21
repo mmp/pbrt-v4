@@ -43,6 +43,10 @@ BSDF SurfaceInteraction::GetBSDF(const RayDifferential &ray, SampledWavelengths 
                                  CameraHandle camera, ScratchBuffer &scratchBuffer,
                                  SamplerHandle sampler) {
     ComputeDifferentials(ray, camera);
+    while (material.Is<MixMaterial>()) {
+        MixMaterial *mix = material.CastOrNullptr<MixMaterial>();
+        material = mix->ChooseMaterial(UniversalTextureEvaluator(), *this);
+    }
     if (!material)
         return {};
     // Evaluate bump map and compute shading normal
@@ -69,6 +73,10 @@ BSSRDFHandle SurfaceInteraction::GetBSSRDF(const RayDifferential &ray,
                                            SampledWavelengths &lambda,
                                            CameraHandle camera,
                                            ScratchBuffer &scratchBuffer) {
+    while (material.Is<MixMaterial>()) {
+        MixMaterial *mix = material.CastOrNullptr<MixMaterial>();
+        material = mix->ChooseMaterial(UniversalTextureEvaluator(), *this);
+    }
     return material.GetBSSRDF(UniversalTextureEvaluator(), *this, lambda, scratchBuffer);
 }
 

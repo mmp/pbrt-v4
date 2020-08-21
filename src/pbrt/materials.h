@@ -19,6 +19,7 @@
 #include <pbrt/util/transform.h>
 
 #include <memory>
+#include <type_traits>
 
 namespace pbrt {
 
@@ -242,6 +243,76 @@ class ThinDielectricMaterial {
     FloatTextureHandle displacement;
     FloatTextureHandle etaF;
     SpectrumTextureHandle etaS;
+};
+
+// MixMaterial Definition
+class MixMaterial {
+  public:
+    using BxDF = void;  // shouldn't be accessed...
+    using BSSRDF = void;
+    // MixMaterial Public Methods
+    MixMaterial(MaterialHandle m[2], FloatTextureHandle amount) : amount(amount) {
+        materials[0] = m[0];
+        materials[1] = m[1];
+    }
+
+    static const char *Name() { return "MixMaterial"; }
+
+    PBRT_CPU_GPU
+    FloatTextureHandle GetDisplacement() const {
+        //    LOG_FATAL("Shouldn't be called");
+        return nullptr;
+    }
+
+    static MixMaterial *Create(MaterialHandle materials[2],
+                               const TextureParameterDictionary &parameters,
+                               const FileLoc *loc, Allocator alloc);
+
+    template <typename TextureEvaluator>
+    PBRT_CPU_GPU void GetBSSRDF(TextureEvaluator texEval, MaterialEvalContext ctx,
+                                SampledWavelengths &lambda, void *) const {
+        //    LOG_FATAL("Shouldn't be called");
+    }
+
+    PBRT_CPU_GPU static constexpr bool HasSubsurfaceScattering() { return false; }
+
+    std::string ToString() const;
+
+    template <typename TextureEvaluator>
+    PBRT_CPU_GPU bool CanEvaluateTextures(TextureEvaluator texEval) const {
+        return texEval.CanEvaluate({amount}, {});
+    }
+
+    template <typename TextureEvaluator>
+    PBRT_CPU_GPU MaterialHandle ChooseMaterial(TextureEvaluator texEval,
+                                               MaterialEvalContext ctx) const {
+        Float amt = texEval(amount, ctx);
+        if (amt <= 0)
+            return materials[0];
+        if (amt >= 1)
+            return materials[1];
+
+        Float u = uint32_t(Hash(ctx.p, ctx.wo)) * 0x1p-32;
+        return (amt < u) ? materials[0] : materials[1];
+    }
+
+    template <typename TextureEvaluator>
+    PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
+                              SampledWavelengths &lambda, void *bxdf) const {
+        //    LOG_FATAL("Shouldn't be called");
+        return {};
+    }
+
+    PBRT_CPU_GPU
+    bool IsTransparent() const {
+        // LOG_FATAL("Shouldn't be called");
+        return false;
+    }
+
+  private:
+    // MixMaterial Private Members
+    FloatTextureHandle amount;
+    MaterialHandle materials[2];
 };
 
 // HairMaterial Definition
@@ -808,10 +879,15 @@ template <typename TextureEvaluator>
 inline BSDF MaterialHandle::GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
                                     SampledWavelengths &lambda,
                                     ScratchBuffer &scratchBuffer) const {
-    auto get = [&](auto ptr) {
-        using BxDF = typename std::remove_reference<decltype(*ptr)>::type::BxDF;
-        BxDF *bxdf = (BxDF *)scratchBuffer.Alloc(sizeof(BxDF), alignof(BxDF));
-        return ptr->GetBSDF(texEval, ctx, lambda, bxdf);
+    auto get = [&](auto ptr) -> BSDF {
+        using Material = typename std::remove_reference<decltype(*ptr)>::type;
+        if constexpr (std::is_same_v<Material, MixMaterial>)
+            return {};
+        else {
+            using BxDF = typename Material::BxDF;
+            BxDF *bxdf = (BxDF *)scratchBuffer.Alloc(sizeof(BxDF), alignof(BxDF));
+            return ptr->GetBSDF(texEval, ctx, lambda, bxdf);
+        }
     };
     return Dispatch(get);
 }
@@ -822,7 +898,8 @@ inline BSSRDFHandle MaterialHandle::GetBSSRDF(TextureEvaluator texEval,
                                               SampledWavelengths &lambda,
                                               ScratchBuffer &scratchBuffer) const {
     auto get = [&](auto ptr) -> BSSRDFHandle {
-        using BSSRDF = typename std::remove_reference<decltype(*ptr)>::type::BSSRDF;
+        using Material = typename std::remove_reference<decltype(*ptr)>::type;
+        using BSSRDF = typename Material::BSSRDF;
         if constexpr (std::is_same_v<BSSRDF, void>)
             return nullptr;
         else {
