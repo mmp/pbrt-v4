@@ -54,7 +54,7 @@ pstd::optional<ShapeIntersection> GeometricPrimitive::Intersect(const Ray &r,
     // Test intersection against alpha texture, if present
     if (alpha) {
         if (Float a = alpha.Evaluate(si->intr); a < 1) {
-            Float u = (a == 0)
+            Float u = (a <= 0)
                           ? 1.f
                           : (uint32_t(Hash(r.o.x, r.o.y, r.o.z, r.d.x, r.d.y, r.d.z)) *
                              0x1p-32f);

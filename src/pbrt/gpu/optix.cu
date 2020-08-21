@@ -289,7 +289,7 @@ static __forceinline__ __device__ bool alphaKilled(const TriangleMeshRecord &rec
     Float alpha = eval(rec.alphaTexture, *intr);
     if (alpha >= 1)
         return false;
-    if (alpha == 0)
+    if (alpha <= 0)
         return true;
     else {
         float3 o = optixGetWorldRayOrigin();
