@@ -260,7 +260,9 @@ class MixMaterial {
 
     PBRT_CPU_GPU
     FloatTextureHandle GetDisplacement() const {
-        //    LOG_FATAL("Shouldn't be called");
+#ifndef PBRT_IS_GPU_CODE
+        LOG_FATAL("Shouldn't be called");
+#endif
         return nullptr;
     }
 
@@ -271,7 +273,9 @@ class MixMaterial {
     template <typename TextureEvaluator>
     PBRT_CPU_GPU void GetBSSRDF(TextureEvaluator texEval, MaterialEvalContext ctx,
                                 SampledWavelengths &lambda, void *) const {
-        //    LOG_FATAL("Shouldn't be called");
+#ifndef PBRT_IS_GPU_CODE
+        LOG_FATAL("Shouldn't be called");
+#endif
     }
 
     PBRT_CPU_GPU static constexpr bool HasSubsurfaceScattering() { return false; }
@@ -299,13 +303,17 @@ class MixMaterial {
     template <typename TextureEvaluator>
     PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
                               SampledWavelengths &lambda, void *bxdf) const {
-        //    LOG_FATAL("Shouldn't be called");
+#ifndef PBRT_IS_GPU_CODE
+        LOG_FATAL("Shouldn't be called");
+#endif
         return {};
     }
 
     PBRT_CPU_GPU
     bool IsTransparent() const {
-        // LOG_FATAL("Shouldn't be called");
+#ifndef PBRT_IS_GPU_CODE
+        LOG_FATAL("Shouldn't be called");
+#endif
         return false;
     }
 
