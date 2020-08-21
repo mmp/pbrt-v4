@@ -1285,30 +1285,58 @@ static ImageAndMetadata ReadPNG(const std::string &name, Allocator alloc,
     default: {
         std::vector<unsigned char> buf;
         int bpp = state.info_png.color.bitdepth == 16 ? 16 : 8;
+        bool hasAlpha = (state.info_png.color.colortype == LCT_RGBA);
+        // Force RGB if it's palletted or whatever.
         error =
             lodepng::decode(buf, width, height, (const unsigned char *)contents.data(),
-                            contents.size(), LCT_RGB, bpp);
+                            contents.size(), hasAlpha ? LCT_RGBA : LCT_RGB, bpp);
         if (error != 0)
             ErrorExit("%s: %s", name, lodepng_error_text(error));
 
         ImageMetadata metadata;
         metadata.colorSpace = RGBColorSpace::sRGB;
         if (state.info_png.color.bitdepth == 16) {
-            image = Image(PixelFormat::Half, Point2i(width, height), {"R", "G", "B"});
-            auto bufIter = buf.begin();
-            for (unsigned int y = 0; y < height; ++y)
-                for (unsigned int x = 0; x < width; ++x, bufIter += 6) {
-                    CHECK(bufIter < buf.end());
-                    // Convert from little endian.
-                    Float rgb[3] = {(((int)bufIter[0] << 8) + (int)bufIter[1]) / 65535.f,
-                                    (((int)bufIter[2] << 8) + (int)bufIter[3]) / 65535.f,
-                                    (((int)bufIter[4] << 8) + (int)bufIter[5]) / 65535.f};
-                    for (int c = 0; c < 3; ++c) {
-                        rgb[c] = encoding.ToFloatLinear(rgb[c]);
-                        image.SetChannel(Point2i(x, y), c, rgb[c]);
+            if (hasAlpha) {
+                image = Image(PixelFormat::Half, Point2i(width, height),
+                              {"R", "G", "B", "A"});
+                auto bufIter = buf.begin();
+                for (unsigned int y = 0; y < height; ++y)
+                    for (unsigned int x = 0; x < width; ++x, bufIter += 8) {
+                        CHECK(bufIter < buf.end());
+                        // Convert from little endian.
+                        Float rgba[4] = {
+                            (((int)bufIter[0] << 8) + (int)bufIter[1]) / 65535.f,
+                            (((int)bufIter[2] << 8) + (int)bufIter[3]) / 65535.f,
+                            (((int)bufIter[4] << 8) + (int)bufIter[5]) / 65535.f,
+                            (((int)bufIter[6] << 8) + (int)bufIter[7]) / 65535.f};
+                        for (int c = 0; c < 4; ++c) {
+                            rgba[c] = encoding.ToFloatLinear(rgba[c]);
+                            image.SetChannel(Point2i(x, y), c, rgba[c]);
+                        }
                     }
-                }
-            CHECK(bufIter == buf.end());
+                CHECK(bufIter == buf.end());
+            } else {
+                image = Image(PixelFormat::Half, Point2i(width, height), {"R", "G", "B"});
+                auto bufIter = buf.begin();
+                for (unsigned int y = 0; y < height; ++y)
+                    for (unsigned int x = 0; x < width; ++x, bufIter += 6) {
+                        CHECK(bufIter < buf.end());
+                        // Convert from little endian.
+                        Float rgb[3] = {
+                            (((int)bufIter[0] << 8) + (int)bufIter[1]) / 65535.f,
+                            (((int)bufIter[2] << 8) + (int)bufIter[3]) / 65535.f,
+                            (((int)bufIter[4] << 8) + (int)bufIter[5]) / 65535.f};
+                        for (int c = 0; c < 3; ++c) {
+                            rgb[c] = encoding.ToFloatLinear(rgb[c]);
+                            image.SetChannel(Point2i(x, y), c, rgb[c]);
+                        }
+                    }
+                CHECK(bufIter == buf.end());
+            }
+        } else if (hasAlpha) {
+            image = Image(PixelFormat::U256, Point2i(width, height), {"R", "G", "B", "A"},
+                          encoding);
+            std::copy(buf.begin(), buf.end(), (uint8_t *)image.RawPointer({0, 0}));
         } else {
             image = Image(PixelFormat::U256, Point2i(width, height), {"R", "G", "B"},
                           encoding);

@@ -1283,17 +1283,26 @@ GPUFloatImageTexture *GPUFloatImageTexture::Create(
 
         ImageAndMetadata immeta = Image::Read(filename);
         Image &image = immeta.image;
-        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
-        if (rgbDesc) {
-            // Convert to one channel
-            Image avgImage(image.Format(), image.Resolution(), {"Y"}, image.Encoding());
+        ImageChannelDesc alphaDesc = image.GetChannelDesc({"A"});
+        bool convertedImage = false;
+        if (alphaDesc) {
+            image = image.SelectChannels(alphaDesc);
+            convertedImage = true;
+        } else {
+            ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
+            if (rgbDesc) {
+                // Convert to one channel
+                Image avgImage(image.Format(), image.Resolution(), {"Y"},
+                               image.Encoding());
 
-            for (int y = 0; y < image.Resolution().y; ++y)
-                for (int x = 0; x < image.Resolution().x; ++x)
-                    avgImage.SetChannel({x, y}, 0,
-                                        image.GetChannels({x, y}, rgbDesc).Average());
+                for (int y = 0; y < image.Resolution().y; ++y)
+                    for (int x = 0; x < image.Resolution().x; ++x)
+                        avgImage.SetChannel({x, y}, 0,
+                                            image.GetChannels({x, y}, rgbDesc).Average());
 
-            image = std::move(avgImage);
+                image = std::move(avgImage);
+                convertedImage = true;
+            }
         }
 
         texArray = createSingleChannelTextureArray(image);
@@ -1302,7 +1311,7 @@ GPUFloatImageTexture *GPUFloatImageTexture::Create(
 
         textureCacheMutex.lock();
         lumTextureCache[filename] =
-            LuminanceTextureCacheItem{texArray, readMode, (bool)rgbDesc == false};
+            LuminanceTextureCacheItem{texArray, readMode, !convertedImage};
         textureCacheMutex.unlock();
     }
 

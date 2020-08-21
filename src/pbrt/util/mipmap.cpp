@@ -195,7 +195,6 @@ MIPMap::MIPMap(Image image, const RGBColorSpace *colorSpace, WrapMode wrapMode,
                Allocator alloc, const MIPMapFilterOptions &options)
     : colorSpace(colorSpace), wrapMode(wrapMode), options(options) {
     CHECK(colorSpace != nullptr);
-    CHECK(image.NChannels() == 1 || image.NChannels() == 3);
     pyramid = Image::GenerateMIPMap(std::move(image), wrapMode, alloc);
     std::for_each(pyramid.begin(), pyramid.end(),
                   [](const Image &im) { imageMapBytes += im.BytesUsed(); });
@@ -210,7 +209,7 @@ Float MIPMap::Texel(int level, Point2i st) const {
 template <>
 RGB MIPMap::Texel(int level, Point2i st) const {
     CHECK(level >= 0 && level < pyramid.size());
-    if (pyramid[level].NChannels() == 3) {
+    if (pyramid[level].NChannels() == 3 || pyramid[level].NChannels() == 4) {
         RGB rgb;
         for (int c = 0; c < 3; ++c)
             rgb[c] = pyramid[level].GetChannel(st, c, wrapMode);
@@ -345,11 +344,17 @@ std::unique_ptr<MIPMap> MIPMap::CreateFromFile(const std::string &filename,
 
     Image &image = imageAndMetadata.image;
     if (image.NChannels() != 1) {
-        // Get rid of alpha or any other unnecessary channels.
-        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
-        if (!rgbDesc)
-            ErrorExit("%s: image doesn't have R, G, and B channels", filename);
-        image = image.SelectChannels(rgbDesc, alloc);
+        // Get the channels in a canonical order..
+        ImageChannelDesc rgbaDesc = image.GetChannelDesc({"R", "G", "B", "A"});
+        if (rgbaDesc)
+            image = image.SelectChannels(rgbaDesc, alloc);
+        else {
+            ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
+            if (rgbDesc)
+                image = image.SelectChannels(rgbDesc, alloc);
+            else
+                ErrorExit("%s: image doesn't have R, G, and B channels", filename);
+        }
     }
 
     const RGBColorSpace *colorSpace = imageAndMetadata.metadata.GetColorSpace();
@@ -370,13 +375,23 @@ T MIPMap::Bilerp(int level, Point2f st) const {
 template <>
 Float MIPMap::Bilerp(int level, Point2f st) const {
     CHECK(level >= 0 && level < pyramid.size());
-    return pyramid[level].BilerpChannel(st, 0, wrapMode);
+    switch (pyramid[level].NChannels()) {
+    case 1:
+        return pyramid[level].BilerpChannel(st, 0, wrapMode);
+    case 3:
+        return pyramid[level].Bilerp(st, wrapMode).Average();
+    case 4:
+        // Return alpha
+        return pyramid[level].BilerpChannel(st, 3, wrapMode);
+    default:
+        LOG_FATAL("Unexpected number of image channels: %d", pyramid[level].NChannels());
+    }
 }
 
 template <>
 RGB MIPMap::Bilerp(int level, Point2f st) const {
     CHECK(level >= 0 && level < pyramid.size());
-    if (pyramid[level].NChannels() == 3) {
+    if (pyramid[level].NChannels() == 3 || pyramid[level].NChannels() == 4) {
         RGB rgb;
         for (int c = 0; c < 3; ++c)
             rgb[c] = pyramid[level].BilerpChannel(st, c, wrapMode);
