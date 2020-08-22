@@ -32,6 +32,24 @@
 
 namespace pbrt {
 
+PBRT_CPU_GPU
+static inline void rescale(SampledSpectrum &beta, SampledSpectrum &pdfLight,
+                           SampledSpectrum &pdfUni) {
+    if (beta.MaxComponentValue() > 0x1p24f ||
+        pdfLight.MaxComponentValue() > 0x1p24f ||
+        pdfUni.MaxComponentValue() > 0x1p24f) {
+        beta *= 1.f / 0x1p24f;
+        pdfLight *= 1.f / 0x1p24f;
+        pdfUni *= 1.f / 0x1p24f;
+    } else if (beta.MaxComponentValue() < 0x1p-24f ||
+               pdfLight.MaxComponentValue() < 0x1p-24f ||
+               pdfUni.MaxComponentValue() < 0x1p-24f) {
+        beta *= 0x1p24f;
+        pdfLight *= 0x1p24f;
+        pdfUni *= 0x1p24f;
+    }
+}
+
 template <typename Material, typename TextureEvaluator>
 void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                                                 MaterialEvalQueue *evalQueue, int depth) {
@@ -124,6 +142,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                     pdfUni *= pdf;
                 } else
                     pdfUni *= bsdfSample.pdf;
+                rescale(beta, pdfUni, pdfNEE);
 
                 Float etaScale = me.etaScale;
                 if (bsdfSample.IsTransmission())

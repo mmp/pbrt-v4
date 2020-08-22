@@ -263,9 +263,15 @@ class VolPathIntegrator : public RayIntegrator {
         if (beta.MaxComponentValue() > 0x1p24f ||
             pdfLight.MaxComponentValue() > 0x1p24f ||
             pdfUni.MaxComponentValue() > 0x1p24f) {
-            beta /= 0x1p24f;
-            pdfLight /= 0x1p24f;
-            pdfUni /= 0x1p24f;
+            beta *= 1.f / 0x1p24f;
+            pdfLight *= 1.f / 0x1p24f;
+            pdfUni *= 1.f / 0x1p24f;
+        } else if (beta.MaxComponentValue() < 0x1p-24f ||
+            pdfLight.MaxComponentValue() < 0x1p-24f ||
+            pdfUni.MaxComponentValue() < 0x1p-24f) {
+            beta *= 0x1p24f;
+            pdfLight *= 0x1p24f;
+            pdfUni *= 0x1p24f;
         }
     }
 
