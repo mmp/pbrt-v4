@@ -184,9 +184,9 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 LightSampleContext ctx(me.pi, me.n, ns);
                 pstd::optional<SampledLight> sampledLight =
                     lightSampler.Sample(ctx, raySamples.direct.uc);
-                LightHandle light = sampledLight->light;
-                if (!light)
+                if (!sampledLight)
                     return;
+                LightHandle light = sampledLight->light;
 
                 // Remarkably, this substantially improves L1 cache hits with
                 // CoatedDiffuseBxDF and gives about a 60% perf. benefit.
