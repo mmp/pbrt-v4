@@ -1110,8 +1110,8 @@ class Triangle {
     // contribution from the emitter due to its subtending a small solid angle.
     // In the second, BSDF sampling should be the much better sampling strategy
     // anyway.
-    static constexpr Float MinSphericalSampleArea = 1e-4;
-    static constexpr Float MaxSphericalSampleArea = 6.28;
+    static constexpr Float MinSphericalSampleArea = 2e-4;
+    static constexpr Float MaxSphericalSampleArea = 6.22;
 
     // Note: much of this method---other than the call to the sampling function
     // and the check about how to sample---is shared with the other
