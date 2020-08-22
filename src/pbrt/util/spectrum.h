@@ -301,18 +301,20 @@ class SampledWavelengths {
 
     PBRT_CPU_GPU
     void TerminateSecondary() {
-        // Return if secondary wavelengths are already terminated
-        bool secondaryTerminated = true;
-        for (int i = 1; i < NSpectrumSamples; ++i)
-            secondaryTerminated &= (pdf[i] == 0);
-        if (secondaryTerminated)
+        if (SecondaryTerminated())
             return;
-
-        secondaryTerminated = true;
         // Update wavelength probabilities for termination
         for (int i = 1; i < NSpectrumSamples; ++i)
             pdf[i] = 0;
         pdf[0] /= NSpectrumSamples;
+    }
+
+    PBRT_CPU_GPU
+    bool SecondaryTerminated() const {
+        for (int i = 1; i < NSpectrumSamples; ++i)
+            if (pdf[i] != 0)
+                return false;
+        return true;
     }
 
     PBRT_CPU_GPU
