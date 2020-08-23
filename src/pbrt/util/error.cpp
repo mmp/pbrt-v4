@@ -10,6 +10,7 @@
 #include <pbrt/util/print.h>
 
 #include <cstdio>
+#include <cstdlib>
 #include <mutex>
 #include <string>
 
