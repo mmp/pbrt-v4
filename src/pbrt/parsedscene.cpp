@@ -1129,8 +1129,12 @@ void FormattingScene::Camera(const std::string &name, ParsedParameterVector para
 void FormattingScene::MakeNamedMedium(const std::string &name,
                                       ParsedParameterVector params, FileLoc loc) {
     ParameterDictionary dict(params, RGBColorSpace::sRGB);
-    Printf("%sMakeNamedMedium \"%s\"\n%s\n", indent(), name,
-           dict.ToParameterList(catIndentCount));
+    if (upgrade && name == "heterogeneous")
+        Printf("%sMakeNamedMedium \"%s\"\n%s\n", indent(), "uniformgrid",
+               dict.ToParameterList(catIndentCount));
+    else
+        Printf("%sMakeNamedMedium \"%s\"\n%s\n", indent(), name,
+               dict.ToParameterList(catIndentCount));
 }
 
 void FormattingScene::MediumInterface(const std::string &insideName,

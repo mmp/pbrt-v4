@@ -43,11 +43,14 @@ class PhaseFunctionHandle : public TaggedPointer<HGPhaseFunction> {
 };
 
 class HomogeneousMedium;
-class GridDensityMedium;
+template <typename DensityProvider>
+class GeneralMedium;
+class UniformGridMediumProvider;
+using UniformGridMedium = GeneralMedium<UniformGridMediumProvider>;
 struct MediumSample;
 
 // MediumHandle Definition
-class MediumHandle : public TaggedPointer<HomogeneousMedium, GridDensityMedium> {
+class MediumHandle : public TaggedPointer<HomogeneousMedium, UniformGridMedium> {
   public:
     // MediumHandle Interface
     using TaggedPointer::TaggedPointer;

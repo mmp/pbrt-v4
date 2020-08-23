@@ -308,6 +308,7 @@ class RayQueue : public WorkQueue<RayWorkItem> {
     PBRT_CPU_GPU
     int PushCameraRay(const Ray &ray, const SampledWavelengths &lambda, int pixelIndex) {
         int index = size.fetch_add(1, cuda::std::memory_order_relaxed);
+        DCHECK(!ray.HasNaN());
         this->ray[index] = ray;
         this->pixelIndex[index] = pixelIndex;
         this->lambda[index] = lambda;
@@ -327,6 +328,7 @@ class RayQueue : public WorkQueue<RayWorkItem> {
                      const SampledWavelengths &lambda, Float etaScale,
                      bool isSpecularBounce, bool anyNonSpecularBounces, int pixelIndex) {
         int index = size.fetch_add(1, cuda::std::memory_order_relaxed);
+        DCHECK(!ray.HasNaN());
         this->ray[index] = ray;
         this->pixelIndex[index] = pixelIndex;
         this->piPrev[index] = piPrev;

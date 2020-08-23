@@ -180,118 +180,23 @@ std::string HomogeneousMedium::ToString() const {
 
 STAT_MEMORY_COUNTER("Memory/Volume grids", volumeGridBytes);
 
-// GridDensityMedium Method Definitions
-GridDensityMedium::GridDensityMedium(SpectrumHandle sigma_a, SpectrumHandle sigma_s,
-                                     Float sigScale, SpectrumHandle Le, Float g,
-                                     const Transform &renderFromMedium,
-                                     pstd::optional<SampledGrid<Float>> dgrid,
-                                     pstd::optional<SampledGrid<RGB>> rgbgrid,
-                                     const RGBColorSpace *colorSpace,
-                                     SampledGrid<Float> Legrid, Allocator alloc)
-    : sigma_a_spec(sigma_a, alloc),
-      sigma_s_spec(sigma_s, alloc),
-      sigScale(sigScale),
-      Le_spec(Le, alloc),
-      phase(g),
-      mediumFromRender(Inverse(renderFromMedium)),
-      renderFromMedium(renderFromMedium),
-      densityGrid(std::move(dgrid)),
+// UniformGridMediumProvider Method Definitions
+UniformGridMediumProvider::UniformGridMediumProvider(
+    pstd::optional<SampledGrid<Float>> dgrid, pstd::optional<SampledGrid<RGB>> rgbgrid,
+    const RGBColorSpace *colorSpace, SpectrumHandle Le, SampledGrid<Float> Legrid,
+    Allocator alloc)
+    : densityGrid(std::move(dgrid)),
       rgbDensityGrid(std::move(rgbgrid)),
-      maxDensityGrid(alloc),
       colorSpace(colorSpace),
+      Le_spec(Le, alloc),
       LeScaleGrid(std::move(Legrid)) {
     volumeGridBytes += LeScaleGrid.BytesAllocated();
     volumeGridBytes +=
         densityGrid ? densityGrid->BytesAllocated() : rgbDensityGrid->BytesAllocated();
-    // Define _getMaxDensity_ lambda
-    auto getMaxDensity = [&](const Bounds3f &bounds) -> Float {
-        if (densityGrid)
-            return densityGrid->MaximumValue(bounds);
-        else {
-            // Compute maximum density of RGB density over _bounds_
-            int nx = rgbDensityGrid->xSize();
-            int ny = rgbDensityGrid->ySize();
-            int nz = rgbDensityGrid->zSize();
-            Point3f ps[2] = {Point3f(bounds.pMin.x * nx - .5f, bounds.pMin.y * ny - .5f,
-                                     bounds.pMin.z * nz - .5f),
-                             Point3f(bounds.pMax.x * nx - .5f, bounds.pMax.y * ny - .5f,
-                                     bounds.pMax.z * nz - .5f)};
-            Point3i pi[2] = {Max(Point3i(Floor(ps[0])), Point3i(0, 0, 0)),
-                             Min(Point3i(Floor(ps[1])) + Vector3i(1, 1, 1),
-                                 Point3i(nx - 1, ny - 1, nz - 1))};
-
-            std::vector<SampledWavelengths> lambdas;
-            for (Float u : Stratified1D(16))
-                lambdas.push_back(SampledWavelengths::SampleXYZ(u));
-
-            Float maxDensity = 0;
-            for (int z = pi[0].z; z <= pi[1].z; ++z)
-                for (int y = pi[0].y; y <= pi[1].y; ++y)
-                    for (int x = pi[0].x; x <= pi[1].x; ++x) {
-                        RGB rgb = rgbDensityGrid->Lookup(Point3i(x, y, z));
-
-                        Float maxComponent = std::max({rgb.r, rgb.g, rgb.b});
-                        if (maxComponent == 0)
-                            continue;
-
-                        RGBSpectrum spec(*colorSpace, rgb);
-                        for (const SampledWavelengths &lambda : lambdas) {
-                            SampledSpectrum s = spec.Sample(lambda);
-                            maxDensity = std::max(maxDensity, s.MaxComponentValue());
-                        }
-                    }
-
-            return maxDensity * 1.025f;
-        }
-    };
-
-    // Set _maxDGridRes_ and allocate _maxDensityGrid_
-    maxDGridRes = Point3i(16, 16, 16);
-    maxDensityGrid.resize(maxDGridRes.x * maxDGridRes.y * maxDGridRes.z);
-
-    // Compute maximum density for each _maxDensityGrid_ cell
-    int offset = 0;
-    for (int z = 0; z < maxDGridRes.z; ++z)
-        for (int y = 0; y < maxDGridRes.y; ++y)
-            for (int x = 0; x < maxDGridRes.x; ++x) {
-                Bounds3f bounds(
-                    Point3f(Float(x) / maxDGridRes.x, Float(y) / maxDGridRes.y,
-                            Float(z) / maxDGridRes.z),
-                    Point3f(Float(x + 1) / maxDGridRes.x, Float(y + 1) / maxDGridRes.y,
-                            Float(z + 1) / maxDGridRes.z));
-                maxDensityGrid[offset++] = getMaxDensity(bounds);
-            }
 }
 
-GridDensityMedium *GridDensityMedium::Create(const ParameterDictionary &parameters,
-                                             const Transform &renderFromMedium,
-                                             const FileLoc *loc, Allocator alloc) {
-    SpectrumHandle sig_a = nullptr, sig_s = nullptr;
-    std::string preset = parameters.GetOneString("preset", "");
-    if (!preset.empty()) {
-        if (!GetMediumScatteringProperties(preset, &sig_a, &sig_s, alloc))
-            Warning(loc, "Material preset \"%s\" not found.", preset);
-    }
-
-    if (sig_a == nullptr) {
-        sig_a =
-            parameters.GetOneSpectrum("sigma_a", nullptr, SpectrumType::General, alloc);
-        if (sig_a == nullptr)
-            sig_a = alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB,
-                                                  RGB(.0011f, .0024f, .014f));
-    }
-    if (sig_s == nullptr) {
-        sig_s =
-            parameters.GetOneSpectrum("sigma_s", nullptr, SpectrumType::General, alloc);
-        if (sig_s == nullptr)
-            sig_s = alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB,
-                                                  RGB(2.55f, 3.21f, 3.77f));
-    }
-
-    Float sigScale = parameters.GetOneFloat("scale", 1.f);
-
-    Float g = parameters.GetOneFloat("g", 0.0f);
-
+UniformGridMediumProvider *UniformGridMediumProvider::Create(
+    const ParameterDictionary &parameters, const FileLoc *loc, Allocator alloc) {
     std::vector<Float> density = parameters.GetFloatArray("density");
     std::vector<RGB> rgbDensity = parameters.GetRGBArray("density");
     if (density.empty() && rgbDensity.empty())
@@ -302,11 +207,9 @@ GridDensityMedium *GridDensityMedium::Create(const ParameterDictionary &paramete
     int nx = parameters.GetOneInt("nx", 1);
     int ny = parameters.GetOneInt("ny", 1);
     int nz = parameters.GetOneInt("nz", 1);
-    Point3f p0 = parameters.GetOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
-    Point3f p1 = parameters.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
     size_t nDensity = !density.empty() ? density.size() : rgbDensity.size();
     if (nDensity != nx * ny * nz)
-        ErrorExit(loc, "GridDensityMedium has %d density values; expected nx*ny*nz = %d",
+        ErrorExit(loc, "UniformGridMedium has %d density values; expected nx*ny*nz = %d",
                   nDensity, nx * ny * nz);
 
     const RGBColorSpace *colorSpace = parameters.ColorSpace();
@@ -335,21 +238,15 @@ GridDensityMedium *GridDensityMedium::Create(const ParameterDictionary &paramete
         LeGrid = SampledGrid<Float>(LeScale, nx, ny, nz, alloc);
     }
 
-    Transform MediumFromData =
-        Translate(Vector3f(p0)) * Scale(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z);
-    return alloc.new_object<GridDensityMedium>(
-        sig_a, sig_s, sigScale, Le, g, renderFromMedium * MediumFromData,
-        std::move(densityGrid), std::move(rgbDensityGrid), colorSpace, std::move(LeGrid),
-        alloc);
+    return alloc.new_object<UniformGridMediumProvider>(
+        std::move(densityGrid), std::move(rgbDensityGrid), colorSpace, Le,
+        std::move(LeGrid), alloc);
 }
 
-std::string GridDensityMedium::ToString() const {
+std::string UniformGridMediumProvider::ToString() const {
     return StringPrintf(
-        "[ GridDensityMedium sigma_a_spec: %s sigma_s_spec: %s Le_spec: %s "
-        "phase: %s mediumFromRender: %s maxDensityGrid: %s maxDGridRes: %s "
-        "colorSpace: %s ]",
-        sigma_a_spec, sigma_s_spec, Le_spec, phase, mediumFromRender, maxDensityGrid,
-        maxDGridRes, *colorSpace);
+        "[ UniformGridMediumProvider Le_spec: %s colorSpace: %s (grids elided) ]",
+        Le_spec, *colorSpace);
 }
 
 MediumHandle MediumHandle::Create(const std::string &name,
@@ -359,9 +256,12 @@ MediumHandle MediumHandle::Create(const std::string &name,
     MediumHandle m = nullptr;
     if (name == "homogeneous")
         m = HomogeneousMedium::Create(parameters, loc, alloc);
-    else if (name == "heterogeneous")
-        m = GridDensityMedium::Create(parameters, renderFromMedium, loc, alloc);
-    else
+    else if (name == "uniformgrid") {
+        UniformGridMediumProvider *provider =
+            UniformGridMediumProvider::Create(parameters, loc, alloc);
+        m = GeneralMedium<UniformGridMediumProvider>::Create(
+            provider, parameters, renderFromMedium, loc, alloc);
+    } else
         ErrorExit(loc, "%s: medium unknown.", name);
 
     if (!m)
