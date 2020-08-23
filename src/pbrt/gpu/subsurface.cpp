@@ -48,10 +48,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                                              be.rayIndex);
         });
 
-    auto events = accel->IntersectOneRandom(maxQueueSize, subsurfaceScatterQueue);
-    struct IsectRandomHack {};
-    GetGPUKernelStats<IsectRandomHack>("Tracing subsurface scattering probe rays")
-        .launchEvents.push_back(events);
+    accel->IntersectOneRandom(maxQueueSize, subsurfaceScatterQueue);
 
     ForAllQueued(
         "Handle out-scattering after SSS", subsurfaceScatterQueue, maxQueueSize,

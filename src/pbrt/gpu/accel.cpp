@@ -4,6 +4,7 @@
 
 #include <pbrt/gpu/accel.h>
 
+#include <pbrt/gpu/launch.h>
 #include <pbrt/gpu/optix.h>
 #include <pbrt/lights.h>
 #include <pbrt/materials.h>
@@ -1039,17 +1040,16 @@ GPUAccel::ParamBufferState &GPUAccel::getParamBuffer(
     return pbs;
 }
 
-std::pair<cudaEvent_t, cudaEvent_t> GPUAccel::IntersectClosest(
+void GPUAccel::IntersectClosest(
     int maxRays, EscapedRayQueue *escapedRayQueue, HitAreaLightQueue *hitAreaLightQueue,
     MaterialEvalQueue *basicEvalMaterialQueue,
     MaterialEvalQueue *universalEvalMaterialQueue,
     MediumTransitionQueue *mediumTransitionQueue, MediumSampleQueue *mediumSampleQueue,
     RayQueue *rayQueue) const {
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+    std::pair<cudaEvent_t, cudaEvent_t> events =
+        GetProfilerEvents("Tracing closest hit rays");
 
-    cudaEventRecord(start);
+    cudaEventRecord(events.first);
 
     if (rootTraversable) {
         RayIntersectParameters params;
@@ -1085,18 +1085,13 @@ std::pair<cudaEvent_t, cudaEvent_t> GPUAccel::IntersectClosest(
 #endif
     }
 
-    cudaEventRecord(stop);
-
-    return std::make_pair(start, stop);
+    cudaEventRecord(events.second);
 };
 
-std::pair<cudaEvent_t, cudaEvent_t> GPUAccel::IntersectShadow(
-    int maxRays, ShadowRayQueue *shadowRayQueue) const {
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+void GPUAccel::IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue) const {
+    std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents("Tracing shadow rays");
 
-    cudaEventRecord(start);
+    cudaEventRecord(events.first);
 
     if (rootTraversable) {
         RayIntersectParameters params;
@@ -1126,17 +1121,13 @@ std::pair<cudaEvent_t, cudaEvent_t> GPUAccel::IntersectShadow(
 #endif
     }
 
-    cudaEventRecord(stop);
-    return std::make_pair(start, stop);
+    cudaEventRecord(events.second);
 }
 
-std::pair<cudaEvent_t, cudaEvent_t> GPUAccel::IntersectShadowTr(
-    int maxRays, ShadowRayQueue *shadowRayQueue) const {
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+void GPUAccel::IntersectShadowTr(int maxRays, ShadowRayQueue *shadowRayQueue) const {
+    std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents("Tracing shadow Tr rays");
 
-    cudaEventRecord(start);
+    cudaEventRecord(events.first);
 
     if (rootTraversable) {
         RayIntersectParameters params;
@@ -1166,17 +1157,15 @@ std::pair<cudaEvent_t, cudaEvent_t> GPUAccel::IntersectShadowTr(
 #endif
     }
 
-    cudaEventRecord(stop);
-    return std::make_pair(start, stop);
+    cudaEventRecord(events.second);
 }
 
-std::pair<cudaEvent_t, cudaEvent_t> GPUAccel::IntersectOneRandom(
-    int maxRays, SubsurfaceScatterQueue *subsurfaceScatterQueue) const {
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+void GPUAccel::IntersectOneRandom(int maxRays,
+                                  SubsurfaceScatterQueue *subsurfaceScatterQueue) const {
+    std::pair<cudaEvent_t, cudaEvent_t> events =
+        GetProfilerEvents("Tracing subsurface scattering probe rays");
 
-    cudaEventRecord(start);
+    cudaEventRecord(events.first);
 
     if (rootTraversable) {
         RayIntersectParameters params;
@@ -1206,9 +1195,7 @@ std::pair<cudaEvent_t, cudaEvent_t> GPUAccel::IntersectOneRandom(
 #endif
     }
 
-    cudaEventRecord(stop);
-
-    return std::make_pair(start, stop);
+    cudaEventRecord(events.second);
 }
 
 }  // namespace pbrt

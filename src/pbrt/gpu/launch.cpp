@@ -6,71 +6,121 @@
 
 #include <pbrt/util/print.h>
 
-#include <map>
 #include <vector>
 
 namespace pbrt {
 
-static std::vector<std::type_index> gpuKernelLaunchOrder;
-static std::map<std::type_index, GPUKernelStats> gpuKernels;
+struct KernelStats {
+    KernelStats(const char *description)
+        : description(description) { }
 
-GPUKernelStats &GetGPUKernelStats(std::type_index typeIndex, const char *description) {
-    auto iter = gpuKernels.find(typeIndex);
-    if (iter != gpuKernels.end()) {
-        CHECK_EQ(iter->second.description, std::string(description));
-        return iter->second;
+    std::string description;
+    int numLaunches = 0;
+    float sumMS = 0, minMS = 0, maxMS = 0;
+};
+
+struct ProfilerEvent {
+    ProfilerEvent() {
+        CUDA_CHECK(cudaEventCreate(&start));
+        CUDA_CHECK(cudaEventCreate(&stop));
     }
 
-    gpuKernelLaunchOrder.push_back(typeIndex);
-    gpuKernels[typeIndex] = GPUKernelStats(description);
-    return gpuKernels.find(typeIndex)->second;
+    void Sync() {
+        CHECK(active);
+        CUDA_CHECK(cudaEventSynchronize(start));
+        CUDA_CHECK(cudaEventSynchronize(stop));
+
+        float ms = 0;
+        CUDA_CHECK(cudaEventElapsedTime(&ms, start, stop));
+
+        ++stats->numLaunches;
+        if (stats->numLaunches == 1)
+            stats->sumMS = stats->minMS = stats->maxMS = ms;
+        else {
+            stats->sumMS += ms;
+            stats->minMS = std::min(stats->minMS, ms);
+            stats->maxMS = std::max(stats->maxMS, ms);
+        }
+
+        active = false;
+    }
+
+    cudaEvent_t start, stop;
+    bool active = false;
+    KernelStats *stats = nullptr;
+};
+
+// Store pointers so that reallocs don't mess up held KernelStats pointers
+// in ProfilerEvent..
+static std::vector<KernelStats *> kernelStats;
+
+// Ring buffer
+static std::vector<ProfilerEvent> eventPool;
+static size_t eventPoolOffset = 0;
+
+std::pair<cudaEvent_t, cudaEvent_t> GetProfilerEvents(const char *description) {
+    if (eventPool.empty())
+        eventPool.resize(1024);  // how many? This is probably more than we need...
+
+    if (eventPoolOffset == eventPool.size())
+        eventPoolOffset = 0;
+
+    ProfilerEvent &pe = eventPool[eventPoolOffset++];
+    if (pe.active)
+        pe.Sync();
+
+    pe.active = true;
+    pe.stats = nullptr;
+
+    for (size_t i = 0; i < kernelStats.size(); ++i) {
+        if (kernelStats[i]->description == description) {
+            pe.stats = kernelStats[i];
+            break;
+        }
+    }
+    if (!pe.stats) {
+        kernelStats.push_back(new KernelStats(description));
+        pe.stats = kernelStats.back();
+    }
+
+    return {pe.start, pe.stop};
 }
 
 void ReportKernelStats() {
     CUDA_CHECK(cudaDeviceSynchronize());
 
+    // Drain active profiler events
+    for (size_t i = 0; i < eventPool.size(); ++i)
+        if (eventPool[i].active)
+            eventPool[i].Sync();
+
     // Compute total milliseconds over all kernels and launches
-    float totalms = 0.f;
-    for (const auto kernelTypeId : gpuKernelLaunchOrder) {
-        const GPUKernelStats &stats = gpuKernels[kernelTypeId];
-        for (const auto &launch : stats.launchEvents) {
-            cudaEventSynchronize(launch.second);
-            float ms = 0;
-            cudaEventElapsedTime(&ms, launch.first, launch.second);
-            totalms += ms;
-        }
-    }
+    float totalMS = 0;
+    for (size_t i = 0; i < kernelStats.size(); ++i)
+        totalMS += kernelStats[i]->sumMS;
 
     printf("GPU Kernel Profile:\n");
     int otherLaunches = 0;
-    float otherms = 0;
-    const float otherCutoff = 0.001f * totalms;
-    for (const auto kernelTypeId : gpuKernelLaunchOrder) {
-        float summs = 0.f, minms = 1e30, maxms = 0;
-        const GPUKernelStats &stats = gpuKernels[kernelTypeId];
-        for (const auto &launch : stats.launchEvents) {
-            float ms = 0;
-            cudaEventElapsedTime(&ms, launch.first, launch.second);
-            summs += ms;
-            minms = std::min(minms, ms);
-            maxms = std::max(maxms, ms);
-        }
-
-        if (summs > otherCutoff)
+    float otherMS = 0;
+    const float otherCutoff = 0.001f * totalMS;
+    for (size_t i = 0; i < kernelStats.size(); ++i) {
+        KernelStats *stats = kernelStats[i];
+        if (stats->sumMS > otherCutoff)
             Printf("  %-49s %5d launches %9.2f ms / %5.1f%s (avg %6.3f, min "
                    "%6.3f, max %7.3f)\n",
-                   stats.description, stats.launchEvents.size(), summs,
-                   100.f * summs / totalms, "%", summs / stats.launchEvents.size(), minms,
-                   maxms);
+                   stats->description, stats->numLaunches, stats->sumMS,
+                   100.f * stats->sumMS / totalMS, "%",
+                   stats->sumMS / stats->numLaunches, stats->minMS,
+                   stats->maxMS);
         else {
-            otherms += summs;
-            otherLaunches += stats.launchEvents.size();
+            otherMS += stats->sumMS;
+            otherLaunches += stats->numLaunches;
         }
     }
     Printf("  %-49s %5d launches %9.2f ms / %5.1f%s (avg %6.3f)\n", "Other",
-           otherLaunches, otherms, 100.f * otherms / totalms, "%",
-           otherms / otherLaunches);
-    Printf("\nTotal GPU time: %9.2f ms\n", totalms);
+           otherLaunches, otherMS, 100.f * otherMS / totalMS, "%",
+           otherMS / otherLaunches);
+    Printf("\nTotal GPU time: %9.2f ms\n", totalMS);
     Printf("\n");
 }
 

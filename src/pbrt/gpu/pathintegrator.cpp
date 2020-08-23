@@ -237,13 +237,9 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
 void GPUPathIntegrator::TraceShadowRays(int depth) {
     std::pair<cudaEvent_t, cudaEvent_t> events;
     if (haveMedia)
-        events =
-            accel->IntersectShadowTr(maxQueueSize, shadowRayQueue);
+        accel->IntersectShadowTr(maxQueueSize, shadowRayQueue);
     else
-        events = accel->IntersectShadow(maxQueueSize, shadowRayQueue);
-    struct IsectShadowHack {};
-    GetGPUKernelStats<IsectShadowHack>("Tracing shadow rays")
-        .launchEvents.push_back(events);
+        accel->IntersectShadow(maxQueueSize, shadowRayQueue);
 
     // Add contribution if light was visible
     ForAllQueued("Incorporate shadow ray contribution", shadowRayQueue, maxQueueSize,
@@ -372,13 +368,10 @@ void GPUPathIntegrator::Render(ImageMetadata *metadata) {
                     rayQueues[(depth + 1) & 1]->Reset();
                 });
 
-                auto events = accel->IntersectClosest(
+                accel->IntersectClosest(
                     maxQueueSize, escapedRayQueue, hitAreaLightQueue,
                     basicEvalMaterialQueue, universalEvalMaterialQueue,
                     mediumTransitionQueue, mediumSampleQueue, rayQueues[depth & 1]);
-                struct IsectHack {};
-                GetGPUKernelStats<IsectHack>("Tracing closest hit rays")
-                    .launchEvents.push_back(events);
 
                 if (depth > 0)
                     GPUDo("Update indirect ray stats", [=] PBRT_GPU() {

@@ -10,8 +10,10 @@
 #include <pbrt/util/check.h>
 #include <pbrt/util/log.h>
 
+#include <map>
 #include <typeindex>
 #include <typeinfo>
+#include <utility>
 #include <vector>
 
 #include <cuda.h>
@@ -23,22 +25,26 @@
 
 namespace pbrt {
 
-struct GPUKernelStats {
-    GPUKernelStats() = default;
-    GPUKernelStats(const char *description) : description(description) {
-        launchEvents.reserve(256);
-    }
+std::pair<cudaEvent_t, cudaEvent_t> GetProfilerEvents(const char *description);
 
-    std::string description;
-    int blockSize = 0;
-    std::vector<std::pair<cudaEvent_t, cudaEvent_t>> launchEvents;
-};
+template <typename F>
+inline int GetBlockSize(const char *description, F kernel) {
+    // Note: this isn't re-entrant, but that's fine for our purposes...
+    static std::map<std::type_index, int> kernelBlockSizes;
 
-GPUKernelStats &GetGPUKernelStats(std::type_index typeIndex, const char *description);
+    std::type_index index = std::type_index(typeid(F));
 
-template <typename T>
-inline GPUKernelStats &GetGPUKernelStats(const char *description) {
-    return GetGPUKernelStats(std::type_index(typeid(T)), description);
+    auto iter = kernelBlockSizes.find(index);
+    if (iter != kernelBlockSizes.end())
+        return iter->second;
+
+    int minGridSize, blockSize;
+    CUDA_CHECK(cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize,
+                                                  kernel, 0, 0));
+    kernelBlockSizes[index] = blockSize;
+    LOG_VERBOSE("[%s]: block size %d", description, blockSize);
+
+    return blockSize;
 }
 
 template <typename F>
@@ -57,28 +63,16 @@ void GPUParallelFor(const char *description, int nItems, F func) {
 #endif
     auto kernel = &Kernel<F>;
 
-    GPUKernelStats &kernelStats = GetGPUKernelStats<F>(description);
-    if (kernelStats.blockSize == 0) {
-        int minGridSize;
-        CUDA_CHECK(cudaOccupancyMaxPotentialBlockSize(
-            &minGridSize, &kernelStats.blockSize, kernel, 0, 0));
-
-        LOG_VERBOSE("[%s]: block size %d", description, kernelStats.blockSize);
-    }
-
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+    int blockSize = GetBlockSize(description, kernel);
+    std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(description);
 
 #ifndef NDEBUG
     LOG_VERBOSE("Launching %s", description);
 #endif
-    cudaEventRecord(start);
-    int gridSize = (nItems + kernelStats.blockSize - 1) / kernelStats.blockSize;
-    kernel<<<gridSize, kernelStats.blockSize>>>(func, nItems);
-    cudaEventRecord(stop);
-
-    kernelStats.launchEvents.push_back(std::make_pair(start, stop));
+    cudaEventRecord(events.first);
+    int gridSize = (nItems + blockSize - 1) / blockSize;
+    kernel<<<gridSize, blockSize>>>(func, nItems);
+    cudaEventRecord(events.second);
 
 #ifndef NDEBUG
     CUDA_CHECK(cudaDeviceSynchronize());

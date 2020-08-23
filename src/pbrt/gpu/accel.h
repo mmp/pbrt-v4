@@ -38,21 +38,18 @@ class GPUAccel {
 
     Bounds3f Bounds() const { return bounds; }
 
-    std::pair<cudaEvent_t, cudaEvent_t> IntersectClosest(
+    void IntersectClosest(
         int maxRays, EscapedRayQueue *escapedRayQueue,
         HitAreaLightQueue *hitAreaLightQueue, MaterialEvalQueue *basicEvalMaterialQueue,
         MaterialEvalQueue *universalEvalMaterialQueue,
         MediumTransitionQueue *mediumTransitionQueue,
         MediumSampleQueue *mediumSampleQueue, RayQueue *rayQueue) const;
 
-    std::pair<cudaEvent_t, cudaEvent_t> IntersectShadow(
-        int maxRays, ShadowRayQueue *shadowRayQueue) const;
+    void IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue) const;
 
-    std::pair<cudaEvent_t, cudaEvent_t> IntersectShadowTr(int maxRays,
-                                                          ShadowRayQueue *shadowRayQueue) const;
+    void IntersectShadowTr(int maxRays, ShadowRayQueue *shadowRayQueue) const;
 
-    std::pair<cudaEvent_t, cudaEvent_t> IntersectOneRandom(
-        int maxRays, SubsurfaceScatterQueue *subsurfaceScatterQueue) const;
+    void IntersectOneRandom(int maxRays, SubsurfaceScatterQueue *subsurfaceScatterQueue) const;
 
   private:
     struct HitgroupRecord;
