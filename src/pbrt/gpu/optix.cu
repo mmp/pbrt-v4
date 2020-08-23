@@ -197,6 +197,13 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
 
     // FIXME: this is all basically duplicate code w/medium.cpp
     MaterialHandle material = intr.material;
+
+    const MixMaterial *mix = material.CastOrNullptr<MixMaterial>();
+    if (mix) {
+        MaterialEvalContext ctx(intr);
+        material = mix->ChooseMaterial(BasicTextureEvaluator(), ctx);
+    }
+
     if (!material) {
         DBG("Enqueuing into medium transition queue: ray index %d pixel index %d \n",
             rayIndex, r.pixelIndex);

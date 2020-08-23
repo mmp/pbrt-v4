@@ -256,11 +256,16 @@ class MixMaterial {
         materials[1] = m[1];
     }
 
+    PBRT_CPU_GPU
+    MaterialHandle GetMaterial(int i) const { return materials[i]; }
+
     static const char *Name() { return "MixMaterial"; }
 
     PBRT_CPU_GPU
     FloatTextureHandle GetDisplacement() const {
-        //    LOG_FATAL("Shouldn't be called");
+#ifndef PBRT_IS_GPU_CODE
+        LOG_FATAL("Shouldn't be called");
+#endif
         return nullptr;
     }
 
@@ -271,7 +276,9 @@ class MixMaterial {
     template <typename TextureEvaluator>
     PBRT_CPU_GPU void GetBSSRDF(TextureEvaluator texEval, MaterialEvalContext ctx,
                                 SampledWavelengths &lambda, void *) const {
-        //    LOG_FATAL("Shouldn't be called");
+#ifndef PBRT_IS_GPU_CODE
+        LOG_FATAL("Shouldn't be called");
+#endif
     }
 
     PBRT_CPU_GPU static constexpr bool HasSubsurfaceScattering() { return false; }
@@ -299,14 +306,19 @@ class MixMaterial {
     template <typename TextureEvaluator>
     PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
                               SampledWavelengths &lambda, void *bxdf) const {
-        //    LOG_FATAL("Shouldn't be called");
+#ifndef PBRT_IS_GPU_CODE
+        LOG_FATAL("Shouldn't be called");
+#endif
         return {};
     }
 
     PBRT_CPU_GPU
     bool IsTransparent() const {
-        // LOG_FATAL("Shouldn't be called");
+#ifdef PBRT_IS_GPU_CODE
         return false;
+#else
+        return materials[0].IsTransparent() || materials[1].IsTransparent();
+#endif
     }
 
   private:

@@ -865,9 +865,16 @@ GPUAccel::GPUAccel(
                           &materials);
 
     // Report which Materials are actually present...
-    auto updateMaterialNeeds = [&](MaterialHandle m) {
+    std::function<void(MaterialHandle)> updateMaterialNeeds;
+    updateMaterialNeeds = [&](MaterialHandle m) {
         if (!m)
             return;
+
+        if (MixMaterial *mix = m.CastOrNullptr<MixMaterial>(); mix) {
+            updateMaterialNeeds(mix->GetMaterial(0));
+            updateMaterialNeeds(mix->GetMaterial(1));
+            return;
+        }
 
         *haveSubsurface |= m.HasSubsurfaceScattering();
 

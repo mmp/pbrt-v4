@@ -92,12 +92,27 @@ std::string MixMaterial::ToString() const {
                         materials[1], amount);
 }
 
-MixMaterial *MixMaterial::Create(MaterialHandle materialHandles[2],
+MixMaterial *MixMaterial::Create(MaterialHandle materials[2],
                                  const TextureParameterDictionary &parameters,
                                  const FileLoc *loc, Allocator alloc) {
     FloatTextureHandle amount = parameters.GetFloatTexture("amount", 0.5f, alloc);
 
-    return alloc.new_object<MixMaterial>(materialHandles, amount);
+    if (Options->useGPU) {
+        // Check for this stuff here, where we can include the FileLoc in
+        // the error message. Note that both of these limitations could be
+        // relaxed if they were problematic; the issue is that we currently
+        // resolve MixMaterials in the closest hit shader, where we'd like
+        // to, for example, not introduce the complexity of potentially
+        // recursively evaluating textures, etc.
+        if (materials[0].Is<MixMaterial>() || materials[1].Is<MixMaterial>())
+            ErrorExit(loc, "The GPU renderer doesn't currently support using "
+                           "\"mix\" materials as parameters to the \"mix\" material.");
+        if (!BasicTextureEvaluator().CanEvaluate({amount}, {}))
+            ErrorExit(loc, "The GPU renderer currently only supports basic textures "
+                           "for its \"amount\" parameter.");
+    }
+
+    return alloc.new_object<MixMaterial>(materials, amount);
 }
 
 // HairMaterial Method Definitions

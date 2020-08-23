@@ -277,45 +277,14 @@ struct EvaluateMaterialCallback {
     GPUPathIntegrator *integrator;
     template <typename Material>
     void operator()() {
+        // MixMaterial is resolved immediately in the closest hit shader,
+        // so we don't need to worry about it here.
         if constexpr (!std::is_same_v<Material, MixMaterial>)
             integrator->EvaluateMaterialAndBSDF<Material>(depth);
     }
 };
 
-template <typename TextureEvaluator>
-void GPUPathIntegrator::ResolveMixMaterial(TextureEvaluator texEval,
-                                           MaterialEvalQueue *evalQueue) {
-    std::string name = StringPrintf("Resolve MixMaterial (%s tex)",
-        std::is_same_v<TextureEvaluator, BasicTextureEvaluator> ? "Basic" : "Universal");
-
-    ForAllQueued(
-        name.c_str(), evalQueue->Get<MixMaterial>(), maxQueueSize,
-        [=] PBRT_GPU(const MaterialEvalWorkItem<MixMaterial> me, int index) {
-            MaterialEvalContext ctx = me.GetMaterialEvalContext(me.ns, me.dpdus);
-            MaterialHandle m = me.material->ChooseMaterial(TextureEvaluator(), ctx);
-
-            auto enqueue = [=](auto ptr) {
-                using NewMaterial = typename std::remove_reference_t<decltype(*ptr)>;
-                evalQueue->Push<NewMaterial>(MaterialEvalWorkItem<NewMaterial>{
-                        ptr, me.lambda, me.beta, me.pdfUni, me.pi, me.n, me.ns,
-                        me.dpdus, me.dpdvs, me.dndus, me.dndvs,
-                        me.wo, me.uv, me.time, me.anyNonSpecularBounces, me.etaScale,
-                        me.mediumInterface, me.rayIndex, me.pixelIndex});
-            };
-            m.Dispatch(enqueue);
-        });
-}
-
 void GPUPathIntegrator::EvaluateMaterialsAndBSDFs(int depth) {
-    // Resolve Mix materials first
-    if (haveBasicEvalMaterial[MaterialHandle::TypeIndex<MixMaterial>()])
-        ResolveMixMaterial(BasicTextureEvaluator(),
-                           basicEvalMaterialQueue);
-
-    if (haveUniversalEvalMaterial[MaterialHandle::TypeIndex<MixMaterial>()])
-        ResolveMixMaterial(UniversalTextureEvaluator(),
-                           universalEvalMaterialQueue);
-
     MaterialHandle::ForEachType(EvaluateMaterialCallback{depth, this});
 }
 
