@@ -881,7 +881,7 @@ GPUAccel::GPUAccel(
 
         FloatTextureHandle displace = m.GetDisplacement();
         if (m.CanEvaluateTextures(BasicTextureEvaluator()) &&
-            (!displace && BasicTextureEvaluator().CanEvaluate({displace}, {})))
+            (!displace || BasicTextureEvaluator().CanEvaluate({displace}, {})))
             (*haveBasicEvalMaterial)[m.Tag()] = true;
         else
             (*haveUniversalEvalMaterial)[m.Tag()] = true;
