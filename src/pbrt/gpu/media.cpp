@@ -158,7 +158,7 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
 
             // There's no more work to do if there was a scattering event in
             // the medium.
-            if (scattered || !beta)
+            if (scattered || !beta || depth == maxDepth)
                 return;
 
             // Otherwise, enqueue bump and medium stuff...
@@ -224,6 +224,9 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
             };
             material.Dispatch(enqueue);
         });
+
+    if (depth == maxDepth)
+        return;
 
     using PhaseFunction = HGPhaseFunction;
     std::string desc = std::string("Sample direct/indirect - Henyey Greenstein");
