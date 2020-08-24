@@ -436,6 +436,7 @@ SET (PBRT_UTIL_SOURCE
   src/pbrt/util/memory.cpp
   src/pbrt/util/mesh.cpp
   src/pbrt/util/mipmap.cpp
+  src/pbrt/util/noise.cpp
   src/pbrt/util/parallel.cpp
   src/pbrt/util/pmj02tables.cpp
   src/pbrt/util/primes.cpp
@@ -476,6 +477,7 @@ SET (PBRT_UTIL_SOURCE_HEADERS
   src/pbrt/util/memory.h
   src/pbrt/util/mesh.h
   src/pbrt/util/mipmap.h
+  src/pbrt/util/noise.h
   src/pbrt/util/parallel.h
   src/pbrt/util/pmj02tables.h
   src/pbrt/util/primes.h
@@ -557,6 +559,7 @@ if (PBRT_CUDA_ENABLED)
 #   src/pbrt/util/memory.cpp
    src/pbrt/util/mesh.cpp
 #   src/pbrt/util/mipmap.cpp
+   src/pbrt/util/noise.cpp
 #   src/pbrt/util/parallel.cpp
    src/pbrt/util/pmj02tables.cpp
    src/pbrt/util/primes.cpp

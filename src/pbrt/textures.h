@@ -12,6 +12,7 @@
 #include <pbrt/paramdict.h>
 #include <pbrt/util/math.h>
 #include <pbrt/util/mipmap.h>
+#include <pbrt/util/noise.h>
 #include <pbrt/util/spectrum.h>
 #include <pbrt/util/taggedptr.h>
 #include <pbrt/util/transform.h>
@@ -23,17 +24,6 @@
 #include <string>
 
 namespace pbrt {
-
-PBRT_CPU_GPU
-Float Noise(Float x, Float y = .5f, Float z = .5f);
-PBRT_CPU_GPU
-Float Noise(const Point3f &p);
-PBRT_CPU_GPU
-Float FBm(const Point3f &p, const Vector3f &dpdx, const Vector3f &dpdy, Float omega,
-          int octaves);
-PBRT_CPU_GPU
-Float Turbulence(const Point3f &p, const Vector3f &dpdx, const Vector3f &dpdy,
-                 Float omega, int octaves);
 
 // TextureEvalContext Definition
 struct TextureEvalContext {
