@@ -240,8 +240,8 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
             pstd::optional<SampledLight> sampledLight =
                 lightSampler.Sample(ctx, raySamples.direct.uc);
 
-            LightHandle light = sampledLight->light;
-            if (light) {
+            if (sampledLight) {
+                LightHandle light = sampledLight->light;
                 // And now sample a point on the light.
                 LightLiSample ls = light.SampleLi(ctx, raySamples.direct.u, ms.lambda,
                                                   LightSamplingMode::WithMIS);
