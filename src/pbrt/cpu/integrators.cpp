@@ -982,6 +982,10 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             ray.medium.SampleTmaj(
                 ray, tMax, rng, lambda, [&](const MediumSample &mediumSample) {
                     // Handle medium scattering event for ray
+                    if (!beta) {
+                        terminated = true;
+                        return false;
+                    }
                     if (!mediumSample.intr) {
                         // Update _beta_ and _pdfUni_ for ray that escaped the medium
                         // FIXME: review this, esp the pdf...
@@ -1333,6 +1337,8 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
         }
 
         // Generate next ray segment or return final transmittance
+        if (!betaLight)
+            return SampledSpectrum(0.f);
         if (!si)
             break;
         lightRay = si->intr.SpawnRayTo(ls.pLight);

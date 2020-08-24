@@ -156,9 +156,9 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                     L[0], L[1], L[2], L[3], ms.pixelIndex, ms.rayIndex);
             }
 
-            // There's more work to do if there was a scattering event in
+            // There's no more work to do if there was a scattering event in
             // the medium.
-            if (scattered)
+            if (scattered || !beta)
                 return;
 
             // Otherwise, enqueue bump and medium stuff...

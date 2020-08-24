@@ -16,10 +16,13 @@
 #include <pbrt/util/transform.h>
 #include <pbrt/util/vecmath.h>
 
-#include <pbrt/util/color.cpp>       // :-(
-#include <pbrt/util/colorspace.cpp>  // :-(
-#include <pbrt/util/spectrum.cpp>    // :-(
-#include <pbrt/util/transform.cpp>   // :-(
+// Make various functions visible to OptiX, which doesn't get to link
+// shader code with the CUDA code in the main executable...
+#include <pbrt/util/color.cpp>
+#include <pbrt/util/colorspace.cpp>
+#include <pbrt/util/noise.cpp>
+#include <pbrt/util/spectrum.cpp>
+#include <pbrt/util/transform.cpp>
 
 #include <optix_device.h>
 
@@ -452,7 +455,8 @@ extern "C" __global__ void __raygen__shadow_Tr() {
             break;
     }
 
-    Ld /= (pdfUni + pdfNEE).Average();
+    if (Ld)
+        Ld /= (pdfUni + pdfNEE).Average();
     DBG("Setting final Ld for shadow ray index %d pixel index %d = as %f %f %f %f\n",
         index, sr.pixelIndex, Ld[0], Ld[1], Ld[2], Ld[3]);
 
