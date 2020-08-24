@@ -200,7 +200,7 @@ UniformGridMediumProvider *UniformGridMediumProvider::Create(
     std::vector<Float> density = parameters.GetFloatArray("density");
     std::vector<RGB> rgbDensity = parameters.GetRGBArray("density");
     if (density.empty() && rgbDensity.empty())
-        ErrorExit(loc, "No \"density\" values provided for heterogeneous medium.");
+        ErrorExit(loc, "No \"density\" values provided for uniform grid medium.");
     if (!density.empty() && !rgbDensity.empty())
         ErrorExit(loc, "Both \"float\" and \"rgb\" \"density\" values were provided.");
 
@@ -209,7 +209,8 @@ UniformGridMediumProvider *UniformGridMediumProvider::Create(
     int nz = parameters.GetOneInt("nz", 1);
     size_t nDensity = !density.empty() ? density.size() : rgbDensity.size();
     if (nDensity != nx * ny * nz)
-        ErrorExit(loc, "UniformGridMedium has %d density values; expected nx*ny*nz = %d",
+        ErrorExit(loc,
+                  "Uniform grid medium has %d density values; expected nx*ny*nz = %d",
                   nDensity, nx * ny * nz);
 
     const RGBColorSpace *colorSpace = parameters.ColorSpace();
@@ -249,6 +250,16 @@ std::string UniformGridMediumProvider::ToString() const {
         Le_spec, *colorSpace);
 }
 
+// CloudMediumProvider Method Definitions
+CloudMediumProvider *CloudMediumProvider::Create(const ParameterDictionary &parameters,
+                                                 const FileLoc *loc, Allocator alloc) {
+    Float density = parameters.GetOneFloat("density", 1);
+    Float wispiness = parameters.GetOneFloat("wispiness", 1);
+    Float extent = parameters.GetOneFloat("extent", 1);
+
+    return alloc.new_object<CloudMediumProvider>(density, wispiness, extent);
+}
+
 MediumHandle MediumHandle::Create(const std::string &name,
                                   const ParameterDictionary &parameters,
                                   const Transform &renderFromMedium, const FileLoc *loc,
@@ -261,6 +272,11 @@ MediumHandle MediumHandle::Create(const std::string &name,
             UniformGridMediumProvider::Create(parameters, loc, alloc);
         m = GeneralMedium<UniformGridMediumProvider>::Create(
             provider, parameters, renderFromMedium, loc, alloc);
+    } else if (name == "cloud") {
+        CloudMediumProvider *provider =
+            CloudMediumProvider::Create(parameters, loc, alloc);
+        m = GeneralMedium<CloudMediumProvider>::Create(provider, parameters,
+                                                       renderFromMedium, loc, alloc);
     } else
         ErrorExit(loc, "%s: medium unknown.", name);
 

@@ -47,10 +47,13 @@ template <typename DensityProvider>
 class GeneralMedium;
 class UniformGridMediumProvider;
 using UniformGridMedium = GeneralMedium<UniformGridMediumProvider>;
+class CloudMediumProvider;
+using CloudMedium = GeneralMedium<CloudMediumProvider>;
 struct MediumSample;
 
 // MediumHandle Definition
-class MediumHandle : public TaggedPointer<HomogeneousMedium, UniformGridMedium> {
+class MediumHandle
+    : public TaggedPointer<HomogeneousMedium, UniformGridMedium, CloudMedium> {
   public:
     // MediumHandle Interface
     using TaggedPointer::TaggedPointer;

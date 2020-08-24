@@ -10,6 +10,7 @@
 #include <pbrt/base/medium.h>
 #include <pbrt/interaction.h>
 #include <pbrt/paramdict.h>
+#include <pbrt/textures.h>
 #include <pbrt/util/colorspace.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/memory.h>
@@ -354,6 +355,12 @@ class UniformGridMediumProvider {
     }
 
     pstd::vector<Float> GetMaxDensityGrid(Allocator alloc, Point3i *res) const {
+        *res = Point3i(1, 1, 1);
+        Float m = 0;
+        for (Float v : *densityGrid)
+            m = std::max(m, v);
+        return pstd::vector<Float>(1, m, alloc);
+
         pstd::vector<Float> maxGrid(alloc);
         // Set _maxDGridRes_ and allocate _maxGrid_
         *res = Point3i(16, 16, 16);
@@ -424,6 +431,68 @@ class UniformGridMediumProvider {
     const RGBColorSpace *colorSpace;
     DenselySampledSpectrum Le_spec;
     SampledGrid<Float> LeScaleGrid;
+};
+
+// CloudMediumProvider Definition
+class CloudMediumProvider {
+  public:
+    // CloudMediumProvider Public Methods
+    static CloudMediumProvider *Create(const ParameterDictionary &parameters,
+                                       const FileLoc *loc, Allocator alloc);
+
+    std::string ToString() const { return "TODO cloud provider"; }
+
+    CloudMediumProvider(Float density, Float wispiness, Float extent)
+        : density(density), wispiness(wispiness), extent(extent) {}
+
+    bool IsEmissive() const { return false; }
+
+    PBRT_CPU_GPU
+    SampledSpectrum Le(const Point3f &p, const SampledWavelengths &lambda) const {
+        return SampledSpectrum(0.f);
+    }
+
+    pstd::vector<Float> GetMaxDensityGrid(Allocator alloc, Point3i *res) const {
+        *res = Point3i(1, 1, 1);
+        return pstd::vector<Float>(1, 1.f, alloc);
+    }
+
+    PBRT_CPU_GPU
+    SampledSpectrum Density(const Point3f &p, const SampledWavelengths &lambda) const {
+        Point3f pp = 5 * extent * p;
+
+        // Use noise to perturb the lookup point.
+        if (wispiness > 0) {
+            Float vscale = .05f * wispiness, vlac = 10.f;
+            for (int i = 0; i < 2; ++i) {
+                Float delta = .01f;
+                // TODO: update Noise() to return the gradient?
+                Float base = Noise(vlac * pp);
+                Point3f pd(Noise(vlac * pp + Vector3f(delta, 0, 0)),
+                           Noise(vlac * pp + Vector3f(0, delta, 0)),
+                           Noise(vlac * pp + Vector3f(0, 0, delta)));
+                pp += vscale * (pd - Vector3f(base, base, base)) / delta;
+                vscale *= 0.5f;
+                vlac *= 2.01f;
+            }
+        }
+
+        Float d = 0;
+        Float scale = .5, lac = 1.f;
+        for (int i = 0; i < 5; ++i) {
+            d += scale * Noise(lac * pp);
+            scale *= 0.5f;
+            lac *= 2.01f;
+        }
+
+        d = Clamp((1 - p.y) * 4.5 * density * d, 0, 1);
+        d += 2 * std::max<Float>(0, .5 - p.y);
+        return SampledSpectrum(Clamp(d, 0, 1));
+    }
+
+  private:
+    // CloudMediumProvider Private Members
+    Float density, wispiness, extent;
 };
 
 inline Float PhaseFunctionHandle::p(const Vector3f &wo, const Vector3f &wi) const {
