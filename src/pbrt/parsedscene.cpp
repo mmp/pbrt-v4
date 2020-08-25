@@ -1050,11 +1050,21 @@ void FormattingScene::Film(const std::string &type, ParsedParameterVector params
                            FileLoc loc) {
     ParameterDictionary dict(std::move(params), RGBColorSpace::sRGB);
 
+    std::string extra;
+    if (upgrade) {
+        std::vector<Float> m = dict.GetFloatArray("maxsampleluminance");
+        if (!m.empty()) {
+            dict.RemoveFloat("maxsampleluminance");
+            extra +=
+                StringPrintf("%s\"float maxcomponentvalue\" [ %f ]\n", indent(1), m[0]);
+        }
+    }
+
     if (upgrade && type == "image")
         Printf("%sFilm \"rgb\"\n", indent());
     else
         Printf("%sFilm \"%s\"\n", indent(), type);
-    std::cout << dict.ToParameterList(catIndentCount);
+    std::cout << extra << dict.ToParameterList(catIndentCount);
 }
 
 void FormattingScene::Sampler(const std::string &name, ParsedParameterVector params,
