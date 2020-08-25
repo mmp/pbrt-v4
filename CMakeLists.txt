@@ -56,6 +56,7 @@ check_ext ("Ptex" "ptex/src" 82bd326)
 check_ext ("double-conversion" "double-conversion/cmake" 9a8e518)
 check_ext ("filesystem" "filesystem/filesystem" 4efd2628)
 check_ext ("stb" "stb/tools" 1034f5)
+check_ext ("OpenVDB" "openvdb/nanovdb" d5ea9808f)
 check_ext ("zlib" "zlib/doc" 54d591e)
 
 if (CMAKE_BUILD_TYPE MATCHES Release)
@@ -165,6 +166,7 @@ if (CMAKE_CUDA_COMPILER)
         # FIXME. Sigh. I'm not sure how else to pass this through to cuda_compile_ptx...
         include_directories (src)
         include_directories (${CMAKE_BINARY_DIR})
+        include_directories (${NANOVDB_INCLUDE})
 
         # from Ingo's configure_optix.cmake (Apache licensed)
         find_program (BIN2C bin2c DOC "Path to the CUDA SDK bin2c executable.")
@@ -656,6 +658,7 @@ target_include_directories (pbrt_lib PUBLIC
   ${FILESYSTEM_INCLUDE}
   ${PTEX_INCLUDE}
   ${DOUBLE_CONVERSION_INCLUDE}
+  ${NANOVDB_INCLUDE}
   ${CMAKE_CURRENT_BINARY_DIR}
 )
 

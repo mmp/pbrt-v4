@@ -96,3 +96,7 @@ set (DOUBLE_CONVERSION_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/double-conversion PAR
 
 set_property (TARGET double-conversion cctest PROPERTY FOLDER "ext")
 
+###########################################################################
+# nanovdb
+
+set (NANOVDB_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/openvdb/nanovdb PARENT_SCOPE)
