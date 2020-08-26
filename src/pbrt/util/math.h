@@ -404,7 +404,7 @@ PBRT_CPU_GPU inline int Log4Int(T v) {
 // https://stackoverflow.com/a/10792321
 PBRT_CPU_GPU
 inline float FastExp(float x) {
-#ifdef __CUDA__ARCH__
+#ifdef PBRT_IS_GPU_CODE
     return __expf(x);
 #else
     /* exp(x) = 2^i * 2^f; i = floor (log2(e) * x), 0 <= f <= 1 */
