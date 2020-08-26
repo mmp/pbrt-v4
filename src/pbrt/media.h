@@ -157,16 +157,16 @@ class GeneralMedium {
           mediumFromRender(Inverse(renderFromMedium)),
           renderFromMedium(renderFromMedium),
           maxDensityGrid(alloc) {
-        maxDensityGrid = provider->GetMaxDensityGrid(alloc, &maxDGridRes);
+        maxDensityGrid = provider->GetMaxDensityGrid(alloc, &gridResolution);
     }
 
     std::string ToString() const {
         return StringPrintf(
             "[ GeneralMedium provider: %s mediumBounds: %s "
             "sigma_a_spec: %s sigma_s_spec: %s sigScale: %f phase: %s "
-            "mediumFromRender: %s maxDensityGrid: %s maxDensityGridRes: %s ]",
+            "mediumFromRender: %s maxDensityGrid: %s gridResolution: %s ]",
             *provider, mediumBounds, sigma_a_spec, sigma_s_spec, sigScale, phase,
-            mediumFromRender, maxDensityGrid, maxDGridRes);
+            mediumFromRender, maxDensityGrid, gridResolution);
     }
     bool IsEmissive() const { return provider->IsEmissive(); }
 
@@ -195,8 +195,8 @@ class GeneralMedium {
         Point3f gridIntersect = rayGrid(tMin);
         float nextCrossingT[3], deltaT[3];
         int step[3], voxelLimit[3], voxel[3];
-        Vector3f voxelWidth(1.f / maxDGridRes.x, 1.f / maxDGridRes.y,
-                            1.f / maxDGridRes.z);
+        Vector3f voxelWidth(1.f / gridResolution.x, 1.f / gridResolution.y,
+                            1.f / gridResolution.z);
         for (int axis = 0; axis < 3; ++axis) {
             // Initialize ray stepping parameters for axis
             // Handle negative zero ray direction
@@ -204,21 +204,21 @@ class GeneralMedium {
                 rayGrid.d[axis] = 0.f;
 
             // Compute current voxel for axis
-            voxel[axis] =
-                Clamp(gridIntersect[axis] * maxDGridRes[axis], 0, maxDGridRes[axis] - 1);
+            voxel[axis] = Clamp(gridIntersect[axis] * gridResolution[axis], 0,
+                                gridResolution[axis] - 1);
 
             if (rayGrid.d[axis] >= 0) {
                 // Handle ray with positive direction for voxel stepping
-                Float nextVoxelPos = Float(voxel[axis] + 1) / maxDGridRes[axis];
+                Float nextVoxelPos = Float(voxel[axis] + 1) / gridResolution[axis];
                 nextCrossingT[axis] =
                     tMin + (nextVoxelPos - gridIntersect[axis]) / rayGrid.d[axis];
                 deltaT[axis] = voxelWidth[axis] / rayGrid.d[axis];
                 step[axis] = 1;
-                voxelLimit[axis] = maxDGridRes[axis];
+                voxelLimit[axis] = gridResolution[axis];
 
             } else {
                 // Handle ray with negative direction for voxel stepping
-                Float nextVoxelPos = Float(voxel[axis]) / maxDGridRes[axis];
+                Float nextVoxelPos = Float(voxel[axis]) / gridResolution[axis];
                 nextCrossingT[axis] =
                     tMin + (nextVoxelPos - gridIntersect[axis]) / rayGrid.d[axis];
                 deltaT[axis] = -voxelWidth[axis] / rayGrid.d[axis];
@@ -240,7 +240,8 @@ class GeneralMedium {
 
             // Sample volume scattering in current voxel
             // Get _maxDensity_ for current voxel and compute _sigma\_maj_
-            int offset = voxel[0] + maxDGridRes.x * (voxel[1] + maxDGridRes.y * voxel[2]);
+            int offset =
+                voxel[0] + gridResolution.x * (voxel[1] + gridResolution.y * voxel[2]);
             Float maxDensity = maxDensityGrid[offset];
             SampledSpectrum sigma_maj(sigma_t * maxDensity);
 
@@ -336,7 +337,7 @@ class GeneralMedium {
     HGPhaseFunction phase;
     Transform mediumFromRender, renderFromMedium;
     pstd::vector<Float> maxDensityGrid;
-    Point3i maxDGridRes;
+    Point3i gridResolution;
 };
 
 // UniformGridMediumProvider Definition
@@ -378,7 +379,7 @@ class UniformGridMediumProvider {
 
     pstd::vector<Float> GetMaxDensityGrid(Allocator alloc, Point3i *res) const {
         pstd::vector<Float> maxGrid(alloc);
-        // Set _maxDGridRes_ and allocate _maxGrid_
+        // Set _gridResolution_ and allocate _maxGrid_
         *res = Point3i(4, 4, 4);
         maxGrid.resize(res->x * res->y * res->z);
 
