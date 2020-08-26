@@ -160,7 +160,14 @@ class GeneralMedium {
         maxDensityGrid = provider->GetMaxDensityGrid(alloc, &maxDGridRes);
     }
 
-    std::string ToString() const { return "GeneralMedium TODO"; }
+    std::string ToString() const {
+        return StringPrintf(
+            "[ GeneralMedium provider: %s mediumBounds: %s "
+            "sigma_a_spec: %s sigma_s_spec: %s sigScale: %f phase: %s "
+            "mediumFromRender: %s maxDensityGrid: %s maxDensityGridRes: %s ]",
+            *provider, mediumBounds, sigma_a_spec, sigma_s_spec, sigScale, phase,
+            mediumFromRender, maxDensityGrid, maxDGridRes);
+    }
     bool IsEmissive() const { return provider->IsEmissive(); }
 
     template <typename F>
@@ -450,7 +457,11 @@ class CloudMediumProvider {
     static CloudMediumProvider *Create(const ParameterDictionary &parameters,
                                        const FileLoc *loc, Allocator alloc);
 
-    std::string ToString() const { return "TODO cloud provider"; }
+    std::string ToString() const {
+        return StringPrintf("[ CloudMediumProvider bounds: %s density: %f "
+                            "wispiness: %f extent: %f ]",
+                            bounds, density, wispiness, extent);
+    }
 
     CloudMediumProvider(const Bounds3f &bounds, Float density, Float wispiness,
                         Float extent)
@@ -590,7 +601,11 @@ class NanoVDBMediumProvider {
     static NanoVDBMediumProvider *Create(const ParameterDictionary &parameters,
                                          const FileLoc *loc, Allocator alloc);
 
-    std::string ToString() const { return "TODO cloud provider"; }
+    std::string ToString() const {
+        return StringPrintf("[ NanoVDBMediumProvider bounds: %s LeScale: %f "
+                            "temperatureCutoff: %f temperatureScale: %f (grids elided) ]",
+                            bounds, LeScale, temperatureCutoff, temperatureScale);
+    }
 
     NanoVDBMediumProvider(const Bounds3f &bounds, nanovdb::GridHandle<NanoVDBBuffer> dg,
                           nanovdb::GridHandle<NanoVDBBuffer> tg, Float LeScale,
