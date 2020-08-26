@@ -369,6 +369,24 @@ extern "C" __global__ void __miss__shadow() {
     optixSetPayload_0(1);
 }
 
+__device__
+inline void rescale(SampledSpectrum &beta, SampledSpectrum &pdfLight,
+                    SampledSpectrum &pdfUni) {
+    if (beta.MaxComponentValue() > 0x1p24f ||
+        pdfLight.MaxComponentValue() > 0x1p24f ||
+        pdfUni.MaxComponentValue() > 0x1p24f) {
+        beta *= 1.f / 0x1p24f;
+        pdfLight *= 1.f / 0x1p24f;
+        pdfUni *= 1.f / 0x1p24f;
+    } else if (beta.MaxComponentValue() < 0x1p-24f ||
+               pdfLight.MaxComponentValue() < 0x1p-24f ||
+               pdfUni.MaxComponentValue() < 0x1p-24f) {
+        beta *= 0x1p24f;
+        pdfLight *= 0x1p24f;
+        pdfUni *= 0x1p24f;
+    }
+}
+
 extern "C" __global__ void __raygen__shadow_Tr() {
     DBG("raygen sahadow tr %d\n", optixGetLaunchIndex().x);
     int index = optixGetLaunchIndex().x;
@@ -433,13 +451,7 @@ extern "C" __global__ void __raygen__shadow_Tr() {
                                       if (!Ld)
                                           return false;
 
-                                      if (Ld.MaxComponentValue() > 0x1p24f ||
-                                          pdfNEE.MaxComponentValue() > 0x1p24f ||
-                                          pdfUni.MaxComponentValue() > 0x1p24f) {
-                                          Ld *= 1.f / 0x1p24f;
-                                          pdfNEE *= 1.f / 0x1p24f;
-                                          pdfUni *= 1.f / 0x1p24f;
-                                      }
+                                      rescale(Ld, pdfNEE, pdfUni);
 
                                       return true;
                                   });
