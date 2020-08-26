@@ -23,6 +23,7 @@
 #include <pbrt/util/progressreporter.h>
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/stats.h>
+#include <pbrt/util/string.h>
 #include <pbrt/util/taggedptr.h>
 
 #include <cstring>
@@ -330,7 +331,16 @@ void GPUPathIntegrator::Render(ImageMetadata *metadata) {
 
     ProgressReporter progress(spp, "Rendering", Options->quiet, true /* GPU */);
 
-    for (int sampleIndex = 0; sampleIndex < spp; ++sampleIndex) {
+    int firstSampleIndex = 0, lastSampleIndex = spp;
+    if (!Options->debugStart.empty()) {
+        if (!Atoi(Options->debugStart, &firstSampleIndex))
+            ErrorExit("Invalid --debugstart value: %s", Options->debugStart);
+        lastSampleIndex = firstSampleIndex + 1;
+    }
+
+    for (int sampleIndex = firstSampleIndex; sampleIndex < lastSampleIndex; ++sampleIndex) {
+        LOG_VERBOSE("Starting to submit work for sample %d", sampleIndex);
+
         for (int y0 = 0; y0 < resolution.y; y0 += scanlinesPerPass) {
             GPUDo("Reset ray queue", [=] PBRT_GPU() {
                 DBG("Starting scanlines at y0 = %d, sample %d / %d\n", y0, sampleIndex,
