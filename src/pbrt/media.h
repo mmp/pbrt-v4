@@ -229,7 +229,7 @@ class GeneralMedium {
                     // Compute _uEnd_ for exiting voxel and continue if no valid event
                     Float uEnd = InvertExponentialSample(t1 - t0, sigma_maj[0]);
                     if (u >= uEnd) {
-                        u = (u - uEnd) / (1 - uEnd);
+                        u = std::min((u - uEnd) / (1 - uEnd), OneMinusEpsilon);
                         goto advance;
                     }
 
