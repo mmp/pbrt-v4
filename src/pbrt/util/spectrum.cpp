@@ -35,19 +35,6 @@ XYZ SpectrumToXYZ(SpectrumHandle s) {
     return xyz / CIE_Y_integral;
 }
 
-Float Blackbody(Float lambda, Float T) {
-    if (T <= 0)
-        return 0;
-    const Float c = 299792458;
-    const Float h = 6.62606957e-34;
-    const Float kb = 1.3806488e-23;
-    // Return emitted radiance for blackbody at wavelength _lambda[i]_
-    Float l = lambda * 1e-9;
-    Float Le = (2 * h * c * c) / (Pow<5>(l) * (std::exp((h * c) / (l * kb * T)) - 1));
-    CHECK(!std::isnan(Le));
-    return Le;
-}
-
 Float SpectrumToPhotometric(SpectrumHandle s) {
     // We have to handle RGBSpectrum separately here as it's composed of an
     // illuminant spectrum and an RGB multiplier. We only want to consider the

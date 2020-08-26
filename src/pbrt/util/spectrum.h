@@ -68,8 +68,18 @@ Float SpectrumToY(SpectrumHandle s);
 Float SpectrumToPhotometric(SpectrumHandle s);
 XYZ SpectrumToXYZ(SpectrumHandle s);
 
-PBRT_CPU_GPU
-Float Blackbody(Float lambda, Float T);
+PBRT_CPU_GPU inline Float Blackbody(Float lambda, Float T) {
+    if (T <= 0)
+        return 0;
+    const Float c = 299792458;
+    const Float h = 6.62606957e-34;
+    const Float kb = 1.3806488e-23;
+    // Return emitted radiance for blackbody at wavelength _lambda[i]_
+    Float l = lambda * 1e-9f;
+    Float Le = (2 * h * c * c) / (Pow<5>(l) * (std::exp((h * c) / (l * kb * T)) - 1));
+    CHECK(!std::isnan(Le));
+    return Le;
+}
 
 namespace Spectra {
 DenselySampledSpectrum D(Float temperature, Allocator alloc);
@@ -561,6 +571,7 @@ class RGBSpectrum {
 class BlackbodySpectrum {
   public:
     // BlackbodySpectrum Public Methods
+    PBRT_CPU_GPU
     BlackbodySpectrum(Float T) : T(T) {
         // Compute blackbody normalization constant for given temperature
         Float lambdaMax = Float(2.8977721e-3 / T * 1e9);
