@@ -142,6 +142,7 @@ class GeneralMedium {
                   SpectrumHandle sigma_s, Float sigScale, Float g,
                   const Transform &renderFromMedium, Allocator alloc)
         : provider(provider),
+          mediumBounds(provider->Bounds()),
           sigma_a_spec(sigma_a, alloc),
           sigma_s_spec(sigma_s, alloc),
           sigScale(sigScale),
@@ -161,9 +162,8 @@ class GeneralMedium {
         // Transform ray to grid density's space and compute bounds overlap
         raytMax *= Length(rRender.d);
         Ray ray = mediumFromRender(Ray(rRender.o, Normalize(rRender.d)), &raytMax);
-        const Bounds3f b(Point3f(0, 0, 0), Point3f(1, 1, 1));
         Float tMin, tMax;
-        if (!b.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax))
+        if (!mediumBounds.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax))
             return;
         DCHECK_LE(tMax, raytMax);
 
@@ -173,34 +173,41 @@ class GeneralMedium {
         SampledSpectrum sigma_t = sigma_a + sigma_s;
 
         // Set up 3D DDA for ray through grid
-        Point3f gridIntersect = ray(tMin);
+        Vector3f diag = mediumBounds.Diagonal();
+        Ray rayGrid(Point3f((ray.o.x - mediumBounds.pMin.x) / diag.x,
+                            (ray.o.y - mediumBounds.pMin.y) / diag.y,
+                            (ray.o.z - mediumBounds.pMin.z) / diag.z),
+                    Vector3f(ray.d.x / diag.x, ray.d.y / diag.y, ray.d.z / diag.z));
+        Point3f gridIntersect = rayGrid(tMin);
         float nextCrossingT[3], deltaT[3];
         int step[3], voxelLimit[3], voxel[3];
+        Vector3f voxelWidth(1.f / maxDGridRes.x, 1.f / maxDGridRes.y,
+                            1.f / maxDGridRes.z);
         for (int axis = 0; axis < 3; ++axis) {
             // Initialize ray stepping parameters for axis
             // Handle negative zero ray direction
-            if (ray.d[axis] == -0.f)
-                ray.d[axis] = 0.f;
+            if (rayGrid.d[axis] == -0.f)
+                rayGrid.d[axis] = 0.f;
 
             // Compute current voxel for axis
             voxel[axis] =
                 Clamp(gridIntersect[axis] * maxDGridRes[axis], 0, maxDGridRes[axis] - 1);
 
-            if (ray.d[axis] >= 0) {
+            if (rayGrid.d[axis] >= 0) {
                 // Handle ray with positive direction for voxel stepping
-                nextCrossingT[axis] = tMin + (Float(voxel[axis] + 1) / maxDGridRes[axis] -
-                                              gridIntersect[axis]) /
-                                                 ray.d[axis];
-                deltaT[axis] = 1 / (ray.d[axis] * maxDGridRes[axis]);
+                Float nextVoxelPos = Float(voxel[axis] + 1) / maxDGridRes[axis];
+                nextCrossingT[axis] =
+                    tMin + (nextVoxelPos - gridIntersect[axis]) / rayGrid.d[axis];
+                deltaT[axis] = voxelWidth[axis] / rayGrid.d[axis];
                 step[axis] = 1;
                 voxelLimit[axis] = maxDGridRes[axis];
 
             } else {
                 // Handle ray with negative direction for voxel stepping
-                nextCrossingT[axis] = tMin + (Float(voxel[axis]) / maxDGridRes[axis] -
-                                              gridIntersect[axis]) /
-                                                 ray.d[axis];
-                deltaT[axis] = -1 / (ray.d[axis] * maxDGridRes[axis]);
+                Float nextVoxelPos = Float(voxel[axis]) / maxDGridRes[axis];
+                nextCrossingT[axis] =
+                    tMin + (nextVoxelPos - gridIntersect[axis]) / rayGrid.d[axis];
+                deltaT[axis] = -voxelWidth[axis] / rayGrid.d[axis];
                 step[axis] = -1;
                 voxelLimit[axis] = -1;
             }
@@ -302,19 +309,14 @@ class GeneralMedium {
 
         Float g = parameters.GetOneFloat("g", 0.0f);
 
-        Point3f p0 = parameters.GetOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
-        Point3f p1 = parameters.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
-
-        Transform MediumFromData =
-            Translate(Vector3f(p0)) * Scale(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z);
         return alloc.new_object<GeneralMedium<DensityProvider>>(
-            provider, sig_a, sig_s, sigScale, g, renderFromMedium * MediumFromData,
-            alloc);
+            provider, sig_a, sig_s, sigScale, g, renderFromMedium, alloc);
     }
 
   private:
     // GeneralMedium Private Members
     const DensityProvider *provider;
+    Bounds3f mediumBounds;
     DenselySampledSpectrum sigma_a_spec, sigma_s_spec;
     Float sigScale;
     HGPhaseFunction phase;
@@ -327,7 +329,8 @@ class GeneralMedium {
 class UniformGridMediumProvider {
   public:
     // UniformGridMediumProvider Public Methods
-    UniformGridMediumProvider(pstd::optional<SampledGrid<Float>> densityGrid,
+    UniformGridMediumProvider(const Bounds3f &bounds,
+                              pstd::optional<SampledGrid<Float>> densityGrid,
                               pstd::optional<SampledGrid<RGB>> rgbDensityGrid,
                               const RGBColorSpace *colorSpace, SpectrumHandle Le,
                               SampledGrid<Float> LeScaleGrid, Allocator alloc);
@@ -337,33 +340,32 @@ class UniformGridMediumProvider {
 
     std::string ToString() const;
 
+    PBRT_CPU_GPU
+    const Bounds3f &Bounds() const { return bounds; }
+
     bool IsEmissive() const { return Le_spec.MaxValue() > 0; }
 
     PBRT_CPU_GPU
     SampledSpectrum Le(const Point3f &p, const SampledWavelengths &lambda) const {
-        return Le_spec.Sample(lambda) * LeScaleGrid.Lookup(p);
+        Point3f pp = Point3f(bounds.Offset(p));
+        return Le_spec.Sample(lambda) * LeScaleGrid.Lookup(pp);
     }
 
     PBRT_CPU_GPU
     SampledSpectrum Density(const Point3f &p, const SampledWavelengths &lambda) const {
+        Point3f pp = Point3f(bounds.Offset(p));
         if (densityGrid)
-            return SampledSpectrum(densityGrid->Lookup(p));
+            return SampledSpectrum(densityGrid->Lookup(pp));
         else {
-            RGB rgb = rgbDensityGrid->Lookup(p);
+            RGB rgb = rgbDensityGrid->Lookup(pp);
             return RGBSpectrum(*colorSpace, rgb).Sample(lambda);
         }
     }
 
     pstd::vector<Float> GetMaxDensityGrid(Allocator alloc, Point3i *res) const {
-        *res = Point3i(1, 1, 1);
-        Float m = 0;
-        for (Float v : *densityGrid)
-            m = std::max(m, v);
-        return pstd::vector<Float>(1, m, alloc);
-
         pstd::vector<Float> maxGrid(alloc);
         // Set _maxDGridRes_ and allocate _maxGrid_
-        *res = Point3i(16, 16, 16);
+        *res = Point3i(4, 4, 4);
         maxGrid.resize(res->x * res->y * res->z);
 
         // Define _getMaxDensity_ lambda
@@ -426,6 +428,7 @@ class UniformGridMediumProvider {
 
   private:
     // UniformGridMediumProvider Private Members
+    Bounds3f bounds;
     pstd::optional<SampledGrid<Float>> densityGrid;
     pstd::optional<SampledGrid<RGB>> rgbDensityGrid;
     const RGBColorSpace *colorSpace;
@@ -442,8 +445,12 @@ class CloudMediumProvider {
 
     std::string ToString() const { return "TODO cloud provider"; }
 
-    CloudMediumProvider(Float density, Float wispiness, Float extent)
-        : density(density), wispiness(wispiness), extent(extent) {}
+    CloudMediumProvider(const Bounds3f &bounds, Float density, Float wispiness,
+                        Float extent)
+        : bounds(bounds), density(density), wispiness(wispiness), extent(extent) {}
+
+    PBRT_CPU_GPU
+    const Bounds3f &Bounds() const { return bounds; }
 
     bool IsEmissive() const { return false; }
 
@@ -485,13 +492,14 @@ class CloudMediumProvider {
             lac *= 2.01f;
         }
 
-        d = Clamp((1 - p.y) * 4.5 * density * d, 0, 1);
-        d += 2 * std::max<Float>(0, .5 - p.y);
+        d = Clamp((1 - p.y) * 4.5f * density * d, 0, 1);
+        d += 2 * std::max<Float>(0, .5f - p.y);
         return SampledSpectrum(Clamp(d, 0, 1));
     }
 
   private:
     // CloudMediumProvider Private Members
+    Bounds3f bounds;
     Float density, wispiness, extent;
 };
 

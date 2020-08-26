@@ -182,10 +182,11 @@ STAT_MEMORY_COUNTER("Memory/Volume grids", volumeGridBytes);
 
 // UniformGridMediumProvider Method Definitions
 UniformGridMediumProvider::UniformGridMediumProvider(
-    pstd::optional<SampledGrid<Float>> dgrid, pstd::optional<SampledGrid<RGB>> rgbgrid,
-    const RGBColorSpace *colorSpace, SpectrumHandle Le, SampledGrid<Float> Legrid,
-    Allocator alloc)
-    : densityGrid(std::move(dgrid)),
+    const Bounds3f &bounds, pstd::optional<SampledGrid<Float>> dgrid,
+    pstd::optional<SampledGrid<RGB>> rgbgrid, const RGBColorSpace *colorSpace,
+    SpectrumHandle Le, SampledGrid<Float> Legrid, Allocator alloc)
+    : bounds(bounds),
+      densityGrid(std::move(dgrid)),
       rgbDensityGrid(std::move(rgbgrid)),
       colorSpace(colorSpace),
       Le_spec(Le, alloc),
@@ -239,9 +240,12 @@ UniformGridMediumProvider *UniformGridMediumProvider::Create(
         LeGrid = SampledGrid<Float>(LeScale, nx, ny, nz, alloc);
     }
 
+    Point3f p0 = parameters.GetOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
+    Point3f p1 = parameters.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
+
     return alloc.new_object<UniformGridMediumProvider>(
-        std::move(densityGrid), std::move(rgbDensityGrid), colorSpace, Le,
-        std::move(LeGrid), alloc);
+        Bounds3f(p0, p1), std::move(densityGrid), std::move(rgbDensityGrid), colorSpace,
+        Le, std::move(LeGrid), alloc);
 }
 
 std::string UniformGridMediumProvider::ToString() const {
@@ -257,7 +261,11 @@ CloudMediumProvider *CloudMediumProvider::Create(const ParameterDictionary &para
     Float wispiness = parameters.GetOneFloat("wispiness", 1);
     Float extent = parameters.GetOneFloat("extent", 1);
 
-    return alloc.new_object<CloudMediumProvider>(density, wispiness, extent);
+    Point3f p0 = parameters.GetOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
+    Point3f p1 = parameters.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
+
+    return alloc.new_object<CloudMediumProvider>(Bounds3f(p0, p1), density, wispiness,
+                                                 extent);
 }
 
 MediumHandle MediumHandle::Create(const std::string &name,
