@@ -19,6 +19,13 @@
 #include <pbrt/util/spectrum.h>
 #include <pbrt/util/transform.h>
 
+#include <nanovdb/NanoVDB.h>
+#include <nanovdb/util/GridHandle.h>
+#include <nanovdb/util/SampleFromVoxels.h>
+#ifdef PBRT_BUILD_GPU_RENDERER
+#include <nanovdb/util/CudaDeviceBuffer.h>
+#endif  // PBRT_BUILD_GPU_RENDERER
+
 #include <memory>
 #include <vector>
 
@@ -501,6 +508,190 @@ class CloudMediumProvider {
     // CloudMediumProvider Private Members
     Bounds3f bounds;
     Float density, wispiness, extent;
+};
+
+// NanoVDBMediumProvider Definition
+// NanoVDBBuffer Definition
+class NanoVDBBuffer {
+  public:
+    static inline void ptrAssert(void *ptr, const char *msg, const char *file, int line,
+                                 bool abort = true) {
+        if (abort)
+            LOG_FATAL("%p: %s (%s:%d)", ptr, msg, file, line);
+        else
+            LOG_ERROR("%p: %s (%s:%d)", ptr, msg, file, line);
+    }
+
+    NanoVDBBuffer() = default;
+    NanoVDBBuffer(Allocator alloc) : alloc(alloc) {}
+    NanoVDBBuffer(size_t size, Allocator alloc = {}) : alloc(alloc) { init(size); }
+    NanoVDBBuffer(const NanoVDBBuffer &) = delete;
+    NanoVDBBuffer(NanoVDBBuffer &&other) noexcept
+        : alloc(std::move(other.alloc)),
+          bytesAllocated(other.bytesAllocated),
+          ptr(other.ptr) {
+        other.bytesAllocated = 0;
+        other.ptr = nullptr;
+    }
+    NanoVDBBuffer &operator=(const NanoVDBBuffer &) = delete;
+    NanoVDBBuffer &operator=(NanoVDBBuffer &&other) noexcept {
+        // Note, this isn't how std containers work, but it's expedient for
+        // our purposes here...
+        clear();
+        // operator= was deleted? Fine.
+        new (&alloc) Allocator(other.alloc.resource());
+        bytesAllocated = other.bytesAllocated;
+        ptr = other.ptr;
+        other.bytesAllocated = 0;
+        other.ptr = nullptr;
+        return *this;
+    }
+    ~NanoVDBBuffer() { clear(); }
+
+    void init(uint64_t size) {
+        if (size == bytesAllocated)
+            return;
+        if (bytesAllocated > 0)
+            clear();
+        if (size == 0)
+            return;
+        bytesAllocated = size;
+        ptr = (uint8_t *)alloc.allocate_bytes(bytesAllocated, 128);
+        LOG_VERBOSE("this %p alloc ptr %p bytes %d", this, ptr, bytesAllocated);
+    }
+
+    const uint8_t *data() const { return ptr; }
+    uint8_t *data() { return ptr; }
+    uint64_t size() const { return bytesAllocated; }
+    bool empty() const { return size() == 0; }
+
+    void clear() {
+        LOG_VERBOSE("this %p clear ptr %p bytes %d", this, ptr, bytesAllocated);
+        alloc.deallocate_bytes(ptr, bytesAllocated, 128);
+        bytesAllocated = 0;
+        ptr = nullptr;
+    }
+
+    static NanoVDBBuffer create(uint64_t size, const NanoVDBBuffer *context = nullptr) {
+        return NanoVDBBuffer(size, context ? context->GetAllocator() : Allocator());
+    }
+
+    Allocator GetAllocator() const { return alloc; }
+
+  private:
+    Allocator alloc;
+    size_t bytesAllocated = 0;
+    uint8_t *ptr = nullptr;
+};
+
+class NanoVDBMediumProvider {
+  public:
+    // NanoVDBMediumProvider Public Methods
+    static NanoVDBMediumProvider *Create(const ParameterDictionary &parameters,
+                                         const FileLoc *loc, Allocator alloc);
+
+    std::string ToString() const { return "TODO cloud provider"; }
+
+    NanoVDBMediumProvider(const Bounds3f &bounds, nanovdb::GridHandle<NanoVDBBuffer> dg,
+                          nanovdb::GridHandle<NanoVDBBuffer> tg, Float LeScale,
+                          Float temperatureCutoff, Float temperatureScale)
+        : bounds(bounds),
+          densityGrid(std::move(dg)),
+          temperatureGrid(std::move(tg)),
+          LeScale(LeScale),
+          temperatureCutoff(temperatureCutoff),
+          temperatureScale(temperatureScale) {
+        densityFloatGrid = densityGrid.grid<float>();
+        if (temperatureGrid) {
+            temperatureFloatGrid = temperatureGrid.grid<float>();
+            Float minTemperature, maxTemperature;
+            temperatureFloatGrid->tree().extrema(minTemperature, maxTemperature);
+            LOG_VERBOSE("Max temperature: %f", maxTemperature);
+        }
+    }
+
+    PBRT_CPU_GPU
+    const Bounds3f &Bounds() const { return bounds; }
+
+    bool IsEmissive() const { return temperatureFloatGrid != nullptr && LeScale > 0; }
+
+    PBRT_CPU_GPU
+    SampledSpectrum Le(const Point3f &p, const SampledWavelengths &lambda) const {
+        if (!temperatureFloatGrid)
+            return SampledSpectrum(0.f);
+        nanovdb::Vec3<float> pIndex =
+            densityFloatGrid->worldToIndexF(nanovdb::Vec3<float>(p.x, p.y, p.z));
+        Float temp = nanovdb::TrilinearSampler(temperatureFloatGrid->tree())(pIndex);
+        temp = (temp - temperatureCutoff) * temperatureScale;
+        if (temp <= 100.f)
+            return SampledSpectrum(0.f);
+        return LeScale * BlackbodySpectrum(temp).Sample(lambda);
+    }
+
+    pstd::vector<Float> GetMaxDensityGrid(Allocator alloc, Point3i *res) const {
+#if 0
+    // For debugging: single, medium-wide majorant...
+    *res = Point3i(1, 1, 1);
+    Float minDensity, maxDensity;
+    densityFloatGrid->tree().extrema(minDensity, maxDensity);
+    return pstd::vector<Float>(1, maxDensity, alloc);
+#else
+        *res = Point3i(64, 64, 64);
+        pstd::vector<Float> maxGrid(res->x * res->y * res->z, 0.f, alloc);
+
+        const auto &tree = densityFloatGrid->tree();
+
+        // Iterate over the leaves
+        for (int i = 0; i < tree.nodeCount(0); ++i) {
+            auto leaf = tree.getNode<0>(i);
+            auto b = leaf->bbox();
+
+            // TODO: it's a little unclear how the rounding should go here;
+            // note also that it depends on how samples end up being
+            // interpolated, and thence the footprint of the filter function..
+            nanovdb::Vec3R w0 = densityFloatGrid->indexToWorld(nanovdb::Vec3R(b.min()) -
+                                                               nanovdb::Vec3R(1, 1, 1));
+            nanovdb::Vec3R w1 = densityFloatGrid->indexToWorld(nanovdb::Vec3R(b.max()) +
+                                                               nanovdb::Vec3R(1, 1, 1));
+
+            Vector3f p0 = bounds.Offset(Point3f(w0[0], w0[1], w0[2]));
+            Vector3f p1 = bounds.Offset(Point3f(w1[0], w1[1], w1[2]));
+
+            int x0 = int(p0.x * res->x);
+            int x1 = std::min(int(p1.x * res->x + 1), res->x);
+            int y0 = int(p0.y * res->y);
+            int y1 = std::min(int(p1.y * res->y + 1), res->y);
+            int z0 = int(p0.z * res->z);
+            int z1 = std::min(int(p1.z * res->z + 1), res->z);
+
+            for (int z = z0; z < z1; ++z)
+                for (int y = y0; y < y1; ++y)
+                    for (int x = x0; x < x1; ++x) {
+                        Float &v = maxGrid[x + res->x * (y + res->y * z)];
+                        v = std::max(v, leaf->valueMax());
+                    }
+        }
+
+        return maxGrid;
+#endif
+    }
+
+    PBRT_CPU_GPU
+    SampledSpectrum Density(const Point3f &p, const SampledWavelengths &lambda) const {
+        nanovdb::Vec3<float> pIndex =
+            densityFloatGrid->worldToIndexF(nanovdb::Vec3<float>(p.x, p.y, p.z));
+        Float density = nanovdb::TrilinearSampler(densityFloatGrid->tree())(pIndex);
+        return SampledSpectrum(density);
+    }
+
+  private:
+    // NanoVDBMediumProvider Private Members
+    Bounds3f bounds;
+    nanovdb::GridHandle<NanoVDBBuffer> densityGrid;
+    nanovdb::GridHandle<NanoVDBBuffer> temperatureGrid;
+    const nanovdb::FloatGrid *densityFloatGrid = nullptr;
+    const nanovdb::FloatGrid *temperatureFloatGrid = nullptr;
+    Float LeScale, temperatureCutoff, temperatureScale;
 };
 
 inline Float PhaseFunctionHandle::p(const Vector3f &wo, const Vector3f &wi) const {

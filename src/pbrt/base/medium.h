@@ -49,11 +49,13 @@ class UniformGridMediumProvider;
 using UniformGridMedium = GeneralMedium<UniformGridMediumProvider>;
 class CloudMediumProvider;
 using CloudMedium = GeneralMedium<CloudMediumProvider>;
+class NanoVDBMediumProvider;
+using NanoVDBMedium = GeneralMedium<NanoVDBMediumProvider>;
 struct MediumSample;
 
 // MediumHandle Definition
-class MediumHandle
-    : public TaggedPointer<HomogeneousMedium, UniformGridMedium, CloudMedium> {
+class MediumHandle : public TaggedPointer<HomogeneousMedium, UniformGridMedium,
+                                          CloudMedium, NanoVDBMedium> {
   public:
     // MediumHandle Interface
     using TaggedPointer::TaggedPointer;

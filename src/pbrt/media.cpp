@@ -17,6 +17,10 @@
 #include <pbrt/util/scattering.h>
 #include <pbrt/util/stats.h>
 
+#include <nanovdb/NanoVDB.h>
+#define NANOVDB_USE_ZIP 1
+#include <nanovdb/util/IO.h>
+
 #include <algorithm>
 #include <cmath>
 
@@ -268,6 +272,60 @@ CloudMediumProvider *CloudMediumProvider::Create(const ParameterDictionary &para
                                                  extent);
 }
 
+// NanoVDBMediumProvider Method Definitions
+template <typename Buffer>
+static nanovdb::GridHandle<Buffer> readGrid(const std::string &filename,
+                                            const std::string &gridName,
+                                            const FileLoc *loc, Allocator alloc) {
+    NanoVDBBuffer buf(alloc);
+    nanovdb::GridHandle<Buffer> grid;
+    try {
+        grid =
+            nanovdb::io::readGrid<Buffer>(filename, gridName, 0 /* not verbose */, buf);
+    } catch (const std::exception &e) {
+        ErrorExit("nanovdb: %s: %s", filename, e.what());
+    }
+
+    if (grid) {
+        if (!grid.gridMetaData()->isFogVolume() && !grid.gridMetaData()->isUnknown())
+            ErrorExit(loc, "%s: \"%s\" isn't a FogVolume grid?", filename, gridName);
+
+        LOG_VERBOSE("%s: found %d \"%s\" voxels", filename,
+                    grid.gridMetaData()->activeVoxelCount(), gridName);
+    }
+
+    return grid;
+}
+
+NanoVDBMediumProvider *NanoVDBMediumProvider::Create(
+    const ParameterDictionary &parameters, const FileLoc *loc, Allocator alloc) {
+    std::string filename = parameters.GetOneString("filename", "");
+    if (filename.empty())
+        ErrorExit(loc, "Must supply \"filename\" to \"nanovdb\" medium.");
+
+    nanovdb::GridHandle<NanoVDBBuffer> densityGrid;
+    nanovdb::BBox<nanovdb::Vec3R> bbox;
+    densityGrid = readGrid<NanoVDBBuffer>(filename, "density", loc, alloc);
+    if (!densityGrid)
+        ErrorExit(loc, "%s: didn't find \"density\" grid.", filename);
+
+    bbox = densityGrid.grid<float>()->worldBBox();
+
+    nanovdb::GridHandle<NanoVDBBuffer> temperatureGrid;
+    temperatureGrid = readGrid<NanoVDBBuffer>(filename, "temperature", loc, alloc);
+
+    Bounds3f bounds(Point3f(bbox.min()[0], bbox.min()[1], bbox.min()[2]),
+                    Point3f(bbox.max()[0], bbox.max()[1], bbox.max()[2]));
+
+    Float LeScale = parameters.GetOneFloat("LeScale", 1.f);
+    Float temperatureCutoff = parameters.GetOneFloat("temperaturecutoff", 0.f);
+    Float temperatureScale = parameters.GetOneFloat("temperaturescale", 1.f);
+
+    return alloc.new_object<NanoVDBMediumProvider>(bounds, std::move(densityGrid),
+                                                   std::move(temperatureGrid), LeScale,
+                                                   temperatureCutoff, temperatureScale);
+}
+
 MediumHandle MediumHandle::Create(const std::string &name,
                                   const ParameterDictionary &parameters,
                                   const Transform &renderFromMedium, const FileLoc *loc,
@@ -285,6 +343,11 @@ MediumHandle MediumHandle::Create(const std::string &name,
             CloudMediumProvider::Create(parameters, loc, alloc);
         m = GeneralMedium<CloudMediumProvider>::Create(provider, parameters,
                                                        renderFromMedium, loc, alloc);
+    } else if (name == "nanovdb") {
+        NanoVDBMediumProvider *provider =
+            NanoVDBMediumProvider::Create(parameters, loc, alloc);
+        m = GeneralMedium<NanoVDBMediumProvider>::Create(provider, parameters,
+                                                         renderFromMedium, loc, alloc);
     } else
         ErrorExit(loc, "%s: medium unknown.", name);
 
