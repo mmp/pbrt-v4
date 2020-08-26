@@ -20,6 +20,30 @@
 
 namespace pbrt {
 
+// It's not unususal for these values to have very large or very small
+// magnitudes after multiple (null) scattering events, even though in the
+// end ratios like beta/pdfUni are generally around 1.  To avoid overflow,
+// we rescale all three of them by the same factor when they become large.
+PBRT_CPU_GPU
+static inline void rescale(SampledSpectrum &beta, SampledSpectrum &pdfLight,
+                           SampledSpectrum &pdfUni) {
+    // Note that no precision is lost in the rescaling since we're always
+    // multiplying by an exact power of 2.
+    if (beta.MaxComponentValue() > 0x1p24f ||
+        pdfLight.MaxComponentValue() > 0x1p24f ||
+        pdfUni.MaxComponentValue() > 0x1p24f) {
+        beta *= 1.f / 0x1p24f;
+        pdfLight *= 1.f / 0x1p24f;
+        pdfUni *= 1.f / 0x1p24f;
+    } else if (beta.MaxComponentValue() < 0x1p-24f ||
+               pdfLight.MaxComponentValue() < 0x1p-24f ||
+               pdfUni.MaxComponentValue() < 0x1p-24f) {
+        beta *= 0x1p24f;
+        pdfLight *= 0x1p24f;
+        pdfUni *= 0x1p24f;
+    }
+}
+
 void GPUPathIntegrator::SampleMediumInteraction(int depth) {
     ForAllQueued(
         "Sample medium interaction", mediumSampleQueue, maxQueueSize,
@@ -121,22 +145,7 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                         pdfUni *= Tmaj * sigma_n;
                         pdfNEE *= Tmaj * intr.sigma_maj;
 
-                        // It's not unususal for these values to have large
-                        // magnitudes after multiple null scattering
-                        // events, even though in the end ratios like
-                        // beta/pdfUni are generally around 1.  To avoid
-                        // overflow, we rescale all three of them by the
-                        // same factor when they become large.
-                        if (beta.MaxComponentValue() > 0x1p24f ||
-                            pdfUni.MaxComponentValue() > 0x1p24f ||
-                            pdfNEE.MaxComponentValue() > 0x1p24f) {
-                            // Note that no precision is lost in the
-                            // rescaling since we're dividing by a power of
-                            // 2.
-                            beta *= 1.f / 0x1p24f;
-                            pdfUni *= 1.f / 0x1p24f;
-                            pdfNEE *= 1.f / 0x1p24f;
-                        }
+                        rescale(beta, pdfUni, pdfNEE);
 
                         return true;
                     }
