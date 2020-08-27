@@ -329,14 +329,19 @@ void GPUPathIntegrator::Render(ImageMetadata *metadata) {
                        });
     }
 
-    ProgressReporter progress(spp, "Rendering", Options->quiet, true /* GPU */);
-
     int firstSampleIndex = 0, lastSampleIndex = spp;
     if (!Options->debugStart.empty()) {
-        if (!Atoi(Options->debugStart, &firstSampleIndex))
-            ErrorExit("Invalid --debugstart value: %s", Options->debugStart);
-        lastSampleIndex = firstSampleIndex + 1;
+        pstd::optional<std::vector<int>> values =
+            SplitStringToInts(Options->debugStart, ',');
+        if (!values || values->size() != 2)
+            ErrorExit("Expected two integer values for --debugstart.");
+
+        firstSampleIndex = (*values)[0];
+        lastSampleIndex = firstSampleIndex + (*values)[1];
     }
+
+    ProgressReporter progress(lastSampleIndex - firstSampleIndex, "Rendering",
+                              Options->quiet, true /* GPU */);
 
     for (int sampleIndex = firstSampleIndex; sampleIndex < lastSampleIndex; ++sampleIndex) {
         LOG_VERBOSE("Starting to submit work for sample %d", sampleIndex);
@@ -452,6 +457,13 @@ void GPUPathIntegrator::HandleEscapedRays(int depth) {
                          return;
 
                      SampledSpectrum L = pixelSampleState.L[er.pixelIndex];
+
+                     DBG("L %f %f %f %f beta %f %f %f %f Le %f %f %f %f",
+                         L[0], L[1], L[2], L[3], er.beta[0], er.beta[1], er.beta[2],
+                         er.beta[3], Le[0], Le[1], Le[2], Le[3]);
+                     DBG("pdf uni %f %f %f %f pdf nee %f %f %f %f",
+                         er.pdfUni[0], er.pdfUni[1], er.pdfUni[2], er.pdfUni[3],
+                         er.pdfNEE[0], er.pdfNEE[1], er.pdfNEE[2], er.pdfNEE[3]);
 
                      if (depth == 0 || er.specularBounce) {
                          L += er.beta * Le / er.pdfUni.Average();
