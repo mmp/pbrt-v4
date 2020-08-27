@@ -33,7 +33,7 @@ struct BasicOptions {
 
 // PBRTOptions Definiton
 struct PBRTOptions : BasicOptions {
-    LogLevel logLevel;
+    LogLevel logLevel = LogLevel::Error;
     pstd::optional<int> pixelSamples;
     pstd::optional<int> gpuDevice;
     std::string imageFile;
