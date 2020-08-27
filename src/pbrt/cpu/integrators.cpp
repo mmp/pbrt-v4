@@ -212,8 +212,9 @@ void ImageTileIntegrator::Render() {
             // Render image tile given by _tileBounds_
             ScratchBuffer &scratchBuffer = scratchBuffers[ThreadIndex];
             SamplerHandle &sampler = samplers[ThreadIndex];
-            VLOG(1, "Starting image tile %s startWave %d, endWave %d", tileBounds,
-                 startWave, endWave);
+            PBRT_DBG("Starting image tile (%d,%d)-(%d,%d) startWave %d, endWave %d\n",
+                     tileBounds.pMin.x, tileBounds.pMin.y, tileBounds.pMax.x,
+                     tileBounds.pMax.y, startWave, endWave);
             for (Point2i pPixel : tileBounds) {
                 StatsReportPixelStart(pPixel);
                 threadPixel = pPixel;
@@ -227,7 +228,8 @@ void ImageTileIntegrator::Render() {
 
                 StatsReportPixelEnd(pPixel);
             }
-            VLOG(1, "Finished image tile %s", tileBounds);
+            PBRT_DBG("Finished image tile (%d,%d)-(%d,%d)\n", tileBounds.pMin.x,
+                     tileBounds.pMin.y, tileBounds.pMax.x, tileBounds.pMax.y);
             progress.Update((endWave - startWave) * tileBounds.Area());
         });
 
@@ -315,11 +317,16 @@ void RayIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleIndex,
         }
 
         if (cameraRay)
-            VLOG(2, "Camera sample: %s -> ray %s -> L = %s, visibleSurface %s",
-                 cameraSample, cameraRay->ray, L,
-                 (visibleSurface ? visibleSurface.ToString() : "(none)"));
+            PBRT_DBG(
+                "%s\n",
+                StringPrintf("Camera sample: %s -> ray %s -> L = %s, visibleSurface %s",
+                             cameraSample, cameraRay->ray, L,
+                             (visibleSurface ? visibleSurface.ToString() : "(none)"))
+                    .c_str());
         else
-            VLOG(2, "Camera sample: %s -> no ray generated", cameraSample);
+            PBRT_DBG("%s\n",
+                     StringPrintf("Camera sample: %s -> no ray generated", cameraSample)
+                         .c_str());
     }
 
     // Add camera ray's contribution to image
@@ -417,7 +424,7 @@ SampledSpectrum Integrator::Tr(const Interaction &p0, const Interaction &p1,
             break;
         ray = si->intr.SpawnRayTo(p1);
     }
-    VLOG(2, "Tr from %s to %s = %s", p0.pi, p1.pi, Tr);
+    PBRT_DBG("%s\n", StringPrintf("Tr from %s to %s = %s", p0.pi, p1.pi, Tr).c_str());
     return Tr / pdf.Average();
 }
 
@@ -972,7 +979,9 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
 
     while (true) {
         // Sample segment of volumetric scattering path
-        VLOG(2, "Path tracer depth %d, current L = %s, beta = %s", depth, L, beta);
+        PBRT_DBG("%s\n", StringPrintf("Path tracer depth %d, current L = %s, beta = %s\n",
+                                      depth, L, beta)
+                             .c_str());
         pstd::optional<ShapeIntersection> si = Intersect(ray);
         bool scattered = false, terminated = false;
         if (ray.medium) {
@@ -1160,7 +1169,9 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             pdfUni *= bs.pdf;
         rescale(beta, pdfUni, pdfNEE);
 
-        VLOG(2, "Sampled BSDF, f = %s, pdf = %f -> beta = %s", bs.f, bs.pdf, beta);
+        PBRT_DBG("%s\n", StringPrintf("Sampled BSDF, f = %s, pdf = %f -> beta = %s", bs.f,
+                                      bs.pdf, beta)
+                             .c_str());
         DCHECK(std::isinf(beta.y(lambda)) == false);
         specularBounce = bs.IsSpecular();
         anyNonSpecularBounces |= !bs.IsSpecular();
@@ -1240,7 +1251,8 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
         if (!beta)
             break;
         SampledSpectrum rrBeta = beta * etaScale / pdfUni.Average();
-        VLOG(2, "etaScale %f -> rrBeta %s", etaScale, rrBeta);
+        PBRT_DBG("%s\n",
+                 StringPrintf("etaScale %f -> rrBeta %s", etaScale, rrBeta).c_str());
         if (rrBeta.MaxComponentValue() < rrThreshold && depth > 1) {
             Float q = std::max<Float>(0, 1 - rrBeta.MaxComponentValue());
             if (sampler.Get1D() < q)
@@ -1908,8 +1920,11 @@ int GenerateLightSubpath(const Integrator &integrator, SampledWavelengths &lambd
                        : Vertex::CreateLight(light, ray, les.L, les.pdfPos * lightPDF);
     SampledSpectrum beta =
         les.L * les.AbsCosTheta(ray.d) / (lightPDF * les.pdfPos * les.pdfDir);
-    VLOG(2, "Starting light subpath. Ray: %s, Le %s, beta %s, pdfPos %f, pdfDir %f", ray,
-         les.L, beta, les.pdfPos, les.pdfDir);
+    PBRT_DBG("%s\n",
+             StringPrintf(
+                 "Starting light subpath. Ray: %s, Le %s, beta %s, pdfPos %f, pdfDir %f",
+                 ray, les.L, beta, les.pdfPos, les.pdfDir)
+                 .c_str());
     int nVertices = RandomWalk(integrator, lambda, ray, sampler, camera, scratchBuffer,
                                beta, les.pdfDir, maxDepth - 1, TransportMode::Importance,
                                path + 1, regularize);
@@ -1943,8 +1958,10 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
 
     while (true) {
         // Attempt to create the next subpath vertex in _path_
-        VLOG(2, "Random walk. Bounces %d, beta %s, pdfFwd %f, pdfRef %f", bounces, beta,
-             pdfFwd, pdfRev);
+        PBRT_DBG("%s\n",
+                 StringPrintf("Random walk. Bounces %d, beta %s, pdfFwd %f, pdfRef %f",
+                              bounces, beta, pdfFwd, pdfRev)
+                     .c_str());
         if (!beta)
             break;
         // Trace a ray and sample the medium, if any
@@ -2067,7 +2084,9 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
             vertex.delta = true;
             pdfRev = pdfFwd = 0;
         }
-        VLOG(2, "Random walk beta after shading normal correction %s", beta);
+        PBRT_DBG("%s\n",
+                 StringPrintf("Random walk beta after shading normal correction %s", beta)
+                     .c_str());
         ray = isect.SpawnRay(ray, bsdf, bs.wi, bs.flags);
 
         // Compute reverse area density at preceding vertex
@@ -2234,8 +2253,10 @@ SampledSpectrum BDPTIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
             SampledSpectrum Lpath =
                 ConnectBDPT(*this, lambda, lightVertices, cameraVertices, s, t,
                             lightSampler, camera, sampler, &pFilmNew, &misWeight);
-            VLOG(2, "Connect bdpt s: %d, t: %d, Lpath: %s, misWeight: %f", s, t, Lpath,
-                 misWeight);
+            PBRT_DBG("%s\n",
+                     StringPrintf("Connect bdpt s: %d, t: %d, Lpath: %s, misWeight: %f\n",
+                                  s, t, Lpath, misWeight)
+                         .c_str());
             if (visualizeStrategies || visualizeWeights) {
                 SampledSpectrum value;
                 if (visualizeStrategies)
@@ -2341,12 +2362,15 @@ SampledSpectrum ConnectBDPT(const Integrator &integrator, SampledWavelengths &la
         if (qs.IsConnectible() && pt.IsConnectible()) {
             L = qs.beta * qs.f(pt, TransportMode::Importance) *
                 pt.f(qs, TransportMode::Radiance) * pt.beta;
-            VLOG(2,
-                 "General connect s: %d, t: %d, qs: %s, pt: %s, qs.f(pt): %s, "
-                 "pt.f(qs): %s, G: %s, dist^2: %f",
-                 s, t, qs, pt, qs.f(pt, TransportMode::Importance),
-                 pt.f(qs, TransportMode::Radiance),
-                 G(integrator, sampler, qs, pt, lambda), DistanceSquared(qs.p(), pt.p()));
+            PBRT_DBG("%s\n",
+                     StringPrintf(
+                         "General connect s: %d, t: %d, qs: %s, pt: %s, qs.f(pt): %s, "
+                         "pt.f(qs): %s, G: %s, dist^2: %f",
+                         s, t, qs, pt, qs.f(pt, TransportMode::Importance),
+                         pt.f(qs, TransportMode::Radiance),
+                         G(integrator, sampler, qs, pt, lambda),
+                         DistanceSquared(qs.p(), pt.p()))
+                         .c_str());
             if (L)
                 L *= G(integrator, sampler, qs, pt, lambda);
         }
@@ -2360,7 +2384,7 @@ SampledSpectrum ConnectBDPT(const Integrator &integrator, SampledWavelengths &la
     Float misWeight = L ? MISWeight(integrator, lightVertices, cameraVertices, sampled, s,
                                     t, lightSampler)
                         : 0.f;
-    VLOG(2, "MIS weight for (s,t) = (%d, %d) connection: %f", s, t, misWeight);
+    PBRT_DBG("MIS weight for (s,t) = (%d, %d) connection: %f\n", s, t, misWeight);
     DCHECK(!std::isnan(misWeight));
     L *= misWeight;
     if (misWeightPtr != nullptr)

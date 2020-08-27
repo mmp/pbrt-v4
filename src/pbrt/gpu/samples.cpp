@@ -9,16 +9,6 @@
 
 #include <type_traits>
 
-#ifdef PBRT_GPU_DBG
-#ifndef TO_STRING
-#define TO_STRING(x) TO_STRING2(x)
-#define TO_STRING2(x) #x
-#endif  // !TO_STRING
-#define DBG(...) printf(__FILE__ ":" TO_STRING(__LINE__) ": " __VA_ARGS__)
-#else
-#define DBG(...)
-#endif  // PBRT_GPU_DBG
-
 namespace pbrt {
 
 template <typename Sampler>

@@ -40,16 +40,6 @@
 #include "nvtx3/nvToolsExtCuda.h"
 #endif
 
-#ifdef PBRT_GPU_DBG
-#ifndef TO_STRING
-#define TO_STRING(x) TO_STRING2(x)
-#define TO_STRING2(x) #x
-#endif  // !TO_STRING
-#define DBG(...) printf(__FILE__ ":" TO_STRING(__LINE__) ": " __VA_ARGS__)
-#else
-#define DBG(...)
-#endif
-
 namespace pbrt {
 
 STAT_MEMORY_COUNTER("Memory/GPU path integrator pixel state", pathIntegratorBytes);
@@ -250,7 +240,7 @@ void GPUPathIntegrator::TraceShadowRays(int depth) {
 
                      SampledSpectrum Lpixel = pixelSampleState.L[sr.pixelIndex];
 
-                     DBG("Adding shadow ray Ld %f %f %f %f at pixel index %d \n",
+                     PBRT_DBG("Adding shadow ray Ld %f %f %f %f at pixel index %d \n",
                          sr.Ld[0], sr.Ld[1], sr.Ld[2], sr.Ld[3], sr.pixelIndex);
 
                      pixelSampleState.L[sr.pixelIndex] = Lpixel + sr.Ld;
@@ -348,7 +338,7 @@ void GPUPathIntegrator::Render(ImageMetadata *metadata) {
 
         for (int y0 = 0; y0 < resolution.y; y0 += scanlinesPerPass) {
             GPUDo("Reset ray queue", [=] PBRT_GPU() {
-                DBG("Starting scanlines at y0 = %d, sample %d / %d\n", y0, sampleIndex,
+                PBRT_DBG("Starting scanlines at y0 = %d, sample %d / %d\n", y0, sampleIndex,
                     spp);
                 rayQueues[0]->Reset();
             });
@@ -458,10 +448,10 @@ void GPUPathIntegrator::HandleEscapedRays(int depth) {
 
                      SampledSpectrum L = pixelSampleState.L[er.pixelIndex];
 
-                     DBG("L %f %f %f %f beta %f %f %f %f Le %f %f %f %f",
+                     PBRT_DBG("L %f %f %f %f beta %f %f %f %f Le %f %f %f %f",
                          L[0], L[1], L[2], L[3], er.beta[0], er.beta[1], er.beta[2],
                          er.beta[3], Le[0], Le[1], Le[2], Le[3]);
-                     DBG("pdf uni %f %f %f %f pdf nee %f %f %f %f",
+                     PBRT_DBG("pdf uni %f %f %f %f pdf nee %f %f %f %f",
                          er.pdfUni[0], er.pdfUni[1], er.pdfUni[2], er.pdfUni[3],
                          er.pdfNEE[0], er.pdfNEE[1], er.pdfNEE[2], er.pdfNEE[3]);
 
@@ -482,7 +472,7 @@ void GPUPathIntegrator::HandleEscapedRays(int depth) {
                          L += er.beta * Le / (pdfUni + pdfNEE).Average();
                      }
 
-                     DBG("Added L %f %f %f %f for escaped ray pixel index %d\n", L[0],
+                     PBRT_DBG("Added L %f %f %f %f for escaped ray pixel index %d\n", L[0],
                          L[1], L[2], L[3], er.pixelIndex);
                      pixelSampleState.L[er.pixelIndex] = L;
                  });
@@ -497,7 +487,7 @@ void GPUPathIntegrator::HandleRayFoundEmission(int depth) {
             if (!Le)
                 return;
 
-            DBG("Got Le %f %f %f %f from hit area light at depth %d\n", Le[0], Le[1],
+            PBRT_DBG("Got Le %f %f %f %f from hit area light at depth %d\n", Le[0], Le[1],
                 Le[2], Le[3], depth);
 
             SampledSpectrum L = pixelSampleState.L[he.pixelIndex];
@@ -519,7 +509,7 @@ void GPUPathIntegrator::HandleRayFoundEmission(int depth) {
                 L += he.beta * Le / (pdfUni + pdfNEE).Average();
             }
 
-            DBG("Added L %f %f %f %f for pixel index %d\n", L[0], L[1], L[2], L[3],
+            PBRT_DBG("Added L %f %f %f %f for pixel index %d\n", L[0], L[1], L[2], L[3],
                 he.pixelIndex);
             pixelSampleState.L[he.pixelIndex] = L;
         });

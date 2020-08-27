@@ -14,16 +14,6 @@
 #include <pbrt/util/sampling.h>
 #include <pbrt/util/spectrum.h>
 
-#ifdef PBRT_GPU_DBG
-#ifndef TO_STRING
-#define TO_STRING(x) TO_STRING2(x)
-#define TO_STRING2(x) #x
-#endif  // !TO_STRING
-#define DBG(...) printf(__FILE__ ":" TO_STRING(__LINE__) ": " __VA_ARGS__)
-#else
-#define DBG(...)
-#endif
-
 namespace pbrt {
 
 void GPUPathIntegrator::SampleSubsurface(int depth) {
@@ -89,7 +79,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                     SampledSpectrum beta = betap * bsdfSample.f * AbsDot(wi, intr.ns);
                     SampledSpectrum pdfUni = s.pdfUni, pdfNEE = pdfUni;
 
-                    DBG("%s f*cos[0] %f bsdfSample.pdf %f f*cos/pdf %f\n", BxDF::Name(),
+                    PBRT_DBG("%s f*cos[0] %f bsdfSample.pdf %f f*cos/pdf %f\n", BxDF::Name(),
                         bsdfSample.f[0] * AbsDot(wi, intr.ns), bsdfSample.pdf,
                         bsdfSample.f[0] * AbsDot(wi, intr.ns) / bsdfSample.pdf);
 
@@ -97,7 +87,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                         Float pdf = bsdf.PDF(wo, wi);
                         beta *= pdf / bsdfSample.pdf;
                         pdfUni *= pdf;
-                        DBG("Sampled PDF is proportional: pdf %f\n", pdf);
+                        PBRT_DBG("Sampled PDF is proportional: pdf %f\n", pdf);
                     } else
                         pdfUni *= bsdfSample.pdf;
 
@@ -110,7 +100,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                         Float q = std::max<Float>(0, 1 - rrBeta.MaxComponentValue());
                         if (raySamples.indirect.rr < q) {
                             beta = SampledSpectrum(0.f);
-                            DBG("Path terminated with RR\n");
+                            PBRT_DBG("Path terminated with RR\n");
                         }
                         pdfUni *= 1 - q;
                         pdfNEE *= 1 - q;
@@ -134,7 +124,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                             etaScale, bsdfSample.IsSpecular(), anyNonSpecularBounces,
                             pixelIndex);
 
-                        DBG("Spawned indirect ray at depth %d from prev index %d. "
+                        PBRT_DBG("Spawned indirect ray at depth %d from prev index %d. "
                             "Specular %d Beta %f %f %f %f pdfUni %f %f %f %f pdfNEE %f "
                             "%f %f %f "
                             "beta/pdfUni %f %f %f %f\n",
@@ -168,7 +158,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
 
                 SampledSpectrum beta = betap * f * AbsDot(wi, intr.ns);
 
-                DBG("depth %d beta %f %f %f %f f %f %f %f %f ls.L %f %f %f %f ls.pdf "
+                PBRT_DBG("depth %d beta %f %f %f %f f %f %f %f %f ls.L %f %f %f %f ls.pdf "
                     "%f\n",
                     depth, beta[0], beta[1], beta[2], beta[3], f[0], f[1], f[2], f[3],
                     ls.L[0], ls.L[1], ls.L[2], ls.L[3], ls.pdf);
@@ -182,7 +172,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
 
                 SampledSpectrum Ld = beta * ls.L;
 
-                DBG("depth %d Ld %f %f %f %f "
+                PBRT_DBG("depth %d Ld %f %f %f %f "
                     "new beta %f %f %f %f beta/uni %f %f %f %f Ld/uni %f %f %f %f\n",
                     depth, Ld[0], Ld[1], Ld[2], Ld[3], beta[0], beta[1], beta[2], beta[3],
                     SafeDiv(beta, pdfUni)[0], SafeDiv(beta, pdfUni)[1],

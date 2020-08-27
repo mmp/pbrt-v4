@@ -28,16 +28,6 @@
 
 #include <utility>
 
-#ifdef PBRT_GPU_DBG
-#ifndef TO_STRING
-#define TO_STRING(x) TO_STRING2(x)
-#define TO_STRING2(x) #x
-#endif  // !TO_STRING
-#define DBG(...) printf(__FILE__ ":" TO_STRING(__LINE__) ": " __VA_ARGS__)
-#else
-#define DBG(...)
-#endif  // PBRT_GPU_DBG
-
 using namespace pbrt;
 
 extern "C" {
@@ -113,7 +103,7 @@ extern "C" __global__ void __raygen__findClosest() {
     ClosestHitContext ctx(ray.medium, false);
     uint32_t p0 = packPointer0(&ctx), p1 = packPointer1(&ctx);
 
-    DBG("ray o %f %f %f dir %f %f %f tmax %f\n", ray.o.x, ray.o.y, ray.o.z, ray.d.x,
+    PBRT_DBG("ray o %f %f %f dir %f %f %f tmax %f\n", ray.o.x, ray.o.y, ray.o.z, ray.d.x,
         ray.d.y, ray.d.z, tMax);
 
     uint32_t missed = 0;
@@ -122,7 +112,7 @@ extern "C" __global__ void __raygen__findClosest() {
 
     if (missed) {
         if (ray.medium) {
-            DBG("Adding miss ray to mediumSampleQueue. "
+            PBRT_DBG("Adding miss ray to mediumSampleQueue. "
                 "ray %f %f %f d %f %f %f beta %f %f %f %f\n",
                 r.ray.o.x, r.ray.o.y, r.ray.o.z, r.ray.d.x, r.ray.d.y, r.ray.d.z,
                 r.beta[0], r.beta[1], r.beta[2], r.beta[3]);
@@ -131,7 +121,7 @@ extern "C" __global__ void __raygen__findClosest() {
                                            r.nPrev, r.nsPrev, r.isSpecularBounce,
                                            r.anyNonSpecularBounces, r.etaScale);
         } else if (params.escapedRayQueue) {
-            DBG("Adding ray to escapedRayQueue ray index %d pixel index %d\n", rayIndex,
+            PBRT_DBG("Adding ray to escapedRayQueue ray index %d pixel index %d\n", rayIndex,
                 r.pixelIndex);
             params.escapedRayQueue->Push(EscapedRayWorkItem{
                 r.beta, r.pdfUni, r.pdfNEE, r.lambda, ray.o, ray.d, r.piPrev, r.nPrev,
@@ -167,7 +157,7 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
 
     if (rayMedium) {
         assert(params.mediumSampleQueue);
-        DBG("Enqueuing into medium sample queue\n");
+        PBRT_DBG("Enqueuing into medium sample queue\n");
         params.mediumSampleQueue->Push(
             MediumSampleWorkItem{r.ray,
                                  optixGetRayTmax(),
@@ -208,7 +198,7 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
     }
 
     if (!material) {
-        DBG("Enqueuing into medium transition queue: ray index %d pixel index %d \n",
+        PBRT_DBG("Enqueuing into medium transition queue: ray index %d pixel index %d \n",
             rayIndex, r.pixelIndex);
         Ray newRay = intr.SpawnRay(r.ray.d);
         params.mediumTransitionQueue->Push(MediumTransitionWorkItem{
@@ -218,7 +208,7 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
     }
 
     if (intr.areaLight) {
-        DBG("Ray hit an area light: adding to hitAreaLightQueue ray index %d pixel index "
+        PBRT_DBG("Ray hit an area light: adding to hitAreaLightQueue ray index %d pixel index "
             "%d\n",
             rayIndex, r.pixelIndex);
         Ray ray = r.ray;
@@ -237,7 +227,7 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
             ? params.basicEvalMaterialQueue
             : params.universalEvalMaterialQueue;
 
-    DBG("Enqueuing for material eval, mtl tag %d\n", material.Tag());
+    PBRT_DBG("Enqueuing for material eval, mtl tag %d\n", material.Tag());
 
     auto enqueue = [=](auto ptr) {
         using Material = typename std::remove_reference_t<decltype(*ptr)>;
@@ -249,7 +239,7 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
     };
     material.Dispatch(enqueue);
 
-    DBG("Closest hit found intersection at t %f\n", optixGetRayTmax());
+    PBRT_DBG("Closest hit found intersection at t %f\n", optixGetRayTmax());
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -388,7 +378,7 @@ inline void rescale(SampledSpectrum &beta, SampledSpectrum &pdfLight,
 }
 
 extern "C" __global__ void __raygen__shadow_Tr() {
-    DBG("raygen sahadow tr %d\n", optixGetLaunchIndex().x);
+    PBRT_DBG("raygen sahadow tr %d\n", optixGetLaunchIndex().x);
     int index = optixGetLaunchIndex().x;
     if (index >= params.shadowRayQueue->Size())
         return;
@@ -397,7 +387,7 @@ extern "C" __global__ void __raygen__shadow_Tr() {
     SampledWavelengths lambda = sr.lambda;
 
     SampledSpectrum Ld = sr.Ld;
-    DBG("Initial Ld %f %f %f %f shadow ray index %d pixel index %d\n", Ld[0], Ld[1],
+    PBRT_DBG("Initial Ld %f %f %f %f shadow ray index %d pixel index %d\n", Ld[0], Ld[1],
         Ld[2], Ld[3], index, sr.pixelIndex);
 
     SampledSpectrum pdfUni = sr.pdfUni, pdfNEE = sr.pdfNEE;
@@ -411,7 +401,7 @@ extern "C" __global__ void __raygen__shadow_Tr() {
         ClosestHitContext ctx(ray.medium, true);
         uint32_t p0 = packPointer0(&ctx), p1 = packPointer1(&ctx);
 
-        DBG("Tracing shadow tr shadow ray index %d pixel index %d "
+        PBRT_DBG("Tracing shadow tr shadow ray index %d pixel index %d "
             "ray %f %f %f d %f %f %f tMax %f\n",
             index, sr.pixelIndex, ray.o.x, ray.o.y, ray.o.z, ray.d.x, ray.d.y, ray.d.z,
             tMax);
@@ -422,14 +412,14 @@ extern "C" __global__ void __raygen__shadow_Tr() {
               p1, missed);
 
         if (!missed && ctx.material) {
-            DBG("Hit opaque. Bye\n");
+            PBRT_DBG("Hit opaque. Bye\n");
             // Hit opaque surface
             Ld = SampledSpectrum(0.f);
             break;
         }
 
         if (ray.medium) {
-            DBG("Ray medium %p. Will sample tmaj...\n", ray.medium.ptr());
+            PBRT_DBG("Ray medium %p. Will sample tmaj...\n", ray.medium.ptr());
 
             Float tEnd =
                 missed ? tMax : (Distance(ray.o, Point3f(ctx.piHit)) / Length(ray.d));
@@ -447,6 +437,16 @@ extern "C" __global__ void __raygen__shadow_Tr() {
                                       Ld *= Tmaj * sigma_n;
                                       pdfNEE *= Tmaj * intr.sigma_maj;
                                       pdfUni *= Tmaj * sigma_n;
+
+                                      PBRT_DBG("Tmaj %f %f %f %f sigma_n %f %f %f %f sigma_maj %f %f %f %f",
+                                          Tmaj[0], Tmaj[1], Tmaj[2], Tmaj[3],
+                                          sigma_n[0], sigma_n[1], sigma_n[2], sigma_n[3],
+                                          intr.sigma_maj[0], intr.sigma_maj[1], intr.sigma_maj[2],
+                                          intr.sigma_maj[3]);
+                                      PBRT_DBG("Ld %f %f %f %f pdfNEE %f %f %f %f pdfUni %f %f %f %f",
+                                          Ld[0], Ld[1], Ld[2], Ld[3],
+                                          pdfNEE[0], pdfNEE[1], pdfNEE[2], pdfNEE[3],
+                                          pdfUni[0], pdfUni[1], pdfUni[2], pdfUni[3]);
 
                                       if (!Ld)
                                           return false;
@@ -469,8 +469,9 @@ extern "C" __global__ void __raygen__shadow_Tr() {
 
     if (Ld)
         Ld /= (pdfUni + pdfNEE).Average();
-    DBG("Setting final Ld for shadow ray index %d pixel index %d = as %f %f %f %f\n",
+    PBRT_DBG("Setting final Ld for shadow ray index %d pixel index %d = as %f %f %f %f\n",
         index, sr.pixelIndex, Ld[0], Ld[1], Ld[2], Ld[3]);
+    CHECK(!std::isnan(Ld[0]));
 
     params.shadowRayQueue->Ld[index] = Ld;
 }
@@ -673,7 +674,7 @@ extern "C" __global__ void __raygen__randomHit() {
 
     uint32_t ptr0 = packPointer0(&payload), ptr1 = packPointer1(&payload);
 
-    DBG("Randomhit raygen ray.o %f %f %f ray.d %f %f %f tMax %f\n", ray.o.x, ray.o.y,
+    PBRT_DBG("Randomhit raygen ray.o %f %f %f ray.d %f %f %f tMax %f\n", ray.o.x, ray.o.y,
         ray.o.z, ray.d.x, ray.d.y, ray.d.z, tMax);
 
     Trace(params.traversable, ray, 0.f /* tMin */, tMax, OPTIX_RAY_FLAG_NONE, ptr0, ptr1);
@@ -681,7 +682,7 @@ extern "C" __global__ void __raygen__randomHit() {
     if (payload.wrs.HasSample() &&
         payload.wrs.WeightSum() > 0) {  // TODO: latter check shouldn't be needed...
         const SubsurfaceInteraction &si = payload.wrs.GetSample();
-        DBG("optix si p %f %f %f n %f %f %f\n", si.p().x, si.p().y, si.p().z, si.n.x,
+        PBRT_DBG("optix si p %f %f %f n %f %f %f\n", si.p().x, si.p().y, si.p().z, si.n.x,
             si.n.y, si.n.z);
 
         params.subsurfaceScatterQueue->weight[index] = payload.wrs.WeightSum();
@@ -695,7 +696,7 @@ extern "C" __global__ void __anyhit__randomHitTriangle() {
 
     RandomHitPayload *p = getPayload<RandomHitPayload>();
 
-    DBG("Anyhit triangle for random hit: rec.material %p params.materials %p\n",
+    PBRT_DBG("Anyhit triangle for random hit: rec.material %p params.materials %p\n",
         rec.material.ptr(), p->material.ptr());
 
     if (rec.material == p->material)
@@ -709,7 +710,7 @@ extern "C" __global__ void __anyhit__randomHitBilinearPatch() {
 
     RandomHitPayload *p = getPayload<RandomHitPayload>();
 
-    DBG("Anyhit blp for random hit: rec.material %p params.materials %p\n",
+    PBRT_DBG("Anyhit blp for random hit: rec.material %p params.materials %p\n",
         rec.material.ptr(), p->material.ptr());
 
     if (rec.material == p->material)
@@ -729,7 +730,7 @@ extern "C" __global__ void __anyhit__randomHitQuadric() {
 
     RandomHitPayload *p = getPayload<RandomHitPayload>();
 
-    DBG("Anyhit quadric for random hit: rec.material %p params.materials %p\n",
+    PBRT_DBG("Anyhit quadric for random hit: rec.material %p params.materials %p\n",
         rec.material.ptr(), p->material.ptr());
 
     if (rec.material == p->material) {

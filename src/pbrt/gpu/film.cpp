@@ -8,16 +8,6 @@
 #include <pbrt/gpu/launch.h>
 #include <pbrt/gpu/pathintegrator.h>
 
-#ifdef PBRT_GPU_DBG
-#ifndef TO_STRING
-#define TO_STRING(x) TO_STRING2(x)
-#define TO_STRING2(x) #x
-#endif  // !TO_STRING
-#define DBG(...) printf(__FILE__ ":" TO_STRING(__LINE__) ": " __VA_ARGS__)
-#else
-#define DBG(...)
-#endif
-
 namespace pbrt {
 
 void GPUPathIntegrator::UpdateFilm() {
@@ -29,9 +19,12 @@ void GPUPathIntegrator::UpdateFilm() {
         // Compute final weighted radiance value
         SampledSpectrum Lw = SampledSpectrum(pixelSampleState.L[pixelIndex]) *
                              pixelSampleState.cameraRayWeight[pixelIndex];
-
+        CHECK(!std::isnan(Lw[0]));
         SampledWavelengths lambda = pixelSampleState.lambda[pixelIndex];
         Float filterWeight = pixelSampleState.filterWeight[pixelIndex];
+
+        PBRT_DBG("Adding Lw %f %f %f %f at pixel (%d, %d)", Lw[0], Lw[1], Lw[2], Lw[3],
+                 pPixel.x, pPixel.y);
 
         if (initializeVisibleSurface) {
             VisibleSurface visibleSurface = pixelSampleState.visibleSurface[pixelIndex];

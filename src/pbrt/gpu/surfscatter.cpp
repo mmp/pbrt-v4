@@ -20,16 +20,6 @@
 
 #include <type_traits>
 
-#ifdef PBRT_GPU_DBG
-#ifndef TO_STRING
-#define TO_STRING(x) TO_STRING2(x)
-#define TO_STRING2(x) #x
-#endif  // !TO_STRING
-#define DBG(...) printf(__FILE__ ":" TO_STRING(__LINE__) ": " __VA_ARGS__)
-#else
-#define DBG(...)
-#endif  // PBRT_GPU_DBG
-
 namespace pbrt {
 
 PBRT_CPU_GPU
@@ -130,7 +120,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 SampledSpectrum beta = me.beta * bsdfSample.f * AbsDot(wi, ns);
                 SampledSpectrum pdfUni = me.pdfUni, pdfNEE = pdfUni;
 
-                DBG("%s f*cos[0] %f bsdfSample.pdf %f f*cos/pdf %f\n", BxDF::Name(),
+                PBRT_DBG("%s f*cos[0] %f bsdfSample.pdf %f f*cos/pdf %f\n", BxDF::Name(),
                     bsdfSample.f[0] * AbsDot(wi, ns), bsdfSample.pdf,
                     bsdfSample.f[0] * AbsDot(wi, ns) / bsdfSample.pdf);
 
@@ -154,7 +144,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                     Float q = std::max<Float>(0, 1 - rrBeta.MaxComponentValue());
                     if (raySamples.indirect.rr < q) {
                         beta = SampledSpectrum(0.f);
-                        DBG("Path terminated with RR ray index %d\n", me.rayIndex);
+                        PBRT_DBG("Path terminated with RR ray index %d\n", me.rayIndex);
                     }
                     pdfUni *= 1 - q;
                     pdfNEE *= 1 - q;
@@ -188,7 +178,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                             bsdfSample.IsSpecular(), anyNonSpecularBounces,
                             me.pixelIndex);
 
-                        DBG("Spawned indirect ray at depth %d from prev ray index %d. "
+                        PBRT_DBG("Spawned indirect ray at depth %d from prev ray index %d. "
                             "Specular %d Beta %f %f %f %f pdfUni %f %f %f %f pdfNEE %f "
                             "%f %f %f beta/pdfUni %f %f %f %f\n",
                             depth + 1, int(me.rayIndex), int(bsdfSample.IsSpecular()),
@@ -226,8 +216,11 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                     return;
 
                 SampledSpectrum beta = me.beta * f * AbsDot(wi, ns);
+                PBRT_DBG("me.beta %f %f %f %f f %f %f %f %f dot %f\n",
+                    me.beta[0], me.beta[1], me.beta[2], me.beta[3],
+                    f[0], f[1], f[2], f[3], AbsDot(wi, ns));
 
-                DBG("ray index %d depth %d beta %f %f %f %f f %f %f %f %f ls.L %f %f %f "
+                PBRT_DBG("ray index %d depth %d beta %f %f %f %f f %f %f %f %f ls.L %f %f %f "
                     "%f ls.pdf %f\n",
                     me.rayIndex, depth, beta[0], beta[1], beta[2], beta[3], f[0], f[1],
                     f[2], f[3], ls.L[0], ls.L[1], ls.L[2], ls.L[3], ls.pdf);
@@ -250,7 +243,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 shadowRayQueue->Push(ray, 1 - ShadowEpsilon, lambda, Ld,
                                      pdfUni, pdfNEE, me.pixelIndex);
 
-                DBG("ray index %d spawned shadow ray depth %d Ld %f %f %f %f "
+                PBRT_DBG("ray index %d spawned shadow ray depth %d Ld %f %f %f %f "
                     "new beta %f %f %f %f beta/uni %f %f %f %f Ld/uni %f %f %f %f\n",
                     me.rayIndex, depth, Ld[0], Ld[1], Ld[2], Ld[3], beta[0], beta[1],
                     beta[2], beta[3], SafeDiv(beta, pdfUni)[0], SafeDiv(beta, pdfUni)[1],

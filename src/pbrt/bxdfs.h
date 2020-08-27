@@ -812,14 +812,17 @@ class LayeredBxDF {
 
             for (int depth = 0; depth < config.maxDepth; ++depth) {
                 // Sample next event for layered BSDF evaluation random walk
-                VLOG(2, "beta: %s, w: %s, f: %s", beta, w, f);
+                PBRT_DBG("beta: %f %f %f %f, w: %f %f %f, f: %f %f %f %f\n", beta[0],
+                         beta[1], beta[2], beta[3], w.x, w.y, w.z, f[0], f[1], f[2],
+                         f[3]);
                 // Possibly terminate layered BSDF random walk with Russian Roulette
                 if (depth > 3 && beta.MaxComponentValue() < .25) {
                     Float q = std::max<Float>(0, 1 - beta.MaxComponentValue());
                     if (r() < q)
                         break;
                     beta /= 1 - q;
-                    VLOG(2, "After RR with q = %f, beta: %s", q, beta);
+                    PBRT_DBG("After RR with q = %f, beta: %f %f %f %f\n", q, beta[0],
+                             beta[1], beta[2], beta[3]);
                 }
 
                 if (SupportAttenuation && albedo) {

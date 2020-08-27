@@ -52,7 +52,7 @@ void PrintStackTrace();
 #define CHECK_LT(a, b) CHECK_IMPL(a, b, <)
 #define CHECK_LE(a, b) CHECK_IMPL(a, b, <=)
 
-#endif  // CUDA_ARCH
+#endif  // PBRT_IS_GPU_CODE
 
 #ifndef NDEBUG
 
