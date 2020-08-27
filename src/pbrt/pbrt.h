@@ -8,17 +8,6 @@
 #include <stdint.h>
 #include <cstddef>
 
-#ifdef PBRT_DBG_LOGGING
-#include <stdio.h>
-#ifndef PBRT_TO_STRING
-#define PBRT_TO_STRING(x) PBRT_TO_STRING2(x)
-#define PBRT_TO_STRING2(x) #x
-#endif  // !PBRT_TO_STRING
-#define PBRT_DBG(...) printf(__FILE__ ":" TO_STRING(__LINE__) ": " __VA_ARGS__)
-#else
-#define PBRT_DBG(...)
-#endif
-
 #if defined(__CUDA_ARCH__)
 #define PBRT_IS_GPU_CODE
 #endif
@@ -45,6 +34,21 @@
 #else
 #define PBRT_L1_CACHE_LINE_SIZE 64
 #endif
+
+#ifdef PBRT_DBG_LOGGING
+#include <stdio.h>
+#ifndef PBRT_TO_STRING
+#define PBRT_TO_STRING(x) PBRT_TO_STRING2(x)
+#define PBRT_TO_STRING2(x) #x
+#endif  // !PBRT_TO_STRING
+#ifdef PBRT_IS_GPU_CODE
+#define PBRT_DBG(...) printf(__FILE__ ":" TO_STRING(__LINE__) ": " __VA_ARGS__)
+#else
+#define PBRT_DBG(...) fprintf(stderr, __FILE__ ":" TO_STRING(__LINE__) ": " __VA_ARGS__)
+#endif  // PBRT_IS_GPU_CODE
+#else
+#define PBRT_DBG(...)
+#endif  // PBRT_DBG_LOGGING
 
 // From ABSL_ARRAYSIZE
 #define PBRT_ARRAYSIZE(array) (sizeof(::pbrt::detail::ArraySizeHelper(array)))
