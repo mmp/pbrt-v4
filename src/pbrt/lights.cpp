@@ -752,7 +752,7 @@ DiffuseAreaLight *DiffuseAreaLight::Create(const Transform &renderFromLight,
         L = &colorSpace->illuminant;
 
     // scale so that radiance is equivalent to 1 nit
-    scale /= SpectrumToPhotometric(L);
+    scale /= SpectrumToPhotometric(L ? L : &colorSpace->illuminant);
 
     Float phi_v = parameters.GetOneFloat("power", -1.0f);
     if (phi_v > 0) {
