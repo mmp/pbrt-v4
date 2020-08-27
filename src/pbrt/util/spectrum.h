@@ -641,6 +641,15 @@ inline SampledSpectrum Sqrt(const SampledSpectrum &s) {
 }
 
 PBRT_CPU_GPU
+inline SampledSpectrum SafeSqrt(const SampledSpectrum &s) {
+    SampledSpectrum ret;
+    for (int i = 0; i < NSpectrumSamples; ++i)
+        ret[i] = SafeSqrt(s[i]);
+    DCHECK(!ret.HasNaNs());
+    return ret;
+}
+
+PBRT_CPU_GPU
 inline SampledSpectrum Pow(const SampledSpectrum &s, Float e) {
     SampledSpectrum ret;
     for (int i = 0; i < NSpectrumSamples; ++i)

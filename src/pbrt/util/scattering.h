@@ -82,7 +82,7 @@ inline SampledSpectrum FrConductor(Float cosTheta_i, const SampledSpectrum &eta,
     SampledSpectrum t0 = eta2 - etak2 - SampledSpectrum(sin2Theta_i);
     SampledSpectrum a2plusb2 = Sqrt(t0 * t0 + 4 * eta2 * etak2);
     SampledSpectrum t1 = a2plusb2 + SampledSpectrum(cos2Theta_i);
-    SampledSpectrum a = Sqrt(0.5f * (a2plusb2 + t0));
+    SampledSpectrum a = SafeSqrt(0.5f * (a2plusb2 + t0));
     SampledSpectrum t2 = (Float)2 * cosTheta_i * a;
     SampledSpectrum Rs = (t1 - t2) / (t1 + t2);
 
