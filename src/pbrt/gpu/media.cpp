@@ -288,6 +288,9 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
             SampledSpectrum pdfNEE = ms.pdfUni;
 
             // Russian roulette
+            // TODO: should we even bother? Generally beta/pdfUni is one here,
+            // due to the way scattering events are scattered and because we're
+            // sampling exactly from the phase function's distribution...
             SampledSpectrum rrBeta = beta * ms.etaScale / pdfUni.Average();
             if (rrBeta.MaxComponentValue() < 1 && depth > 1) {
                 Float q = std::max<Float>(0, 1 - rrBeta.MaxComponentValue());
