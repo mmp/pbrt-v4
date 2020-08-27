@@ -48,26 +48,26 @@ std::string TimeNow() {
 
 }  // namespace
 
-LogConfig LOGGING_logConfig;
+LogLevel LOGGING_LogLevel;
 
 #ifdef PBRT_BUILD_GPU_RENDERER
-__constant__ LogConfig LOGGING_logConfigGPU;
+__constant__ LogLevel LOGGING_LogLevelGPU;
 
 #define MAX_LOG_ITEMS 1024
 PBRT_GPU GPULogItem rawLogItems[MAX_LOG_ITEMS];
 PBRT_GPU int nRawLogItems;
 #endif  // PBRT_BUILD_GPU_RENDERER
 
-void InitLogging(LogConfig config, bool useGPU) {
-    LOGGING_logConfig = config;
+void InitLogging(LogLevel level, bool useGPU) {
+    LOGGING_LogLevel = level;
 
-    if (config.level == LogLevel::Invalid)
+    if (level == LogLevel::Invalid)
         ErrorExit("Invalid --log-level specified.");
 
 #ifdef PBRT_BUILD_GPU_RENDERER
     if (useGPU)
-        CUDA_CHECK(cudaMemcpyToSymbol(LOGGING_logConfigGPU, &LOGGING_logConfig,
-                                      sizeof(LOGGING_logConfig)));
+        CUDA_CHECK(cudaMemcpyToSymbol(LOGGING_LogLevelGPU, &LOGGING_LogLevel,
+                                      sizeof(LOGGING_LogLevel)));
 #endif
 }
 

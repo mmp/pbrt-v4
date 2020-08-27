@@ -27,7 +27,7 @@ void InitPBRT(const PBRTOptions &opt) {
     if (Options->quiet)
         SuppressErrorMessages();
 
-    InitLogging(opt.logConfig, Options->useGPU);
+    InitLogging(opt.logLevel, Options->useGPU);
 
     // General \pbrt Initialization
     int nThreads = Options->nThreads != 0 ? Options->nThreads : AvailableCores();

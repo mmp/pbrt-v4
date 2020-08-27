@@ -81,7 +81,6 @@ Rendering options:
 Logging options:
   --log-level <level>          Log messages at or above this level, where <level>
                                is "verbose", "error", or "fatal". Default: "error".
-  --vlog-level <n>             Set VLOG verbosity. (Default: 0, disabled.)
 
 Reformatting options:
   --format                     Print a reformatted version of the input file(s) to
@@ -172,8 +171,7 @@ int main(int argc, char *argv[]) {
             ParseArg(&argv, "seed", &options.seed, onError) ||
             ParseArg(&argv, "spp", &options.pixelSamples, onError) ||
             ParseArg(&argv, "toply", &toPly, onError) ||
-            ParseArg(&argv, "upgrade", &options.upgrade, onError) ||
-            ParseArg(&argv, "vlog-level", &options.logConfig.vlogLevel, onError)) {
+            ParseArg(&argv, "upgrade", &options.upgrade, onError)) {
             // success
         } else if ((strcmp(*argv, "--help") == 0) || (strcmp(*argv, "-help") == 0) ||
                    (strcmp(*argv, "-h") == 0)) {
@@ -214,7 +212,7 @@ int main(int argc, char *argv[]) {
     if (!options.mseReferenceOutput.empty() && options.mseReferenceImage.empty())
         ErrorExit("Must provide MSE reference image via --mse-reference-image");
 
-    options.logConfig.level = LogLevelFromString(logLevel);
+    options.logLevel = LogLevelFromString(logLevel);
 
     InitPBRT(options);
 

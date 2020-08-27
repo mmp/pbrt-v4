@@ -18,13 +18,7 @@ enum class LogLevel { Verbose, Error, Fatal, Invalid };
 std::string ToString(LogLevel level);
 LogLevel LogLevelFromString(const std::string &s);
 
-// LogConfig Defintion
-struct LogConfig {
-    LogLevel level = LogLevel::Error;
-    int vlogLevel = 0;
-};
-
-void InitLogging(LogConfig config, bool useGPU);
+void InitLogging(LogLevel level, bool useGPU);
 
 #ifdef PBRT_BUILD_GPU_RENDERER
 
@@ -39,8 +33,8 @@ std::vector<GPULogItem> ReadGPULogs();
 
 #endif
 
-// LogConfig Global Variable Declaration
-extern LogConfig LOGGING_logConfig;
+// LogLevel Global Variable Declaration
+extern LogLevel LOGGING_LogLevel;
 
 // Logging Function Declarations
 PBRT_CPU_GPU
@@ -62,36 +56,28 @@ PBRT_CPU_GPU [[noreturn]] inline void LogFatal(LogLevel level, const char *file,
 
 #ifdef PBRT_IS_GPU_CODE
 
-extern __constant__ LogConfig LOGGING_logConfigGPU;
+extern __constant__ LogLevel LOGGING_LogLevelGPU;
 
-#define LOG_VERBOSE(...)                                      \
-    (pbrt::LogLevel::Verbose >= LOGGING_logConfigGPU.level && \
+#define LOG_VERBOSE(...)                               \
+    (pbrt::LogLevel::Verbose >= LOGGING_LogLevelGPU && \
      (pbrt::Log(LogLevel::Verbose, __FILE__, __LINE__, __VA_ARGS__), true))
 
-#define LOG_ERROR(...)                                      \
-    (pbrt::LogLevel::Error >= LOGGING_logConfigGPU.level && \
+#define LOG_ERROR(...)                               \
+    (pbrt::LogLevel::Error >= LOGGING_LogLevelGPU && \
      (pbrt::Log(LogLevel::Error, __FILE__, __LINE__, __VA_ARGS__), true))
 
 #define LOG_FATAL(...) \
     pbrt::LogFatal(pbrt::LogLevel::Fatal, __FILE__, __LINE__, __VA_ARGS__)
 
-#define VLOG(level, ...)                        \
-    (level <= LOGGING_logConfigGPU.vlogLevel && \
-     (pbrt::Log(LogLevel::Verbose, __FILE__, __LINE__, __VA_ARGS__), true))
-
 #else
 
 // Logging Macros
-#define LOG_VERBOSE(...)                                   \
-    (pbrt::LogLevel::Verbose >= LOGGING_logConfig.level && \
+#define LOG_VERBOSE(...)                            \
+    (pbrt::LogLevel::Verbose >= LOGGING_LogLevel && \
      (pbrt::Log(LogLevel::Verbose, __FILE__, __LINE__, __VA_ARGS__), true))
 
-#define VLOG(level, ...)                     \
-    (level <= LOGGING_logConfig.vlogLevel && \
-     (pbrt::Log(LogLevel::Verbose, __FILE__, __LINE__, __VA_ARGS__), true))
-
-#define LOG_ERROR(...)                                   \
-    (pbrt::LogLevel::Error >= LOGGING_logConfig.level && \
+#define LOG_ERROR(...)                            \
+    (pbrt::LogLevel::Error >= LOGGING_LogLevel && \
      (pbrt::Log(LogLevel::Error, __FILE__, __LINE__, __VA_ARGS__), true))
 
 #define LOG_FATAL(...) \

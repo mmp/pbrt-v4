@@ -46,8 +46,7 @@ int main(int argc, char **argv) {
 
         if (ParseArg(&argv, "log-level", &logLevel, onError) ||
             ParseArg(&argv, "nthreads", &opt.nThreads, onError) ||
-            ParseArg(&argv, "test-filter", &testFilter, onError) ||
-            ParseArg(&argv, "vlog-level", &opt.logConfig.vlogLevel, onError)) {
+            ParseArg(&argv, "test-filter", &testFilter, onError)) {
             // success
         } else if ((strcmp(*argv, "--help") == 0) || (strcmp(*argv, "-h") == 0)) {
             usage();
@@ -58,7 +57,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    opt.logConfig.level = LogLevelFromString(logLevel);
+    opt.logLevel = LogLevelFromString(logLevel);
 
     InitPBRT(opt);
 

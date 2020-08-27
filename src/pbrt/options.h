@@ -29,11 +29,11 @@ struct BasicOptions {
     bool forceDiffuse = false;
     bool useGPU = false;
     RenderingCoordinateSystem renderingSpace = RenderingCoordinateSystem::CameraWorld;
-    LogConfig logConfig;
 };
 
 // PBRTOptions Definiton
 struct PBRTOptions : BasicOptions {
+    LogLevel logLevel;
     pstd::optional<int> pixelSamples;
     pstd::optional<int> gpuDevice;
     std::string imageFile;

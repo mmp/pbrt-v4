@@ -8,8 +8,6 @@
 #include <stdint.h>
 #include <cstddef>
 
-#define PBRT_DBG_LOGGING
-
 #ifdef PBRT_DBG_LOGGING
 #include <stdio.h>
 #ifndef PBRT_TO_STRING
