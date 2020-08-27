@@ -155,8 +155,10 @@ class TrowbridgeReitzDistribution {
     PBRT_CPU_GPU inline Float D(const Vector3f &wm) const {
         Float tan2Theta = Tan2Theta(wm);
         if (std::isinf(tan2Theta))
-            return 0.;
+            return 0;
         Float cos4Theta = Cos2Theta(wm) * Cos2Theta(wm);
+        if (cos4Theta == 0)
+            return 0;
         Float e = (Cos2Phi(wm) / Sqr(alpha_x) + Sin2Phi(wm) / Sqr(alpha_y)) * tan2Theta;
         return 1 / (Pi * alpha_x * alpha_y * cos4Theta * Sqr(1 + e));
     }
