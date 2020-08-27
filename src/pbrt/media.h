@@ -655,38 +655,38 @@ class NanoVDBMediumProvider {
         *res = Point3i(64, 64, 64);
         pstd::vector<Float> maxGrid(res->x * res->y * res->z, 0.f, alloc);
 
-        const auto &tree = densityFloatGrid->tree();
+        auto accessor = densityFloatGrid->getAccessor();
+        auto bbox = densityFloatGrid->indexBBox();
+        for (int z = bbox.min()[2]; z < bbox.max()[2]; ++z)
+            for (int y = bbox.min()[1]; y < bbox.max()[1]; ++y)
+                for (int x = bbox.min()[0]; x < bbox.max()[0]; ++x) {
+                    // TODO: it's a little unclear how the rounding should go here;
+                    // note also that it depends on how samples end up being
+                    // interpolated, and thence the footprint of the filter function..
+                    nanovdb::Vec3R w0 = densityFloatGrid->indexToWorld(
+                        nanovdb::Vec3R(x - 1, y - 1, z - 1));
+                    nanovdb::Vec3R w1 = densityFloatGrid->indexToWorld(
+                        nanovdb::Vec3R(x + 1, y + 1, z + 1));
 
-        // Iterate over the leaves
-        for (int i = 0; i < tree.nodeCount(0); ++i) {
-            auto leaf = tree.getNode<0>(i);
-            auto b = leaf->bbox();
+                    Vector3f p0 = bounds.Offset(Point3f(w0[0], w0[1], w0[2]));
+                    Vector3f p1 = bounds.Offset(Point3f(w1[0], w1[1], w1[2]));
 
-            // TODO: it's a little unclear how the rounding should go here;
-            // note also that it depends on how samples end up being
-            // interpolated, and thence the footprint of the filter function..
-            nanovdb::Vec3R w0 = densityFloatGrid->indexToWorld(nanovdb::Vec3R(b.min()) -
-                                                               nanovdb::Vec3R(1, 1, 1));
-            nanovdb::Vec3R w1 = densityFloatGrid->indexToWorld(nanovdb::Vec3R(b.max()) +
-                                                               nanovdb::Vec3R(1, 1, 1));
+                    int x0 = int(p0.x * res->x);
+                    int x1 = std::min(int(p1.x * res->x + 1), res->x);
+                    int y0 = int(p0.y * res->y);
+                    int y1 = std::min(int(p1.y * res->y + 1), res->y);
+                    int z0 = int(p0.z * res->z);
+                    int z1 = std::min(int(p1.z * res->z + 1), res->z);
 
-            Vector3f p0 = bounds.Offset(Point3f(w0[0], w0[1], w0[2]));
-            Vector3f p1 = bounds.Offset(Point3f(w1[0], w1[1], w1[2]));
+                    Float voxelValue = accessor.getValue({x, y, z});
 
-            int x0 = int(p0.x * res->x);
-            int x1 = std::min(int(p1.x * res->x + 1), res->x);
-            int y0 = int(p0.y * res->y);
-            int y1 = std::min(int(p1.y * res->y + 1), res->y);
-            int z0 = int(p0.z * res->z);
-            int z1 = std::min(int(p1.z * res->z + 1), res->z);
-
-            for (int z = z0; z < z1; ++z)
-                for (int y = y0; y < y1; ++y)
-                    for (int x = x0; x < x1; ++x) {
-                        Float &v = maxGrid[x + res->x * (y + res->y * z)];
-                        v = std::max(v, leaf->valueMax());
-                    }
-        }
+                    for (int zz = z0; zz < z1; ++zz)
+                        for (int yy = y0; yy < y1; ++yy)
+                            for (int xx = x0; xx < x1; ++xx) {
+                                Float &v = maxGrid[xx + res->x * (yy + res->y * zz)];
+                                v = std::max(v, voxelValue);
+                            }
+                }
 
         return maxGrid;
 #endif
