@@ -50,7 +50,7 @@ SquareMatrix<3> ConvertRGBColorSpace(const RGBColorSpace &from, const RGBColorSp
 }
 
 RGBSigmoidPolynomial RGBColorSpace::ToRGBCoeffs(const RGB &rgb) const {
-    CHECK_RARE(1e-6, rgb.r < 0 || rgb.g < 0 || rgb.b < 0);
+    CHECK(rgb.r >= 0 && rgb.g >= 0 && rgb.b >= 0);
     return (*rgbToSpectrumTable)(ClampZero(rgb));
 }
 

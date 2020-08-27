@@ -388,6 +388,9 @@ std::vector<SpectrumHandle> ParameterDictionary::extractSpectrumArray(
                     return alloc.new_object<RGBReflectanceSpectrum>(cs, rgb);
                 } else {
                     CHECK(spectrumType == SpectrumType::General);
+                    if (std::min({v[0], v[1], v[2]}) < 0)
+                        ErrorExit(&param.loc,
+                                  "RGB parameter \"%s\" has negative component value.");
                     return alloc.new_object<RGBSpectrum>(cs, rgb);
                 }
             });
@@ -828,6 +831,10 @@ SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTextureOrNull(
             p->lookedUp = true;
 
             RGB rgb(p->numbers[0], p->numbers[1], p->numbers[2]);
+            if (rgb.r < 0 || rgb.g < 0 || rgb.b < 0)
+                ErrorExit(&p->loc,
+                          "Negative value provided for \"rgb\" parameter \"%s\".",
+                          p->name);
             if (spectrumType == SpectrumType::General)
                 return alloc.new_object<RGBConstantTexture>(*dict->ColorSpace(), rgb);
             else {
