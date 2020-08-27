@@ -390,12 +390,13 @@ extern "C" __global__ void __raygen__shadow_Tr() {
     PBRT_DBG("Initial Ld %f %f %f %f shadow ray index %d pixel index %d\n", Ld[0], Ld[1],
         Ld[2], Ld[3], index, sr.pixelIndex);
 
-    SampledSpectrum pdfUni = sr.pdfUni, pdfNEE = sr.pdfNEE;
-
     Ray ray = sr.ray;
     Float tMax = sr.tMax;
     Point3f pLight = ray(tMax);
     RNG rng(Hash(ray.o), Hash(ray.d));
+
+    SampledSpectrum throughput(1.f);
+    SampledSpectrum pdfUni(1.f), pdfNEE(1.f);
 
     while (true) {
         ClosestHitContext ctx(ray.medium, true);
@@ -414,7 +415,7 @@ extern "C" __global__ void __raygen__shadow_Tr() {
         if (!missed && ctx.material) {
             PBRT_DBG("Hit opaque. Bye\n");
             // Hit opaque surface
-            Ld = SampledSpectrum(0.f);
+            throughput = SampledSpectrum(0.f);
             break;
         }
 
@@ -434,30 +435,46 @@ extern "C" __global__ void __raygen__shadow_Tr() {
                                       SampledSpectrum sigma_n = intr.sigma_n();
 
                                       // ratio-tracking: only evaluate null scattering
-                                      Ld *= Tmaj * sigma_n;
+                                      throughput *= Tmaj * sigma_n;
                                       pdfNEE *= Tmaj * intr.sigma_maj;
                                       pdfUni *= Tmaj * sigma_n;
 
-                                      PBRT_DBG("Tmaj %f %f %f %f sigma_n %f %f %f %f sigma_maj %f %f %f %f",
-                                          Tmaj[0], Tmaj[1], Tmaj[2], Tmaj[3],
-                                          sigma_n[0], sigma_n[1], sigma_n[2], sigma_n[3],
-                                          intr.sigma_maj[0], intr.sigma_maj[1], intr.sigma_maj[2],
-                                          intr.sigma_maj[3]);
-                                      PBRT_DBG("Ld %f %f %f %f pdfNEE %f %f %f %f pdfUni %f %f %f %f",
-                                          Ld[0], Ld[1], Ld[2], Ld[3],
-                                          pdfNEE[0], pdfNEE[1], pdfNEE[2], pdfNEE[3],
-                                          pdfUni[0], pdfUni[1], pdfUni[2], pdfUni[3]);
+                                      Float pSurvive = throughput.MaxComponentValue() /
+                                          (pdfNEE + pdfUni).Average();
 
-                                      if (!Ld)
+                                      PBRT_DBG("throughput %f %f %f %f pdfNEE %f %f %f %f pdfUni %f %f %f %f "
+                                               "pSurvive %f\n",
+                                               throughput[0], throughput[1], throughput[2], throughput[3],
+                                               pdfNEE[0], pdfNEE[1], pdfNEE[2], pdfNEE[3],
+                                               pdfUni[0], pdfUni[1], pdfUni[2], pdfUni[3], pSurvive);
+
+                                      if (pSurvive < .25f) {
+                                          if (rng.Uniform<Float>() > pSurvive)
+                                              throughput = SampledSpectrum(0.);
+                                          else
+                                              throughput /= pSurvive;
+                                      }
+
+                                      PBRT_DBG("Tmaj %f %f %f %f sigma_n %f %f %f %f sigma_maj %f %f %f %f\n",
+                                               Tmaj[0], Tmaj[1], Tmaj[2], Tmaj[3],
+                                               sigma_n[0], sigma_n[1], sigma_n[2], sigma_n[3],
+                                               intr.sigma_maj[0], intr.sigma_maj[1], intr.sigma_maj[2],
+                                               intr.sigma_maj[3]);
+                                      PBRT_DBG("throughput %f %f %f %f pdfNEE %f %f %f %f pdfUni %f %f %f %f\n",
+                                               throughput[0], throughput[1], throughput[2], throughput[3],
+                                               pdfNEE[0], pdfNEE[1], pdfNEE[2], pdfNEE[3],
+                                               pdfUni[0], pdfUni[1], pdfUni[2], pdfUni[3]);
+
+                                      if (!throughput)
                                           return false;
 
-                                      rescale(Ld, pdfNEE, pdfUni);
+                                      rescale(throughput, pdfNEE, pdfUni);
 
                                       return true;
                                   });
         }
 
-        if (missed || !Ld)
+        if (missed || !throughput)
             // done
             break;
 
@@ -467,8 +484,11 @@ extern "C" __global__ void __raygen__shadow_Tr() {
             break;
     }
 
-    if (Ld)
-        Ld /= (pdfUni + pdfNEE).Average();
+    if (!throughput)
+        Ld = SampledSpectrum(0.f);
+    else
+        Ld *= throughput / (sr.pdfUni * pdfUni + sr.pdfNEE * pdfNEE).Average();
+
     PBRT_DBG("Setting final Ld for shadow ray index %d pixel index %d = as %f %f %f %f\n",
         index, sr.pixelIndex, Ld[0], Ld[1], Ld[2], Ld[3]);
     CHECK(!std::isnan(Ld[0]));

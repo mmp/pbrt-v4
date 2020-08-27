@@ -1311,8 +1311,7 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
 
     // Declare path state variables for ray to light source
     Ray lightRay = intr.SpawnRayTo(ls.pLight);
-    SampledSpectrum pdfLight = pathPDF * lightPDF;  // p_nee in paper
-    SampledSpectrum pdfUni = pathPDF * scatterPDF;  // p_uni
+    SampledSpectrum throughput(1.f), pdfLight(1.f), pdfUni(1.f);
     RNG rng(Hash(lightRay.o), Hash(lightRay.d));
 
     while (true) {
@@ -1334,33 +1333,45 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
                         return false;
                     }
                     const MediumInteraction &intr = *mediumSample.intr;
-                    // Update _betaLight_ and PDFs using ratio-tracking estimator
+                    // Update _throughput_ and PDFs using ratio-tracking estimator
                     SampledSpectrum sigma_n = intr.sigma_n();
                     // ratio-tracking: only evaluate null scattering
-                    betaLight *= Tmaj * sigma_n;
+                    throughput *= Tmaj * sigma_n;
                     pdfLight *= Tmaj * intr.sigma_maj;
                     pdfUni *= Tmaj * sigma_n;
 
-                    if (!betaLight)
+                    Float pSurvive =
+                        throughput.MaxComponentValue() / (pdfLight + pdfUni).Average();
+                    if (pSurvive < .25f) {
+                        if (rng.Uniform<Float>() > pSurvive)
+                            throughput = SampledSpectrum(0.);
+                        else
+                            throughput /= pSurvive;
+                    }
+
+                    if (!throughput)
                         return false;
-                    rescale(betaLight, pdfLight, pdfUni);
+                    rescale(throughput, pdfLight, pdfUni);
                     return true;
                 });
         }
 
         // Generate next ray segment or return final transmittance
-        if (!betaLight)
+        if (!throughput)
             return SampledSpectrum(0.f);
         if (!si)
             break;
         lightRay = si->intr.SpawnRayTo(ls.pLight);
     }
     // Return weighted light contribution to direct lighting
+    pdfLight *= pathPDF * lightPDF;  // p_nee in paper
     if (IsDeltaLight(light.Type()))
         // pdfUni unused...
-        return betaLight * ls.L / pdfLight.Average();
-    else
-        return betaLight * ls.L / (pdfLight + pdfUni).Average();
+        return betaLight * ls.L * throughput / pdfLight.Average();
+    else {
+        pdfUni *= pathPDF * scatterPDF;
+        return betaLight * ls.L * throughput / (pdfLight + pdfUni).Average();
+    }
 }
 
 std::string VolPathIntegrator::ToString() const {
