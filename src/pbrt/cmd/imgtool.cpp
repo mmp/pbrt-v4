@@ -53,6 +53,11 @@ extern "C" {
     } while (false) /* eat semicolon */
 #endif
 
+// Stop that, Windows.
+#ifdef RGB
+#indef RGB
+#endif
+
 using namespace pbrt;
 
 struct CommandUsage {
