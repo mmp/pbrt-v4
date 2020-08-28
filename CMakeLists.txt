@@ -658,6 +658,11 @@ add_dependencies (pbrt_lib pbrt_soa_generated)
 
 target_compile_definitions (pbrt_lib PRIVATE ${PBRT_DEFINITIONS})
 
+# Attempt to work-around Windows/CUDA build issues.
+# As per https://stackoverflow.com/a/51566919, this works around a cmake
+# bug that leads to undefined symbols...
+set_property(TARGET pbrt_lib PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+
 target_include_directories (pbrt_lib PUBLIC
   src
   src/ext
