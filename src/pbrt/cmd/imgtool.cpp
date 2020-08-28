@@ -55,7 +55,7 @@ extern "C" {
 
 // Stop that, Windows.
 #ifdef RGB
-#indef RGB
+#undef RGB
 #endif
 
 using namespace pbrt;
