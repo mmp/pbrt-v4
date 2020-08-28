@@ -283,7 +283,7 @@ class Sphere {
                 ss->pdf *=
                     DistanceSquared(ctx.p(), ss->intr.p()) / AbsDot(ss->intr.n, -wi);
             }
-            if (std::isinf(ss->pdf))
+            if (IsInf(ss->pdf))
                 return {};
             return ss;
         }
@@ -348,7 +348,7 @@ class Sphere {
                 return 0;
             Float pdf = DistanceSquared(pOrigin, isect->intr.p()) /
                         (AbsDot(isect->intr.n, -wi) * Area());
-            if (std::isinf(pdf))
+            if (IsInf(pdf))
                 pdf = 0.f;
             return pdf;
         }
@@ -581,7 +581,7 @@ class Disk {
             // Convert from area measure, as returned by the Sample() call
             // above, to solid angle measure.
             ss->pdf *= DistanceSquared(ctx.p(), ss->intr.p()) / AbsDot(ss->intr.n, -wi);
-            if (std::isinf(ss->pdf))
+            if (IsInf(ss->pdf))
                 return {};
         }
         return ss;
@@ -598,7 +598,7 @@ class Disk {
         // Convert light sample weight to solid angle measure
         Float pdf =
             DistanceSquared(ctx.p(), si->intr.p()) / (AbsDot(si->intr.n, -wi) * Area());
-        if (std::isinf(pdf))
+        if (IsInf(pdf))
             pdf = 0.f;
         return pdf;
     }
@@ -796,7 +796,7 @@ class Cylinder {
             // Convert from area measure, as returned by the Sample() call
             // above, to solid angle measure.
             ss->pdf *= DistanceSquared(ctx.p(), ss->intr.p()) / AbsDot(ss->intr.n, -wi);
-            if (std::isinf(ss->pdf))
+            if (IsInf(ss->pdf))
                 return {};
         }
         return ss;
@@ -813,7 +813,7 @@ class Cylinder {
         // Convert light sample weight to solid angle measure
         Float pdf =
             DistanceSquared(ctx.p(), si->intr.p()) / (AbsDot(si->intr.n, -wi) * Area());
-        if (std::isinf(pdf))
+        if (IsInf(pdf))
             pdf = 0.f;
         return pdf;
     }
@@ -1141,7 +1141,7 @@ class Triangle {
                 // above, to solid angle measure.
                 ss->pdf *=
                     DistanceSquared(ctx.p(), ss->intr.p()) / AbsDot(ss->intr.n, -wi);
-                if (std::isinf(ss->pdf))
+                if (IsInf(ss->pdf))
                     return {};
             }
             return ss;
@@ -1203,7 +1203,7 @@ class Triangle {
             // Convert light sample weight to solid angle measure
             Float pdf = DistanceSquared(ctx.p(), si->intr.p()) /
                         (AbsDot(si->intr.n, -wi) * Area());
-            if (std::isinf(pdf))
+            if (IsInf(pdf))
                 pdf = 0.f;
             return pdf;
         }

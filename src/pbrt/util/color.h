@@ -70,12 +70,12 @@ class RGB {
     }
     PBRT_CPU_GPU
     RGB operator*(Float a) const {
-        DCHECK(!std::isnan(a));
+        DCHECK(!IsNaN(a));
         return {a * r, a * g, a * b};
     }
     PBRT_CPU_GPU
     RGB &operator*=(Float a) {
-        DCHECK(!std::isnan(a));
+        DCHECK(!IsNaN(a));
         r *= a;
         g *= a;
         b *= a;
@@ -98,7 +98,7 @@ class RGB {
     }
     PBRT_CPU_GPU
     RGB &operator/=(Float a) {
-        DCHECK(!std::isnan(a));
+        DCHECK(!IsNaN(a));
         DCHECK_NE(a, 0);
         r /= a;
         g /= a;
@@ -214,12 +214,12 @@ class XYZ {
     }
     PBRT_CPU_GPU
     XYZ operator*(Float a) const {
-        DCHECK(!std::isnan(a));
+        DCHECK(!IsNaN(a));
         return {a * X, a * Y, a * Z};
     }
     PBRT_CPU_GPU
     XYZ &operator*=(Float a) {
-        DCHECK(!std::isnan(a));
+        DCHECK(!IsNaN(a));
         X *= a;
         Y *= a;
         Z *= a;
@@ -240,7 +240,7 @@ class XYZ {
     }
     PBRT_CPU_GPU
     XYZ &operator/=(Float a) {
-        DCHECK(!std::isnan(a));
+        DCHECK(!IsNaN(a));
         DCHECK_NE(a, 0);
         X /= a;
         Y /= a;
@@ -336,7 +336,7 @@ class RGBSigmoidPolynomial {
     PBRT_CPU_GPU
     Float operator()(Float lambda) const {
         Float v = EvaluatePolynomial(lambda, c2, c1, c0);
-        if (std::isinf(v))
+        if (IsInf(v))
             return v > 0 ? 1 : 0;
         return s(v);
     }

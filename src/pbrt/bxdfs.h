@@ -333,7 +333,7 @@ class DielectricInterfaceBxDF {
 
                 // Compute PDF of _wi_ for microfacet reflection
                 Float pdf = mfDistrib.PDF(wo, wh) / (4 * Dot(wo, wh)) * pr / (pr + pt);
-                CHECK(!std::isnan(pdf));
+                CHECK(!IsNaN(pdf));
 
                 // TODO: reuse fragments from f()
                 Float cosTheta_o = AbsCosTheta(wo), cosTheta_i = AbsCosTheta(wi);
@@ -378,7 +378,7 @@ class DielectricInterfaceBxDF {
                     /*Sqr(etap) * */ AbsDot(wi, wh) /
                     Sqr(Dot(wo, wh) + etap * Dot(wi, wh));
                 Float pdf = mfDistrib.PDF(wo, wh) * dwh_dwi * pt / (pr + pt);
-                CHECK(!std::isnan(pdf));
+                CHECK(!IsNaN(pdf));
 
                 if (mfDistrib.EffectivelySpecular())
                     return BSDFSample(f / pdf, wi, 1, BxDFFlags::SpecularTransmission);
@@ -1241,7 +1241,7 @@ class HairBxDF {
         Float mp =
             (v <= .1) ? (std::exp(LogI0(a) - b - 1 / v + 0.6931f + std::log(1 / (2 * v))))
                       : (std::exp(-b) * I0(a)) / (std::sinh(1 / v) * 2 * v);
-        CHECK(!std::isinf(mp) && !std::isnan(mp));
+        CHECK(!IsInf(mp) && !IsNaN(mp));
         return mp;
     }
 

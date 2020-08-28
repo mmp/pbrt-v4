@@ -111,7 +111,7 @@ HairBxDF::HairBxDF(Float h, Float eta, const SampledSpectrum &sigma_a, Float bet
     // Compute azimuthal logistic scale factor from $\beta_n$
     static const Float SqrtPiOver8 = 0.626657069f;
     s = SqrtPiOver8 * (0.265f * beta_n + 1.194f * Sqr(beta_n) + 5.372f * Pow<22>(beta_n));
-    CHECK(!std::isnan(s));
+    CHECK(!IsNaN(s));
 
     // Compute $\alpha$ terms for hair scales
     sin2kAlpha[0] = std::sin(Radians(alpha));
@@ -181,7 +181,7 @@ SampledSpectrum HairBxDF::f(Vector3f wo, Vector3f wi, TransportMode mode) const 
 
     if (AbsCosTheta(wi) > 0)
         fsum /= AbsCosTheta(wi);
-    CHECK(!std::isinf(fsum.Average()) && !std::isnan(fsum.Average()));
+    CHECK(!IsInf(fsum.Average()) && !IsNaN(fsum.Average()));
     return fsum;
 }
 

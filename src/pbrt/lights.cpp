@@ -1088,7 +1088,7 @@ LightLiSample PortalImageInfiniteLight::SampleLi(LightSampleContext ctx, Point2f
 
     // Compute PDF for sampled infinite light direction
     Float pdf = mapPDF / duv_dw;
-    CHECK(!std::isinf(pdf));
+    CHECK(!IsInf(pdf));
 
     SampledSpectrum L = ImageLookup(uv, lambda);
 

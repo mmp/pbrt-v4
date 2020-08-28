@@ -42,7 +42,7 @@ namespace {
 template <typename T>
 PBRT_CPU_GPU inline typename std::enable_if_t<std::is_floating_point<T>::value, bool>
 isNaN(const T x) {
-    return std::isnan(x);
+    return IsNaN(x);
 }
 
 template <typename T>

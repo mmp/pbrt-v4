@@ -77,7 +77,7 @@ PBRT_CPU_GPU inline Float Blackbody(Float lambda, Float T) {
     // Return emitted radiance for blackbody at wavelength _lambda[i]_
     Float l = lambda * 1e-9f;
     Float Le = (2 * h * c * c) / (Pow<5>(l) * (std::exp((h * c) / (l * kb * T)) - 1));
-    CHECK(!std::isnan(Le));
+    CHECK(!IsNaN(Le));
     return Le;
 }
 
@@ -109,7 +109,7 @@ class SampledSpectrum {
     }
     PBRT_CPU_GPU
     friend SampledSpectrum operator-(Float a, const SampledSpectrum &s) {
-        DCHECK(!std::isnan(a));
+        DCHECK(!IsNaN(a));
         SampledSpectrum ret;
         for (int i = 0; i < NSpectrumSamples; ++i)
             ret.values[i] = a - s.values[i];
@@ -129,7 +129,7 @@ class SampledSpectrum {
     }
     PBRT_CPU_GPU
     SampledSpectrum operator*(Float a) const {
-        DCHECK(!std::isnan(a));
+        DCHECK(!IsNaN(a));
         SampledSpectrum ret = *this;
         for (int i = 0; i < NSpectrumSamples; ++i)
             ret.values[i] *= a;
@@ -137,7 +137,7 @@ class SampledSpectrum {
     }
     PBRT_CPU_GPU
     SampledSpectrum &operator*=(Float a) {
-        DCHECK(!std::isnan(a));
+        DCHECK(!IsNaN(a));
         for (int i = 0; i < NSpectrumSamples; ++i)
             values[i] *= a;
         return *this;
@@ -161,7 +161,7 @@ class SampledSpectrum {
     PBRT_CPU_GPU
     SampledSpectrum &operator/=(Float a) {
         DCHECK_NE(a, 0);
-        DCHECK(!std::isnan(a));
+        DCHECK(!IsNaN(a));
         for (int i = 0; i < NSpectrumSamples; ++i)
             values[i] /= a;
         return *this;
@@ -189,7 +189,7 @@ class SampledSpectrum {
     PBRT_CPU_GPU
     bool HasNaNs() const {
         for (int i = 0; i < NSpectrumSamples; ++i)
-            if (std::isnan(values[i]))
+            if (IsNaN(values[i]))
                 return true;
         return false;
     }

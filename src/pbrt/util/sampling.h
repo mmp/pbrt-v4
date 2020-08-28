@@ -159,7 +159,7 @@ inline Float SampleTrimmedLogistic(Float u, Float s, Float a, Float b) {
     DCHECK_LT(a, b);
     u = Lerp(u, InvertLogisticSample(a, s), InvertLogisticSample(b, s));
     Float x = SampleLogistic(u, s);
-    DCHECK(!std::isnan(x));
+    DCHECK(!IsNaN(x));
     return Clamp(x, a, b);
 }
 
@@ -729,7 +729,7 @@ class PiecewiseConstant1D {
         Float du = u - cdf[offset];
         if (cdf[offset + 1] - cdf[offset] > 0)
             du /= cdf[offset + 1] - cdf[offset];
-        DCHECK(!std::isnan(du));
+        DCHECK(!IsNaN(du));
 
         // Compute PDF for sampled offset
         if (pdf != nullptr)

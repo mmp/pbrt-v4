@@ -313,8 +313,8 @@ class Image {
 
     PBRT_CPU_GPU
     void SetChannel(Point2i p, int c, Float value) {
-        // CHECK(!std::isnan(value));
-        if (std::isnan(value)) {
+        // CHECK(!IsNaN(value));
+        if (IsNaN(value)) {
 #ifndef PBRT_IS_GPU_CODE
             LOG_ERROR("NaN at pixel %d,%d comp %d", p.x, p.y, c);
 #endif

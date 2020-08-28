@@ -522,7 +522,7 @@ class DiffuseAreaLight : public LightBase {
         if (!ss)
             return {};
         ss->intr.mediumInterface = &mediumInterface;
-        DCHECK(!std::isnan(ss->pdf));
+        DCHECK(!IsNaN(ss->pdf));
         if (ss->pdf == 0 || LengthSquared(ss->intr.p() - ctx.p()) == 0)
             return {};
 
@@ -732,7 +732,7 @@ class PortalImageInfiniteLight : public LightBase {
     Vector3f RenderFromImage(const Point2f &st, Float *duv_dw = nullptr) const {
         Float alpha = -Pi / 2 + st.x * Pi, beta = -Pi / 2 + st.y * Pi;
         Float x = std::tan(alpha), y = std::tan(beta);
-        DCHECK(!std::isinf(x) && !std::isinf(y));
+        DCHECK(!IsInf(x) && !IsInf(y));
         Vector3f w = Normalize(Vector3f(x, y, -1));
 
         if (w.z == 0)
@@ -751,7 +751,7 @@ class PortalImageInfiniteLight : public LightBase {
             *duv_dw = Pi * Pi * std::abs((1 - w.y * w.y) * (1 - w.x * w.x) / w.z);
 
         Float alpha = std::atan(w.x / -w.z), beta = std::atan(w.y / -w.z);
-        DCHECK(!std::isnan(alpha + beta));
+        DCHECK(!IsNaN(alpha + beta));
         return Point2f(Clamp((alpha + Pi / 2) / Pi, 0, 1),
                        Clamp((beta + Pi / 2) / Pi, 0, 1));
     }

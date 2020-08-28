@@ -308,7 +308,7 @@ void RayIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleIndex,
                       "Setting to black.",
                       pPixel.x, pPixel.y, sampleIndex);
             L = SampledSpectrum(0.f);
-        } else if (std::isinf(L.y(lambda))) {
+        } else if (IsInf(L.y(lambda))) {
             LOG_ERROR("Infinite radiance value returned for pixel (%d, %d), "
                       "sample %d. "
                       "Setting to black.",
@@ -529,7 +529,7 @@ SampledSpectrum SimplePathIntegrator::Li(RayDifferential ray, SampledWavelengths
         }
 
         CHECK_GE(beta.y(lambda), 0.f);
-        DCHECK(!std::isinf(beta.y(lambda)));
+        DCHECK(!IsInf(beta.y(lambda)));
     }
     return L;
 }
@@ -779,7 +779,7 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
         // Update path state variables for after surface scattering
         beta *= bs.f * AbsDot(bs.wi, isect.shading.n) / bs.pdf;
         bsdfPDF = bsdf.SampledPDFIsProportional() ? bsdf.PDF(wo, bs.wi) : bs.pdf;
-        DCHECK(!std::isinf(beta.y(lambda)));
+        DCHECK(!IsInf(beta.y(lambda)));
         specularBounce = bs.IsSpecular();
         anyNonSpecularBounces |= !bs.IsSpecular();
         if (bs.IsTransmission())
@@ -795,7 +795,7 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
             if (sampler.Get1D() < q)
                 break;
             beta /= 1 - q;
-            DCHECK(!std::isinf(beta.y(lambda)));
+            DCHECK(!IsInf(beta.y(lambda)));
         }
     }
     ReportValue(pathLength, depth);
@@ -1150,7 +1150,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
         // Sample illumination from lights to find attenuated path contribution
         if (bsdf.IsNonSpecular()) {
             L += SampleLd(isect, &bsdf, lambda, sampler, beta, pdfUni);
-            DCHECK(std::isinf(L.y(lambda)) == false);
+            DCHECK(IsInf(L.y(lambda)) == false);
         }
 
         // Sample BSDF to get new volumetric path direction
@@ -1173,7 +1173,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
         PBRT_DBG("%s\n", StringPrintf("Sampled BSDF, f = %s, pdf = %f -> beta = %s", bs.f,
                                       bs.pdf, beta)
                              .c_str());
-        DCHECK(std::isinf(beta.y(lambda)) == false);
+        DCHECK(IsInf(beta.y(lambda)) == false);
         specularBounce = bs.IsSpecular();
         anyNonSpecularBounces |= !bs.IsSpecular();
         if (bs.IsTransmission())
@@ -1243,7 +1243,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             pdfNEE = pdfUni;
             pdfUni *= bs.pdf;
             // don't increment depth this time...
-            DCHECK(!std::isinf(beta.y(lambda)));
+            DCHECK(!IsInf(beta.y(lambda)));
             specularBounce = bs.IsSpecular();
             ray = RayDifferential(pi.SpawnRay(bs.wi));
         }
@@ -2397,7 +2397,7 @@ SampledSpectrum ConnectBDPT(const Integrator &integrator, SampledWavelengths &la
                                     t, lightSampler)
                         : 0.f;
     PBRT_DBG("MIS weight for (s,t) = (%d, %d) connection: %f\n", s, t, misWeight);
-    DCHECK(!std::isnan(misWeight));
+    DCHECK(!IsNaN(misWeight));
     L *= misWeight;
     if (misWeightPtr != nullptr)
         *misWeightPtr = misWeight;

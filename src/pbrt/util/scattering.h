@@ -154,7 +154,7 @@ class TrowbridgeReitzDistribution {
 
     PBRT_CPU_GPU inline Float D(const Vector3f &wm) const {
         Float tan2Theta = Tan2Theta(wm);
-        if (std::isinf(tan2Theta))
+        if (IsInf(tan2Theta))
             return 0;
         Float cos4Theta = Cos2Theta(wm) * Cos2Theta(wm);
         if (cos4Theta < 1e-16f)
@@ -172,7 +172,7 @@ class TrowbridgeReitzDistribution {
     PBRT_CPU_GPU
     Float Lambda(const Vector3f &w) const {
         Float tan2Theta = Tan2Theta(w);
-        if (std::isinf(tan2Theta))
+        if (IsInf(tan2Theta))
             return 0.;
         // Compute _alpha2_ for direction _w_
         Float alpha2 = Cos2Phi(w) * Sqr(alpha_x) + Sin2Phi(w) * Sqr(alpha_y);

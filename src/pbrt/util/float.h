@@ -53,6 +53,24 @@ static const float OneMinusEpsilon = FloatOneMinusEpsilon;
 #endif  // PBRT_IS_GPU_CODE
 
 // Floating-point Inline Functions
+template <typename T>
+PBRT_CPU_GPU inline bool IsNaN(T v) {
+#ifdef PBRT_IS_GPU_CODE
+    return isnan(v);
+#else
+    return std::isnan(v);
+#endif
+}
+
+template <typename T>
+PBRT_CPU_GPU inline bool IsInf(T v) {
+#ifdef PBRT_IS_GPU_CODE
+    return isinf(v);
+#else
+    return std::isinf(v);
+#endif
+}
+
 PBRT_CPU_GPU
 inline uint32_t FloatToBits(float f) {
 #ifdef PBRT_IS_GPU_CODE
@@ -120,7 +138,7 @@ inline double BitsToFloat(uint64_t ui) {
 PBRT_CPU_GPU
 inline float NextFloatUp(float v, int delta = 1) {
     // Handle infinity and negative zero for _NextFloatUp()_
-    if (std::isinf(v) && v > 0.)
+    if (IsInf(v) && v > 0.)
         return v;
     if (v == -0.f)
         v = 0.f;
@@ -141,7 +159,7 @@ inline constexpr Float gamma(int n) {
 PBRT_CPU_GPU
 inline float NextFloatDown(float v, int delta = 1) {
     // Handle infinity and positive zero for _NextFloatDown()_
-    if (std::isinf(v) && v < 0.)
+    if (IsInf(v) && v < 0.)
         return v;
     if (v == 0.f)
         v = -0.f;
@@ -155,7 +173,7 @@ inline float NextFloatDown(float v, int delta = 1) {
 
 PBRT_CPU_GPU
 inline double NextFloatUp(double v, int delta = 1) {
-    if (std::isinf(v) && v > 0.)
+    if (IsInf(v) && v > 0.)
         return v;
     if (v == -0.f)
         v = 0.f;
@@ -169,7 +187,7 @@ inline double NextFloatUp(double v, int delta = 1) {
 
 PBRT_CPU_GPU
 inline double NextFloatDown(double v, int delta = 1) {
-    if (std::isinf(v) && v < 0.)
+    if (IsInf(v) && v < 0.)
         return v;
     if (v == 0.f)
         v = -0.f;

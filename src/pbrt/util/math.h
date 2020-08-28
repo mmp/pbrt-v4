@@ -683,7 +683,7 @@ PBRT_CPU_GPU inline FloatType NewtonBisection(
             xMid = (x0 + x1) / 2;
 
         std::pair<FloatType, FloatType> fxMid = f(xMid);
-        DCHECK(!std::isnan(fxMid.first));
+        DCHECK(!IsNaN(fxMid.first));
 
         if (startIsNegative == fxMid.first < 0)
             x0 = xMid;
@@ -726,7 +726,7 @@ inline Float ErfInv(Float a) {
     // https://stackoverflow.com/a/49743348
     float p;
     float t = std::log(std::max(FMA(a, -a, 1), std::numeric_limits<Float>::min()));
-    CHECK(!std::isnan(t) && !std::isinf(t));
+    CHECK(!IsNaN(t) && !std::isinf(t));
     if (std::abs(t) > 6.125f) {          // maximum ulp error = 2.35793
         p = 3.03697567e-10f;             //  0x1.4deb44p-32
         p = FMA(p, t, 2.93243101e-8f);   //  0x1.f7c9aep-26

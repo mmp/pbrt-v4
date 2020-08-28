@@ -88,10 +88,10 @@ void SurfaceInteraction::ComputeDifferentials(const RayDifferential &ray,
         // Compute auxiliary intersection points with plane, _px_ and _py_
         Float d = -Dot(n, Vector3f(p()));
         Float tx = (-Dot(n, Vector3f(ray.rxOrigin)) - d) / Dot(n, ray.rxDirection);
-        CHECK(!std::isinf(tx) && !std::isnan(tx));
+        CHECK(!IsInf(tx) && !IsNaN(tx));
         Point3f px = ray.rxOrigin + tx * ray.rxDirection;
         Float ty = (-Dot(n, Vector3f(ray.ryOrigin)) - d) / Dot(n, ray.ryDirection);
-        CHECK(!std::isinf(ty) && !std::isnan(ty));
+        CHECK(!IsInf(ty) && !IsNaN(ty));
         Point3f py = ray.ryOrigin + ty * ray.ryDirection;
 
         dpdx = px - p();

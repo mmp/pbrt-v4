@@ -320,7 +320,7 @@ pstd::optional<TriangleIntersection> Triangle::Intersect(const Ray &ray, Float t
     Float b1 = e1 * invDet;
     Float b2 = e2 * invDet;
     Float t = tScaled * invDet;
-    DCHECK(!std::isnan(t));
+    DCHECK(!IsNaN(t));
 
     // Ensure that computed triangle $t$ is conservatively greater than zero
     // Compute $\delta_z$ term for triangle $t$ error bounds
@@ -1251,7 +1251,7 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,
         // Convert from area measure, as returned by the Sample() call
         // above, to solid angle measure.
         ss->pdf *= DistanceSquared(ctx.p(), ss->intr.p()) / AbsDot(ss->intr.n, -wi);
-        if (std::isinf(ss->pdf))
+        if (IsInf(ss->pdf))
             return {};
     }
     return ss;
@@ -1300,7 +1300,7 @@ Float BilinearPatch::PDF(const ShapeSampleContext &ctx, const Vector3f &wi) cons
         // Convert light sample weight to solid angle measure
         Float pdf = PDF(si->intr) * DistanceSquared(ctx.p(), si->intr.p()) /
                     AbsDot(si->intr.n, -wi);
-        if (std::isinf(pdf))
+        if (IsInf(pdf))
             pdf = 0.f;
         return pdf;
     }
