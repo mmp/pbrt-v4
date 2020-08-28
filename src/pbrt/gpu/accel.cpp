@@ -249,6 +249,21 @@ OptixTraversableHandle GPUAccel::createGASForTriangles(
                 if (plyMesh.triIndices.empty() && plyMesh.quadIndices.empty())
                     return;
 
+                if (!plyMesh.quadIndices.empty() && shape.lightIndex != -1) {
+#if 0
+                    // If you'd like to know what they are...
+                    for (int i = 0; i < plyMesh.quadIndices.size(); ++i)
+                        Printf("%s\n", plyMesh.p[plyMesh.quadIndices[i]]);
+#endif
+                    // This would be nice to fix, but it involves some
+                    // plumbing and it's a rare case. The underlying issue
+                    // is that when we create AreaLights for emissive
+                    // shapes earlier, we're not expecting this..
+                    ErrorExit(&shape.loc, "%s: PLY file being used as an area light has quads--"
+                              "this is currently unsupported. Please replace them with \"bilinearmesh\" "
+                              "shapes as a workaround. (Sorry!).", filename);
+                }
+
                 plyMesh.ConvertToOnlyTriangles();
 
                 mesh = alloc.new_object<TriangleMesh>(
