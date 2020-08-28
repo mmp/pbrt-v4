@@ -20,7 +20,9 @@
 #endif  // !PBRT_IS_WINDOWS
 
 #ifdef NVTX
+#ifndef PBRT_IS_WINDOWS
 #include <sys/syscall.h>
+#endif
 #include "nvtx3/nvToolsExtCuda.h"
 #endif
 
@@ -64,7 +66,11 @@ void ProgressReporter::launchThread() {
     Barrier *barrier = new Barrier(2);
     updateThread = std::thread([this, barrier]() {
 #if NVTX
+#ifdef PBRT_IS_WINDOWS
+        nvtxNameOsThread(GetCurrentThreadId(), "PBRT_PROGRESS_BAR");
+#else
         nvtxNameOsThread(syscall(SYS_gettid), "PBRT_PROGRESS_BAR");
+#endif
 #endif
         if (barrier->Block())
             delete barrier;

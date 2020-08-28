@@ -22,6 +22,12 @@
 #include <cmath>
 #include <map>
 
+// I don't know how this is happening (somehow via wingdi.h?), but not cool,
+// Windows, not cool...
+#ifdef RGB
+#undef RGB
+#endif
+
 namespace pbrt {
 
 // Spectrum Function Definitions

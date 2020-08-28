@@ -36,6 +36,11 @@
 #include <cuda/std/atomic>
 
 #ifdef NVTX
+#ifdef PBRT_IS_WINDOWS
+#include <windows.h>
+#else
+#include <sys/syscall.h>
+#endif // PBRT_IS_WINDOWS
 #include "nvtx3/nvToolsExt.h"
 #include "nvtx3/nvToolsExtCuda.h"
 #endif
@@ -273,7 +278,11 @@ void GPUPathIntegrator::Render(ImageMetadata *metadata) {
 
         copyThread = std::thread([&]() {
 #ifdef NVTX
+#ifdef PBRT_IS_WINDOWS
+            nvtxNameOsThread(GetCurrentThreadId(), "DISPLAY_SERVER_COPY_THREAD");
+#else
             nvtxNameOsThread(syscall(SYS_gettid), "DISPLAY_SERVER_COPY_THREAD");
+#endif
 #endif
             // Copy back to the CPU using a separate stream so that we can
             // periodically but asynchronously pick up the latest results

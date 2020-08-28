@@ -6,6 +6,7 @@
 
 #include <pbrt/util/print.h>
 
+#include <algorithm>
 #include <vector>
 
 namespace pbrt {

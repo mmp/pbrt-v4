@@ -19,7 +19,11 @@
 #include <pbrt/util/string.h>
 
 #ifdef NVTX
+#ifdef PBRT_IS_WINDOWS
+#include <windows.h>
+#else
 #include <sys/syscall.h>
+#endif
 #include "nvtx3/nvToolsExt.h"
 #endif
 
@@ -97,8 +101,13 @@ Reformatting options:
 // main program
 int main(int argc, char *argv[]) {
 #ifdef NVTX
+#ifdef PBRT_IS_WINDOWS
+    nvtxNameOsThread(GetCurrentThreadId(), "MAIN_THREAD");
+#else
     nvtxNameOsThread(syscall(SYS_gettid), "MAIN_THREAD");
 #endif
+#endif  // NVTX
+
     // Declare variables for parsed command line
     PBRTOptions options;
     std::vector<std::string> filenames;

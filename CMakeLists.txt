@@ -76,13 +76,6 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 if (MSVC)
   add_definitions (/D _CRT_SECURE_NO_WARNINGS)
   set(PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_IS_MSVC)
-  list (APPEND PBRT_CXX_FLAGS /wd4305) # double constant assigned to float
-  list (APPEND PBRT_CXX_FLAGS /wd4244) # int -> float conversion
-  list (APPEND PBRT_CXX_FLAGS /wd4843) # double -> float conversion
-  list (APPEND PBRT_CXX_FLAGS /wd4267) # size_t -> int conversion
-  list (APPEND PBRT_CXX_FLAGS /wd4838) # double -> int conversion
-  list (APPEND PBRT_CXX_FLAGS /wd26495) # uninitialized member variable
-  list (APPEND PBRT_CXX_FLAGS /wd26451) # arithmetic on 4-byte value, then cast to 8-byte
 endif ()
 
 #######################################
@@ -139,7 +132,12 @@ if (CMAKE_CUDA_COMPILER)
         # https://wagonhelm.github.io/articles/2018-03/detecting-cuda-capability-with-cmake
         # Get CUDA compute capability
         set (OUTPUTFILE ${CMAKE_BINARY_DIR}/checkcuda)
-        execute_process (COMMAND nvcc -lcuda ${CMAKE_SOURCE_DIR}/cmake/checkcuda.cu -o ${OUTPUTFILE})
+        if (MSVC)
+                execute_process (COMMAND nvcc -lcuda ${CMAKE_SOURCE_DIR}/cmake/checkcuda.cu -ccbin ${CMAKE_CXX_COMPILER} -o ${OUTPUTFILE})
+        else  ()
+                execute_process (COMMAND nvcc -lcuda ${CMAKE_SOURCE_DIR}/cmake/checkcuda.cu -o ${OUTPUTFILE})
+        endif ()
+
         execute_process (COMMAND ${OUTPUTFILE}
                          RESULT_VARIABLE CUDA_RETURN_CODE
                          OUTPUT_VARIABLE ARCH)
@@ -239,6 +237,17 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   set_property(CACHE FP_MODEL PROPERTY STRINGS "precise" "fast=1" "fast=2")
 
   list (APPEND PBRT_CXX_FLAGS "-fp-model ${FP_MODEL}")
+endif ()
+
+if (MSVC AND NOT PBRT_CUDA_ENABLED)
+  # FIXME: it would be nice to still pipe these through to MSVC in this case.
+  list (APPEND PBRT_CXX_FLAGS /wd4305) # double constant assigned to float
+  list (APPEND PBRT_CXX_FLAGS /wd4244) # int -> float conversion
+  list (APPEND PBRT_CXX_FLAGS /wd4843) # double -> float conversion
+  list (APPEND PBRT_CXX_FLAGS /wd4267) # size_t -> int conversion
+  list (APPEND PBRT_CXX_FLAGS /wd4838) # double -> int conversion
+  list (APPEND PBRT_CXX_FLAGS /wd26495) # uninitialized member variable
+  list (APPEND PBRT_CXX_FLAGS /wd26451) # arithmetic on 4-byte value, then cast to 8-byte
 endif ()
 
 ###########################################################################
