@@ -9,6 +9,7 @@
 
 #include <float.h>
 #include <limits.h>
+#include <cassert>
 #include <cstddef>
 #include <initializer_list>
 #include <iterator>
@@ -27,6 +28,59 @@ PBRT_CPU_GPU inline void swap(T &a, T &b) {
     a = std::move(b);
     b = std::move(tmp);
 }
+
+template <typename T, int N>
+class array;
+
+// Specialization for zero element arrays (to make MSVC happy)
+template <typename T>
+class array<T, 0> {
+  public:
+    using value_type = T;
+    using iterator = value_type *;
+    using const_iterator = const value_type *;
+    using size_t = std::size_t;
+
+    array() = default;
+
+    PBRT_CPU_GPU
+    void fill(const T &v) { assert(!"should never be called"); }
+
+    PBRT_CPU_GPU
+    bool operator==(const array<T, 0> &a) const { return true; }
+    PBRT_CPU_GPU
+    bool operator!=(const array<T, 0> &a) const { return false; }
+
+    PBRT_CPU_GPU
+    iterator begin() { return nullptr; }
+    PBRT_CPU_GPU
+    iterator end() { return nullptr; }
+    PBRT_CPU_GPU
+    const_iterator begin() const { return nullptr; }
+    PBRT_CPU_GPU
+    const_iterator end() const { return nullptr; }
+
+    PBRT_CPU_GPU
+    size_t size() const { return 0; }
+
+    PBRT_CPU_GPU
+    T &operator[](size_t i) {
+        assert(!"should never be called");
+        static T t;
+        return t;
+    }
+    PBRT_CPU_GPU
+    const T &operator[](size_t i) const {
+        assert(!"should never be called");
+        static T t;
+        return t;
+    }
+
+    PBRT_CPU_GPU
+    T *data() { return nullptr; }
+    PBRT_CPU_GPU
+    const T *data() const { return nullptr; }
+};
 
 template <typename T, int N>
 class array {
