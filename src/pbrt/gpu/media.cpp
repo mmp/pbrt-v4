@@ -63,6 +63,8 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
             bool scattered = false;
             ray.medium.SampleTmaj(
                 ray, tMax, rng, lambda, [&](const MediumSample &mediumSample) {
+                    rescale(beta, pdfUni, pdfNEE);
+
                     if (!mediumSample.intr) {
                         // No interaction was sampled, but update the path
                         // throughput and unidirectional PDF to the end of
@@ -134,8 +136,6 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                         beta *= Tmaj * sigma_n;
                         pdfUni *= Tmaj * sigma_n;
                         pdfNEE *= Tmaj * intr.sigma_maj;
-
-                        rescale(beta, pdfUni, pdfNEE);
 
                         return true;
                     }

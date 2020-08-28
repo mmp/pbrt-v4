@@ -484,6 +484,19 @@ extern "C" __global__ void __raygen__shadow_Tr() {
             break;
     }
 
+    PBRT_DBG("Final throughput %.9g %.9g %.9g %.9g sr.pdfUni %.9g %.9g %.9g %.9g pdfUni %.9g %.9g %.9g %.9g\n",
+             throughput[0], throughput[1], throughput[2], throughput[3],
+             sr.pdfUni[0], sr.pdfUni[1], sr.pdfUni[2], sr.pdfUni[3],
+             pdfUni[0], pdfUni[1], pdfUni[2], pdfUni[3]);
+    PBRT_DBG("sr.pdfNEE %.9g %.9g %.9g %.9g pdfNEE %.9g %.9g %.9g %.9g\n",
+             sr.pdfNEE[0], sr.pdfNEE[1], sr.pdfNEE[2], sr.pdfNEE[3],
+             pdfNEE[0], pdfNEE[1], pdfNEE[2], pdfNEE[3]);
+    PBRT_DBG("scaled throughput %.9g %.9g %.9g %.9g\n",
+             throughput[0] / (sr.pdfUni * pdfUni + sr.pdfNEE * pdfNEE).Average(),
+             throughput[1] / (sr.pdfUni * pdfUni + sr.pdfNEE * pdfNEE).Average(),
+             throughput[2] / (sr.pdfUni * pdfUni + sr.pdfNEE * pdfNEE).Average(),
+             throughput[3] / (sr.pdfUni * pdfUni + sr.pdfNEE * pdfNEE).Average());
+
     if (!throughput)
         Ld = SampledSpectrum(0.f);
     else

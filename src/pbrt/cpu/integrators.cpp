@@ -995,6 +995,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                         terminated = true;
                         return false;
                     }
+                    rescale(beta, pdfUni, pdfNEE);
                     if (!mediumSample.intr) {
                         // Update _beta_ and _pdfUni_ for ray that escaped the medium
                         // FIXME: review this, esp the pdf...
