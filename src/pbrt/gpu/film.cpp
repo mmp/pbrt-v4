@@ -19,7 +19,6 @@ void GPUPathIntegrator::UpdateFilm() {
         // Compute final weighted radiance value
         SampledSpectrum Lw = SampledSpectrum(pixelSampleState.L[pixelIndex]) *
                              pixelSampleState.cameraRayWeight[pixelIndex];
-        CHECK(!std::isnan(Lw[0]));
         SampledWavelengths lambda = pixelSampleState.lambda[pixelIndex];
         Float filterWeight = pixelSampleState.filterWeight[pixelIndex];
 

@@ -504,7 +504,6 @@ extern "C" __global__ void __raygen__shadow_Tr() {
 
     PBRT_DBG("Setting final Ld for shadow ray index %d pixel index %d = as %f %f %f %f\n",
         index, sr.pixelIndex, Ld[0], Ld[1], Ld[2], Ld[3]);
-    CHECK(!std::isnan(Ld[0]));
 
     params.shadowRayQueue->Ld[index] = Ld;
 }
