@@ -14,6 +14,7 @@
 #include <pbrt/util/colorspace.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/memory.h>
+#include <pbrt/util/parallel.h>
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/scattering.h>
 #include <pbrt/util/spectrum.h>
@@ -653,41 +654,56 @@ class NanoVDBMediumProvider {
     return pstd::vector<Float>(1, maxDensity, alloc);
 #else
         *res = Point3i(64, 64, 64);
+
+        LOG_VERBOSE("Starting nanovdb grid GetMaxDensityGrid()");
+
         pstd::vector<Float> maxGrid(res->x * res->y * res->z, 0.f, alloc);
 
-        auto accessor = densityFloatGrid->getAccessor();
-        auto bbox = densityFloatGrid->indexBBox();
-        for (int z = bbox.min()[2]; z < bbox.max()[2]; ++z)
-            for (int y = bbox.min()[1]; y < bbox.max()[1]; ++y)
-                for (int x = bbox.min()[0]; x < bbox.max()[0]; ++x) {
-                    // TODO: it's a little unclear how the rounding should go here;
-                    // note also that it depends on how samples end up being
-                    // interpolated, and thence the footprint of the filter function..
-                    nanovdb::Vec3R w0 = densityFloatGrid->indexToWorld(
-                        nanovdb::Vec3R(x - 1, y - 1, z - 1));
-                    nanovdb::Vec3R w1 = densityFloatGrid->indexToWorld(
-                        nanovdb::Vec3R(x + 1, y + 1, z + 1));
+        ParallelFor(0, maxGrid.size(), [&](size_t index) {
+            // Indices into maxGrid
+            int x = index % res->x;
+            int y = (index / res->x) % res->y;
+            int z = index / (res->x * res->y);
+            CHECK_EQ(index, x + res->x * (y + res->y * z));
 
-                    Vector3f p0 = bounds.Offset(Point3f(w0[0], w0[1], w0[2]));
-                    Vector3f p1 = bounds.Offset(Point3f(w1[0], w1[1], w1[2]));
+            // World (aka medium) space bounds of this max grid cell
+            Bounds3f wb(bounds.Lerp(Point3f(Float(x) / res->x, Float(y) / res->y,
+                                            Float(z) / res->z)),
+                        bounds.Lerp(Point3f(Float(x + 1) / res->x, Float(y + 1) / res->y,
+                                            Float(z + 1) / res->z)));
 
-                    int x0 = int(p0.x * res->x);
-                    int x1 = std::min(int(p1.x * res->x + 1), res->x);
-                    int y0 = int(p0.y * res->y);
-                    int y1 = std::min(int(p1.y * res->y + 1), res->y);
-                    int z0 = int(p0.z * res->z);
-                    int z1 = std::min(int(p1.z * res->z + 1), res->z);
+            // Compute corresponding NanoVDB index-space bounds in floating-point.
+            nanovdb::Vec3R i0 = densityFloatGrid->worldToIndexF(
+                nanovdb::Vec3R(wb.pMin.x, wb.pMin.y, wb.pMin.z));
+            nanovdb::Vec3R i1 = densityFloatGrid->worldToIndexF(
+                nanovdb::Vec3R(wb.pMax.x, wb.pMax.y, wb.pMax.z));
 
-                    Float voxelValue = accessor.getValue({x, y, z});
+            // Now find integer index-space bounds, accounting for both
+            // filtering and the overall index bounding box.
+            auto bbox = densityFloatGrid->indexBBox();
+            Float delta = 1.f;  // Filter slop
+            int nx0 = std::max(int(i0[0] - delta), bbox.min()[0]);
+            int nx1 = std::min(int(i1[0] + delta), bbox.max()[0]);
+            int ny0 = std::max(int(i0[1] - delta), bbox.min()[1]);
+            int ny1 = std::min(int(i1[1] + delta), bbox.max()[1]);
+            int nz0 = std::max(int(i0[2] - delta), bbox.min()[2]);
+            int nz1 = std::min(int(i1[2] + delta), bbox.max()[2]);
 
-                    for (int zz = z0; zz < z1; ++zz)
-                        for (int yy = y0; yy < y1; ++yy)
-                            for (int xx = x0; xx < x1; ++xx) {
-                                Float &v = maxGrid[xx + res->x * (yy + res->y * zz)];
-                                v = std::max(v, voxelValue);
-                            }
-                }
+            Float maxValue = 0;
+            auto accessor = densityFloatGrid->getAccessor();
+            // Apparently nanovdb integer bounding boxes are inclusive on
+            // the upper end...
+            for (int nz = nz0; nz <= nz1; ++nz)
+                for (int ny = ny0; ny <= ny1; ++ny)
+                    for (int nx = nx0; nx <= nx1; ++nx)
+                        maxValue = std::max(maxValue, accessor.getValue({nx, ny, nz}));
 
+            // Only write into maxGrid once when we're done to minimize
+            // cache thrashing..
+            maxGrid[index] = maxValue;
+        });
+
+        LOG_VERBOSE("Finished nanovdb grid GetMaxDensityGrid()");
         return maxGrid;
 #endif
     }
