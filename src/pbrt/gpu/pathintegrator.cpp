@@ -528,25 +528,32 @@ void GPURender(ParsedScene &scene) {
     GPUPathIntegrator *integrator =
         gpuMemoryAllocator.new_object<GPUPathIntegrator>(gpuMemoryAllocator, scene);
 
-    // Set things up so that we can still have read from the
-    // GPUPathIntegrator struct on the CPU without hurting
-    // performance. (This makes it possible to use the values of things
-    // like GPUPathIntegrator::haveSubsurface to conditionally launch
-    // kernels according to what's in the scene...)
     int deviceIndex;
     CUDA_CHECK(cudaGetDevice(&deviceIndex));
-    CUDA_CHECK(
-        cudaMemAdvise(integrator, sizeof(*integrator), cudaMemAdviseSetReadMostly, 0));
-    CUDA_CHECK(cudaMemAdvise(integrator, sizeof(*integrator),
-                             cudaMemAdviseSetPreferredLocation, deviceIndex));
+    int hasConcurrentManagedAccess;
+    cudaDeviceGetAttribute(&hasConcurrentManagedAccess,
+                           cudaDevAttrConcurrentManagedAccess, deviceIndex);
 
-    // Copy all of the scene data structures over to GPU memory.  This
-    // ensures that there isn't a big performance hitch for the first batch
-    // of rays as that stuff is copied over on demand.
-    CUDATrackedMemoryResource *mr =
-        dynamic_cast<CUDATrackedMemoryResource *>(gpuMemoryAllocator.resource());
-    CHECK(mr != nullptr);
-    mr->PrefetchToGPU();
+    if (hasConcurrentManagedAccess) {
+        // Set things up so that we can still have read from the
+        // GPUPathIntegrator struct on the CPU without hurting
+        // performance. (This makes it possible to use the values of things
+        // like GPUPathIntegrator::haveSubsurface to conditionally launch
+        // kernels according to what's in the scene...)
+
+        CUDA_CHECK(cudaMemAdvise(integrator, sizeof(*integrator),
+                                 cudaMemAdviseSetReadMostly, 0));
+        CUDA_CHECK(cudaMemAdvise(integrator, sizeof(*integrator),
+                                 cudaMemAdviseSetPreferredLocation, deviceIndex));
+
+        // Copy all of the scene data structures over to GPU memory.  This
+        // ensures that there isn't a big performance hitch for the first batch
+        // of rays as that stuff is copied over on demand.
+        CUDATrackedMemoryResource *mr =
+            dynamic_cast<CUDATrackedMemoryResource *>(gpuMemoryAllocator.resource());
+        CHECK(mr != nullptr);
+        mr->PrefetchToGPU();
+    }
 
     ///////////////////////////////////////////////////////////////////////////
     // Render!
