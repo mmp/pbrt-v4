@@ -76,8 +76,16 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
     filter = FilterHandle::Create(scene.filter.name, scene.filter.parameters,
                                   &scene.filter.loc, alloc);
 
-    film = FilmHandle::Create(scene.film.name, scene.film.parameters, &scene.film.loc,
-                              filter, alloc);
+    Float exposureTime =
+        scene.camera.parameters.GetOneFloat("shutterclose", 1.f) -
+        scene.camera.parameters.GetOneFloat("shutteropen", 0.f);
+    if (exposureTime <= 0)
+        ErrorExit(&scene.camera.loc,
+                  "The specified camera shutter times imply that the shutter "
+                  "does not open.  A black image will result.");
+
+    film = FilmHandle::Create(scene.film.name, scene.film.parameters, exposureTime,
+                              filter, &scene.film.loc, alloc);
     initializeVisibleSurface = film.UsesVisibleSurface();
 
     sampler = SamplerHandle::Create(scene.sampler.name, scene.sampler.parameters,

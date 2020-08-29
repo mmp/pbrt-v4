@@ -620,9 +620,9 @@ std::string RGBFilm::ToString() const {
                         BaseToString(), scale, *colorSpace, maxComponentValue, writeFP16);
 }
 
-RGBFilm *RGBFilm::Create(const ParameterDictionary &parameters, FilterHandle filter,
-                         const RGBColorSpace *colorSpace, const FileLoc *loc,
-                         Allocator alloc) {
+RGBFilm *RGBFilm::Create(const ParameterDictionary &parameters, Float exposureTime,
+                         FilterHandle filter, const RGBColorSpace *colorSpace,
+                         const FileLoc *loc, Allocator alloc) {
     std::string filename = parameters.GetOneString("filename", "");
     if (!Options->imageFile.empty()) {
         if (!filename.empty())
@@ -720,7 +720,6 @@ RGBFilm *RGBFilm::Create(const ParameterDictionary &parameters, FilterHandle fil
     // The defaults here represent a "passthrough" setup such that the imaging
     // ratio will be exactly 1. This is a useful default since scenes that
     // weren't authored with a physical camera in mind will render as expected.
-    Float exposureTime = parameters.GetOneFloat("exposuretime", 1.);
     Float fNumber = parameters.GetOneFloat("fnumber", 1.);
     Float ISO = parameters.GetOneFloat("iso", 100.);
     // Note: in the talk we mention using 312.5 for historical reasons. The
@@ -934,8 +933,9 @@ std::string GBufferFilm::ToString() const {
 }
 
 GBufferFilm *GBufferFilm::Create(const ParameterDictionary &parameters,
-                                 FilterHandle filter, const RGBColorSpace *colorSpace,
-                                 const FileLoc *loc, Allocator alloc) {
+                                 Float exposureTime, FilterHandle filter,
+                                 const RGBColorSpace *colorSpace, const FileLoc *loc,
+                                 Allocator alloc) {
     std::string filename = parameters.GetOneString("filename", "");
     if (!Options->imageFile.empty()) {
         if (!filename.empty())
@@ -1033,7 +1033,6 @@ GBufferFilm *GBufferFilm::Create(const ParameterDictionary &parameters,
     // The defaults here represent a "passthrough" setup such that the imaging
     // ratio will be exactly 1. This is a useful default since scenes that
     // weren't authored with a physical camera in mind will render as expected.
-    Float exposureTime = parameters.GetOneFloat("exposuretime", 1.);
     Float fNumber = parameters.GetOneFloat("fnumber", 1.);
     Float ISO = parameters.GetOneFloat("iso", 100.);
     // Note: in the talk we mention using 312.5 for historical reasons. The
@@ -1057,14 +1056,15 @@ GBufferFilm *GBufferFilm::Create(const ParameterDictionary &parameters,
 }
 
 FilmHandle FilmHandle::Create(const std::string &name,
-                              const ParameterDictionary &parameters, const FileLoc *loc,
-                              FilterHandle filter, Allocator alloc) {
+                              const ParameterDictionary &parameters, Float exposureTime,
+                              FilterHandle filter, const FileLoc *loc, Allocator alloc) {
     FilmHandle film;
     if (name == "rgb")
-        film = RGBFilm::Create(parameters, filter, parameters.ColorSpace(), loc, alloc);
+        film = RGBFilm::Create(parameters, exposureTime, filter, parameters.ColorSpace(),
+                               loc, alloc);
     else if (name == "gbuffer")
-        film =
-            GBufferFilm::Create(parameters, filter, parameters.ColorSpace(), loc, alloc);
+        film = GBufferFilm::Create(parameters, exposureTime, filter,
+                                   parameters.ColorSpace(), loc, alloc);
     else
         ErrorExit(loc, "%s: film type unknown.", name);
 

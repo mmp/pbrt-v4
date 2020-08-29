@@ -45,9 +45,19 @@ void CPURender(ParsedScene &parsedScene) {
                              &parsedScene.filter.loc, alloc);
 
     // Film
+    // It's a little ugly to poke into the camera's parameters here, but we
+    // have this circular dependency that CameraHandle::Create() expects a
+    // FilmHandle, yet now the film needs to know the exposure time from
+    // the camera....
+    Float exposureTime = parsedScene.camera.parameters.GetOneFloat("shutterclose", 1.f) -
+                         parsedScene.camera.parameters.GetOneFloat("shutteropen", 0.f);
+    if (exposureTime <= 0)
+        ErrorExit(&parsedScene.camera.loc,
+                  "Specified camera shutter times imply that the shutter "
+                  "does not open.  A black image will result.");
     FilmHandle film =
         FilmHandle::Create(parsedScene.film.name, parsedScene.film.parameters,
-                           &parsedScene.film.loc, filter, alloc);
+                           exposureTime, filter, &parsedScene.film.loc, alloc);
 
     // Camera
     MediumHandle cameraMedium =

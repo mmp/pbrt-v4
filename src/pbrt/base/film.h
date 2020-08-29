@@ -49,8 +49,8 @@ class FilmHandle : public TaggedPointer<RGBFilm, GBufferFilm> {
     using TaggedPointer::TaggedPointer;
 
     static FilmHandle Create(const std::string &name,
-                             const ParameterDictionary &parameters, const FileLoc *loc,
-                             FilterHandle filter, Allocator alloc);
+                             const ParameterDictionary &parameters, Float exposureTime,
+                             FilterHandle filter, const FileLoc *loc, Allocator alloc);
 
     PBRT_CPU_GPU inline FilterHandle GetFilter() const;
 

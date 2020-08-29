@@ -212,9 +212,9 @@ class RGBFilm : public FilmBase {
             const RGBColorSpace *colorSpace, Float maxComponentValue = Infinity,
             bool writeFP16 = true, Allocator allocator = {});
 
-    static RGBFilm *Create(const ParameterDictionary &parameters, FilterHandle filter,
-                           const RGBColorSpace *colorSpace, const FileLoc *loc,
-                           Allocator alloc);
+    static RGBFilm *Create(const ParameterDictionary &parameters, Float exposureTime,
+                           FilterHandle filter, const RGBColorSpace *colorSpace,
+                           const FileLoc *loc, Allocator alloc);
 
     PBRT_CPU_GPU
     SampledWavelengths SampleWavelengths(Float u) const;
@@ -257,9 +257,9 @@ class GBufferFilm : public FilmBase {
                 Float maxComponentValue = Infinity, bool writeFP16 = true,
                 Allocator alloc = {});
 
-    static GBufferFilm *Create(const ParameterDictionary &parameters, FilterHandle filter,
-                               const RGBColorSpace *colorSpace, const FileLoc *loc,
-                               Allocator alloc);
+    static GBufferFilm *Create(const ParameterDictionary &parameters, Float exposureTime,
+                               FilterHandle filter, const RGBColorSpace *colorSpace,
+                               const FileLoc *loc, Allocator alloc);
 
     PBRT_CPU_GPU
     SampledWavelengths SampleWavelengths(Float u) const;
