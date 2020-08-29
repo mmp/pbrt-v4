@@ -74,6 +74,16 @@ void GPUParallelFor(const char *description, int nItems, F func) {
     kernel<<<gridSize, blockSize>>>(func, nItems);
     cudaEventRecord(events.second);
 
+#if defined(PBRT_IS_WINDOWS) && defined(NDEBUG)
+    // Unified memory on Windows doesn't allow concurrent access on the CPU
+    // and the GPU.  To work around the fact that the current
+    // GPUPathIntegrator does this extensively, we'll synchronize after
+    // each kernel launch. (And will plan to rewrite things so that this
+    // isn't necessary.) This synchronization will, of course, hurt
+    // performance, but at least it won't crash...
+    CUDA_CHECK(cudaDeviceSynchronize());
+#endif // PBRT_IS_WINDOWS && NDEBUG
+
 #ifndef NDEBUG
     CUDA_CHECK(cudaDeviceSynchronize());
     LOG_VERBOSE("Post-sync %s", description);

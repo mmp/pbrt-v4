@@ -50,6 +50,11 @@ namespace pbrt {
 STAT_MEMORY_COUNTER("Memory/GPU path integrator pixel state", pathIntegratorBytes);
 
 GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) {
+#ifdef PBRT_IS_WINDOWS
+    Warning("GPU performance on Windows is currently not optimal; see "
+            "https://github.com/mmp/pbrt-v4/issues/20 for the latest status.");
+#endif
+
     // Allocate all of the data structures that represent the scene...
     std::map<std::string, MediumHandle> media = scene.CreateMedia(alloc);
 
