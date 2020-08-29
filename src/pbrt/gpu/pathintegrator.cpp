@@ -540,9 +540,8 @@ void GPURender(ParsedScene &scene) {
         // performance. (This makes it possible to use the values of things
         // like GPUPathIntegrator::haveSubsurface to conditionally launch
         // kernels according to what's in the scene...)
-
         CUDA_CHECK(cudaMemAdvise(integrator, sizeof(*integrator),
-                                 cudaMemAdviseSetReadMostly, 0));
+                                 cudaMemAdviseSetReadMostly, /* ignored argument */0));
         CUDA_CHECK(cudaMemAdvise(integrator, sizeof(*integrator),
                                  cudaMemAdviseSetPreferredLocation, deviceIndex));
 
