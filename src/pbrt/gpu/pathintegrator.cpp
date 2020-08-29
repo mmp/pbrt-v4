@@ -539,8 +539,8 @@ void GPURender(ParsedScene &scene) {
     int deviceIndex;
     CUDA_CHECK(cudaGetDevice(&deviceIndex));
     int hasConcurrentManagedAccess;
-    cudaDeviceGetAttribute(&hasConcurrentManagedAccess,
-                           cudaDevAttrConcurrentManagedAccess, deviceIndex);
+    CUDA_CHECK(cudaDeviceGetAttribute(&hasConcurrentManagedAccess,
+                                      cudaDevAttrConcurrentManagedAccess, deviceIndex));
 
     if (hasConcurrentManagedAccess) {
         // Set things up so that we can still have read from the
