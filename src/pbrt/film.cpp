@@ -466,8 +466,15 @@ Sensor *Sensor::Create(const std::string &name, const RGBColorSpace *colorSpace,
                        Float exposureTime, Float fNumber, Float ISO, Float C,
                        Float whiteBalanceTemp, const FileLoc *loc, Allocator alloc) {
     if (name == "cie1931") {
+        SquareMatrix<3> whiteBalanceMatrix;
+        if (whiteBalanceTemp != 0) {
+            Point2f targetWhite = colorSpace->w;
+            auto whiteIlluminant = Spectra::D(whiteBalanceTemp, alloc);
+            Point2f sourceWhite = SpectrumToXYZ(&whiteIlluminant).xy();
+            whiteBalanceMatrix = WhiteBalance(sourceWhite, targetWhite);
+        }
         return alloc.new_object<Sensor>(&Spectra::X(), &Spectra::Y(), &Spectra::Z(),
-                                        colorSpace, SquareMatrix<3>(), exposureTime,
+                                        colorSpace, whiteBalanceMatrix, exposureTime,
                                         fNumber, ISO, C, colorSpace->illuminant, alloc);
     } else {
         SpectrumHandle r = GetNamedSpectrum(name + "_r");
@@ -720,9 +727,14 @@ RGBFilm *RGBFilm::Create(const ParameterDictionary &parameters, FilterHandle fil
     // choice of 100 * Pi here just means that the other parameters make nice
     // "round" numbers like 1 and 100.
     Float C = parameters.GetOneFloat("c", 100.0 * Pi);
-    Float whiteBalanceTemp = parameters.GetOneFloat("whitebalance", 6500);
+    Float whiteBalanceTemp = parameters.GetOneFloat("whitebalance", 0);
 
     std::string sensorName = parameters.GetOneString("sensor", "cie1931");
+    // Pass through 0 for cie1931 if it's unspecified so that it doesn't do
+    // any white balancing. For actual sensors, 6500 is the default...
+    if (sensorName != "cie1931" && whiteBalanceTemp == 0)
+        whiteBalanceTemp = 6500;
+
     Sensor *sensor = Sensor::Create(sensorName, colorSpace, exposureTime, fNumber, ISO, C,
                                     whiteBalanceTemp, loc, alloc);
 
@@ -1028,9 +1040,14 @@ GBufferFilm *GBufferFilm::Create(const ParameterDictionary &parameters,
     // choice of 100 * Pi here just means that the other parameters make nice
     // "round" numbers like 1 and 100.
     Float C = parameters.GetOneFloat("c", 100.0 * Pi);
-    Float whiteBalanceTemp = parameters.GetOneFloat("whitebalance", 6500);
+    Float whiteBalanceTemp = parameters.GetOneFloat("whitebalance", 0);
 
     std::string sensorName = parameters.GetOneString("sensor", "cie1931");
+    // Pass through 0 for cie1931 if it's unspecified so that it doesn't do
+    // any white balancing. For actual sensors, 6500 is the default...
+    if (sensorName != "cie1931" && whiteBalanceTemp == 0)
+        whiteBalanceTemp = 6500;
+
     Sensor *sensor = Sensor::Create(sensorName, colorSpace, exposureTime, fNumber, ISO, C,
                                     whiteBalanceTemp, loc, alloc);
 

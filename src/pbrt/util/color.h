@@ -547,7 +547,7 @@ const SquareMatrix<3> XYZFromLMS( 0.986993,   -0.147054,  0.159963,
                                  -0.00852866,  0.0400428, 0.968487);
 // clang-format on
 
-inline PBRT_CPU_GPU SquareMatrix<3> WhiteBalance(Point2f srcWhite, Point2f targetWhite) {
+inline SquareMatrix<3> WhiteBalance(Point2f srcWhite, Point2f targetWhite) {
     XYZ srcXYZ = XYZ::FromxyY(srcWhite), dstXYZ = XYZ::FromxyY(targetWhite);
 
     auto srcLMS = LMSFromXYZ * srcXYZ, dstLMS = LMSFromXYZ * dstXYZ;

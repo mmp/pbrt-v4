@@ -1682,6 +1682,8 @@ int whitebalance(int argc, char *argv[]) {
         }
         srcWhite = SpectrumToXYZ(illum).xy();
     } else if (temperature > 0) {
+        // Sensor::Create uses Spectra::D() rather than BlackbodySpectrum
+        // here---make consistent?
         BlackbodySpectrum bb(temperature);
         srcWhite = SpectrumToXYZ(&bb).xy();
     } else

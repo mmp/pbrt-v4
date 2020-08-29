@@ -47,7 +47,7 @@ class Sensor {
                           Float whiteBalanceTemp, const FileLoc *loc, Allocator alloc);
 
     static Sensor *CreateDefault() {
-        return Create("cie1931", RGBColorSpace::sRGB, 1.0, 1.0, 100, 100.0 * Pi, 6500,
+        return Create("cie1931", RGBColorSpace::sRGB, 1.0, 1.0, 100, 100.0 * Pi, 0.f,
                       nullptr, Allocator());
     }
 
