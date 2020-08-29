@@ -10,8 +10,21 @@
 #include <pbrt/gpu/launch.h>
 #include <pbrt/util/pstd.h>
 
-#include <cuda/atomic>
 #include <utility>
+
+#ifdef PBRT_IS_WINDOWS
+#if (__CUDA_ARCH__ >= 700)
+#define PBRT_HAVE_CUDA_ATOMICS
+#endif
+#else
+#if (__CUDA_ARCH__ >= 600)
+#define PBRT_HAVE_CUDA_ATOMICS
+#endif
+#endif // PBRT_IS_WINDOWS
+
+#ifdef PBRT_HAVE_CUDA_ATOMICS
+#include <cuda/atomic>
+#endif // PBRT_HAVE_CUDA_ATOMICS
 
 namespace pbrt {
 
@@ -21,20 +34,51 @@ class WorkQueue : public SOA<WorkItem> {
     WorkQueue(int n, Allocator alloc) : SOA<WorkItem>(n, alloc) {}
 
     PBRT_CPU_GPU
-    int Size() const { return size.load(cuda::std::memory_order_relaxed); }
+    int Size() const {
+#ifdef PBRT_HAVE_CUDA_ATOMICS
+        return size.load(cuda::std::memory_order_relaxed);
+#else
+        return size;
+#endif
+    }
 
     PBRT_CPU_GPU
-    void Reset() { size.store(0, cuda::std::memory_order_relaxed); }
+    void Reset() {
+#ifdef PBRT_HAVE_CUDA_ATOMICS
+        size.store(0, cuda::std::memory_order_relaxed);
+#else
+        size = 0;
+#endif
+    }
 
     PBRT_CPU_GPU
     int Push(WorkItem w) {
-        int index = size.fetch_add(1, cuda::std::memory_order_relaxed);
+        int index = AllocateEntry();
         (*this)[index] = w;
         return index;
     }
 
   protected:
+    PBRT_CPU_GPU
+    int AllocateEntry() {
+#ifdef PBRT_HAVE_CUDA_ATOMICS
+        return size.fetch_add(1, cuda::std::memory_order_relaxed);
+#else
+#ifdef PBRT_IS_GPU_CODE
+        return atomicAdd(&size, 1);
+#else
+        assert(!"this shouldn't be called");
+        return 0;
+#endif
+#endif
+    }
+
+  private:
+#ifdef PBRT_HAVE_CUDA_ATOMICS
     cuda::atomic<int, cuda::thread_scope_device> size{0};
+#else
+    int size = 0;
+#endif
 };
 
 template <typename F, typename WorkItem>
@@ -97,7 +141,6 @@ class MultiWorkQueueHelper<WorkItem, T, Ts...>
     }
 
   private:
-    cuda::atomic<int, cuda::thread_scope_device> size{0};
     WorkQueue<WorkItem<T>> q;
 };
 

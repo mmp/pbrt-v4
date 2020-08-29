@@ -16,8 +16,6 @@
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/soa.h>
 
-#include <cuda/std/atomic>
-
 namespace pbrt {
 
 struct RaySamples {
@@ -307,7 +305,7 @@ class RayQueue : public WorkQueue<RayWorkItem> {
 
     PBRT_CPU_GPU
     int PushCameraRay(const Ray &ray, const SampledWavelengths &lambda, int pixelIndex) {
-        int index = size.fetch_add(1, cuda::std::memory_order_relaxed);
+        int index = AllocateEntry();
         DCHECK(!ray.HasNaN());
         this->ray[index] = ray;
         this->pixelIndex[index] = pixelIndex;
@@ -327,7 +325,7 @@ class RayQueue : public WorkQueue<RayWorkItem> {
                      const SampledSpectrum &pdfUni, const SampledSpectrum &pdfNEE,
                      const SampledWavelengths &lambda, Float etaScale,
                      bool isSpecularBounce, bool anyNonSpecularBounces, int pixelIndex) {
-        int index = size.fetch_add(1, cuda::std::memory_order_relaxed);
+        int index = AllocateEntry();
         DCHECK(!ray.HasNaN());
         this->ray[index] = ray;
         this->pixelIndex[index] = pixelIndex;
@@ -368,7 +366,7 @@ public:
              Point3f p, Vector3f wo, Normal3f n, Normal3f ns,
              Vector3f dpdus, Point2f uv, MediumInterface mediumInterface,
              int rayIndex) {
-        int index = size.fetch_add(1, cuda::std::memory_order_relaxed);
+        int index = AllocateEntry();
         this->material[index] = material;
         this->lambda[index] = lambda;
         this->beta[index] = beta;
@@ -393,7 +391,7 @@ class SubsurfaceScatterQueue : public WorkQueue<SubsurfaceScatterWorkItem> {
     int Push(Point3f p0, Point3f p1, MaterialHandle material, TabulatedBSSRDF bssrdf,
              SampledSpectrum beta, SampledSpectrum pdfUni,
              MediumInterface mediumInterface, int rayIndex) {
-        int index = size.fetch_add(1, cuda::std::memory_order_relaxed);
+        int index = AllocateEntry();
         this->p0[index] = p0;
         this->p1[index] = p1;
         this->material[index] = material;
@@ -417,7 +415,7 @@ class MediumSampleQueue : public WorkQueue<MediumSampleWorkItem> {
              SampledSpectrum pdfUni, SampledSpectrum pdfNEE, int rayIndex, int pixelIndex,
              Point3fi piPrev, Normal3f nPrev, Normal3f nsPrev, int isSpecularBounce,
              int anyNonSpecularBounces, Float etaScale) {
-        int index = size.fetch_add(1, cuda::std::memory_order_relaxed);
+        int index = AllocateEntry();
         this->ray[index] = ray;
         this->tMax[index] = tMax;
         this->lambda[index] = lambda;
