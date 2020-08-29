@@ -645,8 +645,11 @@ add_library (pbrt_lib STATIC
   ${CMAKE_CURRENT_BINARY_DIR}/rgbspectrum_aces.cpp
   ${PBRT_SOA_GENERATED}
   ${PBRT_SOURCE}
+  ${PBRT_SOURCE_HEADERS}
   ${PBRT_UTIL_SOURCE}
+  ${PBRT_UTIL_SOURCE_HEADERS}
   ${PBRT_GPU_SOURCE}
+  ${PBRT_GPU_SOURCE_HEADERS}
 
   src/ext/gtest/gtest-all.cc
   src/ext/lodepng/lodepng.cpp
