@@ -101,7 +101,11 @@ if (CMAKE_CUDA_COMPILER)
         set (CMAKE_CUDA_STANDARD 17)
     endif ()
 
-    message (STATUS "Found CUDA: ${CMAKE_CUDA_COMPILER_VERSION}")
+    message (STATUS "Found CUDA: ${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR}")
+    if (CUDA_VERSION_MAJOR LESS 11)
+      message(SEND_ERROR "pbrt-v4 requires CUDA version 11.0 or later")
+    endif ()
+
     if ("${PBRT_OPTIX7_PATH}" STREQUAL "")
         message (WARNING "Found CUDA but PBRT_OPTIX7_PATH is not set. Disabling GPU compilation.")
     else ()
