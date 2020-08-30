@@ -59,6 +59,13 @@ void GPUInit() {
 #endif
     CUDA_CHECK(cudaSetDevice(device));
 
+    int hasUnifiedAddressing;
+    CUDA_CHECK(cudaDeviceGetAttribute(&hasUnifiedAddressing, cudaDevAttrUnifiedAddressing,
+                                      device));
+    if (!hasUnifiedAddressing)
+        LOG_FATAL("The selected GPU device (%d) does not support unified addressing.",
+                  device);
+
     CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 8192));
     size_t stackSize;
     CUDA_CHECK(cudaDeviceGetLimit(&stackSize, cudaLimitStackSize));
