@@ -56,8 +56,8 @@ struct TextureEvalContext {
     Point3f p;
     Vector3f dpdx, dpdy;
     Point2f uv;
-    Float dudx, dudy, dvdx, dvdy;
-    int faceIndex;
+    Float dudx = 0, dudy = 0, dvdx = 0, dvdy = 0;
+    int faceIndex = 0;
 };
 
 // UVMapping2D Definition
