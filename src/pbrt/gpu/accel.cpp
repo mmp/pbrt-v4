@@ -1094,6 +1094,12 @@ void GPUAccel::IntersectClosest(
 #ifdef NVTX
         nvtxRangePop();
 #endif
+
+#if defined(PBRT_IS_WINDOWS) && defined(NDEBUG)
+        // Unified memory on Windows workaround (temporary).
+        CUDA_CHECK(cudaDeviceSynchronize());
+#endif // PBRT_IS_WINDOWS && NDEBUG
+
 #ifndef NDEBUG
         CUDA_CHECK(cudaDeviceSynchronize());
         LOG_VERBOSE("Post-sync triangle intersect closest");
@@ -1130,6 +1136,12 @@ void GPUAccel::IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue) cons
 #ifdef NVTX
         nvtxRangePop();
 #endif
+
+#if defined(PBRT_IS_WINDOWS) && defined(NDEBUG)
+        // Unified memory on Windows workaround (temporary).
+        CUDA_CHECK(cudaDeviceSynchronize());
+#endif // PBRT_IS_WINDOWS && NDEBUG
+
 #ifndef NDEBUG
         CUDA_CHECK(cudaDeviceSynchronize());
         LOG_VERBOSE("Post-sync intersect shadow");
@@ -1166,6 +1178,12 @@ void GPUAccel::IntersectShadowTr(int maxRays, ShadowRayQueue *shadowRayQueue) co
 #ifdef NVTX
         nvtxRangePop();
 #endif
+
+#if defined(PBRT_IS_WINDOWS) && defined(NDEBUG)
+        // Unified memory on Windows workaround (temporary).
+        CUDA_CHECK(cudaDeviceSynchronize());
+#endif // PBRT_IS_WINDOWS && NDEBUG
+
 #ifndef NDEBUG
         CUDA_CHECK(cudaDeviceSynchronize());
         LOG_VERBOSE("Post-sync intersect shadow Tr");
@@ -1204,6 +1222,12 @@ void GPUAccel::IntersectOneRandom(int maxRays,
 #ifdef NVTX
         nvtxRangePop();
 #endif
+
+#if defined(PBRT_IS_WINDOWS) && defined(NDEBUG)
+        // Unified memory on Windows workaround (temporary).
+        CUDA_CHECK(cudaDeviceSynchronize());
+#endif // PBRT_IS_WINDOWS && NDEBUG
+
 #ifndef NDEBUG
         CUDA_CHECK(cudaDeviceSynchronize());
         LOG_VERBOSE("Post-sync triangle intersect random");
