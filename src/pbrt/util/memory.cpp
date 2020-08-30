@@ -89,8 +89,8 @@ void CUDATrackedMemoryResource::do_deallocate(void *p, size_t size, size_t align
         DCHECK(iter != allocations.end());
         allocations.erase(iter);
         bytesAllocated -= size;
-    } else
-        LOG_VERBOSE("Ignoring dealloc of %d bytes", size);
+    }
+    // Note: no deallocation is done if it is in a slab...
 }
 
 void CUDATrackedMemoryResource::PrefetchToGPU() const {
