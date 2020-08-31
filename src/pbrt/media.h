@@ -253,7 +253,7 @@ class GeneralMedium {
                     Float uEnd = InvertExponentialSample(t1 - t0, sigma_maj[0]);
                     if (u >= uEnd) {
                         u = std::min((u - uEnd) / (1 - uEnd), OneMinusEpsilon);
-                        goto advance;
+                        break;
                     }
 
                     // Sample _t_ for scattering event and check validity
@@ -283,7 +283,6 @@ class GeneralMedium {
                 }
             }
 
-        advance:
             // Advance to next voxel in maximum density grid
             if (nextCrossingT[stepAxis] > tMax)
                 return;
