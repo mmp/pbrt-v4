@@ -150,7 +150,7 @@ if (CMAKE_CUDA_COMPILER)
         if (CMAKE_BUILD_TYPE MATCHES Debug)
           set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --use_fast_math -G -g")
         else()
-          set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --use_fast_math -lineinfo --maxrregcount 128")
+          set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --use_fast_math -lineinfo -maxrregcount 128")
         endif ()
 
         if (NOT ${CUDA_RETURN_CODE} EQUAL 0)
