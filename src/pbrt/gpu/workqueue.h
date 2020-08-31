@@ -83,7 +83,7 @@ class WorkQueue : public SOA<WorkItem> {
 
 template <typename F, typename WorkItem>
 void ForAllQueued(const char *desc, WorkQueue<WorkItem> *q, int maxQueued, F func) {
-    GPUParallelFor(desc, maxQueued, [=] PBRT_GPU(int index) {
+    GPUParallelFor(desc, maxQueued, [=] PBRT_GPU(int index) mutable {
         if (index >= q->Size())
             return;
         func((*q)[index], index);

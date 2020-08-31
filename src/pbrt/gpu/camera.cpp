@@ -17,10 +17,13 @@ namespace pbrt {
 
 template <typename Sampler>
 void GPUPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
-    Vector2i resolution = film.PixelBounds().Diagonal();
-    Bounds2i pixelBounds = film.PixelBounds();
+    RayQueue *rayQueue = CurrentRayQueue(0);
 
-    GPUParallelFor("Generate Camera rays", maxQueueSize, [=] PBRT_GPU(int pixelIndex) {
+    GPUParallelFor("Generate Camera rays", maxQueueSize,
+    PBRT_GPU_LAMBDA(int pixelIndex) {
+        Vector2i resolution = film.PixelBounds().Diagonal();
+        Bounds2i pixelBounds = film.PixelBounds();
+
         Point2i pPixel(pixelBounds.pMin.x + int(pixelIndex) % resolution.x,
                        pixelBounds.pMin.y + y0 + int(pixelIndex) / resolution.x);
         pixelSampleState.pPixel[pixelIndex] = pPixel;
@@ -33,8 +36,8 @@ void GPUPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
             return;
 
         // Initialize the Sampler for the current pixel and sample.
-        Sampler sampler = *this->sampler.Cast<Sampler>();
-        sampler.StartPixelSample(pPixel, sampleIndex, 0);
+        Sampler pixelSampler = *sampler.Cast<Sampler>();
+        pixelSampler.StartPixelSample(pPixel, sampleIndex, 0);
 
         // Sample wavelengths for the ray path for the pixel sample.
         // Use a blue noise pattern rather than the Sampler.
@@ -46,7 +49,7 @@ void GPUPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
         SampledWavelengths lambda = film.SampleWavelengths(lu);
 
         // Generate samples for the camera ray and the ray itself.
-        CameraSample cameraSample = GetCameraSample(sampler, pPixel, filter);
+        CameraSample cameraSample = GetCameraSample(pixelSampler, pPixel, filter);
         CameraRay cameraRay = camera.GenerateRay(cameraSample, lambda);
 
         // Initialize the rest of the pixel sample's state.
@@ -61,7 +64,7 @@ void GPUPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
             // Enqueue the camera ray if the camera gave us one with
             // non-zero weight. (RealisticCamera doesn't always return
             // a ray, e.g. in the case of vignetting...)
-            rayQueues[0]->PushCameraRay(cameraRay.ray, lambda, pixelIndex);
+            rayQueue->PushCameraRay(cameraRay.ray, lambda, pixelIndex);
     });
 }
 

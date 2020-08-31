@@ -51,11 +51,6 @@ namespace pbrt {
 STAT_MEMORY_COUNTER("Memory/GPU path integrator pixel state", pathIntegratorBytes);
 
 GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) {
-#ifdef PBRT_IS_WINDOWS
-    Warning("GPU performance on Windows is currently not optimal; see "
-            "https://github.com/mmp/pbrt-v4/issues/20 for the latest status.");
-#endif
-
     // Allocate all of the data structures that represent the scene...
     std::map<std::string, MediumHandle> media = scene.CreateMedia(alloc);
 
@@ -251,23 +246,25 @@ void GPUPathIntegrator::TraceShadowRays(int depth) {
         accel->IntersectShadow(maxQueueSize, shadowRayQueue);
 
     // Add contribution if light was visible
-    ForAllQueued("Incorporate shadow ray contribution", shadowRayQueue, maxQueueSize,
-                 [=] PBRT_GPU(const ShadowRayWorkItem sr, int index) {
-                     if (!sr.Ld)
-                         return;
+    ForAllQueued(
+        "Incorporate shadow ray contribution", shadowRayQueue, maxQueueSize,
+        PBRT_GPU_LAMBDA(const ShadowRayWorkItem sr, int index) {
+            if (!sr.Ld)
+                return;
 
-                     SampledSpectrum Lpixel = pixelSampleState.L[sr.pixelIndex];
+            SampledSpectrum Lpixel = pixelSampleState.L[sr.pixelIndex];
 
-                     PBRT_DBG("Adding shadow ray Ld %f %f %f %f at pixel index %d \n",
-                         sr.Ld[0], sr.Ld[1], sr.Ld[2], sr.Ld[3], sr.pixelIndex);
+            PBRT_DBG("Adding shadow ray Ld %f %f %f %f at pixel index %d \n",
+                     sr.Ld[0], sr.Ld[1], sr.Ld[2], sr.Ld[3], sr.pixelIndex);
 
-                     pixelSampleState.L[sr.pixelIndex] = Lpixel + sr.Ld;
-                 });
+            pixelSampleState.L[sr.pixelIndex] = Lpixel + sr.Ld;
+        });
 
-    GPUDo("Reset shadowRayQueue", [=] PBRT_GPU() {
-        stats->shadowRays[depth] += shadowRayQueue->Size();
-        shadowRayQueue->Reset();
-    });
+    GPUDo("Reset shadowRayQueue",
+          PBRT_GPU_LAMBDA() {
+              stats->shadowRays[depth] += shadowRayQueue->Size();
+              shadowRayQueue->Reset();
+          });
 }
 
 void GPUPathIntegrator::Render(ImageMetadata *metadata) {
@@ -359,51 +356,63 @@ void GPUPathIntegrator::Render(ImageMetadata *metadata) {
         LOG_VERBOSE("Starting to submit work for sample %d", sampleIndex);
 
         for (int y0 = 0; y0 < resolution.y; y0 += scanlinesPerPass) {
-            GPUDo("Reset ray queue", [=] PBRT_GPU() {
-                PBRT_DBG("Starting scanlines at y0 = %d, sample %d / %d\n", y0, sampleIndex,
-                    spp);
-                rayQueues[0]->Reset();
-            });
+            // We have to do the array indexing on the CPU...
+            // TODO: clean this up.
+            RayQueue *cameraRayQueue = CurrentRayQueue(0);
+            GPUDo("Reset ray queue",
+                  PBRT_GPU_LAMBDA() {
+                      PBRT_DBG("Starting scanlines at y0 = %d, sample %d / %d\n", y0, sampleIndex,
+                               spp);
+                      cameraRayQueue->Reset();
+                  });
 
             GenerateCameraRays(y0, sampleIndex);
 
             GPUDo("Update camera ray stats",
-                  [=] PBRT_GPU() { stats->cameraRays += rayQueues[0]->Size(); });
+                  PBRT_GPU_LAMBDA() { stats->cameraRays += cameraRayQueue->Size(); });
 
             for (int depth = 0; true; ++depth) {
                 GenerateRaySamples(depth, sampleIndex);
 
-                GPUDo("Reset queues before tracing rays", [=] PBRT_GPU() {
-                    hitAreaLightQueue->Reset();
-                    if (escapedRayQueue)
-                        escapedRayQueue->Reset();
+                // Same issue and same TODO as above with not indexing into
+                // the queues in the kernel.
+                RayQueue *resetQueue = NextRayQueue(depth);
+                GPUDo("Reset queues before tracing rays",
+                      PBRT_GPU_LAMBDA() {
+                          hitAreaLightQueue->Reset();
+                          if (escapedRayQueue)
+                              escapedRayQueue->Reset();
 
-                    basicEvalMaterialQueue->Reset();
-                    universalEvalMaterialQueue->Reset();
+                          basicEvalMaterialQueue->Reset();
+                          universalEvalMaterialQueue->Reset();
 
-                    if (bssrdfEvalQueue)
-                        bssrdfEvalQueue->Reset();
-                    if (subsurfaceScatterQueue)
-                        subsurfaceScatterQueue->Reset();
+                          if (bssrdfEvalQueue)
+                              bssrdfEvalQueue->Reset();
+                          if (subsurfaceScatterQueue)
+                              subsurfaceScatterQueue->Reset();
 
-                    mediumTransitionQueue->Reset();
-                    if (mediumSampleQueue)
-                        mediumSampleQueue->Reset();
-                    if (mediumScatterQueue)
-                        mediumScatterQueue->Reset();
+                          mediumTransitionQueue->Reset();
+                          if (mediumSampleQueue)
+                              mediumSampleQueue->Reset();
+                          if (mediumScatterQueue)
+                              mediumScatterQueue->Reset();
 
-                    rayQueues[(depth + 1) & 1]->Reset();
-                });
+                          resetQueue->Reset();
+                      });
 
                 accel->IntersectClosest(
                     maxQueueSize, escapedRayQueue, hitAreaLightQueue,
                     basicEvalMaterialQueue, universalEvalMaterialQueue,
-                    mediumTransitionQueue, mediumSampleQueue, rayQueues[depth & 1]);
+                    mediumTransitionQueue, mediumSampleQueue, CurrentRayQueue(depth));
 
-                if (depth > 0)
-                    GPUDo("Update indirect ray stats", [=] PBRT_GPU() {
-                        stats->indirectRays[depth] += rayQueues[depth & 1]->Size();
-                    });
+                if (depth > 0) {
+                    // As above, with the indexing...
+                    RayQueue *statsQueue = CurrentRayQueue(depth);
+                    GPUDo("Update indirect ray stats",
+                          PBRT_GPU_LAMBDA() {
+                              stats->indirectRays[depth] += statsQueue->Size();
+                          });
+                }
 
                 if (haveMedia)
                     SampleMediumInteraction(depth);
@@ -432,7 +441,7 @@ void GPUPathIntegrator::Render(ImageMetadata *metadata) {
 
             if (!Options->displayServer.empty())
                 GPUParallelFor("Update Display RGB Buffer", maxQueueSize,
-                               [=] PBRT_GPU(int pixelIndex) {
+                               PBRT_GPU_LAMBDA(int pixelIndex) {
                                    Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
                                    if (!InsideExclusive(pPixel, film.PixelBounds()))
                                        return;
@@ -456,13 +465,17 @@ void GPUPathIntegrator::Render(ImageMetadata *metadata) {
         copyThread.join();
     }
 
+    // Another synchronization to make sure no kernels are running on the
+    // GPU so that we can safely access unified memory from the CPU.
+    CUDA_CHECK(cudaDeviceSynchronize());
+
     metadata->samplesPerPixel = sampler.SamplesPerPixel();
     camera.InitMetadata(metadata);
 }
 
 void GPUPathIntegrator::HandleEscapedRays(int depth) {
     ForAllQueued("Handle escaped rays", escapedRayQueue, maxQueueSize,
-                 [=] PBRT_GPU(const EscapedRayWorkItem er, int index) {
+                 PBRT_GPU_LAMBDA(const EscapedRayWorkItem er, int index) {
                      Ray ray(er.rayo, er.rayd);
                      SampledSpectrum Le = envLight.Le(ray, er.lambda);
                      if (!Le)
@@ -507,7 +520,7 @@ void GPUPathIntegrator::HandleEscapedRays(int depth) {
 void GPUPathIntegrator::HandleRayFoundEmission(int depth) {
     ForAllQueued(
         "Handle emitters hit by indirect rays", hitAreaLightQueue, maxQueueSize,
-        [=] PBRT_GPU(const HitAreaLightWorkItem he, int index) {
+        PBRT_GPU_LAMBDA(const HitAreaLightWorkItem he, int index) {
             LightHandle areaLight = he.areaLight;
             SampledSpectrum Le = areaLight.L(he.p, he.n, he.uv, he.wo, he.lambda);
             if (!Le)
@@ -546,8 +559,21 @@ void GPUPathIntegrator::HandleRayFoundEmission(int depth) {
 }
 
 void GPURender(ParsedScene &scene) {
+#ifdef PBRT_IS_WINDOWS
+    // NOTE: on Windows, where only basic unified memory is upported, the
+    // GPUPathIntegrator itself is *not* allocated using the unified memory
+    // allocator so that the CPU can access the values of its members
+    // (e.g. maxDepth) concurrently while the GPU is rendering.  In turn,
+    // the lambda capture for GPU kernels has to capture *this by value (see
+    // the definition of PBRT_GPU_LAMBDA in gpulaunch.h.).
+    GPUPathIntegrator *integrator = new GPUPathIntegrator(gpuMemoryAllocator, scene);
+#else
+    // With more capable unified memory, the GPUPathIntegrator can live in
+    // unified memory and some cudaMemAdvise calls, to come shortly, let us
+    // have fast read-only access to it on the CPU.
     GPUPathIntegrator *integrator =
         gpuMemoryAllocator.new_object<GPUPathIntegrator>(gpuMemoryAllocator, scene);
+#endif
 
     int deviceIndex;
     CUDA_CHECK(cudaGetDevice(&deviceIndex));
@@ -555,6 +581,9 @@ void GPURender(ParsedScene &scene) {
     CUDA_CHECK(cudaDeviceGetAttribute(&hasConcurrentManagedAccess,
                                       cudaDevAttrConcurrentManagedAccess, deviceIndex));
 
+    // Copy all of the scene data structures over to GPU memory.  This
+    // ensures that there isn't a big performance hitch for the first batch
+    // of rays as that stuff is copied over on demand.
     if (hasConcurrentManagedAccess) {
         // Set things up so that we can still have read from the
         // GPUPathIntegrator struct on the CPU without hurting
@@ -573,6 +602,10 @@ void GPURender(ParsedScene &scene) {
             dynamic_cast<CUDATrackedMemoryResource *>(gpuMemoryAllocator.resource());
         CHECK(mr != nullptr);
         mr->PrefetchToGPU();
+    } else {
+        // TODO: on systems with basic unified memory, just launching a
+        // kernel should cause everything to be copied over. Is an empty
+        // kernel sufficient?
     }
 
     ///////////////////////////////////////////////////////////////////////////

@@ -11,8 +11,9 @@
 namespace pbrt {
 
 void GPUPathIntegrator::UpdateFilm() {
-    GPUParallelFor("Update Film", maxQueueSize, [=] PBRT_GPU(int pixelIndex) {
-        Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
+    GPUParallelFor("Update Film", maxQueueSize,
+    PBRT_GPU_LAMBDA(int pixelIndex) {
+            Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
         if (!InsideExclusive(pPixel, film.PixelBounds()))
             return;
 

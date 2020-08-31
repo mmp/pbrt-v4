@@ -46,10 +46,12 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
     std::string name = StringPrintf(
         "%s + BxDF Eval (%s tex)", Material::Name(),
         std::is_same_v<TextureEvaluator, BasicTextureEvaluator> ? "Basic" : "Universal");
+    RayQueue *rayQueue = CurrentRayQueue(depth);
+    RayQueue *nextRayQueue = NextRayQueue(depth);
 
     ForAllQueued(
         name.c_str(), evalQueue->Get<Material>(), maxQueueSize,
-        [=] PBRT_GPU(const MaterialEvalWorkItem<Material> me, int index) {
+        PBRT_GPU_LAMBDA(const MaterialEvalWorkItem<Material> me, int index) {
             const Material *material = me.material;
 
             Normal3f ns = me.ns;
@@ -107,7 +109,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
             }
 
             Vector3f wo = me.wo;
-            RaySamples raySamples = rayQueues[depth & 1]->raySamples[me.rayIndex];
+            RaySamples raySamples = rayQueue->raySamples[me.rayIndex];
 
             // Sample indirect lighting
             BSDFSample bsdfSample =
@@ -170,7 +172,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                             !bsdfSample.IsSpecular() || me.anyNonSpecularBounces;
 
                         // Spawn indriect ray.
-                        rayQueues[(depth + 1) & 1]->PushIndirect(
+                        nextRayQueue->PushIndirect(
                             ray, me.pi, me.n, ns, beta, pdfUni, pdfNEE, lambda, etaScale,
                             bsdfSample.IsSpecular(), anyNonSpecularBounces,
                             me.pixelIndex);

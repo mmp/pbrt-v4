@@ -341,16 +341,27 @@ extern "C" __global__ void __raygen__shadow() {
         return;
 
     ShadowRayWorkItem sr = (*params.shadowRayQueue)[index];
+    PBRT_DBG("Tracing shadow ray index %d o %f %f %f d %f %f %f\n",
+             index, sr.ray.o.x, sr.ray.o.y, sr.ray.o.z,
+             sr.ray.d.x, sr.ray.d.y, sr.ray.d.z);
 
     uint32_t missed = 0;
     Trace(params.traversable, sr.ray, 1e-5f /* tMin */, sr.tMax, OPTIX_RAY_FLAG_NONE,
           missed);
 
     SampledSpectrum Ld;
-    if (missed)
+    if (missed) {
         Ld = sr.Ld / (sr.pdfUni + sr.pdfNEE).Average();
-    else
+        PBRT_DBG("Unoccluded shadow ray. Final Ld %f %f %f %f "
+                 "(sr.Ld %f %f %f %f pdfUni %f %f %f %f pdfNEE %f %f %f %f)\n",
+                 Ld[0], Ld[1], Ld[2], Ld[3],
+                 sr.Ld[0], sr.Ld[1], sr.Ld[2], sr.Ld[3],
+                 sr.pdfUni[0], sr.pdfUni[1], sr.pdfUni[2], sr.pdfUni[3],
+                 sr.pdfNEE[0], sr.pdfNEE[1], sr.pdfNEE[2], sr.pdfNEE[3]);
+    } else {
+        PBRT_DBG("Shadow ray was occluded\n");
         Ld = SampledSpectrum(0.);
+    }
 
     params.shadowRayQueue->Ld[index] = Ld;
 }

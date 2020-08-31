@@ -65,6 +65,9 @@ class GPUPathIntegrator {
 
     void UpdateFilm();
 
+    RayQueue *CurrentRayQueue(int depth) { return rayQueues[depth & 1]; }
+    RayQueue *NextRayQueue(int depth) { return rayQueues[(depth + 1) & 1]; }
+
     FilterHandle filter;
     FilmHandle film;
     SamplerHandle sampler;

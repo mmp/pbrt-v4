@@ -37,7 +37,7 @@ static inline void rescale(SampledSpectrum &beta, SampledSpectrum &pdfLight,
 void GPUPathIntegrator::SampleMediumInteraction(int depth) {
     ForAllQueued(
         "Sample medium interaction", mediumSampleQueue, maxQueueSize,
-        [=] PBRT_GPU(MediumSampleWorkItem ms, int index) {
+        PBRT_GPU_LAMBDA(MediumSampleWorkItem ms, int index) {
             Ray ray = ms.ray;
             Float tMax = ms.tMax;
 
@@ -227,12 +227,15 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
     if (depth == maxDepth)
         return;
 
+    RayQueue *currentRayQueue = CurrentRayQueue(depth);
+    RayQueue *nextRayQueue = NextRayQueue(depth);
+
     using PhaseFunction = HGPhaseFunction;
     std::string desc = std::string("Sample direct/indirect - Henyey Greenstein");
     ForAllQueued(
         desc.c_str(), mediumScatterQueue, maxQueueSize,
-        [=] PBRT_GPU(MediumScatterWorkItem ms, int index) {
-            RaySamples raySamples = rayQueues[depth & 1]->raySamples[ms.rayIndex];
+        PBRT_GPU_LAMBDA(MediumScatterWorkItem ms, int index) {
+            RaySamples raySamples = currentRayQueue->raySamples[ms.rayIndex];
             Float time = 0;  // TODO: FIXME
             Vector3f wo = ms.wo;
 
@@ -308,7 +311,7 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
             bool anyNonSpecularBounces = true;
 
             // Spawn indirect ray.
-            rayQueues[(depth + 1) & 1]->PushIndirect(
+            nextRayQueue->PushIndirect(
                 ray, Point3fi(ms.p), Normal3f(0, 0, 0), Normal3f(0, 0, 0), beta, pdfUni,
                 pdfNEE, ms.lambda, ms.etaScale, isSpecularBounce, anyNonSpecularBounces,
                 ms.pixelIndex);
@@ -318,15 +321,17 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
 }
 
 void GPUPathIntegrator::HandleMediumTransitions(int depth) {
+    RayQueue *rayQueue = NextRayQueue(depth);
+
     ForAllQueued(
         "Handle medium transitions", mediumTransitionQueue, maxQueueSize,
-        [=] PBRT_GPU(MediumTransitionWorkItem mt, int index) {
+        PBRT_GPU_LAMBDA(MediumTransitionWorkItem mt, int index) {
             // Have to do this here, later, since we can't be writing into
             // the other ray queue in optix closest hit.  (Wait--really?
             // Why not? Basically boils down to current indirect enqueue (and other
             // places?))
             // TODO: figure this out...
-            rayQueues[(depth + 1) & 1]->PushIndirect(
+            rayQueue->PushIndirect(
                 mt.ray, mt.piPrev, mt.nPrev, mt.nsPrev, mt.beta, mt.pdfUni, mt.pdfNEE,
                 mt.lambda, mt.etaScale, mt.isSpecularBounce, mt.anyNonSpecularBounces,
                 mt.pixelIndex);

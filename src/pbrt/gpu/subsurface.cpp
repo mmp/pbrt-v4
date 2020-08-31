@@ -17,9 +17,12 @@
 namespace pbrt {
 
 void GPUPathIntegrator::SampleSubsurface(int depth) {
+    RayQueue *rayQueue = CurrentRayQueue(depth);
+    RayQueue *nextRayQueue = NextRayQueue(depth);
+
     ForAllQueued(
         "Get BSSRDF and enqueue probe ray", bssrdfEvalQueue, maxQueueSize,
-        [=] PBRT_GPU(const GetBSSRDFAndProbeRayWorkItem be, int index) {
+        PBRT_GPU_LAMBDA(const GetBSSRDFAndProbeRayWorkItem be, int index) {
             using BSSRDF = typename SubsurfaceMaterial::BSSRDF;
             BSSRDF bssrdf;
             const SubsurfaceMaterial *material = be.material.Cast<SubsurfaceMaterial>();
@@ -27,7 +30,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
             SampledWavelengths lambda = be.lambda;
             material->GetBSSRDF(BasicTextureEvaluator(), ctx, lambda, &bssrdf);
 
-            RaySamples raySamples = rayQueues[depth & 1]->raySamples[be.rayIndex];
+            RaySamples raySamples = rayQueue->raySamples[be.rayIndex];
             Float uc = raySamples.subsurface.uc;
             Point2f u = raySamples.subsurface.u;
 
@@ -42,7 +45,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
 
     ForAllQueued(
         "Handle out-scattering after SSS", subsurfaceScatterQueue, maxQueueSize,
-        [=] PBRT_GPU(SubsurfaceScatterWorkItem s, int index) {
+        PBRT_GPU_LAMBDA(SubsurfaceScatterWorkItem s, int index) {
             if (s.weight == 0)
                 return;
 
@@ -58,9 +61,9 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                 return;
 
             SampledSpectrum betap = s.beta * bssrdfSample.S * s.weight / bssrdfSample.pdf;
-            SampledWavelengths lambda = rayQueues[depth & 1]->lambda[s.rayIndex];
-            Float etaScale = rayQueues[depth & 1]->etaScale[s.rayIndex];
-            RaySamples raySamples = rayQueues[depth & 1]->raySamples[s.rayIndex];
+            SampledWavelengths lambda = rayQueue->lambda[s.rayIndex];
+            Float etaScale = rayQueue->etaScale[s.rayIndex];
+            RaySamples raySamples = rayQueue->raySamples[s.rayIndex];
             Vector3f wo = bssrdfSample.wo;
             BSDF &bsdf = bssrdfSample.bsdf;
             Float time = 0;  // TODO: pipe through
@@ -117,9 +120,9 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                         // || rather than | is intentional, to avoid the read if
                         // possible...
                         bool anyNonSpecularBounces = true;
-                        int pixelIndex = rayQueues[depth & 1]->pixelIndex[s.rayIndex];
+                        int pixelIndex = rayQueue->pixelIndex[s.rayIndex];
 
-                        rayQueues[(depth + 1) & 1]->PushIndirect(
+                        nextRayQueue->PushIndirect(
                             ray, intr.pi, intr.n, intr.ns, beta, pdfUni, pdfNEE, lambda,
                             etaScale, bsdfSample.IsSpecular(), anyNonSpecularBounces,
                             pixelIndex);
@@ -186,7 +189,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                     ray.medium = Dot(ray.d, intr.n) > 0 ? s.mediumInterface.outside
                                                         : s.mediumInterface.inside;
 
-                int pixelIndex = rayQueues[depth & 1]->pixelIndex[s.rayIndex];
+                int pixelIndex = rayQueue->pixelIndex[s.rayIndex];
                 shadowRayQueue->Push(ray, 1 - ShadowEpsilon, lambda, Ld, pdfUni, pdfNEE,
                                      pixelIndex);
             }
