@@ -58,10 +58,9 @@ class Sensor {
 
     PBRT_CPU_GPU
     RGB ToCameraRGB(const SampledSpectrum &L, const SampledWavelengths &lambda) const {
-        SampledSpectrum pdf = lambda.PDF();
-        RGB rgb(SafeDiv(r_bar.Sample(lambda) * L, pdf).Average(),
-                SafeDiv(g_bar.Sample(lambda) * L, pdf).Average(),
-                SafeDiv(b_bar.Sample(lambda) * L, pdf).Average());
+        RGB rgb((r_bar.Sample(lambda) * L).Average(),
+                (g_bar.Sample(lambda) * L).Average(),
+                (b_bar.Sample(lambda) * L).Average());
         return rgb * cameraRGBWhiteNorm;
     }
 

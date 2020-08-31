@@ -150,7 +150,7 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
             // Add any emission found to its pixel sample's L value.
             if (L) {
                 SampledSpectrum Lp = pixelSampleState.L[ms.pixelIndex];
-                pixelSampleState.L[ms.pixelIndex] = Lp + L;
+                pixelSampleState.L[ms.pixelIndex] = Lp + SafeDiv(L, lambda.PDF());
                 PBRT_DBG("Added emitted radiance %f %f %f %f at pixel index %d ray index %d\n",
                     L[0], L[1], L[2], L[3], ms.pixelIndex, ms.rayIndex);
             }
@@ -261,7 +261,7 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                     SampledSpectrum pdfUni = ms.pdfUni * phasePDF;
                     SampledSpectrum pdfNEE = ms.pdfUni * lightPDF;
 
-                    SampledSpectrum Ld = beta * ls.L;
+                    SampledSpectrum Ld = SafeDiv(beta * ls.L, ms.lambda.PDF());
                     Ray ray(ms.p, ls.pLight.p() - ms.p, time, ms.medium);
 
                     // Enqueue shadow ray

@@ -75,9 +75,6 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
             BxDF bxdf;
             BSDF bsdf = material->GetBSDF(texEval, ctx, lambda, &bxdf);
 
-            if (lambda.SecondaryTerminated() && !me.lambda.SecondaryTerminated())
-                pixelSampleState.lambda[me.pixelIndex] = lambda;
-
             // BSDF regularization, if appropriate.
             if (regularize && me.anyNonSpecularBounces)
                 bsdf.Regularize();
@@ -233,7 +230,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 SampledSpectrum pdfUni = me.pdfUni * bsdfPDF;
                 SampledSpectrum pdfNEE = me.pdfUni * lightPDF;
 
-                SampledSpectrum Ld = beta * ls.L;
+                SampledSpectrum Ld = SafeDiv(beta * ls.L, lambda.PDF());
 
                 Ray ray = SpawnRayTo(me.pi, me.n, me.time, ls.pLight.pi, ls.pLight.n);
                 if (haveMedia)

@@ -22,6 +22,7 @@
 #include <pbrt/util/print.h>
 #include <pbrt/util/progressreporter.h>
 #include <pbrt/util/pstd.h>
+#include <pbrt/util/spectrum.h>
 #include <pbrt/util/stats.h>
 #include <pbrt/util/string.h>
 #include <pbrt/util/taggedptr.h>
@@ -244,7 +245,6 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
 }
 
 void GPUPathIntegrator::TraceShadowRays(int depth) {
-    std::pair<cudaEvent_t, cudaEvent_t> events;
     if (haveMedia)
         accel->IntersectShadowTr(maxQueueSize, shadowRayQueue);
     else
@@ -468,7 +468,7 @@ void GPUPathIntegrator::HandleEscapedRays(int depth) {
                      if (!Le)
                          return;
 
-                     SampledSpectrum L = pixelSampleState.L[er.pixelIndex];
+                     SampledSpectrum L(0.f);
 
                      PBRT_DBG("L %f %f %f %f beta %f %f %f %f Le %f %f %f %f",
                          L[0], L[1], L[2], L[3], er.beta[0], er.beta[1], er.beta[2],
@@ -478,7 +478,7 @@ void GPUPathIntegrator::HandleEscapedRays(int depth) {
                          er.pdfNEE[0], er.pdfNEE[1], er.pdfNEE[2], er.pdfNEE[3]);
 
                      if (depth == 0 || er.specularBounce) {
-                         L += er.beta * Le / er.pdfUni.Average();
+                         L = er.beta * Le / er.pdfUni.Average();
                      } else {
                          Float time = 0;  // FIXME
                          LightSampleContext ctx(er.piPrev, er.nPrev, er.nsPrev);
@@ -491,11 +491,15 @@ void GPUPathIntegrator::HandleEscapedRays(int depth) {
                          SampledSpectrum pdfUni = er.pdfUni;
                          SampledSpectrum pdfNEE = er.pdfNEE * lightPDF;
 
-                         L += er.beta * Le / (pdfUni + pdfNEE).Average();
+                         L = er.beta * Le / (pdfUni + pdfNEE).Average();
                      }
+                     L = SafeDiv(L, er.lambda.PDF());
 
                      PBRT_DBG("Added L %f %f %f %f for escaped ray pixel index %d\n", L[0],
                          L[1], L[2], L[3], er.pixelIndex);
+
+                     L += pixelSampleState.L[er.pixelIndex];
+
                      pixelSampleState.L[er.pixelIndex] = L;
                  });
 }
@@ -512,10 +516,10 @@ void GPUPathIntegrator::HandleRayFoundEmission(int depth) {
             PBRT_DBG("Got Le %f %f %f %f from hit area light at depth %d\n", Le[0], Le[1],
                 Le[2], Le[3], depth);
 
-            SampledSpectrum L = pixelSampleState.L[he.pixelIndex];
+            SampledSpectrum L(0.f);
 
             if (depth == 0 || he.isSpecularBounce) {
-                L += he.beta * Le / he.pdfUni.Average();
+                L = he.beta * Le / he.pdfUni.Average();
             } else {
                 Vector3f wi = he.rayd;
 
@@ -528,11 +532,15 @@ void GPUPathIntegrator::HandleRayFoundEmission(int depth) {
                 SampledSpectrum pdfUni = he.pdfUni;
                 SampledSpectrum pdfNEE = he.pdfNEE * lightPDF;
 
-                L += he.beta * Le / (pdfUni + pdfNEE).Average();
+                L = he.beta * Le / (pdfUni + pdfNEE).Average();
             }
+            L = SafeDiv(L, he.lambda.PDF());
 
             PBRT_DBG("Added L %f %f %f %f for pixel index %d\n", L[0], L[1], L[2], L[3],
                 he.pixelIndex);
+
+            L += pixelSampleState.L[he.pixelIndex];
+
             pixelSampleState.L[he.pixelIndex] = L;
         });
 }
