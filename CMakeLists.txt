@@ -147,10 +147,10 @@ if (CMAKE_CUDA_COMPILER)
                          OUTPUT_VARIABLE ARCH)
 
         set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --std=c++17")
-        if (CMAKE_BUILD_TYPE MATCHES Release)
-          set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --use_fast_math -lineinfo --maxrregcount 128")
-        else()
+        if (CMAKE_BUILD_TYPE MATCHES Debug)
           set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --use_fast_math -G -g")
+        else()
+          set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --use_fast_math -lineinfo --maxrregcount 128")
         endif ()
 
         if (NOT ${CUDA_RETURN_CODE} EQUAL 0)
