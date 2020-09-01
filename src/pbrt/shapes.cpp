@@ -215,14 +215,12 @@ pstd::optional<ShapeIntersection> Triangle::Intersect(const Ray &ray, Float tMax
         return {};
 
     Float b0 = triIsect->b0, b1 = triIsect->b1, b2 = triIsect->b2;
-    pstd::optional<SurfaceInteraction> intr = Triangle::InteractionFromIntersection(
+    SurfaceInteraction intr = Triangle::InteractionFromIntersection(
         mesh, triIndex, {b0, b1, b2}, ray.time, -ray.d);
-    if (!intr)
-        return {};
 #ifndef PBRT_IS_GPU_CODE
     ++nTriHits;
 #endif
-    return ShapeIntersection{*intr, triIsect->t};
+    return ShapeIntersection{intr, triIsect->t};
 }
 
 bool Triangle::IntersectP(const Ray &ray, Float tMax) const {

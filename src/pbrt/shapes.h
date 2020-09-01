@@ -924,16 +924,13 @@ class Triangle {
                                                           const Point3f &p2);
 
     PBRT_CPU_GPU
-    static pstd::optional<SurfaceInteraction> InteractionFromIntersection(
-        const TriangleMesh *mesh, int triIndex, pstd::array<Float, 3> b, Float time,
-        const Vector3f &wo, pstd::optional<Transform> renderFromInstance = {}) {
+    static SurfaceInteraction InteractionFromIntersection(const TriangleMesh *mesh,
+                                                          int triIndex,
+                                                          pstd::array<Float, 3> b,
+                                                          Float time,
+                                                          const Vector3f &wo) {
         const int *v = &mesh->vertexIndices[3 * triIndex];
         Point3f p0 = mesh->p[v[0]], p1 = mesh->p[v[1]], p2 = mesh->p[v[2]];
-        if (renderFromInstance) {
-            p0 = (*renderFromInstance)(p0);
-            p1 = (*renderFromInstance)(p1);
-            p2 = (*renderFromInstance)(p2);
-        }
         // Compute triangle partial derivatives
         Vector3f dpdu, dpdv;
         pstd::array<Point2f, 3> triuv =
@@ -955,8 +952,10 @@ class Triangle {
         if (degenerateUV || LengthSquared(Cross(dpdu, dpdv)) == 0) {
             Vector3f ng = Cross(p2 - p0, p1 - p0);
             if (LengthSquared(ng) == 0) {
-                // TODO: should these be eliminated from the start?
-                return {};
+                using Point3d = Point3<double>;
+                ng =
+                    Vector3f(Cross(Point3d(p2) - Point3d(p0), Point3d(p1) - Point3d(p0)));
+                CHECK_NE(LengthSquared(ng), 0);
             }
             // Handle zero determinant for triangle partial derivative matrix
             CoordinateSystem(Normalize(ng), &dpdu, &dpdv);
@@ -992,9 +991,6 @@ class Triangle {
             Normal3f ns;
             if (mesh->n != nullptr) {
                 ns = (b[0] * mesh->n[v[0]] + b[1] * mesh->n[v[1]] + b[2] * mesh->n[v[2]]);
-                if (renderFromInstance)
-                    ns = (*renderFromInstance)(ns);
-
                 if (LengthSquared(ns) > 0)
                     ns = Normalize(ns);
                 else
@@ -1006,9 +1002,6 @@ class Triangle {
             Vector3f ss;
             if (mesh->s != nullptr) {
                 ss = (b[0] * mesh->s[v[0]] + b[1] * mesh->s[v[1]] + b[2] * mesh->s[v[2]]);
-                if (renderFromInstance)
-                    ss = (*renderFromInstance)(ss);
-
                 if (LengthSquared(ss) == 0)
                     ss = isect.dpdu;
             } else
@@ -1029,10 +1022,6 @@ class Triangle {
                 Vector2f duv12 = triuv[1] - triuv[2];
                 Normal3f dn1 = mesh->n[v[0]] - mesh->n[v[2]];
                 Normal3f dn2 = mesh->n[v[1]] - mesh->n[v[2]];
-                if (renderFromInstance) {
-                    dn1 = (*renderFromInstance)(dn1);
-                    dn2 = (*renderFromInstance)(dn2);
-                }
 
                 Float determinant =
                     DifferenceOfProducts(duv02[0], duv12[1], duv02[1], duv12[0]);
@@ -1046,8 +1035,6 @@ class Triangle {
                     // parameterizations are still reasonable.
                     Vector3f dn = Cross(Vector3f(mesh->n[v[2]] - mesh->n[v[0]]),
                                         Vector3f(mesh->n[v[1]] - mesh->n[v[0]]));
-                    if (renderFromInstance)
-                        dn = (*renderFromInstance)(dn);
 
                     if (LengthSquared(dn) == 0)
                         dndu = dndv = Normal3f(0, 0, 0);

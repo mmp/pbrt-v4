@@ -245,7 +245,7 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
 ///////////////////////////////////////////////////////////////////////////
 // Triangles
 
-static __forceinline__ __device__ pstd::optional<SurfaceInteraction>
+static __forceinline__ __device__ SurfaceInteraction
 getTriangleIntersection() {
     const TriangleMeshRecord &rec = *(const TriangleMeshRecord *)optixGetSbtDataPointer();
 
@@ -272,21 +272,23 @@ getTriangleIntersection() {
                                   0.f, 0.f, 0.f, 1.f);
 
     Transform worldFromInstance(worldFromObjM, objFromWorldM);
-    return Triangle::InteractionFromIntersection(rec.mesh, optixGetPrimitiveIndex(),
-                                                 {b0, b1, b2}, optixGetRayTime(), wo,
-                                                 worldFromInstance);
+
+    Float time = optixGetRayTime();
+    wo = worldFromInstance.ApplyInverse(wo);
+    SurfaceInteraction intr =
+        Triangle::InteractionFromIntersection(rec.mesh, optixGetPrimitiveIndex(),
+                                              {b0, b1, b2}, time, wo);
+    return worldFromInstance(intr);
 }
 
 static __forceinline__ __device__ bool alphaKilled(const TriangleMeshRecord &rec) {
     if (!rec.alphaTexture)
         return false;
 
-    pstd::optional<SurfaceInteraction> intr = getTriangleIntersection();
-    if (!intr)
-        return true;
+    SurfaceInteraction intr = getTriangleIntersection();
 
     BasicTextureEvaluator eval;
-    Float alpha = eval(rec.alphaTexture, *intr);
+    Float alpha = eval(rec.alphaTexture, intr);
     if (alpha >= 1)
         return false;
     if (alpha <= 0)
@@ -304,7 +306,7 @@ extern "C" __global__ void __closesthit__triangle() {
     // It's slightly dicey to assume intr is valid. But invalid would
     // presumably mean that OptiX returned a hit with a degenerate
     // triangle...
-    SurfaceInteraction intr = *getTriangleIntersection();
+    SurfaceInteraction intr = getTriangleIntersection();
 
     if (rec.mediumInterface && rec.mediumInterface->IsMediumTransition())
         intr.mediumInterface = rec.mediumInterface;
@@ -743,7 +745,7 @@ extern "C" __global__ void __anyhit__randomHitTriangle() {
         rec.material.ptr(), p->material.ptr());
 
     if (rec.material == p->material)
-        p->wrs.Add([&] PBRT_CPU_GPU() { return *getTriangleIntersection(); }, 1.f);
+        p->wrs.Add([&] PBRT_CPU_GPU() { return getTriangleIntersection(); }, 1.f);
 
     optixIgnoreIntersection();
 }
