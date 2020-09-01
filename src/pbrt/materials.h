@@ -526,7 +526,8 @@ class CoatedDiffuseMaterial {
     // CoatedDiffuseMaterial Public Methods
     CoatedDiffuseMaterial(SpectrumTextureHandle reflectance,
                           FloatTextureHandle uRoughness, FloatTextureHandle vRoughness,
-                          FloatTextureHandle thickness, FloatTextureHandle eta,
+                          FloatTextureHandle thickness, SpectrumTextureHandle albedo,
+                          FloatTextureHandle g, FloatTextureHandle eta,
                           FloatTextureHandle displacement, bool remapRoughness,
                           LayeredBxDFConfig config)
         : displacement(displacement),
@@ -534,6 +535,8 @@ class CoatedDiffuseMaterial {
           uRoughness(uRoughness),
           vRoughness(vRoughness),
           thickness(thickness),
+          albedo(albedo),
+          g(g),
           eta(eta),
           remapRoughness(remapRoughness),
           config(config) {}
@@ -542,8 +545,8 @@ class CoatedDiffuseMaterial {
 
     template <typename TextureEvaluator>
     PBRT_CPU_GPU bool CanEvaluateTextures(TextureEvaluator texEval) const {
-        return texEval.CanEvaluate({uRoughness, vRoughness, thickness, eta},
-                                   {reflectance});
+        return texEval.CanEvaluate({uRoughness, vRoughness, thickness, g, eta},
+                                   {reflectance, albedo});
     }
 
     template <typename TextureEvaluator>
@@ -563,10 +566,11 @@ class CoatedDiffuseMaterial {
 
         Float thick = texEval(thickness, ctx);
         Float e = texEval(eta, ctx);
+        SampledSpectrum a = Clamp(texEval(albedo, ctx, lambda), 0, 1);
+        Float gg = Clamp(texEval(g, ctx), -1, 1);
 
-        *bxdf =
-            CoatedDiffuseBxDF(DielectricInterfaceBxDF(e, distrib), IdealDiffuseBxDF(r),
-                              thick, SampledSpectrum(0) /* albedo */, 0 /* g */, config);
+        *bxdf = CoatedDiffuseBxDF(DielectricInterfaceBxDF(e, distrib),
+                                  IdealDiffuseBxDF(r), thick, a, gg, config);
         return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf);
     }
 
@@ -588,8 +592,8 @@ class CoatedDiffuseMaterial {
   private:
     // CoatedDiffuseMaterial Private Members
     FloatTextureHandle displacement;
-    SpectrumTextureHandle reflectance;
-    FloatTextureHandle uRoughness, vRoughness, thickness, eta;
+    SpectrumTextureHandle reflectance, albedo;
+    FloatTextureHandle uRoughness, vRoughness, thickness, g, eta;
     bool remapRoughness;
     LayeredBxDFConfig config;
 };
@@ -603,6 +607,7 @@ class CoatedConductorMaterial {
     CoatedConductorMaterial(FloatTextureHandle interfaceURoughness,
                             FloatTextureHandle interfaceVRoughness,
                             FloatTextureHandle thickness, FloatTextureHandle interfaceEta,
+                            FloatTextureHandle g, SpectrumTextureHandle albedo,
                             FloatTextureHandle conductorURoughness,
                             FloatTextureHandle conductorVRoughness,
                             SpectrumTextureHandle conductorEta, SpectrumTextureHandle k,
@@ -613,6 +618,8 @@ class CoatedConductorMaterial {
           interfaceVRoughness(interfaceVRoughness),
           thickness(thickness),
           interfaceEta(interfaceEta),
+          albedo(albedo),
+          g(g),
           conductorURoughness(conductorURoughness),
           conductorVRoughness(conductorVRoughness),
           conductorEta(conductorEta),
@@ -625,9 +632,9 @@ class CoatedConductorMaterial {
     template <typename TextureEvaluator>
     PBRT_CPU_GPU bool CanEvaluateTextures(TextureEvaluator texEval) const {
         return texEval.CanEvaluate(
-            {interfaceURoughness, interfaceVRoughness, thickness, interfaceEta,
+            {interfaceURoughness, interfaceVRoughness, thickness, g, interfaceEta,
              conductorURoughness, conductorVRoughness},
-            {conductorEta, k});
+            {conductorEta, k, albedo});
     }
 
     template <typename TextureEvaluator>
@@ -655,9 +662,12 @@ class CoatedConductorMaterial {
         }
         TrowbridgeReitzDistribution conductorDistrib(curough, cvrough);
 
+        SampledSpectrum a = Clamp(texEval(albedo, ctx, lambda), 0, 1);
+        Float gg = Clamp(texEval(g, ctx), -1, 1);
+
         *bxdf = CoatedConductorBxDF(DielectricInterfaceBxDF(ieta, interfaceDistrib),
-                                    ConductorBxDF(conductorDistrib, ce, ck), thick,
-                                    SampledSpectrum(0) /* albedo */, 0 /* g */, config);
+                                    ConductorBxDF(conductorDistrib, ce, ck), thick, a, gg,
+                                    config);
         return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf);
     }
 
@@ -680,6 +690,8 @@ class CoatedConductorMaterial {
     // CoatedConductorMaterial Private Members
     FloatTextureHandle displacement;
     FloatTextureHandle interfaceURoughness, interfaceVRoughness, thickness, interfaceEta;
+    FloatTextureHandle g;
+    SpectrumTextureHandle albedo;
     FloatTextureHandle conductorURoughness, conductorVRoughness;
     SpectrumTextureHandle conductorEta, k;
     bool remapRoughness;

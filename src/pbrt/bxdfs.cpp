@@ -65,8 +65,8 @@ std::string DiffuseBxDF::ToString() const {
     return StringPrintf("[ DiffuseBxDF R: %s T: %s A: %f B: %f ]", R, T, A, B);
 }
 
-template <typename TopBxDF, typename BottomBxDF, bool SupportAttenuation>
-std::string LayeredBxDF<TopBxDF, BottomBxDF, SupportAttenuation>::ToString() const {
+template <typename TopBxDF, typename BottomBxDF>
+std::string LayeredBxDF<TopBxDF, BottomBxDF>::ToString() const {
     return StringPrintf(
         "[ LayeredBxDF top: %s bottom: %s thickness: %f albedo: %s g: %f ]", top, bottom,
         thickness, albedo, g);
@@ -991,7 +991,7 @@ std::string BxDFHandle::ToString() const {
     return DispatchCPU(toStr);
 }
 
-template class LayeredBxDF<DielectricInterfaceBxDF, IdealDiffuseBxDF, false>;
-template class LayeredBxDF<DielectricInterfaceBxDF, ConductorBxDF, false>;
+template class LayeredBxDF<DielectricInterfaceBxDF, IdealDiffuseBxDF>;
+template class LayeredBxDF<DielectricInterfaceBxDF, ConductorBxDF>;
 
 }  // namespace pbrt

@@ -701,7 +701,7 @@ class TopOrBottomBxDF {
 };
 
 // LayeredBxDF Definition
-template <typename TopBxDF, typename BottomBxDF, bool SupportAttenuation>
+template <typename TopBxDF, typename BottomBxDF>
 class LayeredBxDF {
   public:
     // LayeredBxDF Public Methods
@@ -825,7 +825,7 @@ class LayeredBxDF {
                              beta[1], beta[2], beta[3]);
                 }
 
-                if (SupportAttenuation && albedo) {
+                if (albedo) {
                     // Sample medium scattering for layered BSDF evaluation
                     Float sigma_t = 1;
                     Float dz = SampleExponential(r(), sigma_t / AbsCosTheta(w));
@@ -980,7 +980,7 @@ beta /= AbsCosTheta(w);
             if (w.z == 0)
                 return {};
 
-            if (SupportAttenuation && albedo) {
+            if (albedo) {
                 // Sample potential scattering event in layered medium
                 Float sigma_t = 1;
                 Float dz = SampleExponential(r(), sigma_t / AbsCosTheta(w));
@@ -1168,8 +1168,7 @@ f /= AbsCosTheta(w);
 };
 
 // CoatedDiffuseBxDF Definition
-class CoatedDiffuseBxDF
-    : public LayeredBxDF<DielectricInterfaceBxDF, IdealDiffuseBxDF, false> {
+class CoatedDiffuseBxDF : public LayeredBxDF<DielectricInterfaceBxDF, IdealDiffuseBxDF> {
   public:
     // CoatedDiffuseBxDF Public Methods
     using LayeredBxDF::LayeredBxDF;
@@ -1180,8 +1179,7 @@ class CoatedDiffuseBxDF
 };
 
 // CoatedConductorBxDF Definition
-class CoatedConductorBxDF
-    : public LayeredBxDF<DielectricInterfaceBxDF, ConductorBxDF, false> {
+class CoatedConductorBxDF : public LayeredBxDF<DielectricInterfaceBxDF, ConductorBxDF> {
   public:
     // CoatedConductorBxDF Public Methods
     PBRT_CPU_GPU
@@ -1452,8 +1450,8 @@ inline void BxDFHandle::Regularize() {
     return Dispatch(regularize);
 }
 
-extern template class LayeredBxDF<DielectricInterfaceBxDF, IdealDiffuseBxDF, false>;
-extern template class LayeredBxDF<DielectricInterfaceBxDF, ConductorBxDF, false>;
+extern template class LayeredBxDF<DielectricInterfaceBxDF, IdealDiffuseBxDF>;
+extern template class LayeredBxDF<DielectricInterfaceBxDF, ConductorBxDF>;
 
 }  // namespace pbrt
 

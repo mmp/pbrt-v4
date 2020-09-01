@@ -252,12 +252,19 @@ CoatedDiffuseMaterial *CoatedDiffuseMaterial::Create(
     config.nSamples = parameters.GetOneInt("nsamples", config.nSamples);
     config.twoSided = parameters.GetOneBool("twosided", config.twoSided);
 
+    FloatTextureHandle g = parameters.GetFloatTexture("g", 0.f, alloc);
+    SpectrumTextureHandle albedo = parameters.GetSpectrumTexture(
+        "albedo", nullptr, SpectrumType::Reflectance, alloc);
+    if (!albedo)
+        albedo = alloc.new_object<SpectrumConstantTexture>(
+            alloc.new_object<ConstantSpectrum>(0.f));
+
     FloatTextureHandle displacement =
         parameters.GetFloatTextureOrNull("displacement", alloc);
     bool remapRoughness = parameters.GetOneBool("remaproughness", true);
     return alloc.new_object<CoatedDiffuseMaterial>(reflectance, uRoughness, vRoughness,
-                                                   thickness, eta, displacement,
-                                                   remapRoughness, config);
+                                                   thickness, albedo, g, eta,
+                                                   displacement, remapRoughness, config);
 }
 
 std::string CoatedConductorMaterial::ToString() const {
@@ -302,12 +309,19 @@ CoatedConductorMaterial *CoatedConductorMaterial::Create(
     config.maxDepth = parameters.GetOneInt("maxdepth", config.maxDepth);
     config.nSamples = parameters.GetOneInt("nsamples", config.nSamples);
 
+    FloatTextureHandle g = parameters.GetFloatTexture("g", 0.f, alloc);
+    SpectrumTextureHandle albedo = parameters.GetSpectrumTexture(
+        "albedo", nullptr, SpectrumType::Reflectance, alloc);
+    if (!albedo)
+        albedo = alloc.new_object<SpectrumConstantTexture>(
+            alloc.new_object<ConstantSpectrum>(0.f));
+
     FloatTextureHandle displacement =
         parameters.GetFloatTextureOrNull("displacement", alloc);
     bool remapRoughness = parameters.GetOneBool("remaproughness", true);
 
     return alloc.new_object<CoatedConductorMaterial>(
-        interfaceURoughness, interfaceVRoughness, thickness, interfaceEta,
+        interfaceURoughness, interfaceVRoughness, thickness, interfaceEta, g, albedo,
         conductorURoughness, conductorVRoughness, conductorEta, k, displacement,
         remapRoughness, config);
 }
