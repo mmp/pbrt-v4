@@ -94,6 +94,7 @@ soa GetBSSRDFAndProbeRayWorkItem {
     Vector3f dpdus;
     Point2f uv;
     MediumInterface mediumInterface;
+    Float etaScale;
     int rayIndex;
 };
 
@@ -102,8 +103,10 @@ soa SubsurfaceScatterWorkItem {
     Point3f p0, p1;
     MaterialHandle material;
     TabulatedBSSRDF bssrdf;
+    SampledWavelengths lambda;
     SampledSpectrum beta, pdfUni;
     MediumInterface mediumInterface;
+    Float etaScale;
     int rayIndex;
 
     // OptiX code initializes these.

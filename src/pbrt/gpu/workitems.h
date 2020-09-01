@@ -224,6 +224,7 @@ struct GetBSSRDFAndProbeRayWorkItem {
     Vector3f dpdus;
     Point2f uv;
     MediumInterface mediumInterface;
+    Float etaScale;
     int rayIndex;
 };
 
@@ -231,11 +232,13 @@ struct SubsurfaceScatterWorkItem {
     Point3f p0, p1;
     MaterialHandle material;
     TabulatedBSSRDF bssrdf;
+    SampledWavelengths lambda;
     SampledSpectrum beta, pdfUni;
     Float weight;
     Float uLight;
     SubsurfaceInteraction ssi;
     MediumInterface mediumInterface;
+    Float etaScale;
     int rayIndex;
 };
 
@@ -365,7 +368,7 @@ public:
              SampledSpectrum beta, SampledSpectrum pdfUni,
              Point3f p, Vector3f wo, Normal3f n, Normal3f ns,
              Vector3f dpdus, Point2f uv, MediumInterface mediumInterface,
-             int rayIndex) {
+             Float etaScale, int rayIndex) {
         int index = AllocateEntry();
         this->material[index] = material;
         this->lambda[index] = lambda;
@@ -378,6 +381,7 @@ public:
         this->dpdus[index] = dpdus;
         this->uv[index] = uv;
         this->mediumInterface[index] = mediumInterface;
+        this->etaScale[index] = etaScale;
         this->rayIndex[index] = rayIndex;
         return index;
     }
@@ -389,16 +393,18 @@ class SubsurfaceScatterQueue : public WorkQueue<SubsurfaceScatterWorkItem> {
 
     PBRT_CPU_GPU
     int Push(Point3f p0, Point3f p1, MaterialHandle material, TabulatedBSSRDF bssrdf,
-             SampledSpectrum beta, SampledSpectrum pdfUni,
-             MediumInterface mediumInterface, int rayIndex) {
+             SampledWavelengths lambda, SampledSpectrum beta, SampledSpectrum pdfUni,
+             MediumInterface mediumInterface, Float etaScale, int rayIndex) {
         int index = AllocateEntry();
         this->p0[index] = p0;
         this->p1[index] = p1;
         this->material[index] = material;
         this->bssrdf[index] = bssrdf;
+        this->lambda[index] = lambda;
         this->beta[index] = beta;
         this->pdfUni[index] = pdfUni;
         this->mediumInterface[index] = mediumInterface;
+        this->etaScale[index] = etaScale;
         this->rayIndex[index] = rayIndex;
         return index;
     }

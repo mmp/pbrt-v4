@@ -159,7 +159,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                         bssrdfEvalQueue->Push(material, lambda, beta, pdfUni,
                                               Point3f(me.pi), wo, me.n, ns,
                                               dpdus, me.uv, me.mediumInterface,
-                                              me.rayIndex);
+                                              etaScale, me.rayIndex);
                     } else {
                         Ray ray = SpawnRay(me.pi, me.n, me.time, wi);
                         if (haveMedia)

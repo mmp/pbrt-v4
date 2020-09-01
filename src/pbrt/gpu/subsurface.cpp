@@ -37,8 +37,8 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
             BSSRDFProbeSegment probeSeg = bssrdf.Sample(uc, u);
             if (probeSeg)
                 subsurfaceScatterQueue->Push(probeSeg.p0, probeSeg.p1, material, bssrdf,
-                                             be.beta, be.pdfUni, be.mediumInterface,
-                                             be.rayIndex);
+                                             lambda, be.beta, be.pdfUni, be.mediumInterface,
+                                             be.etaScale, be.rayIndex);
         });
 
     accel->IntersectOneRandom(maxQueueSize, subsurfaceScatterQueue);
@@ -61,8 +61,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                 return;
 
             SampledSpectrum betap = s.beta * bssrdfSample.S * s.weight / bssrdfSample.pdf;
-            SampledWavelengths lambda = rayQueue->lambda[s.rayIndex];
-            Float etaScale = rayQueue->etaScale[s.rayIndex];
+            SampledWavelengths lambda = s.lambda;
             RaySamples raySamples = rayQueue->raySamples[s.rayIndex];
             Vector3f wo = bssrdfSample.wo;
             BSDF &bsdf = bssrdfSample.bsdf;
@@ -94,6 +93,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                     } else
                         pdfUni *= bsdfSample.pdf;
 
+                    Float etaScale = s.etaScale;
                     if (bsdfSample.IsTransmission())
                         etaScale *= Sqr(bsdf.eta);
 
