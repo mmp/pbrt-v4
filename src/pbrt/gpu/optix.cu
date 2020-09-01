@@ -117,12 +117,12 @@ extern "C" __global__ void __raygen__findClosest() {
                 r.ray.o.x, r.ray.o.y, r.ray.o.z, r.ray.d.x, r.ray.d.y, r.ray.d.z,
                 r.beta[0], r.beta[1], r.beta[2], r.beta[3]);
             params.mediumSampleQueue->Push(r.ray, Infinity, r.lambda, r.beta, r.pdfUni,
-                                           r.pdfNEE, rayIndex, r.pixelIndex, r.piPrev,
+                                           r.pdfNEE, r.pixelIndex, r.piPrev,
                                            r.nPrev, r.nsPrev, r.isSpecularBounce,
                                            r.anyNonSpecularBounces, r.etaScale);
         } else if (params.escapedRayQueue) {
             PBRT_DBG("Adding ray to escapedRayQueue ray index %d pixel index %d\n", rayIndex,
-                r.pixelIndex);
+                     r.pixelIndex);
             params.escapedRayQueue->Push(EscapedRayWorkItem{
                 r.beta, r.pdfUni, r.pdfNEE, r.lambda, ray.o, ray.d, r.piPrev, r.nPrev,
                 r.nsPrev, (int)r.isSpecularBounce, r.pixelIndex});
@@ -165,7 +165,6 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
                                  r.beta,
                                  r.pdfUni,
                                  r.pdfNEE,
-                                 rayIndex,
                                  r.pixelIndex,
                                  r.piPrev,
                                  r.nPrev,
@@ -199,7 +198,7 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
 
     if (!material) {
         PBRT_DBG("Enqueuing into medium transition queue: ray index %d pixel index %d \n",
-            rayIndex, r.pixelIndex);
+                 rayIndex, r.pixelIndex);
         Ray newRay = intr.SpawnRay(r.ray.d);
         params.mediumTransitionQueue->Push(MediumTransitionWorkItem{
             newRay, r.lambda, r.beta, r.pdfUni, r.pdfNEE, r.piPrev, r.nPrev, r.nsPrev,
@@ -209,8 +208,7 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
 
     if (intr.areaLight) {
         PBRT_DBG("Ray hit an area light: adding to hitAreaLightQueue ray index %d pixel index "
-            "%d\n",
-            rayIndex, r.pixelIndex);
+                 "%d\n", rayIndex, r.pixelIndex);
         Ray ray = r.ray;
         // TODO: intr.wo == -ray.d?
         params.hitAreaLightQueue->Push(HitAreaLightWorkItem{
@@ -235,7 +233,7 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
             ptr, r.lambda, r.beta, r.pdfUni, intr.pi, intr.n, intr.shading.n,
             intr.shading.dpdu, intr.shading.dpdv, intr.shading.dndu, intr.shading.dndv,
             intr.wo, intr.uv, intr.time, r.anyNonSpecularBounces, r.etaScale,
-            getPayload<ClosestHitContext>()->mediumInterface, rayIndex, r.pixelIndex});
+            getPayload<ClosestHitContext>()->mediumInterface, r.pixelIndex});
     };
     material.Dispatch(enqueue);
 

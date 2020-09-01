@@ -33,6 +33,7 @@ soa PixelSampleState {
     SampledSpectrum L;
     SampledSpectrum cameraRayWeight;
     VisibleSurface visibleSurface;
+    RaySamples samples;
 };
 
 soa RayWorkItem {
@@ -43,7 +44,6 @@ soa RayWorkItem {
     Point3fi piPrev;
     Normal3f nPrev;
     Normal3f nsPrev;
-    RaySamples raySamples;
     Float etaScale;
     int isSpecularBounce;
     int anyNonSpecularBounces;
@@ -95,7 +95,7 @@ soa GetBSSRDFAndProbeRayWorkItem {
     Point2f uv;
     MediumInterface mediumInterface;
     Float etaScale;
-    int rayIndex;
+    int pixelIndex;
 };
 
 soa SubsurfaceScatterWorkItem {
@@ -107,7 +107,7 @@ soa SubsurfaceScatterWorkItem {
     SampledSpectrum beta, pdfUni;
     MediumInterface mediumInterface;
     Float etaScale;
-    int rayIndex;
+    int pixelIndex;
 
     // OptiX code initializes these.
     Float weight;
@@ -134,7 +134,6 @@ soa MediumSampleWorkItem {
     SampledSpectrum beta;
     SampledSpectrum pdfUni;
     SampledSpectrum pdfNEE;
-    int rayIndex;
     int pixelIndex;
     LightHandle areaLight;
     Point3fi pi;
@@ -160,7 +159,6 @@ soa MediumScatterWorkItem {
     Point3f p;
     SampledWavelengths lambda;
     SampledSpectrum beta, pdfUni;
-    int rayIndex;
     HGPhaseFunction phase;
     Vector3f wo;
     Float etaScale;
@@ -182,6 +180,5 @@ soa MaterialEvalWorkItem<Material> {
     int anyNonSpecularBounces;
     Float etaScale;
     MediumInterface mediumInterface;
-    int rayIndex;
     int pixelIndex;
 };

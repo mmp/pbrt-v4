@@ -41,9 +41,9 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
             Ray ray = ms.ray;
             Float tMax = ms.tMax;
 
-            PBRT_DBG("Sampling medium interaction ray index %d depth %d ray %f %f %f d %f %f "
+            PBRT_DBG("Sampling medium interaction pixel index %d depth %d ray %f %f %f d %f %f "
                 "%f tMax %f\n",
-                ms.rayIndex, depth, ray.o.x, ray.o.y, ray.o.z, ray.d.x, ray.d.y, ray.d.z,
+                ms.pixelIndex, depth, ray.o.x, ray.o.y, ray.o.z, ray.d.x, ray.d.y, ray.d.z,
                 tMax);
 
             SampledWavelengths lambda = ms.lambda;
@@ -123,7 +123,7 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                             intr.phase.CastOrNullptr<HGPhaseFunction>();
                         // Enqueue medium scattering work.
                         mediumScatterQueue->Push(MediumScatterWorkItem{
-                            intr.p(), lambda, beta, pdfUni, ms.rayIndex, *phase, -ray.d,
+                            intr.p(), lambda, beta, pdfUni, *phase, -ray.d,
                             ms.etaScale, ray.medium, ms.pixelIndex});
                         scattered = true;
 
@@ -151,8 +151,8 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
             if (L) {
                 SampledSpectrum Lp = pixelSampleState.L[ms.pixelIndex];
                 pixelSampleState.L[ms.pixelIndex] = Lp + SafeDiv(L, lambda.PDF());
-                PBRT_DBG("Added emitted radiance %f %f %f %f at pixel index %d ray index %d\n",
-                    L[0], L[1], L[2], L[3], ms.pixelIndex, ms.rayIndex);
+                PBRT_DBG("Added emitted radiance %f %f %f %f at pixel index %d\n",
+                    L[0], L[1], L[2], L[3], ms.pixelIndex);
             }
 
             // There's no more work to do if there was a scattering event in
@@ -219,7 +219,7 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                 q->Push<Material>(MaterialEvalWorkItem<Material>{
                     ptr, lambda, beta, pdfUni, ms.pi, ms.n, ms.ns, ms.dpdus, ms.dpdvs,
                     ms.dndus, ms.dndvs, -ray.d, ms.uv, ray.time, ms.anyNonSpecularBounces,
-                    ms.etaScale, ms.mediumInterface, ms.rayIndex, ms.pixelIndex});
+                    ms.etaScale, ms.mediumInterface, ms.pixelIndex});
             };
             material.Dispatch(enqueue);
         });
@@ -235,7 +235,7 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
     ForAllQueued(
         desc.c_str(), mediumScatterQueue, maxQueueSize,
         PBRT_GPU_LAMBDA(MediumScatterWorkItem ms, int index) {
-            RaySamples raySamples = currentRayQueue->raySamples[ms.rayIndex];
+            RaySamples raySamples = pixelSampleState.samples[ms.pixelIndex];
             Float time = 0;  // TODO: FIXME
             Vector3f wo = ms.wo;
 
@@ -272,11 +272,11 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                                          pdfUni, pdfNEE, ms.pixelIndex);
 
                     PBRT_DBG("Enqueued medium shadow ray depth %d "
-                        "Ld %f %f %f %f pdfUni %f %f %f %f "
-                        "pdfNEE %f %f %f %f parent ray index %d parent pixel index %d\n",
-                        depth, Ld[0], Ld[1], Ld[2], Ld[3], pdfUni[0], pdfUni[1],
-                        pdfUni[2], pdfUni[3], pdfNEE[0], pdfNEE[1], pdfNEE[2], pdfNEE[3],
-                        ms.rayIndex, ms.pixelIndex);
+                             "Ld %f %f %f %f pdfUni %f %f %f %f "
+                             "pdfNEE %f %f %f %f pixel index %d\n",
+                             depth, Ld[0], Ld[1], Ld[2], Ld[3], pdfUni[0], pdfUni[1],
+                             pdfUni[2], pdfUni[3], pdfNEE[0], pdfNEE[1], pdfNEE[2], pdfNEE[3],
+                             ms.pixelIndex);
                 }
             }
 
@@ -298,8 +298,8 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
             if (rrBeta.MaxComponentValue() < 1 && depth > 1) {
                 Float q = std::max<Float>(0, 1 - rrBeta.MaxComponentValue());
                 if (raySamples.indirect.rr < q) {
-                    PBRT_DBG("RR terminated medium indirect with q %f ray index %d\n", q,
-                        ms.rayIndex);
+                    PBRT_DBG("RR terminated medium indirect with q %f pixel index %d\n", q,
+                             ms.pixelIndex);
                     return;
                 }
                 pdfUni *= 1 - q;
@@ -315,8 +315,8 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                 ray, Point3fi(ms.p), Normal3f(0, 0, 0), Normal3f(0, 0, 0), beta, pdfUni,
                 pdfNEE, ms.lambda, ms.etaScale, isSpecularBounce, anyNonSpecularBounces,
                 ms.pixelIndex);
-            PBRT_DBG("Enqueuing indirect medium ray at depth %d ray index %d pixel index %d\n",
-                depth + 1, ms.rayIndex, ms.pixelIndex);
+            PBRT_DBG("Enqueuing indirect medium ray at depth %d pixel index %d\n",
+                     depth + 1, ms.pixelIndex);
         });
 }
 

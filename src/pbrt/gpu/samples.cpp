@@ -45,8 +45,8 @@ void GPUPathIntegrator::GenerateRaySamples(int depth, int sampleIndex) {
             rs.subsurface.u = pixelSampler.Get2D();
         }
 
-        rayQueue->raySamples[index] = rs;
-                 });
+        pixelSampleState.samples[w.pixelIndex] = rs;
+   });
 }
 
 void GPUPathIntegrator::GenerateRaySamples(int depth, int sampleIndex) {

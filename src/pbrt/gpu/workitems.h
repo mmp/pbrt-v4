@@ -103,6 +103,7 @@ struct PixelSampleState {
     SampledSpectrum L;
     SampledSpectrum cameraRayWeight;
     VisibleSurface visibleSurface;
+    RaySamples samples;
 };
 
 struct RayWorkItem {
@@ -113,7 +114,6 @@ struct RayWorkItem {
     Point3fi piPrev;
     Normal3f nPrev;
     Normal3f nsPrev;
-    RaySamples raySamples;
     Float etaScale;
     int isSpecularBounce;
     int anyNonSpecularBounces;
@@ -198,7 +198,6 @@ struct MaterialEvalWorkItem {
     int anyNonSpecularBounces;
     Float etaScale;
     MediumInterface mediumInterface;
-    int rayIndex;
     int pixelIndex;
 };
 
@@ -225,7 +224,7 @@ struct GetBSSRDFAndProbeRayWorkItem {
     Point2f uv;
     MediumInterface mediumInterface;
     Float etaScale;
-    int rayIndex;
+    int pixelIndex;
 };
 
 struct SubsurfaceScatterWorkItem {
@@ -239,7 +238,7 @@ struct SubsurfaceScatterWorkItem {
     SubsurfaceInteraction ssi;
     MediumInterface mediumInterface;
     Float etaScale;
-    int rayIndex;
+    int pixelIndex;
 };
 
 struct MediumTransitionWorkItem {
@@ -264,7 +263,6 @@ struct MediumSampleWorkItem {
     SampledSpectrum beta;
     SampledSpectrum pdfUni;
     SampledSpectrum pdfNEE;
-    int rayIndex;
     int pixelIndex;
     Point3fi piPrev;
     Normal3f nPrev;
@@ -292,7 +290,6 @@ struct MediumScatterWorkItem {
     Point3f p;
     SampledWavelengths lambda;
     SampledSpectrum beta, pdfUni;
-    int rayIndex;
     HGPhaseFunction phase;
     Vector3f wo;
     Float etaScale;
@@ -368,7 +365,7 @@ public:
              SampledSpectrum beta, SampledSpectrum pdfUni,
              Point3f p, Vector3f wo, Normal3f n, Normal3f ns,
              Vector3f dpdus, Point2f uv, MediumInterface mediumInterface,
-             Float etaScale, int rayIndex) {
+             Float etaScale, int pixelIndex) {
         int index = AllocateEntry();
         this->material[index] = material;
         this->lambda[index] = lambda;
@@ -382,7 +379,7 @@ public:
         this->uv[index] = uv;
         this->mediumInterface[index] = mediumInterface;
         this->etaScale[index] = etaScale;
-        this->rayIndex[index] = rayIndex;
+        this->pixelIndex[index] = pixelIndex;
         return index;
     }
 };
@@ -394,7 +391,7 @@ class SubsurfaceScatterQueue : public WorkQueue<SubsurfaceScatterWorkItem> {
     PBRT_CPU_GPU
     int Push(Point3f p0, Point3f p1, MaterialHandle material, TabulatedBSSRDF bssrdf,
              SampledWavelengths lambda, SampledSpectrum beta, SampledSpectrum pdfUni,
-             MediumInterface mediumInterface, Float etaScale, int rayIndex) {
+             MediumInterface mediumInterface, Float etaScale, int pixelIndex) {
         int index = AllocateEntry();
         this->p0[index] = p0;
         this->p1[index] = p1;
@@ -405,7 +402,7 @@ class SubsurfaceScatterQueue : public WorkQueue<SubsurfaceScatterWorkItem> {
         this->pdfUni[index] = pdfUni;
         this->mediumInterface[index] = mediumInterface;
         this->etaScale[index] = etaScale;
-        this->rayIndex[index] = rayIndex;
+        this->pixelIndex[index] = pixelIndex;
         return index;
     }
 };
@@ -418,7 +415,7 @@ class MediumSampleQueue : public WorkQueue<MediumSampleWorkItem> {
 
     PBRT_CPU_GPU
     int Push(Ray ray, Float tMax, SampledWavelengths lambda, SampledSpectrum beta,
-             SampledSpectrum pdfUni, SampledSpectrum pdfNEE, int rayIndex, int pixelIndex,
+             SampledSpectrum pdfUni, SampledSpectrum pdfNEE, int pixelIndex,
              Point3fi piPrev, Normal3f nPrev, Normal3f nsPrev, int isSpecularBounce,
              int anyNonSpecularBounces, Float etaScale) {
         int index = AllocateEntry();
@@ -428,7 +425,6 @@ class MediumSampleQueue : public WorkQueue<MediumSampleWorkItem> {
         this->beta[index] = beta;
         this->pdfUni[index] = pdfUni;
         this->pdfNEE[index] = pdfNEE;
-        this->rayIndex[index] = rayIndex;
         this->pixelIndex[index] = pixelIndex;
         this->piPrev[index] = piPrev;
         this->nPrev[index] = nPrev;

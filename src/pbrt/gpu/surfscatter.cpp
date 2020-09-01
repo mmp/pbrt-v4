@@ -109,7 +109,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
             }
 
             Vector3f wo = me.wo;
-            RaySamples raySamples = rayQueue->raySamples[me.rayIndex];
+            RaySamples raySamples = pixelSampleState.samples[me.pixelIndex];
 
             // Sample indirect lighting
             BSDFSample bsdfSample =
@@ -143,7 +143,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                     Float q = std::max<Float>(0, 1 - rrBeta.MaxComponentValue());
                     if (raySamples.indirect.rr < q) {
                         beta = SampledSpectrum(0.f);
-                        PBRT_DBG("Path terminated with RR ray index %d\n", me.rayIndex);
+                        PBRT_DBG("Path terminated with RR\n");
                     }
                     pdfUni *= 1 - q;
                     pdfNEE *= 1 - q;
@@ -159,7 +159,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                         bssrdfEvalQueue->Push(material, lambda, beta, pdfUni,
                                               Point3f(me.pi), wo, me.n, ns,
                                               dpdus, me.uv, me.mediumInterface,
-                                              etaScale, me.rayIndex);
+                                              etaScale, me.pixelIndex);
                     } else {
                         Ray ray = SpawnRay(me.pi, me.n, me.time, wi);
                         if (haveMedia)
@@ -177,10 +177,10 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                             bsdfSample.IsSpecular(), anyNonSpecularBounces,
                             me.pixelIndex);
 
-                        PBRT_DBG("Spawned indirect ray at depth %d from prev ray index %d. "
+                        PBRT_DBG("Spawned indirect ray at depth %d from me.index %d. "
                             "Specular %d Beta %f %f %f %f pdfUni %f %f %f %f pdfNEE %f "
                             "%f %f %f beta/pdfUni %f %f %f %f\n",
-                            depth + 1, int(me.rayIndex), int(bsdfSample.IsSpecular()),
+                            depth + 1, index, int(bsdfSample.IsSpecular()),
                             beta[0], beta[1], beta[2], beta[3], pdfUni[0], pdfUni[1],
                             pdfUni[2], pdfUni[3], pdfNEE[0], pdfNEE[1], pdfNEE[2],
                             pdfNEE[3], SafeDiv(beta, pdfUni)[0], SafeDiv(beta, pdfUni)[1],
@@ -219,9 +219,9 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                     me.beta[0], me.beta[1], me.beta[2], me.beta[3],
                     f[0], f[1], f[2], f[3], AbsDot(wi, ns));
 
-                PBRT_DBG("ray index %d depth %d beta %f %f %f %f f %f %f %f %f ls.L %f %f %f "
+                PBRT_DBG("me index %d depth %d beta %f %f %f %f f %f %f %f %f ls.L %f %f %f "
                     "%f ls.pdf %f\n",
-                    me.rayIndex, depth, beta[0], beta[1], beta[2], beta[3], f[0], f[1],
+                    index, depth, beta[0], beta[1], beta[2], beta[3], f[0], f[1],
                     f[2], f[3], ls.L[0], ls.L[1], ls.L[2], ls.L[3], ls.pdf);
 
                 // Compute light and BSDF PDFs for MIS.
@@ -242,9 +242,9 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 shadowRayQueue->Push(ray, 1 - ShadowEpsilon, lambda, Ld,
                                      pdfUni, pdfNEE, me.pixelIndex);
 
-                PBRT_DBG("ray index %d spawned shadow ray depth %d Ld %f %f %f %f "
+                PBRT_DBG("me.index %d spawned shadow ray depth %d Ld %f %f %f %f "
                     "new beta %f %f %f %f beta/uni %f %f %f %f Ld/uni %f %f %f %f\n",
-                    me.rayIndex, depth, Ld[0], Ld[1], Ld[2], Ld[3], beta[0], beta[1],
+                    index, depth, Ld[0], Ld[1], Ld[2], Ld[3], beta[0], beta[1],
                     beta[2], beta[3], SafeDiv(beta, pdfUni)[0], SafeDiv(beta, pdfUni)[1],
                     SafeDiv(beta, pdfUni)[2], SafeDiv(beta, pdfUni)[3],
                     SafeDiv(Ld, pdfUni)[0], SafeDiv(Ld, pdfUni)[1],
