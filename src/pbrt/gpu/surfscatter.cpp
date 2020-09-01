@@ -190,7 +190,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
             }
 
             // Sample direct lighting.
-            if (!bsdf.IsSpecular()) {
+            if (bsdf.IsNonSpecular()) {
                 // Choose a light source using the LightSampler.
                 LightSampleContext ctx(me.pi, me.n, ns);
                 pstd::optional<SampledLight> sampledLight =

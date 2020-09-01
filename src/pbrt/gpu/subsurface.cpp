@@ -140,7 +140,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
             }
 
             // Direct lighting...
-            if (!bsdf.IsSpecular()) {
+            if (bsdf.IsNonSpecular()) {
                 LightSampleContext ctx(intr.pi, intr.n, intr.ns);
                 pstd::optional<SampledLight> sampledLight =
                     lightSampler.Sample(ctx, raySamples.direct.uc);
