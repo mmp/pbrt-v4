@@ -1474,19 +1474,14 @@ class BilinearPatch {
     }
 
     PBRT_CPU_GPU
-    static SurfaceInteraction InteractionFromIntersection(
-        const BilinearPatchMesh *mesh, int patchIndex, const Point2f &uvHit, Float time,
-        const Vector3f &wo, pstd::optional<Transform> renderFromInstance = {}) {
+    static SurfaceInteraction InteractionFromIntersection(const BilinearPatchMesh *mesh,
+                                                          int patchIndex,
+                                                          const Point2f &uvHit,
+                                                          Float time,
+                                                          const Vector3f &wo) {
         const int *v = &mesh->vertexIndices[4 * patchIndex];
         Point3f p00 = mesh->p[v[0]], p10 = mesh->p[v[1]], p01 = mesh->p[v[2]],
                 p11 = mesh->p[v[3]];
-
-        if (renderFromInstance) {
-            p00 = (*renderFromInstance)(p00);
-            p10 = (*renderFromInstance)(p10);
-            p01 = (*renderFromInstance)(p01);
-            p11 = (*renderFromInstance)(p11);
-        }
 
         Point3f pHit = Lerp(uvHit[0], Lerp(uvHit[1], p00, p01), Lerp(uvHit[1], p10, p11));
 
@@ -1572,12 +1567,6 @@ class BilinearPatch {
         if (mesh->n != nullptr) {
             Normal3f n00 = mesh->n[v[0]], n10 = mesh->n[v[1]], n01 = mesh->n[v[2]],
                      n11 = mesh->n[v[3]];
-            if (renderFromInstance) {
-                n00 = (*renderFromInstance)(n00);
-                n10 = (*renderFromInstance)(n10);
-                n01 = (*renderFromInstance)(n01);
-                n11 = (*renderFromInstance)(n11);
-            }
 
             // TODO: should these be computed using normalized normals?
             Normal3f dndu = Lerp(uvHit[1], n10, n11) - Lerp(uvHit[1], n00, n01);
