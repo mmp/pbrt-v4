@@ -59,7 +59,7 @@ check_ext ("stb" "stb/tools" 1034f5)
 check_ext ("OpenVDB" "openvdb/nanovdb" d5ea9808f)
 check_ext ("zlib" "zlib/doc" 54d591e)
 
-if (CMAKE_BUILD_TYPE MATCHES Release)
+if (NOT CMAKE_BUILD_TYPE MATCHES Debug)
   add_definitions (-D NDEBUG)
 endif ()
 # To build a release build with CHECKs enabled, comment-out the above
