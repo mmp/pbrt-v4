@@ -408,7 +408,7 @@ class HairMaterial {
 // DiffuseMaterial Definition
 class DiffuseMaterial {
   public:
-    using BxDF = IdealDiffuseBxDF;
+    using BxDF = DiffuseBxDF;
     using BSSRDF = void;
     // DiffuseMaterial Public Methods
     static const char *Name() { return "DiffuseMaterial"; }
@@ -439,11 +439,11 @@ class DiffuseMaterial {
 
     template <typename TextureEvaluator>
     PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
-                              SampledWavelengths &lambda, IdealDiffuseBxDF *bxdf) const {
+                              SampledWavelengths &lambda, DiffuseBxDF *bxdf) const {
         // Evaluate textures for _DiffuseMaterial_ and allocate BSDF
         SampledSpectrum r = Clamp(texEval(reflectance, ctx, lambda), 0, 1);
         Float sig = Clamp(texEval(sigma, ctx), 0, 90);
-        *bxdf = IdealDiffuseBxDF(r);
+        *bxdf = DiffuseBxDF(r, SampledSpectrum(0), sig);
         return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf);
     }
 
