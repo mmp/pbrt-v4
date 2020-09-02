@@ -111,7 +111,6 @@ int main(int argc, char *argv[]) {
     // Declare variables for parsed command line
     PBRTOptions options;
     std::vector<std::string> filenames;
-
     std::string logLevel = "error";
     std::string renderCoordSys = "cameraworld";
     bool format = false, toPly = false;
@@ -201,11 +200,12 @@ int main(int argc, char *argv[]) {
 #endif  // !NDEBUG
         printf("Copyright (c)1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.\n");
         printf("The source code to pbrt (but *not* the book contents) is covered "
-               "by the BSD License.\n");
+               "by the Apache 2.0 License.\n");
         printf("See the file LICENSE.txt for the conditions of the license.\n");
         fflush(stdout);
     }
 
+    // Check validity of provided arguments
     if (renderCoordSys == "camera")
         options.renderingSpace = RenderingCoordinateSystem::Camera;
     else if (renderCoordSys == "cameraworld")
@@ -223,6 +223,7 @@ int main(int argc, char *argv[]) {
 
     options.logLevel = LogLevelFromString(logLevel);
 
+    // Initialize pbrt
     InitPBRT(options);
 
     if (format || toPly || options.upgrade) {
@@ -240,9 +241,8 @@ int main(int argc, char *argv[]) {
             CPURender(scene);
 
         LOG_VERBOSE("Memory used after post-render cleanup: %s", GetCurrentRSS());
-        // Clean up after rendering scene
+        // Clean up after rendering the scene
         CleanupPBRT();
     }
-
     return 0;
 }

@@ -142,19 +142,18 @@ void ImageTileIntegrator::Render() {
     });
 
     // Declare common variables for rendering image in tiles
-    Bounds2i pixelBounds = camera.GetFilm().PixelBounds();
-    int spp = samplerPrototype.SamplesPerPixel();
-    int startWave = 0, endWave = 1, waveDelta = 1;
-
     std::vector<ScratchBuffer> scratchBuffers;
     for (int i = 0; i < MaxThreadIndex(); ++i)
         scratchBuffers.push_back(ScratchBuffer(65536));
 
-    std::vector<SamplerHandle> samplers =
-        samplerPrototype.Clone(MaxThreadIndex(), Allocator());
+    std::vector<SamplerHandle> samplers = samplerPrototype.Clone(MaxThreadIndex());
 
+    Bounds2i pixelBounds = camera.GetFilm().PixelBounds();
+    int spp = samplerPrototype.SamplesPerPixel();
     ProgressReporter progress(int64_t(spp) * pixelBounds.Area(), "Rendering",
                               Options->quiet);
+
+    int startWave = 0, endWave = 1, waveDelta = 1;
 
     if (Options->recordPixelStatistics)
         StatsEnablePixelStats(pixelBounds,
@@ -206,6 +205,7 @@ void ImageTileIntegrator::Render() {
                        });
     }
 
+    // Render image in waves
     while (startWave < spp) {
         // Render image tiles in parallel
         ParallelFor2D(pixelBounds, [&](Bounds2i tileBounds) {
@@ -256,6 +256,7 @@ void ImageTileIntegrator::Render() {
         camera.InitMetadata(&metadata);
         camera.GetFilm().WriteImage(metadata, 1.0f / startWave);
     }
+
     if (mseOutFile)
         fclose(mseOutFile);
     progress.Done();

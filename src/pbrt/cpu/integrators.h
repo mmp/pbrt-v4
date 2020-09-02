@@ -47,11 +47,11 @@ class Integrator {
 
     const Bounds3f &SceneBounds() const { return sceneBounds; }
 
+    virtual void Render() = 0;
+
     pstd::optional<ShapeIntersection> Intersect(const Ray &ray,
                                                 Float tMax = Infinity) const;
     bool IntersectP(const Ray &ray, Float tMax = Infinity) const;
-
-    virtual void Render() = 0;
 
     bool Unoccluded(const Interaction &p0, const Interaction &p1) const {
         return !IntersectP(p0.SpawnRayTo(p1), 1 - ShadowEpsilon);
@@ -62,12 +62,13 @@ class Integrator {
 
     // Integrator Public Members
     std::vector<LightHandle> lights;
+    PrimitiveHandle aggregate;
     std::vector<LightHandle> infiniteLights;
 
   protected:
     // Integrator Private Methods
-    Integrator(PrimitiveHandle aggregate, std::vector<LightHandle> l)
-        : lights(std::move(l)), aggregate(aggregate) {
+    Integrator(PrimitiveHandle aggregate, std::vector<LightHandle> lights)
+        : lights(lights), aggregate(aggregate) {
         // Integrator Constructor Implementation
         if (aggregate)
             sceneBounds = aggregate.Bounds();
@@ -80,7 +81,6 @@ class Integrator {
     }
 
     // Integrator Private Members
-    PrimitiveHandle aggregate;
     Bounds3f sceneBounds;
 };
 
