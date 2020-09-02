@@ -3,7 +3,7 @@
 // SPDX: Apache-2.0
 
 // PhysLight code contributed by Anders Langlands and Luca Fascione
-// Copyright © 2020, Weta Digital, Ltd.
+// Copyright (c) 2020, Weta Digital, Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
 #include <pbrt/film.h>

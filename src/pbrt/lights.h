@@ -6,7 +6,7 @@
 #define PBRT_LIGHTS_H
 
 // PhysLight code contributed by Anders Langlands and Luca Fascione
-// Copyright © 2020, Weta Digital, Ltd.
+// Copyright (c) 2020, Weta Digital, Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
 #include <pbrt/pbrt.h>

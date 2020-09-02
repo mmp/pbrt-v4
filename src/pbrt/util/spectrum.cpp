@@ -3,7 +3,7 @@
 // SPDX: Apache-2.0
 
 // PhysLight code contributed by Anders Langlands and Luca Fascione
-// Copyright © 2020, Weta Digital, Ltd.
+// Copyright (c) 2020, Weta Digital, Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
 #include <pbrt/util/spectrum.h>
@@ -1441,7 +1441,7 @@ const Float GlassSF11_eta[] = {
 };
 
 // PhysLight code and measurements contributed by Anders Langlands and Luca Fascione
-// Copyright © 2020, Weta Digital, Ltd.
+// Copyright (c) 2020, Weta Digital, Ltd.
 // SPDX-License-Identifier: Apache-2.0
 const Float Canon_eos5dmkii_lambda[] = {380, 390, 400, 410, 420, 430, 440, 450, 460,
                                         470, 480, 490, 500, 510, 520, 530, 540, 550,

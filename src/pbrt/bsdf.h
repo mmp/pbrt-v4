@@ -98,15 +98,12 @@ class BSDF {
         if (!bs || !bs.f)
             return {};
         DCHECK_GT(bs.pdf, 0);
-
         PBRT_DBG("For wo = (%f, %f, %f), ng %f %f %f ns %f %f %f "
                  "sampled f = %f %f %f %f, pdf = %f, ratio[0] = %f "
                  "wi = (%f, %f, %f)\n",
-                 wo.x, wo.y, wo.z, ng.x, ng.y, ng.z,
-                 shadingFrame.z.x, shadingFrame.z.y, shadingFrame.z.z,
-                 bs.f[0], bs.f[1], bs.f[2], bs.f[3], bs.pdf,
+                 wo.x, wo.y, wo.z, ng.x, ng.y, ng.z, shadingFrame.z.x, shadingFrame.z.y,
+                 shadingFrame.z.z, bs.f[0], bs.f[1], bs.f[2], bs.f[3], bs.pdf,
                  (bs.pdf > 0) ? (bs.f[0] / bs.pdf) : 0, bs.wi.x, bs.wi.y, bs.wi.z);
-
         bs.wi = LocalToRender(bs.wi);
         bs.f *= GBump(woRender, bs.wi, mode);
         return bs;
@@ -146,9 +143,8 @@ class BSDF {
         PBRT_DBG("For wo = (%f, %f, %f), ng %f %f %f ns %f %f %f "
                  "sampled f = %f %f %f %f, pdf = %f, ratio[0] = %f "
                  "wi = (%f, %f, %f)\n",
-                 wo.x, wo.y, wo.z, ng.x, ng.y, ng.z,
-                 shadingFrame.z.x, shadingFrame.z.y, shadingFrame.z.z,
-                 bs.f[0], bs.f[1], bs.f[2], bs.f[3], bs.pdf,
+                 wo.x, wo.y, wo.z, ng.x, ng.y, ng.z, shadingFrame.z.x, shadingFrame.z.y,
+                 shadingFrame.z.z, bs.f[0], bs.f[1], bs.f[2], bs.f[3], bs.pdf,
                  (bs.pdf > 0) ? (bs.f[0] / bs.pdf) : 0, bs.wi.x, bs.wi.y, bs.wi.z);
 
         bs.wi = LocalToRender(bs.wi);
