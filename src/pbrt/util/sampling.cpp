@@ -625,12 +625,12 @@ void PiecewiseConstant2D::TestCompareDistributions(const PiecewiseConstant2D &da
 }
 
 // AliasTable Method Definitions
-AliasTable::AliasTable(pstd::span<const Float> values, Allocator alloc)
-    : bins(values.size(), alloc) {
-    // Normalize _values_ to compute alias table PDF
-    Float sum = std::accumulate(values.begin(), values.end(), 0.);
-    for (size_t i = 0; i < values.size(); ++i)
-        bins[i].pdf = values[i] / sum;
+AliasTable::AliasTable(pstd::span<const Float> weights, Allocator alloc)
+    : bins(weights.size(), alloc) {
+    // Normalize _weights_ to compute alias table PDF
+    Float sum = std::accumulate(weights.begin(), weights.end(), 0.);
+    for (size_t i = 0; i < weights.size(); ++i)
+        bins[i].pdf = weights[i] / sum;
 
     // Create alias table work lists
     struct Outcome {

@@ -592,7 +592,7 @@ class VarianceEstimator {
 };
 
 // WeightedReservoirSampler Definition
-template <typename T, typename Float = Float>
+template <typename T>
 class WeightedReservoirSampler {
   public:
     // WeightedReservoirSampler Public Methods
@@ -867,7 +867,7 @@ class AliasTable {
     // AliasTable Public Methods
     AliasTable() = default;
     AliasTable(Allocator alloc = {}) : bins(alloc) {}
-    AliasTable(pstd::span<const Float> values, Allocator alloc = {});
+    AliasTable(pstd::span<const Float> weights, Allocator alloc = {});
 
     PBRT_CPU_GPU
     int Sample(Float u, Float *pdf = nullptr, Float *uRemapped = nullptr) const;
@@ -1607,7 +1607,8 @@ class PiecewiseLinear2D {
                             : (c0 - SafeSqrt(c0 * c0 - 2.f * sample.x * (c0 - c1)));
         sample.x /= is_const ? (c0 + c1) : (c0 - c1);
 
-        return {(Vector2f(col, row) + sample) * m_patch_size,
+        return {Vector2f((col + sample.x) * m_patch_size.x,
+                         (row + sample.y) * m_patch_size.y),
                 ((1.f - sample.x) * c0 + sample.x * c1) * HProd(m_inv_patch_size)};
     }
 
@@ -1637,7 +1638,8 @@ class PiecewiseLinear2D {
         }
 
         /* Fetch values at corners of bilinear patch */
-        sample *= m_inv_patch_size;
+        sample.x *= m_inv_patch_size.x;
+        sample.y *= m_inv_patch_size.y;
         Vector2i pos = Min(Vector2i(sample), m_size - Vector2i(2, 2));
         sample -= Vector2f(pos);
 
@@ -1724,7 +1726,8 @@ class PiecewiseLinear2D {
         }
 
         /* Compute linear interpolation weights */
-        pos *= m_inv_patch_size;
+        pos.x *= m_inv_patch_size.x;
+        pos.y *= m_inv_patch_size.y;
         Vector2i offset = Min(Vector2i(pos), m_size - Vector2i(2, 2));
 
         Vector2f w1 = pos - Vector2f(Vector2i(offset)), w0 = Vector2f(1, 1) - w1;

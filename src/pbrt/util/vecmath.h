@@ -38,22 +38,9 @@ extern template std::string internal::ToString3(int, int, int);
 
 namespace {
 
-// isNaN Inline Functions
 template <typename T>
-PBRT_CPU_GPU inline typename std::enable_if_t<std::is_floating_point<T>::value, bool>
-isNaN(const T x) {
-    return IsNaN(x);
-}
-
-template <typename T>
-PBRT_CPU_GPU inline typename std::enable_if_t<std::is_integral<T>::value, bool> isNaN(
-    const T x) {
-    return false;
-}
-
-template <typename T>
-PBRT_CPU_GPU inline bool isNaN(Interval<T> fi) {
-    return isNaN(T(fi));
+PBRT_CPU_GPU inline bool IsNaN(Interval<T> fi) {
+    return pbrt::IsNaN(T(fi));
 }
 
 // TupleLength Definition
@@ -77,42 +64,6 @@ struct TupleLength<Interval<T>> {
     using type = Interval<typename TupleLength<T>::type>;
 };
 
-// CommonType Definition
-template <typename T, typename U, typename TT = void>
-struct CommonType;
-
-template <typename T, typename U>
-struct CommonType<T, U,
-                  typename std::enable_if_t<std::is_arithmetic<T>::value &&
-                                            std::is_arithmetic<U>::value>> {
-    using type = typename std::common_type<T, U>::type;
-};
-
-template <>
-struct CommonType<float, double> {
-    using type = Float;
-};
-
-template <>
-struct CommonType<double, float> {
-    using type = Float;
-};
-
-template <typename T, typename U>
-struct CommonType<Interval<T>, Interval<U>> {
-    using type = Interval<typename CommonType<T, U>::type>;
-};
-
-template <typename T, typename U>
-struct CommonType<T, Interval<U>> {
-    using type = Interval<typename CommonType<T, U>::type>;
-};
-
-template <typename T, typename U>
-struct CommonType<Interval<T>, U> {
-    using type = Interval<typename CommonType<T, U>::type>;
-};
-
 }  // anonymous namespace
 
 // Tuple2 Definition
@@ -126,7 +77,7 @@ class Tuple2 {
     PBRT_CPU_GPU
     Tuple2(T x, T y) : x(x), y(y) { DCHECK(!HasNaN()); }
     PBRT_CPU_GPU
-    bool HasNaN() const { return isNaN(x) || isNaN(y); }
+    bool HasNaN() const { return IsNaN(x) || IsNaN(y); }
 #ifndef NDEBUG
     // The default versions of these are fine for release builds; for debug
     // we define them so that we can add the Assert checks.
@@ -176,41 +127,27 @@ class Tuple2 {
     PBRT_CPU_GPU
     bool operator!=(const Child<T> &c) const { return x != c.x || y != c.y; }
 
-    // Hadmard product
     template <typename U>
-    PBRT_CPU_GPU auto operator*(const Child<U> &c) const -> Child<decltype(T{} * U{})> {
-        DCHECK(!c.HasNaN());
-        return {x * c.x, y * c.y};
-    }
-    template <typename U>
-    PBRT_CPU_GPU Child<T> &operator*=(const Child<U> &c) {
-        DCHECK(!c.HasNaN());
-        x *= c.x;
-        y *= c.y;
-        return static_cast<Child<T> &>(*this);
-    }
-
-    template <typename U>
-    PBRT_CPU_GPU auto operator*(U s) const -> Child<typename CommonType<T, U>::type> {
-        return Child<typename CommonType<T, U>::type>(s * x, s * y);
+    PBRT_CPU_GPU auto operator*(U s) const -> Child<decltype(T{} * U{})> {
+        return {s * x, s * y};
     }
     template <typename U>
     PBRT_CPU_GPU Child<T> &operator*=(U s) {
-        DCHECK(!isNaN(s));
+        DCHECK(!IsNaN(s));
         x *= s;
         y *= s;
         return static_cast<Child<T> &>(*this);
     }
 
     template <typename U>
-    PBRT_CPU_GPU auto operator/(U d) const -> Child<typename CommonType<T, U>::type> {
-        DCHECK(d != 0 && !isNaN(d));
-        return Child<typename CommonType<T, U>::type>(x / d, y / d);
+    PBRT_CPU_GPU auto operator/(U d) const -> Child<decltype(T{} / U{})> {
+        DCHECK(d != 0 && !IsNaN(d));
+        return {x / d, y / d};
     }
     template <typename U>
     PBRT_CPU_GPU Child<T> &operator/=(U d) {
         DCHECK_NE(d, 0);
-        DCHECK(!isNaN(d));
+        DCHECK(!IsNaN(d));
         x /= d;
         y /= d;
         return static_cast<Child<T> &>(*this);
@@ -239,8 +176,7 @@ class Tuple2 {
 
 // Tuple2 Inline Functions
 template <template <class> class C, typename T, typename U>
-PBRT_CPU_GPU inline auto operator*(U s, const Tuple2<C, T> &t)
-    -> C<typename CommonType<T, U>::type> {
+PBRT_CPU_GPU inline auto operator*(U s, const Tuple2<C, T> &t) -> C<decltype(T{} * U{})> {
     DCHECK(!t.HasNaN());
     return t * s;
 }
@@ -333,7 +269,7 @@ class Tuple3 {
     Tuple3(T x, T y, T z) : x(x), y(y), z(z) { DCHECK(!HasNaN()); }
 
     PBRT_CPU_GPU
-    bool HasNaN() const { return isNaN(x) || isNaN(y) || isNaN(z); }
+    bool HasNaN() const { return IsNaN(x) || IsNaN(y) || IsNaN(z); }
 
     PBRT_CPU_GPU
     T operator[](int i) const {
@@ -412,28 +348,13 @@ class Tuple3 {
     PBRT_CPU_GPU
     bool operator!=(const Child<T> &c) const { return x != c.x || y != c.y || z != c.z; }
 
-    // Hadmard product
     template <typename U>
-    PBRT_CPU_GPU auto operator*(const Child<U> &c) const -> Child<decltype(T{} * U{})> {
-        DCHECK(!c.HasNaN());
-        return {x * c.x, y * c.y, z * c.z};
-    }
-    template <typename U>
-    PBRT_CPU_GPU Child<T> &operator*=(const Child<U> &c) {
-        DCHECK(!c.HasNaN());
-        x *= c.x;
-        y *= c.y;
-        z *= c.z;
-        return static_cast<Child<T> &>(*this);
-    }
-
-    template <typename U>
-    PBRT_CPU_GPU auto operator*(U s) const -> Child<typename CommonType<T, U>::type> {
-        return Child<typename CommonType<T, U>::type>(s * x, s * y, s * z);
+    PBRT_CPU_GPU auto operator*(U s) const -> Child<decltype(T{} * U{})> {
+        return {s * x, s * y, s * z};
     }
     template <typename U>
     PBRT_CPU_GPU Child<T> &operator*=(U s) {
-        DCHECK(!isNaN(s));
+        DCHECK(!IsNaN(s));
         x *= s;
         y *= s;
         z *= s;
@@ -441,9 +362,9 @@ class Tuple3 {
     }
 
     template <typename U>
-    PBRT_CPU_GPU auto operator/(U d) const -> Child<typename CommonType<T, U>::type> {
+    PBRT_CPU_GPU auto operator/(U d) const -> Child<decltype(T{} / U{})> {
         DCHECK_NE(d, 0);
-        return Child<typename CommonType<T, U>::type>(x / d, y / d, z / d);
+        return {x / d, y / d, z / d};
     }
     template <typename U>
     PBRT_CPU_GPU Child<T> &operator/=(U d) {
@@ -464,8 +385,7 @@ class Tuple3 {
 
 // Tuple3 Inline Functions
 template <template <class> class C, typename T, typename U>
-PBRT_CPU_GPU inline auto operator*(U s, const Tuple3<C, T> &t)
-    -> C<typename CommonType<T, U>::type> {
+PBRT_CPU_GPU inline auto operator*(U s, const Tuple3<C, T> &t) -> C<decltype(T{} * U{})> {
     return t * s;
 }
 
@@ -576,7 +496,6 @@ class Vector3 : public Tuple3<Vector3, T> {
     Vector3() = default;
     PBRT_CPU_GPU
     Vector3(T x, T y, T z) : Tuple3<pbrt::Vector3, T>(x, y, z) {}
-
     template <typename U>
     PBRT_CPU_GPU explicit Vector3(const Vector3<U> &v)
         : Tuple3<pbrt::Vector3, T>(T(v.x), T(v.y), T(v.z)) {}

@@ -54,7 +54,8 @@ static const float OneMinusEpsilon = FloatOneMinusEpsilon;
 
 // Floating-point Inline Functions
 template <typename T>
-PBRT_CPU_GPU inline bool IsNaN(T v) {
+PBRT_CPU_GPU inline typename std::enable_if_t<std::is_floating_point<T>::value, bool>
+IsNaN(T v) {
 #ifdef PBRT_IS_GPU_CODE
     return isnan(v);
 #else
@@ -63,12 +64,25 @@ PBRT_CPU_GPU inline bool IsNaN(T v) {
 }
 
 template <typename T>
-PBRT_CPU_GPU inline bool IsInf(T v) {
+PBRT_CPU_GPU inline typename std::enable_if_t<std::is_integral<T>::value, bool> IsNaN(
+    T v) {
+    return false;
+}
+
+template <typename T>
+PBRT_CPU_GPU inline typename std::enable_if_t<std::is_floating_point<T>::value, bool>
+IsInf(T v) {
 #ifdef PBRT_IS_GPU_CODE
     return isinf(v);
 #else
     return std::isinf(v);
 #endif
+}
+
+template <typename T>
+PBRT_CPU_GPU inline typename std::enable_if_t<std::is_integral<T>::value, bool> IsInf(
+    T v) {
+    return false;
 }
 
 PBRT_CPU_GPU
