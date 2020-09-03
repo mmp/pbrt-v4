@@ -59,7 +59,8 @@ SampledSpectrum RandomWalkIntegrator::Li(RayDifferential ray, SampledWavelengths
                                          SamplerHandle sampler,
                                          ScratchBuffer &scratchBuffer,
                                          VisibleSurface *visibleSurface) const {
-    return SafeDiv(LiRandomWalk(ray, lambda, sampler, scratchBuffer, 0), lambda.PDF());
+    SampledSpectrum L = LiRandomWalk(ray, lambda, sampler, scratchBuffer, 0);
+    return SafeDiv(L, lambda.PDF());
 }
 
 SampledSpectrum RandomWalkIntegrator::LiRandomWalk(RayDifferential ray,

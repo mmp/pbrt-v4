@@ -160,6 +160,7 @@ template <typename T>
 class SOA;
 class ScratchBuffer;
 
+// Define _Allocator_
 using Allocator = pstd::pmr::polymorphic_allocator<std::byte>;
 
 // Initialization and Cleanup Function Declarations
