@@ -117,7 +117,7 @@ class RayIntegrator : public ImageTileIntegrator {
 
     virtual SampledSpectrum Li(RayDifferential ray, SampledWavelengths &lambda,
                                SamplerHandle sampler, ScratchBuffer &scratchBuffer,
-                               VisibleSurface *visibleSurface = nullptr) const = 0;
+                               VisibleSurface *visibleSurface) const = 0;
 };
 
 // RandomWalkIntegrator Definition
@@ -139,9 +139,9 @@ class RandomWalkIntegrator : public RayIntegrator {
 
   private:
     // RandomWalkIntegrator Private Methods
-    SampledSpectrum RandomWalk(RayDifferential ray, SampledWavelengths &lambda,
-                               SamplerHandle sampler, ScratchBuffer &scratchBuffer,
-                               int depth) const;
+    SampledSpectrum LiRandomWalk(RayDifferential ray, SampledWavelengths &lambda,
+                                 SamplerHandle sampler, ScratchBuffer &scratchBuffer,
+                                 int depth) const;
 
     // RandomWalkIntegrator Private Members
     int maxDepth;

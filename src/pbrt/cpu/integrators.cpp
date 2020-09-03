@@ -59,14 +59,14 @@ SampledSpectrum RandomWalkIntegrator::Li(RayDifferential ray, SampledWavelengths
                                          SamplerHandle sampler,
                                          ScratchBuffer &scratchBuffer,
                                          VisibleSurface *visibleSurface) const {
-    return SafeDiv(RandomWalk(ray, lambda, sampler, scratchBuffer, 0), lambda.PDF());
+    return SafeDiv(LiRandomWalk(ray, lambda, sampler, scratchBuffer, 0), lambda.PDF());
 }
 
-SampledSpectrum RandomWalkIntegrator::RandomWalk(RayDifferential ray,
-                                                 SampledWavelengths &lambda,
-                                                 SamplerHandle sampler,
-                                                 ScratchBuffer &scratchBuffer,
-                                                 int depth) const {
+SampledSpectrum RandomWalkIntegrator::LiRandomWalk(RayDifferential ray,
+                                                   SampledWavelengths &lambda,
+                                                   SamplerHandle sampler,
+                                                   ScratchBuffer &scratchBuffer,
+                                                   int depth) const {
     SampledSpectrum L(0.f);
     // Intersect ray with scene and return if no intersection
     pstd::optional<ShapeIntersection> si = Intersect(ray);
@@ -102,7 +102,7 @@ SampledSpectrum RandomWalkIntegrator::RandomWalk(RayDifferential ray,
 
     // Recursively trace ray to estimate incident radiance at surface
     ray = isect.SpawnRay(wi);
-    return L + beta * RandomWalk(ray, lambda, sampler, scratchBuffer, depth + 1);
+    return L + beta * LiRandomWalk(ray, lambda, sampler, scratchBuffer, depth + 1);
 }
 
 // Integrator Method Definitions
@@ -153,7 +153,7 @@ void ImageTileIntegrator::Render() {
     ProgressReporter progress(int64_t(spp) * pixelBounds.Area(), "Rendering",
                               Options->quiet);
 
-    int startWave = 0, endWave = 1, waveDelta = 1;
+    int waveStart = 0, waveEnd = 1, nextWaveSize = 1;
 
     if (Options->recordPixelStatistics)
         StatsEnablePixelStats(pixelBounds,
@@ -206,20 +206,20 @@ void ImageTileIntegrator::Render() {
     }
 
     // Render image in waves
-    while (startWave < spp) {
-        // Render image tiles in parallel
+    while (waveStart < spp) {
+        // Render current wave's image tiles in parallel
         ParallelFor2D(pixelBounds, [&](Bounds2i tileBounds) {
             // Render image tile given by _tileBounds_
             ScratchBuffer &scratchBuffer = scratchBuffers[ThreadIndex];
             SamplerHandle &sampler = samplers[ThreadIndex];
-            PBRT_DBG("Starting image tile (%d,%d)-(%d,%d) startWave %d, endWave %d\n",
+            PBRT_DBG("Starting image tile (%d,%d)-(%d,%d) waveStart %d, waveEnd %d\n",
                      tileBounds.pMin.x, tileBounds.pMin.y, tileBounds.pMax.x,
-                     tileBounds.pMax.y, startWave, endWave);
+                     tileBounds.pMax.y, waveStart, waveEnd);
             for (Point2i pPixel : tileBounds) {
                 StatsReportPixelStart(pPixel);
                 threadPixel = pPixel;
                 // Render samples in pixel _pPixel_
-                for (int sampleIndex = startWave; sampleIndex < endWave; ++sampleIndex) {
+                for (int sampleIndex = waveStart; sampleIndex < waveEnd; ++sampleIndex) {
                     threadSampleIndex = sampleIndex;
                     sampler.StartPixelSample(pPixel, sampleIndex);
                     EvaluatePixelSample(pPixel, sampleIndex, sampler, scratchBuffer);
@@ -230,31 +230,31 @@ void ImageTileIntegrator::Render() {
             }
             PBRT_DBG("Finished image tile (%d,%d)-(%d,%d)\n", tileBounds.pMin.x,
                      tileBounds.pMin.y, tileBounds.pMax.x, tileBounds.pMax.y);
-            progress.Update((endWave - startWave) * tileBounds.Area());
+            progress.Update((waveEnd - waveStart) * tileBounds.Area());
         });
 
         // Update start and end wave
-        startWave = endWave;
-        endWave = std::min(spp, endWave + waveDelta);
+        waveStart = waveEnd;
+        waveEnd = std::min(spp, waveEnd + nextWaveSize);
         if (!referenceImage)
-            waveDelta = std::min(2 * waveDelta, 64);
+            nextWaveSize = std::min(2 * nextWaveSize, 64);
 
         // Write current image to disk
-        LOG_VERBOSE("Writing image with spp = %d", startWave);
+        LOG_VERBOSE("Writing image with spp = %d", waveStart);
         ImageMetadata metadata;
         metadata.renderTimeSeconds = progress.ElapsedSeconds();
-        metadata.samplesPerPixel = startWave;
+        metadata.samplesPerPixel = waveStart;
         if (referenceImage) {
             ImageMetadata filmMetadata;
-            Image filmImage = camera.GetFilm().GetImage(&filmMetadata, 1.f / startWave);
+            Image filmImage = camera.GetFilm().GetImage(&filmMetadata, 1.f / waveStart);
             ImageChannelValues mse =
                 filmImage.MSE(filmImage.AllChannelsDesc(), *referenceImage);
-            fprintf(mseOutFile, "%d, %.9g\n", startWave, mse.Average());
+            fprintf(mseOutFile, "%d, %.9g\n", waveStart, mse.Average());
             metadata.MSE = mse.Average();
             fflush(mseOutFile);
         }
         camera.InitMetadata(&metadata);
-        camera.GetFilm().WriteImage(metadata, 1.0f / startWave);
+        camera.GetFilm().WriteImage(metadata, 1.0f / waveStart);
     }
 
     if (mseOutFile)
@@ -305,14 +305,12 @@ void RayIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleIndex,
         // Issue warning if unexpected radiance value is returned
         if (L.HasNaNs()) {
             LOG_ERROR("Not-a-number radiance value returned for pixel (%d, "
-                      "%d), sample %d. "
-                      "Setting to black.",
+                      "%d), sample %d. Setting to black.",
                       pPixel.x, pPixel.y, sampleIndex);
             L = SampledSpectrum(0.f);
         } else if (IsInf(L.y(lambda))) {
             LOG_ERROR("Infinite radiance value returned for pixel (%d, %d), "
-                      "sample %d. "
-                      "Setting to black.",
+                      "sample %d. Setting to black.",
                       pPixel.x, pPixel.y, sampleIndex);
             L = SampledSpectrum(0.f);
         }

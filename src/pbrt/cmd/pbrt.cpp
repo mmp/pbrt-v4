@@ -234,7 +234,7 @@ int main(int argc, char *argv[]) {
         ParsedScene scene;
         ParseFiles(&scene, filenames);
 
-        // Render scene
+        // Render the scene
         if (options.useGPU)
             GPURender(scene);
         else
