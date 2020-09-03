@@ -19,6 +19,7 @@
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/stats.h>
 
+#include <atomic>
 #include <mutex>
 
 #include <optix.h>

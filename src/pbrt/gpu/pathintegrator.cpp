@@ -27,6 +27,7 @@
 #include <pbrt/util/string.h>
 #include <pbrt/util/taggedptr.h>
 
+#include <atomic>
 #include <cstring>
 #include <iostream>
 #include <map>
@@ -34,7 +35,6 @@
 #include <cuda.h>
 #include <cuda_profiler_api.h>
 #include <cuda_runtime.h>
-#include <cuda/std/atomic>
 
 #ifdef NVTX
 #ifdef PBRT_IS_WINDOWS

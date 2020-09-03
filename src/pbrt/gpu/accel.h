@@ -23,7 +23,6 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <optix.h>
-#include <cuda/std/atomic>
 
 namespace pbrt {
 
