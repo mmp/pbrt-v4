@@ -247,6 +247,10 @@ pstd::optional<TriangleIntersection> Triangle::Intersect(const Ray &ray, Float t
                                                          const Point3f &p0,
                                                          const Point3f &p1,
                                                          const Point3f &p2) {
+    // Return no intersection if triangle is degenerate
+    if (LengthSquared(Cross(p2 - p0, p1 - p0)) == 0)
+        return {};
+
     // Transform triangle vertices to ray coordinate space
     // Translate vertices based on ray origin
     Point3f p0t = p0 - Vector3f(ray.o);
