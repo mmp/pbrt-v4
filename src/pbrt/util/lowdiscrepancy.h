@@ -147,14 +147,11 @@ PBRT_CPU_GPU inline uint32_t MultiplyGenerator(pstd::span<const uint32_t> C, uin
 // Laine et al., Stratified Sampling for Stochastic Transparency, Sec 3.1...
 PBRT_CPU_GPU inline uint32_t OwenScramble(uint32_t v, uint32_t hash) {
     // Expect already reversed?
-    v = ReverseBits32(v ^ hash);
-    // Must be even numbers!
-    v ^= v * 0x9207662f0u;
-    v ^= v << 3;
-    v ^= v * 0xfe932074u;
-    v ^= v << 5;
-    v ^= v * 0x94b41206u;
-    v ^= v << 2;
+    v = ReverseBits32(v);
+    v += hash;
+    v ^= v * 0x6c50b47cu;
+    v ^= hash;
+    v ^= v * 0xb82f1e52u;
     return ReverseBits32(v);
 }
 
