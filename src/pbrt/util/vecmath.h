@@ -937,7 +937,7 @@ PBRT_CPU_GPU inline auto Length(const Vector3<T> &v) -> typename TupleLength<T>:
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto Normalize(const Vector3<T> &v) {
+PBRT_CPU_GPU inline Vector3<T> Normalize(const Vector3<T> &v) {
     return v / Length(v);
 }
 
@@ -950,11 +950,11 @@ PBRT_CPU_GPU inline T Dot(const Vector3<T> &v, const Vector3<T> &w) {
 // Equivalent to std::acos(Dot(a, b)), but more numerically stable.
 // via http://www.plunk.org/~hatch/rightway.php
 template <typename T>
-PBRT_CPU_GPU inline Float AngleBetween(const Vector3<T> &a, const Vector3<T> &b) {
-    if (Dot(a, b) < 0)
-        return Pi - 2 * SafeASin(Length(a + b) / 2);
+PBRT_CPU_GPU inline Float AngleBetween(const Vector3<T> &v1, const Vector3<T> &v2) {
+    if (Dot(v1, v2) < 0)
+        return Pi - 2 * SafeASin(Length(v1 + v2) / 2);
     else
-        return 2 * SafeASin(Length(b - a) / 2);
+        return 2 * SafeASin(Length(v2 - v1) / 2);
 }
 
 template <typename T>
@@ -972,11 +972,11 @@ PBRT_CPU_GPU inline Float AngleBetween(const Normal3<T> &a, const Normal3<T> &b)
 }
 
 template <typename T>
-PBRT_CPU_GPU inline Vector3<T> Cross(const Vector3<T> &v1, const Vector3<T> &v2) {
-    DCHECK(!v1.HasNaN() && !v2.HasNaN());
-    return {DifferenceOfProducts(v1.y, v2.z, v1.z, v2.y),
-            DifferenceOfProducts(v1.z, v2.x, v1.x, v2.z),
-            DifferenceOfProducts(v1.x, v2.y, v1.y, v2.x)};
+PBRT_CPU_GPU inline Vector3<T> Cross(const Vector3<T> &v, const Vector3<T> &w) {
+    DCHECK(!v.HasNaN() && !w.HasNaN());
+    return {DifferenceOfProducts(v.y, w.z, v.z, w.y),
+            DifferenceOfProducts(v.z, w.x, v.x, w.z),
+            DifferenceOfProducts(v.x, w.y, v.y, w.x)};
 }
 
 template <typename T>
