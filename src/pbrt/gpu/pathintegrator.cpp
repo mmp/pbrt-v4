@@ -177,6 +177,9 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
         lightSamplerName = "uniform";
     lightSampler = LightSamplerHandle::Create(lightSamplerName, allLights, alloc);
 
+    if (scene.integrator.name != "path" && scene.integrator.name != "volpath")
+        Warning(&scene.integrator.loc, "The GPU renderer always uses a \"volpath\" integrator.");
+
     // Integrator parameters
     regularize = scene.integrator.parameters.GetOneBool("regularize", false);
     maxDepth = scene.integrator.parameters.GetOneInt("maxdepth", 5);
