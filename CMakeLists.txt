@@ -85,6 +85,30 @@ set (BUILD_SHARED_LIBS OFF)
 
 add_subdirectory (${CMAKE_CURRENT_SOURCE_DIR}/src/ext)
 
+########################################
+# os/compiler-specific stuff
+
+if (CMAKE_SYSTEM_NAME STREQUAL Windows)
+  set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_IS_WINDOWS NOMINMAX)
+elseif (CMAKE_SYSTEM_NAME STREQUAL Darwin)
+  set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_IS_OSX)
+elseif (CMAKE_SYSTEM_NAME STREQUAL Linux)
+  set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_IS_LINUX)
+  # -rdynamic so we can get backtrace symbols...
+  # --no-as-needed so libprofiler sticks around
+  set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -rdynamic -Wl,--no-as-needed")
+else ()
+  message (SEND_ERROR "Unknown system name: " + CMAKE_SYSTEM_NAME)
+endif()
+
+# libgoogle-perftools-dev
+find_library (PROFILE_LIB profiler)
+if (NOT PROFILE_LIB)
+  message (STATUS "Unable to find -lprofiler")
+else ()
+  message (STATUS "Found -lprofiler: ${PROFILE_LIB}")
+endif ()
+
 #########################################
 ## CUDA / OptiX
 
@@ -291,30 +315,6 @@ int main() {
 
 if (HAS_INTRIN_H)
   set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_HAS_INTRIN_H)
-endif ()
-
-########################################
-# os/compiler-specific stuff
-
-if (CMAKE_SYSTEM_NAME STREQUAL Windows)
-  set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_IS_WINDOWS NOMINMAX)
-elseif (CMAKE_SYSTEM_NAME STREQUAL Darwin)
-  set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_IS_OSX)
-elseif (CMAKE_SYSTEM_NAME STREQUAL Linux)
-  set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_IS_LINUX)
-  # -rdynamic so we can get backtrace symbols...
-  # --no-as-needed so libprofiler sticks around
-  set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -rdynamic -Wl,--no-as-needed")
-else ()
-  message (SEND_ERROR "Unknown system name: " + CMAKE_SYSTEM_NAME)
-endif()
-
-# libgoogle-perftools-dev
-find_library (PROFILE_LIB profiler)
-if (NOT PROFILE_LIB)
-  message (STATUS "Unable to find -lprofiler")
-else ()
-  message (STATUS "Found -lprofiler: ${PROFILE_LIB}")
 endif ()
 
 ########################################
