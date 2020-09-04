@@ -496,6 +496,7 @@ class Vector3 : public Tuple3<Vector3, T> {
     Vector3() = default;
     PBRT_CPU_GPU
     Vector3(T x, T y, T z) : Tuple3<pbrt::Vector3, T>(x, y, z) {}
+
     template <typename U>
     PBRT_CPU_GPU explicit Vector3(const Vector3<U> &v)
         : Tuple3<pbrt::Vector3, T>(T(v.x), T(v.y), T(v.z)) {}
@@ -925,23 +926,31 @@ PBRT_CPU_GPU inline Vector3<T> Cross(const Normal3<T> &v1, const Vector3<T> &v2)
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto Dot(const Vector3<T> &v1, const Vector3<T> &v2) ->
-    typename TupleLength<T>::type {
-    DCHECK(!v1.HasNaN() && !v2.HasNaN());
-    return FMA(v1.x, v2.x, SumOfProducts(v1.y, v2.y, v1.z, v2.z));
+PBRT_CPU_GPU inline T LengthSquared(const Vector3<T> &v) {
+    return v.x * v.x + v.y * v.y + v.z * v.z;
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto AbsDot(const Vector3<T> &v1, const Vector3<T> &v2) {
-    DCHECK(!v1.HasNaN() && !v2.HasNaN());
-    return std::abs(Dot(v1, v2));
+PBRT_CPU_GPU inline auto Length(const Vector3<T> &v) -> typename TupleLength<T>::type {
+    using std::sqrt;
+    return sqrt(LengthSquared(v));
+}
+
+template <typename T>
+PBRT_CPU_GPU inline auto Normalize(const Vector3<T> &v) {
+    return v / Length(v);
+}
+
+template <typename T>
+PBRT_CPU_GPU inline T Dot(const Vector3<T> &v, const Vector3<T> &w) {
+    DCHECK(!v.HasNaN() && !w.HasNaN());
+    return v.x * w.x + v.y * w.y + v.z * w.z;
 }
 
 // Equivalent to std::acos(Dot(a, b)), but more numerically stable.
-// http://www.plunk.org/~hatch/rightway.php
+// via http://www.plunk.org/~hatch/rightway.php
 template <typename T>
-PBRT_CPU_GPU inline auto AngleBetween(const Vector3<T> &a, const Vector3<T> &b) ->
-    typename TupleLength<T>::type {
+PBRT_CPU_GPU inline Float AngleBetween(const Vector3<T> &a, const Vector3<T> &b) {
     if (Dot(a, b) < 0)
         return Pi - 2 * SafeASin(Length(a + b) / 2);
     else
@@ -949,8 +958,13 @@ PBRT_CPU_GPU inline auto AngleBetween(const Vector3<T> &a, const Vector3<T> &b) 
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto AngleBetween(const Normal3<T> &a, const Normal3<T> &b) ->
-    typename TupleLength<T>::type {
+PBRT_CPU_GPU inline T AbsDot(const Vector3<T> &v1, const Vector3<T> &v2) {
+    DCHECK(!v1.HasNaN() && !v2.HasNaN());
+    return std::abs(Dot(v1, v2));
+}
+
+template <typename T>
+PBRT_CPU_GPU inline Float AngleBetween(const Normal3<T> &a, const Normal3<T> &b) {
     if (Dot(a, b) < 0)
         return Pi - 2 * SafeASin(Length(a + b) / 2);
     else
@@ -963,24 +977,6 @@ PBRT_CPU_GPU inline Vector3<T> Cross(const Vector3<T> &v1, const Vector3<T> &v2)
     return {DifferenceOfProducts(v1.y, v2.z, v1.z, v2.y),
             DifferenceOfProducts(v1.z, v2.x, v1.x, v2.z),
             DifferenceOfProducts(v1.x, v2.y, v1.y, v2.x)};
-}
-
-template <typename T>
-PBRT_CPU_GPU inline auto LengthSquared(const Vector3<T> &v) ->
-    typename TupleLength<T>::type {
-    return Sqr(v.x) + Sqr(v.y) + Sqr(v.z);
-}
-
-template <typename T>
-PBRT_CPU_GPU inline auto Length(const Vector3<T> &v) -> typename TupleLength<T>::type {
-    using std::sqrt;
-    return sqrt(LengthSquared(v));
-}
-
-template <typename T>
-PBRT_CPU_GPU inline auto Normalize(const Vector3<T> &v)
-    -> Vector3<typename TupleLength<T>::type> {
-    return v / Length(v);
 }
 
 template <typename T>
