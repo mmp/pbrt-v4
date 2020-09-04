@@ -669,13 +669,6 @@ class Point3 : public Tuple3<Point3, T> {
     }
 
     template <typename U>
-    PBRT_CPU_GPU auto operator-(const Point3<U> &p) const
-        -> Vector3<decltype(T{} - U{})> {
-        DCHECK(!p.HasNaN());
-        return {x - p.x, y - p.y, z - p.z};
-    }
-
-    template <typename U>
     PBRT_CPU_GPU auto operator-(const Vector3<U> &v) const
         -> Point3<decltype(T{} - U{})> {
         DCHECK(!v.HasNaN());
@@ -688,6 +681,13 @@ class Point3 : public Tuple3<Point3, T> {
         y -= v.y;
         z -= v.z;
         return *this;
+    }
+
+    template <typename U>
+    PBRT_CPU_GPU auto operator-(const Point3<U> &p) const
+        -> Vector3<decltype(T{} - U{})> {
+        DCHECK(!p.HasNaN());
+        return {x - p.x, y - p.y, z - p.z};
     }
 };
 
@@ -1006,14 +1006,12 @@ Vector3<T>::Vector3(const Normal3<U> &n)
 
 // Point3 Inline Functions
 template <typename T>
-PBRT_CPU_GPU inline auto Distance(const Point3<T> &p1, const Point3<T> &p2) ->
-    typename TupleLength<T>::type {
+PBRT_CPU_GPU inline auto Distance(const Point3<T> &p1, const Point3<T> &p2) {
     return Length(p1 - p2);
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto DistanceSquared(const Point3<T> &p1, const Point3<T> &p2) ->
-    typename TupleLength<T>::type {
+PBRT_CPU_GPU inline auto DistanceSquared(const Point3<T> &p1, const Point3<T> &p2) {
     return LengthSquared(p1 - p2);
 }
 
@@ -1505,30 +1503,25 @@ PBRT_CPU_GPU inline bool Inside(const Point3<T> &p, const Bounds3<T> &b) {
 }
 
 template <typename T>
-PBRT_CPU_GPU inline bool Inside(const Bounds3<T> &ba, const Bounds3<T> &bb) {
-    return (ba.pMin.x >= bb.pMin.x && ba.pMax.x <= bb.pMax.x && ba.pMin.y >= bb.pMin.y &&
-            ba.pMay.y <= bb.pMay.y && ba.pMin.z >= bb.pMin.z && ba.pMay.z <= bb.pMay.z);
-}
-
-template <typename T>
 PBRT_CPU_GPU inline bool InsideExclusive(const Point3<T> &p, const Bounds3<T> &b) {
     return (p.x >= b.pMin.x && p.x < b.pMax.x && p.y >= b.pMin.y && p.y < b.pMax.y &&
             p.z >= b.pMin.z && p.z < b.pMax.z);
 }
 
-// Minimum squared distance from point to box; returns zero if point is
-// inside.
 template <typename T, typename U>
-PBRT_CPU_GPU inline Float DistanceSquared(const Point3<T> &p, const Bounds3<U> &b) {
-    Float dx = std::max<Float>({0, b.pMin.x - p.x, p.x - b.pMax.x});
-    Float dy = std::max<Float>({0, b.pMin.y - p.y, p.y - b.pMax.y});
-    Float dz = std::max<Float>({0, b.pMin.z - p.z, p.z - b.pMax.z});
+PBRT_CPU_GPU inline auto DistanceSquared(const Point3<T> &p, const Bounds3<U> &b) {
+    using TDist = decltype(T{} - U{});
+    TDist dx = std::max<TDist>({0, b.pMin.x - p.x, p.x - b.pMax.x});
+    TDist dy = std::max<TDist>({0, b.pMin.y - p.y, p.y - b.pMax.y});
+    TDist dz = std::max<TDist>({0, b.pMin.z - p.z, p.z - b.pMax.z});
     return dx * dx + dy * dy + dz * dz;
 }
 
 template <typename T, typename U>
-PBRT_CPU_GPU inline Float Distance(const Point3<T> &p, const Bounds3<U> &b) {
-    return std::sqrt(DistanceSquared(p, b));
+PBRT_CPU_GPU inline auto Distance(const Point3<T> &p, const Bounds3<U> &b) {
+    auto dist2 = DistanceSquared(p, b);
+    using TDist = typename TupleLength<decltype(dist2)>::type;
+    return std::sqrt(TDist(dist2));
 }
 
 template <typename T, typename U>
@@ -1817,7 +1810,6 @@ class DirectionCone {
 };
 
 // DirectionCone Inline Functions
-// TODO: require normalized w?
 PBRT_CPU_GPU
 inline bool Inside(const DirectionCone &d, const Vector3f &w) {
     return Dot(d.w, Normalize(w)) >= d.cosTheta;
@@ -1841,14 +1833,12 @@ inline DirectionCone BoundSubtendedDirections(const Bounds3f &b, const Point3f &
 PBRT_CPU_GPU
 inline Vector3f DirectionCone::ClosestVectorInCone(Vector3f wp) const {
     wp = Normalize(wp);
+    // Return provided vector if it is inside the cone
     if (Dot(wp, w) > cosTheta)
-        // in cone already
         return wp;
 
+    // Find closest vector by rotating _wp_ until it touches the cone
     Float sinTheta = -SafeSqrt(1 - cosTheta * cosTheta);
-    // closest vector to cone.nb
-    // Take the rotation matrix around Normalize(a), then apply it to w,
-    // simplify, and we end up with this.
     Vector3f a = Cross(wp, w);
     return cosTheta * w +
            (sinTheta / Length(a)) *

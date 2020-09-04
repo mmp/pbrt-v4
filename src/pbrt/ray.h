@@ -47,12 +47,10 @@ class RayDifferential : public Ray {
     PBRT_CPU_GPU
     RayDifferential(const Point3f &o, const Vector3f &d, Float time = 0.f,
                     MediumHandle medium = nullptr)
-        : Ray(o, d, time, medium) {
-        hasDifferentials = false;
-    }
+        : Ray(o, d, time, medium) {}
 
     PBRT_CPU_GPU
-    explicit RayDifferential(const Ray &ray) : Ray(ray) { hasDifferentials = false; }
+    explicit RayDifferential(const Ray &ray) : Ray(ray) {}
 
     void ScaleDifferentials(Float s) {
         rxOrigin = o + (rxOrigin - o) * s;
@@ -70,7 +68,7 @@ class RayDifferential : public Ray {
     std::string ToString() const;
 
     // RayDifferential Public Members
-    bool hasDifferentials;
+    bool hasDifferentials = false;
     Point3f rxOrigin, ryOrigin;
     Vector3f rxDirection, ryDirection;
 };

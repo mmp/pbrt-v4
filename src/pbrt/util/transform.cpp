@@ -381,6 +381,7 @@ std::string Transform::ToString() const {
 DirectionCone Union(const DirectionCone &a, const DirectionCone &b) {
     Float theta_d = AngleBetween(a.w, b.w);
     Float theta_a = SafeACos(a.cosTheta), theta_b = SafeACos(b.cosTheta);
+    // Handle the cases where one cone is inside the other
     if (std::min(theta_d + theta_b, Pi) <= theta_a)
         // a encloses b
         return a;
@@ -388,20 +389,16 @@ DirectionCone Union(const DirectionCone &a, const DirectionCone &b) {
         // b encloses a
         return b;
 
-    // merge
+    // Compute the spread angle of the merged cone, $\theta_o$
     Float theta_o = (theta_a + theta_d + theta_b) / 2;
     if (theta_o >= Pi)
         return DirectionCone(a.w, -1);
 
-    // Rotate a's axis toward b so theta_o covers both
+    // Find the merged cone's axis and return cone union
     Float theta_r = theta_o - theta_a;
-
     Vector3f wr = Cross(a.w, b.w);
     if (LengthSquared(wr) == 0)
-        // They face opposite directions; if they were equal, one of the
-        // tests for one enclosing the other would have taken care of it.
         return DirectionCone(a.w, -1);
-
     Vector3f w = Rotate(Degrees(theta_r), wr)(a.w);
     return DirectionCone(w, std::cos(theta_o));
 }
