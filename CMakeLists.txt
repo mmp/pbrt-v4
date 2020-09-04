@@ -186,10 +186,6 @@ if (CMAKE_CUDA_COMPILER)
 
         set (PBRT_CUDA_LIB cuda)
 
-        # optix
-        # FIXME
-        include_directories (${PBRT_OPTIX7_PATH}/include)
-
         # from Ingo's configure_optix.cmake (Apache licensed)
         find_program (BIN2C bin2c DOC "Path to the CUDA SDK bin2c executable.")
 
@@ -221,7 +217,7 @@ if (CMAKE_CUDA_COMPILER)
                 --define-macro=NDEBUG ${cuda_definitions}
                 )
           target_include_directories ("${lib_name}" PRIVATE src ${CMAKE_BINARY_DIR})
-          target_include_directories ("${lib_name}" SYSTEM PRIVATE ${NANOVDB_INCLUDE})
+          target_include_directories ("${lib_name}" SYSTEM PRIVATE ${NANOVDB_INCLUDE} ${PBRT_OPTIX7_PATH}/include)
           set (c_var_name ${output_var})
           set (embedded_file ${cuda_file}.ptx_embedded.c)
           add_custom_command (
@@ -696,6 +692,9 @@ target_include_directories (pbrt_lib PUBLIC
   ${NANOVDB_INCLUDE}
   ${CMAKE_CURRENT_BINARY_DIR}
 )
+if (PBRT_CUDA_ENABLED AND PBRT_OPTIX7_PATH)
+    target_include_directories (pbrt_lib SYSTEM PUBLIC ${PBRT_OPTIX7_PATH}/include)
+endif ()
 
 target_compile_options (pbrt_lib PUBLIC ${PBRT_CXX_FLAGS})
 
