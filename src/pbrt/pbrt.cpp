@@ -14,8 +14,11 @@
 #include <pbrt/util/error.h>
 #include <pbrt/util/memory.h>
 #include <pbrt/util/parallel.h>
+#include <pbrt/util/print.h>
 #include <pbrt/util/spectrum.h>
 #include <pbrt/util/stats.h>
+
+#include <stdlib.h>
 
 namespace pbrt {
 
@@ -23,6 +26,22 @@ namespace pbrt {
 void InitPBRT(const PBRTOptions &opt) {
     Options = new PBRTOptions(opt);
     // API Initialization
+
+#ifdef PBRT_IS_WINDOWS
+    if (Options->useGPU && Options->gpuDevice &&
+        getenv("CUDA_VISIBLE_DEVICES") == nullptr) {
+        // Limit CUDA to considering only a single GPU on Windows.  pbrt
+        // only uses a single GPU anyway, and if there are multiple GPUs
+        // plugged in with different architectures, pbrt's use of unified
+        // memory causes a performance hit.  We set this early, before CUDA
+        // gets going...
+        std::string env = StringPrintf("CUDA_VISIBLE_DEVICES=%d", *Options->gpuDevice);
+        _putenv(env.c_str());
+        // Now CUDA should only see a single device, so tell it that zero
+        // is the one to use.
+        *Options->gpuDevice = 0;
+    }
+#endif  // PBRT_IS_WINDOWS
 
     if (Options->quiet)
         SuppressErrorMessages();

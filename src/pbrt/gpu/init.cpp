@@ -6,6 +6,7 @@
 
 #include <pbrt/options.h>
 #include <pbrt/util/check.h>
+#include <pbrt/util/error.h>
 #include <pbrt/util/log.h>
 #include <pbrt/util/print.h>
 
@@ -34,22 +35,31 @@ void GPUInit() {
 
     int nDevices;
     CUDA_CHECK(cudaGetDeviceCount(&nDevices));
+    cudaDeviceProp firstDeviceProperties;
+    std::string devices;
     for (int i = 0; i < nDevices; ++i) {
         cudaDeviceProp deviceProperties;
         CUDA_CHECK(cudaGetDeviceProperties(&deviceProperties, i));
+        if (i == 0)
+            firstDeviceProperties = deviceProperties;
         CHECK(deviceProperties.canMapHostMemory);
 
-        size_t stackSize;
-        CUDA_CHECK(cudaDeviceGetLimit(&stackSize, cudaLimitStackSize));
-        size_t printfFIFOSize;
-        CUDA_CHECK(cudaDeviceGetLimit(&printfFIFOSize, cudaLimitPrintfFifoSize));
-
-        LOG_VERBOSE(
+        std::string deviceString = StringPrintf(
             "CUDA device %d (%s) with %f MiB, %d SMs running at %f MHz "
-            "with shader model  %d.%d, max stack %d printf FIFO %d",
+            "with shader model %d.%d",
             i, deviceProperties.name, deviceProperties.totalGlobalMem / (1024. * 1024.),
             deviceProperties.multiProcessorCount, deviceProperties.clockRate / 1000.,
-            deviceProperties.major, deviceProperties.minor, stackSize, printfFIFOSize);
+            deviceProperties.major, deviceProperties.minor);
+        LOG_VERBOSE("%s", deviceString);
+        devices += deviceString + "\n";
+
+#ifdef PBRT_IS_WINDOWS
+        if (deviceProperties.major != firstDeviceProperties.major)
+            ErrorExit("Found multiple GPUs with different shader models.\n"
+                      "On Windows, this unfortunately causes a significant slowdown with pbrt.\n"
+                      "Please select a single GPU and use the --gpu-device command line option to specify it.\n"
+                      "Found devices:\n%s", devices);
+#endif
     }
 
     int device = Options->gpuDevice ? *Options->gpuDevice : 0;
