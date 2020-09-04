@@ -19,10 +19,11 @@ void usage(const std::string &msg = "") {
         fprintf(stderr, "pbrt_test: %s\n\n", msg.c_str());
 
     fprintf(stderr, R"(pbrt_test arguments:
+  --list-tests                List all tests.
   --log-level <level>         Log messages at or above this level, where <level>
                               is "verbose", "error", or "fatal". Default: "error".
   --nthreads <num>            Use specified number of threads for rendering.
-  --test_filter <regexp>      Regular expression of test names to run.
+  --test-filter <regexp>      Regular expression of test names to run.
   --vlog-level <n>            Set VLOG verbosity. (Default: 0, disabled.)
 )");
 
@@ -34,6 +35,7 @@ int main(int argc, char **argv) {
     opt.quiet = true;
     std::string logLevel = "error";
     std::string testFilter;
+    bool listTests = false;
 
     char **origArgv = argv;
     // Process command-line arguments
@@ -44,7 +46,8 @@ int main(int argc, char **argv) {
             exit(1);
         };
 
-        if (ParseArg(&argv, "log-level", &logLevel, onError) ||
+        if (ParseArg(&argv, "list-tests", &listTests, onError) ||
+            ParseArg(&argv, "log-level", &logLevel, onError) ||
             ParseArg(&argv, "nthreads", &opt.nThreads, onError) ||
             ParseArg(&argv, "test-filter", &testFilter, onError)) {
             // success
@@ -67,9 +70,11 @@ int main(int argc, char **argv) {
     std::string filter;
     if (!testFilter.empty()) {
         filter = StringPrintf("--gtest_filter=%s", testFilter);
-        googleArgc += 1;
-        googleArgv[1] = filter.c_str();
+        googleArgv[googleArgc++] = filter.c_str();
     }
+    if (listTests)
+        googleArgv[googleArgc++] = "--gtest_list_tests";
+
     testing::InitGoogleTest(&googleArgc, (char **)googleArgv);
 
     int ret = RUN_ALL_TESTS();
