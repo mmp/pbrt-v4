@@ -342,10 +342,7 @@ class DielectricInterfaceBxDF {
                     return {};
                 SampledSpectrum f(mfDistrib.D(wh) * mfDistrib.G(wo, wi) * F /
                                   (4 * cosTheta_i * cosTheta_o));
-                if (mfDistrib.EffectivelySpecular())
-                    return BSDFSample(f / pdf, wi, 1, BxDFFlags::SpecularReflection);
-                else
-                    return BSDFSample(f, wi, pdf, BxDFFlags::GlossyReflection);
+                return BSDFSample(f, wi, pdf, BxDFFlags::GlossyReflection);
 
             } else {
                 // Sample transmission at non-delta dielectric interface
@@ -380,10 +377,7 @@ class DielectricInterfaceBxDF {
                 Float pdf = mfDistrib.PDF(wo, wh) * dwh_dwi * pt / (pr + pt);
                 CHECK(!IsNaN(pdf));
 
-                if (mfDistrib.EffectivelySpecular())
-                    return BSDFSample(f / pdf, wi, 1, BxDFFlags::SpecularTransmission);
-                else
-                    return BSDFSample(f, wi, pdf, BxDFFlags::GlossyTransmission);
+                return BSDFSample(f, wi, pdf, BxDFFlags::GlossyTransmission);
             }
         }
     }
