@@ -150,7 +150,7 @@ bool Transform::SwapsHandedness() const {
     Float minor02 = DifferenceOfProducts(m[1][0], m[2][2], m[1][2], m[2][0]);
     Float minor01 = DifferenceOfProducts(m[1][0], m[2][1], m[1][1], m[2][0]);
     Float det =
-        FMA(m[0][2], minor01, DifferenceOfProducts(m[0][0], minor12, m[0][1], minor02));
+        m[0][2] * minor01 + DifferenceOfProducts(m[0][0], minor12, m[0][1], minor02);
     return det < 0;
 }
 
@@ -375,32 +375,6 @@ SurfaceInteraction Transform::ApplyInverse(const SurfaceInteraction &si) const {
 
 std::string Transform::ToString() const {
     return StringPrintf("[ m: %s mInv: %s ]", m, mInv);
-}
-
-// DirectionCone Function Definitions
-DirectionCone Union(const DirectionCone &a, const DirectionCone &b) {
-    Float theta_d = AngleBetween(a.w, b.w);
-    Float theta_a = SafeACos(a.cosTheta), theta_b = SafeACos(b.cosTheta);
-    // Handle the cases where one cone is inside the other
-    if (std::min(theta_d + theta_b, Pi) <= theta_a)
-        // a encloses b
-        return a;
-    if (std::min(theta_d + theta_a, Pi) <= theta_b)
-        // b encloses a
-        return b;
-
-    // Compute the spread angle of the merged cone, $\theta_o$
-    Float theta_o = (theta_a + theta_d + theta_b) / 2;
-    if (theta_o >= Pi)
-        return DirectionCone(a.w, -1);
-
-    // Find the merged cone's axis and return cone union
-    Float theta_r = theta_o - theta_a;
-    Vector3f wr = Cross(a.w, b.w);
-    if (LengthSquared(wr) == 0)
-        return DirectionCone(a.w, -1);
-    Vector3f w = Rotate(Degrees(theta_r), wr)(a.w);
-    return DirectionCone(w, std::cos(theta_o));
 }
 
 // AnimatedTransform Method Definitions

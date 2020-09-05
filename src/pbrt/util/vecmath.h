@@ -1790,9 +1790,7 @@ class DirectionCone {
     DirectionCone() = default;
     PBRT_CPU_GPU
     DirectionCone(const Vector3f &w, Float cosTheta)
-        : w(Normalize(w)), cosTheta(cosTheta) {
-        DCHECK(cosTheta >= -1 && cosTheta <= 1);
-    }
+        : w(Normalize(w)), cosTheta(cosTheta), empty(false) {}
     PBRT_CPU_GPU
     explicit DirectionCone(const Vector3f &w) : DirectionCone(w, 1) {}
 
@@ -1805,25 +1803,27 @@ class DirectionCone {
     Vector3f ClosestVectorInCone(Vector3f wp) const;
 
     // DirectionCone Public Members
-    Vector3f w = Vector3f(0, 0, 1);
-    Float cosTheta = -1;
+    Vector3f w;
+    Float cosTheta;
+    bool empty = true;
 };
 
 // DirectionCone Inline Functions
 PBRT_CPU_GPU
 inline bool Inside(const DirectionCone &d, const Vector3f &w) {
-    return Dot(d.w, Normalize(w)) >= d.cosTheta;
+    return !d.empty && Dot(d.w, Normalize(w)) >= d.cosTheta;
 }
 
 PBRT_CPU_GPU
 inline DirectionCone BoundSubtendedDirections(const Bounds3f &b, const Point3f &p) {
+    // Compute bounding sphere for _b_ and check if _p_ is inside
     Float radius;
     Point3f pCenter;
     b.BoundingSphere(&pCenter, &radius);
-    DirectionCone cSphere;
     if (DistanceSquared(p, pCenter) < radius * radius)
         return DirectionCone::EntireSphere();
 
+    // Compute and return _DirectionCone_ for bounding sphere
     Vector3f w = Normalize(pCenter - p);
     Float sinThetaMax2 = radius * radius / DistanceSquared(pCenter, p);
     Float cosThetaMax = SafeSqrt(1 - sinThetaMax2);
@@ -1832,6 +1832,7 @@ inline DirectionCone BoundSubtendedDirections(const Bounds3f &b, const Point3f &
 
 PBRT_CPU_GPU
 inline Vector3f DirectionCone::ClosestVectorInCone(Vector3f wp) const {
+    DCHECK(!empty);
     wp = Normalize(wp);
     // Return provided vector if it is inside the cone
     if (Dot(wp, w) > cosTheta)
@@ -1871,7 +1872,6 @@ class Frame {
     static Frame FromXZ(const Vector3f &x, const Vector3f &z) {
         return Frame(x, Cross(z, x), z);
     }
-
     PBRT_CPU_GPU
     static Frame FromXY(const Vector3f &x, const Vector3f &y) {
         return Frame(x, y, Cross(x, y));
@@ -1891,6 +1891,7 @@ class Frame {
     Vector3f ToLocal(const Vector3f &v) const {
         return Vector3f(Dot(v, x), Dot(v, y), Dot(v, z));
     }
+
     PBRT_CPU_GPU
     Normal3f ToLocal(const Normal3f &n) const {
         return Normal3f(Dot(n, x), Dot(n, y), Dot(n, z));

@@ -26,15 +26,6 @@ class Transform {
   public:
     // Transform Public Methods
     PBRT_CPU_GPU
-    bool HasScale() const {
-        Float la2 = LengthSquared((*this)(Vector3f(1, 0, 0)));
-        Float lb2 = LengthSquared((*this)(Vector3f(0, 1, 0)));
-        Float lc2 = LengthSquared((*this)(Vector3f(0, 0, 1)));
-        return (std::abs(la2 - 1) > 1e-3f || std::abs(lb2 - 1) > 1e-3f ||
-                std::abs(lc2 - 1) > 1e-3f);
-    }
-
-    PBRT_CPU_GPU
     inline Ray ApplyInverse(const Ray &r, Float *tMax = nullptr) const;
     PBRT_CPU_GPU
     inline RayDifferential ApplyInverse(const RayDifferential &r,
@@ -49,12 +40,6 @@ class Transform {
     std::string ToString() const;
 
     Transform() = default;
-
-    PBRT_CPU_GPU
-    explicit Transform(const Frame &frame)
-        : Transform(SquareMatrix<4>(frame.x.x, frame.x.y, frame.x.z, 0., frame.y.x,
-                                    frame.y.y, frame.y.z, 0., frame.z.x, frame.z.y,
-                                    frame.z.z, 0., 0, 0, 0, 1.)) {}
 
     PBRT_CPU_GPU
     Transform(const SquareMatrix<4> &m) : m(m) {
@@ -90,6 +75,15 @@ class Transform {
     PBRT_CPU_GPU
     bool IsIdentity() const { return m.IsIdentity(); }
 
+    PBRT_CPU_GPU
+    bool HasScale(Float tolerance = 1e-3f) const {
+        Float la2 = LengthSquared((*this)(Vector3f(1, 0, 0)));
+        Float lb2 = LengthSquared((*this)(Vector3f(0, 1, 0)));
+        Float lc2 = LengthSquared((*this)(Vector3f(0, 0, 1)));
+        return (std::abs(la2 - 1) > tolerance || std::abs(lb2 - 1) > tolerance ||
+                std::abs(lc2 - 1) > tolerance);
+    }
+
     template <typename T>
     PBRT_CPU_GPU Point3<T> operator()(const Point3<T> &p) const;
 
@@ -115,6 +109,9 @@ class Transform {
 
     PBRT_CPU_GPU
     bool SwapsHandedness() const;
+
+    PBRT_CPU_GPU
+    explicit Transform(const Frame &frame);
 
     PBRT_CPU_GPU
     explicit Transform(const Quaternion &q);
@@ -347,6 +344,11 @@ inline RayDifferential Transform::operator()(const RayDifferential &r,
     ret.ryDirection = (*this)(r.ryDirection);
     return ret;
 }
+
+inline Transform::Transform(const Frame &frame)
+    : Transform(SquareMatrix<4>(frame.x.x, frame.x.y, frame.x.z, 0, frame.y.x, frame.y.y,
+                                frame.y.z, 0, frame.z.x, frame.z.y, frame.z.z, 0, 0, 0, 0,
+                                1)) {}
 
 inline Transform::Transform(const Quaternion &q) {
     Float xx = q.v.x * q.v.x, yy = q.v.y * q.v.y, zz = q.v.z * q.v.z;
