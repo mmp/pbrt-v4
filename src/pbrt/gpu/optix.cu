@@ -301,9 +301,7 @@ static __forceinline__ __device__ bool alphaKilled(const TriangleMeshRecord &rec
 
 extern "C" __global__ void __closesthit__triangle() {
     const TriangleMeshRecord &rec = *(const TriangleMeshRecord *)optixGetSbtDataPointer();
-    // It's slightly dicey to assume intr is valid. But invalid would
-    // presumably mean that OptiX returned a hit with a degenerate
-    // triangle...
+
     SurfaceInteraction intr = getTriangleIntersection();
 
     if (rec.mediumInterface && rec.mediumInterface->IsMediumTransition())

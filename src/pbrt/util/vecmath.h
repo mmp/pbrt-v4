@@ -1119,22 +1119,14 @@ inline Quaternion Normalize(const Quaternion &q) {
     return q / Length(q);
 }
 
+// http://www.plunk.org/~hatch/rightway.php
 PBRT_CPU_GPU
 inline Quaternion Slerp(Float t, const Quaternion &q1, const Quaternion &q2) {
-    // http://www.plunk.org/~hatch/rightway.php
-    // First, robust "angle between" computation.
     Float theta = (Dot(q1, q2) < 0) ? (Pi - 2 * SafeASin(Length(q1 + q2) / 2))
                                     : (2 * SafeASin(Length(q2 - q1) / 2));
-
-    // Now, rewrite slerp(t, q1, q2) = sin((1-t)*theta)/sin(theta)*q1 +
-    // sin(t*theta)/sin(theta)*q2 by multiplying the first term by
-    // (theta*(1-t))/(theta*(1-t)) and the second term by
-    // ((t*theta)/(t*theta)).  In turn, we can replace the sin() calls,
-    // which head towards 0/0 when theta approaches 0, with robust sin(x)/x
-    // calls.
     Float sinThetaOverTheta = SinXOverX(theta);
-    return ((SinXOverX((1 - t) * theta) / sinThetaOverTheta) * (1 - t) * q1 +
-            (SinXOverX(t * theta) / sinThetaOverTheta) * t * q2);
+    return q1 * (1 - t) * SinXOverX((1 - t) * theta) / sinThetaOverTheta +
+           q2 * t * SinXOverX(t * theta) / sinThetaOverTheta;
 }
 
 // Bounds2 Definition
