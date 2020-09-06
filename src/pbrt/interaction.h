@@ -30,8 +30,8 @@ class Interaction {
 
     PBRT_CPU_GPU
     Interaction(const Point3fi &pi, const Normal3f &n, const Point2f &uv,
-                const Vector3f &wo, Float time, const MediumInterface *intr)
-        : pi(pi), n(n), uv(uv), wo(Normalize(wo)), time(time), mediumInterface(intr) {}
+                const Vector3f &wo, Float time)
+        : pi(pi), n(n), uv(uv), wo(Normalize(wo)), time(time) {}
 
     PBRT_CPU_GPU
     Point3f p() const { return Point3f(pi); }
@@ -178,15 +178,12 @@ class SurfaceInteraction : public Interaction {
     PBRT_CPU_GPU
     SurfaceInteraction(const Point3fi &pi, const Point2f &uv, const Vector3f &wo,
                        const Vector3f &dpdu, const Vector3f &dpdv, const Normal3f &dndu,
-                       const Normal3f &dndv, Float time, bool flipNormal,
-                       int faceIndex = 0)
-        : Interaction(pi, Normal3f(Normalize(Cross(dpdu, dpdv))), uv, wo, time,
-                      (MediumInterface *)nullptr),
+                       const Normal3f &dndv, Float time, bool flipNormal)
+        : Interaction(pi, Normal3f(Normalize(Cross(dpdu, dpdv))), uv, wo, time),
           dpdu(dpdu),
           dpdv(dpdv),
           dndu(dndu),
-          dndv(dndv),
-          faceIndex(faceIndex) {
+          dndv(dndv) {
         // Initialize shading geometry from true geometry
         shading.n = n;
         shading.dpdu = dpdu;
@@ -199,6 +196,14 @@ class SurfaceInteraction : public Interaction {
             n *= -1;
             shading.n *= -1;
         }
+    }
+
+    PBRT_CPU_GPU
+    SurfaceInteraction(const Point3fi &pi, const Point2f &uv, const Vector3f &wo,
+                       const Vector3f &dpdu, const Vector3f &dpdv, const Normal3f &dndu,
+                       const Normal3f &dndv, Float time, bool flipNormal, int faceIndex)
+        : SurfaceInteraction(pi, uv, wo, dpdu, dpdv, dndu, dndv, time, flipNormal) {
+        this->faceIndex = faceIndex;
     }
 
     PBRT_CPU_GPU
@@ -218,9 +223,10 @@ class SurfaceInteraction : public Interaction {
         shading.dpdv = dpdvs;
         shading.dndu = dndus;
         shading.dndv = dndvs;
-        while (LengthSquared(shading.dpdu) > 1e16 || LengthSquared(shading.dpdv) > 1e16) {
-            shading.dpdu /= 1e8;
-            shading.dpdv /= 1e8;
+        while (LengthSquared(shading.dpdu) > 1e16f ||
+               LengthSquared(shading.dpdv) > 1e16f) {
+            shading.dpdu /= 1e8f;
+            shading.dpdv /= 1e8f;
         }
     }
 
@@ -251,12 +257,12 @@ class SurfaceInteraction : public Interaction {
     // SurfaceInteraction Public Members
     Vector3f dpdu, dpdv;
     Normal3f dndu, dndv;
-    int faceIndex = 0;
     struct {
         Normal3f n;
         Vector3f dpdu, dpdv;
         Normal3f dndu, dndv;
     } shading;
+    int faceIndex = 0;
     MaterialHandle material;
     LightHandle areaLight;
     mutable Vector3f dpdx, dpdy;
