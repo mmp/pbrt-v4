@@ -699,36 +699,35 @@ using Point2i = Point2<int>;
 using Point3f = Point3<Float>;
 using Point3i = Point3<int>;
 
-class Point3fi : public Point3<Interval<Float>> {
+// Point3fi Definition
+class Point3fi : public Point3<FloatInterval> {
   public:
-    using Point3<Interval<Float>>::x;
-    using Point3<Interval<Float>>::y;
-    using Point3<Interval<Float>>::z;
-    using Point3<Interval<Float>>::HasNaN;
-    using Point3<Interval<Float>>::operator+;
-    using Point3<Interval<Float>>::operator*;
-    using Point3<Interval<Float>>::operator*=;
+    using Point3<FloatInterval>::x;
+    using Point3<FloatInterval>::y;
+    using Point3<FloatInterval>::z;
+    using Point3<FloatInterval>::HasNaN;
+    using Point3<FloatInterval>::operator+;
+    using Point3<FloatInterval>::operator*;
+    using Point3<FloatInterval>::operator*=;
 
     Point3fi() = default;
     PBRT_CPU_GPU
     Point3fi(FloatInterval x, FloatInterval y, FloatInterval z)
-        : Point3<Interval<Float>>(x, y, z) {}
+        : Point3<FloatInterval>(x, y, z) {}
     PBRT_CPU_GPU
     Point3fi(Float x, Float y, Float z)
-        : Point3<Interval<Float>>(Interval<Float>(x), Interval<Float>(y),
-                                  Interval<Float>(z)) {}
+        : Point3<FloatInterval>(FloatInterval(x), FloatInterval(y), FloatInterval(z)) {}
     PBRT_CPU_GPU
     Point3fi(const Point3f &p)
-        : Point3<Interval<Float>>(Interval<Float>(p.x), Interval<Float>(p.y),
-                                  Interval<Float>(p.z)) {}
+        : Point3<FloatInterval>(FloatInterval(p.x), FloatInterval(p.y),
+                                FloatInterval(p.z)) {}
     template <typename F>
-    PBRT_CPU_GPU Point3fi(const Point3<Interval<F>> &pfi)
-        : Point3<Interval<Float>>(pfi) {}
+    PBRT_CPU_GPU Point3fi(const Point3<Interval<F>> &pfi) : Point3<FloatInterval>(pfi) {}
     PBRT_CPU_GPU
     Point3fi(const Point3f &p, const Vector3f &e)
-        : Point3<Interval<Float>>(Interval<Float>::FromValueAndError(p.x, e.x),
-                                  Interval<Float>::FromValueAndError(p.y, e.y),
-                                  Interval<Float>::FromValueAndError(p.z, e.z)) {}
+        : Point3<FloatInterval>(FloatInterval::FromValueAndError(p.x, e.x),
+                                FloatInterval::FromValueAndError(p.y, e.y),
+                                FloatInterval::FromValueAndError(p.z, e.z)) {}
 
     PBRT_CPU_GPU
     Vector3f Error() const { return {x.Width() / 2, y.Width() / 2, z.Width() / 2}; }
@@ -1644,6 +1643,61 @@ inline Float SphericalPhi(const Vector3f &v) {
 }
 
 PBRT_CPU_GPU
+inline Float SphericalTriangleArea(const Vector3f &a, const Vector3f &b,
+                                   const Vector3f &c) {
+    // http://math.stackexchange.com/questions/9819/area-of-a-spherical-triangle
+    // Girard's theorem: surface area of a spherical triangle on a unit
+    // sphere is the 'excess angle' alpha+beta+gamma-pi, where
+    // alpha/beta/gamma are the interior angles at the vertices.
+    //
+    // Given three vertices on the sphere, a, b, c, then we can compute,
+    // for example, the angle c->a->b by
+    //
+    // cos theta =  Dot(Cross(c, a), Cross(b, a)) /
+    //              (Length(Cross(c, a)) * Length(Cross(b, a))).
+    //
+    // We only need to do three cross products to evaluate the angles at
+    // all three vertices, though, since we can take advantage of the fact
+    // that Cross(a, b) = -Cross(b, a).
+    Vector3f axb = Cross(a, b), bxc = Cross(b, c), cxa = Cross(c, a);
+    if (LengthSquared(axb) == 0 || LengthSquared(bxc) == 0 || LengthSquared(cxa) == 0)
+        return 0;
+    axb = Normalize(axb);
+    bxc = Normalize(bxc);
+    cxa = Normalize(cxa);
+
+    Float alpha = AngleBetween(cxa, -axb);
+    Float beta = AngleBetween(axb, -bxc);
+    Float gamma = AngleBetween(bxc, -cxa);
+
+    return std::abs(alpha + beta + gamma - Pi);
+}
+
+// Note: if it folds over itself, the total spherical area is returned.
+// (i.e. sort of not what we'd want...)
+// https://math.stackexchange.com/questions/1228964/area-of-spherical-polygon
+PBRT_CPU_GPU
+inline Float SphericalQuadArea(const Vector3f &a, const Vector3f &b, const Vector3f &c,
+                               const Vector3f &d) {
+    Vector3f axb = Cross(a, b), bxc = Cross(b, c);
+    Vector3f cxd = Cross(c, d), dxa = Cross(d, a);
+    if (LengthSquared(axb) == 0 || LengthSquared(bxc) == 0 || LengthSquared(cxd) == 0 ||
+        LengthSquared(dxa) == 0)
+        return 0;
+    axb = Normalize(axb);
+    bxc = Normalize(bxc);
+    cxd = Normalize(cxd);
+    dxa = Normalize(dxa);
+
+    Float alpha = AngleBetween(dxa, -axb);
+    Float beta = AngleBetween(axb, -bxc);
+    Float gamma = AngleBetween(bxc, -cxd);
+    Float delta = AngleBetween(cxd, -dxa);
+
+    return std::abs(alpha + beta + gamma + delta - 2 * Pi);
+}
+
+PBRT_CPU_GPU
 inline Float CosTheta(const Vector3f &w) {
     return w.z;
 }
@@ -1711,75 +1765,6 @@ inline bool SameHemisphere(const Vector3f &w, const Vector3f &wp) {
 PBRT_CPU_GPU
 inline bool SameHemisphere(const Vector3f &w, const Normal3f &wp) {
     return w.z * wp.z > 0;
-}
-
-PBRT_CPU_GPU
-inline Float SphericalTriangleArea(const Vector3f &a, const Vector3f &b,
-                                   const Vector3f &c) {
-    // http://math.stackexchange.com/questions/9819/area-of-a-spherical-triangle
-    // Girard's theorem: surface area of a spherical triangle on a unit
-    // sphere is the 'excess angle' alpha+beta+gamma-pi, where
-    // alpha/beta/gamma are the interior angles at the vertices.
-    //
-    // Given three vertices on the sphere, a, b, c, then we can compute,
-    // for example, the angle c->a->b by
-    //
-    // cos theta =  Dot(Cross(c, a), Cross(b, a)) /
-    //              (Length(Cross(c, a)) * Length(Cross(b, a))).
-    //
-    // We only need to do three cross products to evaluate the angles at
-    // all three vertices, though, since we can take advantage of the fact
-    // that Cross(a, b) = -Cross(b, a).
-    Vector3f axb = Cross(a, b), bxc = Cross(b, c), cxa = Cross(c, a);
-    if (LengthSquared(axb) == 0 || LengthSquared(bxc) == 0 || LengthSquared(cxa) == 0)
-        return 0;
-    axb = Normalize(axb);
-    bxc = Normalize(bxc);
-    cxa = Normalize(cxa);
-
-    Float alpha = AngleBetween(cxa, -axb);
-    Float beta = AngleBetween(axb, -bxc);
-    Float gamma = AngleBetween(bxc, -cxa);
-
-    return std::abs(alpha + beta + gamma - Pi);
-}
-
-// Note: if it folds over itself, the total spherical area is returned.
-// (i.e. sort of not what we'd want...)
-// https://math.stackexchange.com/questions/1228964/area-of-spherical-polygon
-PBRT_CPU_GPU
-inline Float SphericalQuadArea(const Vector3f &a, const Vector3f &b, const Vector3f &c,
-                               const Vector3f &d) {
-    Vector3f axb = Cross(a, b), bxc = Cross(b, c);
-    Vector3f cxd = Cross(c, d), dxa = Cross(d, a);
-    if (LengthSquared(axb) == 0 || LengthSquared(bxc) == 0 || LengthSquared(cxd) == 0 ||
-        LengthSquared(dxa) == 0)
-        return 0;
-    axb = Normalize(axb);
-    bxc = Normalize(bxc);
-    cxd = Normalize(cxd);
-    dxa = Normalize(dxa);
-
-    Float alpha = AngleBetween(dxa, -axb);
-    Float beta = AngleBetween(axb, -bxc);
-    Float gamma = AngleBetween(bxc, -cxd);
-    Float delta = AngleBetween(cxd, -dxa);
-
-    return std::abs(alpha + beta + gamma + delta - 2 * Pi);
-}
-
-PBRT_CPU_GPU
-inline Point2f ToCylindrical(const Vector3f &v) {
-    Float phi = std::atan2(v.y, v.x);
-    if (phi < 0)
-        phi += 2 * Pi;
-    return {Clamp(v.z, -1, 1), phi};
-}
-
-PBRT_CPU_GPU
-inline Vector3f FromCylindrical(const Point2f &c) {
-    Float cosTheta = c[0], sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
-    return SphericalDirection(sinTheta, cosTheta, c[1]);
 }
 
 // DirectionCone Definition

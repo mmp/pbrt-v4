@@ -30,13 +30,8 @@ class Interaction {
 
     PBRT_CPU_GPU
     Interaction(const Point3fi &pi, const Normal3f &n, const Point2f &uv,
-                const Vector3f &wo, Float time, const MediumInterface *mediumInterface)
-        : pi(pi),
-          n(n),
-          uv(uv),
-          wo(Normalize(wo)),
-          time(time),
-          mediumInterface(mediumInterface) {}
+                const Vector3f &wo, Float time, const MediumInterface *intr)
+        : pi(pi), n(n), uv(uv), wo(Normalize(wo)), time(time), mediumInterface(intr) {}
 
     PBRT_CPU_GPU
     Point3f p() const { return Point3f(pi); }
@@ -141,16 +136,12 @@ class Interaction {
     MediumHandle medium = nullptr;
 };
 
+// MediumInteraction Definition
 class MediumInteraction : public Interaction {
   public:
     // MediumInteraction Public Methods
     PBRT_CPU_GPU
     MediumInteraction() : phase(nullptr) {}
-    // TODO: get rid of this once old volume stuff is gone...
-    PBRT_CPU_GPU
-    MediumInteraction(const Point3f &p, const Vector3f &wo, Float time,
-                      MediumHandle medium, PhaseFunctionHandle phase)
-        : Interaction(p, wo, time, medium), phase(phase) {}
     PBRT_CPU_GPU
     MediumInteraction(const Point3f &p, const Vector3f &wo, Float time,
                       const SampledSpectrum &sigma_a, const SampledSpectrum &sigma_s,
@@ -162,9 +153,6 @@ class MediumInteraction : public Interaction {
           sigma_s(sigma_s),
           sigma_maj(sigma_maj),
           Le(Le) {}
-
-    PBRT_CPU_GPU
-    bool IsValid() const { return phase != nullptr; }
 
     PBRT_CPU_GPU
     SampledSpectrum sigma_n() const {
