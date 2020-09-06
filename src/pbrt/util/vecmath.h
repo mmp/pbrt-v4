@@ -1119,11 +1119,18 @@ inline Quaternion Normalize(const Quaternion &q) {
     return q / Length(q);
 }
 
+PBRT_CPU_GPU
+inline Float AngleBetween(const Quaternion &q1, const Quaternion &q2) {
+    if (Dot(q1, q2) < 0)
+        return Pi - 2 * SafeASin(Length(q1 + q2) / 2);
+    else
+        return 2 * SafeASin(Length(q2 - q1) / 2);
+}
+
 // http://www.plunk.org/~hatch/rightway.php
 PBRT_CPU_GPU
 inline Quaternion Slerp(Float t, const Quaternion &q1, const Quaternion &q2) {
-    Float theta = (Dot(q1, q2) < 0) ? (Pi - 2 * SafeASin(Length(q1 + q2) / 2))
-                                    : (2 * SafeASin(Length(q2 - q1) / 2));
+    Float theta = AngleBetween(q1, q2);
     Float sinThetaOverTheta = SinXOverX(theta);
     return q1 * (1 - t) * SinXOverX((1 - t) * theta) / sinThetaOverTheta +
            q2 * t * SinXOverX(t * theta) / sinThetaOverTheta;

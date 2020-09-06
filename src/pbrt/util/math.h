@@ -1352,6 +1352,32 @@ class SquareMatrix {
     }
 
     PBRT_CPU_GPU
+    SquareMatrix operator+(const SquareMatrix &m) const {
+        SquareMatrix r = *this;
+        for (int i = 0; i < N; ++i)
+            for (int j = 0; j < N; ++j)
+                r.m[i][j] += m.m[i][j];
+        return r;
+    }
+    PBRT_CPU_GPU
+    SquareMatrix operator*(Float s) const {
+        SquareMatrix r = *this;
+        for (int i = 0; i < N; ++i)
+            for (int j = 0; j < N; ++j)
+                r.m[i][j] *= s;
+        return r;
+    }
+    PBRT_CPU_GPU
+    SquareMatrix operator/(Float s) const {
+        DCHECK_NE(s, 0);
+        SquareMatrix r = *this;
+        for (int i = 0; i < N; ++i)
+            for (int j = 0; j < N; ++j)
+                r.m[i][j] /= s;
+        return r;
+    }
+
+    PBRT_CPU_GPU
     bool operator==(const SquareMatrix<N> &m2) const {
         for (int i = 0; i < N; ++i)
             for (int j = 0; j < N; ++j)
@@ -1409,6 +1435,11 @@ class SquareMatrix {
 };
 
 // SquareMatrix Inline Methods
+template <int N>
+PBRT_CPU_GPU inline SquareMatrix<N> operator*(Float s, const SquareMatrix<N> &m) {
+    return m * s;
+}
+
 template <typename Tresult, int N, typename T>
 PBRT_CPU_GPU inline Tresult Mul(const SquareMatrix<N> &m, const T &v) {
     Tresult result;

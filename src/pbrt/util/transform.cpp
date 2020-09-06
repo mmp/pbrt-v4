@@ -209,11 +209,8 @@ void Transform::Decompose(Vector3f *T, SquareMatrix<4> *R, SquareMatrix<4> *S) c
     *R = M;
     do {
         // Compute next matrix _Rnext_ in series
-        SquareMatrix<4> Rnext;
         SquareMatrix<4> Rit = *Inverse(Transpose(*R));
-        for (int i = 0; i < 4; ++i)
-            for (int j = 0; j < 4; ++j)
-                Rnext[i][j] = 0.5f * ((*R)[i][j] + Rit[i][j]);
+        SquareMatrix<4> Rnext = (*R + Rit) / 2;
 
         // Compute norm of difference between _R_ and _Rnext_
         norm = 0;
@@ -1080,10 +1077,7 @@ Transform AnimatedTransform::Interpolate(Float time) const {
     Quaternion rotate = Slerp(dt, R[0], R[1]);
 
     // Interpolate scale at _dt_
-    SquareMatrix<4> scale;
-    for (int i = 0; i < 3; ++i)
-        for (int j = 0; j < 3; ++j)
-            scale[i][j] = Lerp(dt, S[0][i][j], S[1][i][j]);
+    SquareMatrix<4> scale = (1 - dt) * S[0] + dt * S[1];
 
     // Return interpolated matrix as product of interpolated components
     return Translate(trans) * Transform(rotate) * Transform(scale);
@@ -1114,8 +1108,7 @@ Bounds3f AnimatedTransform::BoundPointMotion(const Point3f &p) const {
         Float zeros[8];
         int nZeros = 0;
         FindZeros(c1[c].Eval(p), c2[c].Eval(p), c3[c].Eval(p), c4[c].Eval(p),
-                  c5[c].Eval(p), theta, FloatInterval(0., 1.), pstd::MakeSpan(zeros),
-                  &nZeros);
+                  c5[c].Eval(p), theta, FloatInterval(0., 1.), zeros, &nZeros);
         CHECK_LE(nZeros, PBRT_ARRAYSIZE(zeros));
 
         // Expand bounding box for any motion derivative zeros found
@@ -1129,34 +1122,37 @@ Bounds3f AnimatedTransform::BoundPointMotion(const Point3f &p) const {
 
 void AnimatedTransform::FindZeros(Float c1, Float c2, Float c3, Float c4, Float c5,
                                   Float theta, FloatInterval tInterval,
-                                  pstd::span<Float> zeros, int *zeroCount, int depth) {
+                                  pstd::span<Float> zeros, int *nZeros, int depth) {
     // Evaluate motion derivative in interval form, return if no zeros
-    FloatInterval range = FloatInterval(c1) +
-                          (FloatInterval(c2) + FloatInterval(c3) * tInterval) *
-                              Cos(FloatInterval(2 * theta) * tInterval) +
-                          (FloatInterval(c4) + FloatInterval(c5) * tInterval) *
-                              Sin(FloatInterval(2 * theta) * tInterval);
-    if (range.LowerBound() > 0 || range.UpperBound() < 0 ||
-        range.LowerBound() == range.UpperBound())
+    FloatInterval dadt = FloatInterval(c1) +
+                         (FloatInterval(c2) + FloatInterval(c3) * tInterval) *
+                             Cos(FloatInterval(2 * theta) * tInterval) +
+                         (FloatInterval(c4) + FloatInterval(c5) * tInterval) *
+                             Sin(FloatInterval(2 * theta) * tInterval);
+    if (dadt.LowerBound() > 0 || dadt.UpperBound() < 0 ||
+        dadt.LowerBound() == dadt.UpperBound())
         return;
 
-    if (depth > 0 && range.Width() > 1e-3) {
+    // Either split range and recurse or report a zero
+    if (depth > 0 && dadt.Width() > 1e-3) {
         // Split _tInterval_ and check both resulting intervals
         Float mid = tInterval.Midpoint();
         FindZeros(c1, c2, c3, c4, c5, theta, FloatInterval(tInterval.LowerBound(), mid),
-                  zeros, zeroCount, depth - 1);
+                  zeros, nZeros, depth - 1);
         FindZeros(c1, c2, c3, c4, c5, theta, FloatInterval(mid, tInterval.UpperBound()),
-                  zeros, zeroCount, depth - 1);
+                  zeros, nZeros, depth - 1);
 
     } else {
         // Use Newton's method to refine zero
         Float tNewton = tInterval.Midpoint();
         for (int i = 0; i < 4; ++i) {
-            Float fNewton = c1 + (c2 + c3 * tNewton) * std::cos(2.f * theta * tNewton) +
-                            (c4 + c5 * tNewton) * std::sin(2.f * theta * tNewton);
+            // Evaluate motion function derivative and its derivative at _tNewton_
+            Float fNewton = c1 + (c2 + c3 * tNewton) * std::cos(2 * theta * tNewton) +
+                            (c4 + c5 * tNewton) * std::sin(2 * theta * tNewton);
             Float fPrimeNewton =
-                (c3 + 2 * (c4 + c5 * tNewton) * theta) * std::cos(2.f * tNewton * theta) +
-                (c5 - 2 * (c2 + c3 * tNewton) * theta) * std::sin(2.f * tNewton * theta);
+                (c3 + 2 * (c4 + c5 * tNewton) * theta) * std::cos(2 * tNewton * theta) +
+                (c5 - 2 * (c2 + c3 * tNewton) * theta) * std::sin(2 * tNewton * theta);
+
             if (fNewton == 0 || fPrimeNewton == 0)
                 break;
             tNewton = tNewton - fNewton / fPrimeNewton;
@@ -1165,8 +1161,8 @@ void AnimatedTransform::FindZeros(Float c1, Float c2, Float c3, Float c4, Float 
         // Record zero if refined zero is in interval
         if (tNewton >= tInterval.LowerBound() - 1e-3f &&
             tNewton < tInterval.UpperBound() + 1e-3f) {
-            zeros[*zeroCount] = tNewton;
-            (*zeroCount)++;
+            zeros[*nZeros] = tNewton;
+            (*nZeros)++;
         }
     }
 }
