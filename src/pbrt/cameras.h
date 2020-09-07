@@ -110,6 +110,18 @@ struct CameraRayDifferential {
     SampledSpectrum weight = SampledSpectrum(1);
 };
 
+// CameraBaseParameters Definition
+struct CameraBaseParameters {
+    CameraTransform cameraTransform;
+    Float shutterOpen = 0, shutterClose = 1;
+    FilmHandle film;
+    MediumHandle medium;
+    CameraBaseParameters() = default;
+    CameraBaseParameters(const CameraTransform &cameraTransform, FilmHandle film,
+                         MediumHandle medium, const ParameterDictionary &parameters,
+                         const FileLoc *loc);
+};
+
 // CameraBase Definition
 class CameraBase {
   public:
@@ -138,8 +150,7 @@ class CameraBase {
 
     // CameraBase Protected Methods
     CameraBase() = default;
-    CameraBase(const CameraTransform &cameraTransform, Float shutterOpen,
-               Float shutterClose, FilmHandle film, MediumHandle medium);
+    CameraBase(CameraBaseParameters p);
 
     PBRT_CPU_GPU
     static pstd::optional<CameraRayDifferential> GenerateRayDifferential(
@@ -187,11 +198,10 @@ class ProjectiveCamera : public CameraBase {
 
     std::string BaseToString() const;
 
-    ProjectiveCamera(const CameraTransform &cameraTransform,
+    ProjectiveCamera(CameraBaseParameters baseParameters,
                      const Transform &screenFromCamera, const Bounds2f &screenWindow,
-                     Float shutterOpen, Float shutterClose, Float lensRadius,
-                     Float focalDistance, FilmHandle film, MediumHandle medium)
-        : CameraBase(cameraTransform, shutterOpen, shutterClose, film, medium),
+                     Float lensRadius, Float focalDistance)
+        : CameraBase(baseParameters),
           screenFromCamera(screenFromCamera),
           lensRadius(lensRadius),
           focalDistance(focalDistance) {
@@ -219,12 +229,10 @@ class ProjectiveCamera : public CameraBase {
 class OrthographicCamera : public ProjectiveCamera {
   public:
     // OrthographicCamera Public Methods
-    OrthographicCamera(const CameraTransform &cameraTransform,
-                       const Bounds2f &screenWindow, Float shutterOpen,
-                       Float shutterClose, Float lensRadius, Float focalDistance,
-                       FilmHandle film, MediumHandle medium)
-        : ProjectiveCamera(cameraTransform, Orthographic(0, 1), screenWindow, shutterOpen,
-                           shutterClose, lensRadius, focalDistance, film, medium) {
+    OrthographicCamera(CameraBaseParameters baseParameters, const Bounds2f &screenWindow,
+                       Float lensRadius, Float focalDistance)
+        : ProjectiveCamera(baseParameters, Orthographic(0, 1), screenWindow, lensRadius,
+                           focalDistance) {
         // Compute differential changes in origin for orthographic camera rays
         dxCamera = cameraFromRaster(Vector3f(1, 0, 0));
         dyCamera = cameraFromRaster(Vector3f(0, 1, 0));
@@ -278,13 +286,10 @@ class OrthographicCamera : public ProjectiveCamera {
 class PerspectiveCamera : public ProjectiveCamera {
   public:
     // PerspectiveCamera Public Methods
-    PerspectiveCamera(const CameraTransform &cameraTransform,
-                      const Bounds2f &screenWindow, Float shutterOpen, Float shutterClose,
-                      Float lensRadius, Float focalDistance, Float fov, FilmHandle film,
-                      MediumHandle medium)
-        : ProjectiveCamera(cameraTransform, Perspective(fov, 1e-2f, 1000.f), screenWindow,
-                           shutterOpen, shutterClose, lensRadius, focalDistance, film,
-                           medium) {
+    PerspectiveCamera(CameraBaseParameters baseParameters, const Bounds2f &screenWindow,
+                      Float lensRadius, Float focalDistance, Float fov)
+        : ProjectiveCamera(baseParameters, Perspective(fov, 1e-2f, 1000.f), screenWindow,
+                           lensRadius, focalDistance) {
         // Compute differential changes in origin for perspective camera rays
         dxCamera =
             cameraFromRaster(Point3f(1, 0, 0)) - cameraFromRaster(Point3f(0, 0, 0));
@@ -293,8 +298,8 @@ class PerspectiveCamera : public ProjectiveCamera {
 
         // Compute _cosTotalWidth_ for perspective camera
         Point2f radius = Point2f(film.GetFilter().Radius());
-        Point3f pCornerRaster(-radius.x, -radius.y, 0.f);
-        Vector3f wCornerCamera = Normalize(Vector3f(cameraFromRaster(pCornerRaster)));
+        Point3f pCorner(-radius.x, -radius.y, 0.f);
+        Vector3f wCornerCamera = Normalize(Vector3f(cameraFromRaster(pCorner)));
         cosTotalWidth = wCornerCamera.z;
         DCHECK_LT(.9999 * cosTotalWidth, std::cos(Radians(fov / 2)));
 
@@ -350,11 +355,8 @@ class SphericalCamera : public CameraBase {
     enum Mapping { EquiRectangular, EqualArea };
 
     // SphericalCamera Public Methods
-    SphericalCamera(const CameraTransform &cameraTransform, Float shutterOpen,
-                    Float shutterClose, FilmHandle film, MediumHandle medium,
-                    Mapping mapping)
-        : CameraBase(cameraTransform, shutterOpen, shutterClose, film, medium),
-          mapping(mapping) {
+    SphericalCamera(CameraBaseParameters baseParameters, Mapping mapping)
+        : CameraBase(baseParameters), mapping(mapping) {
         // Compute minimum differentials for _SphericalCamera_
         FindMinimumDifferentials(this);
     }
@@ -404,11 +406,9 @@ class SphericalCamera : public CameraBase {
 class RealisticCamera : public CameraBase {
   public:
     // RealisticCamera Public Methods
-    RealisticCamera(const CameraTransform &cameraTransform, Float shutterOpen,
-                    Float shutterClose, Float apertureDiameter, Float focusDistance,
-                    Float dispersionFactor, std::vector<Float> &lensData, Float scale,
-                    FilmHandle film, MediumHandle medium, Image apertureImage,
-                    Allocator alloc);
+    RealisticCamera(CameraBaseParameters baseParameters, Float apertureDiameter,
+                    Float focusDistance, std::vector<Float> &lensData, Float scale,
+                    Image apertureImage, Allocator alloc);
 
     static RealisticCamera *Create(const ParameterDictionary &parameters,
                                    const CameraTransform &cameraTransform,
@@ -526,7 +526,6 @@ class RealisticCamera : public CameraBase {
 
     // RealisticCamera Private Members
     Float scale;
-    Float dispersionFactor;
     Image apertureImage;
     pstd::vector<LensElementInterface> elementInterfaces;
     pstd::vector<Bounds2f> exitPupilBounds;

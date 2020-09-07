@@ -280,9 +280,9 @@ std::vector<TestIntegrator> GetIntegrators() {
             RGBFilm *film = new RGBFilm(Sensor::CreateDefault(), resolution,
                                         Bounds2i(Point2i(0, 0), resolution), filter, 1.,
                                         inTestDir("test.exr"), 1., RGBColorSpace::sRGB);
-            PerspectiveCamera *camera = new PerspectiveCamera(
-                CameraTransform(identity), Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0.,
-                1., 0., 10., 45, film, nullptr);
+            CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
+            PerspectiveCamera *camera = new PerspectiveCamera(cbp,
+                Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10., 45);
 
             const FilmHandle filmp = camera->GetFilm();
             Integrator *integrator = new PathIntegrator(8, camera, sampler.first,
@@ -298,9 +298,9 @@ std::vector<TestIntegrator> GetIntegrators() {
             RGBFilm *film = new RGBFilm(Sensor::CreateDefault(), resolution,
                                         Bounds2i(Point2i(0, 0), resolution), filter, 1.,
                                         inTestDir("test.exr"), 1., RGBColorSpace::sRGB);
-            OrthographicCamera *camera = new OrthographicCamera(
-                CameraTransform(identity), Bounds2f(Point2f(-.1, -.1), Point2f(.1, .1)),
-                0., 1., 0., 10., film, nullptr);
+            CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
+            OrthographicCamera *camera = new OrthographicCamera(cbp,
+                Bounds2f(Point2f(-.1, -.1), Point2f(.1, .1)), 0., 10.);
             const FilmHandle filmp = camera->GetFilm();
 
             Integrator *integrator = new PathIntegrator(8, camera, sampler.first,
@@ -317,9 +317,9 @@ std::vector<TestIntegrator> GetIntegrators() {
             RGBFilm *film = new RGBFilm(Sensor::CreateDefault(), resolution,
                                         Bounds2i(Point2i(0, 0), resolution), filter, 1.,
                                         inTestDir("test.exr"), 1., RGBColorSpace::sRGB);
-            PerspectiveCamera *camera = new PerspectiveCamera(
-                CameraTransform(identity), Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0.,
-                1., 0., 10., 45, film, nullptr);
+            CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
+            PerspectiveCamera *camera = new PerspectiveCamera(cbp,
+                Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10., 45);
             const FilmHandle filmp = camera->GetFilm();
 
             Integrator *integrator = new VolPathIntegrator(8, camera, sampler.first,
@@ -334,9 +334,9 @@ std::vector<TestIntegrator> GetIntegrators() {
             RGBFilm *film = new RGBFilm(Sensor::CreateDefault(), resolution,
                                         Bounds2i(Point2i(0, 0), resolution), filter, 1.,
                                         inTestDir("test.exr"), 1., RGBColorSpace::sRGB);
-            OrthographicCamera *camera = new OrthographicCamera(
-                CameraTransform(identity), Bounds2f(Point2f(-.1, -.1), Point2f(.1, .1)),
-                0., 1., 0., 10., film, nullptr);
+            CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
+            OrthographicCamera *camera = new OrthographicCamera(cbp,
+                Bounds2f(Point2f(-.1, -.1), Point2f(.1, .1)), 0., 10.);
             const FilmHandle filmp = camera->GetFilm();
 
             Integrator *integrator = new VolPathIntegrator(8, camera, sampler.first,
@@ -353,9 +353,9 @@ std::vector<TestIntegrator> GetIntegrators() {
             RGBFilm *film = new RGBFilm(Sensor::CreateDefault(), resolution,
                                         Bounds2i(Point2i(0, 0), resolution), filter, 1.,
                                         inTestDir("test.exr"), 1., RGBColorSpace::sRGB);
-            PerspectiveCamera *camera = new PerspectiveCamera(
-                CameraTransform(identity), Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0.,
-                1., 0., 10., 45, film, nullptr);
+            CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
+            PerspectiveCamera *camera = new PerspectiveCamera(cbp,
+                Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10., 45);
 
             const FilmHandle filmp = camera->GetFilm();
             Integrator *integrator = new SimplePathIntegrator(
@@ -372,9 +372,9 @@ std::vector<TestIntegrator> GetIntegrators() {
             RGBFilm *film = new RGBFilm(Sensor::CreateDefault(), resolution,
                                         Bounds2i(Point2i(0, 0), resolution), filter, 1.,
                                         inTestDir("test.exr"), 1., RGBColorSpace::sRGB);
-            PerspectiveCamera *camera = new PerspectiveCamera(
-                CameraTransform(identity), Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0.,
-                1., 0., 10., 45, film, nullptr);
+            CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
+            PerspectiveCamera *camera = new PerspectiveCamera(cbp,
+                Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10., 45);
             const FilmHandle filmp = camera->GetFilm();
 
             Integrator *integrator =
@@ -392,9 +392,9 @@ std::vector<TestIntegrator> GetIntegrators() {
             RGBFilm *film = new RGBFilm(Sensor::CreateDefault(), resolution,
                                         Bounds2i(Point2i(0, 0), resolution), filter, 1.,
                                         inTestDir("test.exr"), 1., RGBColorSpace::sRGB);
-            PerspectiveCamera *camera = new PerspectiveCamera(
-                CameraTransform(identity), Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0.,
-                1., 0., 10., 45, film, nullptr);
+            CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
+            PerspectiveCamera *camera = new PerspectiveCamera(cbp,
+                Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10., 45);
             const FilmHandle filmp = camera->GetFilm();
 
             Integrator *integrator =

@@ -104,13 +104,12 @@ std::string CameraHandle::ToString() const {
 }
 
 // CameraBase Method Definitions
-CameraBase::CameraBase(const CameraTransform &cameraTransform, Float shutterOpen,
-                       Float shutterClose, FilmHandle film, MediumHandle medium)
-    : cameraTransform(cameraTransform),
-      shutterOpen(shutterOpen),
-      shutterClose(shutterClose),
-      film(film),
-      medium(medium) {
+CameraBase::CameraBase(CameraBaseParameters p)
+    : cameraTransform(p.cameraTransform),
+      shutterOpen(p.shutterOpen),
+      shutterClose(p.shutterClose),
+      film(p.film),
+      medium(p.medium) {
     if (cameraTransform.CameraFromRenderHasScale())
         Warning("Scaling detected in world-to-camera transformation!\n"
                 "The system has numerous assumptions, implicit and explicit,\n"
@@ -289,6 +288,21 @@ CameraHandle CameraHandle::Create(const std::string &name,
     return camera;
 }
 
+// CameraBaseParameters Method Definitions
+CameraBaseParameters::CameraBaseParameters(const CameraTransform &cameraTransform,
+                                           FilmHandle film, MediumHandle medium,
+                                           const ParameterDictionary &parameters,
+                                           const FileLoc *loc)
+    : cameraTransform(cameraTransform), film(film), medium(medium) {
+    shutterOpen = parameters.GetOneFloat("shutteropen", 0.f);
+    shutterClose = parameters.GetOneFloat("shutterclose", 1.f);
+    if (shutterClose < shutterOpen) {
+        Warning(loc, "Shutter close time %f < shutter open %f.  Swapping them.",
+                shutterClose, shutterOpen);
+        pstd::swap(shutterClose, shutterOpen);
+    }
+}
+
 // OrthographicCamera Method Definitions
 pstd::optional<CameraRay> OrthographicCamera::GenerateRay(
     CameraSample sample, SampledWavelengths &lambda) const {
@@ -370,14 +384,9 @@ OrthographicCamera *OrthographicCamera::Create(const ParameterDictionary &parame
                                                const CameraTransform &cameraTransform,
                                                FilmHandle film, MediumHandle medium,
                                                const FileLoc *loc, Allocator alloc) {
-    // Extract common camera parameters from _ParameterDictionary_
-    Float shutteropen = parameters.GetOneFloat("shutteropen", 0.f);
-    Float shutterclose = parameters.GetOneFloat("shutterclose", 1.f);
-    if (shutterclose < shutteropen) {
-        Warning(loc, "Shutter close time %f < shutter open %f.  Swapping them.",
-                shutterclose, shutteropen);
-        pstd::swap(shutterclose, shutteropen);
-    }
+    CameraBaseParameters cameraBaseParameters(cameraTransform, film, medium, parameters,
+                                              loc);
+
     Float lensradius = parameters.GetOneFloat("lensradius", 0.f);
     Float focaldistance = parameters.GetOneFloat("focaldistance", 1e6f);
     Float frame =
@@ -405,9 +414,8 @@ OrthographicCamera *OrthographicCamera::Create(const ParameterDictionary &parame
         } else
             Error("\"screenwindow\" should have four values");
     }
-    return alloc.new_object<OrthographicCamera>(cameraTransform, screen, shutteropen,
-                                                shutterclose, lensradius, focaldistance,
-                                                film, medium);
+    return alloc.new_object<OrthographicCamera>(cameraBaseParameters, screen, lensradius,
+                                                focaldistance);
 }
 
 // PerspectiveCamera Method Definitions
@@ -497,14 +505,9 @@ PerspectiveCamera *PerspectiveCamera::Create(const ParameterDictionary &paramete
                                              const CameraTransform &cameraTransform,
                                              FilmHandle film, MediumHandle medium,
                                              const FileLoc *loc, Allocator alloc) {
-    // Extract common camera parameters from _ParameterDictionary_
-    Float shutteropen = parameters.GetOneFloat("shutteropen", 0.f);
-    Float shutterclose = parameters.GetOneFloat("shutterclose", 1.f);
-    if (shutterclose < shutteropen) {
-        Warning(loc, "Shutter close time %f < shutter open %f.  Swapping them.",
-                shutterclose, shutteropen);
-        pstd::swap(shutterclose, shutteropen);
-    }
+    CameraBaseParameters cameraBaseParameters(cameraTransform, film, medium, parameters,
+                                              loc);
+
     Float lensradius = parameters.GetOneFloat("lensradius", 0.f);
     Float focaldistance = parameters.GetOneFloat("focaldistance", 1e6);
     Float frame =
@@ -533,9 +536,8 @@ PerspectiveCamera *PerspectiveCamera::Create(const ParameterDictionary &paramete
             Error(loc, "\"screenwindow\" should have four values");
     }
     Float fov = parameters.GetOneFloat("fov", 90.);
-    return alloc.new_object<PerspectiveCamera>(cameraTransform, screen, shutteropen,
-                                               shutterclose, lensradius, focaldistance,
-                                               fov, film, medium);
+    return alloc.new_object<PerspectiveCamera>(cameraBaseParameters, screen, lensradius,
+                                               focaldistance, fov);
 }
 
 SampledSpectrum PerspectiveCamera::We(const Ray &ray, SampledWavelengths &lambda,
@@ -621,17 +623,16 @@ pstd::optional<CameraWiSample> PerspectiveCamera::SampleWi(
 pstd::optional<CameraRay> SphericalCamera::GenerateRay(CameraSample sample,
                                                        SampledWavelengths &lambda) const {
     // Compute spherical camera ray direction
+    Point2f uv(sample.pFilm.x / film.FullResolution().x,
+               sample.pFilm.y / film.FullResolution().y);
     Vector3f dir;
     if (mapping == EquiRectangular) {
-        // Compute ray direction using equi-rectangular mapping
-        Float theta = Pi * sample.pFilm.y / film.FullResolution().y;
-        Float phi = 2 * Pi * sample.pFilm.x / film.FullResolution().x;
+        // Compute ray direction using equirectangular mapping
+        Float theta = Pi * uv[1], phi = 2 * Pi * uv[0];
         dir = SphericalDirection(std::sin(theta), std::cos(theta), phi);
 
     } else {
-        // Compute ray direction using equi-area mapping
-        Point2f uv(sample.pFilm.x / film.FullResolution().x,
-                   sample.pFilm.y / film.FullResolution().y);
+        // Compute ray direction using equal area mapping
         uv = WrapEqualAreaSquare(uv);
         dir = EqualAreaSquareToSphere(uv);
     }
@@ -645,14 +646,9 @@ SphericalCamera *SphericalCamera::Create(const ParameterDictionary &parameters,
                                          const CameraTransform &cameraTransform,
                                          FilmHandle film, MediumHandle medium,
                                          const FileLoc *loc, Allocator alloc) {
-    // Extract common camera parameters from _ParameterDictionary_
-    Float shutteropen = parameters.GetOneFloat("shutteropen", 0.f);
-    Float shutterclose = parameters.GetOneFloat("shutterclose", 1.f);
-    if (shutterclose < shutteropen) {
-        Warning(loc, "Shutter close time %f < shutter open %f.  Swapping them.",
-                shutterclose, shutteropen);
-        pstd::swap(shutterclose, shutteropen);
-    }
+    CameraBaseParameters cameraBaseParameters(cameraTransform, film, medium, parameters,
+                                              loc);
+
     Float lensradius = parameters.GetOneFloat("lensradius", 0.f);
     Float focaldistance = parameters.GetOneFloat("focaldistance", 1e30f);
     Float frame =
@@ -695,8 +691,7 @@ SphericalCamera *SphericalCamera::Create(const ParameterDictionary &parameters,
                   "\"equalarea\" or \"equirectangular\".)",
                   m);
 
-    return alloc.new_object<SphericalCamera>(cameraTransform, shutteropen, shutterclose,
-                                             film, medium, mapping);
+    return alloc.new_object<SphericalCamera>(cameraBaseParameters, mapping);
 }
 
 std::string SphericalCamera::ToString() const {
@@ -705,15 +700,12 @@ std::string SphericalCamera::ToString() const {
 }
 
 // RealisticCamera Method Definitions
-RealisticCamera::RealisticCamera(const CameraTransform &cameraTransform,
-                                 Float shutterOpen, Float shutterClose,
+RealisticCamera::RealisticCamera(CameraBaseParameters baseParameters,
                                  Float setApertureDiameter, Float focusDistance,
-                                 Float dispersionFactor, std::vector<Float> &lensData,
-                                 Float scale, FilmHandle film, MediumHandle medium,
+                                 std::vector<Float> &lensData, Float scale,
                                  Image apertureImage, Allocator alloc)
-    : CameraBase(cameraTransform, shutterOpen, shutterClose, film, medium),
+    : CameraBase(baseParameters),
       scale(scale),
-      dispersionFactor(dispersionFactor),
       elementInterfaces(alloc),
       exitPupilBounds(alloc),
       apertureImage(std::move(apertureImage)) {
@@ -754,6 +746,7 @@ RealisticCamera::RealisticCamera(const CameraTransform &cameraTransform,
         exitPupilBounds[i] = BoundExitPupil(r0, r1);
     });
 
+    // Compute minimum differentials for _RealisticCamera_
     FindMinimumDifferentials(this);
 }
 
@@ -814,14 +807,6 @@ Float RealisticCamera::TraceLensesFromFilm(const Ray &rCamera, Ray *rOut,
             Float eta_t = (i > 0 && elementInterfaces[i - 1].eta != 0)
                               ? elementInterfaces[i - 1].eta
                               : 1;
-            // Optionally apply ad-hoc dispersion approximation
-            if (dispersionFactor != 0) {
-                Float offset =
-                    (lambda - 550) / (550 - 400);  // [-1,1] for lambda in [400,700]
-                eta_i -= offset * dispersionFactor * .02;
-                eta_t -= offset * dispersionFactor * .02;
-            }
-
             if (!Refract(Normalize(-rLens.d), n, eta_t / eta_i, &w))
                 return 0;
             rLens.d = w;
@@ -1024,10 +1009,6 @@ pstd::optional<CameraRay> RealisticCamera::GenerateRay(CameraSample sample,
     ray.medium = medium;
     ray = RenderFromCamera(ray);
     ray.d = Normalize(ray.d);
-
-    // Terminate secondary rays if lenses are dispersive
-    if (dispersionFactor != 0)
-        lambda.TerminateSecondary();
 
     // Compute weighting for _RealisticCamera_ ray
     Float cosTheta = Normalize(rFilm.d).z;
@@ -1376,29 +1357,22 @@ void RealisticCamera::TestExitPupilBounds() const {
 }
 
 std::string RealisticCamera::ToString() const {
-    return StringPrintf("[ RealisticCamera %s dispersionFactor: %f "
-                        "elementInterfaces: %s exitPupilBounds: %s ]",
-                        CameraBase::ToString(), dispersionFactor, elementInterfaces,
-                        exitPupilBounds);
+    return StringPrintf(
+        "[ RealisticCamera %s elementInterfaces: %s exitPupilBounds: %s ]",
+        CameraBase::ToString(), elementInterfaces, exitPupilBounds);
 }
 
 RealisticCamera *RealisticCamera::Create(const ParameterDictionary &parameters,
                                          const CameraTransform &cameraTransform,
                                          FilmHandle film, MediumHandle medium,
                                          const FileLoc *loc, Allocator alloc) {
-    Float shutteropen = parameters.GetOneFloat("shutteropen", 0.f);
-    Float shutterclose = parameters.GetOneFloat("shutterclose", 1.f);
-    if (shutterclose < shutteropen) {
-        Warning(loc, "Shutter close time %f < shutter open %f.  Swapping them.",
-                shutterclose, shutteropen);
-        pstd::swap(shutterclose, shutteropen);
-    }
+    CameraBaseParameters cameraBaseParameters(cameraTransform, film, medium, parameters,
+                                              loc);
 
     // Realistic camera-specific parameters
     std::string lensFile = ResolveFilename(parameters.GetOneString("lensfile", ""));
     Float apertureDiameter = parameters.GetOneFloat("aperturediameter", 1.0);
     Float focusDistance = parameters.GetOneFloat("focusdistance", 10.0);
-    Float dispersionFactor = parameters.GetOneFloat("dispersionfactor", 0.);
     Float scale = parameters.GetOneFloat("scale", 1.f);
 
     if (lensFile.empty()) {
@@ -1531,9 +1505,9 @@ RealisticCamera *RealisticCamera::Create(const ParameterDictionary &parameters,
         }
     }
 
-    return alloc.new_object<RealisticCamera>(
-        cameraTransform, shutteropen, shutterclose, apertureDiameter, focusDistance,
-        dispersionFactor, lensData, scale, film, medium, std::move(apertureImage), alloc);
+    return alloc.new_object<RealisticCamera>(cameraBaseParameters, apertureDiameter,
+                                             focusDistance, lensData, scale,
+                                             std::move(apertureImage), alloc);
 }
 
 }  // namespace pbrt
