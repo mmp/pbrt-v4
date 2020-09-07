@@ -622,7 +622,7 @@ pstd::optional<CameraRay> SphericalCamera::GenerateRay(CameraSample sample,
                                                        SampledWavelengths &lambda) const {
     // Compute spherical camera ray direction
     Vector3f dir;
-    if (mapping == EquiRect) {
+    if (mapping == EquiRectangular) {
         // Compute ray direction using equi-rectangular mapping
         Float theta = Pi * sample.pFilm.y / film.FullResolution().y;
         Float phi = 2 * Pi * sample.pFilm.x / film.FullResolution().x;
@@ -632,8 +632,8 @@ pstd::optional<CameraRay> SphericalCamera::GenerateRay(CameraSample sample,
         // Compute ray direction using equi-area mapping
         Point2f uv(sample.pFilm.x / film.FullResolution().x,
                    sample.pFilm.y / film.FullResolution().y);
-        uv = WrapEquiAreaSquare(uv);
-        dir = EquiAreaSquareToSphere(uv);
+        uv = WrapEqualAreaSquare(uv);
+        dir = EqualAreaSquareToSphere(uv);
     }
     pstd::swap(dir.y, dir.z);
 
@@ -683,16 +683,16 @@ SphericalCamera *SphericalCamera::Create(const ParameterDictionary &parameters,
     (void)lensradius;     // don't need this
     (void)focaldistance;  // don't need this
 
-    std::string m = parameters.GetOneString("mapping", "equiarea");
+    std::string m = parameters.GetOneString("mapping", "equalarea");
     Mapping mapping;
-    if (m == "equiarea")
-        mapping = EquiArea;
-    else if (m == "equirect")
-        mapping = EquiRect;
+    if (m == "equalarea")
+        mapping = EqualArea;
+    else if (m == "equirectangular")
+        mapping = EquiRectangular;
     else
         ErrorExit(loc,
                   "%s: unknown mapping for spherical camera. (Must be "
-                  "\"equiarea\" or \"equirect\".)",
+                  "\"equalarea\" or \"equirectangular\".)",
                   m);
 
     return alloc.new_object<SphericalCamera>(cameraTransform, shutteropen, shutterclose,
@@ -701,7 +701,7 @@ SphericalCamera *SphericalCamera::Create(const ParameterDictionary &parameters,
 
 std::string SphericalCamera::ToString() const {
     return StringPrintf("[ SphericalCamera %s mapping: %s ]", CameraBase::ToString(),
-                        mapping == EquiRect ? "EquiRect" : "EquiArea");
+                        mapping == EquiRectangular ? "EquiRectangular" : "EqualArea");
 }
 
 // RealisticCamera Method Definitions

@@ -305,7 +305,7 @@ Float InvertCatmullRom(pstd::span<const Float> x, pstd::span<const Float> values
 /// Transform a 2D position p=(u,v) in the unit square to a normalized 3D
 /// vector on the unit sphere. Optimized scalar implementation.
 //  ------------------------------------------------------------------------
-Vector3f EquiAreaSquareToSphere(const Point2f &p) {
+Vector3f EqualAreaSquareToSphere(const Point2f &p) {
     CHECK(p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1);
 
     // Transform p from [0,1] to [-1,1]
@@ -339,7 +339,7 @@ Vector3f EquiAreaSquareToSphere(const Point2f &p) {
 /// Transforms a normalized 3D vector to a 2D position in the unit square.
 /// Optimized scalar implementation using trigonometric approximations.
 //  ------------------------------------------------------------------------
-Point2f EquiAreaSphereToSquare(const Vector3f &d) {
+Point2f EqualAreaSphereToSquare(const Vector3f &d) {
     CHECK(LengthSquared(d) > .999 && LengthSquared(d) < 1.001);
 
     Float x = std::abs(d.x);
@@ -392,7 +392,7 @@ Point2f EquiAreaSphereToSquare(const Vector3f &d) {
     return Point2f(u, v);
 }
 
-Point2f WrapEquiAreaSquare(Point2f uv) {
+Point2f WrapEqualAreaSquare(Point2f uv) {
     if (uv[0] < 0) {
         uv[0] = -uv[0];     // mirror across u = 0
         uv[1] = 1 - uv[1];  // mirror across v = 0.5

@@ -1127,7 +1127,8 @@ void FormattingScene::Camera(const std::string &name, ParsedParameterVector para
     ParameterDictionary dict(std::move(params), RGBColorSpace::sRGB);
 
     if (upgrade && name == "environment")
-        Printf("%sCamera \"spherical\" \"string mapping\" \"equirect\"\n", indent());
+        Printf("%sCamera \"spherical\" \"string mapping\" \"equirectangular\"\n",
+               indent());
     else
         Printf("%sCamera \"%s\"\n", indent(), name);
     if (upgrade && name == "realistic")

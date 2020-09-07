@@ -1273,11 +1273,11 @@ PBRT_CPU_GPU inline Interval<Float> SumSquares(Interval<Float> i, Args... args) 
 }
 
 PBRT_CPU_GPU
-Vector3f EquiAreaSquareToSphere(const Point2f &p);
+Vector3f EqualAreaSquareToSphere(const Point2f &p);
 PBRT_CPU_GPU
-Point2f EquiAreaSphereToSquare(const Vector3f &v);
+Point2f EqualAreaSphereToSquare(const Vector3f &v);
 PBRT_CPU_GPU
-Point2f WrapEquiAreaSquare(Point2f p);
+Point2f WrapEqualAreaSquare(Point2f p);
 
 // Spline Interpolation Declarations
 PBRT_CPU_GPU

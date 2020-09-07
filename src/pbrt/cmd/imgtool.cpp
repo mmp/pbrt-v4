@@ -282,7 +282,7 @@ int makesky(int argc, char *argv[]) {
             Float y = (iy + 0.5f) / resolution;
             for (int ix = 0; ix < resolution; ++ix) {
                 Float x = (ix + 0.5f) / resolution;
-                Vector3f v = EquiAreaSquareToSphere({x, y});
+                Vector3f v = EqualAreaSquareToSphere({x, y});
                 if (v.z <= 0)
                     // downward hemisphere
                     continue;
@@ -1843,10 +1843,10 @@ int makeenv(int argc, char *argv[]) {
                         // pixel.
                         Point2f pSquare((u + 0.5f + fs.p.x) / resolution,
                                         (v + 0.5f + fs.p.y) / resolution);
-                        pSquare = WrapEquiAreaSquare(pSquare);
+                        pSquare = WrapEqualAreaSquare(pSquare);
 
                         // Get corresponding pixel values from the lat-long map.
-                        Vector3f dir = EquiAreaSquareToSphere(pSquare);
+                        Vector3f dir = EqualAreaSquareToSphere(pSquare);
                         Float theta = SphericalTheta(dir), phi = SphericalPhi(dir);
                         Point2f p(phi / (2 * Pi), theta / Pi);
                         ImageChannelValues values = latlongImage.Bilerp(p, latlongWrap);

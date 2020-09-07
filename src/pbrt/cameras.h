@@ -347,7 +347,7 @@ class PerspectiveCamera : public ProjectiveCamera {
 class SphericalCamera : public CameraBase {
   public:
     // SphericalCamera::Mapping Definition
-    enum Mapping { EquiRect, EquiArea };
+    enum Mapping { EquiRectangular, EqualArea };
 
     // SphericalCamera Public Methods
     SphericalCamera(const CameraTransform &cameraTransform, Float shutterOpen,
@@ -355,6 +355,7 @@ class SphericalCamera : public CameraBase {
                     Mapping mapping)
         : CameraBase(cameraTransform, shutterOpen, shutterClose, film, medium),
           mapping(mapping) {
+        // Compute minimum differentials for _SphericalCamera_
         FindMinimumDifferentials(this);
     }
 

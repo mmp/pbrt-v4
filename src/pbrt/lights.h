@@ -628,7 +628,7 @@ class ImageInfiniteLight : public LightBase {
     PBRT_CPU_GPU
     SampledSpectrum Le(const Ray &ray, const SampledWavelengths &lambda) const {
         Vector3f wl = Normalize(renderFromLight.ApplyInverse(ray.d));
-        Point2f st = EquiAreaSphereToSquare(wl);
+        Point2f st = EqualAreaSphereToSquare(wl);
         return LookupLe(st, lambda);
     }
 
@@ -644,7 +644,7 @@ class ImageInfiniteLight : public LightBase {
             return {};
 
         // Convert infinite light sample point to direction
-        Vector3f wl = EquiAreaSquareToSphere(uv);
+        Vector3f wl = EqualAreaSquareToSphere(uv);
         Vector3f wi = renderFromLight(wl);
 
         // Compute PDF for sampled infinite light direction

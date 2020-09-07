@@ -288,21 +288,21 @@ TEST(Bounds3, Union) {
     EXPECT_EQ(Bounds3f(Point3f(-15, -10, 5), Point3f(0, 20, 30)), e);
 }
 
-TEST(EquiArea, Randoms) {
+TEST(EqualArea, Randoms) {
     for (Point2f u : Uniform2D(100)) {
         Vector3f v = SampleUniformSphere(u);
-        Point2f c = EquiAreaSphereToSquare(v);
-        Vector3f vp = EquiAreaSquareToSphere(c);
+        Point2f c = EqualAreaSphereToSquare(v);
+        Vector3f vp = EqualAreaSquareToSphere(c);
         EXPECT_TRUE(Length(vp) > 0.9999 && Length(vp) < 1.0001) << Length(vp);
         EXPECT_GT(Dot(v, vp), 0.9999) << v;
     }
 }
 
-TEST(EquiArea, RemapEdges) {
+TEST(EqualArea, RemapEdges) {
     auto checkClose = [&](Point2f a, Point2f b) {
-        Vector3f av = EquiAreaSquareToSphere(a);
-        b = WrapEquiAreaSquare(b);
-        Vector3f bv = EquiAreaSquareToSphere(b);
+        Vector3f av = EqualAreaSquareToSphere(a);
+        b = WrapEqualAreaSquare(b);
+        Vector3f bv = EqualAreaSquareToSphere(b);
         EXPECT_GT(Dot(av, bv), .99);
     };
 

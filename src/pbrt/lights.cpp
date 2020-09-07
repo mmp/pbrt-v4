@@ -889,8 +889,8 @@ Float ImageInfiniteLight::PDF_Li(LightSampleContext ctx, Vector3f w,
                                  LightSamplingMode mode) const {
     Vector3f wl = renderFromLight.ApplyInverse(w);
     Float pdf = (mode == LightSamplingMode::WithMIS)
-                    ? compensatedDistribution.PDF(EquiAreaSphereToSquare(wl))
-                    : distribution.PDF(EquiAreaSphereToSquare(wl));
+                    ? compensatedDistribution.PDF(EqualAreaSphereToSquare(wl))
+                    : distribution.PDF(EqualAreaSphereToSquare(wl));
     return pdf / (4 * Pi);
 }
 
@@ -918,7 +918,7 @@ LightLeSample ImageInfiniteLight::SampleLe(const Point2f &u1, const Point2f &u2,
     // Sample infinite light image and compute ray direction _w_
     Float mapPDF;
     Point2f uv = distribution.Sample(u1, &mapPDF);
-    Vector3f wl = EquiAreaSquareToSphere(uv);
+    Vector3f wl = EqualAreaSquareToSphere(uv);
     Vector3f w = -renderFromLight(wl);
 
     // Compute infinite light sample ray
@@ -936,7 +936,7 @@ LightLeSample ImageInfiniteLight::SampleLe(const Point2f &u1, const Point2f &u2,
 
 void ImageInfiniteLight::PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
     Vector3f wl = -renderFromLight.ApplyInverse(ray.d);
-    Float mapPDF = distribution.PDF(EquiAreaSphereToSquare(wl));
+    Float mapPDF = distribution.PDF(EqualAreaSphereToSquare(wl));
     *pdfDir = mapPDF / (4 * Pi);
     *pdfPos = 1 / (Pi * Sqr(sceneRadius));
 }
@@ -1007,7 +1007,7 @@ PortalImageInfiniteLight::PortalImageInfiniteLight(
 
             WrapMode2D equiAreaWrap(WrapMode::OctahedralSphere,
                                     WrapMode::OctahedralSphere);
-            Point2f stEqui = EquiAreaSphereToSquare(w);
+            Point2f stEqui = EqualAreaSphereToSquare(w);
             for (int c = 0; c < 3; ++c)
                 image.SetChannel({x, y}, c,
                                  equiAreaImage.BilerpChannel(stEqui, c, equiAreaWrap));
