@@ -42,22 +42,22 @@ class CameraHandle : public TaggedPointer<PerspectiveCamera, OrthographicCamera,
                                const CameraTransform &cameraTransform, FilmHandle film,
                                const FileLoc *loc, Allocator alloc);
 
-    PBRT_CPU_GPU inline FilmHandle GetFilm() const;
-
-    PBRT_CPU_GPU inline Float SampleTime(Float u) const;
-
-    PBRT_CPU_GPU inline const CameraTransform &GetCameraTransform() const;
-
-    void InitMetadata(ImageMetadata *metadata) const;
-
     std::string ToString() const;
 
-    PBRT_CPU_GPU inline CameraRay GenerateRay(CameraSample sample,
-                                              SampledWavelengths &lambda) const;
+    PBRT_CPU_GPU inline pstd::optional<CameraRay> GenerateRay(
+        CameraSample sample, SampledWavelengths &lambda) const;
 
     PBRT_CPU_GPU
     pstd::optional<CameraRayDifferential> GenerateRayDifferential(
         const CameraSample &sample, SampledWavelengths &lambda) const;
+
+    PBRT_CPU_GPU inline FilmHandle GetFilm() const;
+
+    PBRT_CPU_GPU inline Float SampleTime(Float u) const;
+
+    void InitMetadata(ImageMetadata *metadata) const;
+
+    PBRT_CPU_GPU inline const CameraTransform &GetCameraTransform() const;
 
     PBRT_CPU_GPU
     void ApproximatedPdxy(const SurfaceInteraction &si) const;

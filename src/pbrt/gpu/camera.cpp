@@ -50,21 +50,23 @@ void GPUPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
 
         // Generate samples for the camera ray and the ray itself.
         CameraSample cameraSample = GetCameraSample(pixelSampler, pPixel, filter);
-        CameraRay cameraRay = camera.GenerateRay(cameraSample, lambda);
+        pstd::optional<CameraRay> cameraRay = camera.GenerateRay(cameraSample, lambda);
 
         // Initialize the rest of the pixel sample's state.
         pixelSampleState.L[pixelIndex] = SampledSpectrum(0.f);
         pixelSampleState.lambda[pixelIndex] = lambda;
-        pixelSampleState.cameraRayWeight[pixelIndex] = cameraRay.weight;
         pixelSampleState.filterWeight[pixelIndex] = cameraSample.weight;
         if (initializeVisibleSurface)
             pixelSampleState.visibleSurface[pixelIndex] = VisibleSurface();
 
-        if (cameraRay.weight)
+        if (cameraRay) {
             // Enqueue the camera ray if the camera gave us one with
             // non-zero weight. (RealisticCamera doesn't always return
             // a ray, e.g. in the case of vignetting...)
-            rayQueue->PushCameraRay(cameraRay.ray, lambda, pixelIndex);
+            rayQueue->PushCameraRay(cameraRay->ray, lambda, pixelIndex);
+            pixelSampleState.cameraRayWeight[pixelIndex] = cameraRay->weight;
+        } else
+            pixelSampleState.cameraRayWeight[pixelIndex] = SampledSpectrum(0);
     });
 }
 

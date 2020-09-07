@@ -137,14 +137,6 @@ class CameraBase {
     Vector3f minDirDifferentialX, minDirDifferentialY;
 
     // CameraBase Protected Methods
-    CameraBase() = default;
-    CameraBase(const CameraTransform &cameraTransform, Float shutterOpen,
-               Float shutterClose, FilmHandle film, MediumHandle medium);
-
-    PBRT_CPU_GPU
-    static pstd::optional<CameraRayDifferential> GenerateRayDifferential(
-        CameraHandle camera, const CameraSample &sample, SampledWavelengths &lambda);
-
     PBRT_CPU_GPU
     Ray RenderFromCamera(const Ray &r) const {
         return cameraTransform.RenderFromCamera(r);
@@ -174,6 +166,14 @@ class CameraBase {
         return cameraTransform.CameraFromRender(p, time);
     }
 
+    CameraBase() = default;
+    CameraBase(const CameraTransform &cameraTransform, Float shutterOpen,
+               Float shutterClose, FilmHandle film, MediumHandle medium);
+
+    PBRT_CPU_GPU
+    static pstd::optional<CameraRayDifferential> GenerateRayDifferential(
+        CameraHandle camera, const CameraSample &sample, SampledWavelengths &lambda);
+
     void FindMinimumDifferentials(CameraHandle camera);
 };
 
@@ -196,11 +196,13 @@ class ProjectiveCamera : public CameraBase {
           focalDistance(focalDistance) {
         // Compute projective camera transformations
         // Compute projective camera screen transformations
-        rasterFromScreen =
-            Scale(film.FullResolution().x, film.FullResolution().y, 1) *
+        Transform NDCFromScreen =
             Scale(1 / (screenWindow.pMax.x - screenWindow.pMin.x),
-                  1 / (screenWindow.pMin.y - screenWindow.pMax.y), 1) *
+                  1 / (screenWindow.pMax.y - screenWindow.pMin.y), 1) *
             Translate(Vector3f(-screenWindow.pMin.x, -screenWindow.pMax.y, 0));
+        Transform rasterFromNDC =
+            Scale(film.FullResolution().x, -film.FullResolution().y, 1);
+        rasterFromScreen = rasterFromNDC * NDCFromScreen;
         screenFromRaster = Inverse(rasterFromScreen);
 
         cameraFromRaster = Inverse(screenFromCamera) * screenFromRaster;
@@ -231,7 +233,8 @@ class OrthographicCamera : public ProjectiveCamera {
     }
 
     PBRT_CPU_GPU
-    CameraRay GenerateRay(CameraSample sample, SampledWavelengths &lambda) const;
+    pstd::optional<CameraRay> GenerateRay(CameraSample sample,
+                                          SampledWavelengths &lambda) const;
 
     PBRT_CPU_GPU
     pstd::optional<CameraRayDifferential> GenerateRayDifferential(
@@ -311,7 +314,8 @@ class PerspectiveCamera : public ProjectiveCamera {
                                      const FileLoc *loc, Allocator alloc = {});
 
     PBRT_CPU_GPU
-    CameraRay GenerateRay(CameraSample sample, SampledWavelengths &lambda) const;
+    pstd::optional<CameraRay> GenerateRay(CameraSample sample,
+                                          SampledWavelengths &lambda) const;
 
     PBRT_CPU_GPU
     pstd::optional<CameraRayDifferential> GenerateRayDifferential(
@@ -356,7 +360,8 @@ class SphericalCamera : public CameraBase {
                                    const FileLoc *loc, Allocator alloc = {});
 
     PBRT_CPU_GPU
-    CameraRay GenerateRay(CameraSample sample, SampledWavelengths &lambda) const;
+    pstd::optional<CameraRay> GenerateRay(CameraSample sample,
+                                          SampledWavelengths &lambda) const;
 
     PBRT_CPU_GPU
     pstd::optional<CameraRayDifferential> GenerateRayDifferential(
@@ -406,7 +411,8 @@ class RealisticCamera : public CameraBase {
                                    const FileLoc *loc, Allocator alloc = {});
 
     PBRT_CPU_GPU
-    CameraRay GenerateRay(CameraSample sample, SampledWavelengths &lambda) const;
+    pstd::optional<CameraRay> GenerateRay(CameraSample sample,
+                                          SampledWavelengths &lambda) const;
 
     PBRT_CPU_GPU
     pstd::optional<CameraRayDifferential> GenerateRayDifferential(
@@ -521,8 +527,8 @@ class RealisticCamera : public CameraBase {
     pstd::vector<Bounds2f> exitPupilBounds;
 };
 
-inline CameraRay CameraHandle::GenerateRay(CameraSample sample,
-                                           SampledWavelengths &lambda) const {
+inline pstd::optional<CameraRay> CameraHandle::GenerateRay(
+    CameraSample sample, SampledWavelengths &lambda) const {
     auto generate = [&](auto ptr) { return ptr->GenerateRay(sample, lambda); };
     return Dispatch(generate);
 }

@@ -121,44 +121,40 @@ CameraBase::CameraBase(const CameraTransform &cameraTransform, Float shutterOpen
 
 pstd::optional<CameraRayDifferential> CameraBase::GenerateRayDifferential(
     CameraHandle camera, const CameraSample &sample, SampledWavelengths &lambda) {
-    // Find ray differential using differencing
     // Generate regular camera ray _cr_ for ray differential
-    CameraRay cr = camera.GenerateRay(sample, lambda);
-    if (!cr.weight)
+    pstd::optional<CameraRay> cr = camera.GenerateRay(sample, lambda);
+    if (!cr)
         return {};
+    RayDifferential rd(cr->ray);
 
-    RayDifferential rd(cr.ray);
     // Find camera ray after shifting one pixel in the $x$ direction
-    CameraRay rx;
-    for (Float eps : {.05, -.05}) {
+    pstd::optional<CameraRay> rx;
+    for (Float eps : {.05f, -.05f}) {
         CameraSample sshift = sample;
         sshift.pFilm.x += eps;
         // Try to generate ray with _sshift_ and compute $x$ differential
-        if (rx = camera.GenerateRay(sshift, lambda); rx.weight) {
-            rd.rxOrigin = rd.o + (rx.ray.o - rd.o) / eps;
-            rd.rxDirection = rd.d + (rx.ray.d - rd.d) / eps;
+        if (rx = camera.GenerateRay(sshift, lambda); rx) {
+            rd.rxOrigin = rd.o + (rx->ray.o - rd.o) / eps;
+            rd.rxDirection = rd.d + (rx->ray.d - rd.d) / eps;
             break;
         }
     }
-    if (!rx.weight)
-        return {};
 
     // Find camera ray after shifting one pixel in the $y$ direction
-    CameraRay ry;
-    for (Float eps : {.05, -.05}) {
+    pstd::optional<CameraRay> ry;
+    for (Float eps : {.05f, -.05f}) {
         CameraSample sshift = sample;
         sshift.pFilm.y += eps;
-        if (ry = camera.GenerateRay(sshift, lambda); ry.weight) {
-            rd.ryOrigin = rd.o + (ry.ray.o - rd.o) / eps;
-            rd.ryDirection = rd.d + (ry.ray.d - rd.d) / eps;
+        if (ry = camera.GenerateRay(sshift, lambda); ry) {
+            rd.ryOrigin = rd.o + (ry->ray.o - rd.o) / eps;
+            rd.ryDirection = rd.d + (ry->ray.d - rd.d) / eps;
             break;
         }
     }
-    if (!ry.weight)
-        return {};
 
-    rd.hasDifferentials = true;
-    return CameraRayDifferential{rd, cr.weight};
+    // Return approximate ray differential and weight
+    rd.hasDifferentials = rx && ry;
+    return CameraRayDifferential{rd, cr->weight};
 }
 
 void CameraBase::ApproximatedPdxy(const SurfaceInteraction &si) const {
@@ -294,8 +290,8 @@ CameraHandle CameraHandle::Create(const std::string &name,
 }
 
 // OrthographicCamera Method Definitions
-CameraRay OrthographicCamera::GenerateRay(CameraSample sample,
-                                          SampledWavelengths &lambda) const {
+pstd::optional<CameraRay> OrthographicCamera::GenerateRay(
+    CameraSample sample, SampledWavelengths &lambda) const {
     // Compute raster and camera sample positions
     Point3f pFilm = Point3f(sample.pFilm.x, sample.pFilm.y, 0);
     Point3f pCamera = cameraFromRaster(pFilm);
@@ -415,8 +411,8 @@ OrthographicCamera *OrthographicCamera::Create(const ParameterDictionary &parame
 }
 
 // PerspectiveCamera Method Definitions
-CameraRay PerspectiveCamera::GenerateRay(CameraSample sample,
-                                         SampledWavelengths &lambda) const {
+pstd::optional<CameraRay> PerspectiveCamera::GenerateRay(
+    CameraSample sample, SampledWavelengths &lambda) const {
     // Compute raster and camera sample positions
     Point3f pFilm = Point3f(sample.pFilm.x, sample.pFilm.y, 0);
     Point3f pCamera = cameraFromRaster(pFilm);
@@ -622,8 +618,8 @@ pstd::optional<CameraWiSample> PerspectiveCamera::SampleWi(
 }
 
 // SphericalCamera Method Definitions
-CameraRay SphericalCamera::GenerateRay(CameraSample sample,
-                                       SampledWavelengths &lambda) const {
+pstd::optional<CameraRay> SphericalCamera::GenerateRay(CameraSample sample,
+                                                       SampledWavelengths &lambda) const {
     // Compute spherical camera ray direction
     Vector3f dir;
     if (mapping == EquiRect) {
@@ -998,8 +994,8 @@ Point3f RealisticCamera::SampleExitPupil(const Point2f &pFilm, const Point2f &le
             sinTheta * pLens.x + cosTheta * pLens.y, LensRearZ()};
 }
 
-CameraRay RealisticCamera::GenerateRay(CameraSample sample,
-                                       SampledWavelengths &lambda) const {
+pstd::optional<CameraRay> RealisticCamera::GenerateRay(CameraSample sample,
+                                                       SampledWavelengths &lambda) const {
     // Find point on film, _pFilm_, corresponding to _sample.pFilm_
     // Compute Film's physical extent
     Float aspect = (Float)film.FullResolution().y / (Float)film.FullResolution().x;
@@ -1021,7 +1017,7 @@ CameraRay RealisticCamera::GenerateRay(CameraSample sample,
     Ray ray;
     Float weight = TraceLensesFromFilm(rFilm, &ray, lambda[0]);
     if (weight == 0)
-        return CameraRay{Ray(), SampledSpectrum(0.f)};
+        return {};
 
     // Finish initialization of _RealisticCamera_ ray
     ray.time = SampleTime(sample.time);
