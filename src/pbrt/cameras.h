@@ -137,10 +137,19 @@ class CameraBase {
     Vector3f minDirDifferentialX, minDirDifferentialY;
 
     // CameraBase Protected Methods
+    CameraBase() = default;
+    CameraBase(const CameraTransform &cameraTransform, Float shutterOpen,
+               Float shutterClose, FilmHandle film, MediumHandle medium);
+
+    PBRT_CPU_GPU
+    static pstd::optional<CameraRayDifferential> GenerateRayDifferential(
+        CameraHandle camera, const CameraSample &sample, SampledWavelengths &lambda);
+
     PBRT_CPU_GPU
     Ray RenderFromCamera(const Ray &r) const {
         return cameraTransform.RenderFromCamera(r);
     }
+
     PBRT_CPU_GPU
     RayDifferential RenderFromCamera(const RayDifferential &r) const {
         return cameraTransform.RenderFromCamera(r);
@@ -165,14 +174,6 @@ class CameraBase {
     Point3f CameraFromRender(const Point3f &p, Float time) const {
         return cameraTransform.CameraFromRender(p, time);
     }
-
-    CameraBase() = default;
-    CameraBase(const CameraTransform &cameraTransform, Float shutterOpen,
-               Float shutterClose, FilmHandle film, MediumHandle medium);
-
-    PBRT_CPU_GPU
-    static pstd::optional<CameraRayDifferential> GenerateRayDifferential(
-        CameraHandle camera, const CameraSample &sample, SampledWavelengths &lambda);
 
     void FindMinimumDifferentials(CameraHandle camera);
 };
@@ -227,6 +228,8 @@ class OrthographicCamera : public ProjectiveCamera {
         // Compute differential changes in origin for orthographic camera rays
         dxCamera = cameraFromRaster(Vector3f(1, 0, 0));
         dyCamera = cameraFromRaster(Vector3f(0, 1, 0));
+
+        // Compute minimum differentials for orthographic camera
         minDirDifferentialX = minDirDifferentialY = Vector3f(0, 0, 0);
         minPosDifferentialX = dxCamera;
         minPosDifferentialY = dyCamera;
@@ -284,9 +287,9 @@ class PerspectiveCamera : public ProjectiveCamera {
                            medium) {
         // Compute differential changes in origin for perspective camera rays
         dxCamera =
-            (cameraFromRaster(Point3f(1, 0, 0)) - cameraFromRaster(Point3f(0, 0, 0)));
+            cameraFromRaster(Point3f(1, 0, 0)) - cameraFromRaster(Point3f(0, 0, 0));
         dyCamera =
-            (cameraFromRaster(Point3f(0, 1, 0)) - cameraFromRaster(Point3f(0, 0, 0)));
+            cameraFromRaster(Point3f(0, 1, 0)) - cameraFromRaster(Point3f(0, 0, 0));
 
         // Compute _cosTotalWidth_ for perspective camera
         Point2f radius = Point2f(film.GetFilter().Radius());
@@ -303,6 +306,7 @@ class PerspectiveCamera : public ProjectiveCamera {
         pMax /= pMax.z;
         A = std::abs((pMax.x - pMin.x) * (pMax.y - pMin.y));
 
+        // Compute minimum differentials for _PerspectiveCamera_
         FindMinimumDifferentials(this);
     }
 
@@ -334,8 +338,8 @@ class PerspectiveCamera : public ProjectiveCamera {
 
   private:
     // PerspectiveCamera Private Members
-    Float cosTotalWidth;
     Vector3f dxCamera, dyCamera;
+    Float cosTotalWidth;
     Float A;
 };
 
