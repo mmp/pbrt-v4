@@ -472,7 +472,7 @@ class RealisticCamera : public CameraBase {
     Float RearElementRadius() const { return elementInterfaces.back().apertureRadius; }
 
     PBRT_CPU_GPU
-    Float TraceLensesFromFilm(const Ray &rCamera, Ray *rOut, Float lambda = 550) const;
+    Float TraceLensesFromFilm(const Ray &rCamera, Ray *rOut) const;
 
     PBRT_CPU_GPU
     static bool IntersectSphericalElement(Float radius, Float zCenter, const Ray &ray,
@@ -500,7 +500,7 @@ class RealisticCamera : public CameraBase {
     }
 
     PBRT_CPU_GPU
-    bool TraceLensesFromScene(const Ray &rCamera, Ray *rOut) const;
+    Float TraceLensesFromScene(const Ray &rCamera, Ray *rOut) const;
 
     void DrawLensSystem() const;
     void DrawRayPathFromFilm(const Ray &r, bool arrow, bool toOpticalIntercept) const;
@@ -510,8 +510,6 @@ class RealisticCamera : public CameraBase {
                                       Float *f);
     void ComputeThickLensApproximation(Float pz[2], Float f[2]) const;
     Float FocusThickLens(Float focusDistance);
-    Float FocusBinarySearch(Float focusDistance);
-    Float FocusDistance(Float filmDist);
     Bounds2f BoundExitPupil(Float filmX0, Float filmX1) const;
     void RenderExitPupil(Float sx, Float sy, const char *filename) const;
 
@@ -522,6 +520,7 @@ class RealisticCamera : public CameraBase {
     void TestExitPupilBounds() const;
 
     // RealisticCamera Private Members
+    Bounds2f physicalExtent;
     pstd::vector<LensElementInterface> elementInterfaces;
     Image apertureImage;
     pstd::vector<Bounds2f> exitPupilBounds;
