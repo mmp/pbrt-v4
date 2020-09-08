@@ -167,6 +167,71 @@ Sensor::Sensor(SpectrumHandle r_bar, SpectrumHandle g_bar, SpectrumHandle b_bar,
     cameraRGBWhiteNorm = RGB(1, 1, 1) / white;
 }
 
+RGB Sensor::SpectrumToCameraRGB(SpectrumHandle s, const DenselySampledSpectrum &illum,
+                                const DenselySampledSpectrum &r,
+                                const DenselySampledSpectrum &g,
+                                const DenselySampledSpectrum &b) {
+    RGB rgb(0, 0, 0);
+    Float g_integral = 0;
+    for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda) {
+        g_integral += g(lambda) * illum(lambda);
+        rgb.r += r(lambda) * s(lambda) * illum(lambda);
+        rgb.g += g(lambda) * s(lambda) * illum(lambda);
+        rgb.b += b(lambda) * s(lambda) * illum(lambda);
+    }
+    return rgb / g_integral;
+}
+
+RGB Sensor::IlluminantToCameraRGB(const DenselySampledSpectrum &illum,
+                                  const DenselySampledSpectrum &r,
+                                  const DenselySampledSpectrum &g,
+                                  const DenselySampledSpectrum &b) {
+    RGB rgb(0, 0, 0);
+    for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda) {
+        rgb.r += r(lambda) * illum(lambda);
+        rgb.g += g(lambda) * illum(lambda);
+        rgb.b += b(lambda) * illum(lambda);
+    }
+    return rgb / rgb.g;
+}
+
+Float Sensor::IlluminantToY(const DenselySampledSpectrum &illum,
+                            const DenselySampledSpectrum &g) {
+    Float y = 0;
+    for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda)
+        y += g(lambda) * illum(lambda);
+    return y;
+}
+
+pstd::optional<SquareMatrix<3>> Sensor::SolveCameraMatrix(
+    const DenselySampledSpectrum &srcw, const DenselySampledSpectrum &dstw) const {
+    // FIXME: make sure these match trainingSwatches.size()
+    Float A_data[24][3];
+    Float B_data[24][3];
+
+    RGB src_white = IlluminantToCameraRGB(srcw, r_bar, g_bar, b_bar);
+    RGB dst_white = IlluminantToCameraRGB(dstw, r_bar, g_bar, b_bar);
+
+    // account for perceptual brightness difference in whites by scaling the
+    // target swatches by the relative difference between the whitepoint in
+    // camera space and in CIE XYZ
+    Float srcG = IlluminantToY(srcw, g_bar);
+    Float srcY = IlluminantToY(srcw, Spectra::Y());
+
+    for (size_t i = 0; i < trainingSwatches.size(); ++i) {
+        SpectrumHandle s = trainingSwatches[i];
+        RGB a = SpectrumToCameraRGB(s, srcw, r_bar, g_bar, b_bar) / dst_white;
+        RGB b = SpectrumToCameraRGB(s, dstw, Spectra::X(), Spectra::Y(), Spectra::Z()) *
+                (srcY / srcG);
+        for (int c = 0; c < 3; ++c) {
+            A_data[i][c] = a[c];
+            B_data[i][c] = b[c];
+        }
+    }
+
+    return LinearLeastSquares(A_data, B_data, trainingSwatches.size());
+}
+
 std::vector<SpectrumHandle> Sensor::trainingSwatches{
     PiecewiseLinearSpectrum::FromInterleaved(
         {380.000000, 0.051500, 390.000000, 0.056500, 400.000000, 0.063000,
@@ -504,71 +569,6 @@ std::vector<SpectrumHandle> Sensor::trainingSwatches{
          680.000000, 0.032500, 690.000000, 0.032000, 700.000000, 0.032000,
          710.000000, 0.032000, 720.000000, 0.032000, 730.000000, 0.032500},
         false, Allocator())};
-
-RGB Sensor::SpectrumToCameraRGB(SpectrumHandle s, const DenselySampledSpectrum &illum,
-                                const DenselySampledSpectrum &r,
-                                const DenselySampledSpectrum &g,
-                                const DenselySampledSpectrum &b) {
-    RGB rgb(0, 0, 0);
-    Float g_integral = 0;
-    for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda) {
-        g_integral += g(lambda) * illum(lambda);
-        rgb.r += r(lambda) * s(lambda) * illum(lambda);
-        rgb.g += g(lambda) * s(lambda) * illum(lambda);
-        rgb.b += b(lambda) * s(lambda) * illum(lambda);
-    }
-    return rgb / g_integral;
-}
-
-RGB Sensor::IlluminantToCameraRGB(const DenselySampledSpectrum &illum,
-                                  const DenselySampledSpectrum &r,
-                                  const DenselySampledSpectrum &g,
-                                  const DenselySampledSpectrum &b) {
-    RGB rgb(0, 0, 0);
-    for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda) {
-        rgb.r += r(lambda) * illum(lambda);
-        rgb.g += g(lambda) * illum(lambda);
-        rgb.b += b(lambda) * illum(lambda);
-    }
-    return rgb / rgb.g;
-}
-
-Float Sensor::IlluminantToY(const DenselySampledSpectrum &illum,
-                            const DenselySampledSpectrum &g) {
-    Float y = 0;
-    for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda)
-        y += g(lambda) * illum(lambda);
-    return y;
-}
-
-pstd::optional<SquareMatrix<3>> Sensor::SolveCameraMatrix(
-    const DenselySampledSpectrum &srcw, const DenselySampledSpectrum &dstw) const {
-    // FIXME: make sure these match trainingSwatches.size()
-    Float A_data[24][3];
-    Float B_data[24][3];
-
-    RGB src_white = IlluminantToCameraRGB(srcw, r_bar, g_bar, b_bar);
-    RGB dst_white = IlluminantToCameraRGB(dstw, r_bar, g_bar, b_bar);
-
-    // account for perceptual brightness difference in whites by scaling the
-    // target swatches by the relative difference between the whitepoint in
-    // camera space and in CIE XYZ
-    Float srcG = IlluminantToY(srcw, g_bar);
-    Float srcY = IlluminantToY(srcw, Spectra::Y());
-
-    for (size_t i = 0; i < trainingSwatches.size(); ++i) {
-        SpectrumHandle s = trainingSwatches[i];
-        RGB a = SpectrumToCameraRGB(s, srcw, r_bar, g_bar, b_bar) / dst_white;
-        RGB b = SpectrumToCameraRGB(s, dstw, Spectra::X(), Spectra::Y(), Spectra::Z()) *
-                (srcY / srcG);
-        for (int c = 0; c < 3; ++c) {
-            A_data[i][c] = a[c];
-            B_data[i][c] = b[c];
-        }
-    }
-
-    return LinearLeastSquares(A_data, B_data, trainingSwatches.size());
-}
 
 STAT_MEMORY_COUNTER("Memory/Film pixels", filmPixelMemory);
 
