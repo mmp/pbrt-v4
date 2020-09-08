@@ -701,36 +701,34 @@ std::string SphericalCamera::ToString() const {
 
 // RealisticCamera Method Definitions
 RealisticCamera::RealisticCamera(CameraBaseParameters baseParameters,
-                                 Float setApertureDiameter, Float focusDistance,
-                                 std::vector<Float> &lensData, Float scale,
-                                 Image apertureImage, Allocator alloc)
+                                 std::vector<Float> &lensParameters, Float focusDistance,
+                                 Float setApertureDiameter, Image apertureImage,
+                                 Allocator alloc)
     : CameraBase(baseParameters),
-      scale(scale),
       elementInterfaces(alloc),
       exitPupilBounds(alloc),
       apertureImage(std::move(apertureImage)) {
     // Initialize _elementInterfaces_ for camera
-    for (int i = 0; i < (int)lensData.size(); i += 4) {
-        // Extract lens element configuration from _lensData_
-        Float curvatureRadius = scale * lensData[i] * 0.001f;
-        Float thickness = scale * lensData[i + 1] * 0.001f;
-        Float eta = lensData[i + 2];
-        Float apertureDiameter = scale * lensData[i + 3] * 0.001f;
+    for (size_t i = 0; i < lensParameters.size(); i += 4) {
+        // Extract lens element configuration from _lensParameters_
+        Float curvatureRadius = lensParameters[i] / 1000;
+        Float thickness = lensParameters[i + 1] / 1000;
+        Float eta = lensParameters[i + 2];
+        Float apertureDiameter = lensParameters[i + 3] / 1000;
 
         if (curvatureRadius == 0) {
             // Set aperture stop diameter
-            setApertureDiameter *= 0.001f;
+            setApertureDiameter /= 1000;
             if (setApertureDiameter > apertureDiameter)
-                Warning("Specified aperture diameter %f is greater than maximum "
-                        "possible %f.  Clamping it.",
+                Warning("Aperture diameter %f is greater than maximum possible %f. "
+                        "Clamping it.",
                         setApertureDiameter, apertureDiameter);
             else
                 apertureDiameter = setApertureDiameter;
         }
         // Add element interface to end of _elementInterfaces_
-        LensElementInterface interface{curvatureRadius, thickness, eta,
-                                       apertureDiameter / 2};
-        elementInterfaces.emplace_back(interface);
+        elementInterfaces.push_back(
+            {curvatureRadius, thickness, eta, apertureDiameter / 2});
     }
 
     // Compute lens--film distance for given focus distance
@@ -741,8 +739,8 @@ RealisticCamera::RealisticCamera(CameraBaseParameters baseParameters,
     int nSamples = 64;
     exitPupilBounds.resize(nSamples);
     ParallelFor(0, nSamples, [&](int i) {
-        Float r0 = (Float)i / nSamples * FilmDiagonal() / 2;
-        Float r1 = (Float)(i + 1) / nSamples * FilmDiagonal() / 2;
+        Float r0 = (Float)i / nSamples * film.Diagonal() / 2;
+        Float r1 = (Float)(i + 1) / nSamples * film.Diagonal() / 2;
         exitPupilBounds[i] = BoundExitPupil(r0, r1);
     });
 
@@ -831,7 +829,7 @@ void RealisticCamera::ComputeCardinalPoints(const Ray &rIn, const Ray &rOut, Flo
 
 void RealisticCamera::ComputeThickLensApproximation(Float pz[2], Float fz[2]) const {
     // Find height $x$ from optical axis for parallel rays
-    Float x = .001 * FilmDiagonal();
+    Float x = .001f * film.Diagonal();
 
     // Compute cardinal points for film side of lens system
     Ray rScene(Point3f(x, 0, LensFrontZ() + 1), Vector3f(0, 0, -1));
@@ -892,7 +890,7 @@ Float RealisticCamera::FocusBinarySearch(Float focusDistance) {
 
 Float RealisticCamera::FocusDistance(Float filmDistance) {
     // Find offset ray from film center through lens
-    Bounds2f bounds = BoundExitPupil(0, .001 * FilmDiagonal());
+    Bounds2f bounds = BoundExitPupil(0, .001 * film.Diagonal());
     Ray ray;
     bool foundFocusRay = false;
     for (Float scale : {0.1f, 0.01f, 0.001f}) {
@@ -963,7 +961,7 @@ Point3f RealisticCamera::SampleExitPupil(const Point2f &pFilm, const Point2f &le
                                          Float *sampleBoundsArea) const {
     // Find exit pupil bound for sample distance from film center
     Float rFilm = std::sqrt(pFilm.x * pFilm.x + pFilm.y * pFilm.y);
-    int rIndex = rFilm / (FilmDiagonal() / 2) * exitPupilBounds.size();
+    int rIndex = rFilm / (film.Diagonal() / 2) * exitPupilBounds.size();
     rIndex = std::min<int>(exitPupilBounds.size() - 1, rIndex);
     Bounds2f pupilBounds = exitPupilBounds[rIndex];
     if (sampleBoundsArea != nullptr)
@@ -984,7 +982,7 @@ pstd::optional<CameraRay> RealisticCamera::GenerateRay(CameraSample sample,
     // Find point on film, _pFilm_, corresponding to _sample.pFilm_
     // Compute Film's physical extent
     Float aspect = (Float)film.FullResolution().y / (Float)film.FullResolution().x;
-    Float diagonal = FilmDiagonal();
+    Float diagonal = film.Diagonal();
     Float x = std::sqrt(diagonal * diagonal / (1 + aspect * aspect));
     Float y = aspect * x;
     Bounds2f physicalExtent(Point2f(-x / 2, -y / 2), Point2f(x / 2, y / 2));
@@ -1311,7 +1309,7 @@ void RealisticCamera::RenderExitPupil(Float sx, Float sy, const char *filename) 
 }
 
 void RealisticCamera::TestExitPupilBounds() const {
-    Float filmDiagonal = FilmDiagonal();
+    Float filmDiagonal = film.Diagonal();
 
     static RNG rng;
 
@@ -1373,23 +1371,22 @@ RealisticCamera *RealisticCamera::Create(const ParameterDictionary &parameters,
     std::string lensFile = ResolveFilename(parameters.GetOneString("lensfile", ""));
     Float apertureDiameter = parameters.GetOneFloat("aperturediameter", 1.0);
     Float focusDistance = parameters.GetOneFloat("focusdistance", 10.0);
-    Float scale = parameters.GetOneFloat("scale", 1.f);
 
     if (lensFile.empty()) {
         Error(loc, "No lens description file supplied!");
         return nullptr;
     }
     // Load element data from lens description file
-    std::vector<Float> lensData = ReadFloatFile(lensFile);
-    if (lensData.empty()) {
+    std::vector<Float> lensParameters = ReadFloatFile(lensFile);
+    if (lensParameters.empty()) {
         Error(loc, "Error reading lens specification file \"%s\".", lensFile);
         return nullptr;
     }
-    if (lensData.size() % 4 != 0) {
+    if (lensParameters.size() % 4 != 0) {
         Error(loc,
               "%s: excess values in lens specification file; "
               "must be multiple-of-four values, read %d.",
-              lensFile, (int)lensData.size());
+              lensFile, (int)lensParameters.size());
         return nullptr;
     }
 
@@ -1505,8 +1502,8 @@ RealisticCamera *RealisticCamera::Create(const ParameterDictionary &parameters,
         }
     }
 
-    return alloc.new_object<RealisticCamera>(cameraBaseParameters, apertureDiameter,
-                                             focusDistance, lensData, scale,
+    return alloc.new_object<RealisticCamera>(cameraBaseParameters, lensParameters,
+                                             focusDistance, apertureDiameter,
                                              std::move(apertureImage), alloc);
 }
 

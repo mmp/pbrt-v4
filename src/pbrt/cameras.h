@@ -406,9 +406,9 @@ class SphericalCamera : public CameraBase {
 class RealisticCamera : public CameraBase {
   public:
     // RealisticCamera Public Methods
-    RealisticCamera(CameraBaseParameters baseParameters, Float apertureDiameter,
-                    Float focusDistance, std::vector<Float> &lensData, Float scale,
-                    Image apertureImage, Allocator alloc);
+    RealisticCamera(CameraBaseParameters baseParameters,
+                    std::vector<Float> &lensParameters, Float focusDistance,
+                    Float apertureDiameter, Image apertureImage, Allocator alloc);
 
     static RealisticCamera *Create(const ParameterDictionary &parameters,
                                    const CameraTransform &cameraTransform,
@@ -502,9 +502,6 @@ class RealisticCamera : public CameraBase {
     PBRT_CPU_GPU
     bool TraceLensesFromScene(const Ray &rCamera, Ray *rOut) const;
 
-    PBRT_CPU_GPU
-    Float FilmDiagonal() const { return film.Diagonal() * scale; }
-
     void DrawLensSystem() const;
     void DrawRayPathFromFilm(const Ray &r, bool arrow, bool toOpticalIntercept) const;
     void DrawRayPathFromScene(const Ray &r, bool arrow, bool toOpticalIntercept) const;
@@ -525,9 +522,8 @@ class RealisticCamera : public CameraBase {
     void TestExitPupilBounds() const;
 
     // RealisticCamera Private Members
-    Float scale;
-    Image apertureImage;
     pstd::vector<LensElementInterface> elementInterfaces;
+    Image apertureImage;
     pstd::vector<Bounds2f> exitPupilBounds;
 };
 
