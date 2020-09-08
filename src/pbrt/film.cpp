@@ -94,13 +94,14 @@ std::string VisibleSurface::ToString() const {
                         set, p, n, ns, dzdx, dzdy, time, albedo);
 }
 
-// Sensor Method Definitions
-Sensor *Sensor::Create(const std::string &name, const RGBColorSpace *colorSpace,
-                       Float exposureTime, Float fNumber, Float ISO, Float C,
-                       Float whiteBalanceTemp, const FileLoc *loc, Allocator alloc) {
+// PixelSensor Method Definitions
+PixelSensor *PixelSensor::Create(const std::string &name, const RGBColorSpace *colorSpace,
+                                 Float exposureTime, Float fNumber, Float ISO, Float C,
+                                 Float whiteBalanceTemp, const FileLoc *loc,
+                                 Allocator alloc) {
     if (name == "cie1931") {
-        return alloc.new_object<Sensor>(colorSpace, whiteBalanceTemp, exposureTime,
-                                        fNumber, ISO, C, alloc);
+        return alloc.new_object<PixelSensor>(colorSpace, whiteBalanceTemp, exposureTime,
+                                             fNumber, ISO, C, alloc);
     } else {
         SpectrumHandle r = GetNamedSpectrum(name + "_r");
         SpectrumHandle g = GetNamedSpectrum(name + "_g");
@@ -109,69 +110,70 @@ Sensor *Sensor::Create(const std::string &name, const RGBColorSpace *colorSpace,
         if (!r || !g || !b)
             ErrorExit(loc, "%s: unknown sensor type", name);
 
-        return alloc.new_object<Sensor>(r, g, b, colorSpace, whiteBalanceTemp,
-                                        exposureTime, fNumber, ISO, C, alloc);
+        return alloc.new_object<PixelSensor>(r, g, b, colorSpace, whiteBalanceTemp,
+                                             exposureTime, fNumber, ISO, C, alloc);
     }
 }
 
-Sensor *Sensor::CreateDefault(Allocator alloc) {
+PixelSensor *PixelSensor::CreateDefault(Allocator alloc) {
     return Create("cie1931", RGBColorSpace::sRGB, 1.0, 1.0, 100, 100.0 * Pi, 0.f, nullptr,
                   alloc);
 }
 
-Sensor::Sensor(const RGBColorSpace *outputColorSpace, Float whiteBalanceTemp,
-               Float exposureTime, Float fNumber, Float ISO, Float C, Allocator alloc)
-    : r_bar(&Spectra::X(), alloc),
-      g_bar(&Spectra::Y(), alloc),
-      b_bar(&Spectra::Z(), alloc),
-      exposureTime(exposureTime),
-      fNumber(fNumber),
-      ISO(ISO),
-      C(C) {
-    if (whiteBalanceTemp != 0) {
-        Point2f targetWhite = outputColorSpace->w;
-        auto whiteIlluminant = Spectra::D(whiteBalanceTemp, alloc);
-        Point2f sourceWhite = SpectrumToXYZ(&whiteIlluminant).xy();
-        XYZFromCameraRGB = WhiteBalance(sourceWhite, targetWhite);
+pstd::optional<SquareMatrix<3>> PixelSensor::SolveCameraMatrix(
+    const DenselySampledSpectrum &srcw, const DenselySampledSpectrum &dstw) const {
+    RGB src_white = IlluminantToCameraRGB(srcw, r_bar, g_bar, b_bar);
+    RGB dst_white = IlluminantToCameraRGB(dstw, r_bar, g_bar, b_bar);
+
+    // account for perceptual brightness difference in whites by scaling the
+    // target swatches by the relative difference between the whitepoint in
+    // camera space and in CIE XYZ
+    Float srcG = IlluminantToY(srcw, g_bar);
+    Float srcY = IlluminantToY(srcw, Spectra::Y());
+
+    // Compute camera matrix using linear least squares fit
+    // FIXME: make sure these match trainingSwatches.size()
+    Float A[24][3], B[24][3];
+    for (size_t i = 0; i < trainingSwatches.size(); ++i) {
+        SpectrumHandle s = trainingSwatches[i];
+        RGB a = SpectrumToCameraRGB(s, srcw, r_bar, g_bar, b_bar) / dst_white;
+        RGB b = SpectrumToCameraRGB(s, dstw, Spectra::X(), Spectra::Y(), Spectra::Z()) *
+                (srcY / srcG);
+        for (int c = 0; c < 3; ++c) {
+            A[i][c] = a[c];
+            B[i][c] = b[c];
+        }
     }
+    return LinearLeastSquares(A, B, trainingSwatches.size());
 }
 
-Sensor::Sensor(SpectrumHandle r_bar, SpectrumHandle g_bar, SpectrumHandle b_bar,
-               const RGBColorSpace *outputColorSpace, Float whiteBalanceTemp,
-               Float exposureTime, Float fNumber, Float ISO, Float C, Allocator alloc)
-    : r_bar(r_bar, alloc),
-      g_bar(g_bar, alloc),
-      b_bar(b_bar, alloc),
-      exposureTime(exposureTime),
-      fNumber(fNumber),
-      ISO(ISO),
-      C(C) {
-    // Compute XYZ from camera RGB matrix
-    DenselySampledSpectrum sensorWhiteIlluminant = Spectra::D(whiteBalanceTemp, alloc);
-    pstd::optional<SquareMatrix<3>> m =
-        SolveCameraMatrix(sensorWhiteIlluminant, outputColorSpace->illuminant);
-    if (!m)
-        ErrorExit("Camera matrix could not be solved");
-    XYZFromCameraRGB = *m;
-
-    // Compute sensor's RGB normalization factor
-    // Compute white normalization factor for sensor
-    RGB white;
-    for (Float l = Lambda_min; l <= Lambda_max; ++l) {
-        white.r += r_bar(l) * outputColorSpace->illuminant(l);
-        white.g += g_bar(l) * outputColorSpace->illuminant(l);
-        white.b += b_bar(l) * outputColorSpace->illuminant(l);
+RGB PixelSensor::IlluminantToCameraRGB(const DenselySampledSpectrum &illum,
+                                       const DenselySampledSpectrum &r,
+                                       const DenselySampledSpectrum &g,
+                                       const DenselySampledSpectrum &b) {
+    RGB rgb;
+    for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda) {
+        rgb.r += r(lambda) * illum(lambda);
+        rgb.g += g(lambda) * illum(lambda);
+        rgb.b += b(lambda) * illum(lambda);
     }
-    white /= white.g;
-
-    cameraRGBWhiteNorm = RGB(1, 1, 1) / white;
+    return rgb / rgb.g;
 }
 
-RGB Sensor::SpectrumToCameraRGB(SpectrumHandle s, const DenselySampledSpectrum &illum,
-                                const DenselySampledSpectrum &r,
-                                const DenselySampledSpectrum &g,
-                                const DenselySampledSpectrum &b) {
-    RGB rgb(0, 0, 0);
+Float PixelSensor::IlluminantToY(const DenselySampledSpectrum &illum,
+                                 const DenselySampledSpectrum &g) {
+    Float y = 0;
+    for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda)
+        y += g(lambda) * illum(lambda);
+    return y;
+}
+
+RGB PixelSensor::SpectrumToCameraRGB(SpectrumHandle s,
+                                     const DenselySampledSpectrum &illum,
+                                     const DenselySampledSpectrum &r,
+                                     const DenselySampledSpectrum &g,
+                                     const DenselySampledSpectrum &b) {
+    RGB rgb;
     Float g_integral = 0;
     for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda) {
         g_integral += g(lambda) * illum(lambda);
@@ -182,57 +184,7 @@ RGB Sensor::SpectrumToCameraRGB(SpectrumHandle s, const DenselySampledSpectrum &
     return rgb / g_integral;
 }
 
-RGB Sensor::IlluminantToCameraRGB(const DenselySampledSpectrum &illum,
-                                  const DenselySampledSpectrum &r,
-                                  const DenselySampledSpectrum &g,
-                                  const DenselySampledSpectrum &b) {
-    RGB rgb(0, 0, 0);
-    for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda) {
-        rgb.r += r(lambda) * illum(lambda);
-        rgb.g += g(lambda) * illum(lambda);
-        rgb.b += b(lambda) * illum(lambda);
-    }
-    return rgb / rgb.g;
-}
-
-Float Sensor::IlluminantToY(const DenselySampledSpectrum &illum,
-                            const DenselySampledSpectrum &g) {
-    Float y = 0;
-    for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda)
-        y += g(lambda) * illum(lambda);
-    return y;
-}
-
-pstd::optional<SquareMatrix<3>> Sensor::SolveCameraMatrix(
-    const DenselySampledSpectrum &srcw, const DenselySampledSpectrum &dstw) const {
-    // FIXME: make sure these match trainingSwatches.size()
-    Float A_data[24][3];
-    Float B_data[24][3];
-
-    RGB src_white = IlluminantToCameraRGB(srcw, r_bar, g_bar, b_bar);
-    RGB dst_white = IlluminantToCameraRGB(dstw, r_bar, g_bar, b_bar);
-
-    // account for perceptual brightness difference in whites by scaling the
-    // target swatches by the relative difference between the whitepoint in
-    // camera space and in CIE XYZ
-    Float srcG = IlluminantToY(srcw, g_bar);
-    Float srcY = IlluminantToY(srcw, Spectra::Y());
-
-    for (size_t i = 0; i < trainingSwatches.size(); ++i) {
-        SpectrumHandle s = trainingSwatches[i];
-        RGB a = SpectrumToCameraRGB(s, srcw, r_bar, g_bar, b_bar) / dst_white;
-        RGB b = SpectrumToCameraRGB(s, dstw, Spectra::X(), Spectra::Y(), Spectra::Z()) *
-                (srcY / srcG);
-        for (int c = 0; c < 3; ++c) {
-            A_data[i][c] = a[c];
-            B_data[i][c] = b[c];
-        }
-    }
-
-    return LinearLeastSquares(A_data, B_data, trainingSwatches.size());
-}
-
-std::vector<SpectrumHandle> Sensor::trainingSwatches{
+std::vector<SpectrumHandle> PixelSensor::trainingSwatches{
     PiecewiseLinearSpectrum::FromInterleaved(
         {380.000000, 0.051500, 390.000000, 0.056500, 400.000000, 0.063000,
          410.000000, 0.065000, 420.000000, 0.063000, 430.000000, 0.060500,
@@ -573,7 +525,7 @@ std::vector<SpectrumHandle> Sensor::trainingSwatches{
 STAT_MEMORY_COUNTER("Memory/Film pixels", filmPixelMemory);
 
 // RGBFilm Method Definitions
-RGBFilm::RGBFilm(const Sensor *sensor, const Point2i &resolution,
+RGBFilm::RGBFilm(const PixelSensor *sensor, const Point2i &resolution,
                  const Bounds2i &pixelBounds, FilterHandle filter, Float diagonal,
                  const std::string &filename, Float scale,
                  const RGBColorSpace *colorSpace, Float maxComponentValue, bool writeFP16,
@@ -776,8 +728,9 @@ RGBFilm *RGBFilm::Create(const ParameterDictionary &parameters, Float exposureTi
     if (sensorName != "cie1931" && whiteBalanceTemp == 0)
         whiteBalanceTemp = 6500;
 
-    Sensor *sensor = Sensor::Create(sensorName, colorSpace, exposureTime, fNumber, ISO, C,
-                                    whiteBalanceTemp, loc, alloc);
+    PixelSensor *sensor =
+        PixelSensor::Create(sensorName, colorSpace, exposureTime, fNumber, ISO, C,
+                            whiteBalanceTemp, loc, alloc);
 
     return alloc.new_object<RGBFilm>(sensor, fullResolution, pixelBounds, filter,
                                      diagonal, filename, scale, colorSpace,
@@ -823,7 +776,7 @@ void GBufferFilm::AddSample(const Point2i &pFilm, SampledSpectrum L,
     p.weightSum += weight;
 }
 
-GBufferFilm::GBufferFilm(const Sensor *sensor, const Point2i &resolution,
+GBufferFilm::GBufferFilm(const PixelSensor *sensor, const Point2i &resolution,
                          const Bounds2i &pixelBounds, FilterHandle filter, Float diagonal,
                          const std::string &filename, Float scale,
                          const RGBColorSpace *colorSpace, Float maxComponentValue,
@@ -1089,8 +1042,9 @@ GBufferFilm *GBufferFilm::Create(const ParameterDictionary &parameters,
     if (sensorName != "cie1931" && whiteBalanceTemp == 0)
         whiteBalanceTemp = 6500;
 
-    Sensor *sensor = Sensor::Create(sensorName, colorSpace, exposureTime, fNumber, ISO, C,
-                                    whiteBalanceTemp, loc, alloc);
+    PixelSensor *sensor =
+        PixelSensor::Create(sensorName, colorSpace, exposureTime, fNumber, ISO, C,
+                            whiteBalanceTemp, loc, alloc);
 
     return alloc.new_object<GBufferFilm>(sensor, fullResolution, pixelBounds, filter,
                                          diagonal, filename, scale, colorSpace,
