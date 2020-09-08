@@ -101,6 +101,9 @@ struct CompensatedFloat {
     std::string ToString() const;
 };
 
+template <int N>
+class SquareMatrix;
+
 // Math Inline Functions
 PBRT_CPU_GPU
 inline Float Lerp(Float t, Float a, Float b) {
@@ -718,6 +721,9 @@ inline Float SmoothStep(Float x, Float a, Float b) {
 // Math Function Declarations
 int NextPrime(int x);
 
+pstd::optional<SquareMatrix<3>> LinearLeastSquares(const Float A[][3], const Float B[][3],
+                                                   int rows);
+
 PBRT_CPU_GPU
 inline Float ErfInv(Float a) {
 #ifdef PBRT_IS_GPU_CODE
@@ -1322,6 +1328,15 @@ PBRT_CPU_GPU inline void initDiag(Float m[N][N], int i, Float v, Args... args) {
 template <int N>
 class SquareMatrix {
   public:
+    PBRT_CPU_GPU
+    static SquareMatrix Zero() {
+        SquareMatrix m;
+        for (int i = 0; i < N; ++i)
+            for (int j = 0; j < N; ++j)
+                m.m[i][j] = 0;
+        return m;
+    }
+
     PBRT_CPU_GPU
     SquareMatrix() {
         for (int i = 0; i < N; ++i)

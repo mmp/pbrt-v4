@@ -32,12 +32,6 @@
 
 namespace pbrt {
 
-// Camera Matrix Function Declarations
-SquareMatrix<3> SolveCameraMatrix(SpectrumHandle r, SpectrumHandle g, SpectrumHandle b,
-                                  const DenselySampledSpectrum &srcw,
-                                  const DenselySampledSpectrum &dstw,
-                                  Allocator alloc = {});
-
 // Sensor Definition
 class Sensor {
   public:
@@ -46,15 +40,13 @@ class Sensor {
                           Float exposureTime, Float fNumber, Float ISO, Float C,
                           Float whiteBalanceTemp, const FileLoc *loc, Allocator alloc);
 
-    static Sensor *CreateDefault() {
-        return Create("cie1931", RGBColorSpace::sRGB, 1.0, 1.0, 100, 100.0 * Pi, 0.f,
-                      nullptr, Allocator());
-    }
-
     Sensor(SpectrumHandle r_bar, SpectrumHandle g_bar, SpectrumHandle b_bar,
-           const RGBColorSpace *outputColorSpace, const SquareMatrix<3> &XYZFromCameraRGB,
-           Float exposureTime, Float fNumber, Float ISO, Float C,
-           const DenselySampledSpectrum &whiteIlluminant, Allocator alloc);
+           const RGBColorSpace *outputColorSpace, Float whiteBalanceTemp,
+           Float exposureTime, Float fNumber, Float ISO, Float C, Allocator alloc);
+    Sensor(const RGBColorSpace *outputColorSpace, Float whiteBalanceTemp,
+           Float exposureTime, Float fNumber, Float ISO, Float C, Allocator alloc);
+
+    static Sensor *CreateDefault(Allocator alloc = {});
 
     PBRT_CPU_GPU
     RGB ToCameraRGB(const SampledSpectrum &L, const SampledWavelengths &lambda) const {
@@ -73,10 +65,28 @@ class Sensor {
     SquareMatrix<3> XYZFromCameraRGB;
 
   private:
+    // Sensor Private Methods
+    static RGB SpectrumToCameraRGB(SpectrumHandle s, const DenselySampledSpectrum &illum,
+                                   const DenselySampledSpectrum &r,
+                                   const DenselySampledSpectrum &g,
+                                   const DenselySampledSpectrum &b);
+
+    static RGB IlluminantToCameraRGB(const DenselySampledSpectrum &illum,
+                                     const DenselySampledSpectrum &r,
+                                     const DenselySampledSpectrum &g,
+                                     const DenselySampledSpectrum &b);
+
+    static Float IlluminantToY(const DenselySampledSpectrum &illum,
+                               const DenselySampledSpectrum &g);
+
+    pstd::optional<SquareMatrix<3>> SolveCameraMatrix(
+        const DenselySampledSpectrum &srcw, const DenselySampledSpectrum &dstw) const;
+
     // Sensor Private Members
     DenselySampledSpectrum r_bar, g_bar, b_bar;
-    RGB cameraRGBWhiteNorm;
     Float exposureTime, fNumber, ISO, C;
+    RGB cameraRGBWhiteNorm = RGB(1, 1, 1);
+    static std::vector<SpectrumHandle> trainingSwatches;
 };
 
 // VisibleSurface Definition
