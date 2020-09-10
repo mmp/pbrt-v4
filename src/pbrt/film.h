@@ -272,6 +272,12 @@ class RGBFilm : public FilmBase {
     PBRT_CPU_GPU
     void AddSplat(const Point2f &p, SampledSpectrum v, const SampledWavelengths &lambda);
 
+    PBRT_CPU_GPU
+    RGB ToOutputRGB(const SampledSpectrum &L, const SampledWavelengths &lambda) const {
+        RGB cameraRGB = sensor->ToCameraRGB(L * sensor->ImagingRatio(), lambda);
+        return Mul<RGB>(outputRGBFromCameraRGB, cameraRGB);
+    }
+
     void WriteImage(ImageMetadata metadata, Float splatScale = 1);
     Image GetImage(ImageMetadata *metadata, Float splatScale = 1);
 
@@ -321,6 +327,12 @@ class GBufferFilm : public FilmBase {
 
     PBRT_CPU_GPU
     void AddSplat(const Point2f &p, SampledSpectrum v, const SampledWavelengths &lambda);
+
+    PBRT_CPU_GPU
+    RGB ToOutputRGB(const SampledSpectrum &L, const SampledWavelengths &lambda) const {
+        RGB cameraRGB = sensor->ToCameraRGB(L * sensor->ImagingRatio(), lambda);
+        return Mul<RGB>(outputRGBFromCameraRGB, cameraRGB);
+    }
 
     PBRT_CPU_GPU
     bool UsesVisibleSurface() const { return true; }
@@ -421,6 +433,13 @@ inline bool FilmHandle::UsesVisibleSurface() const {
 PBRT_CPU_GPU
 inline RGB FilmHandle::GetPixelRGB(const Point2i &p, Float splatScale) const {
     auto get = [&](auto ptr) { return ptr->GetPixelRGB(p, splatScale); };
+    return Dispatch(get);
+}
+
+PBRT_CPU_GPU
+inline RGB FilmHandle::ToOutputRGB(const SampledSpectrum &L,
+                                   const SampledWavelengths &lambda) const {
+    auto get = [&](auto ptr) { return ptr->ToOutputRGB(L, lambda); };
     return Dispatch(get);
 }
 
