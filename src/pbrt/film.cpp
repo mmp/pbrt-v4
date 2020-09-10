@@ -935,6 +935,7 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
             rgb[c] += splatScale * pixel.splatRGB[c] / filterIntegral;
 
         rgb *= scale;
+        rgb = Mul<RGB>(outputRGBFromCameraRGB, rgb);
 
         Point2i pOffset(p.x - pixelBounds.pMin.x, p.y - pixelBounds.pMin.y);
         image.SetChannels(pOffset, rgbDesc, {rgb[0], rgb[1], rgb[2]});
