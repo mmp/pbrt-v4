@@ -42,6 +42,10 @@ class FilmHandle : public TaggedPointer<RGBFilm, GBufferFilm> {
     PBRT_CPU_GPU inline Bounds2i PixelBounds() const;
 
     PBRT_CPU_GPU
+    inline RGB ToOutputRGB(const SampledSpectrum &L,
+                           const SampledWavelengths &lambda) const;
+
+    PBRT_CPU_GPU
     RGB GetPixelRGB(const Point2i &p, Float splatScale = 1) const;
     void WriteImage(ImageMetadata metadata, Float splatScale = 1);
     Image GetImage(ImageMetadata *metadata, Float splatScale = 1);
