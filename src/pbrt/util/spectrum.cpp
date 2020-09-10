@@ -32,13 +32,8 @@ namespace pbrt {
 
 // Spectrum Function Definitions
 XYZ SpectrumToXYZ(SpectrumHandle s) {
-    XYZ xyz;
-    for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda) {
-        xyz.X += Spectra::X()(lambda) * s(lambda);
-        xyz.Y += Spectra::Y()(lambda) * s(lambda);
-        xyz.Z += Spectra::Z()(lambda) * s(lambda);
-    }
-    return xyz / CIE_Y_integral;
+    return XYZ(InnerProduct(&Spectra::X(), s), InnerProduct(&Spectra::Y(), s),
+               InnerProduct(&Spectra::Z(), s));
 }
 
 Float SpectrumToPhotometric(SpectrumHandle s) {
@@ -73,13 +68,6 @@ std::string SpectrumHandle::ParameterType() const {
 std::string SpectrumHandle::ParameterString() const {
     auto ps = [&](auto ptr) { return ptr->ParameterString(); };
     return DispatchCPU(ps);
-}
-
-Float SpectrumToY(SpectrumHandle s) {
-    Float y = 0;
-    for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda)
-        y += Spectra::Y()(lambda) * s(lambda);
-    return y / CIE_Y_integral;
 }
 
 // Spectrum Method Definitions
@@ -157,6 +145,28 @@ pstd::optional<SpectrumHandle> PiecewiseLinearSpectrum::Read(const std::string &
             alloc.new_object<PiecewiseLinearSpectrum>(lambda, v, alloc);
         return handle;
     }
+}
+
+PiecewiseLinearSpectrum *PiecewiseLinearSpectrum::FromInterleaved(
+    pstd::span<const Float> samples, bool normalize, Allocator alloc) {
+    CHECK_EQ(0, samples.size() % 2);
+    int n = samples.size() / 2;
+    std::vector<Float> lambda(n), v(n);
+    for (size_t i = 0; i < n; ++i) {
+        lambda[i] = samples[2 * i];
+        v[i] = samples[2 * i + 1];
+        if (i > 0)
+            CHECK_GT(lambda[i], lambda[i - 1]);
+    }
+
+    PiecewiseLinearSpectrum *spec =
+        alloc.new_object<pbrt::PiecewiseLinearSpectrum>(lambda, v, alloc);
+
+    if (normalize)
+        // Normalize to have luminance of 1.
+        spec->Scale(1 / InnerProduct(spec, &Spectra::Y()));
+
+    return spec;
 }
 
 std::string BlackbodySpectrum::ToString() const {

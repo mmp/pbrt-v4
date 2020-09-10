@@ -279,7 +279,7 @@ std::vector<TestIntegrator> GetIntegrators() {
             FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
             RGBFilm *film = new RGBFilm(PixelSensor::CreateDefault(), resolution,
                                         Bounds2i(Point2i(0, 0), resolution), filter, 1.,
-                                        inTestDir("test.exr"), 1., RGBColorSpace::sRGB);
+                                        inTestDir("test.exr"), RGBColorSpace::sRGB);
             CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
             PerspectiveCamera *camera = new PerspectiveCamera(cbp,
                 Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10., 45);
@@ -297,7 +297,7 @@ std::vector<TestIntegrator> GetIntegrators() {
             FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
             RGBFilm *film = new RGBFilm(PixelSensor::CreateDefault(), resolution,
                                         Bounds2i(Point2i(0, 0), resolution), filter, 1.,
-                                        inTestDir("test.exr"), 1., RGBColorSpace::sRGB);
+                                        inTestDir("test.exr"), RGBColorSpace::sRGB);
             CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
             OrthographicCamera *camera = new OrthographicCamera(cbp,
                 Bounds2f(Point2f(-.1, -.1), Point2f(.1, .1)), 0., 10.);
@@ -316,7 +316,7 @@ std::vector<TestIntegrator> GetIntegrators() {
             FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
             RGBFilm *film = new RGBFilm(PixelSensor::CreateDefault(), resolution,
                                         Bounds2i(Point2i(0, 0), resolution), filter, 1.,
-                                        inTestDir("test.exr"), 1., RGBColorSpace::sRGB);
+                                        inTestDir("test.exr"), RGBColorSpace::sRGB);
             CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
             PerspectiveCamera *camera = new PerspectiveCamera(cbp,
                 Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10., 45);
@@ -333,7 +333,7 @@ std::vector<TestIntegrator> GetIntegrators() {
             FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
             RGBFilm *film = new RGBFilm(PixelSensor::CreateDefault(), resolution,
                                         Bounds2i(Point2i(0, 0), resolution), filter, 1.,
-                                        inTestDir("test.exr"), 1., RGBColorSpace::sRGB);
+                                        inTestDir("test.exr"), RGBColorSpace::sRGB);
             CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
             OrthographicCamera *camera = new OrthographicCamera(cbp,
                 Bounds2f(Point2f(-.1, -.1), Point2f(.1, .1)), 0., 10.);
@@ -352,7 +352,7 @@ std::vector<TestIntegrator> GetIntegrators() {
             FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
             RGBFilm *film = new RGBFilm(PixelSensor::CreateDefault(), resolution,
                                         Bounds2i(Point2i(0, 0), resolution), filter, 1.,
-                                        inTestDir("test.exr"), 1., RGBColorSpace::sRGB);
+                                        inTestDir("test.exr"), RGBColorSpace::sRGB);
             CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
             PerspectiveCamera *camera = new PerspectiveCamera(cbp,
                 Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10., 45);
@@ -371,7 +371,7 @@ std::vector<TestIntegrator> GetIntegrators() {
             FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
             RGBFilm *film = new RGBFilm(PixelSensor::CreateDefault(), resolution,
                                         Bounds2i(Point2i(0, 0), resolution), filter, 1.,
-                                        inTestDir("test.exr"), 1., RGBColorSpace::sRGB);
+                                        inTestDir("test.exr"), RGBColorSpace::sRGB);
             CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
             PerspectiveCamera *camera = new PerspectiveCamera(cbp,
                 Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10., 45);
@@ -391,7 +391,7 @@ std::vector<TestIntegrator> GetIntegrators() {
             FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
             RGBFilm *film = new RGBFilm(PixelSensor::CreateDefault(), resolution,
                                         Bounds2i(Point2i(0, 0), resolution), filter, 1.,
-                                        inTestDir("test.exr"), 1., RGBColorSpace::sRGB);
+                                        inTestDir("test.exr"), RGBColorSpace::sRGB);
             CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
             PerspectiveCamera *camera = new PerspectiveCamera(cbp,
                 Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10., 45);

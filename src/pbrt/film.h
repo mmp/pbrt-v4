@@ -36,98 +36,99 @@ namespace pbrt {
 class PixelSensor {
   public:
     // PixelSensor Public Methods
-    static PixelSensor *Create(const std::string &name, const RGBColorSpace *colorSpace,
-                               Float exposureTime, Float fNumber, Float ISO, Float C,
-                               Float whiteBalanceTemp, const FileLoc *loc,
-                               Allocator alloc);
-
-    PixelSensor(const RGBColorSpace *outputColorSpace, Float whiteBalanceTemp,
-                Float exposureTime, Float fNumber, Float ISO, Float C, Allocator alloc)
-        : r_bar(&Spectra::X(), alloc),
-          g_bar(&Spectra::Y(), alloc),
-          b_bar(&Spectra::Z(), alloc),
-          exposureTime(exposureTime),
-          fNumber(fNumber),
-          ISO(ISO),
-          C(C) {
-        // Compute white balancing matrix for XYZ _PixelSensor_
-        if (whiteBalanceTemp != 0) {
-            auto whiteIlluminant = Spectra::D(whiteBalanceTemp, alloc);
-            Point2f sourceWhite = SpectrumToXYZ(&whiteIlluminant).xy();
-            Point2f targetWhite = outputColorSpace->w;
-            XYZFromCameraRGB = WhiteBalance(sourceWhite, targetWhite);
-        }
-    }
+    static PixelSensor *Create(const ParameterDictionary &parameters,
+                               const RGBColorSpace *colorSpace, Float exposureTime,
+                               const FileLoc *loc, Allocator alloc);
 
     static PixelSensor *CreateDefault(Allocator alloc = {});
 
     PixelSensor(SpectrumHandle r_bar, SpectrumHandle g_bar, SpectrumHandle b_bar,
-                const RGBColorSpace *outputColorSpace, Float whiteBalanceTemp,
-                Float exposureTime, Float fNumber, Float ISO, Float C, Allocator alloc)
+                const RGBColorSpace *outputColorSpace, Float wbTemp, Float imagingRatio,
+                Allocator alloc)
         : r_bar(r_bar, alloc),
           g_bar(g_bar, alloc),
           b_bar(b_bar, alloc),
-          exposureTime(exposureTime),
-          fNumber(fNumber),
-          ISO(ISO),
-          C(C) {
+          imagingRatio(imagingRatio) {
         // Compute XYZ from camera RGB matrix
-        DenselySampledSpectrum sensorWhiteIlluminant =
-            Spectra::D(whiteBalanceTemp, alloc);
+        DenselySampledSpectrum sensorIlluminant = Spectra::D(wbTemp, alloc);
         pstd::optional<SquareMatrix<3>> m =
-            SolveCameraMatrix(sensorWhiteIlluminant, outputColorSpace->illuminant);
+            SolveXYZFromSensorRGB(&sensorIlluminant, &outputColorSpace->illuminant);
         if (!m)
-            ErrorExit("Camera matrix could not be solved");
-        XYZFromCameraRGB = *m;
+            ErrorExit("Sensor XYZ from RGB matrix could not be solved.");
+        XYZFromSensorRGB = *m;
 
         // Compute sensor's RGB normalization factor
-        // Compute white normalization factor for sensor
-        RGB white =
-            IlluminantToCameraRGB(outputColorSpace->illuminant, r_bar, g_bar, b_bar);
-
+        RGB white = IlluminantToSensorRGB(&outputColorSpace->illuminant);
         cameraRGBWhiteNorm = RGB(1, 1, 1) / white;
     }
 
     PBRT_CPU_GPU
-    RGB ToCameraRGB(const SampledSpectrum &L, const SampledWavelengths &lambda) const {
-        RGB rgb((r_bar.Sample(lambda) * L).Average(),
-                (g_bar.Sample(lambda) * L).Average(),
-                (b_bar.Sample(lambda) * L).Average());
-        return rgb * cameraRGBWhiteNorm;
+    Float ImagingRatio() const { return imagingRatio; }
+
+    PixelSensor(const RGBColorSpace *outputColorSpace, Float wbTemp, Float imagingRatio,
+                Allocator alloc)
+        : r_bar(&Spectra::X(), alloc),
+          g_bar(&Spectra::Y(), alloc),
+          b_bar(&Spectra::Z(), alloc),
+          imagingRatio(imagingRatio) {
+        // Compute white balancing matrix for XYZ _PixelSensor_
+        if (wbTemp != 0) {
+            auto whiteIlluminant = Spectra::D(wbTemp, alloc);
+            Point2f sourceWhite = SpectrumToXYZ(&whiteIlluminant).xy();
+            Point2f targetWhite = outputColorSpace->w;
+            XYZFromSensorRGB = WhiteBalance(sourceWhite, targetWhite);
+        }
     }
 
     PBRT_CPU_GPU
-    Float ImagingRatio() const {
-        return Pi * exposureTime * ISO * K_m / (C * fNumber * fNumber);
+    RGB ToSensorRGB(const SampledSpectrum &s, const SampledWavelengths &lambda) const {
+        RGB rgb((r_bar.Sample(lambda) * s).Average(),
+                (g_bar.Sample(lambda) * s).Average(),
+                (b_bar.Sample(lambda) * s).Average());
+        return rgb * cameraRGBWhiteNorm;
     }
 
     // PixelSensor Public Members
-    SquareMatrix<3> XYZFromCameraRGB;
+    SquareMatrix<3> XYZFromSensorRGB;
 
   private:
     // PixelSensor Private Methods
-    pstd::optional<SquareMatrix<3>> SolveCameraMatrix(
-        const DenselySampledSpectrum &srcw, const DenselySampledSpectrum &dstw) const;
+    pstd::optional<SquareMatrix<3>> SolveXYZFromSensorRGB(
+        SpectrumHandle sensorIlluminant, SpectrumHandle outputIlluminant) const;
 
-    static RGB IlluminantToCameraRGB(const DenselySampledSpectrum &illum,
-                                     const DenselySampledSpectrum &r,
-                                     const DenselySampledSpectrum &g,
-                                     const DenselySampledSpectrum &b);
+    RGB IlluminantToSensorRGB(SpectrumHandle illum) const {
+        RGB rgb(InnerProduct(illum, &r_bar), InnerProduct(illum, &g_bar),
+                InnerProduct(illum, &b_bar));
+        return rgb / rgb.g;
+    }
 
-    static Float IlluminantToY(const DenselySampledSpectrum &illum,
-                               const DenselySampledSpectrum &g);
-
-    static RGB SpectrumToCameraRGB(SpectrumHandle s, const DenselySampledSpectrum &illum,
-                                   const DenselySampledSpectrum &r,
-                                   const DenselySampledSpectrum &g,
-                                   const DenselySampledSpectrum &b);
+    template <typename Triplet>
+    static Triplet ProjectReflectance(SpectrumHandle refl, SpectrumHandle illum,
+                                      SpectrumHandle b1, SpectrumHandle b2,
+                                      SpectrumHandle b3);
 
     // PixelSensor Private Members
     DenselySampledSpectrum r_bar, g_bar, b_bar;
-    Float exposureTime, fNumber, ISO, C;
-    static std::vector<SpectrumHandle> trainingSwatches;
+    const Float imagingRatio;
+    static std::vector<SpectrumHandle> swatchReflectances;
     RGB cameraRGBWhiteNorm = RGB(1, 1, 1);
 };
+
+// PixelSensor Inline Methods
+template <typename Triplet>
+inline Triplet PixelSensor::ProjectReflectance(SpectrumHandle refl, SpectrumHandle illum,
+                                               SpectrumHandle b1, SpectrumHandle b2,
+                                               SpectrumHandle b3) {
+    Triplet result;
+    Float g_integral = 0;
+    for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda) {
+        g_integral += b2(lambda) * illum(lambda);
+        result[0] += b1(lambda) * refl(lambda) * illum(lambda);
+        result[1] += b2(lambda) * refl(lambda) * illum(lambda);
+        result[2] += b3(lambda) * refl(lambda) * illum(lambda);
+    }
+    return result / g_integral;
+}
 
 // VisibleSurface Definition
 class VisibleSurface {
@@ -159,11 +160,11 @@ class FilmBase {
     FilmBase(const Point2i &resolution, const Bounds2i &pixelBounds, FilterHandle filter,
              Float diagonal, const PixelSensor *sensor, const std::string &filename)
         : fullResolution(resolution),
-          diagonal(diagonal * .001),
-          filter(filter),
-          filename(filename),
           pixelBounds(pixelBounds),
-          sensor(sensor) {
+          filter(filter),
+          diagonal(diagonal * .001f),
+          sensor(sensor),
+          filename(filename) {
         CHECK(!pixelBounds.IsEmpty());
         CHECK_GE(pixelBounds.pMin.x, 0);
         CHECK_LE(pixelBounds.pMax.x, resolution.x);
@@ -174,13 +175,13 @@ class FilmBase {
     }
 
     PBRT_CPU_GPU
-    FilterHandle GetFilter() const { return filter; }
-    PBRT_CPU_GPU
     Point2i FullResolution() const { return fullResolution; }
+    PBRT_CPU_GPU
+    Bounds2i PixelBounds() const { return pixelBounds; }
     PBRT_CPU_GPU
     Float Diagonal() const { return diagonal; }
     PBRT_CPU_GPU
-    Bounds2i PixelBounds() const { return pixelBounds; }
+    FilterHandle GetFilter() const { return filter; }
     PBRT_CPU_GPU
     const PixelSensor *GetPixelSensor() const { return sensor; }
     std::string GetFilename() const { return filename; }
@@ -193,11 +194,11 @@ class FilmBase {
   protected:
     // FilmBase Protected Members
     Point2i fullResolution;
-    Float diagonal;
-    FilterHandle filter;
-    std::string filename;
     Bounds2i pixelBounds;
+    FilterHandle filter;
+    Float diagonal;
     const PixelSensor *sensor;
+    std::string filename;
 };
 
 // RGBFilm Definition
@@ -210,7 +211,7 @@ class RGBFilm : public FilmBase {
                    Float weight) {
         // First convert to sensor exposure, H, then to camera RGB
         SampledSpectrum H = L * sensor->ImagingRatio();
-        RGB rgb = sensor->ToCameraRGB(H, lambda);
+        RGB rgb = sensor->ToSensorRGB(H, lambda);
         // Optionally clamp sensor RGB value
         Float m = std::max({rgb.r, rgb.g, rgb.b});
         if (m > maxComponentValue) {
@@ -246,11 +247,8 @@ class RGBFilm : public FilmBase {
         for (int c = 0; c < 3; ++c)
             rgb[c] += splatScale * pixel.splatRGB[c] / filterIntegral;
 
-        // Scale pixel value by _scale_
-        rgb *= scale;
-
         // Convert _rgb_ to output RGB color space
-        rgb = Mul<RGB>(outputRGBFromCameraRGB, rgb);
+        rgb = Mul<RGB>(outputRGBFromSensorRGB, rgb);
 
         return rgb;
     }
@@ -258,9 +256,9 @@ class RGBFilm : public FilmBase {
     RGBFilm() = default;
     RGBFilm(const PixelSensor *sensor, const Point2i &resolution,
             const Bounds2i &pixelBounds, FilterHandle filter, Float diagonal,
-            const std::string &filename, Float scale, const RGBColorSpace *colorSpace,
+            const std::string &filename, const RGBColorSpace *colorSpace,
             Float maxComponentValue = Infinity, bool writeFP16 = true,
-            Allocator allocator = {});
+            Allocator alloc = {});
 
     static RGBFilm *Create(const ParameterDictionary &parameters, Float exposureTime,
                            FilterHandle filter, const RGBColorSpace *colorSpace,
@@ -272,16 +270,16 @@ class RGBFilm : public FilmBase {
     PBRT_CPU_GPU
     void AddSplat(const Point2f &p, SampledSpectrum v, const SampledWavelengths &lambda);
 
-    PBRT_CPU_GPU
-    RGB ToOutputRGB(const SampledSpectrum &L, const SampledWavelengths &lambda) const {
-        RGB cameraRGB = sensor->ToCameraRGB(L * sensor->ImagingRatio(), lambda);
-        return Mul<RGB>(outputRGBFromCameraRGB, cameraRGB);
-    }
-
     void WriteImage(ImageMetadata metadata, Float splatScale = 1);
     Image GetImage(ImageMetadata *metadata, Float splatScale = 1);
 
     std::string ToString() const;
+
+    PBRT_CPU_GPU
+    RGB ToOutputRGB(const SampledSpectrum &L, const SampledWavelengths &lambda) const {
+        RGB cameraRGB = sensor->ToSensorRGB(L * sensor->ImagingRatio(), lambda);
+        return Mul<RGB>(outputRGBFromSensorRGB, cameraRGB);
+    }
 
   private:
     // RGBFilm::Pixel Definition
@@ -295,12 +293,11 @@ class RGBFilm : public FilmBase {
 
     // RGBFilm Private Members
     Array2D<Pixel> pixels;
-    Float scale;
     const RGBColorSpace *colorSpace;
     Float maxComponentValue;
     bool writeFP16;
     Float filterIntegral;
-    SquareMatrix<3> outputRGBFromCameraRGB;
+    SquareMatrix<3> outputRGBFromSensorRGB;
 };
 
 // GBufferFilm Definition
@@ -309,7 +306,7 @@ class GBufferFilm : public FilmBase {
     // GBufferFilm Public Methods
     GBufferFilm(const PixelSensor *sensor, const Point2i &resolution,
                 const Bounds2i &pixelBounds, FilterHandle filter, Float diagonal,
-                const std::string &filename, Float scale, const RGBColorSpace *colorSpace,
+                const std::string &filename, const RGBColorSpace *colorSpace,
                 Float maxComponentValue = Infinity, bool writeFP16 = true,
                 Allocator alloc = {});
 
@@ -330,8 +327,8 @@ class GBufferFilm : public FilmBase {
 
     PBRT_CPU_GPU
     RGB ToOutputRGB(const SampledSpectrum &L, const SampledWavelengths &lambda) const {
-        RGB cameraRGB = sensor->ToCameraRGB(L * sensor->ImagingRatio(), lambda);
-        return Mul<RGB>(outputRGBFromCameraRGB, cameraRGB);
+        RGB cameraRGB = sensor->ToSensorRGB(L * sensor->ImagingRatio(), lambda);
+        return Mul<RGB>(outputRGBFromSensorRGB, cameraRGB);
     }
 
     PBRT_CPU_GPU
@@ -351,10 +348,7 @@ class GBufferFilm : public FilmBase {
         for (int c = 0; c < 3; ++c)
             rgb[c] += splatScale * pixel.splatRGB[c] / filterIntegral;
 
-        // Scale pixel value by _scale_
-        rgb *= scale;
-
-        rgb = Mul<RGB>(outputRGBFromCameraRGB, rgb);
+        rgb = Mul<RGB>(outputRGBFromSensorRGB, rgb);
 
         return rgb;
     }
@@ -380,12 +374,11 @@ class GBufferFilm : public FilmBase {
 
     // GBufferFilm Private Members
     Array2D<Pixel> pixels;
-    Float scale;
     const RGBColorSpace *colorSpace;
     Float maxComponentValue;
     bool writeFP16;
     Float filterIntegral;
-    SquareMatrix<3> outputRGBFromCameraRGB;
+    SquareMatrix<3> outputRGBFromSensorRGB;
 };
 
 PBRT_CPU_GPU
@@ -439,8 +432,8 @@ inline RGB FilmHandle::GetPixelRGB(const Point2i &p, Float splatScale) const {
 PBRT_CPU_GPU
 inline RGB FilmHandle::ToOutputRGB(const SampledSpectrum &L,
                                    const SampledWavelengths &lambda) const {
-    auto get = [&](auto ptr) { return ptr->ToOutputRGB(L, lambda); };
-    return Dispatch(get);
+    auto out = [&](auto ptr) { return ptr->ToOutputRGB(L, lambda); };
+    return Dispatch(out);
 }
 
 PBRT_CPU_GPU

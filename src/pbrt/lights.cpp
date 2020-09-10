@@ -244,7 +244,7 @@ ProjectionLight::ProjectionLight(const Transform &renderFromLight,
     distrib = PiecewiseConstant2D(d, screenBounds);
 
     // scale radiance to 1 nit
-    scale = scale / SpectrumToPhotometric(&imageColorSpace->illuminant);
+    scale /= SpectrumToPhotometric(&imageColorSpace->illuminant);
     // scale to target photometric power if requested
     if (phi_v > 0) {
         Float sum = 0;
@@ -331,7 +331,7 @@ SampledSpectrum ProjectionLight::Projection(const Vector3f &wl,
     for (int c = 0; c < 3; ++c)
         rgb[c] = image.LookupNearestChannel(st, c);
 
-    return RGBSpectrum(*imageColorSpace, rgb).Sample(lambda) * scale;
+    return scale * RGBSpectrum(*imageColorSpace, rgb).Sample(lambda);
 }
 
 SampledSpectrum ProjectionLight::Phi(const SampledWavelengths &lambda) const {
@@ -376,7 +376,7 @@ LightLeSample ProjectionLight::SampleLe(const Point2f &u1, const Point2f &u2,
     for (int c = 0; c < 3; ++c)
         rgb[c] = image.LookupNearestChannel(p, c);
 
-    SampledSpectrum L = RGBSpectrum(*imageColorSpace, rgb).Sample(lambda) * scale;
+    SampledSpectrum L = scale * RGBSpectrum(*imageColorSpace, rgb).Sample(lambda);
 
     return LightLeSample(L, ray, 1, pdfDir);
 }

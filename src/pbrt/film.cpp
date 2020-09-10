@@ -95,96 +95,79 @@ std::string VisibleSurface::ToString() const {
 }
 
 // PixelSensor Method Definitions
-PixelSensor *PixelSensor::Create(const std::string &name, const RGBColorSpace *colorSpace,
-                                 Float exposureTime, Float fNumber, Float ISO, Float C,
-                                 Float whiteBalanceTemp, const FileLoc *loc,
-                                 Allocator alloc) {
-    if (name == "cie1931") {
-        return alloc.new_object<PixelSensor>(colorSpace, whiteBalanceTemp, exposureTime,
-                                             fNumber, ISO, C, alloc);
+PixelSensor *PixelSensor::Create(const ParameterDictionary &parameters,
+                                 const RGBColorSpace *colorSpace, Float exposureTime,
+                                 const FileLoc *loc, Allocator alloc) {
+    // Imaging ratio parameters
+    // The defaults here represent a "passthrough" setup such that the imaging
+    // ratio will be exactly 1. This is a useful default since scenes that
+    // weren't authored with a physical camera in mind will render as expected.
+    Float fNumber = parameters.GetOneFloat("fnumber", 1.);
+    Float ISO = parameters.GetOneFloat("iso", 100.);
+    // Note: in the talk we mention using 312.5 for historical reasons. The
+    // choice of 100 * Pi here just means that the other parameters make nice
+    // "round" numbers like 1 and 100.
+    Float C = parameters.GetOneFloat("c", 100.0 * Pi);
+    Float whiteBalanceTemp = parameters.GetOneFloat("whitebalance", 0);
+
+    std::string sensorName = parameters.GetOneString("sensor", "cie1931");
+
+    // Pass through 0 for cie1931 if it's unspecified so that it doesn't do
+    // any white balancing. For actual sensors, 6500 is the default...
+    if (sensorName != "cie1931" && whiteBalanceTemp == 0)
+        whiteBalanceTemp = 6500;
+
+    Float imagingRatio = Pi * exposureTime * ISO * K_m / (C * fNumber * fNumber);
+
+    if (sensorName == "cie1931") {
+        return alloc.new_object<PixelSensor>(colorSpace, whiteBalanceTemp, imagingRatio,
+                                             alloc);
     } else {
-        SpectrumHandle r = GetNamedSpectrum(name + "_r");
-        SpectrumHandle g = GetNamedSpectrum(name + "_g");
-        SpectrumHandle b = GetNamedSpectrum(name + "_b");
+        SpectrumHandle r = GetNamedSpectrum(sensorName + "_r");
+        SpectrumHandle g = GetNamedSpectrum(sensorName + "_g");
+        SpectrumHandle b = GetNamedSpectrum(sensorName + "_b");
 
         if (!r || !g || !b)
-            ErrorExit(loc, "%s: unknown sensor type", name);
+            ErrorExit(loc, "%s: unknown sensor type", sensorName);
 
         return alloc.new_object<PixelSensor>(r, g, b, colorSpace, whiteBalanceTemp,
-                                             exposureTime, fNumber, ISO, C, alloc);
+                                             imagingRatio, alloc);
     }
 }
 
 PixelSensor *PixelSensor::CreateDefault(Allocator alloc) {
-    return Create("cie1931", RGBColorSpace::sRGB, 1.0, 1.0, 100, 100.0 * Pi, 0.f, nullptr,
-                  alloc);
+    return Create(ParameterDictionary(), RGBColorSpace::sRGB, 1.0, nullptr, alloc);
 }
 
-pstd::optional<SquareMatrix<3>> PixelSensor::SolveCameraMatrix(
-    const DenselySampledSpectrum &srcw, const DenselySampledSpectrum &dstw) const {
-    RGB src_white = IlluminantToCameraRGB(srcw, r_bar, g_bar, b_bar);
-    RGB dst_white = IlluminantToCameraRGB(dstw, r_bar, g_bar, b_bar);
-
-    // account for perceptual brightness difference in whites by scaling the
-    // target swatches by the relative difference between the whitepoint in
-    // camera space and in CIE XYZ
-    Float srcG = IlluminantToY(srcw, g_bar);
-    Float srcY = IlluminantToY(srcw, Spectra::Y());
-
-    // Compute camera matrix using linear least squares fit
-    // FIXME: make sure these match trainingSwatches.size()
-    Float A[24][3], B[24][3];
-    for (size_t i = 0; i < trainingSwatches.size(); ++i) {
-        SpectrumHandle s = trainingSwatches[i];
-        RGB a = SpectrumToCameraRGB(s, srcw, r_bar, g_bar, b_bar) / dst_white;
-        RGB b = SpectrumToCameraRGB(s, dstw, Spectra::X(), Spectra::Y(), Spectra::Z()) *
-                (srcY / srcG);
-        for (int c = 0; c < 3; ++c) {
-            A[i][c] = a[c];
-            B[i][c] = b[c];
-        }
+pstd::optional<SquareMatrix<3>> PixelSensor::SolveXYZFromSensorRGB(
+    SpectrumHandle sensorIllum, SpectrumHandle outputIllum) const {
+    Float rgbCamera[24][3], xyzOutput[24][3];
+    // Compute _rgbCamera_ values for training swatches
+    RGB outputWhite = IlluminantToSensorRGB(outputIllum);
+    for (size_t i = 0; i < swatchReflectances.size(); ++i) {
+        RGB rgb = ProjectReflectance<RGB>(swatchReflectances[i], sensorIllum, &r_bar,
+                                          &g_bar, &b_bar) /
+                  outputWhite;
+        for (int c = 0; c < 3; ++c)
+            rgbCamera[i][c] = rgb[c];
     }
-    return LinearLeastSquares(A, B, trainingSwatches.size());
-}
 
-RGB PixelSensor::IlluminantToCameraRGB(const DenselySampledSpectrum &illum,
-                                       const DenselySampledSpectrum &r,
-                                       const DenselySampledSpectrum &g,
-                                       const DenselySampledSpectrum &b) {
-    RGB rgb;
-    for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda) {
-        rgb.r += r(lambda) * illum(lambda);
-        rgb.g += g(lambda) * illum(lambda);
-        rgb.b += b(lambda) * illum(lambda);
+    // Compute _xyzOutput_ values for training swatches
+    Float sensorWhiteG = InnerProduct(sensorIllum, &g_bar);
+    Float sensorWhiteY = InnerProduct(sensorIllum, &Spectra::Y());
+    for (size_t i = 0; i < swatchReflectances.size(); ++i) {
+        SpectrumHandle s = swatchReflectances[i];
+        XYZ xyz = ProjectReflectance<XYZ>(s, outputIllum, &Spectra::X(), &Spectra::Y(),
+                                          &Spectra::Z()) *
+                  (sensorWhiteY / sensorWhiteG);
+        for (int c = 0; c < 3; ++c)
+            xyzOutput[i][c] = xyz[c];
     }
-    return rgb / rgb.g;
+
+    return LinearLeastSquares(rgbCamera, xyzOutput, swatchReflectances.size());
 }
 
-Float PixelSensor::IlluminantToY(const DenselySampledSpectrum &illum,
-                                 const DenselySampledSpectrum &g) {
-    Float y = 0;
-    for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda)
-        y += g(lambda) * illum(lambda);
-    return y;
-}
-
-RGB PixelSensor::SpectrumToCameraRGB(SpectrumHandle s,
-                                     const DenselySampledSpectrum &illum,
-                                     const DenselySampledSpectrum &r,
-                                     const DenselySampledSpectrum &g,
-                                     const DenselySampledSpectrum &b) {
-    RGB rgb;
-    Float g_integral = 0;
-    for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda) {
-        g_integral += g(lambda) * illum(lambda);
-        rgb.r += r(lambda) * s(lambda) * illum(lambda);
-        rgb.g += g(lambda) * s(lambda) * illum(lambda);
-        rgb.b += b(lambda) * s(lambda) * illum(lambda);
-    }
-    return rgb / g_integral;
-}
-
-std::vector<SpectrumHandle> PixelSensor::trainingSwatches{
+std::vector<SpectrumHandle> PixelSensor::swatchReflectances{
     PiecewiseLinearSpectrum::FromInterleaved(
         {380.000000, 0.051500, 390.000000, 0.056500, 400.000000, 0.063000,
          410.000000, 0.065000, 420.000000, 0.063000, 430.000000, 0.060500,
@@ -527,12 +510,10 @@ STAT_MEMORY_COUNTER("Memory/Film pixels", filmPixelMemory);
 // RGBFilm Method Definitions
 RGBFilm::RGBFilm(const PixelSensor *sensor, const Point2i &resolution,
                  const Bounds2i &pixelBounds, FilterHandle filter, Float diagonal,
-                 const std::string &filename, Float scale,
-                 const RGBColorSpace *colorSpace, Float maxComponentValue, bool writeFP16,
-                 Allocator allocator)
+                 const std::string &filename, const RGBColorSpace *colorSpace,
+                 Float maxComponentValue, bool writeFP16, Allocator alloc)
     : FilmBase(resolution, pixelBounds, filter, diagonal, sensor, filename),
-      pixels(pixelBounds, allocator),
-      scale(scale),
+      pixels(pixelBounds, alloc),
       colorSpace(colorSpace),
       maxComponentValue(maxComponentValue),
       writeFP16(writeFP16) {
@@ -540,7 +521,7 @@ RGBFilm::RGBFilm(const PixelSensor *sensor, const Point2i &resolution,
     CHECK(!pixelBounds.IsEmpty());
     CHECK(colorSpace != nullptr);
     filmPixelMemory += pixelBounds.Area() * sizeof(Pixel);
-    outputRGBFromCameraRGB = colorSpace->RGBFromXYZ * sensor->XYZFromCameraRGB;
+    outputRGBFromSensorRGB = colorSpace->RGBFromXYZ * sensor->XYZFromSensorRGB;
 }
 
 SampledWavelengths RGBFilm::SampleWavelengths(Float u) const {
@@ -552,7 +533,7 @@ void RGBFilm::AddSplat(const Point2f &p, SampledSpectrum v,
     CHECK(!v.HasNaNs());
     // First convert to sensor exposure, H, then to camera RGB
     SampledSpectrum H = v * sensor->ImagingRatio();
-    RGB rgb = sensor->ToCameraRGB(H, lambda);
+    RGB rgb = sensor->ToSensorRGB(H, lambda);
     // Optionally clamp splat sensor RGB value
     Float m = std::max({rgb.r, rgb.g, rgb.b});
     if (m > maxComponentValue)
@@ -609,9 +590,9 @@ Image RGBFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
 }
 
 std::string RGBFilm::ToString() const {
-    return StringPrintf("[ RGBFilm %s scale: %f colorSpace: %s maxComponentValue: %f "
-                        "writeFP16: %s ]",
-                        BaseToString(), scale, *colorSpace, maxComponentValue, writeFP16);
+    return StringPrintf(
+        "[ RGBFilm %s colorSpace: %s maxComponentValue: %f writeFP16: %s ]",
+        BaseToString(), *colorSpace, maxComponentValue, writeFP16);
 }
 
 RGBFilm *RGBFilm::Create(const ParameterDictionary &parameters, Float exposureTime,
@@ -705,36 +686,16 @@ RGBFilm *RGBFilm::Create(const ParameterDictionary &parameters, Float exposureTi
     if (pixelBounds.IsEmpty())
         ErrorExit(loc, "Degenerate pixel bounds provided to film: %s.", pixelBounds);
 
-    Float scale = parameters.GetOneFloat("scale", 1.);
     Float diagonal = parameters.GetOneFloat("diagonal", 35.);
     Float maxComponentValue = parameters.GetOneFloat("maxcomponentvalue", Infinity);
     bool writeFP16 = parameters.GetOneBool("savefp16", true);
 
-    // Imaging ratio parameters
-    // The defaults here represent a "passthrough" setup such that the imaging
-    // ratio will be exactly 1. This is a useful default since scenes that
-    // weren't authored with a physical camera in mind will render as expected.
-    Float fNumber = parameters.GetOneFloat("fnumber", 1.);
-    Float ISO = parameters.GetOneFloat("iso", 100.);
-    // Note: in the talk we mention using 312.5 for historical reasons. The
-    // choice of 100 * Pi here just means that the other parameters make nice
-    // "round" numbers like 1 and 100.
-    Float C = parameters.GetOneFloat("c", 100.0 * Pi);
-    Float whiteBalanceTemp = parameters.GetOneFloat("whitebalance", 0);
-
-    std::string sensorName = parameters.GetOneString("sensor", "cie1931");
-    // Pass through 0 for cie1931 if it's unspecified so that it doesn't do
-    // any white balancing. For actual sensors, 6500 is the default...
-    if (sensorName != "cie1931" && whiteBalanceTemp == 0)
-        whiteBalanceTemp = 6500;
-
     PixelSensor *sensor =
-        PixelSensor::Create(sensorName, colorSpace, exposureTime, fNumber, ISO, C,
-                            whiteBalanceTemp, loc, alloc);
+        PixelSensor::Create(parameters, colorSpace, exposureTime, loc, alloc);
 
     return alloc.new_object<RGBFilm>(sensor, fullResolution, pixelBounds, filter,
-                                     diagonal, filename, scale, colorSpace,
-                                     maxComponentValue, writeFP16, alloc);
+                                     diagonal, filename, colorSpace, maxComponentValue,
+                                     writeFP16, alloc);
 }
 
 // GBufferFilm Method Definitions
@@ -743,7 +704,7 @@ void GBufferFilm::AddSample(const Point2i &pFilm, SampledSpectrum L,
                             const VisibleSurface *visibleSurface, Float weight) {
     // First convert to sensor exposure, H, then to camera RGB
     SampledSpectrum H = L * sensor->ImagingRatio();
-    RGB rgb = sensor->ToCameraRGB(H, lambda);
+    RGB rgb = sensor->ToSensorRGB(H, lambda);
     Float m = std::max({rgb.r, rgb.g, rgb.b});
     if (m > maxComponentValue) {
         H *= maxComponentValue / m;
@@ -778,19 +739,17 @@ void GBufferFilm::AddSample(const Point2i &pFilm, SampledSpectrum L,
 
 GBufferFilm::GBufferFilm(const PixelSensor *sensor, const Point2i &resolution,
                          const Bounds2i &pixelBounds, FilterHandle filter, Float diagonal,
-                         const std::string &filename, Float scale,
-                         const RGBColorSpace *colorSpace, Float maxComponentValue,
-                         bool writeFP16, Allocator alloc)
+                         const std::string &filename, const RGBColorSpace *colorSpace,
+                         Float maxComponentValue, bool writeFP16, Allocator alloc)
     : FilmBase(resolution, pixelBounds, filter, diagonal, sensor, filename),
       pixels(pixelBounds, alloc),
-      scale(scale),
       colorSpace(colorSpace),
       maxComponentValue(maxComponentValue),
       writeFP16(writeFP16),
       filterIntegral(filter.Integral()) {
     CHECK(!pixelBounds.IsEmpty());
     filmPixelMemory += pixelBounds.Area() * sizeof(Pixel);
-    outputRGBFromCameraRGB = colorSpace->RGBFromXYZ * sensor->XYZFromCameraRGB;
+    outputRGBFromSensorRGB = colorSpace->RGBFromXYZ * sensor->XYZFromSensorRGB;
 }
 
 SampledWavelengths GBufferFilm::SampleWavelengths(Float u) const {
@@ -803,7 +762,7 @@ void GBufferFilm::AddSplat(const Point2f &p, SampledSpectrum v,
     CHECK(!v.HasNaNs());
     // First convert to sensor exposure, H, then to camera RGB
     SampledSpectrum H = v * sensor->ImagingRatio();
-    RGB rgb = sensor->ToCameraRGB(H, lambda);
+    RGB rgb = sensor->ToSensorRGB(H, lambda);
     Float m = std::max({rgb.r, rgb.g, rgb.b});
     if (m > maxComponentValue)
         rgb *= maxComponentValue / m;
@@ -887,8 +846,7 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
         for (int c = 0; c < 3; ++c)
             rgb[c] += splatScale * pixel.splatRGB[c] / filterIntegral;
 
-        rgb *= scale;
-        rgb = Mul<RGB>(outputRGBFromCameraRGB, rgb);
+        rgb = Mul<RGB>(outputRGBFromSensorRGB, rgb);
 
         Point2i pOffset(p.x - pixelBounds.pMin.x, p.y - pixelBounds.pMin.y);
         image.SetChannels(pOffset, rgbDesc, {rgb[0], rgb[1], rgb[2]});
@@ -1022,33 +980,13 @@ GBufferFilm *GBufferFilm::Create(const ParameterDictionary &parameters,
 
     Float diagonal = parameters.GetOneFloat("diagonal", 35.);
     Float maxComponentValue = parameters.GetOneFloat("maxcomponentvalue", Infinity);
-    Float scale = parameters.GetOneFloat("scale", 1.);
     bool writeFP16 = parameters.GetOneBool("savefp16", true);
 
-    // Imaging ratio parameters
-    // The defaults here represent a "passthrough" setup such that the imaging
-    // ratio will be exactly 1. This is a useful default since scenes that
-    // weren't authored with a physical camera in mind will render as expected.
-    Float fNumber = parameters.GetOneFloat("fnumber", 1.);
-    Float ISO = parameters.GetOneFloat("iso", 100.);
-    // Note: in the talk we mention using 312.5 for historical reasons. The
-    // choice of 100 * Pi here just means that the other parameters make nice
-    // "round" numbers like 1 and 100.
-    Float C = parameters.GetOneFloat("c", 100.0 * Pi);
-    Float whiteBalanceTemp = parameters.GetOneFloat("whitebalance", 0);
-
-    std::string sensorName = parameters.GetOneString("sensor", "cie1931");
-    // Pass through 0 for cie1931 if it's unspecified so that it doesn't do
-    // any white balancing. For actual sensors, 6500 is the default...
-    if (sensorName != "cie1931" && whiteBalanceTemp == 0)
-        whiteBalanceTemp = 6500;
-
     PixelSensor *sensor =
-        PixelSensor::Create(sensorName, colorSpace, exposureTime, fNumber, ISO, C,
-                            whiteBalanceTemp, loc, alloc);
+        PixelSensor::Create(parameters, colorSpace, exposureTime, loc, alloc);
 
     return alloc.new_object<GBufferFilm>(sensor, fullResolution, pixelBounds, filter,
-                                         diagonal, filename, scale, colorSpace,
+                                         diagonal, filename, colorSpace,
                                          maxComponentValue, writeFP16, alloc);
 }
 

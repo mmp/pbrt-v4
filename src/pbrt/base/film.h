@@ -38,29 +38,27 @@ class FilmHandle : public TaggedPointer<RGBFilm, GBufferFilm> {
     void AddSplat(const Point2f &p, SampledSpectrum v, const SampledWavelengths &lambda);
 
     PBRT_CPU_GPU inline Point2i FullResolution() const;
-    PBRT_CPU_GPU inline Float Diagonal() const;
     PBRT_CPU_GPU inline Bounds2i PixelBounds() const;
+    PBRT_CPU_GPU inline Float Diagonal() const;
 
-    PBRT_CPU_GPU
-    inline RGB ToOutputRGB(const SampledSpectrum &L,
-                           const SampledWavelengths &lambda) const;
+    void WriteImage(ImageMetadata metadata, Float splatScale = 1);
 
+    PBRT_CPU_GPU inline RGB ToOutputRGB(const SampledSpectrum &L,
+                                        const SampledWavelengths &lambda) const;
+
+    Image GetImage(ImageMetadata *metadata, Float splatScale = 1);
     PBRT_CPU_GPU
     RGB GetPixelRGB(const Point2i &p, Float splatScale = 1) const;
-    void WriteImage(ImageMetadata metadata, Float splatScale = 1);
-    Image GetImage(ImageMetadata *metadata, Float splatScale = 1);
+
+    PBRT_CPU_GPU inline FilterHandle GetFilter() const;
+    PBRT_CPU_GPU inline const PixelSensor *GetPixelSensor() const;
+    std::string GetFilename() const;
 
     using TaggedPointer::TaggedPointer;
 
     static FilmHandle Create(const std::string &name,
                              const ParameterDictionary &parameters, Float exposureTime,
                              FilterHandle filter, const FileLoc *loc, Allocator alloc);
-
-    PBRT_CPU_GPU inline FilterHandle GetFilter() const;
-
-    PBRT_CPU_GPU inline const PixelSensor *GetPixelSensor() const;
-
-    std::string GetFilename() const;
 
     std::string ToString() const;
 

@@ -1058,6 +1058,11 @@ void FormattingScene::Film(const std::string &type, ParsedParameterVector params
             extra +=
                 StringPrintf("%s\"float maxcomponentvalue\" [ %f ]\n", indent(1), m[0]);
         }
+        std::vector<Float> s = dict.GetFloatArray("scale");
+        if (!s.empty()) {
+            dict.RemoveFloat("scale");
+            extra += StringPrintf("%s\"float iso\" [ %f ]\n", indent(1), 100 * s[0]);
+        }
     }
 
     if (upgrade && type == "image")

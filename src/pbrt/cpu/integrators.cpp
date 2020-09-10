@@ -2229,8 +2229,7 @@ void BDPTIntegrator::Render() {
                     PixelSensor::CreateDefault(), camera.GetFilm().FullResolution(),
                     Bounds2i(Point2i(0, 0), camera.GetFilm().FullResolution()),
                     new BoxFilter,  // FIXME: leaks
-                    camera.GetFilm().Diagonal() * 1000, filename, 1.f,
-                    RGBColorSpace::sRGB);
+                    camera.GetFilm().Diagonal() * 1000, filename, RGBColorSpace::sRGB);
             }
         }
     }
@@ -2790,7 +2789,6 @@ void SPPMIntegrator::Render() {
     for (int i = 0; i < MaxThreadIndex(); ++i)
         // TODO: size this
         perThreadScratchBuffers.push_back(ScratchBuffer(nPixels * 1024));
-
     FilmHandle film = camera.GetFilm();
 
     for (int iter = 0; iter < nIterations; ++iter) {

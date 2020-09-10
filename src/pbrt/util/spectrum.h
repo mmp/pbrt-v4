@@ -64,7 +64,6 @@ class SpectrumHandle : public TaggedPointer<ConstantSpectrum, DenselySampledSpec
 };
 
 // Spectrum Function Declarations
-Float SpectrumToY(SpectrumHandle s);
 Float SpectrumToPhotometric(SpectrumHandle s);
 XYZ SpectrumToXYZ(SpectrumHandle s);
 
@@ -475,26 +474,7 @@ class PiecewiseLinearSpectrum {
                                                Allocator alloc);
 
     static PiecewiseLinearSpectrum *FromInterleaved(pstd::span<const Float> samples,
-                                                    bool normalize, Allocator alloc) {
-        CHECK_EQ(0, samples.size() % 2);
-        int n = samples.size() / 2;
-        std::vector<Float> lambda(n), v(n);
-        for (size_t i = 0; i < n; ++i) {
-            lambda[i] = samples[2 * i];
-            v[i] = samples[2 * i + 1];
-            if (i > 0)
-                CHECK_GT(lambda[i], lambda[i - 1]);
-        }
-
-        PiecewiseLinearSpectrum *spec =
-            alloc.new_object<pbrt::PiecewiseLinearSpectrum>(lambda, v, alloc);
-
-        if (normalize)
-            // Normalize to have luminance of 1.
-            spec->Scale(1 / SpectrumToY(spec));
-
-        return spec;
-    }
+                                                    bool normalize, Allocator alloc);
 
   private:
     // PiecewiseLinearSpectrum Private Members
@@ -738,6 +718,14 @@ inline const DenselySampledSpectrum &X();
 inline const DenselySampledSpectrum &Y();
 inline const DenselySampledSpectrum &Z();
 }  // namespace Spectra
+
+// Spectrum Inline Functions
+inline Float InnerProduct(SpectrumHandle a, SpectrumHandle b) {
+    Float result = 0;
+    for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda)
+        result += a(lambda) * b(lambda);
+    return result / CIE_Y_integral;
+}
 
 // SpectrumHandle Inline Method Definitions
 inline Float SpectrumHandle::operator()(Float lambda) const {
