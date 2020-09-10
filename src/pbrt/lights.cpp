@@ -202,12 +202,12 @@ STAT_MEMORY_COUNTER("Memory/Light image and distributions", imageBytes);
 // ProjectionLight Method Definitions
 ProjectionLight::ProjectionLight(const Transform &renderFromLight,
                                  const MediumInterface &mediumInterface, Image im,
-                                 const RGBColorSpace *imageColorSpace, Float scale,
+                                 const RGBColorSpace *imageColorSpace, Float lscale,
                                  Float fov, Float phi_v, Allocator alloc)
     : LightBase(LightType::DeltaPosition, renderFromLight, mediumInterface),
       image(std::move(im)),
       imageColorSpace(imageColorSpace),
-      scale(scale),
+      scale(lscale),
       distrib(alloc) {
     // Initialize ProjectionLight projection matrix
     Float aspect = Float(image.Resolution().x) / Float(image.Resolution().y);
@@ -244,7 +244,7 @@ ProjectionLight::ProjectionLight(const Transform &renderFromLight,
     distrib = PiecewiseConstant2D(d, screenBounds);
 
     // scale radiance to 1 nit
-    scale /= SpectrumToPhotometric(&imageColorSpace->illuminant);
+    scale = scale / SpectrumToPhotometric(&imageColorSpace->illuminant);
     // scale to target photometric power if requested
     if (phi_v > 0) {
         Float sum = 0;
@@ -331,7 +331,7 @@ SampledSpectrum ProjectionLight::Projection(const Vector3f &wl,
     for (int c = 0; c < 3; ++c)
         rgb[c] = image.LookupNearestChannel(st, c);
 
-    return scale * RGBSpectrum(*imageColorSpace, rgb).Sample(lambda);
+    return RGBSpectrum(*imageColorSpace, rgb).Sample(lambda) * scale;
 }
 
 SampledSpectrum ProjectionLight::Phi(const SampledWavelengths &lambda) const {
@@ -376,7 +376,7 @@ LightLeSample ProjectionLight::SampleLe(const Point2f &u1, const Point2f &u2,
     for (int c = 0; c < 3; ++c)
         rgb[c] = image.LookupNearestChannel(p, c);
 
-    SampledSpectrum L = scale * RGBSpectrum(*imageColorSpace, rgb).Sample(lambda);
+    SampledSpectrum L = RGBSpectrum(*imageColorSpace, rgb).Sample(lambda) * scale;
 
     return LightLeSample(L, ray, 1, pdfDir);
 }
