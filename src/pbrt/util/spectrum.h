@@ -64,9 +64,6 @@ class SpectrumHandle : public TaggedPointer<ConstantSpectrum, DenselySampledSpec
 };
 
 // Spectrum Function Declarations
-Float SpectrumToPhotometric(SpectrumHandle s);
-XYZ SpectrumToXYZ(SpectrumHandle s);
-
 PBRT_CPU_GPU inline Float Blackbody(Float lambda, Float T) {
     if (T <= 0)
         return 0;
@@ -84,6 +81,9 @@ namespace Spectra {
 DenselySampledSpectrum D(Float temperature, Allocator alloc);
 }  // namespace Spectra
 Float SpectrumToPhotometric(SpectrumHandle s);
+
+Float SpectrumToPhotometric(SpectrumHandle s);
+XYZ SpectrumToXYZ(SpectrumHandle s);
 
 // SampledSpectrum Definition
 class SampledSpectrum {
@@ -481,6 +481,42 @@ class PiecewiseLinearSpectrum {
     pstd::vector<Float> lambdas, values;
 };
 
+class BlackbodySpectrum {
+  public:
+    // BlackbodySpectrum Public Methods
+    PBRT_CPU_GPU
+    BlackbodySpectrum(Float T) : T(T) {
+        // Compute blackbody normalization constant for given temperature
+        Float lambdaMax = Float(2.8977721e-3 / T * 1e9);
+        normalizationFactor = 1 / Blackbody(lambdaMax, T);
+    }
+
+    PBRT_CPU_GPU
+    Float operator()(Float lambda) const {
+        return Blackbody(lambda, T) * normalizationFactor;
+    }
+
+    PBRT_CPU_GPU
+    SampledSpectrum Sample(const SampledWavelengths &lambda) const {
+        SampledSpectrum s;
+        for (int i = 0; i < NSpectrumSamples; ++i)
+            s[i] = Blackbody(lambda[i], T) * normalizationFactor;
+        return s;
+    }
+
+    PBRT_CPU_GPU
+    Float MaxValue() const { return 1.f; }
+
+    std::string ToString() const;
+    std::string ParameterType() const;
+    std::string ParameterString() const;
+
+  private:
+    // BlackbodySpectrum Private Members
+    Float T;
+    Float normalizationFactor;
+};
+
 class RGBReflectanceSpectrum {
   public:
     // RGBReflectanceSpectrum Public Methods
@@ -546,42 +582,6 @@ class RGBSpectrum {
     Float scale;
     RGBSigmoidPolynomial rsp;
     const DenselySampledSpectrum *illuminant;
-};
-
-class BlackbodySpectrum {
-  public:
-    // BlackbodySpectrum Public Methods
-    PBRT_CPU_GPU
-    BlackbodySpectrum(Float T) : T(T) {
-        // Compute blackbody normalization constant for given temperature
-        Float lambdaMax = Float(2.8977721e-3 / T * 1e9);
-        normalizationFactor = 1 / Blackbody(lambdaMax, T);
-    }
-
-    PBRT_CPU_GPU
-    Float operator()(Float lambda) const {
-        return Blackbody(lambda, T) * normalizationFactor;
-    }
-
-    PBRT_CPU_GPU
-    SampledSpectrum Sample(const SampledWavelengths &lambda) const {
-        SampledSpectrum s;
-        for (int i = 0; i < NSpectrumSamples; ++i)
-            s[i] = Blackbody(lambda[i], T) * normalizationFactor;
-        return s;
-    }
-
-    PBRT_CPU_GPU
-    Float MaxValue() const { return 1.f; }
-
-    std::string ToString() const;
-    std::string ParameterType() const;
-    std::string ParameterString() const;
-
-  private:
-    // BlackbodySpectrum Private Members
-    Float T;
-    Float normalizationFactor;
 };
 
 // SampledSpectrum Inline Functions

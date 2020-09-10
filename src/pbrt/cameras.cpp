@@ -536,8 +536,8 @@ PerspectiveCamera *PerspectiveCamera::Create(const ParameterDictionary &paramete
             Error(loc, "\"screenwindow\" should have four values");
     }
     Float fov = parameters.GetOneFloat("fov", 90.);
-    return alloc.new_object<PerspectiveCamera>(cameraBaseParameters, screen, lensradius,
-                                               focaldistance, fov);
+    return alloc.new_object<PerspectiveCamera>(cameraBaseParameters, fov, screen,
+                                               lensradius, focaldistance);
 }
 
 SampledSpectrum PerspectiveCamera::We(const Ray &ray, SampledWavelengths &lambda,

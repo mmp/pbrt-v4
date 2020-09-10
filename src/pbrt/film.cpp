@@ -58,6 +58,102 @@ std::string FilmHandle::GetFilename() const {
     return DispatchCPU(get);
 }
 
+// FilmBaseParameters Method Definitions
+FilmBaseParameters::FilmBaseParameters(const ParameterDictionary &parameters,
+                                       FilterHandle filter, const PixelSensor *sensor,
+                                       const FileLoc *loc)
+    : filter(filter), sensor(sensor) {
+    filename = parameters.GetOneString("filename", "");
+    if (!Options->imageFile.empty()) {
+        if (!filename.empty())
+            Warning(loc,
+                    "Output filename supplied on command line, \"%s\" will "
+                    "override "
+                    "filename provided in scene description file, \"%s\".",
+                    Options->imageFile, filename);
+        filename = Options->imageFile;
+    } else if (filename.empty())
+        filename = "pbrt.exr";
+
+    fullResolution = Point2i(parameters.GetOneInt("xresolution", 1280),
+                             parameters.GetOneInt("yresolution", 720));
+    if (Options->quickRender) {
+        fullResolution.x = std::max(1, fullResolution.x / 4);
+        fullResolution.y = std::max(1, fullResolution.y / 4);
+    }
+
+    pixelBounds = Bounds2i(Point2i(0, 0), fullResolution);
+    std::vector<int> pb = parameters.GetIntArray("pixelbounds");
+    if (Options->pixelBounds) {
+        Bounds2i newBounds = *Options->pixelBounds;
+        if (Intersect(newBounds, pixelBounds) != newBounds)
+            Warning(loc, "Supplied pixel bounds extend beyond image "
+                         "resolution. Clamping.");
+        pixelBounds = Intersect(newBounds, pixelBounds);
+
+        if (!pb.empty())
+            Warning(loc, "Both pixel bounds and crop window were specified. Using the "
+                         "crop window.");
+    } else if (!pb.empty()) {
+        if (pb.size() != 4)
+            Error(loc, "%d values supplied for \"pixelbounds\". Expected 4.",
+                  int(pb.size()));
+        else {
+            Bounds2i newBounds = Bounds2i({pb[0], pb[2]}, {pb[1], pb[3]});
+            if (Intersect(newBounds, pixelBounds) != newBounds)
+                Warning(loc, "Supplied pixel bounds extend beyond image "
+                             "resolution. Clamping.");
+            pixelBounds = Intersect(newBounds, pixelBounds);
+        }
+    }
+
+    std::vector<Float> cr = parameters.GetFloatArray("cropwindow");
+    if (Options->cropWindow) {
+        Bounds2f crop = *Options->cropWindow;
+        // Compute film image bounds
+        pixelBounds = Bounds2i(Point2i(std::ceil(fullResolution.x * crop.pMin.x),
+                                       std::ceil(fullResolution.y * crop.pMin.y)),
+                               Point2i(std::ceil(fullResolution.x * crop.pMax.x),
+                                       std::ceil(fullResolution.y * crop.pMax.y)));
+
+        if (!cr.empty())
+            Warning(loc, "Crop window supplied on command line will override "
+                         "crop window specified with Film.");
+        if (Options->pixelBounds || !pb.empty())
+            Warning(loc, "Both pixel bounds and crop window were specified. Using the "
+                         "crop window.");
+    } else if (!cr.empty()) {
+        if (Options->pixelBounds)
+            Warning(loc, "Ignoring \"cropwindow\" since pixel bounds were specified "
+                         "on the command line.");
+        else if (cr.size() == 4) {
+            if (!pb.empty())
+                Warning(loc, "Both pixel bounds and crop window were "
+                             "specified. Using the "
+                             "crop window.");
+
+            Bounds2f crop;
+            crop.pMin.x = Clamp(std::min(cr[0], cr[1]), 0.f, 1.f);
+            crop.pMax.x = Clamp(std::max(cr[0], cr[1]), 0.f, 1.f);
+            crop.pMin.y = Clamp(std::min(cr[2], cr[3]), 0.f, 1.f);
+            crop.pMax.y = Clamp(std::max(cr[2], cr[3]), 0.f, 1.f);
+
+            // Compute film image bounds
+            pixelBounds = Bounds2i(Point2i(std::ceil(fullResolution.x * crop.pMin.x),
+                                           std::ceil(fullResolution.y * crop.pMin.y)),
+                                   Point2i(std::ceil(fullResolution.x * crop.pMax.x),
+                                           std::ceil(fullResolution.y * crop.pMax.y)));
+        } else
+            Error(loc, "%d values supplied for \"cropwindow\". Expected 4.",
+                  (int)cr.size());
+    }
+
+    if (pixelBounds.IsEmpty())
+        ErrorExit(loc, "Degenerate pixel bounds provided to film: %s.", pixelBounds);
+
+    diagonal = parameters.GetOneFloat("diagonal", 35.);
+}
+
 // FilmBase Method Definitions
 std::string FilmBase::BaseToString() const {
     return StringPrintf("fullResolution: %s diagonal: %f filter: %s filename: %s "
@@ -508,12 +604,10 @@ std::vector<SpectrumHandle> PixelSensor::swatchReflectances{
 STAT_MEMORY_COUNTER("Memory/Film pixels", filmPixelMemory);
 
 // RGBFilm Method Definitions
-RGBFilm::RGBFilm(const PixelSensor *sensor, const Point2i &resolution,
-                 const Bounds2i &pixelBounds, FilterHandle filter, Float diagonal,
-                 const std::string &filename, const RGBColorSpace *colorSpace,
+RGBFilm::RGBFilm(FilmBaseParameters p, const RGBColorSpace *colorSpace,
                  Float maxComponentValue, bool writeFP16, Allocator alloc)
-    : FilmBase(resolution, pixelBounds, filter, diagonal, sensor, filename),
-      pixels(pixelBounds, alloc),
+    : FilmBase(p),
+      pixels(p.pixelBounds, alloc),
       colorSpace(colorSpace),
       maxComponentValue(maxComponentValue),
       writeFP16(writeFP16) {
@@ -598,103 +692,14 @@ std::string RGBFilm::ToString() const {
 RGBFilm *RGBFilm::Create(const ParameterDictionary &parameters, Float exposureTime,
                          FilterHandle filter, const RGBColorSpace *colorSpace,
                          const FileLoc *loc, Allocator alloc) {
-    std::string filename = parameters.GetOneString("filename", "");
-    if (!Options->imageFile.empty()) {
-        if (!filename.empty())
-            Warning(loc,
-                    "Output filename supplied on command line, \"%s\" will "
-                    "override "
-                    "filename provided in scene description file, \"%s\".",
-                    Options->imageFile, filename);
-        filename = Options->imageFile;
-    } else if (filename.empty())
-        filename = "pbrt.exr";
-
-    Point2i fullResolution(parameters.GetOneInt("xresolution", 1280),
-                           parameters.GetOneInt("yresolution", 720));
-    if (Options->quickRender) {
-        fullResolution.x = std::max(1, fullResolution.x / 4);
-        fullResolution.y = std::max(1, fullResolution.y / 4);
-    }
-
-    Bounds2i pixelBounds(Point2i(0, 0), fullResolution);
-    std::vector<int> pb = parameters.GetIntArray("pixelbounds");
-    if (Options->pixelBounds) {
-        Bounds2i newBounds = *Options->pixelBounds;
-        if (Intersect(newBounds, pixelBounds) != newBounds)
-            Warning(loc, "Supplied pixel bounds extend beyond image "
-                         "resolution. Clamping.");
-        pixelBounds = Intersect(newBounds, pixelBounds);
-
-        if (!pb.empty())
-            Warning(loc, "Both pixel bounds and crop window were specified. Using the "
-                         "crop window.");
-    } else if (!pb.empty()) {
-        if (pb.size() != 4)
-            Error(loc, "%d values supplied for \"pixelbounds\". Expected 4.",
-                  int(pb.size()));
-        else {
-            Bounds2i newBounds = Bounds2i({pb[0], pb[2]}, {pb[1], pb[3]});
-            if (Intersect(newBounds, pixelBounds) != newBounds)
-                Warning(loc, "Supplied pixel bounds extend beyond image "
-                             "resolution. Clamping.");
-            pixelBounds = Intersect(newBounds, pixelBounds);
-        }
-    }
-
-    std::vector<Float> cr = parameters.GetFloatArray("cropwindow");
-    if (Options->cropWindow) {
-        Bounds2f crop = *Options->cropWindow;
-        // Compute film image bounds
-        pixelBounds = Bounds2i(Point2i(std::ceil(fullResolution.x * crop.pMin.x),
-                                       std::ceil(fullResolution.y * crop.pMin.y)),
-                               Point2i(std::ceil(fullResolution.x * crop.pMax.x),
-                                       std::ceil(fullResolution.y * crop.pMax.y)));
-
-        if (!cr.empty())
-            Warning(loc, "Crop window supplied on command line will override "
-                         "crop window specified with Film.");
-        if (Options->pixelBounds || !pb.empty())
-            Warning(loc, "Both pixel bounds and crop window were specified. Using the "
-                         "crop window.");
-    } else if (!cr.empty()) {
-        if (Options->pixelBounds)
-            Warning(loc, "Ignoring \"cropwindow\" since pixel bounds were specified "
-                         "on the command line.");
-        else if (cr.size() == 4) {
-            if (!pb.empty())
-                Warning(loc, "Both pixel bounds and crop window were "
-                             "specified. Using the "
-                             "crop window.");
-
-            Bounds2f crop;
-            crop.pMin.x = Clamp(std::min(cr[0], cr[1]), 0.f, 1.f);
-            crop.pMax.x = Clamp(std::max(cr[0], cr[1]), 0.f, 1.f);
-            crop.pMin.y = Clamp(std::min(cr[2], cr[3]), 0.f, 1.f);
-            crop.pMax.y = Clamp(std::max(cr[2], cr[3]), 0.f, 1.f);
-
-            // Compute film image bounds
-            pixelBounds = Bounds2i(Point2i(std::ceil(fullResolution.x * crop.pMin.x),
-                                           std::ceil(fullResolution.y * crop.pMin.y)),
-                                   Point2i(std::ceil(fullResolution.x * crop.pMax.x),
-                                           std::ceil(fullResolution.y * crop.pMax.y)));
-        } else
-            Error(loc, "%d values supplied for \"cropwindow\". Expected 4.",
-                  (int)cr.size());
-    }
-
-    if (pixelBounds.IsEmpty())
-        ErrorExit(loc, "Degenerate pixel bounds provided to film: %s.", pixelBounds);
-
-    Float diagonal = parameters.GetOneFloat("diagonal", 35.);
     Float maxComponentValue = parameters.GetOneFloat("maxcomponentvalue", Infinity);
     bool writeFP16 = parameters.GetOneBool("savefp16", true);
 
     PixelSensor *sensor =
         PixelSensor::Create(parameters, colorSpace, exposureTime, loc, alloc);
+    FilmBaseParameters filmBaseParameters(parameters, filter, sensor, loc);
 
-    return alloc.new_object<RGBFilm>(sensor, fullResolution, pixelBounds, filter,
-                                     diagonal, filename, colorSpace, maxComponentValue,
+    return alloc.new_object<RGBFilm>(filmBaseParameters, colorSpace, maxComponentValue,
                                      writeFP16, alloc);
 }
 
@@ -737,11 +742,9 @@ void GBufferFilm::AddSample(const Point2i &pFilm, SampledSpectrum L,
     p.weightSum += weight;
 }
 
-GBufferFilm::GBufferFilm(const PixelSensor *sensor, const Point2i &resolution,
-                         const Bounds2i &pixelBounds, FilterHandle filter, Float diagonal,
-                         const std::string &filename, const RGBColorSpace *colorSpace,
+GBufferFilm::GBufferFilm(FilmBaseParameters p, const RGBColorSpace *colorSpace,
                          Float maxComponentValue, bool writeFP16, Allocator alloc)
-    : FilmBase(resolution, pixelBounds, filter, diagonal, sensor, filename),
+    : FilmBase(p),
       pixels(pixelBounds, alloc),
       colorSpace(colorSpace),
       maxComponentValue(maxComponentValue),
@@ -846,7 +849,7 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
         for (int c = 0; c < 3; ++c)
             rgb[c] += splatScale * pixel.splatRGB[c] / filterIntegral;
 
-        rgb = Mul<RGB>(outputRGBFromSensorRGB, rgb);
+        rgb = outputRGBFromSensorRGB * rgb;
 
         Point2i pOffset(p.x - pixelBounds.pMin.x, p.y - pixelBounds.pMin.y);
         image.SetChannels(pOffset, rgbDesc, {rgb[0], rgb[1], rgb[2]});
@@ -890,103 +893,15 @@ GBufferFilm *GBufferFilm::Create(const ParameterDictionary &parameters,
                                  Float exposureTime, FilterHandle filter,
                                  const RGBColorSpace *colorSpace, const FileLoc *loc,
                                  Allocator alloc) {
-    std::string filename = parameters.GetOneString("filename", "");
-    if (!Options->imageFile.empty()) {
-        if (!filename.empty())
-            Warning(loc,
-                    "Output filename supplied on command line, \"%s\" will "
-                    "override "
-                    "filename provided in scene description file, \"%s\".",
-                    Options->imageFile, filename);
-        filename = Options->imageFile;
-    } else if (filename.empty())
-        filename = "pbrt.exr";
-
-    Point2i fullResolution(parameters.GetOneInt("xresolution", 1280),
-                           parameters.GetOneInt("yresolution", 720));
-    if (Options->quickRender) {
-        fullResolution.x = std::max(1, fullResolution.x / 4);
-        fullResolution.y = std::max(1, fullResolution.y / 4);
-    }
-
-    Bounds2i pixelBounds(Point2i(0, 0), fullResolution);
-    std::vector<int> pb = parameters.GetIntArray("pixelbounds");
-    if (Options->pixelBounds) {
-        Bounds2i newBounds = *Options->pixelBounds;
-        if (Intersect(newBounds, pixelBounds) != newBounds)
-            Warning(loc, "Supplied pixel bounds extend beyond image "
-                         "resolution. Clamping.");
-        pixelBounds = Intersect(newBounds, pixelBounds);
-
-        if (!pb.empty())
-            Warning(loc, "Both pixel bounds and crop window were specified. Using the "
-                         "crop window.");
-    } else if (!pb.empty()) {
-        if (pb.size() != 4)
-            Error(loc, "%d values supplied for \"pixelbounds\". Expected 4.",
-                  int(pb.size()));
-        else {
-            Bounds2i newBounds = Bounds2i({pb[0], pb[2]}, {pb[1], pb[3]});
-            if (Intersect(newBounds, pixelBounds) != newBounds)
-                Warning(loc, "Supplied pixel bounds extend beyond image "
-                             "resolution. Clamping.");
-            pixelBounds = Intersect(newBounds, pixelBounds);
-        }
-    }
-
-    std::vector<Float> cr = parameters.GetFloatArray("cropwindow");
-    if (Options->cropWindow) {
-        Bounds2f crop = *Options->cropWindow;
-        // Compute film image bounds
-        pixelBounds = Bounds2i(Point2i(std::ceil(fullResolution.x * crop.pMin.x),
-                                       std::ceil(fullResolution.y * crop.pMin.y)),
-                               Point2i(std::ceil(fullResolution.x * crop.pMax.x),
-                                       std::ceil(fullResolution.y * crop.pMax.y)));
-
-        if (!cr.empty())
-            Warning(loc, "Crop window supplied on command line will override "
-                         "crop window specified with Film.");
-        if (Options->pixelBounds || !pb.empty())
-            Warning(loc, "Both pixel bounds and crop window were specified. Using the "
-                         "crop window.");
-    } else if (!cr.empty()) {
-        if (Options->pixelBounds)
-            Warning(loc, "Ignoring \"cropwindow\" since pixel bounds were specified "
-                         "on the command line.");
-        else if (cr.size() == 4) {
-            if (!pb.empty())
-                Warning(loc, "Both pixel bounds and crop window were "
-                             "specified. Using the "
-                             "crop window.");
-
-            Bounds2f crop;
-            crop.pMin.x = Clamp(std::min(cr[0], cr[1]), 0.f, 1.f);
-            crop.pMax.x = Clamp(std::max(cr[0], cr[1]), 0.f, 1.f);
-            crop.pMin.y = Clamp(std::min(cr[2], cr[3]), 0.f, 1.f);
-            crop.pMax.y = Clamp(std::max(cr[2], cr[3]), 0.f, 1.f);
-
-            // Compute film image bounds
-            pixelBounds = Bounds2i(Point2i(std::ceil(fullResolution.x * crop.pMin.x),
-                                           std::ceil(fullResolution.y * crop.pMin.y)),
-                                   Point2i(std::ceil(fullResolution.x * crop.pMax.x),
-                                           std::ceil(fullResolution.y * crop.pMax.y)));
-        } else
-            Error(loc, "%d values supplied for \"cropwindow\". Expected 4.",
-                  (int)cr.size());
-    }
-
-    if (pixelBounds.IsEmpty())
-        ErrorExit(loc, "Degenerate pixel bounds provided to film: %s.", pixelBounds);
-
-    Float diagonal = parameters.GetOneFloat("diagonal", 35.);
     Float maxComponentValue = parameters.GetOneFloat("maxcomponentvalue", Infinity);
     bool writeFP16 = parameters.GetOneBool("savefp16", true);
 
     PixelSensor *sensor =
         PixelSensor::Create(parameters, colorSpace, exposureTime, loc, alloc);
 
-    return alloc.new_object<GBufferFilm>(sensor, fullResolution, pixelBounds, filter,
-                                         diagonal, filename, colorSpace,
+    FilmBaseParameters filmBaseParameters(parameters, filter, sensor, loc);
+
+    return alloc.new_object<GBufferFilm>(filmBaseParameters, colorSpace,
                                          maxComponentValue, writeFP16, alloc);
 }
 

@@ -286,8 +286,8 @@ class OrthographicCamera : public ProjectiveCamera {
 class PerspectiveCamera : public ProjectiveCamera {
   public:
     // PerspectiveCamera Public Methods
-    PerspectiveCamera(CameraBaseParameters baseParameters, const Bounds2f &screenWindow,
-                      Float lensRadius, Float focalDistance, Float fov)
+    PerspectiveCamera(CameraBaseParameters baseParameters, Float fov,
+                      const Bounds2f &screenWindow, Float lensRadius, Float focalDistance)
         : ProjectiveCamera(baseParameters, Perspective(fov, 1e-2f, 1000.f), screenWindow,
                            lensRadius, focalDistance) {
         // Compute differential changes in origin for perspective camera rays

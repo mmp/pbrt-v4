@@ -109,7 +109,7 @@ class PixelSensor {
 
     // PixelSensor Private Members
     DenselySampledSpectrum r_bar, g_bar, b_bar;
-    const Float imagingRatio;
+    Float imagingRatio;
     static std::vector<SpectrumHandle> swatchReflectances;
     RGB cameraRGBWhiteNorm = RGB(1, 1, 1);
 };
@@ -153,25 +153,45 @@ class VisibleSurface {
     SampledSpectrum albedo;
 };
 
+// FilmBaseParameters Definition
+struct FilmBaseParameters {
+    FilmBaseParameters(const ParameterDictionary &parameters, FilterHandle filter,
+                       const PixelSensor *sensor, const FileLoc *loc);
+    FilmBaseParameters(Point2i fullResolution, Bounds2i pixelBounds, FilterHandle filter,
+                       Float diagonal, const PixelSensor *sensor, std::string filename)
+        : fullResolution(fullResolution),
+          pixelBounds(pixelBounds),
+          filter(filter),
+          diagonal(diagonal),
+          sensor(sensor),
+          filename(filename) {}
+
+    Point2i fullResolution;
+    Bounds2i pixelBounds;
+    FilterHandle filter;
+    Float diagonal;
+    const PixelSensor *sensor;
+    std::string filename;
+};
+
 // FilmBase Definition
 class FilmBase {
   public:
     // FilmBase Public Methods
-    FilmBase(const Point2i &resolution, const Bounds2i &pixelBounds, FilterHandle filter,
-             Float diagonal, const PixelSensor *sensor, const std::string &filename)
-        : fullResolution(resolution),
-          pixelBounds(pixelBounds),
-          filter(filter),
-          diagonal(diagonal * .001f),
-          sensor(sensor),
-          filename(filename) {
+    FilmBase(FilmBaseParameters p)
+        : fullResolution(p.fullResolution),
+          pixelBounds(p.pixelBounds),
+          filter(p.filter),
+          diagonal(p.diagonal * .001f),
+          sensor(p.sensor),
+          filename(p.filename) {
         CHECK(!pixelBounds.IsEmpty());
         CHECK_GE(pixelBounds.pMin.x, 0);
-        CHECK_LE(pixelBounds.pMax.x, resolution.x);
+        CHECK_LE(pixelBounds.pMax.x, fullResolution.x);
         CHECK_GE(pixelBounds.pMin.y, 0);
-        CHECK_LE(pixelBounds.pMax.y, resolution.y);
-        LOG_VERBOSE("Created film with full resolution %s, pixelBounds %s", resolution,
-                    pixelBounds);
+        CHECK_LE(pixelBounds.pMax.y, fullResolution.y);
+        LOG_VERBOSE("Created film with full resolution %s, pixelBounds %s",
+                    fullResolution, pixelBounds);
     }
 
     PBRT_CPU_GPU
@@ -248,15 +268,13 @@ class RGBFilm : public FilmBase {
             rgb[c] += splatScale * pixel.splatRGB[c] / filterIntegral;
 
         // Convert _rgb_ to output RGB color space
-        rgb = Mul<RGB>(outputRGBFromSensorRGB, rgb);
+        rgb = outputRGBFromSensorRGB * rgb;
 
         return rgb;
     }
 
     RGBFilm() = default;
-    RGBFilm(const PixelSensor *sensor, const Point2i &resolution,
-            const Bounds2i &pixelBounds, FilterHandle filter, Float diagonal,
-            const std::string &filename, const RGBColorSpace *colorSpace,
+    RGBFilm(FilmBaseParameters p, const RGBColorSpace *colorSpace,
             Float maxComponentValue = Infinity, bool writeFP16 = true,
             Allocator alloc = {});
 
@@ -278,7 +296,7 @@ class RGBFilm : public FilmBase {
     PBRT_CPU_GPU
     RGB ToOutputRGB(const SampledSpectrum &L, const SampledWavelengths &lambda) const {
         RGB cameraRGB = sensor->ToSensorRGB(L * sensor->ImagingRatio(), lambda);
-        return Mul<RGB>(outputRGBFromSensorRGB, cameraRGB);
+        return outputRGBFromSensorRGB * cameraRGB;
     }
 
   private:
@@ -304,9 +322,7 @@ class RGBFilm : public FilmBase {
 class GBufferFilm : public FilmBase {
   public:
     // GBufferFilm Public Methods
-    GBufferFilm(const PixelSensor *sensor, const Point2i &resolution,
-                const Bounds2i &pixelBounds, FilterHandle filter, Float diagonal,
-                const std::string &filename, const RGBColorSpace *colorSpace,
+    GBufferFilm(FilmBaseParameters p, const RGBColorSpace *colorSpace,
                 Float maxComponentValue = Infinity, bool writeFP16 = true,
                 Allocator alloc = {});
 
@@ -328,7 +344,7 @@ class GBufferFilm : public FilmBase {
     PBRT_CPU_GPU
     RGB ToOutputRGB(const SampledSpectrum &L, const SampledWavelengths &lambda) const {
         RGB cameraRGB = sensor->ToSensorRGB(L * sensor->ImagingRatio(), lambda);
-        return Mul<RGB>(outputRGBFromSensorRGB, cameraRGB);
+        return outputRGBFromSensorRGB * cameraRGB;
     }
 
     PBRT_CPU_GPU
@@ -348,7 +364,7 @@ class GBufferFilm : public FilmBase {
         for (int c = 0; c < 3; ++c)
             rgb[c] += splatScale * pixel.splatRGB[c] / filterIntegral;
 
-        rgb = Mul<RGB>(outputRGBFromSensorRGB, rgb);
+        rgb = outputRGBFromSensorRGB * rgb;
 
         return rgb;
     }

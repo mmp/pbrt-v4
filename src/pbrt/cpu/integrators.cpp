@@ -2224,12 +2224,13 @@ void BDPTIntegrator::Render() {
                 std::string filename =
                     StringPrintf("bdpt_d%02i_s%02i_t%02i.exr", depth, s, t);
 
-                // FIXME: leaks
-                weightFilms[BufferIndex(s, t)] = new RGBFilm(
-                    PixelSensor::CreateDefault(), camera.GetFilm().FullResolution(),
+                FilmBaseParameters p(
+                    camera.GetFilm().FullResolution(),
                     Bounds2i(Point2i(0, 0), camera.GetFilm().FullResolution()),
                     new BoxFilter,  // FIXME: leaks
-                    camera.GetFilm().Diagonal() * 1000, filename, RGBColorSpace::sRGB);
+                    camera.GetFilm().Diagonal() * 1000, PixelSensor::CreateDefault(),
+                    filename);
+                weightFilms[BufferIndex(s, t)] = new RGBFilm(p, RGBColorSpace::sRGB);
             }
         }
     }
