@@ -138,26 +138,25 @@ class Sphere {
         if (!isect)
             return {};
         SurfaceInteraction intr = InteractionFromIntersection(*isect, -ray.d, ray.time);
-        return {{intr, isect->tHit}};
+        return ShapeIntersection{intr, isect->tHit};
     }
 
     PBRT_CPU_GPU
     pstd::optional<QuadricIntersection> BasicIntersect(const Ray &r, Float tMax) const {
         Float phi;
         Point3f pHit;
-        // Transform _Ray_ to object space
+        // Transform _Ray_ origin and direction to object space
         Point3fi oi = (*objectFromRender)(Point3fi(r.o));
         Vector3fi di = (*objectFromRender)(Vector3fi(r.d));
-        Ray ray(Point3f(oi), Vector3f(di), r.time, r.medium);
 
-        // Solve quadratic to compute sphere _t0_ and _t1_
+        // Solve quadratic equation to compute sphere _t0_ and _t1_
         FloatInterval t0, t1;
         // Compute sphere quadratic coefficients
         FloatInterval a = SumSquares(di.x, di.y, di.z);
         FloatInterval b = 2 * (di.x * oi.x + di.y * oi.y + di.z * oi.z);
         FloatInterval c = SumSquares(oi.x, oi.y, oi.z) - Sqr(FloatInterval(radius));
 
-// Compute sphere quadratic discriminant
+// Compute sphere quadratic discriminant _discrim_
 #if 0
 // Original
 FloatInterval b2 = Sqr(b), ac = 4 * a * c;
@@ -171,16 +170,17 @@ FloatInterval odiscrim = b2 - ac; // b * b - FloatInterval(4) * a * c;
             4 * a * ((FloatInterval(radius)) - sqrtf) * ((FloatInterval(radius)) + sqrtf);
         if (discrim.LowerBound() < 0)
             return {};
-        FloatInterval rootDiscrim = Sqrt(discrim);
 
         // Compute quadratic $t$ values
+        FloatInterval rootDiscrim = Sqrt(discrim);
         FloatInterval q;
         if ((Float)b < 0)
-            q = -.5 * (b - rootDiscrim);
+            q = -.5f * (b - rootDiscrim);
         else
-            q = -.5 * (b + rootDiscrim);
+            q = -.5f * (b + rootDiscrim);
         t0 = q / a;
         t1 = c / q;
+        // Swap quadratic $t$ values so that _t0_ is the lesser
         if (t0.LowerBound() > t1.LowerBound())
             pstd::swap(t0, t1);
 
@@ -195,7 +195,7 @@ FloatInterval odiscrim = b2 - ac; // b * b - FloatInterval(4) * a * c;
         }
 
         // Compute sphere hit position and $\phi$
-        pHit = ray((Float)tShapeHit);
+        pHit = Point3f(oi) + (Float)tShapeHit * Vector3f(di);
         // Refine sphere intersection point
         pHit *= radius / Distance(pHit, Point3f(0, 0, 0));
 
@@ -214,7 +214,7 @@ FloatInterval odiscrim = b2 - ac; // b * b - FloatInterval(4) * a * c;
                 return {};
             tShapeHit = t1;
             // Compute sphere hit position and $\phi$
-            pHit = ray((Float)tShapeHit);
+            pHit = Point3f(oi) + (Float)tShapeHit * Vector3f(di);
             // Refine sphere intersection point
             pHit *= radius / Distance(pHit, Point3f(0, 0, 0));
 
@@ -234,6 +234,11 @@ FloatInterval odiscrim = b2 - ac; // b * b - FloatInterval(4) * a * c;
     }
 
     PBRT_CPU_GPU
+    bool IntersectP(const Ray &r, Float tMax = Infinity) const {
+        return BasicIntersect(r, tMax).has_value();
+    }
+
+    PBRT_CPU_GPU
     SurfaceInteraction InteractionFromIntersection(const QuadricIntersection &isect,
                                                    const Vector3f &wo, Float time) const {
         Point3f pHit = isect.pObj;
@@ -245,9 +250,8 @@ FloatInterval odiscrim = b2 - ac; // b * b - FloatInterval(4) * a * c;
         Float v = (theta - thetaZMin) / (thetaZMax - thetaZMin);
         // Compute sphere $\dpdu$ and $\dpdv$
         Float zRadius = std::sqrt(pHit.x * pHit.x + pHit.y * pHit.y);
-        Float invZRadius = 1 / zRadius;
-        Float cosPhi = pHit.x * invZRadius;
-        Float sinPhi = pHit.y * invZRadius;
+        Float cosPhi = pHit.x / zRadius;
+        Float sinPhi = pHit.y / zRadius;
         Vector3f dpdu(-phiMax * pHit.y, phiMax * pHit.x, 0);
         Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
         Vector3f dpdv = (thetaZMax - thetaZMin) *
@@ -279,14 +283,11 @@ FloatInterval odiscrim = b2 - ac; // b * b - FloatInterval(4) * a * c;
         Vector3f pError = gamma(5) * Abs((Vector3f)pHit);
 
         // Return _SurfaceInteraction_ for quadric intersection
-        return (*renderFromObject)(SurfaceInteraction(
-            Point3fi(pHit, pError), Point2f(u, v), (*objectFromRender)(wo), dpdu, dpdv,
-            dndu, dndv, time, reverseOrientation ^ transformSwapsHandedness));
-    }
-
-    PBRT_CPU_GPU
-    bool IntersectP(const Ray &r, Float tMax = Infinity) const {
-        return BasicIntersect(r, tMax).has_value();
+        bool flipNormal = reverseOrientation ^ transformSwapsHandedness;
+        Vector3f woObject = (*objectFromRender)(wo);
+        return (*renderFromObject)(SurfaceInteraction(Point3fi(pHit, pError),
+                                                      Point2f(u, v), woObject, dpdu, dpdv,
+                                                      dndu, dndv, time, flipNormal));
     }
 
     PBRT_CPU_GPU
@@ -454,22 +455,21 @@ class Disk {
 
     PBRT_CPU_GPU
     pstd::optional<QuadricIntersection> BasicIntersect(const Ray &r, Float tMax) const {
-        // Transform _Ray_ to object space
+        // Transform _Ray_ origin and direction to object space
         Point3fi oi = (*objectFromRender)(Point3fi(r.o));
         Vector3fi di = (*objectFromRender)(Vector3fi(r.d));
-        Ray ray(Point3f(oi), Vector3f(di), r.time, r.medium);
 
         // Compute plane intersection for disk
         // Reject disk intersections for rays parallel to the disk's plane
-        if (ray.d.z == 0)
+        if (Float(di.z) == 0)
             return {};
 
-        Float tShapeHit = (height - ray.o.z) / ray.d.z;
+        Float tShapeHit = (height - Float(oi.z)) / Float(di.z);
         if (tShapeHit <= 0 || tShapeHit >= tMax)
             return {};
 
         // See if hit point is inside disk radii and $\phimax$
-        Point3f pHit = ray(tShapeHit);
+        Point3f pHit = Point3f(oi) + (Float)tShapeHit * Vector3f(di);
         Float dist2 = pHit.x * pHit.x + pHit.y * pHit.y;
         if (dist2 > radius * radius || dist2 < innerRadius * innerRadius)
             return {};
@@ -505,9 +505,11 @@ class Disk {
         Vector3f pError(0, 0, 0);
 
         // Return _SurfaceInteraction_ for quadric intersection
-        return (*renderFromObject)(SurfaceInteraction(
-            Point3fi(pHit, pError), Point2f(u, v), (*objectFromRender)(wo), dpdu, dpdv,
-            dndu, dndv, time, reverseOrientation ^ transformSwapsHandedness));
+        bool flipNormal = reverseOrientation ^ transformSwapsHandedness;
+        Vector3f woObject = (*objectFromRender)(wo);
+        return (*renderFromObject)(SurfaceInteraction(Point3fi(pHit, pError),
+                                                      Point2f(u, v), woObject, dpdu, dpdv,
+                                                      dndu, dndv, time, flipNormal));
     }
 
     PBRT_CPU_GPU
@@ -621,15 +623,40 @@ class Cylinder {
     pstd::optional<QuadricIntersection> BasicIntersect(const Ray &r, Float tMax) const {
         Float phi;
         Point3f pHit;
-        // Transform _Ray_ to object space
+        // Transform _Ray_ origin and direction to object space
         Point3fi oi = (*objectFromRender)(Point3fi(r.o));
         Vector3fi di = (*objectFromRender)(Vector3fi(r.d));
-        Ray ray(Point3f(oi), Vector3f(di), r.time, r.medium);
 
-        // Compute quadratic cylinder coefficients
+        // Solve quadratic equation to find cylinder _t0_ and _t1_ values
         FloatInterval t0, t1;
-        if (!CylinderQuadratic(oi, di, &t0, &t1))
+        // Compute cylinder quadratic coefficients
+        FloatInterval a = SumSquares(di.x, di.y);
+        FloatInterval b = 2 * (di.x * oi.x + di.y * oi.y);
+        FloatInterval c = SumSquares(oi.x, oi.y) - Sqr(FloatInterval(radius));
+
+        // Compute cylinder quadratic discriminant _discrim_
+        // FloatInterval discrim = B * B - FloatInterval(4) * A * C;
+        FloatInterval f = b / (2 * a);  // (o . d) / LengthSquared(d)
+        FloatInterval fx = oi.x - f * di.x;
+        FloatInterval fy = oi.y - f * di.y;
+        FloatInterval sqrtf = Sqrt(SumSquares(fx, fy));
+        FloatInterval discrim =
+            4 * a * (FloatInterval(radius) + sqrtf) * (FloatInterval(radius) - sqrtf);
+        if (discrim.LowerBound() < 0)
             return {};
+
+        // Compute quadratic $t$ values
+        FloatInterval rootDiscrim = Sqrt(discrim);
+        FloatInterval q;
+        if ((Float)b < 0)
+            q = -.5f * (b - rootDiscrim);
+        else
+            q = -.5f * (b + rootDiscrim);
+        t0 = q / a;
+        t1 = c / q;
+        // Swap quadratic $t$ values so that _t0_ is the lesser
+        if (t0.LowerBound() > t1.LowerBound())
+            pstd::swap(t0, t1);
 
         // Check quadric shape _t0_ and _t1_ for nearest intersection
         if (t0.UpperBound() > tMax || t1.LowerBound() <= 0)
@@ -642,7 +669,7 @@ class Cylinder {
         }
 
         // Compute cylinder hit point and $\phi$
-        pHit = ray((Float)tShapeHit);
+        pHit = Point3f(oi) + (Float)tShapeHit * Vector3f(di);
         // Refine cylinder intersection point
         Float hitRad = std::sqrt(pHit.x * pHit.x + pHit.y * pHit.y);
         pHit.x *= radius / hitRad;
@@ -660,7 +687,7 @@ class Cylinder {
             if (t1.UpperBound() > tMax)
                 return {};
             // Compute cylinder hit point and $\phi$
-            pHit = ray((Float)tShapeHit);
+            pHit = Point3f(oi) + (Float)tShapeHit * Vector3f(di);
             // Refine cylinder intersection point
             Float hitRad = std::sqrt(pHit.x * pHit.x + pHit.y * pHit.y);
             pHit.x *= radius / hitRad;
@@ -713,9 +740,11 @@ class Cylinder {
         Vector3f pError = gamma(3) * Abs(Vector3f(pHit.x, pHit.y, 0));
 
         // Return _SurfaceInteraction_ for quadric intersection
-        return (*renderFromObject)(SurfaceInteraction(
-            Point3fi(pHit, pError), Point2f(u, v), (*objectFromRender)(wo), dpdu, dpdv,
-            dndu, dndv, time, reverseOrientation ^ transformSwapsHandedness));
+        bool flipNormal = reverseOrientation ^ transformSwapsHandedness;
+        Vector3f woObject = (*objectFromRender)(wo);
+        return (*renderFromObject)(SurfaceInteraction(Point3fi(pHit, pError),
+                                                      Point2f(u, v), woObject, dpdu, dpdv,
+                                                      dndu, dndv, time, flipNormal));
     }
 
     PBRT_CPU_GPU
@@ -783,39 +812,6 @@ class Cylinder {
     }
 
   private:
-    // Cylinder Private Methods
-    PBRT_CPU_GPU
-    bool CylinderQuadratic(const Point3fi &oi, const Vector3fi &di, FloatInterval *t0,
-                           FloatInterval *t1) const {
-        FloatInterval a = SumSquares(di.x, di.y);
-        FloatInterval b = 2 * (di.x * oi.x + di.y * oi.y);
-        FloatInterval c = SumSquares(oi.x, oi.y) - Sqr(FloatInterval(radius));
-
-        // Solve quadratic equation for _t_ values
-        // FloatInterval discrim = B * B - FloatInterval(4) * A * C;
-        FloatInterval f = b / (2 * a);  // (o . d) / LengthSquared(d)
-        FloatInterval fx = oi.x - f * di.x;
-        FloatInterval fy = oi.y - f * di.y;
-        FloatInterval sqrtf = Sqrt(SumSquares(fx, fy));
-        FloatInterval discrim =
-            4 * a * (FloatInterval(radius) + sqrtf) * (FloatInterval(radius) - sqrtf);
-        if (discrim.LowerBound() < 0)
-            return false;
-        FloatInterval rootDiscrim = Sqrt(discrim);
-
-        // Compute quadratic _t_ values
-        FloatInterval q;
-        if ((Float)b < 0)
-            q = -.5 * (b - rootDiscrim);
-        else
-            q = -.5 * (b + rootDiscrim);
-        *t0 = q / a;
-        *t1 = c / q;
-        if (t0->LowerBound() > t1->LowerBound())
-            pstd::swap(*t0, *t1);
-        return true;
-    }
-
     // Cylinder Private Members
     const Transform *renderFromObject, *objectFromRender;
     bool reverseOrientation, transformSwapsHandedness;
