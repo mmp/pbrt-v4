@@ -11,6 +11,8 @@
 #include <pbrt/util/hash.h>
 #include <pbrt/util/print.h>
 #include <pbrt/util/pstd.h>
+#include <pbrt/util/stats.h>
+#include <pbrt/util/vecmath.h>
 
 #include <cstring>
 #include <mutex>
@@ -98,6 +100,16 @@ class BufferCache {
     std::mutex mutex;
     std::unordered_map<BufferId, pstd::vector<T> *, BufferHasher> cache;
 };
+
+extern BufferCache<int> *indexBufferCache;
+extern BufferCache<Point3f> *pBufferCache;
+extern BufferCache<Normal3f> *nBufferCache;
+extern BufferCache<Point2f> *uvBufferCache;
+extern BufferCache<Vector3f> *sBufferCache;
+extern BufferCache<int> *faceIndexBufferCache;
+
+void InitBufferCaches(Allocator alloc);
+void FreeBufferCaches();
 
 }  // namespace pbrt
 

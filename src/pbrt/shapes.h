@@ -30,14 +30,13 @@ struct ShapeSample {
 };
 
 // ShapeSampleContext Definition
-class ShapeSampleContext {
-  public:
+struct ShapeSampleContext {
+    // ShapeSampleContext Public Methods
     ShapeSampleContext() = default;
     PBRT_CPU_GPU
     ShapeSampleContext(const Point3fi &pi, const Normal3f &n, const Normal3f &ns,
                        Float time)
         : pi(pi), n(n), ns(ns), time(time) {}
-
     PBRT_CPU_GPU
     ShapeSampleContext(const SurfaceInteraction &si)
         : pi(si.pi), n(si.n), ns(si.shading.n), time(si.time) {}
@@ -48,38 +47,45 @@ class ShapeSampleContext {
     Point3f p() const { return Point3f(pi); }
 
     PBRT_CPU_GPU
-    Point3f OffsetRayOrigin(const Vector3f &w) const {
-        // Copied from Interaction... :-p
-        Float d = Dot(Abs(n), pi.Error());
-        Vector3f offset = d * Vector3f(n);
-        if (Dot(w, n) < 0)
-            offset = -offset;
-        Point3f po = Point3f(pi) + offset;
-        // Round offset point _po_ away from _p_
-        for (int i = 0; i < 3; ++i) {
-            if (offset[i] > 0)
-                po[i] = NextFloatUp(po[i]);
-            else if (offset[i] < 0)
-                po[i] = NextFloatDown(po[i]);
-        }
-
-        return po;
-    }
-
+    Point3f OffsetRayOrigin(const Vector3f &w) const;
     PBRT_CPU_GPU
-    Point3f OffsetRayOrigin(const Point3f &pt) const { return OffsetRayOrigin(pt - p()); }
-
+    Point3f OffsetRayOrigin(const Point3f &pt) const;
     PBRT_CPU_GPU
-    Ray SpawnRay(const Vector3f &w) const {
-        // Note: doesn't set medium, but that's fine, since this is only
-        // used by shapes to see if ray would have intersected them
-        return Ray(OffsetRayOrigin(w), w, time);
-    }
+    Ray SpawnRay(const Vector3f &w) const;
 
     Point3fi pi;
     Normal3f n, ns;
     Float time;
 };
+
+// ShapeSampleContext Inline Methods
+PBRT_CPU_GPU inline Point3f ShapeSampleContext::OffsetRayOrigin(const Vector3f &w) const {
+    // Copied from Interaction... :-p
+    Float d = Dot(Abs(n), pi.Error());
+    Vector3f offset = d * Vector3f(n);
+    if (Dot(w, n) < 0)
+        offset = -offset;
+    Point3f po = Point3f(pi) + offset;
+    // Round offset point _po_ away from _p_
+    for (int i = 0; i < 3; ++i) {
+        if (offset[i] > 0)
+            po[i] = NextFloatUp(po[i]);
+        else if (offset[i] < 0)
+            po[i] = NextFloatDown(po[i]);
+    }
+
+    return po;
+}
+
+PBRT_CPU_GPU inline Point3f ShapeSampleContext::OffsetRayOrigin(const Point3f &pt) const {
+    return OffsetRayOrigin(pt - p());
+}
+
+PBRT_CPU_GPU inline Ray ShapeSampleContext::SpawnRay(const Vector3f &w) const {
+    // Note: doesn't set medium, but that's fine, since this is only
+    // used by shapes to see if ray would have intersected them
+    return Ray(OffsetRayOrigin(w), w, time);
+}
 
 // ShapeIntersection Definition
 struct ShapeIntersection {
@@ -146,8 +152,37 @@ class Sphere {
 
         // Solve quadratic to compute sphere _t0_ and _t1_
         FloatInterval t0, t1;
-        if (!SphereQuadratic(oi, di, &t0, &t1))
+        // Compute sphere quadratic coefficients
+        FloatInterval a = SumSquares(di.x, di.y, di.z);
+        FloatInterval b = 2 * (di.x * oi.x + di.y * oi.y + di.z * oi.z);
+        FloatInterval c = SumSquares(oi.x, oi.y, oi.z) - Sqr(FloatInterval(radius));
+
+// Compute sphere quadratic discriminant
+#if 0
+// Original
+FloatInterval b2 = Sqr(b), ac = 4 * a * c;
+FloatInterval odiscrim = b2 - ac; // b * b - FloatInterval(4) * a * c;
+#endif
+        FloatInterval f = b / (2 * a);  // (o . d) / LengthSquared(d)
+        Point3fi fp = oi - f * di;
+        // There's a bit more precision if you compute x^2-y^2 as (x+y)(x-y).
+        FloatInterval sqrtf = Sqrt(SumSquares(fp.x, fp.y, fp.z));
+        FloatInterval discrim =
+            4 * a * ((FloatInterval(radius)) - sqrtf) * ((FloatInterval(radius)) + sqrtf);
+        if (discrim.LowerBound() < 0)
             return {};
+        FloatInterval rootDiscrim = Sqrt(discrim);
+
+        // Compute quadratic $t$ values
+        FloatInterval q;
+        if ((Float)b < 0)
+            q = -.5 * (b - rootDiscrim);
+        else
+            q = -.5 * (b + rootDiscrim);
+        t0 = q / a;
+        t1 = c / q;
+        if (t0.LowerBound() > t1.LowerBound())
+            pstd::swap(t0, t1);
 
         // Check quadric shape _t0_ and _t1_ for nearest intersection
         if (t0.UpperBound() > tMax || t1.LowerBound() <= 0)
@@ -365,83 +400,12 @@ class Sphere {
     }
 
   private:
-    // Sphere Private Methods
-    PBRT_CPU_GPU
-    bool SphereQuadratic(const Point3fi &o, const Vector3fi &d, FloatInterval *t0,
-                         FloatInterval *t1) const {
-        /* Recap of the approach from Ray Tracing Gems:
-
-           The basic idea is to rewrite b^2 - 4ac to 4a (b^2/4a - c),
-           then simplify that to 4a * (r^2 - (Dot(o, o) - Dot(o,
-           d)^2/LengthSquared(d)) = 4a (r^2 - (Dot(o, o) - Dot(o, d^))) where d^
-           is Normalize(d). Now, consider the decomposition of o into the sum of
-           two vectors, d_perp and d_parl, where d_parl is parallel to d^. We
-           have d_parl = Dot(o, d^) d^, and d_perp = o - d_parl = o - Dot(o, d^)
-           d^. We have a right triangle formed by o, d_perp, and d_parl, and so
-           |o|^2 = |d_perp|^2 + |d_parl|^2.
-           Note that |d_parl|^2 = Dot(o, d^)^2. Subtrace |d_parl|^2 from both
-           sides and we have Dot(o, o) - Dot(o, d^)^2 = |o - Dot(o, d^) d^|^2.
-
-           With the conventional approach, when the ray is long, we end up with
-           b^2 \approx 4ac and get hit with catastrophic cancellation.  It's
-           extra bad since the magnitudes of the two terms are related to the
-           *squared* distance to the ray origin. Even for rays that massively
-           miss, we'll end up with a discriminant exactly equal to zero, and
-           thence a reported intersection.
-
-           The new approach eliminates c from the computation of the
-           discriminant: that's a big win, since it's magnitude is proportional
-           to the squared distance to the origin, with accordingly limited
-           precision ("accuracy"?)
-
-           Note: the error in the old one is best visualized by going to the
-           checkout *before* 1d6e7bd9f6e10991d0c75a2ec74026a2a453522c
-           (otherwise everything disappears, since there's too much error in
-           the discriminant.)
-        */
-        // Initialize _FloatInterval_ ray coordinate values
-        FloatInterval a = SumSquares(d.x, d.y, d.z);
-        FloatInterval b = 2 * (d.x * o.x + d.y * o.y + d.z * o.z);
-        FloatInterval c = SumSquares(o.x, o.y, o.z) - Sqr(FloatInterval(radius));
-
-        // Solve quadratic equation for _t_ values
-#if 0
-    // Original
-    FloatInterval b2 = Sqr(b), ac = 4 * a * c;
-    FloatInterval odiscrim = b2 - ac; // b * b - FloatInterval(4) * a * c;
-#endif
-        // RT Gems
-        FloatInterval f = b / (2 * a);  // (o . d) / LengthSquared(d)
-        Point3fi fp = o - f * d;
-        // There's a bit more precision if you compute x^2-y^2 as (x+y)(x-y).
-        FloatInterval sqrtf = Sqrt(SumSquares(fp.x, fp.y, fp.z));
-        FloatInterval discrim =
-            4 * a * ((FloatInterval(radius)) - sqrtf) * ((FloatInterval(radius)) + sqrtf);
-
-        if (discrim.LowerBound() < 0)
-            return {};
-        FloatInterval rootDiscrim = Sqrt(discrim);
-
-        // Compute quadratic _t_ values
-        FloatInterval q;
-        if ((Float)b < 0)
-            q = -.5 * (b - rootDiscrim);
-        else
-            q = -.5 * (b + rootDiscrim);
-        *t0 = q / a;
-        *t1 = c / q;
-        if (t0->LowerBound() > t1->LowerBound())
-            pstd::swap(*t0, *t1);
-        return true;
-    }
-
     // Sphere Private Members
     Float radius;
     Float zMin, zMax;
     Float thetaZMin, thetaZMax, phiMax;
     const Transform *renderFromObject, *objectFromRender;
-    bool reverseOrientation;
-    bool transformSwapsHandedness;
+    bool reverseOrientation, transformSwapsHandedness;
 };
 
 // Disk Definition

@@ -446,6 +446,7 @@ set (PBRT_SOURCE_HEADERS
 
 SET (PBRT_UTIL_SOURCE
   src/pbrt/util/bluenoise.cpp
+  src/pbrt/util/buffercache.cpp
   src/pbrt/util/check.cpp
   src/pbrt/util/color.cpp
   src/pbrt/util/colorspace.cpp

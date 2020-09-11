@@ -15,9 +15,6 @@
 
 namespace pbrt {
 
-void InitBufferCaches(Allocator alloc);
-void FreeBufferCaches();
-
 // TriangleMesh Definition
 class TriangleMesh {
   public:

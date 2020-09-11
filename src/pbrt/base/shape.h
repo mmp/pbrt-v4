@@ -26,11 +26,11 @@ class Disk;
 
 struct ShapeSample;
 struct ShapeIntersection;
-class ShapeSampleContext;
+struct ShapeSampleContext;
 
 // ShapeHandle Definition
 class ShapeHandle
-    : public TaggedPointer<Triangle, BilinearPatch, Curve, Sphere, Cylinder, Disk> {
+    : public TaggedPointer<Sphere, Cylinder, Disk, Triangle, BilinearPatch, Curve> {
   public:
     // Shape Interface
     using TaggedPointer::TaggedPointer;
@@ -63,18 +63,6 @@ class ShapeHandle
 
     PBRT_CPU_GPU inline Float PDF(const ShapeSampleContext &ctx,
                                   const Vector3f &wi) const;
-
-  private:
-    // ShapeHandle Private Members
-    friend class TriangleMesh;
-    friend class BilinearPatchMesh;
-
-    static BufferCache<int> *indexBufferCache;
-    static BufferCache<Point3f> *pBufferCache;
-    static BufferCache<Normal3f> *nBufferCache;
-    static BufferCache<Point2f> *uvBufferCache;
-    static BufferCache<Vector3f> *sBufferCache;
-    static BufferCache<int> *faceIndexBufferCache;
 };
 
 }  // namespace pbrt
