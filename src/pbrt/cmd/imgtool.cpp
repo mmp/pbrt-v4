@@ -989,15 +989,6 @@ static void printImageStats(const char *name, const Image &image,
     if (metadata.samplesPerPixel)
         printf("\tsamples per pixel: %d\n", *metadata.samplesPerPixel);
 
-    if (metadata.estimatedVariance) {
-        printf("\taverage pixel variance: %g\n", *metadata.estimatedVariance);
-        if (metadata.renderTimeSeconds)
-            printf("\tMonte Carlo efficiency: %g\n",
-                   1. / (*metadata.renderTimeSeconds * *metadata.estimatedVariance));
-        else
-            printf("\n");
-    }
-
     if (metadata.MSE)
         printf("\tMSE vs. reference image: %g\n", *metadata.MSE);
 

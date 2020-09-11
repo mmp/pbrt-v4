@@ -154,7 +154,7 @@ struct ImageMetadata {
     pstd::optional<Bounds2i> pixelBounds;
     pstd::optional<Point2i> fullResolution;
     pstd::optional<int> samplesPerPixel;
-    pstd::optional<float> estimatedVariance, MSE;
+    pstd::optional<float> MSE;
     pstd::optional<const RGBColorSpace *> colorSpace;
     std::map<std::string, std::vector<std::string>> stringVectors;
 

@@ -134,22 +134,23 @@ inline Triplet PixelSensor::ProjectReflectance(SpectrumHandle refl, SpectrumHand
 class VisibleSurface {
   public:
     // VisibleSurface Public Methods
-    VisibleSurface() = default;
     PBRT_CPU_GPU
     VisibleSurface(const SurfaceInteraction &si, const CameraTransform &cameraTransform,
                    const SampledSpectrum &albedo, const SampledWavelengths &lambda);
 
-    std::string ToString() const;
-
     PBRT_CPU_GPU
     operator bool() const { return set; }
+
+    VisibleSurface() = default;
+
+    std::string ToString() const;
 
     // VisibleSurface Public Members
     bool set = false;
     Point3f p;
     Normal3f n, ns;
     Float time = 0;
-    Float dzdx = 0, dzdy = 0;  // x/y: raster space, z: camera space
+    Float dzdx = 0, dzdy = 0;
     SampledSpectrum albedo;
 };
 
@@ -226,12 +227,16 @@ class RGBFilm : public FilmBase {
   public:
     // RGBFilm Public Methods
     PBRT_CPU_GPU
+    bool UsesVisibleSurface() const { return false; }
+
+    PBRT_CPU_GPU
     void AddSample(const Point2i &pFilm, SampledSpectrum L,
-                   const SampledWavelengths &lambda, const VisibleSurface *visibleSurface,
+                   const SampledWavelengths &lambda, const VisibleSurface *,
                    Float weight) {
-        // First convert to sensor exposure, H, then to camera RGB
+        // Convert sample radiance to _PixelSensor_ RGB
         SampledSpectrum H = L * sensor->ImagingRatio();
         RGB rgb = sensor->ToSensorRGB(H, lambda);
+
         // Optionally clamp sensor RGB value
         Float m = std::max({rgb.r, rgb.g, rgb.b});
         if (m > maxComponentValue) {
@@ -240,19 +245,12 @@ class RGBFilm : public FilmBase {
         }
 
         DCHECK(InsideExclusive(pFilm, pixelBounds));
-        // Update pixel variance estimate
-        // pixels[pFilm].varianceEstimator.Add(H.Average());
-        pixels[pFilm].varianceEstimator.Add(L.Average());
-
         // Update pixel values with filtered sample contribution
         Pixel &pixel = pixels[pFilm];
         for (int c = 0; c < 3; ++c)
             pixel.rgbSum[c] += weight * rgb[c];
         pixel.weightSum += weight;
     }
-
-    PBRT_CPU_GPU
-    bool UsesVisibleSurface() const { return false; }
 
     PBRT_CPU_GPU
     RGB GetPixelRGB(const Point2i &p, Float splatScale = 1) const {
@@ -295,8 +293,8 @@ class RGBFilm : public FilmBase {
 
     PBRT_CPU_GPU
     RGB ToOutputRGB(const SampledSpectrum &L, const SampledWavelengths &lambda) const {
-        RGB cameraRGB = sensor->ToSensorRGB(L * sensor->ImagingRatio(), lambda);
-        return outputRGBFromSensorRGB * cameraRGB;
+        RGB sensorRGB = sensor->ToSensorRGB(L * sensor->ImagingRatio(), lambda);
+        return outputRGBFromSensorRGB * sensorRGB;
     }
 
   private:
@@ -306,16 +304,15 @@ class RGBFilm : public FilmBase {
         double rgbSum[3] = {0., 0., 0.};
         double weightSum = 0.;
         AtomicDouble splatRGB[3];
-        VarianceEstimator<Float> varianceEstimator;
     };
 
     // RGBFilm Private Members
-    Array2D<Pixel> pixels;
     const RGBColorSpace *colorSpace;
     Float maxComponentValue;
     bool writeFP16;
     Float filterIntegral;
     SquareMatrix<3> outputRGBFromSensorRGB;
+    Array2D<Pixel> pixels;
 };
 
 // GBufferFilm Definition
@@ -385,7 +382,7 @@ class GBufferFilm : public FilmBase {
         Float dzdxSum = 0, dzdySum = 0;
         Normal3f nSum, nsSum;
         double albedoSum[3] = {0., 0., 0.};
-        VarianceEstimator<Float> rgbVarianceEstimator;
+        VarianceEstimator<Float> varianceEstimator[3];
     };
 
     // GBufferFilm Private Members

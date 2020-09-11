@@ -18,6 +18,7 @@
 #include <pbrt/util/color.h>
 #include <pbrt/util/colorspace.h>
 #include <pbrt/util/error.h>
+#include <pbrt/util/file.h>
 #include <pbrt/util/image.h>
 #include <pbrt/util/lowdiscrepancy.h>
 #include <pbrt/util/memory.h>
@@ -622,21 +623,25 @@ SampledWavelengths RGBFilm::SampleWavelengths(Float u) const {
     return SampledWavelengths::SampleXYZ(u);
 }
 
-void RGBFilm::AddSplat(const Point2f &p, SampledSpectrum v,
+void RGBFilm::AddSplat(const Point2f &p, SampledSpectrum L,
                        const SampledWavelengths &lambda) {
-    CHECK(!v.HasNaNs());
-    // First convert to sensor exposure, H, then to camera RGB
-    SampledSpectrum H = v * sensor->ImagingRatio();
+    CHECK(!L.HasNaNs());
+    // Convert sample radiance to _PixelSensor_ RGB
+    SampledSpectrum H = L * sensor->ImagingRatio();
     RGB rgb = sensor->ToSensorRGB(H, lambda);
-    // Optionally clamp splat sensor RGB value
+
+    // Optionally clamp sensor RGB value
     Float m = std::max({rgb.r, rgb.g, rgb.b});
-    if (m > maxComponentValue)
+    if (m > maxComponentValue) {
+        H *= maxComponentValue / m;
         rgb *= maxComponentValue / m;
+    }
 
     // Compute bounds of affected pixels for splat, _splatBounds_
     Point2f pDiscrete = p + Vector2f(0.5, 0.5);
-    Bounds2i splatBounds(Point2i(Floor(pDiscrete - filter.Radius())),
-                         Point2i(Floor(pDiscrete + filter.Radius())) + Vector2i(1, 1));
+    Vector2f radius = filter.Radius();
+    Bounds2i splatBounds(Point2i(Floor(pDiscrete - radius)),
+                         Point2i(Floor(pDiscrete + radius)) + Vector2i(1, 1));
     splatBounds = Intersect(splatBounds, pixelBounds);
 
     for (Point2i pi : splatBounds) {
@@ -672,13 +677,6 @@ Image RGBFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
     metadata->pixelBounds = pixelBounds;
     metadata->fullResolution = fullResolution;
     metadata->colorSpace = colorSpace;
-
-    Float varianceSum = 0;
-    for (Point2i p : pixelBounds) {
-        const Pixel &pixel = pixels[p];
-        varianceSum += Float(pixel.varianceEstimator.Variance());
-    }
-    metadata->estimatedVariance = varianceSum / pixelBounds.Area();
 
     return image;
 }
@@ -719,8 +717,8 @@ void GBufferFilm::AddSample(const Point2i &pFilm, SampledSpectrum L,
     Pixel &p = pixels[pFilm];
     if (visibleSurface && *visibleSurface) {
         // Update variance estimates.
-        // TODO: store channels independently?
-        p.rgbVarianceEstimator.Add(H.y(lambda));
+        for (int c = 0; c < 3; ++c)
+            p.varianceEstimator[c].Add(rgb[c]);
 
         p.pSum += weight * visibleSurface->p;
 
@@ -812,11 +810,12 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
                  "Nsx",
                  "Nsy",
                  "Nsz",
-                 "materialId.R",
-                 "materialId.G",
-                 "materialId.B",
-                 "rgbVariance",
-                 "rgbRelativeVariance"});
+                 "Variance.R",
+                 "Variance.G",
+                 "Variance.B",
+                 "RelativeVariance.R",
+                 "RelativeVariance.G",
+                 "RelativeVariance.B"});
 
     ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
     ImageChannelDesc pDesc = image.GetChannelDesc({"Px", "Py", "Pz"});
@@ -826,7 +825,9 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
     ImageChannelDesc albedoRgbDesc =
         image.GetChannelDesc({"Albedo.R", "Albedo.G", "Albedo.B"});
     ImageChannelDesc varianceDesc =
-        image.GetChannelDesc({"rgbVariance", "rgbRelativeVariance"});
+        image.GetChannelDesc({"Variance.R", "Variance.G", "Variance.B"});
+    ImageChannelDesc relVarianceDesc = image.GetChannelDesc(
+        {"RelativeVariance.R", "RelativeVariance.G", "RelativeVariance.B"});
 
     ParallelFor2D(pixelBounds, [&](Point2i p) {
         Pixel &pixel = pixels[p];
@@ -864,21 +865,19 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
         image.SetChannels(pOffset, dzDesc, {std::abs(dzdx), std::abs(dzdy)});
         image.SetChannels(pOffset, nDesc, {n.x, n.y, n.z});
         image.SetChannels(pOffset, nsDesc, {ns.x, ns.y, ns.z});
-        image.SetChannels(pOffset, varianceDesc,
-                          {pixel.rgbVarianceEstimator.Variance(),
-                           pixel.rgbVarianceEstimator.RelativeVariance()});
+        image.SetChannels(
+            pOffset, varianceDesc,
+            {pixel.varianceEstimator[0].Variance(), pixel.varianceEstimator[1].Variance(),
+             pixel.varianceEstimator[2].Variance()});
+        image.SetChannels(pOffset, relVarianceDesc,
+                          {pixel.varianceEstimator[0].RelativeVariance(),
+                           pixel.varianceEstimator[1].RelativeVariance(),
+                           pixel.varianceEstimator[2].RelativeVariance()});
     });
 
     metadata->pixelBounds = pixelBounds;
     metadata->fullResolution = fullResolution;
     metadata->colorSpace = colorSpace;
-
-    Float varianceSum = 0;
-    for (Point2i p : pixelBounds) {
-        const Pixel &pixel = pixels[p];
-        varianceSum += pixel.rgbVarianceEstimator.Variance();
-    }
-    metadata->estimatedVariance = varianceSum / pixelBounds.Area();
 
     return image;
 }
@@ -900,6 +899,10 @@ GBufferFilm *GBufferFilm::Create(const ParameterDictionary &parameters,
         PixelSensor::Create(parameters, colorSpace, exposureTime, loc, alloc);
 
     FilmBaseParameters filmBaseParameters(parameters, filter, sensor, loc);
+
+    if (!HasExtension(filmBaseParameters.filename, "exr"))
+        ErrorExit(loc, "%s: EXR is the only format supported by the GBufferFilm.",
+                  filmBaseParameters.filename);
 
     return alloc.new_object<GBufferFilm>(filmBaseParameters, colorSpace,
                                          maxComponentValue, writeFP16, alloc);
