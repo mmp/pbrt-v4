@@ -302,100 +302,89 @@ FloatInterval odiscrim = b2 - ac; // b * b - FloatInterval(4) * a * c;
     PBRT_CPU_GPU
     pstd::optional<ShapeSample> Sample(const ShapeSampleContext &ctx,
                                        const Point2f &u) const {
-        Point3f pCenter = (*renderFromObject)(Point3f(0, 0, 0));
         // Sample uniformly on sphere if $\pt{}$ is inside it
+        Point3f pCenter = (*renderFromObject)(Point3f(0, 0, 0));
         Point3f pOrigin = ctx.OffsetRayOrigin(pCenter);
         if (DistanceSquared(pOrigin, pCenter) <= radius * radius) {
+            // Uniformly sample sphere and compute incident direction _wi_
             pstd::optional<ShapeSample> ss = Sample(u);
-            if (!ss)
-                return {};
+            DCHECK(ss.has_value());
             Vector3f wi = ss->intr.p() - ctx.p();
             if (LengthSquared(wi) == 0)
                 return {};
-            else {
-                // Convert from area measure returned by Sample() call above to
-                // solid angle measure.
-                wi = Normalize(wi);
-                ss->pdf *=
-                    DistanceSquared(ctx.p(), ss->intr.p()) / AbsDot(ss->intr.n, -wi);
-            }
+            wi = Normalize(wi);
+
+            // Convert uniform area sphere sample to solid angle measure
+            ss->pdf /= AbsDot(ss->intr.n, -wi) / DistanceSquared(ctx.p(), ss->intr.p());
             if (IsInf(ss->pdf))
                 return {};
+
             return ss;
         }
 
-        // Compute coordinate system for sphere sampling
-        Frame samplingFrame = Frame::FromZ(Normalize(ctx.p() - pCenter));
-
         // Sample sphere uniformly inside subtended cone
-        // Compute $\theta$ and $\phi$ values for sample in cone
-        Float dc = Distance(ctx.p(), pCenter);
-        Float invDc = 1 / dc;
-        Float sinThetaMax = radius * invDc;
-        Float sinThetaMax2 = sinThetaMax * sinThetaMax;
-        Float invSinThetaMax = 1 / sinThetaMax;
-        Float cosThetaMax = SafeSqrt(1 - sinThetaMax2);
+        // Compute quantities related the $\theta_\roman{max}$ for cone
+        Float sinThetaMax = radius / Distance(ctx.p(), pCenter);
+        Float sin2ThetaMax = sinThetaMax * sinThetaMax;
+        Float cosThetaMax = SafeSqrt(1 - sin2ThetaMax);
         Float oneMinusCosThetaMax = 1 - cosThetaMax;
+
+        // Compute $\theta$ and $\phi$ values for sample in cone
         Float cosTheta = (cosThetaMax - 1) * u[0] + 1;
-        Float sinTheta2 = 1 - cosTheta * cosTheta;
-
-        if (sinThetaMax2 < 0.00068523f /* sin^2(1.5 deg) */) {
-            /* Fall back to a Taylor series expansion for small angles, where
-               the standard approach suffers from severe cancellation errors */
-            sinTheta2 = sinThetaMax2 * u[0];
-            cosTheta = std::sqrt(1 - sinTheta2);
-
-            // Taylor expansion of 1 - sqrt(1 - Sqr(sinThetaMax)) at 0...
-            oneMinusCosThetaMax = sinThetaMax2 / 2;
+        Float sin2Theta = 1 - cosTheta * cosTheta;
+        if (sin2ThetaMax < 0.00068523f /* sin^2(1.5 deg) */) {
+            // Compute cone sample via Taylor series expansion for small angles
+            sin2Theta = sin2ThetaMax * u[0];
+            cosTheta = std::sqrt(1 - sin2Theta);
+            oneMinusCosThetaMax = sin2ThetaMax / 2;
         }
 
         // Compute angle $\alpha$ from center of sphere to sampled point on surface
-        Float cosAlpha =
-            sinTheta2 * invSinThetaMax +
-            cosTheta * SafeSqrt(1 - sinTheta2 * invSinThetaMax * invSinThetaMax);
-        Float sinAlpha = SafeSqrt(1 - cosAlpha * cosAlpha);
+        Float cosAlpha = sin2Theta / sinThetaMax +
+                         cosTheta * SafeSqrt(1 - sin2Theta / Sqr(sinThetaMax));
+        Float sinAlpha = SafeSqrt(1 - Sqr(cosAlpha));
 
         // Compute surface normal and sampled point on sphere
         Float phi = u[1] * 2 * Pi;
-        Vector3f nRender =
-            samplingFrame.FromLocal(SphericalDirection(sinAlpha, cosAlpha, phi));
-        Point3f pRender = pCenter + radius * Point3f(nRender.x, nRender.y, nRender.z);
-        Vector3f pError = gamma(5) * Abs((Vector3f)pRender);
-        Point3fi pi(pRender, pError);
-        Normal3f n(nRender);
+        Vector3f w = SphericalDirection(sinAlpha, cosAlpha, phi);
+        Frame samplingFrame = Frame::FromZ(Normalize(pCenter - ctx.p()));
+        Normal3f n(samplingFrame.FromLocal(-w));
+        Point3f p = pCenter + radius * Point3f(n.x, n.y, n.z);
         if (reverseOrientation)
             n *= -1;
 
         // Return _ShapeSample_ for sampled point on sphere
+        // Compute _pError_ for sampled point on sphere
+        Vector3f pError = gamma(5) * Abs((Vector3f)p);
+
         DCHECK_NE(oneMinusCosThetaMax, 0);  // very small far away sphere
-        return ShapeSample{Interaction(pi, n, ctx.time),
+        return ShapeSample{Interaction(Point3fi(p, pError), n, ctx.time),
                            1 / (2 * Pi * oneMinusCosThetaMax)};
     }
 
     PBRT_CPU_GPU
     Float PDF(const ShapeSampleContext &ctx, const Vector3f &wi) const {
         Point3f pCenter = (*renderFromObject)(Point3f(0, 0, 0));
-        // Return uniform PDF if point is inside sphere
         Point3f pOrigin = ctx.OffsetRayOrigin(pCenter);
         if (DistanceSquared(pOrigin, pCenter) <= radius * radius) {
+            // Return solid angle PDF for point inside sphere
             pstd::optional<ShapeIntersection> isect = Intersect(Ray(pOrigin, wi));
             CHECK_RARE(1e-6, !isect.has_value());
             if (!isect)
                 return 0;
-            Float pdf = DistanceSquared(pOrigin, isect->intr.p()) /
-                        (AbsDot(isect->intr.n, -wi) * Area());
+            Float pdf = (1 / Area()) / (AbsDot(isect->intr.n, -wi) /
+                                        DistanceSquared(pOrigin, isect->intr.p()));
             if (IsInf(pdf))
-                pdf = 0.f;
+                pdf = 0;
             return pdf;
         }
-
-        // Compute general sphere PDF
-        Float sinThetaMax2 = radius * radius / DistanceSquared(ctx.p(), pCenter);
-        Float cosThetaMax = SafeSqrt(1 - sinThetaMax2);
+        // Compute general solid angle sphere PDF
+        Float sin2ThetaMax = radius * radius / DistanceSquared(ctx.p(), pCenter);
+        Float cosThetaMax = SafeSqrt(1 - sin2ThetaMax);
         Float oneMinusCosThetaMax = 1 - cosThetaMax;
-
-        if (sinThetaMax2 < 0.00068523f /* sin^2(1.5 deg) */)
-            oneMinusCosThetaMax = sinThetaMax2 / 2;
+        // Compute more accurate _oneMinusCosThetaMax_ for small solid angle
+        if (sin2ThetaMax < 0.00068523f /* sin^2(1.5 deg) */)
+            oneMinusCosThetaMax = sin2ThetaMax / 2;
 
         return 1 / (2 * Pi * oneMinusCosThetaMax);
     }
@@ -1588,8 +1577,8 @@ class BilinearPatch {
 };
 
 inline Bounds3f ShapeHandle::Bounds() const {
-    auto cwb = [&](auto ptr) { return ptr->Bounds(); };
-    return Dispatch(cwb);
+    auto bounds = [&](auto ptr) { return ptr->Bounds(); };
+    return Dispatch(bounds);
 }
 
 inline pstd::optional<ShapeIntersection> ShapeHandle::Intersect(const Ray &ray,

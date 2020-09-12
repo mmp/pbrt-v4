@@ -38,11 +38,12 @@ pstd::optional<ShapeSample> Sphere::Sample(const Point2f &u) const {
     // Reproject _pObj_ to sphere surface and compute _pObjError_
     pObj *= radius / Distance(pObj, Point3f(0, 0, 0));
     Vector3f pObjError = gamma(5) * Abs((Vector3f)pObj);
-    Point3fi pi = (*renderFromObject)(Point3fi(pObj, pObjError));
 
+    // Compute surface normal for sphere sample and return _ShapeSample_
     Normal3f n = Normalize((*renderFromObject)(Normal3f(pObj.x, pObj.y, pObj.z)));
     if (reverseOrientation)
         n *= -1;
+    Point3fi pi = (*renderFromObject)(Point3fi(pObj, pObjError));
     return ShapeSample{Interaction(pi, n), 1 / Area()};
 }
 
