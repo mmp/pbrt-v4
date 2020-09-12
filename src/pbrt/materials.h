@@ -760,7 +760,7 @@ class SubsurfaceMaterial {
             sig_s = ClampZero(scale * texEval(sigma_s, ctx, lambda));
 
         } else {
-            // Compute _sig\_a_ and _sig\_s_ from reflectance and mfp
+            // Compute _sig_a_ and _sig_s_ from reflectance and mfp
             DCHECK(reflectance && mfp);
             SampledSpectrum mfree = ClampZero(scale * texEval(mfp, ctx, lambda));
             SampledSpectrum r = Clamp(texEval(reflectance, ctx, lambda), 0, 1);

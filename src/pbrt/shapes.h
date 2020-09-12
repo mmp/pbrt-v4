@@ -306,15 +306,16 @@ FloatInterval odiscrim = b2 - ac; // b * b - FloatInterval(4) * a * c;
         Point3f pCenter = (*renderFromObject)(Point3f(0, 0, 0));
         Point3f pOrigin = ctx.OffsetRayOrigin(pCenter);
         if (DistanceSquared(pOrigin, pCenter) <= radius * radius) {
-            // Uniformly sample sphere and compute incident direction _wi_
+            // Uniformly sample shape and compute incident direction _wi_
             pstd::optional<ShapeSample> ss = Sample(u);
             DCHECK(ss.has_value());
+            ss->intr.time = ctx.time;
             Vector3f wi = ss->intr.p() - ctx.p();
             if (LengthSquared(wi) == 0)
                 return {};
             wi = Normalize(wi);
 
-            // Convert uniform area sphere sample to solid angle measure
+            // Convert uniform area sample PDF _ss->pdf_ to solid angle measure
             ss->pdf /= AbsDot(ss->intr.n, -wi) / DistanceSquared(ctx.p(), ss->intr.p());
             if (IsInf(ss->pdf))
                 return {};
@@ -368,14 +369,19 @@ FloatInterval odiscrim = b2 - ac; // b * b - FloatInterval(4) * a * c;
         Point3f pOrigin = ctx.OffsetRayOrigin(pCenter);
         if (DistanceSquared(pOrigin, pCenter) <= radius * radius) {
             // Return solid angle PDF for point inside sphere
-            pstd::optional<ShapeIntersection> isect = Intersect(Ray(pOrigin, wi));
+            // Intersect sample ray with shape geometry
+            Ray ray = ctx.SpawnRay(wi);
+            pstd::optional<ShapeIntersection> isect = Intersect(ray);
             CHECK_RARE(1e-6, !isect.has_value());
             if (!isect)
                 return 0;
+
+            // Compute PDF in solid angle measure from shape intersection point
             Float pdf = (1 / Area()) / (AbsDot(isect->intr.n, -wi) /
-                                        DistanceSquared(pOrigin, isect->intr.p()));
+                                        DistanceSquared(ctx.p(), isect->intr.p()));
             if (IsInf(pdf))
                 pdf = 0;
+
             return pdf;
         }
         // Compute general solid angle sphere PDF
@@ -533,9 +539,8 @@ class Disk {
             return {};
         else {
             wi = Normalize(wi);
-            // Convert from area measure, as returned by the Sample() call
-            // above, to solid angle measure.
-            ss->pdf *= DistanceSquared(ctx.p(), ss->intr.p()) / AbsDot(ss->intr.n, -wi);
+            // Convert uniform area sample PDF _ss->pdf_ to solid angle measure
+            ss->pdf /= AbsDot(ss->intr.n, -wi) / DistanceSquared(ctx.p(), ss->intr.p());
             if (IsInf(ss->pdf))
                 return {};
         }
@@ -571,15 +576,7 @@ class Cylinder {
   public:
     // Cylinder Public Methods
     Cylinder(const Transform *renderFromObject, const Transform *objectFromRender,
-             bool reverseOrientation, Float radius, Float zMin, Float zMax, Float phiMax)
-        : renderFromObject(renderFromObject),
-          objectFromRender(objectFromRender),
-          reverseOrientation(reverseOrientation),
-          transformSwapsHandedness(renderFromObject->SwapsHandedness()),
-          radius(radius),
-          zMin(std::min(zMin, zMax)),
-          zMax(std::max(zMin, zMax)),
-          phiMax(Radians(Clamp(phiMax, 0, 360))) {}
+             bool reverseOrientation, Float radius, Float zMin, Float zMax, Float phiMax);
 
     static Cylinder *Create(const Transform *renderFromObject,
                             const Transform *objectFromRender, bool reverseOrientation,
@@ -603,9 +600,8 @@ class Cylinder {
         pstd::optional<QuadricIntersection> isect = BasicIntersect(ray, tMax);
         if (!isect)
             return {};
-
         SurfaceInteraction intr = InteractionFromIntersection(*isect, -ray.d, ray.time);
-        return {{intr, isect->tHit}};
+        return ShapeIntersection{intr, isect->tHit};
     }
 
     PBRT_CPU_GPU
@@ -695,6 +691,11 @@ class Cylinder {
     }
 
     PBRT_CPU_GPU
+    bool IntersectP(const Ray &r, Float tMax = Infinity) const {
+        return BasicIntersect(r, tMax).has_value();
+    }
+
+    PBRT_CPU_GPU
     SurfaceInteraction InteractionFromIntersection(const QuadricIntersection &isect,
                                                    const Vector3f &wo, Float time) const {
         Point3f pHit = isect.pObj;
@@ -737,14 +738,10 @@ class Cylinder {
     }
 
     PBRT_CPU_GPU
-    bool IntersectP(const Ray &r, Float tMax = Infinity) const {
-        return BasicIntersect(r, tMax).has_value();
-    }
-
-    PBRT_CPU_GPU
     pstd::optional<ShapeSample> Sample(const Point2f &u) const {
         Float z = Lerp(u[0], zMin, zMax);
         Float phi = u[1] * phiMax;
+        // Compute cylinder sample position _pi_ and normal _n_ from $z$ and $\phi$
         Point3f pObj = Point3f(radius * std::cos(phi), radius * std::sin(phi), z);
         // Reproject _pObj_ to cylinder surface and compute _pObjError_
         Float hitRad = std::sqrt(pObj.x * pObj.x + pObj.y * pObj.y);
@@ -756,6 +753,7 @@ class Cylinder {
         Normal3f n = Normalize((*renderFromObject)(Normal3f(pObj.x, pObj.y, 0)));
         if (reverseOrientation)
             n *= -1;
+
         return ShapeSample{Interaction(pi, n), 1 / Area()};
     }
 
@@ -765,38 +763,38 @@ class Cylinder {
     PBRT_CPU_GPU
     pstd::optional<ShapeSample> Sample(const ShapeSampleContext &ctx,
                                        const Point2f &u) const {
+        // Uniformly sample shape and compute incident direction _wi_
         pstd::optional<ShapeSample> ss = Sample(u);
-        if (!ss)
-            return ss;
-
+        DCHECK(ss.has_value());
         ss->intr.time = ctx.time;
         Vector3f wi = ss->intr.p() - ctx.p();
         if (LengthSquared(wi) == 0)
             return {};
-        else {
-            wi = Normalize(wi);
-            // Convert from area measure, as returned by the Sample() call
-            // above, to solid angle measure.
-            ss->pdf *= DistanceSquared(ctx.p(), ss->intr.p()) / AbsDot(ss->intr.n, -wi);
-            if (IsInf(ss->pdf))
-                return {};
-        }
+        wi = Normalize(wi);
+
+        // Convert uniform area sample PDF _ss->pdf_ to solid angle measure
+        ss->pdf /= AbsDot(ss->intr.n, -wi) / DistanceSquared(ctx.p(), ss->intr.p());
+        if (IsInf(ss->pdf))
+            return {};
+
         return ss;
     }
 
     PBRT_CPU_GPU
     Float PDF(const ShapeSampleContext &ctx, const Vector3f &wi) const {
-        // Intersect sample ray with area light geometry
+        // Intersect sample ray with shape geometry
         Ray ray = ctx.SpawnRay(wi);
-        pstd::optional<ShapeIntersection> si = Intersect(ray);
-        if (!si)
+        pstd::optional<ShapeIntersection> isect = Intersect(ray);
+        CHECK_RARE(1e-6, !isect.has_value());
+        if (!isect)
             return 0;
 
-        // Convert light sample weight to solid angle measure
-        Float pdf =
-            DistanceSquared(ctx.p(), si->intr.p()) / (AbsDot(si->intr.n, -wi) * Area());
+        // Compute PDF in solid angle measure from shape intersection point
+        Float pdf = (1 / Area()) / (AbsDot(isect->intr.n, -wi) /
+                                    DistanceSquared(ctx.p(), isect->intr.p()));
         if (IsInf(pdf))
-            pdf = 0.f;
+            pdf = 0;
+
         return pdf;
     }
 
@@ -806,6 +804,19 @@ class Cylinder {
     bool reverseOrientation, transformSwapsHandedness;
     Float radius, zMin, zMax, phiMax;
 };
+
+// Cylinder Inline Methods
+inline Cylinder::Cylinder(const Transform *renderFromObject,
+                          const Transform *objectFromRender, bool reverseOrientation,
+                          Float radius, Float zMin, Float zMax, Float phiMax)
+    : renderFromObject(renderFromObject),
+      objectFromRender(objectFromRender),
+      reverseOrientation(reverseOrientation),
+      transformSwapsHandedness(renderFromObject->SwapsHandedness()),
+      radius(radius),
+      zMin(std::min(zMin, zMax)),
+      zMax(std::max(zMin, zMax)),
+      phiMax(Radians(Clamp(phiMax, 0, 360))) {}
 
 // Triangle Declarations
 #if defined(PBRT_BUILD_GPU_RENDERER) && defined(__CUDACC__)
@@ -1073,10 +1084,9 @@ class Triangle {
                 return {};
             else {
                 wi = Normalize(wi);
-                // Convert from area measure, as returned by the Sample() call
-                // above, to solid angle measure.
-                ss->pdf *=
-                    DistanceSquared(ctx.p(), ss->intr.p()) / AbsDot(ss->intr.n, -wi);
+                // Convert uniform area sample PDF _ss->pdf_ to solid angle measure
+                ss->pdf /=
+                    AbsDot(ss->intr.n, -wi) / DistanceSquared(ctx.p(), ss->intr.p());
                 if (IsInf(ss->pdf))
                     return {};
             }

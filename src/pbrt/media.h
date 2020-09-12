@@ -240,7 +240,7 @@ class GeneralMedium {
             Float t1 = nextCrossingT[stepAxis];
 
             // Sample volume scattering in current voxel
-            // Get _maxDensity_ for current voxel and compute _sigma\_maj_
+            // Get _maxDensity_ for current voxel and compute _sigma_maj_
             int offset =
                 voxel[0] + gridResolution.x * (voxel[1] + gridResolution.y * voxel[2]);
             Float maxDensity = maxDensityGrid[offset];

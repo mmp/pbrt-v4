@@ -1249,14 +1249,12 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,
 
     if (LengthSquared(wi) == 0)
         return {};
-    else {
-        wi = Normalize(wi);
-        // Convert from area measure, as returned by the Sample() call
-        // above, to solid angle measure.
-        ss->pdf *= DistanceSquared(ctx.p(), ss->intr.p()) / AbsDot(ss->intr.n, -wi);
-        if (IsInf(ss->pdf))
-            return {};
-    }
+    wi = Normalize(wi);
+    // Convert uniform area sample PDF _ss->pdf_ to solid angle measure
+    ss->pdf /= AbsDot(ss->intr.n, -wi) / DistanceSquared(ctx.p(), ss->intr.p());
+    if (IsInf(ss->pdf))
+        return {};
+
     return ss;
 }
 
