@@ -539,8 +539,8 @@ TEST(SphericalTriangleArea, RandomSampling) {
                 v = frame.FromLocal(v);
             }
 
-            if (Triangle::Intersect(Ray(Point3f(0, 0, 0), v), Infinity, Point3f(a),
-                                    Point3f(b), Point3f(c)))
+            if (IntersectTriangle(Ray(Point3f(0, 0, 0), v), Infinity, Point3f(a),
+                                  Point3f(b), Point3f(c)))
                 ++count;
         }
 

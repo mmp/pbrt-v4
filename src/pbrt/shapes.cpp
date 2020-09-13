@@ -154,102 +154,11 @@ void Triangle::Init(Allocator alloc) {
 
 STAT_MEMORY_COUNTER("Memory/Triangles", triangleBytes);
 
-// Triangle Method Definitions
-pstd::vector<ShapeHandle> Triangle::CreateTriangles(const TriangleMesh *mesh,
-                                                    Allocator alloc) {
-    CHECK_LT(allMeshes->size(), 1 << 31);
-    int meshIndex = int(allMeshes->size());
-    allMeshes->push_back(mesh);
-
-    pstd::vector<ShapeHandle> tris(mesh->nTriangles, alloc);
-    Triangle *t = alloc.allocate_object<Triangle>(mesh->nTriangles);
-    for (int i = 0; i < mesh->nTriangles; ++i) {
-        alloc.construct(&t[i], meshIndex, i);
-        tris[i] = &t[i];
-    }
-    triangleBytes += mesh->nTriangles * sizeof(Triangle);
-    return tris;
-}
-
-Bounds3f Triangle::Bounds() const {
-    // Get triangle vertices in _p0_, _p1_, and _p2_
-    auto mesh = GetMesh();
-    const int *v = &mesh->vertexIndices[3 * triIndex];
-    const Point3f &p0 = mesh->p[v[0]], &p1 = mesh->p[v[1]];
-    const Point3f &p2 = mesh->p[v[2]];
-
-    return Union(Bounds3f(p0, p1), p2);
-}
-
-DirectionCone Triangle::NormalBounds() const {
-    // Get triangle vertices in _p0_, _p1_, and _p2_
-    auto mesh = GetMesh();
-    const int *v = &mesh->vertexIndices[3 * triIndex];
-    const Point3f &p0 = mesh->p[v[0]], &p1 = mesh->p[v[1]];
-    const Point3f &p2 = mesh->p[v[2]];
-
-    // Compute surface normal for sampled point on triangle
-    Normal3f n = Normalize(Normal3f(Cross(p1 - p0, p2 - p0)));
-    // Ensure correct orientation of the geometric normal; follow the same
-    // approach as was used in Triangle::Intersect().
-    if (mesh->n != nullptr) {
-        // TODO: um, can this be different at different points on the
-        // triangle, and if so, what is the implication for NormalBounds()?
-        Normal3f ns(mesh->n[v[0]] + mesh->n[v[1]] + mesh->n[v[2]]);
-        n = FaceForward(n, ns);
-    } else if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
-        n *= -1;
-
-    return DirectionCone(Vector3f(n));
-}
-
-pstd::optional<ShapeIntersection> Triangle::Intersect(const Ray &ray, Float tMax) const {
-#ifndef PBRT_IS_GPU_CODE
-    ++nTriTests;
-#endif
-    // Get triangle vertices in _p0_, _p1_, and _p2_
-    auto mesh = GetMesh();
-    const int *v = &mesh->vertexIndices[3 * triIndex];
-    const Point3f &p0 = mesh->p[v[0]], &p1 = mesh->p[v[1]];
-    const Point3f &p2 = mesh->p[v[2]];
-
-    pstd::optional<TriangleIntersection> triIsect = Intersect(ray, tMax, p0, p1, p2);
-    if (!triIsect)
-        return {};
-
-    Float b0 = triIsect->b0, b1 = triIsect->b1, b2 = triIsect->b2;
-    SurfaceInteraction intr = Triangle::InteractionFromIntersection(
-        mesh, triIndex, {b0, b1, b2}, ray.time, -ray.d);
-#ifndef PBRT_IS_GPU_CODE
-    ++nTriHits;
-#endif
-    return ShapeIntersection{intr, triIsect->t};
-}
-
-bool Triangle::IntersectP(const Ray &ray, Float tMax) const {
-#ifndef PBRT_IS_GPU_CODE
-    ++nTriTests;
-#endif
-    // Get triangle vertices in _p0_, _p1_, and _p2_
-    auto mesh = GetMesh();
-    const int *v = &mesh->vertexIndices[3 * triIndex];
-    const Point3f &p0 = mesh->p[v[0]], &p1 = mesh->p[v[1]];
-    const Point3f &p2 = mesh->p[v[2]];
-
-    pstd::optional<TriangleIntersection> isect = Intersect(ray, tMax, p0, p1, p2);
-    if (isect) {
-#ifndef PBRT_IS_GPU_CODE
-        ++nTriHits;
-#endif
-        return true;
-    } else
-        return false;
-}
-
-pstd::optional<TriangleIntersection> Triangle::Intersect(const Ray &ray, Float tMax,
-                                                         const Point3f &p0,
-                                                         const Point3f &p1,
-                                                         const Point3f &p2) {
+// Triangle Functions
+pstd::optional<TriangleIntersection> IntersectTriangle(const Ray &ray, Float tMax,
+                                                       const Point3f &p0,
+                                                       const Point3f &p1,
+                                                       const Point3f &p2) {
     // Return no intersection if triangle is degenerate
     if (LengthSquared(Cross(p2 - p0, p1 - p0)) == 0)
         return {};
@@ -350,6 +259,91 @@ pstd::optional<TriangleIntersection> Triangle::Intersect(const Ray &ray, Float t
 
     // Return _TriangleIntersection_ for intersection
     return TriangleIntersection{b0, b1, b2, t};
+}
+
+// Triangle Method Definitions
+pstd::vector<ShapeHandle> Triangle::CreateTriangles(const TriangleMesh *mesh,
+                                                    Allocator alloc) {
+    CHECK_LT(allMeshes->size(), 1 << 31);
+    int meshIndex = int(allMeshes->size());
+    allMeshes->push_back(mesh);
+
+    pstd::vector<ShapeHandle> tris(mesh->nTriangles, alloc);
+    Triangle *t = alloc.allocate_object<Triangle>(mesh->nTriangles);
+    for (int i = 0; i < mesh->nTriangles; ++i) {
+        alloc.construct(&t[i], meshIndex, i);
+        tris[i] = &t[i];
+    }
+    triangleBytes += mesh->nTriangles * sizeof(Triangle);
+    return tris;
+}
+
+Bounds3f Triangle::Bounds() const {
+    // Get triangle vertices in _p0_, _p1_, and _p2_
+    const TriangleMesh *mesh = GetMesh();
+    const int *v = &mesh->vertexIndices[3 * triIndex];
+    Point3f p0 = mesh->p[v[0]], p1 = mesh->p[v[1]], p2 = mesh->p[v[2]];
+
+    return Union(Bounds3f(p0, p1), p2);
+}
+
+DirectionCone Triangle::NormalBounds() const {
+    // Get triangle vertices in _p0_, _p1_, and _p2_
+    const TriangleMesh *mesh = GetMesh();
+    const int *v = &mesh->vertexIndices[3 * triIndex];
+    Point3f p0 = mesh->p[v[0]], p1 = mesh->p[v[1]], p2 = mesh->p[v[2]];
+
+    Normal3f n = Normalize(Normal3f(Cross(p1 - p0, p2 - p0)));
+    // Ensure correct orientation of geometric normal for normal bounds
+    if (mesh->n != nullptr) {
+        Normal3f ns(mesh->n[v[0]] + mesh->n[v[1]] + mesh->n[v[2]]);
+        n = FaceForward(n, ns);
+    } else if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
+        n *= -1;
+
+    return DirectionCone(Vector3f(n));
+}
+
+pstd::optional<ShapeIntersection> Triangle::Intersect(const Ray &ray, Float tMax) const {
+#ifndef PBRT_IS_GPU_CODE
+    ++nTriTests;
+#endif
+    // Get triangle vertices in _p0_, _p1_, and _p2_
+    const TriangleMesh *mesh = GetMesh();
+    const int *v = &mesh->vertexIndices[3 * triIndex];
+    Point3f p0 = mesh->p[v[0]], p1 = mesh->p[v[1]], p2 = mesh->p[v[2]];
+
+    pstd::optional<TriangleIntersection> triIsect =
+        IntersectTriangle(ray, tMax, p0, p1, p2);
+    if (!triIsect)
+        return {};
+
+    Float b0 = triIsect->b0, b1 = triIsect->b1, b2 = triIsect->b2;
+    SurfaceInteraction intr = Triangle::InteractionFromIntersection(
+        mesh, triIndex, {b0, b1, b2}, ray.time, -ray.d);
+#ifndef PBRT_IS_GPU_CODE
+    ++nTriHits;
+#endif
+    return ShapeIntersection{intr, triIsect->t};
+}
+
+bool Triangle::IntersectP(const Ray &ray, Float tMax) const {
+#ifndef PBRT_IS_GPU_CODE
+    ++nTriTests;
+#endif
+    // Get triangle vertices in _p0_, _p1_, and _p2_
+    const TriangleMesh *mesh = GetMesh();
+    const int *v = &mesh->vertexIndices[3 * triIndex];
+    Point3f p0 = mesh->p[v[0]], p1 = mesh->p[v[1]], p2 = mesh->p[v[2]];
+
+    pstd::optional<TriangleIntersection> isect = IntersectTriangle(ray, tMax, p0, p1, p2);
+    if (isect) {
+#ifndef PBRT_IS_GPU_CODE
+        ++nTriHits;
+#endif
+        return true;
+    } else
+        return false;
 }
 
 std::string Triangle::ToString() const {
@@ -1123,7 +1117,7 @@ DirectionCone BilinearPatch::NormalBounds() const {
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
 
-    Float flip = (OrientationIsReversed() ^ TransformSwapsHandedness()) ? -1 : 1;
+    Float flip = (mesh->reverseOrientation ^ mesh->transformSwapsHandedness) ? -1 : 1;
 
     if (p00 == p10 || p10 == p11 || p11 == p01 || p01 == p00) {
         // it's a triangle. Evaluate the normal at the center so we don't
@@ -1227,7 +1221,7 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,
         Point3f p = SampleSphericalQuad(ctx.p(), p00, p10 - p00, p01 - p00, u, &quadPDF);
         pdf *= quadPDF;
         Normal3f n = Normal3f(Normalize(Cross(p10 - p00, p01 - p00)));
-        if (OrientationIsReversed() ^ TransformSwapsHandedness())
+        if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
             n *= -1;
         Point2f uv(Dot(p - p00, p10 - p00) / DistanceSquared(p10, p00),
                    Dot(p - p00, p01 - p00) / DistanceSquared(p01, p00));
@@ -1336,7 +1330,7 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(const Point2f &uo) const {
         return {};
 
     Normal3f n = Normal3f(Normalize(Cross(dpdu, dpdv)));
-    if (OrientationIsReversed() ^ TransformSwapsHandedness())
+    if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
         n = -n;
 
     // TODO: double check pError

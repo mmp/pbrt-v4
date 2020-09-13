@@ -827,6 +827,13 @@ struct TriangleIntersection {
     std::string ToString() const;
 };
 
+// Triangle Function Declarations
+PBRT_CPU_GPU
+pstd::optional<TriangleIntersection> IntersectTriangle(const Ray &ray, Float tMax,
+                                                       const Point3f &p0,
+                                                       const Point3f &p1,
+                                                       const Point3f &p2);
+
 // Triangle Definition
 class Triangle {
   public:
@@ -849,17 +856,11 @@ class Triangle {
     bool IntersectP(const Ray &ray, Float tMax = Infinity) const;
 
     PBRT_CPU_GPU
-    bool OrientationIsReversed() const { return GetMesh()->reverseOrientation; }
-    PBRT_CPU_GPU
-    bool TransformSwapsHandedness() const { return GetMesh()->transformSwapsHandedness; }
-
-    PBRT_CPU_GPU
     Float Area() const {
         // Get triangle vertices in _p0_, _p1_, and _p2_
-        auto mesh = GetMesh();
+        const TriangleMesh *mesh = GetMesh();
         const int *v = &mesh->vertexIndices[3 * triIndex];
-        const Point3f &p0 = mesh->p[v[0]], &p1 = mesh->p[v[1]];
-        const Point3f &p2 = mesh->p[v[2]];
+        Point3f p0 = mesh->p[v[0]], p1 = mesh->p[v[1]], p2 = mesh->p[v[2]];
 
         return 0.5f * Length(Cross(p1 - p0, p2 - p0));
     }
@@ -873,12 +874,6 @@ class Triangle {
                                     bool reverseOrientation,
                                     const ParameterDictionary &parameters,
                                     const FileLoc *loc, Allocator alloc);
-
-    PBRT_CPU_GPU
-    static pstd::optional<TriangleIntersection> Intersect(const Ray &ray, Float tMax,
-                                                          const Point3f &p0,
-                                                          const Point3f &p1,
-                                                          const Point3f &p2);
 
     PBRT_CPU_GPU
     static SurfaceInteraction InteractionFromIntersection(const TriangleMesh *mesh,
@@ -1017,10 +1012,9 @@ class Triangle {
     PBRT_CPU_GPU
     pstd::optional<ShapeSample> Sample(const Point2f &u) const {
         // Get triangle vertices in _p0_, _p1_, and _p2_
-        auto mesh = GetMesh();
+        const TriangleMesh *mesh = GetMesh();
         const int *v = &mesh->vertexIndices[3 * triIndex];
-        const Point3f &p0 = mesh->p[v[0]], &p1 = mesh->p[v[1]];
-        const Point3f &p2 = mesh->p[v[2]];
+        Point3f p0 = mesh->p[v[0]], p1 = mesh->p[v[1]], p2 = mesh->p[v[2]];
 
         // Sample point on triangle uniformly by area
         pstd::array<Float, 3> b = SampleUniformTriangle(u);
@@ -1064,10 +1058,9 @@ class Triangle {
     pstd::optional<ShapeSample> Sample(const ShapeSampleContext &ctx,
                                        const Point2f &uo) const {
         // Get triangle vertices in _p0_, _p1_, and _p2_
-        auto mesh = GetMesh();
+        const TriangleMesh *mesh = GetMesh();
         const int *v = &mesh->vertexIndices[3 * triIndex];
-        const Point3f &p0 = mesh->p[v[0]], &p1 = mesh->p[v[1]];
-        const Point3f &p2 = mesh->p[v[2]];
+        Point3f p0 = mesh->p[v[0]], p1 = mesh->p[v[1]], p2 = mesh->p[v[2]];
 
         Float sa = SolidAngle(ctx.p());
         if (sa < MinSphericalSampleArea || sa > MaxSphericalSampleArea) {
@@ -1157,10 +1150,9 @@ class Triangle {
         Float pdf = 1 / sa;
         if (ctx.ns != Normal3f(0, 0, 0)) {
             // Get triangle vertices in _p0_, _p1_, and _p2_
-            auto mesh = GetMesh();
+            const TriangleMesh *mesh = GetMesh();
             const int *v = &mesh->vertexIndices[3 * triIndex];
-            const Point3f &p0 = mesh->p[v[0]], &p1 = mesh->p[v[1]];
-            const Point3f &p2 = mesh->p[v[2]];
+            Point3f p0 = mesh->p[v[0]], p1 = mesh->p[v[1]], p2 = mesh->p[v[2]];
 
             Point3f rp = ctx.p();
             Vector3f wit[3] = {Normalize(p0 - rp), Normalize(p1 - rp),
@@ -1195,7 +1187,7 @@ class Triangle {
   private:
     // Triangle Private Methods
     PBRT_CPU_GPU
-    const TriangleMesh *&GetMesh() const {
+    const TriangleMesh *GetMesh() const {
 #ifdef PBRT_IS_GPU_CODE
         return (*allTriangleMeshesGPU)[meshIndex];
 #else
@@ -1353,12 +1345,6 @@ class BilinearPatch {
     DirectionCone NormalBounds() const;
 
     std::string ToString() const;
-
-    PBRT_CPU_GPU
-    bool OrientationIsReversed() const { return GetMesh()->reverseOrientation; }
-
-    PBRT_CPU_GPU
-    bool TransformSwapsHandedness() const { return GetMesh()->transformSwapsHandedness; }
 
     PBRT_CPU_GPU
     static pstd::optional<BilinearIntersection> Intersect(const Ray &ray, Float tMax,

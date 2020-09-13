@@ -44,9 +44,11 @@ class BufferCache {
         }
 
         // Add _buf_ contents to cache and return pointer to cached copy
+        T *ptr = alloc.allocate_object<T>(buf.size());
+        std::copy(buf.begin(), buf.end(), ptr);
         bytesUsed += buf.size() * sizeof(T);
-        auto iter = cache.insert(Buffer(buf, alloc));
-        return iter.first->ptr;
+        cache.insert(Buffer(ptr, buf.size()));
+        return ptr;
     }
 
     void Clear() {
@@ -68,21 +70,20 @@ class BufferCache {
         bool operator==(const Buffer &b) const {
             return size == b.size && std::memcmp(ptr, b.ptr, size * sizeof(T)) == 0;
         }
-        size_t operator()(const Buffer &b) const { return HashBuffer(ptr, size); }
-
-        Buffer(const std::vector<T> &buf, Allocator alloc) : size(buf.size()) {
-            ptr = alloc.allocate_object<T>(buf.size());
-            std::copy(buf.begin(), buf.end(), const_cast<T *>(ptr));
-        }
 
         const T *ptr = nullptr;
         size_t size = 0;
     };
 
+    // BufferCache::BufferHasher Definition
+    struct BufferHasher {
+        size_t operator()(const Buffer &b) const { return HashBuffer(b.ptr, b.size); }
+    };
+
     // BufferCache Private Members
     Allocator alloc;
     std::mutex mutex;
-    std::unordered_set<Buffer, Buffer> cache;
+    std::unordered_set<Buffer, BufferHasher> cache;
     size_t bytesUsed = 0;
 };
 
