@@ -78,6 +78,8 @@ Bounds3f Disk::Bounds() const {
 
 DirectionCone Disk::NormalBounds() const {
     Normal3f n = (*renderFromObject)(Normal3f(0, 0, 1));
+    if (reverseOrientation)
+        n = -n;
     return DirectionCone(Vector3f(n));
 }
 
@@ -1250,7 +1252,7 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,
     if (LengthSquared(wi) == 0)
         return {};
     wi = Normalize(wi);
-    // Convert uniform area sample PDF _ss->pdf_ to solid angle measure
+    // Convert uniform area sample PDF in _ss_ to solid angle measure
     ss->pdf /= AbsDot(ss->intr.n, -wi) / DistanceSquared(ctx.p(), ss->intr.p());
     if (IsInf(ss->pdf))
         return {};

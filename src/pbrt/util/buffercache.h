@@ -17,96 +17,81 @@
 #include <cstring>
 #include <mutex>
 #include <string>
-#include <unordered_map>
+#include <unordered_set>
 
 namespace pbrt {
 
 STAT_MEMORY_COUNTER("Memory/Redundant vertex and index buffers", redundantBufferBytes);
 STAT_PERCENT("Geometry/Buffer cache hits", nBufferCacheHits, nBufferCacheLookups);
 
-// BufferId Definition
-// BufferId stores a hash of the contents of a buffer as well as its size.
-// It serves as a key for the BufferCache hash table.
-struct BufferId {
-    BufferId() = default;
-    BufferId(const char *ptr, size_t size) : hash(HashBuffer(ptr, size)), size(size) {}
-
-    bool operator==(const BufferId &id) const {
-        return hash == id.hash && size == id.size;
-    }
-
-    std::string ToString() const {
-        return StringPrintf("[ BufferId hash: %d size: %d ]", hash, size);
-    }
-
-    uint64_t hash = 0;
-    size_t size = 0;
-};
-
-// BufferHasher Definition
-// Utility class that computes the hash of a BufferId, using the
-// already-computed hash of its buffer.
-struct BufferHasher {
-    size_t operator()(const BufferId &id) const { return id.hash; }
-};
-
 // BufferCache Definition
 template <typename T>
 class BufferCache {
   public:
+    // BufferCache Public Methods
     BufferCache(Allocator alloc) : alloc(alloc) {}
 
-    const T *LookupOrAdd(std::vector<T> buf) {
-        // Hash the provided buffer and see if it's already in the cache.
-        // Assumes no padding in T for alignment. (TODO: can we verify this
-        // at compile time?)
-        BufferId id((const char *)buf.data(), buf.size() * sizeof(T));
+    const T *LookupOrAdd(const std::vector<T> &buf) {
         ++nBufferCacheLookups;
         std::lock_guard<std::mutex> lock(mutex);
-        auto iter = cache.find(id);
-        if (iter != cache.end()) {
-            // Success; return the pointer to the start of already-existing
-            // one.
-            DCHECK(std::memcmp(buf.data(), iter->second->data(),
-                               buf.size() * sizeof(T)) == 0);
+        // Return pointer to data if _buf_ contents is already in the cache
+        Buffer lookupBuffer(buf.data(), buf.size());
+        if (auto iter = cache.find(lookupBuffer); iter != cache.end()) {
+            DCHECK(std::memcmp(buf.data(), iter->ptr, buf.size() * sizeof(T)) == 0);
             ++nBufferCacheHits;
             redundantBufferBytes += buf.capacity() * sizeof(T);
-            return iter->second->data();
+            return iter->ptr;
         }
-        cache[id] = alloc.new_object<pstd::vector<T>>(buf.begin(), buf.end(), alloc);
-        return cache[id]->data();
-    }
 
-    size_t BytesUsed() const {
-        size_t sum = 0;
-        for (const auto &item : cache)
-            sum += item.second->capacity() * sizeof(T);
-        return sum;
+        // Add _buf_ contents to cache and return pointer to cached copy
+        bytesUsed += buf.size() * sizeof(T);
+        auto iter = cache.insert(Buffer(buf, alloc));
+        return iter.first->ptr;
     }
 
     void Clear() {
-        for (const auto &item : cache)
-            alloc.delete_object(item.second);
+        std::lock_guard<std::mutex> lock(mutex);
+        for (auto iter : cache)
+            alloc.deallocate_object(const_cast<T *>(iter.ptr), iter.size);
         cache.clear();
     }
 
-    std::string ToString() const {
-        return StringPrintf("[ BufferCache cache.size(): %d BytesUsed(): %d ]",
-                            cache.size(), BytesUsed());
-    }
+    size_t BytesUsed() const { return bytesUsed; }
 
   private:
+    // BufferCache::Buffer Definition
+    struct Buffer {
+        // BufferCache::Buffer Public Methods
+        Buffer() = default;
+        Buffer(const T *ptr, size_t size) : ptr(ptr), size(size) {}
+
+        bool operator==(const Buffer &b) const {
+            return size == b.size && std::memcmp(ptr, b.ptr, size * sizeof(T)) == 0;
+        }
+        size_t operator()(const Buffer &b) const { return HashBuffer(ptr, size); }
+
+        Buffer(const std::vector<T> &buf, Allocator alloc) : size(buf.size()) {
+            ptr = alloc.allocate_object<T>(buf.size());
+            std::copy(buf.begin(), buf.end(), const_cast<T *>(ptr));
+        }
+
+        const T *ptr = nullptr;
+        size_t size = 0;
+    };
+
+    // BufferCache Private Members
     Allocator alloc;
     std::mutex mutex;
-    std::unordered_map<BufferId, pstd::vector<T> *, BufferHasher> cache;
+    std::unordered_set<Buffer, Buffer> cache;
+    size_t bytesUsed = 0;
 };
 
-extern BufferCache<int> *indexBufferCache;
-extern BufferCache<Point3f> *pBufferCache;
-extern BufferCache<Normal3f> *nBufferCache;
-extern BufferCache<Point2f> *uvBufferCache;
-extern BufferCache<Vector3f> *sBufferCache;
-extern BufferCache<int> *faceIndexBufferCache;
+// BufferCache Global Declarations
+extern BufferCache<int> *intBufferCache;
+extern BufferCache<Point2f> *point2BufferCache;
+extern BufferCache<Point3f> *point3BufferCache;
+extern BufferCache<Vector3f> *vector3BufferCache;
+extern BufferCache<Normal3f> *normal3BufferCache;
 
 void InitBufferCaches(Allocator alloc);
 void FreeBufferCaches();

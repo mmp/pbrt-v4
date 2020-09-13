@@ -827,6 +827,7 @@ set (PBRT_TEST_SOURCE
 
   src/pbrt/util/args_test.cpp
   src/pbrt/util/bits_test.cpp
+  src/pbrt/util/buffercache_test.cpp
   src/pbrt/util/color_test.cpp
   src/pbrt/util/containers_test.cpp
   src/pbrt/util/file_test.cpp

@@ -19,6 +19,62 @@ namespace pbrt {
 STAT_RATIO("Geometry/Triangles per mesh", nTris, nTriMeshes);
 STAT_MEMORY_COUNTER("Memory/Triangles", triangleBytes);
 
+// TriangleMesh Method Implementations
+TriangleMesh::TriangleMesh(const Transform &renderFromObject, bool reverseOrientation,
+                           std::vector<int> indices, std::vector<Point3f> p,
+                           std::vector<Vector3f> s, std::vector<Normal3f> n,
+                           std::vector<Point2f> uv, std::vector<int> faceIndices)
+    : nTriangles(indices.size() / 3), nVertices(p.size()) {
+    CHECK_EQ((indices.size() % 3), 0);
+    ++nTriMeshes;
+    nTris += nTriangles;
+    triangleBytes += sizeof(*this);
+    // Initialize mesh _vertexIndices_
+    vertexIndices = intBufferCache->LookupOrAdd(indices);
+
+    // Transform mesh vertices to render space and initialize mesh _p_
+    for (Point3f &pt : p)
+        pt = renderFromObject(pt);
+    this->p = point3BufferCache->LookupOrAdd(p);
+
+    // Remainder of _TriangleMesh_ constructor
+    this->reverseOrientation = reverseOrientation;
+    this->transformSwapsHandedness = renderFromObject.SwapsHandedness();
+
+    if (!uv.empty()) {
+        CHECK_EQ(nVertices, uv.size());
+        this->uv = point2BufferCache->LookupOrAdd(uv);
+    }
+    if (!n.empty()) {
+        CHECK_EQ(nVertices, n.size());
+        for (Normal3f &nn : n) {
+            nn = renderFromObject(nn);
+            if (reverseOrientation)
+                nn = -nn;
+        }
+        this->n = normal3BufferCache->LookupOrAdd(n);
+    }
+    if (!s.empty()) {
+        CHECK_EQ(nVertices, s.size());
+        for (Vector3f &ss : s)
+            ss = renderFromObject(ss);
+        this->s = vector3BufferCache->LookupOrAdd(s);
+    }
+
+    if (!faceIndices.empty()) {
+        CHECK_EQ(nTriangles, faceIndices.size());
+        this->faceIndices = intBufferCache->LookupOrAdd(faceIndices);
+    }
+
+    // Make sure that we don't have too much stuff to be using integers to
+    // index into things.
+    CHECK_LE(p.size(), std::numeric_limits<int>::max());
+    // We could be clever and check indices.size() / 3 if we were careful
+    // to promote to a 64-bit int before multiplying by 3 when we look up
+    // in the indices array...
+    CHECK_LE(indices.size(), std::numeric_limits<int>::max());
+}
+
 std::string TriangleMesh::ToString() const {
     std::string np = "(nullptr)";
     return StringPrintf(
@@ -34,62 +90,6 @@ std::string TriangleMesh::ToString() const {
         uv ? StringPrintf("%s", pstd::MakeSpan(uv, nVertices)) : nullptr,
         faceIndices ? StringPrintf("%s", pstd::MakeSpan(faceIndices, nTriangles))
                     : nullptr);
-}
-
-TriangleMesh::TriangleMesh(const Transform &renderFromObject, bool reverseOrientation,
-                           std::vector<int> indices, std::vector<Point3f> P,
-                           std::vector<Vector3f> S, std::vector<Normal3f> N,
-                           std::vector<Point2f> UV, std::vector<int> fIndices)
-    : reverseOrientation(reverseOrientation),
-      transformSwapsHandedness(renderFromObject.SwapsHandedness()),
-      nTriangles(indices.size() / 3),
-      nVertices(P.size()) {
-    CHECK_EQ((indices.size() % 3), 0);
-    ++nTriMeshes;
-    nTris += nTriangles;
-
-    // Make sure that we don't have too much stuff to be using integers to
-    // index into things.
-    CHECK_LE(P.size(), std::numeric_limits<int>::max());
-    // We could be clever and check indices.size() / 3 if we were careful
-    // to promote to a 64-bit int before multiplying by 3 when we look up
-    // in the indices array...
-    CHECK_LE(indices.size(), std::numeric_limits<int>::max());
-
-    vertexIndices = indexBufferCache->LookupOrAdd(std::move(indices));
-
-    triangleBytes += sizeof(*this);
-
-    // Transform mesh vertices to world space
-    for (Point3f &p : P)
-        p = renderFromObject(p);
-    p = pBufferCache->LookupOrAdd(std::move(P));
-
-    // Copy _UV_, _N_, and _S_ vertex data, if present
-    if (!UV.empty()) {
-        CHECK_EQ(nVertices, UV.size());
-        uv = uvBufferCache->LookupOrAdd(std::move(UV));
-    }
-    if (!N.empty()) {
-        CHECK_EQ(nVertices, N.size());
-        for (Normal3f &n : N) {
-            n = renderFromObject(n);
-            if (reverseOrientation)
-                n = -n;
-        }
-        n = nBufferCache->LookupOrAdd(std::move(N));
-    }
-    if (!S.empty()) {
-        CHECK_EQ(nVertices, S.size());
-        for (Vector3f &s : S)
-            s = renderFromObject(s);
-        s = sBufferCache->LookupOrAdd(std::move(S));
-    }
-
-    if (!fIndices.empty()) {
-        CHECK_EQ(nTriangles, fIndices.size());
-        faceIndices = faceIndexBufferCache->LookupOrAdd(std::move(fIndices));
-    }
 }
 
 static void PlyErrorCallback(p_ply, const char *message) {
@@ -175,19 +175,19 @@ BilinearPatchMesh::BilinearPatchMesh(const Transform &renderFromObject,
     CHECK_LE(P.size(), std::numeric_limits<int>::max());
     CHECK_LE(indices.size(), std::numeric_limits<int>::max());
 
-    vertexIndices = indexBufferCache->LookupOrAdd(std::move(indices));
+    vertexIndices = intBufferCache->LookupOrAdd(indices);
 
     blpBytes += sizeof(*this);
 
     // Transform mesh vertices to world space
     for (Point3f &p : P)
         p = renderFromObject(p);
-    p = pBufferCache->LookupOrAdd(std::move(P));
+    p = point3BufferCache->LookupOrAdd(P);
 
     // Copy _UV_ and _N_ vertex data, if present
     if (!UV.empty()) {
         CHECK_EQ(nVertices, UV.size());
-        uv = uvBufferCache->LookupOrAdd(std::move(UV));
+        uv = point2BufferCache->LookupOrAdd(UV);
     }
     if (!N.empty()) {
         CHECK_EQ(nVertices, N.size());
@@ -196,12 +196,12 @@ BilinearPatchMesh::BilinearPatchMesh(const Transform &renderFromObject,
             if (reverseOrientation)
                 n = -n;
         }
-        n = nBufferCache->LookupOrAdd(std::move(N));
+        n = normal3BufferCache->LookupOrAdd(N);
     }
 
     if (!fIndices.empty()) {
         CHECK_EQ(nPatches, fIndices.size());
-        faceIndices = faceIndexBufferCache->LookupOrAdd(std::move(fIndices));
+        faceIndices = intBufferCache->LookupOrAdd(fIndices);
     }
 }
 

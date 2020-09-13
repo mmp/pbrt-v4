@@ -315,7 +315,7 @@ FloatInterval odiscrim = b2 - ac; // b * b - FloatInterval(4) * a * c;
                 return {};
             wi = Normalize(wi);
 
-            // Convert uniform area sample PDF _ss->pdf_ to solid angle measure
+            // Convert uniform area sample PDF in _ss_ to solid angle measure
             ss->pdf /= AbsDot(ss->intr.n, -wi) / DistanceSquared(ctx.p(), ss->intr.p());
             if (IsInf(ss->pdf))
                 return {};
@@ -428,9 +428,7 @@ class Disk {
     std::string ToString() const;
 
     PBRT_CPU_GPU
-    Float Area() const {
-        return phiMax * 0.5f * (radius * radius - innerRadius * innerRadius);
-    }
+    Float Area() const { return phiMax * 0.5f * (Sqr(radius) - Sqr(innerRadius)); }
 
     PBRT_CPU_GPU
     Bounds3f Bounds() const;
@@ -445,7 +443,7 @@ class Disk {
         if (!isect)
             return {};
         SurfaceInteraction intr = InteractionFromIntersection(*isect, -ray.d, ray.time);
-        return {{intr, isect->tHit}};
+        return ShapeIntersection{intr, isect->tHit};
     }
 
     PBRT_CPU_GPU
@@ -484,10 +482,9 @@ class Disk {
                                                    const Vector3f &wo, Float time) const {
         Point3f pHit = isect.pObj;
         Float phi = isect.phi;
-        Float dist2 = pHit.x * pHit.x + pHit.y * pHit.y;
         // Find parametric representation of disk hit
         Float u = phi / phiMax;
-        Float rHit = std::sqrt(dist2);
+        Float rHit = std::sqrt(pHit.x * pHit.x + pHit.y * pHit.y);
         Float v = (radius - rHit) / (radius - innerRadius);
         Vector3f dpdu(-phiMax * pHit.y, phiMax * pHit.x, 0);
         Vector3f dpdv = Vector3f(pHit.x, pHit.y, 0.) * (innerRadius - radius) / rHit;
@@ -529,45 +526,45 @@ class Disk {
     PBRT_CPU_GPU
     pstd::optional<ShapeSample> Sample(const ShapeSampleContext &ctx,
                                        const Point2f &u) const {
+        // Uniformly sample shape and compute incident direction _wi_
         pstd::optional<ShapeSample> ss = Sample(u);
-        if (!ss)
-            return ss;
-
+        DCHECK(ss.has_value());
         ss->intr.time = ctx.time;
         Vector3f wi = ss->intr.p() - ctx.p();
         if (LengthSquared(wi) == 0)
             return {};
-        else {
-            wi = Normalize(wi);
-            // Convert uniform area sample PDF _ss->pdf_ to solid angle measure
-            ss->pdf /= AbsDot(ss->intr.n, -wi) / DistanceSquared(ctx.p(), ss->intr.p());
-            if (IsInf(ss->pdf))
-                return {};
-        }
+        wi = Normalize(wi);
+
+        // Convert uniform area sample PDF in _ss_ to solid angle measure
+        ss->pdf /= AbsDot(ss->intr.n, -wi) / DistanceSquared(ctx.p(), ss->intr.p());
+        if (IsInf(ss->pdf))
+            return {};
+
         return ss;
     }
 
     PBRT_CPU_GPU
     Float PDF(const ShapeSampleContext &ctx, const Vector3f &wi) const {
-        // Intersect sample ray with area light geometry
+        // Intersect sample ray with shape geometry
         Ray ray = ctx.SpawnRay(wi);
-        pstd::optional<ShapeIntersection> si = Intersect(ray);
-        if (!si)
+        pstd::optional<ShapeIntersection> isect = Intersect(ray);
+        CHECK_RARE(1e-6, !isect.has_value());
+        if (!isect)
             return 0;
 
-        // Convert light sample weight to solid angle measure
-        Float pdf =
-            DistanceSquared(ctx.p(), si->intr.p()) / (AbsDot(si->intr.n, -wi) * Area());
+        // Compute PDF in solid angle measure from shape intersection point
+        Float pdf = (1 / Area()) / (AbsDot(isect->intr.n, -wi) /
+                                    DistanceSquared(ctx.p(), isect->intr.p()));
         if (IsInf(pdf))
-            pdf = 0.f;
+            pdf = 0;
+
         return pdf;
     }
 
   private:
     // Disk Private Members
     const Transform *renderFromObject, *objectFromRender;
-    bool reverseOrientation;
-    bool transformSwapsHandedness;
+    bool reverseOrientation, transformSwapsHandedness;
     Float height, radius, innerRadius, phiMax;
 };
 
@@ -772,7 +769,7 @@ class Cylinder {
             return {};
         wi = Normalize(wi);
 
-        // Convert uniform area sample PDF _ss->pdf_ to solid angle measure
+        // Convert uniform area sample PDF in _ss_ to solid angle measure
         ss->pdf /= AbsDot(ss->intr.n, -wi) / DistanceSquared(ctx.p(), ss->intr.p());
         if (IsInf(ss->pdf))
             return {};
@@ -1084,7 +1081,7 @@ class Triangle {
                 return {};
             else {
                 wi = Normalize(wi);
-                // Convert uniform area sample PDF _ss->pdf_ to solid angle measure
+                // Convert uniform area sample PDF in _ss_ to solid angle measure
                 ss->pdf /=
                     AbsDot(ss->intr.n, -wi) / DistanceSquared(ctx.p(), ss->intr.p());
                 if (IsInf(ss->pdf))
