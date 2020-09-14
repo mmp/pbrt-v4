@@ -61,21 +61,19 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v,
     Float beta = AngleBetween(n_bc, -n_ab);
     Float gamma = AngleBetween(n_ca, -n_bc);
 
-    // Find spherical area $A$ of triangle and set _pdf_
+    // Uniformly sample triangle area $A$ to compute $A'$
     Float A = alpha + beta + gamma - Pi;
     if (A <= 0)
         return {};
     if (pdf != nullptr)
         *pdf = 1 / A;
-
-    // Uniformly sample triangle area to compute $A'$
     Float Ap = u[0] * A;
 
     // Compute $\sin \beta'$ and $\cos \beta'$ for point along _b_ for sampled area
     Float cosAlpha = std::cos(alpha), sinAlpha = std::sin(alpha);
 
-    Float sinPhi = std::sin(Ap) * cosAlpha - std::cos(Ap) * SafeSqrt(1 - Sqr(cosAlpha));
-    Float cosPhi = std::cos(Ap) * cosAlpha + std::sin(Ap) * SafeSqrt(1 - Sqr(cosAlpha));
+    Float sinPhi = std::sin(Ap) * cosAlpha - std::cos(Ap) * sinAlpha;
+    Float cosPhi = std::cos(Ap) * cosAlpha + std::sin(Ap) * sinAlpha;
 
     Float uu = cosPhi - cosAlpha;
     Float vv = sinPhi + sinAlpha * Dot(a, b) /* cos c */;
@@ -95,12 +93,11 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v,
     };
     Vector3f cp = cosBetap * a + sinBetap * GS(c, a);
 
-    // Compute sampled spherical triangle direction and barycentrics
+    // Compute sampled spherical triangle direction and return barycentrics
     Float cosTheta = 1 - u[1] * (1 - Dot(cp, b));
     Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
     Vector3f w = cosTheta * b + sinTheta * GS(cp, b);
     // Find barycentric coordinates for sampled direction _w_
-    // Compute barycentrics. Subset of Moller-Trumbore intersection test.
     Vector3f e1(v[1] - v[0]), e2(v[2] - v[0]);
     Vector3f s1 = Cross(w, e2);
     Float divisor = Dot(s1, e1);
@@ -116,16 +113,13 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v,
     Vector3f s2 = Cross(s, e1);
     Float b2 = Dot(w, s2) * invDivisor;
 
-    // Clamp barycentrics and ensure they are valid
-    // We get goofy barycentrics for very small and very large (w.r.t. the
-    // sphere) triangles.
+    // Return clamped barycentrics for sampled direction
     b1 = Clamp(b1, 0, 1);
     b2 = Clamp(b2, 0, 1);
     if (b1 + b2 > 1) {
         b1 /= b1 + b2;
         b2 /= b1 + b2;
     }
-
     return {Float(1 - b1 - b2), Float(b1), Float(b2)};
 }
 

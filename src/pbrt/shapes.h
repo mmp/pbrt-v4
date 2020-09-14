@@ -1123,43 +1123,43 @@ class Triangle {
 
     PBRT_CPU_GPU
     Float PDF(const ShapeSampleContext &ctx, const Vector3f &wi) const {
-        Float sa = SolidAngle(ctx.p());
-        if (sa < MinSphericalSampleArea || sa > MaxSphericalSampleArea) {
-            // From Shape::PDF()
-            // Intersect sample ray with area light geometry
+        Float solidAngle = SolidAngle(ctx.p());
+        // Return PDF based on uniform area sampling for challenging triangles
+        if (solidAngle < MinSphericalSampleArea || solidAngle > MaxSphericalSampleArea) {
+            // Intersect sample ray with shape geometry
             Ray ray = ctx.SpawnRay(wi);
-            pstd::optional<ShapeIntersection> si = Intersect(ray);
-            if (!si)
+            pstd::optional<ShapeIntersection> isect = Intersect(ray);
+            CHECK_RARE(1e-6, !isect.has_value());
+            if (!isect)
                 return 0;
 
-            // Convert light sample weight to solid angle measure
-            Float pdf = DistanceSquared(ctx.p(), si->intr.p()) /
-                        (AbsDot(si->intr.n, -wi) * Area());
+            // Compute PDF in solid angle measure from shape intersection point
+            Float pdf = (1 / Area()) / (AbsDot(isect->intr.n, -wi) /
+                                        DistanceSquared(ctx.p(), isect->intr.p()));
             if (IsInf(pdf))
-                pdf = 0.f;
+                pdf = 0;
+
             return pdf;
         }
 
-        if (!IntersectP(ctx.SpawnRay(wi), Infinity))
-            return 0;
-
-        Float pdf = 1 / sa;
+        Float pdf = 1 / solidAngle;
+        // Adjust PDF for warp product sampling of triangle $\cos \theta$ factor
         if (ctx.ns != Normal3f(0, 0, 0)) {
             // Get triangle vertices in _p0_, _p1_, and _p2_
             const TriangleMesh *mesh = GetMesh();
             const int *v = &mesh->vertexIndices[3 * triIndex];
             Point3f p0 = mesh->p[v[0]], p1 = mesh->p[v[1]], p2 = mesh->p[v[2]];
 
+            Point2f u = InvertSphericalTriangleSample({p0, p1, p2}, ctx.p(), wi);
+            // Compute $\cos \theta$-based weights _w_ at sample domain corners
             Point3f rp = ctx.p();
-            Vector3f wit[3] = {Normalize(p0 - rp), Normalize(p1 - rp),
-                               Normalize(p2 - rp)};
+            Vector3f wi[3] = {Normalize(p0 - rp), Normalize(p1 - rp), Normalize(p2 - rp)};
             pstd::array<Float, 4> w =
-                pstd::array<Float, 4>{std::max<Float>(0.01, AbsDot(ctx.ns, wit[1])),
-                                      std::max<Float>(0.01, AbsDot(ctx.ns, wit[1])),
-                                      std::max<Float>(0.01, AbsDot(ctx.ns, wit[0])),
-                                      std::max<Float>(0.01, AbsDot(ctx.ns, wit[2]))};
+                pstd::array<Float, 4>{std::max<Float>(0.01, AbsDot(ctx.ns, wi[1])),
+                                      std::max<Float>(0.01, AbsDot(ctx.ns, wi[1])),
+                                      std::max<Float>(0.01, AbsDot(ctx.ns, wi[0])),
+                                      std::max<Float>(0.01, AbsDot(ctx.ns, wi[2]))};
 
-            Point2f u = InvertSphericalTriangleSample({p0, p1, p2}, rp, wi);
             pdf *= BilinearPDF(u, w);
         }
 
