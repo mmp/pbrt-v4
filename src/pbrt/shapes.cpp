@@ -230,9 +230,7 @@ pstd::optional<TriangleIntersection> IntersectTriangle(const Ray &ray, Float tMa
 
     // Compute barycentric coordinates and $t$ value for triangle intersection
     Float invDet = 1 / det;
-    Float b0 = e0 * invDet;
-    Float b1 = e1 * invDet;
-    Float b2 = e2 * invDet;
+    Float b0 = e0 * invDet, b1 = e1 * invDet, b2 = e2 * invDet;
     Float t = tScaled * invDet;
     DCHECK(!IsNaN(t));
 
@@ -318,9 +316,8 @@ pstd::optional<ShapeIntersection> Triangle::Intersect(const Ray &ray, Float tMax
     if (!triIsect)
         return {};
 
-    Float b0 = triIsect->b0, b1 = triIsect->b1, b2 = triIsect->b2;
-    SurfaceInteraction intr = Triangle::InteractionFromIntersection(
-        mesh, triIndex, {b0, b1, b2}, ray.time, -ray.d);
+    SurfaceInteraction intr =
+        InteractionFromIntersection(mesh, triIndex, *triIsect, ray.time, -ray.d);
 #ifndef PBRT_IS_GPU_CODE
     ++nTriHits;
 #endif

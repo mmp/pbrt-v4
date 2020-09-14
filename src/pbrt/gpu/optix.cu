@@ -273,9 +273,11 @@ getTriangleIntersection() {
 
     Float time = optixGetRayTime();
     wo = worldFromInstance.ApplyInverse(wo);
+
+    TriangleIntersection ti{b0, b1, b2, optixGetRayTmax()};
     SurfaceInteraction intr =
         Triangle::InteractionFromIntersection(rec.mesh, optixGetPrimitiveIndex(),
-                                              {b0, b1, b2}, time, wo);
+                                              ti, time, wo);
     return worldFromInstance(intr);
 }
 

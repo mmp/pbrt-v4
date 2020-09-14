@@ -878,52 +878,53 @@ class Triangle {
     PBRT_CPU_GPU
     static SurfaceInteraction InteractionFromIntersection(const TriangleMesh *mesh,
                                                           int triIndex,
-                                                          pstd::array<Float, 3> b,
+                                                          const TriangleIntersection &ti,
                                                           Float time,
                                                           const Vector3f &wo) {
         const int *v = &mesh->vertexIndices[3 * triIndex];
         Point3f p0 = mesh->p[v[0]], p1 = mesh->p[v[1]], p2 = mesh->p[v[2]];
         // Compute triangle partial derivatives
-        Vector3f dpdu, dpdv;
-        pstd::array<Point2f, 3> triuv =
+        // Compute deltas and matrix determinant for triangle partial derivatives
+        // Get triangle texture coordinates in _uv_ array
+        pstd::array<Point2f, 3> uv =
             mesh->uv
                 ? pstd::array<Point2f, 3>(
                       {mesh->uv[v[0]], mesh->uv[v[1]], mesh->uv[v[2]]})
                 : pstd::array<Point2f, 3>({Point2f(0, 0), Point2f(1, 0), Point2f(1, 1)});
-        // Compute deltas for triangle partial derivatives
-        Vector2f duv02 = triuv[0] - triuv[2], duv12 = triuv[1] - triuv[2];
-        Vector3f dp02 = p0 - p2, dp12 = p1 - p2;
 
+        Vector2f duv02 = uv[0] - uv[2], duv12 = uv[1] - uv[2];
+        Vector3f dp02 = p0 - p2, dp12 = p1 - p2;
         Float determinant = DifferenceOfProducts(duv02[0], duv12[1], duv02[1], duv12[0]);
-        bool degenerateUV = std::abs(determinant) < 1e-9;
+
+        Vector3f dpdu, dpdv;
+        bool degenerateUV = std::abs(determinant) < 1e-9f;
         if (!degenerateUV) {
+            // Compute triangle $\dpdu$ and $\dpdv$ via matrix inversion
             Float invdet = 1 / determinant;
             dpdu = DifferenceOfProducts(duv12[1], dp02, duv02[1], dp12) * invdet;
             dpdv = DifferenceOfProducts(duv02[0], dp12, duv12[0], dp02) * invdet;
         }
+        // Handle degenerate triangle $(u,v)$ parameterization or partial derivatives
         if (degenerateUV || LengthSquared(Cross(dpdu, dpdv)) == 0) {
             Vector3f ng = Cross(p2 - p0, p1 - p0);
             if (LengthSquared(ng) == 0) {
-                using Point3d = Point3<double>;
-                ng =
-                    Vector3f(Cross(Point3d(p2) - Point3d(p0), Point3d(p1) - Point3d(p0)));
+                ng = Vector3f(Cross(Vector3<double>(p2 - p0), Vector3<double>(p1 - p0)));
                 CHECK_NE(LengthSquared(ng), 0);
             }
-            // Handle zero determinant for triangle partial derivative matrix
             CoordinateSystem(Normalize(ng), &dpdu, &dpdv);
         }
 
         // Interpolate $(u,v)$ parametric coordinates and hit point
-        Point3f pHit = b[0] * p0 + b[1] * p1 + b[2] * p2;
-        Point2f uvHit = b[0] * triuv[0] + b[1] * triuv[1] + b[2] * triuv[2];
+        Point3f pHit = ti.b0 * p0 + ti.b1 * p1 + ti.b2 * p2;
+        Point2f uvHit = ti.b0 * uv[0] + ti.b1 * uv[1] + ti.b2 * uv[2];
 
         // Compute error bounds for triangle intersection
         Float xAbsSum =
-            (std::abs(b[0] * p0.x) + std::abs(b[1] * p1.x) + std::abs(b[2] * p2.x));
+            (std::abs(ti.b0 * p0.x) + std::abs(ti.b1 * p1.x) + std::abs(ti.b2 * p2.x));
         Float yAbsSum =
-            (std::abs(b[0] * p0.y) + std::abs(b[1] * p1.y) + std::abs(b[2] * p2.y));
+            (std::abs(ti.b0 * p0.y) + std::abs(ti.b1 * p1.y) + std::abs(ti.b2 * p2.y));
         Float zAbsSum =
-            (std::abs(b[0] * p0.z) + std::abs(b[1] * p1.z) + std::abs(b[2] * p2.z));
+            (std::abs(ti.b0 * p0.z) + std::abs(ti.b1 * p1.z) + std::abs(ti.b2 * p2.z));
         Vector3f pError = gamma(7) * Vector3f(xAbsSum, yAbsSum, zAbsSum);
 
         // Return _SurfaceInteraction_ for triangle hit
@@ -942,7 +943,8 @@ class Triangle {
             // Compute shading normal _ns_ for triangle
             Normal3f ns;
             if (mesh->n != nullptr) {
-                ns = (b[0] * mesh->n[v[0]] + b[1] * mesh->n[v[1]] + b[2] * mesh->n[v[2]]);
+                ns = (ti.b0 * mesh->n[v[0]] + ti.b1 * mesh->n[v[1]] +
+                      ti.b2 * mesh->n[v[2]]);
                 if (LengthSquared(ns) > 0)
                     ns = Normalize(ns);
                 else
@@ -953,7 +955,8 @@ class Triangle {
             // Compute shading tangent _ss_ for triangle
             Vector3f ss;
             if (mesh->s != nullptr) {
-                ss = (b[0] * mesh->s[v[0]] + b[1] * mesh->s[v[1]] + b[2] * mesh->s[v[2]]);
+                ss = (ti.b0 * mesh->s[v[0]] + ti.b1 * mesh->s[v[1]] +
+                      ti.b2 * mesh->s[v[2]]);
                 if (LengthSquared(ss) == 0)
                     ss = isect.dpdu;
             } else
@@ -970,8 +973,8 @@ class Triangle {
             Normal3f dndu, dndv;
             if (mesh->n != nullptr) {
                 // Compute deltas for triangle partial derivatives of normal
-                Vector2f duv02 = triuv[0] - triuv[2];
-                Vector2f duv12 = triuv[1] - triuv[2];
+                Vector2f duv02 = uv[0] - uv[2];
+                Vector2f duv12 = uv[1] - uv[2];
                 Normal3f dn1 = mesh->n[v[0]] - mesh->n[v[2]];
                 Normal3f dn2 = mesh->n[v[1]] - mesh->n[v[2]];
 
@@ -1173,7 +1176,7 @@ class Triangle {
     // Returns the solid angle subtended by the triangle w.r.t. the given
     // reference point p.
     PBRT_CPU_GPU
-    Float SolidAngle(const Point3f &p, int = 0 /*nSamples: unused...*/) const {
+    Float SolidAngle(const Point3f &p) const {
         // Project the vertices into the unit sphere around p.
         auto mesh = GetMesh();
         const int *v = &mesh->vertexIndices[3 * triIndex];
@@ -1193,16 +1196,6 @@ class Triangle {
 #else
         return (*allMeshes)[meshIndex];
 #endif
-    }
-
-    PBRT_CPU_GPU
-    pstd::array<Point2f, 3> GetUVs() const {
-        auto mesh = GetMesh();
-        if (mesh->uv) {
-            const int *v = &mesh->vertexIndices[3 * triIndex];
-            return {mesh->uv[v[0]], mesh->uv[v[1]], mesh->uv[v[2]]};
-        } else
-            return {Point2f(0, 0), Point2f(1, 0), Point2f(1, 1)};
     }
 
     // Triangle Private Members
