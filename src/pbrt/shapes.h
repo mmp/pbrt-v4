@@ -876,6 +876,17 @@ class Triangle {
                                     const FileLoc *loc, Allocator alloc);
 
     PBRT_CPU_GPU
+    Float SolidAngle(const Point3f &p) const {
+        // Get triangle vertices in _p0_, _p1_, and _p2_
+        const TriangleMesh *mesh = GetMesh();
+        const int *v = &mesh->vertexIndices[3 * triIndex];
+        Point3f p0 = mesh->p[v[0]], p1 = mesh->p[v[1]], p2 = mesh->p[v[2]];
+
+        return SphericalTriangleArea(Normalize(p0 - p), Normalize(p1 - p),
+                                     Normalize(p2 - p));
+    }
+
+    PBRT_CPU_GPU
     static SurfaceInteraction InteractionFromIntersection(const TriangleMesh *mesh,
                                                           int triIndex,
                                                           const TriangleIntersection &ti,
@@ -1040,18 +1051,6 @@ class Triangle {
     PBRT_CPU_GPU
     Float PDF(const Interaction &) const { return 1 / Area(); }
 
-    // The spherical sampling code has trouble with both very small and very
-    // large triangles (on the hemisphere); fall back to uniform area sampling
-    // in these cases. In the first case, there is presumably not a lot of
-    // contribution from the emitter due to its subtending a small solid angle.
-    // In the second, BSDF sampling should be the much better sampling strategy
-    // anyway.
-    static constexpr Float MinSphericalSampleArea = 2e-4;
-    static constexpr Float MaxSphericalSampleArea = 6.22;
-
-    // Note: much of this method---other than the call to the sampling function
-    // and the check about how to sample---is shared with the other
-    // Triangle::Sample() routine.
     PBRT_CPU_GPU
     pstd::optional<ShapeSample> Sample(const ShapeSampleContext &ctx, Point2f u) const {
         // Get triangle vertices in _p0_, _p1_, and _p2_
@@ -1059,8 +1058,9 @@ class Triangle {
         const int *v = &mesh->vertexIndices[3 * triIndex];
         Point3f p0 = mesh->p[v[0]], p1 = mesh->p[v[1]], p2 = mesh->p[v[2]];
 
-        Float sa = SolidAngle(ctx.p());
-        if (sa < MinSphericalSampleArea || sa > MaxSphericalSampleArea) {
+        // Use uniform area sampling for numerically unstable cases
+        Float solidAngle = SolidAngle(ctx.p());
+        if (solidAngle < MinSphericalSampleArea || solidAngle > MaxSphericalSampleArea) {
             // Uniformly sample shape and compute incident direction _wi_
             pstd::optional<ShapeSample> ss = Sample(u);
             DCHECK(ss.has_value());
@@ -1078,30 +1078,31 @@ class Triangle {
             return ss;
         }
 
-        Float pdf = 1;
+        // Sample spherical triangle from reference point
         // Apply warp product sampling for cosine factor at reference point
+        Float pdf = 1;
         if (ctx.ns != Normal3f(0, 0, 0)) {
+            // Compute $\cos \theta$-based weights _w_ at sample domain corners
             Point3f rp = ctx.p();
             Vector3f wi[3] = {Normalize(p0 - rp), Normalize(p1 - rp), Normalize(p2 - rp)};
-            // (0,0) -> p1, (1,0) -> p1, (0,1) -> p0, (1,1) -> p2
             pstd::array<Float, 4> w =
                 pstd::array<Float, 4>{std::max<Float>(0.01, AbsDot(ctx.ns, wi[1])),
                                       std::max<Float>(0.01, AbsDot(ctx.ns, wi[1])),
                                       std::max<Float>(0.01, AbsDot(ctx.ns, wi[0])),
                                       std::max<Float>(0.01, AbsDot(ctx.ns, wi[2]))};
+
             u = SampleBilinear(u, w);
             DCHECK(u[0] >= 0 && u[0] < 1 && u[1] >= 0 && u[1] < 1);
             pdf *= BilinearPDF(u, w);
         }
 
-        // Sample spherical triangle from reference point
         Float triPDF;
         pstd::array<Float, 3> b =
             SampleSphericalTriangle({p0, p1, p2}, ctx.p(), u, &triPDF);
         if (triPDF == 0)
             return {};
         pdf *= triPDF;
-        Point3f ps = b[0] * p0 + b[1] * p1 + b[2] * p2;
+        Point3f p = b[0] * p0 + b[1] * p1 + b[2] * p2;
 
         // Compute surface normal for sampled point on triangle
         Normal3f n = Normalize(Normal3f(Cross(p1 - p0, p2 - p0)));
@@ -1116,7 +1117,8 @@ class Triangle {
         Point3f pAbsSum = Abs(b[0] * p0) + Abs(b[1] * p1) + Abs((1 - b[0] - b[1]) * p2);
         Vector3f pError = Vector3f(gamma(6) * pAbsSum);
 
-        return ShapeSample{Interaction(Point3fi(ps, pError), n, ctx.time), pdf};
+        // Return _ShapeSample_ for uniform solid angle sampled point on triangle
+        return ShapeSample{Interaction(Point3fi(p, pError), n, ctx.time), pdf};
     }
 
     PBRT_CPU_GPU
@@ -1164,20 +1166,6 @@ class Triangle {
         return pdf;
     }
 
-    // Returns the solid angle subtended by the triangle w.r.t. the given
-    // reference point p.
-    PBRT_CPU_GPU
-    Float SolidAngle(const Point3f &p) const {
-        // Project the vertices into the unit sphere around p.
-        auto mesh = GetMesh();
-        const int *v = &mesh->vertexIndices[3 * triIndex];
-        Vector3f a = Normalize(mesh->p[v[0]] - p);
-        Vector3f b = Normalize(mesh->p[v[1]] - p);
-        Vector3f c = Normalize(mesh->p[v[2]] - p);
-
-        return SphericalTriangleArea(a, b, c);
-    }
-
   private:
     // Triangle Private Methods
     PBRT_CPU_GPU
@@ -1192,6 +1180,8 @@ class Triangle {
     // Triangle Private Members
     int meshIndex = -1, triIndex = -1;
     static pstd::vector<const TriangleMesh *> *allMeshes;
+    static constexpr Float MinSphericalSampleArea = 2e-4;
+    static constexpr Float MaxSphericalSampleArea = 6.22;
 };
 
 // CurveType Definition

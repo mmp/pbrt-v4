@@ -37,8 +37,10 @@ Point2f RejectionSampleDisk(RNG &rng) {
 pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v,
                                               const Point3f &p, const Point2f &u,
                                               Float *pdf) {
-    using Vector3d = Vector3<Float>;
-    Vector3d a(v[0] - p), b(v[1] - p), c(v[2] - p);
+    if (pdf != nullptr)
+        *pdf = 0;
+    // Compute vectors _a_, _b_, and _c_ to spherical triangle vertices
+    Vector3f a(v[0] - p), b(v[1] - p), c(v[2] - p);
     CHECK_GT(LengthSquared(a), 0);
     CHECK_GT(LengthSquared(b), 0);
     CHECK_GT(LengthSquared(c), 0);
@@ -46,39 +48,30 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v,
     b = Normalize(b);
     c = Normalize(c);
 
-    // TODO: have a shared snippet that goes from here to computing
-    // alpha/beta/gamma, use it also in Triangle::SolidAngle().
-    Vector3d axb = Cross(a, b), bxc = Cross(b, c), cxa = Cross(c, a);
-    if (LengthSquared(axb) == 0 || LengthSquared(bxc) == 0 || LengthSquared(cxa) == 0) {
-        if (pdf != nullptr)
-            *pdf = 0;
+    // Compute normalized cross products of all direction pairs
+    Vector3f n_ab = Cross(a, b), n_bc = Cross(b, c), n_ca = Cross(c, a);
+    if (LengthSquared(n_ab) == 0 || LengthSquared(n_bc) == 0 || LengthSquared(n_ca) == 0)
         return {};
-    }
-    axb = Normalize(axb);
-    bxc = Normalize(bxc);
-    cxa = Normalize(cxa);
+    n_ab = Normalize(n_ab);
+    n_bc = Normalize(n_bc);
+    n_ca = Normalize(n_ca);
 
-    // See comment in Triangle::SolidAngle() for ordering...
-    Float alpha = AngleBetween(cxa, -axb);
-    Float beta = AngleBetween(axb, -bxc);
-    Float gamma = AngleBetween(bxc, -cxa);
+    // Compute angles $\alpha$, $\beta$, and $\gamma$ at spherical triangle vertices
+    Float alpha = AngleBetween(n_ab, -n_ca);
+    Float beta = AngleBetween(n_bc, -n_ab);
+    Float gamma = AngleBetween(n_ca, -n_bc);
 
-    // Spherical area of the triangle.
+    // Find spherical area $A$ of triangle and set _pdf_
     Float A = alpha + beta + gamma - Pi;
-    if (A <= 0) {
-        if (pdf != nullptr)
-            *pdf = 0;
+    if (A <= 0)
         return {};
-    }
     if (pdf != nullptr)
         *pdf = 1 / A;
 
-    // Uniformly sample triangle area
+    // Uniformly sample triangle area to compute $A'$
     Float Ap = u[0] * A;
 
-    // Compute sin beta' and cos beta' for the point along the edge b
-    // corresponding to the area sampled, A'.
-
+    // Compute $\sin \beta'$ and $\cos \beta'$ for point along _b_ for sampled area
     Float cosAlpha = std::cos(alpha), sinAlpha = std::sin(alpha);
 
     Float sinPhi = std::sin(Ap) * cosAlpha - std::cos(Ap) * SafeSqrt(1 - Sqr(cosAlpha));
@@ -88,12 +81,6 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v,
     Float vv = sinPhi + sinAlpha * Dot(a, b) /* cos c */;
     Float cosBetap = (((vv * cosPhi - uu * sinPhi) * cosAlpha - vv) /
                       ((vv * sinPhi + uu * cosPhi) * sinAlpha));
-#if 0
-    CHECK_RARE(1e-6, cosBetap < -1.001 || cosBetap > 1.001);
-    if (cosBetap < -1.001 || cosBetap > 1.001)
-        LOG_ERROR("cbp %f", cosBetap);
-#endif
-
     // Happens if the triangle basically covers the entire hemisphere.
     // We currently depend on calling code to detect this case, which
     // is sort of ugly/unfortunate.
@@ -101,42 +88,35 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v,
     cosBetap = Clamp(cosBetap, -1, 1);
     Float sinBetap = SafeSqrt(1 - cosBetap * cosBetap);
 
+    // Compute $c'$ along the arc between $b'$ and $a$
     // Gram-Schmidt
-    auto GS = [](const Vector3d &a, const Vector3d &b) {
+    auto GS = [](const Vector3f &a, const Vector3f &b) {
         return Normalize(a - Dot(a, b) * b);
     };
+    Vector3f cp = cosBetap * a + sinBetap * GS(c, a);
 
-    // Compute c', the point along the arc between b' and a.
-    Vector3d cp = cosBetap * a + sinBetap * GS(c, a);
-
+    // Compute sampled spherical triangle direction and barycentrics
     Float cosTheta = 1 - u[1] * (1 - Dot(cp, b));
     Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
-
-    // Compute direction on the sphere.
-    Vector3d w = cosTheta * b + sinTheta * GS(cp, b);
-
+    Vector3f w = cosTheta * b + sinTheta * GS(cp, b);
+    // Find barycentric coordinates for sampled direction _w_
     // Compute barycentrics. Subset of Moller-Trumbore intersection test.
-    Vector3d e1(v[1] - v[0]), e2(v[2] - v[0]);
-    Vector3d s1 = Cross(w, e2);
+    Vector3f e1(v[1] - v[0]), e2(v[2] - v[0]);
+    Vector3f s1 = Cross(w, e2);
     Float divisor = Dot(s1, e1);
-
     CHECK_RARE(1e-6, divisor == 0);
     if (divisor == 0) {
         // This happens with triangles that cover (nearly) the whole
         // hemisphere.
-        // LOG_ERROR("Divisor 0. A = %f", A);
         return {1.f / 3.f, 1.f / 3.f, 1.f / 3.f};
     }
     Float invDivisor = 1 / divisor;
-
-    // Compute first barycentric coordinate
-    Vector3d s(p - v[0]);
+    Vector3f s(p - v[0]);
     Float b1 = Dot(s, s1) * invDivisor;
-
-    // Compute second barycentric coordinate
-    Vector3d s2 = Cross(s, e1);
+    Vector3f s2 = Cross(s, e1);
     Float b2 = Dot(w, s2) * invDivisor;
 
+    // Clamp barycentrics and ensure they are valid
     // We get goofy barycentrics for very small and very large (w.r.t. the
     // sphere) triangles.
     b1 = Clamp(b1, 0, 1);
