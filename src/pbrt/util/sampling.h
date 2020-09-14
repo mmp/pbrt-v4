@@ -393,14 +393,15 @@ inline Float SampleXYZMatching(Float u) {
     return 538 - 138.888889f * std::atanh(0.85691062f - 1.82750197f * u);
 }
 
-PBRT_CPU_GPU
-inline pstd::array<Float, 3> SampleUniformTriangle(const Point2f &u) {
-    Float b0 = u[0] / 2, b1 = u[1] / 2;
-    Float offset = b1 - b0;
-    if (offset > 0)
-        b1 += offset;
-    else
-        b0 -= offset;
+PBRT_CPU_GPU inline pstd::array<Float, 3> SampleUniformTriangle(const Point2f &u) {
+    Float b0, b1;
+    if (u[0] < u[1]) {
+        b0 = u[0] / 2;
+        b1 = u[1] - b0;
+    } else {
+        b1 = u[1] / 2;
+        b0 = u[0] - b1;
+    }
     return {b0, b1, 1 - b0 - b1};
 }
 

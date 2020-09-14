@@ -918,7 +918,10 @@ class Triangle {
         Point3f pHit = ti.b0 * p0 + ti.b1 * p1 + ti.b2 * p2;
         Point2f uvHit = ti.b0 * uv[0] + ti.b1 * uv[1] + ti.b2 * uv[2];
 
-        // Compute error bounds for triangle intersection
+        // Return _SurfaceInteraction_ for triangle hit
+        int faceIndex = mesh->faceIndices ? mesh->faceIndices[triIndex] : 0;
+        bool flipNormal = mesh->reverseOrientation ^ mesh->transformSwapsHandedness;
+        // Compute error bounds _pError_ for triangle intersection
         Float xAbsSum =
             (std::abs(ti.b0 * p0.x) + std::abs(ti.b1 * p1.x) + std::abs(ti.b2 * p2.x));
         Float yAbsSum =
@@ -927,12 +930,9 @@ class Triangle {
             (std::abs(ti.b0 * p0.z) + std::abs(ti.b1 * p1.z) + std::abs(ti.b2 * p2.z));
         Vector3f pError = gamma(7) * Vector3f(xAbsSum, yAbsSum, zAbsSum);
 
-        // Return _SurfaceInteraction_ for triangle hit
-        Point3fi pHitError(pHit, pError);
-        int faceIndex = mesh->faceIndices != nullptr ? mesh->faceIndices[triIndex] : 0;
-        SurfaceInteraction isect(
-            pHitError, uvHit, wo, dpdu, dpdv, Normal3f(0, 0, 0), Normal3f(0, 0, 0), time,
-            mesh->reverseOrientation ^ mesh->transformSwapsHandedness, faceIndex);
+        SurfaceInteraction isect(Point3fi(pHit, pError), uvHit, wo, dpdu, dpdv,
+                                 Normal3f(), Normal3f(), time, flipNormal, faceIndex);
+        // Set final surface normal and shading geometry for triangle
         // Override surface normal in _isect_ for triangle
         isect.n = isect.shading.n = Normal3f(Normalize(Cross(dp02, dp12)));
         if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
@@ -943,20 +943,17 @@ class Triangle {
             // Compute shading normal _ns_ for triangle
             Normal3f ns;
             if (mesh->n != nullptr) {
-                ns = (ti.b0 * mesh->n[v[0]] + ti.b1 * mesh->n[v[1]] +
-                      ti.b2 * mesh->n[v[2]]);
-                if (LengthSquared(ns) > 0)
-                    ns = Normalize(ns);
-                else
-                    ns = isect.n;
+                ns =
+                    ti.b0 * mesh->n[v[0]] + ti.b1 * mesh->n[v[1]] + ti.b2 * mesh->n[v[2]];
+                ns = LengthSquared(ns) > 0 ? Normalize(ns) : isect.n;
             } else
                 ns = isect.n;
 
             // Compute shading tangent _ss_ for triangle
             Vector3f ss;
             if (mesh->s != nullptr) {
-                ss = (ti.b0 * mesh->s[v[0]] + ti.b1 * mesh->s[v[1]] +
-                      ti.b2 * mesh->s[v[2]]);
+                ss =
+                    ti.b0 * mesh->s[v[0]] + ti.b1 * mesh->s[v[1]] + ti.b2 * mesh->s[v[2]];
                 if (LengthSquared(ss) == 0)
                     ss = isect.dpdu;
             } else
@@ -1009,6 +1006,7 @@ class Triangle {
 
             isect.SetShadingGeometry(ns, ss, ts, dndu, dndv, true);
         }
+
         return isect;
     }
 
@@ -1025,8 +1023,6 @@ class Triangle {
 
         // Compute surface normal for sampled point on triangle
         Normal3f n = Normalize(Normal3f(Cross(p1 - p0, p2 - p0)));
-        // Ensure correct orientation of the geometric normal; follow the same
-        // approach as was used in Triangle::Intersect().
         if (mesh->n != nullptr) {
             Normal3f ns(b[0] * mesh->n[v[0]] + b[1] * mesh->n[v[1]] +
                         (1 - b[0] - b[1]) * mesh->n[v[2]]);
@@ -1034,12 +1030,11 @@ class Triangle {
         } else if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
             n *= -1;
 
-        // Compute error bounds for sampled point on triangle
+        // Compute error bounds _pError_ for sampled point on triangle
         Point3f pAbsSum = Abs(b[0] * p0) + Abs(b[1] * p1) + Abs((1 - b[0] - b[1]) * p2);
         Vector3f pError = Vector3f(gamma(6) * pAbsSum);
 
-        Point3fi pi = Point3fi(p, pError);
-        return ShapeSample{Interaction(pi, n), 1 / Area()};
+        return ShapeSample{Interaction(Point3fi(p, pError), n), 1 / Area()};
     }
 
     PBRT_CPU_GPU
@@ -1058,8 +1053,7 @@ class Triangle {
     // and the check about how to sample---is shared with the other
     // Triangle::Sample() routine.
     PBRT_CPU_GPU
-    pstd::optional<ShapeSample> Sample(const ShapeSampleContext &ctx,
-                                       const Point2f &uo) const {
+    pstd::optional<ShapeSample> Sample(const ShapeSampleContext &ctx, Point2f u) const {
         // Get triangle vertices in _p0_, _p1_, and _p2_
         const TriangleMesh *mesh = GetMesh();
         const int *v = &mesh->vertexIndices[3 * triIndex];
@@ -1067,27 +1061,25 @@ class Triangle {
 
         Float sa = SolidAngle(ctx.p());
         if (sa < MinSphericalSampleArea || sa > MaxSphericalSampleArea) {
-            // From Shape::Sample().
-            pstd::optional<ShapeSample> ss = Sample(uo);
-            if (!ss)
-                return {};
+            // Uniformly sample shape and compute incident direction _wi_
+            pstd::optional<ShapeSample> ss = Sample(u);
+            DCHECK(ss.has_value());
             ss->intr.time = ctx.time;
             Vector3f wi = ss->intr.p() - ctx.p();
             if (LengthSquared(wi) == 0)
                 return {};
-            else {
-                wi = Normalize(wi);
-                // Convert uniform area sample PDF in _ss_ to solid angle measure
-                ss->pdf /=
-                    AbsDot(ss->intr.n, -wi) / DistanceSquared(ctx.p(), ss->intr.p());
-                if (IsInf(ss->pdf))
-                    return {};
-            }
+            wi = Normalize(wi);
+
+            // Convert uniform area sample PDF in _ss_ to solid angle measure
+            ss->pdf /= AbsDot(ss->intr.n, -wi) / DistanceSquared(ctx.p(), ss->intr.p());
+            if (IsInf(ss->pdf))
+                return {};
+
             return ss;
         }
 
         Float pdf = 1;
-        Point2f u = uo;
+        // Apply warp product sampling for cosine factor at reference point
         if (ctx.ns != Normal3f(0, 0, 0)) {
             Point3f rp = ctx.p();
             Vector3f wi[3] = {Normalize(p0 - rp), Normalize(p1 - rp), Normalize(p2 - rp)};
@@ -1101,31 +1093,30 @@ class Triangle {
             DCHECK(u[0] >= 0 && u[0] < 1 && u[1] >= 0 && u[1] < 1);
             pdf *= BilinearPDF(u, w);
         }
+
+        // Sample spherical triangle from reference point
         Float triPDF;
         pstd::array<Float, 3> b =
             SampleSphericalTriangle({p0, p1, p2}, ctx.p(), u, &triPDF);
         if (triPDF == 0)
             return {};
         pdf *= triPDF;
+        Point3f ps = b[0] * p0 + b[1] * p1 + b[2] * p2;
 
         // Compute surface normal for sampled point on triangle
         Normal3f n = Normalize(Normal3f(Cross(p1 - p0, p2 - p0)));
-        // Ensure correct orientation of the geometric normal; follow the same
-        // approach as was used in Triangle::Intersect().
         if (mesh->n != nullptr) {
             Normal3f ns(b[0] * mesh->n[v[0]] + b[1] * mesh->n[v[1]] +
-                        b[2] * mesh->n[v[2]]);
+                        (1 - b[0] - b[1]) * mesh->n[v[2]]);
             n = FaceForward(n, ns);
         } else if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
             n *= -1;
 
-        // Compute error bounds for sampled point on triangle
-        Point3f ps = b[0] * p0 + b[1] * p1 + b[2] * p2;
-        Point3f pAbsSum = Abs(b[0] * p0) + Abs(b[1] * p1) + Abs(b[2] * p2);
-        Vector3f pError = gamma(6) * Vector3f(pAbsSum.x, pAbsSum.y, pAbsSum.z);
-        Point3fi pi = Point3fi(ps, pError);
+        // Compute error bounds _pError_ for sampled point on triangle
+        Point3f pAbsSum = Abs(b[0] * p0) + Abs(b[1] * p1) + Abs((1 - b[0] - b[1]) * p2);
+        Vector3f pError = Vector3f(gamma(6) * pAbsSum);
 
-        return ShapeSample{Interaction(pi, n, ctx.time), pdf};
+        return ShapeSample{Interaction(Point3fi(ps, pError), n, ctx.time), pdf};
     }
 
     PBRT_CPU_GPU
