@@ -44,6 +44,7 @@ class TriangleMesh {
 // BilinearPatchMesh Definition
 class BilinearPatchMesh {
   public:
+    // BilinearPatchMesh Public Methods
     BilinearPatchMesh(const Transform &renderFromObject, bool reverseOrientation,
                       std::vector<int> vertexIndices, std::vector<Point3f> p,
                       std::vector<Normal3f> N, std::vector<Point2f> uv,
@@ -53,6 +54,7 @@ class BilinearPatchMesh {
 
     static void Init(Allocator alloc);
 
+    // BilinearPatchMesh Public Members
     bool reverseOrientation, transformSwapsHandedness;
     int nPatches, nVertices;
     const int *vertexIndices = nullptr;

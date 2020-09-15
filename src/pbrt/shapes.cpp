@@ -1044,13 +1044,14 @@ STAT_MEMORY_COUNTER("Memory/Bilinear patches", blpBytes);
 BilinearPatch::BilinearPatch(int meshIndex, int blpIndex)
     : meshIndex(meshIndex), blpIndex(blpIndex) {
     blpBytes += sizeof(*this);
+    // Store area of bilinear patch in _area_
     // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
-    auto mesh = GetMesh();
+    const BilinearPatchMesh *mesh = GetMesh();
     const int *v = &mesh->vertexIndices[4 * blpIndex];
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
 
-    if (IsQuad())
+    if (IsRectangle())
         area = Distance(p00, p01) * Distance(p00, p10);
     else {
         // Compute approximate area of bilinear patch
@@ -1070,18 +1071,12 @@ BilinearPatch::BilinearPatch(int meshIndex, int blpIndex)
             for (int j = 0; j < na; ++j)
                 area += 0.5f * Length(Cross(p[i + 1][j + 1] - p[i][j],
                                             p[i + 1][j] - p[i][j + 1]));
-#if 0
-fprintf(stderr, "area old a %f, old b %f, subsampled %f\n", 0.5 * Length(Cross(p11 - p00, p10 - p01)),
-        0.5 * (Length(Cross(p01 - p00, p10 - p00)) +
-               Length(Cross(p01 - p11, p10 - p11))),
-        area);
-#endif
     }
 }
 
 Bounds3f BilinearPatch::Bounds() const {
     // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
-    auto mesh = GetMesh();
+    const BilinearPatchMesh *mesh = GetMesh();
     const int *v = &mesh->vertexIndices[4 * blpIndex];
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
@@ -1089,48 +1084,51 @@ Bounds3f BilinearPatch::Bounds() const {
     return Union(Bounds3f(p00, p01), Bounds3f(p10, p11));
 }
 
-Float BilinearPatch::Area() const {
-    return area;
-}
-
-bool BilinearPatch::IsQuad() const {
-    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
-    auto mesh = GetMesh();
-    const int *v = &mesh->vertexIndices[4 * blpIndex];
-    const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
-    const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
-
-    Point3f p11quad = p00 + (p10 - p00) + (p01 - p00);
-    Float diag = std::max(Distance(p00, p11), Distance(p01, p11));
-    return Distance(p11quad, p11) < .001f * diag;
-}
-
 DirectionCone BilinearPatch::NormalBounds() const {
-    // Ignore shading normal...
-
     // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
-    auto mesh = GetMesh();
+    const BilinearPatchMesh *mesh = GetMesh();
     const int *v = &mesh->vertexIndices[4 * blpIndex];
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
 
     Float flip = (mesh->reverseOrientation ^ mesh->transformSwapsHandedness) ? -1 : 1;
-
+    // If patch is a triangle, return bounds for single surface normal
     if (p00 == p10 || p10 == p11 || p11 == p01 || p01 == p00) {
-        // it's a triangle. Evaluate the normal at the center so we don't
-        // have to worry about the degeneracies.
         Vector3f dpdu = Lerp(0.5f, p10, p11) - Lerp(0.5f, p00, p01);
         Vector3f dpdv = Lerp(0.5f, p01, p11) - Lerp(0.5f, p00, p10);
-        Vector3f n = flip * Normalize(Cross(dpdu, dpdv));
+        Vector3f n = Normalize(Cross(dpdu, dpdv));
+        if (mesh->n != nullptr) {
+            Normal3f ns =
+                (mesh->n[v[0]] + mesh->n[v[1]] + mesh->n[v[2]] + mesh->n[v[3]]) / 4;
+            n = FaceForward(n, ns);
+        } else
+            n *= flip;
         return DirectionCone(n);
     }
 
-    Vector3f n00 = flip * Normalize(Cross(p10 - p00, p01 - p00));
-    Vector3f n10 = flip * Normalize(Cross(p11 - p10, p00 - p10));
-    Vector3f n01 = flip * Normalize(Cross(p00 - p01, p11 - p01));
-    Vector3f n11 = flip * Normalize(Cross(p01 - p11, p10 - p11));
+    // Compute bilinear patch normal _n00_ at $(0,0)$
+    Vector3f n00 = Normalize(Cross(p10 - p00, p01 - p00));
+    if (mesh->n != nullptr)
+        n00 = FaceForward(n00, mesh->n[v[0]]);
+    else
+        n00 *= flip;
 
-    Vector3f n = flip * Normalize(n00 + n10 + n01 + n11);
+    // Compute bilinear patch normals _n10_, _n01_, and _n11_
+    Vector3f n10 = Normalize(Cross(p11 - p10, p00 - p10));
+    Vector3f n01 = Normalize(Cross(p00 - p01, p11 - p01));
+    Vector3f n11 = Normalize(Cross(p01 - p11, p10 - p11));
+    if (mesh->n != nullptr) {
+        n10 = FaceForward(n10, mesh->n[v[1]]);
+        n01 = FaceForward(n01, mesh->n[v[2]]);
+        n11 = FaceForward(n11, mesh->n[v[3]]);
+    } else {
+        n10 *= flip;
+        n01 *= flip;
+        n11 *= flip;
+    }
+
+    // Compute average normal and return normal bounds for patch
+    Vector3f n = Normalize(n00 + n10 + n01 + n11);
     Float cosTheta = std::min({Dot(n, n00), Dot(n, n01), Dot(n, n10), Dot(n, n11)});
     return DirectionCone(n, Clamp(cosTheta, -1, 1));
 }
@@ -1138,7 +1136,7 @@ DirectionCone BilinearPatch::NormalBounds() const {
 pstd::optional<ShapeIntersection> BilinearPatch::Intersect(const Ray &ray,
                                                            Float tMax) const {
     // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
-    auto mesh = GetMesh();
+    const BilinearPatchMesh *mesh = GetMesh();
     const int *v = &mesh->vertexIndices[4 * blpIndex];
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
@@ -1154,7 +1152,7 @@ pstd::optional<ShapeIntersection> BilinearPatch::Intersect(const Ray &ray,
 
 bool BilinearPatch::IntersectP(const Ray &ray, Float tMax) const {
     // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
-    auto mesh = GetMesh();
+    const BilinearPatchMesh *mesh = GetMesh();
     const int *v = &mesh->vertexIndices[4 * blpIndex];
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
@@ -1165,7 +1163,7 @@ bool BilinearPatch::IntersectP(const Ray &ray, Float tMax) const {
 pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,
                                                   const Point2f &uo) const {
     // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
-    auto mesh = GetMesh();
+    const BilinearPatchMesh *mesh = GetMesh();
     const int *v = &mesh->vertexIndices[4 * blpIndex];
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
@@ -1175,7 +1173,7 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,
     Vector3f v01 = Normalize(p01 - ctx.p());
     Vector3f v11 = Normalize(p11 - ctx.p());
 
-    if (IsQuad() && SphericalQuadArea(v00, v10, v11, v01) > MinSphericalSampleArea) {
+    if (IsRectangle() && SphericalQuadArea(v00, v10, v11, v01) > MinSphericalSampleArea) {
         Float pdf = 1;
         Point2f u = uo;
         if (mesh->imageDistribution) {
@@ -1260,7 +1258,7 @@ Float BilinearPatch::PDF(const ShapeSampleContext &ctx, const Vector3f &wi) cons
         return 0;
 
     // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
-    auto mesh = GetMesh();
+    const BilinearPatchMesh *mesh = GetMesh();
     const int *v = &mesh->vertexIndices[4 * blpIndex];
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
@@ -1270,7 +1268,7 @@ Float BilinearPatch::PDF(const ShapeSampleContext &ctx, const Vector3f &wi) cons
     Vector3f v01 = Normalize(p01 - ctx.p());
     Vector3f v11 = Normalize(p11 - ctx.p());
 
-    if (IsQuad() && SphericalQuadArea(v00, v10, v11, v01) > MinSphericalSampleArea) {
+    if (IsRectangle() && SphericalQuadArea(v00, v10, v11, v01) > MinSphericalSampleArea) {
         Float pdf = 1 / SphericalQuadArea(v00, v10, v11, v01);  // note: arg ordering...
 
         if (GetMesh()->imageDistribution) {
@@ -1302,7 +1300,7 @@ Float BilinearPatch::PDF(const ShapeSampleContext &ctx, const Vector3f &wi) cons
 
 pstd::optional<ShapeSample> BilinearPatch::Sample(const Point2f &uo) const {
     // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
-    auto mesh = GetMesh();
+    const BilinearPatchMesh *mesh = GetMesh();
     const int *v = &mesh->vertexIndices[4 * blpIndex];
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
@@ -1311,7 +1309,7 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(const Point2f &uo) const {
     Float pdf = 1;
     if (mesh->imageDistribution)
         u = mesh->imageDistribution->Sample(u, &pdf);
-    else if (!IsQuad()) {
+    else if (!IsRectangle()) {
         // Approximate uniform area
         pstd::array<Float, 4> w = {
             Length(Cross(p10 - p00, p01 - p00)), Length(Cross(p10 - p00, p11 - p10)),
@@ -1341,7 +1339,7 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(const Point2f &uo) const {
 
 Float BilinearPatch::PDF(const Interaction &intr) const {
     // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
-    auto mesh = GetMesh();
+    const BilinearPatchMesh *mesh = GetMesh();
     const int *v = &mesh->vertexIndices[4 * blpIndex];
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
@@ -1349,7 +1347,7 @@ Float BilinearPatch::PDF(const Interaction &intr) const {
     Float pdf = 1;
     if (mesh->imageDistribution)
         pdf = mesh->imageDistribution->PDF(intr.uv);
-    else if (!IsQuad()) {
+    else if (!IsRectangle()) {
         pstd::array<Float, 4> w = {
             Length(Cross(p10 - p00, p01 - p00)), Length(Cross(p10 - p00, p11 - p10)),
             Length(Cross(p01 - p00, p11 - p01)), Length(Cross(p11 - p10, p11 - p01))};

@@ -1300,9 +1300,6 @@ class BilinearPatch {
     bool IntersectP(const Ray &ray, Float tMax = Infinity) const;
 
     PBRT_CPU_GPU
-    Float Area() const;
-
-    PBRT_CPU_GPU
     pstd::optional<ShapeSample> Sample(const ShapeSampleContext &ctx,
                                        const Point2f &u) const;
 
@@ -1319,6 +1316,9 @@ class BilinearPatch {
     DirectionCone NormalBounds() const;
 
     std::string ToString() const;
+
+    PBRT_CPU_GPU
+    Float Area() const { return area; }
 
     PBRT_CPU_GPU
     static pstd::optional<BilinearIntersection> Intersect(const Ray &ray, Float tMax,
@@ -1522,13 +1522,9 @@ class BilinearPatch {
     }
 
   private:
-    static constexpr Float MinSphericalSampleArea = 1e-4;
-
+    // BilinearPatch Private Methods
     PBRT_CPU_GPU
-    bool IsQuad() const;
-
-    PBRT_CPU_GPU
-    const BilinearPatchMesh *&GetMesh() const {
+    const BilinearPatchMesh *GetMesh() const {
 #ifdef PBRT_IS_GPU_CODE
         return (*allBilinearMeshesGPU)[meshIndex];
 #else
@@ -1536,11 +1532,36 @@ class BilinearPatch {
 #endif
     }
 
-    // BilinearPatch Private Data
+    PBRT_CPU_GPU
+    bool IsRectangle() const {
+        // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
+        const BilinearPatchMesh *mesh = GetMesh();
+        const int *v = &mesh->vertexIndices[4 * blpIndex];
+        const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
+        const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
+
+        if (p00 == p01 || p01 == p11 || p11 == p10 || p10 == p00)
+            return false;
+        // Check if bilinear patch vertices are coplanar
+        Normal3f n(Normalize(Cross(p10 - p00, p01 - p00)));
+        if (AbsDot(Normalize(p11 - p00), n) > 1e-5f)
+            return false;
+
+        // Check if planar vertices form a rectangle
+        Point3f pCenter = (p00 + p01 + p10 + p11) / 4;
+        Float d2[4] = {DistanceSquared(p00, pCenter), DistanceSquared(p01, pCenter),
+                       DistanceSquared(p10, pCenter), DistanceSquared(p11, pCenter)};
+        for (int i = 1; i < 4; ++i)
+            if (std::abs(d2[i] - d2[0]) / d2[0] > 1e-4f)
+                return false;
+        return true;
+    }
+
+    // BilinearPatch Private Members
     int meshIndex, blpIndex;
     Float area;
-
     static pstd::vector<const BilinearPatchMesh *> *allMeshes;
+    static constexpr Float MinSphericalSampleArea = 1e-4;
 };
 
 inline Bounds3f ShapeHandle::Bounds() const {
