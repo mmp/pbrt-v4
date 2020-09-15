@@ -40,6 +40,7 @@ PBRT_CPU_GPU
 Point3f SampleSphericalRectangle(const Point3f &p, const Point3f &v00, const Vector3f &ex,
                                  const Vector3f &ey, const Point2f &u,
                                  Float *pdf = nullptr);
+
 PBRT_CPU_GPU
 Point2f InvertSphericalRectangleSample(const Point3f &pRef, const Point3f &v00,
                                        const Vector3f &ex, const Vector3f &ey,

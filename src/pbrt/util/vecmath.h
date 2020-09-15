@@ -1660,9 +1660,9 @@ PBRT_CPU_GPU inline Float SphericalTriangleArea(const Vector3f &a, const Vector3
     return std::abs(alpha + beta + gamma - Pi);
 }
 
-// Note: if it folds over itself, the total spherical area is returned.
-// (i.e. sort of not what we'd want...)
-// https://math.stackexchange.com/questions/1228964/area-of-spherical-polygon
+PBRT_CPU_GPU inline Float SphericalQuadArea(const Vector3f &a, const Vector3f &b,
+                                            const Vector3f &c, const Vector3f &d);
+
 PBRT_CPU_GPU
 inline Float SphericalQuadArea(const Vector3f &a, const Vector3f &b, const Vector3f &c,
                                const Vector3f &d) {

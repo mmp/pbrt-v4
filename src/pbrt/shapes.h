@@ -1277,7 +1277,7 @@ struct BilinearIntersection {
 PBRT_CPU_GPU inline pstd::optional<BilinearIntersection> IntersectBilinearPatch(
     const Ray &ray, Float tMax, const Point3f &p00, const Point3f &p10,
     const Point3f &p01, const Point3f &p11) {
-    // Compute quadratic coefficients for distance from ray to $u$ line
+    // Find quadratic coefficients for distance from ray to $u$ line
     Vector3f qn = Cross(p10 - p00, p01 - p11);
     Vector3f e11 = p11 - p10, e00 = p01 - p00;
     Vector3f q00 = p00 - ray.o, q10 = p10 - ray.o;
@@ -1459,7 +1459,6 @@ class BilinearPatch {
             Normal3f n00 = mesh->n[v[0]], n10 = mesh->n[v[1]], n01 = mesh->n[v[2]],
                      n11 = mesh->n[v[3]];
             Normal3f ns = Lerp(uv[0], Lerp(uv[1], n00, n01), Lerp(uv[1], n10, n11));
-
             if (LengthSquared(ns) > 0) {
                 ns = Normalize(ns);
                 Normal3f n = Normal3f(Normalize(isect.n));
