@@ -665,7 +665,7 @@ extern "C" __global__ void __intersection__bilinearPatch() {
     Point3f p01 = rec.mesh->p[rec.mesh->vertexIndices[vertexIndex + 2]];
     Point3f p11 = rec.mesh->p[rec.mesh->vertexIndices[vertexIndex + 3]];
     pstd::optional<BilinearIntersection> isect =
-        BilinearPatch::Intersect(ray, tMax, p00, p10, p01, p11);
+        IntersectBilinearPatch(ray, tMax, p00, p10, p01, p11);
 
     if (!isect)
         return;

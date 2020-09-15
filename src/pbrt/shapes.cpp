@@ -1091,7 +1091,6 @@ DirectionCone BilinearPatch::NormalBounds() const {
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
 
-    Float flip = (mesh->reverseOrientation ^ mesh->transformSwapsHandedness) ? -1 : 1;
     // If patch is a triangle, return bounds for single surface normal
     if (p00 == p10 || p10 == p11 || p11 == p01 || p01 == p00) {
         Vector3f dpdu = Lerp(0.5f, p10, p11) - Lerp(0.5f, p00, p01);
@@ -1101,8 +1100,8 @@ DirectionCone BilinearPatch::NormalBounds() const {
             Normal3f ns =
                 (mesh->n[v[0]] + mesh->n[v[1]] + mesh->n[v[2]] + mesh->n[v[3]]) / 4;
             n = FaceForward(n, ns);
-        } else
-            n *= flip;
+        } else if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
+            n = -n;
         return DirectionCone(n);
     }
 
@@ -1110,8 +1109,8 @@ DirectionCone BilinearPatch::NormalBounds() const {
     Vector3f n00 = Normalize(Cross(p10 - p00, p01 - p00));
     if (mesh->n != nullptr)
         n00 = FaceForward(n00, mesh->n[v[0]]);
-    else
-        n00 *= flip;
+    else if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
+        n00 = -n00;
 
     // Compute bilinear patch normals _n10_, _n01_, and _n11_
     Vector3f n10 = Normalize(Cross(p11 - p10, p00 - p10));
@@ -1121,10 +1120,10 @@ DirectionCone BilinearPatch::NormalBounds() const {
         n10 = FaceForward(n10, mesh->n[v[1]]);
         n01 = FaceForward(n01, mesh->n[v[2]]);
         n11 = FaceForward(n11, mesh->n[v[3]]);
-    } else {
-        n10 *= flip;
-        n01 *= flip;
-        n11 *= flip;
+    } else if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness) {
+        n10 = -n10;
+        n01 = -n01;
+        n11 = -n11;
     }
 
     // Compute average normal and return normal bounds for patch
@@ -1142,7 +1141,7 @@ pstd::optional<ShapeIntersection> BilinearPatch::Intersect(const Ray &ray,
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
 
     pstd::optional<BilinearIntersection> blpIsect =
-        Intersect(ray, tMax, p00, p10, p01, p11);
+        IntersectBilinearPatch(ray, tMax, p00, p10, p01, p11);
     if (!blpIsect)
         return {};
     SurfaceInteraction intr =
@@ -1157,7 +1156,7 @@ bool BilinearPatch::IntersectP(const Ray &ray, Float tMax) const {
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
 
-    return Intersect(ray, tMax, p00, p10, p01, p11).has_value();
+    return IntersectBilinearPatch(ray, tMax, p00, p10, p01, p11).has_value();
 }
 
 pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,

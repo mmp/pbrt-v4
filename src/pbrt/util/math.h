@@ -638,6 +638,11 @@ inline bool Quadratic(float a, float b, float c, float *t0, float *t1) {
         return false;
     float rootDiscrim = std::sqrt(discrim);
 
+    if (a == 0) {
+        *t0 = *t1 = -c / b;
+        return true;
+    }
+
     // Compute quadratic _t_ values
     float q = -0.5f * (b + std::copysign(rootDiscrim, b));
     *t0 = q / a;
@@ -654,6 +659,11 @@ inline bool Quadratic(double a, double b, double c, double *t0, double *t1) {
     if (discrim < 0)
         return false;
     double rootDiscrim = std::sqrt(discrim);
+
+    if (a == 0) {
+        *t0 = *t1 = -c / b;
+        return true;
+    }
 
     // Compute quadratic _t_ values
     double q = -0.5 * (b + std::copysign(rootDiscrim, b));

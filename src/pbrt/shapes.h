@@ -1273,6 +1273,61 @@ struct BilinearIntersection {
     std::string ToString() const;
 };
 
+// Bilinear Patch Inline Functions
+PBRT_CPU_GPU inline pstd::optional<BilinearIntersection> IntersectBilinearPatch(
+    const Ray &ray, Float tMax, const Point3f &p00, const Point3f &p10,
+    const Point3f &p01, const Point3f &p11) {
+    // Compute quadratic coefficients for distance from ray to $u$ line
+    Vector3f qn = Cross(p10 - p00, p01 - p11);
+    Vector3f e11 = p11 - p10, e00 = p01 - p00;
+    Vector3f q00 = p00 - ray.o, q10 = p10 - ray.o;
+    Float a = Dot(qn, ray.d);
+    Float c = Dot(Cross(q00, ray.d), e00);
+    Float b = Dot(Cross(q10, ray.d), e11) - (a + c);
+
+    // Solve quadratic for bilinear patch intersection
+    Float u1, u2;
+    if (!Quadratic(a, b, c, &u1, &u2))
+        return {};
+
+    Float t = tMax, u, v;
+    // Compute $(u,v)$ and ray $t$ corresponding to first quadratic root
+    if (0 <= u1 && u1 <= 1) {
+        Vector3f pa = Lerp(u1, q00, q10), pb = Lerp(u1, e00, e11);
+        Vector3f n = Cross(ray.d, pb);
+        Float det = Dot(n, n);
+        n = Cross(n, pa);
+        Float t1 = Dot(n, pb), v1 = Dot(n, ray.d);
+        // Set _u_, _v_, and _t_ if intersection is valid
+        if (t1 > 0 && 0 <= v1 && v1 <= det) {
+            u = u1;
+            v = v1 / det;
+            t = t1 / det;
+        }
+    }
+
+    // Compute $(u,v)$ and ray $t$ corresponding to second quadratic root
+    if (0 <= u2 && u2 <= 1 && u2 != u1) {
+        Vector3f pa = Lerp(u2, q00, q10), pb = Lerp(u2, e00, e11);
+        Vector3f n = Cross(ray.d, pb);
+        Float det = Dot(n, n);
+        n = Cross(n, pa);
+        Float t2 = Dot(n, pb) / det;
+        Float v2 = Dot(n, ray.d);
+        if (0 <= v2 && v2 <= det && t > t2 && t2 > 0) {
+            t = t2;
+            u = u2;
+            v = v2 / det;
+        }
+    }
+
+    // TODO: reject hits with sufficiently small t that we're not sure.
+    // Check intersection $t$ against _tMax_ and possibly return intersection
+    if (t >= tMax)
+        return {};
+    return BilinearIntersection{{u, v}, t};
+}
+
 // BilinearPatch Definition
 class BilinearPatch {
   public:
@@ -1321,96 +1376,25 @@ class BilinearPatch {
     Float Area() const { return area; }
 
     PBRT_CPU_GPU
-    static pstd::optional<BilinearIntersection> Intersect(const Ray &ray, Float tMax,
-                                                          const Point3f &p00,
-                                                          const Point3f &p10,
-                                                          const Point3f &p01,
-                                                          const Point3f &p11) {
-        Vector3f qn = Cross(p10 - p00, p01 - p11);
-        Vector3f e10 = p10 - p00;  // p01------u--------p11
-        Vector3f e11 = p11 - p10;  // |                   |
-        Vector3f e00 = p01 - p00;  // v e00           e11 v
-        // |        e10        |
-        // p00------u--------p10
-        Vector3f q00 = p00 - ray.o;
-        Vector3f q10 = p10 - ray.o;
-        Float a = Dot(Cross(q00, ray.d), e00);  // the equation is
-        Float c = Dot(qn, ray.d);               // a + b u + c u^2
-        Float b = Dot(Cross(q10, ray.d), e11);  // first compute a+b+c
-        b -= a + c;                             // and then b
-        Float det = b * b - 4 * a * c;
-        if (det < 0)
-            return {};
-        det = std::sqrt(det);
-        Float u1, u2;          // two roots (u parameter)
-        Float t = tMax, u, v;  // need solution for the smallest t > 0
-        if (c == 0) {          // if c == 0, it is a trapezoid
-            u1 = -a / b;
-            u2 = -1;                            // and there is only one root
-        } else {                                // (c != 0 in Stanford models)
-            u1 = (-b - copysignf(det, b)) / 2;  // numerically "stable" root
-            u2 = a / u1;                        // Viete's formula for u1*u2
-            u1 /= c;
-        }
-        if (0 <= u1 && u1 <= 1) {              // is it inside the patch?
-            Vector3f pa = Lerp(u1, q00, q10);  // point on edge e10 (Figure 8.4)
-            Vector3f pb = Lerp(u1, e00, e11);  // it is, actually, pb - pa
-            Vector3f n = Cross(ray.d, pb);
-            det = Dot(n, n);
-            n = Cross(n, pa);
-            Float t1 = Dot(n, pb);
-            Float v1 = Dot(n, ray.d);              // no need to check t1 < t
-            if (t1 > 0 && 0 <= v1 && v1 <= det) {  // if t1 > ray.tmax,
-                t = t1 / det;
-                u = u1;
-                v = v1 / det;  // it will be rejected
-            }                  // in rtPotentialIntersection
-        }
-        if (0 <= u2 && u2 <= 1) {              // it is slightly different,
-            Vector3f pa = Lerp(u2, q00, q10);  // since u1 might be good
-            Vector3f pb = Lerp(u2, e00, e11);  // and we need 0 < t2 < t1
-            Vector3f n = Cross(ray.d, pb);
-            det = Dot(n, n);
-            n = Cross(n, pa);
-            Float t2 = Dot(n, pb) / det;
-            Float v2 = Dot(n, ray.d);
-            if (0 <= v2 && v2 <= det && t > t2 && t2 > 0) {
-                t = t2;
-                u = u2;
-                v = v2 / det;
-            }
-        }
-
-        // TODO: reject hits with sufficiently small t that we're not sure.
-
-        if (t >= tMax)
-            return {};
-
-        return BilinearIntersection{{u, v}, t};
-    }
-
-    PBRT_CPU_GPU
     static SurfaceInteraction InteractionFromIntersection(const BilinearPatchMesh *mesh,
                                                           int patchIndex,
-                                                          const Point2f &uvHit,
-                                                          Float time,
+                                                          const Point2f &uv, Float time,
                                                           const Vector3f &wo) {
         const int *v = &mesh->vertexIndices[4 * patchIndex];
         Point3f p00 = mesh->p[v[0]], p10 = mesh->p[v[1]], p01 = mesh->p[v[2]],
                 p11 = mesh->p[v[3]];
 
-        Point3f pHit = Lerp(uvHit[0], Lerp(uvHit[1], p00, p01), Lerp(uvHit[1], p10, p11));
+        Point3f pHit = Lerp(uv[0], Lerp(uv[1], p00, p01), Lerp(uv[1], p10, p11));
 
-        Vector3f dpdu = Lerp(uvHit[1], p10, p11) - Lerp(uvHit[1], p00, p01);
-        Vector3f dpdv = Lerp(uvHit[0], p01, p11) - Lerp(uvHit[0], p00, p10);
+        Vector3f dpdu = Lerp(uv[1], p10, p11) - Lerp(uv[1], p00, p01);
+        Vector3f dpdv = Lerp(uv[0], p01, p11) - Lerp(uv[0], p00, p10);
 
-        // Interpolate texture coordinates, if provided
-        Point2f uv = uvHit;
+        Point2f uvTex = uv;
         if (mesh->uv != nullptr) {
-            const Point2f &uv00 = mesh->uv[v[0]];
-            const Point2f &uv10 = mesh->uv[v[1]];
-            const Point2f &uv01 = mesh->uv[v[2]];
-            const Point2f &uv11 = mesh->uv[v[3]];
+            // Compute texture coordinates for bilinear patch intersection point
+            const Point2f &uv00 = mesh->uv[v[0]], &uv10 = mesh->uv[v[1]];
+            const Point2f &uv01 = mesh->uv[v[2]], &uv11 = mesh->uv[v[3]];
+            uvTex = Lerp(uv[0], Lerp(uv[1], uv00, uv01), Lerp(uv[1], uv10, uv11));
 
             Float dsdu =
                 -uv00[0] + uv10[0] + uv[1] * (uv00[0] - uv01[0] - uv10[0] + uv11[0]);
@@ -1425,9 +1409,6 @@ class BilinearPatch {
             Float dvds = std::abs(dsdv) < 1e-8f ? 0 : 1 / dsdv;
             Float dudt = std::abs(dtdu) < 1e-8f ? 0 : 1 / dtdu;
             Float dvdt = std::abs(dtdv) < 1e-8f ? 0 : 1 / dtdv;
-
-            // actually this is st (and confusing)
-            uv = Lerp(uv[0], Lerp(uv[1], uv00, uv01), Lerp(uv[1], uv10, uv11));
 
             // dpds = dpdu * duds + dpdv * dvds, etc
             // duds = 1/dsdu
@@ -1477,24 +1458,25 @@ class BilinearPatch {
         int faceIndex = mesh->faceIndices != nullptr ? mesh->faceIndices[patchIndex] : 0;
         Point3fi pe(pHit, pError);
         SurfaceInteraction isect(
-            pe, uv, wo, dpdu, dpdv, dndu, dndv, time,
+            pe, uvTex, wo, dpdu, dpdv, dndu, dndv, time,
             mesh->reverseOrientation ^ mesh->transformSwapsHandedness, faceIndex);
 
         if (mesh->n != nullptr) {
+            // Compute shading normals for bilinear patch intersection point
             Normal3f n00 = mesh->n[v[0]], n10 = mesh->n[v[1]], n01 = mesh->n[v[2]],
                      n11 = mesh->n[v[3]];
+            Normal3f ns = Lerp(uv[0], Lerp(uv[1], n00, n01), Lerp(uv[1], n10, n11));
 
-            // TODO: should these be computed using normalized normals?
-            Normal3f dndu = Lerp(uvHit[1], n10, n11) - Lerp(uvHit[1], n00, n01);
-            Normal3f dndv = Lerp(uvHit[0], n01, n11) - Lerp(uvHit[0], n00, n10);
-
-            Normal3f ns =
-                Lerp(uvHit[0], Lerp(uvHit[1], n00, n01), Lerp(uvHit[1], n10, n11));
             if (LengthSquared(ns) > 0) {
                 ns = Normalize(ns);
                 Normal3f n = Normal3f(Normalize(isect.n));
                 Vector3f axis = Cross(Vector3f(n), Vector3f(ns));
-                if (LengthSquared(axis) > 1e-14) {
+                if (LengthSquared(axis) > 1e-14f) {
+                    // Set shading geometry for bilinear patch itnersection
+                    // TODO: should these be computed using normalized normals?
+                    Normal3f dndu = Lerp(uv[1], n10, n11) - Lerp(uv[1], n00, n01);
+                    Normal3f dndv = Lerp(uv[0], n01, n11) - Lerp(uv[0], n00, n10);
+
                     axis = Normalize(axis);
                     // The shading normal is different enough.
                     //
