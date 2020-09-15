@@ -188,14 +188,10 @@ Point2f InvertSphericalTriangleSample(const pstd::array<Point3f, 3> &v, const Po
 Point3f SampleSphericalRectangle(const Point3f &pRef, const Point3f &s,
                                  const Vector3f &ex, const Vector3f &ey, const Point2f &u,
                                  Float *pdf) {
-    // SphQuadInit()
-    // local reference system 'R'
+    // Compute local reference frame and transform rectangle coordinates
     Float exl = Length(ex), eyl = Length(ey);
     Frame R = Frame::FromXY(ex / exl, ey / eyl);
-
-    // compute rectangle coords in local reference system
-    Vector3f d = s - pRef;
-    Vector3f dLocal = R.ToLocal(d);
+    Vector3f dLocal = R.ToLocal(s - pRef);
     Float z0 = dLocal.z;
 
     // flip 'z' to make it point against 'Q'
@@ -203,33 +199,20 @@ Point3f SampleSphericalRectangle(const Point3f &pRef, const Point3f &s,
         R.z = -R.z;
         z0 *= -1;
     }
-    Float z0sq = Sqr(z0);
-    Float x0 = dLocal.x;
-    Float y0 = dLocal.y;
-    Float x1 = x0 + exl;
-    Float y1 = y0 + eyl;
-    Float y0sq = Sqr(y0), y1sq = Sqr(y1);
+    Float x0 = dLocal.x, y0 = dLocal.y;
+    Float x1 = x0 + exl, y1 = y0 + eyl;
 
-    // create vectors to four vertices
+    // Find plane normals to rectangle edges and compute internal angles
     Vector3f v00(x0, y0, z0), v01(x0, y1, z0);
     Vector3f v10(x1, y0, z0), v11(x1, y1, z0);
-
-    // compute normals to edges
-    Vector3f n0 = Normalize(Cross(v00, v10));
-    Vector3f n1 = Normalize(Cross(v10, v11));
-    Vector3f n2 = Normalize(Cross(v11, v01));
-    Vector3f n3 = Normalize(Cross(v01, v00));
-
-    // compute internal angles (gamma_i)
+    Vector3f n0 = Normalize(Cross(v00, v10)), n1 = Normalize(Cross(v10, v11));
+    Vector3f n2 = Normalize(Cross(v11, v01)), n3 = Normalize(Cross(v01, v00));
     Float g0 = AngleBetween(-n0, n1);
     Float g1 = AngleBetween(-n1, n2);
     Float g2 = AngleBetween(-n2, n3);
     Float g3 = AngleBetween(-n3, n0);
 
-    // compute predefined constants
-    Float b0 = n0.z, b1 = n2.z, b0sq = Sqr(b0), b1sq = Sqr(b1);
-
-    // compute solid angle from internal angles
+    // Compute spherical rectangle solid angle and PDF
     Float solidAngle = double(g0) + double(g1) + double(g2) + double(g3) - 2. * Pi;
     CHECK_RARE(1e-5, solidAngle <= 0);
     if (solidAngle <= 0) {
@@ -239,32 +222,29 @@ Point3f SampleSphericalRectangle(const Point3f &pRef, const Point3f &s,
     }
     if (pdf != nullptr)
         *pdf = std::max<Float>(0, 1 / solidAngle);
-
     if (solidAngle < 1e-3)
         return Point3f(s + u[0] * ex + u[1] * ey);
 
-    // SphQuadSample
-    // 1. compute 'cu'
+    // Sample _cu_ for spherical rectangle sample
+    Float b0 = n0.z, b1 = n2.z;
     // Float au = u[0] * solidAngle + k;   // original
     Float au = u[0] * solidAngle - g2 - g3;
     Float fu = (std::cos(au) * b0 - b1) / std::sin(au);
-    Float fusq = Sqr(fu);
-    Float cu = std::copysign(1 / std::sqrt(Sqr(fu) + b0sq), fu);
+    Float cu = std::copysign(1 / std::sqrt(Sqr(fu) + Sqr(b0)), fu);
     cu = Clamp(cu, -OneMinusEpsilon, OneMinusEpsilon);  // avoid NaNs
 
-    // 2. compute 'xu'
+    // Find _xu_ along $x$ edge for spherical rectangle sample
     Float xu = -(cu * z0) / SafeSqrt(1 - Sqr(cu));
-    xu = Clamp(xu, x0, x1);  // avoid Infs
+    xu = Clamp(xu, x0, x1);
 
-    // 3. compute 'yv'
-    Float dd = std::sqrt(Sqr(xu) + z0sq);
-    Float h0 = y0 / std::sqrt(Sqr(dd) + y0sq);
-    Float h1 = y1 / std::sqrt(Sqr(dd) + y1sq);
+    // Find _xv_ along $y$ edge for spherical rectangle sample
+    Float dd = std::sqrt(Sqr(xu) + Sqr(z0));
+    Float h0 = y0 / std::sqrt(Sqr(dd) + Sqr(y0));
+    Float h1 = y1 / std::sqrt(Sqr(dd) + Sqr(y1));
     Float hv = h0 + u[1] * (h1 - h0), hvsq = Sqr(hv);
-    const Float eps = 1e-6;
-    Float yv = (hvsq < 1 - eps) ? (hv * dd) / std::sqrt(1 - hvsq) : y1;
+    Float yv = (hvsq < 1 - 1e-6f) ? (hv * dd) / std::sqrt(1 - hvsq) : y1;
 
-    // 4. transform (xu,yv,z0) to world coords
+    // Return spherical triangle sample in original coordinate system
     return pRef + R.FromLocal(Vector3f(xu, yv, z0));
 }
 
