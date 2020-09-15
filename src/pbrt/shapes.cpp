@@ -1159,22 +1159,101 @@ bool BilinearPatch::IntersectP(const Ray &ray, Float tMax) const {
     return IntersectBilinearPatch(ray, tMax, p00, p10, p01, p11).has_value();
 }
 
-pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,
-                                                  const Point2f &uo) const {
+pstd::optional<ShapeSample> BilinearPatch::Sample(Point2f u) const {
     // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const BilinearPatchMesh *mesh = GetMesh();
     const int *v = &mesh->vertexIndices[4 * blpIndex];
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
 
+    // Sample bilinear patch parametric $(u,v)$ coordinates
+    Float pdf = 1;
+    Point2f uv;
+    if (mesh->imageDistribution)
+        uv = mesh->imageDistribution->Sample(u, &pdf);
+    else if (!IsRectangle()) {
+        // Sample patch $(u,v)$ with approximate uniform area sampling
+        // Initialize _w_ array with differential area at bilinear patch corners
+        pstd::array<Float, 4> w = {
+            Length(Cross(p10 - p00, p01 - p00)), Length(Cross(p10 - p00, p11 - p10)),
+            Length(Cross(p01 - p00, p11 - p01)), Length(Cross(p11 - p10, p11 - p01))};
+
+        uv = SampleBilinear(u, w);
+        pdf = BilinearPDF(uv, w);
+
+    } else
+        uv = u;
+
+    // Compute position, $\dpdu$, and $\dpdv$ for sampled bilinear patch $(u,v)$
+    Point3f pu0 = Lerp(uv[1], p00, p01), pu1 = Lerp(uv[1], p10, p11);
+    Point3f p = Lerp(uv[0], pu0, pu1);
+    Vector3f dpdu = pu1 - pu0;
+    Vector3f dpdv = Lerp(uv[0], p01, p11) - Lerp(uv[0], p00, p10);
+    if (LengthSquared(dpdu) == 0 || LengthSquared(dpdv) == 0)
+        return {};
+
+    // Compute surface normal for sampled bilinear patch $(u,v)$
+    Normal3f n = Normal3f(Normalize(Cross(dpdu, dpdv)));
+    if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
+        n = -n;
+
+    // Compute _pError_ for sampled bilinear patch $(u,v)$
+    Vector3f pError =
+        gamma(6) * Vector3f(Max(Max(Abs(p00), Abs(p10)), Max(Abs(p01), Abs(p11))));
+
+    // Return _ShapeSample_ for sampled bilinear patch point
+    return ShapeSample{Interaction(Point3fi(p, pError), n, uv),
+                       pdf / Length(Cross(dpdu, dpdv))};
+}
+
+Float BilinearPatch::PDF(const Interaction &intr) const {
+    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
+    const BilinearPatchMesh *mesh = GetMesh();
+    const int *v = &mesh->vertexIndices[4 * blpIndex];
+    const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
+    const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
+
+    // Compute PDF for sampling the $(u,v)$ coordinates given by _intr.uv_
+    Float pdf;
+    if (mesh->imageDistribution)
+        pdf = mesh->imageDistribution->PDF(intr.uv);
+    else if (!IsRectangle()) {
+        // Initialize _w_ array with differential area at bilinear patch corners
+        pstd::array<Float, 4> w = {
+            Length(Cross(p10 - p00, p01 - p00)), Length(Cross(p10 - p00, p11 - p10)),
+            Length(Cross(p01 - p00, p11 - p01)), Length(Cross(p11 - p10, p11 - p01))};
+
+        pdf = BilinearPDF(intr.uv, w);
+    } else
+        pdf = 1;
+
+    // Find $\dpdu$ and $\dpdv$ at bilinear patch $(u,v)$
+    CHECK(!intr.uv.HasNaN());
+    Point3f pu0 = Lerp(intr.uv[1], p00, p01), pu1 = Lerp(intr.uv[1], p10, p11);
+    Vector3f dpdu = pu1 - pu0;
+    Vector3f dpdv = Lerp(intr.uv[0], p01, p11) - Lerp(intr.uv[0], p00, p10);
+
+    // Return final bilinear patch area sampling PDF
+    return pdf / Length(Cross(dpdu, dpdv));
+}
+
+pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,
+                                                  Point2f u) const {
+    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
+    const BilinearPatchMesh *mesh = GetMesh();
+    const int *v = &mesh->vertexIndices[4 * blpIndex];
+    const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
+    const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
+
+    // Find normalized vectors to corners of bilinear patch
     Vector3f v00 = Normalize(p00 - ctx.p());
     Vector3f v10 = Normalize(p10 - ctx.p());
     Vector3f v01 = Normalize(p01 - ctx.p());
     Vector3f v11 = Normalize(p11 - ctx.p());
 
     if (IsRectangle() && SphericalQuadArea(v00, v10, v11, v01) > MinSphericalSampleArea) {
+        // Sample direction to rectanglular bilinear patch
         Float pdf = 1;
-        Point2f u = uo;
         if (mesh->imageDistribution) {
             if (u[0] < 0.5) {
                 u[0] = std::min(2.f * u[0], OneMinusEpsilon);
@@ -1212,7 +1291,8 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,
         }
 
         Float quadPDF;
-        Point3f p = SampleSphericalQuad(ctx.p(), p00, p10 - p00, p01 - p00, u, &quadPDF);
+        Point3f p =
+            SampleSphericalRectangle(ctx.p(), p00, p10 - p00, p01 - p00, u, &quadPDF);
         pdf *= quadPDF;
         Normal3f n = Normal3f(Normalize(Cross(p10 - p00, p01 - p00)));
         if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
@@ -1228,24 +1308,24 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,
         }
 
         return ShapeSample{Interaction(p, n, ctx.time, uv), pdf};
+
+    } else {
+        // Uniformly sample shape and compute incident direction _wi_
+        pstd::optional<ShapeSample> ss = Sample(u);
+        DCHECK(ss.has_value());
+        ss->intr.time = ctx.time;
+        Vector3f wi = ss->intr.p() - ctx.p();
+        if (LengthSquared(wi) == 0)
+            return {};
+        wi = Normalize(wi);
+
+        // Convert uniform area sample PDF in _ss_ to solid angle measure
+        ss->pdf /= AbsDot(ss->intr.n, -wi) / DistanceSquared(ctx.p(), ss->intr.p());
+        if (IsInf(ss->pdf))
+            return {};
+
+        return ss;
     }
-
-    // From Shape::Sample().
-    pstd::optional<ShapeSample> ss = Sample(uo);
-    if (!ss)
-        return {};
-    ss->intr.time = ctx.time;
-    Vector3f wi = ss->intr.p() - ctx.p();
-
-    if (LengthSquared(wi) == 0)
-        return {};
-    wi = Normalize(wi);
-    // Convert uniform area sample PDF in _ss_ to solid angle measure
-    ss->pdf /= AbsDot(ss->intr.n, -wi) / DistanceSquared(ctx.p(), ss->intr.p());
-    if (IsInf(ss->pdf))
-        return {};
-
-    return ss;
 }
 
 Float BilinearPatch::PDF(const ShapeSampleContext &ctx, const Vector3f &wi) const {
@@ -1282,8 +1362,8 @@ Float BilinearPatch::PDF(const ShapeSampleContext &ctx, const Vector3f &wi) cons
                 std::max<Float>(0.01, AbsDot(Normalize(p01 - rp), ctx.ns)),
                 std::max<Float>(0.01, AbsDot(Normalize(p11 - rp), ctx.ns))};
 
-            Point2f u =
-                InvertSphericalQuadSample(rp, p00, p10 - p00, p01 - p00, si->intr.p());
+            Point2f u = InvertSphericalRectangleSample(rp, p00, p10 - p00, p01 - p00,
+                                                       si->intr.p());
             return BilinearPDF(u, w) * pdf;
         } else
             return pdf;
@@ -1295,69 +1375,6 @@ Float BilinearPatch::PDF(const ShapeSampleContext &ctx, const Vector3f &wi) cons
             pdf = 0.f;
         return pdf;
     }
-}
-
-pstd::optional<ShapeSample> BilinearPatch::Sample(const Point2f &uo) const {
-    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
-    const BilinearPatchMesh *mesh = GetMesh();
-    const int *v = &mesh->vertexIndices[4 * blpIndex];
-    const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
-    const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
-
-    Point2f u = uo;
-    Float pdf = 1;
-    if (mesh->imageDistribution)
-        u = mesh->imageDistribution->Sample(u, &pdf);
-    else if (!IsRectangle()) {
-        // Approximate uniform area
-        pstd::array<Float, 4> w = {
-            Length(Cross(p10 - p00, p01 - p00)), Length(Cross(p10 - p00, p11 - p10)),
-            Length(Cross(p01 - p00, p11 - p01)), Length(Cross(p11 - p10, p11 - p01))};
-        u = SampleBilinear(u, w);
-        pdf = BilinearPDF(u, w);
-    }
-
-    Point3f pu0 = Lerp(u[1], p00, p01), pu1 = Lerp(u[1], p10, p11);
-    Vector3f dpdu = pu1 - pu0;
-    Vector3f dpdv = Lerp(u[0], p01, p11) - Lerp(u[0], p00, p10);
-    if (LengthSquared(dpdu) == 0 || LengthSquared(dpdv) == 0)
-        return {};
-
-    Normal3f n = Normal3f(Normalize(Cross(dpdu, dpdv)));
-    if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
-        n = -n;
-
-    // TODO: double check pError
-    Point3f p = Lerp(u[0], pu0, pu1);
-    Vector3f pError =
-        gamma(6) * Vector3f(Max(Max(Abs(p00), Abs(p10)), Max(Abs(p01), Abs(p11))));
-
-    return ShapeSample{Interaction(Point3fi(p, pError), n, u),
-                       pdf / Length(Cross(dpdu, dpdv))};
-}
-
-Float BilinearPatch::PDF(const Interaction &intr) const {
-    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
-    const BilinearPatchMesh *mesh = GetMesh();
-    const int *v = &mesh->vertexIndices[4 * blpIndex];
-    const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
-    const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
-
-    Float pdf = 1;
-    if (mesh->imageDistribution)
-        pdf = mesh->imageDistribution->PDF(intr.uv);
-    else if (!IsRectangle()) {
-        pstd::array<Float, 4> w = {
-            Length(Cross(p10 - p00, p01 - p00)), Length(Cross(p10 - p00, p11 - p10)),
-            Length(Cross(p01 - p00, p11 - p01)), Length(Cross(p11 - p10, p11 - p01))};
-        pdf = BilinearPDF(intr.uv, w);
-    }
-
-    CHECK(!intr.uv.HasNaN());
-    Point3f pu0 = Lerp(intr.uv[1], p00, p01), pu1 = Lerp(intr.uv[1], p10, p11);
-    Vector3f dpdu = pu1 - pu0;
-    Vector3f dpdv = Lerp(intr.uv[0], p01, p11) - Lerp(intr.uv[0], p00, p10);
-    return pdf / Length(Cross(dpdu, dpdv));
 }
 
 std::string BilinearPatch::ToString() const {

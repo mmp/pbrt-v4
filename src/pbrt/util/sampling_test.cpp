@@ -520,7 +520,7 @@ TEST(Sampling, SphericalQuad) {
     Float sphSum = 0, areaSum = 0;
     for (Point2f u : Hammersley2D(count)) {
         Float pdf;
-        Point3f pq = SampleSphericalQuad(p, v[0], v[1] - v[0], v[2] - v[0], u, &pdf);
+        Point3f pq = SampleSphericalRectangle(p, v[0], v[1] - v[0], v[2] - v[0], u, &pdf);
         sphSum += f(pq) / pdf;
 
         pq = Lerp(u[1], Lerp(u[0], v[0], v[1]), Lerp(u[0], v[2], v[3]));
@@ -542,8 +542,8 @@ TEST(Sampling, SphericalQuadInverse) {
     Vector3f ex( 0, 3, 0), ey( -2, 0, 3);
     Point2f u(0.031906128, 0.82836914);
 
-    Point3f pq = SampleSphericalQuad(p, s, ex, ey, u);
-    Point2f ui = InvertSphericalQuadSample(p, s, ex, ey, pq);
+    Point3f pq = SampleSphericalRectangle(p, s, ex, ey, u);
+    Point2f ui = InvertSphericalRectangleSample(p, s, ex, ey, pq);
     EXPECT_EQ(u, ui);
     }
 
@@ -551,8 +551,8 @@ TEST(Sampling, SphericalQuadInverse) {
         Point3f p(-1.8413692, 3.8777208, 9.158957), s( 6, 4, -2);
         Vector3f ex(0, -3, 0), ey( -2, 0, 3);
         Point2f u (0.11288452, 0.40319824 );
-        Point3f pq = SampleSphericalQuad(p, s, ex, ey, u);
-        Point2f ui = InvertSphericalQuadSample(p, s, ex, ey, pq);
+        Point3f pq = SampleSphericalRectangle(p, s, ex, ey, u);
+        Point2f ui = InvertSphericalRectangleSample(p, s, ex, ey, pq);
         EXPECT_EQ(u, ui);
     }
 //CO    return;
@@ -571,14 +571,14 @@ TEST(Sampling, SphericalQuadInverse) {
                   Lerp(rng.Uniform<Float>(), -10, 10),
                   Lerp(rng.Uniform<Float>(), -10, 10));
         Float pdf;
-        Point3f pq = SampleSphericalQuad(p, v[a][b], v[!a][b] - v[a][b],
+        Point3f pq = SampleSphericalRectangle(p, v[a][b], v[!a][b] - v[a][b],
                                          v[a][!b] - v[a][b], u, &pdf);
 
         Float solidAngle = 1 / pdf;
         if (solidAngle < .01)
             continue;
         ++nTested;
-        Point2f ui = InvertSphericalQuadSample(p, v[a][b], v[!a][b] - v[a][b],
+        Point2f ui = InvertSphericalRectangleSample(p, v[a][b], v[!a][b] - v[a][b],
                                                v[a][!b] - v[a][b], pq);
 
         auto err = [](Float a, Float ref) {

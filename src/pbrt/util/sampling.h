@@ -37,12 +37,13 @@ Point2f InvertSphericalTriangleSample(const pstd::array<Point3f, 3> &v, const Po
                                       const Vector3f &w);
 
 PBRT_CPU_GPU
-Point3f SampleSphericalQuad(const Point3f &p, const Point3f &v00, const Vector3f &ex,
-                            const Vector3f &ey, const Point2f &u, Float *pdf = nullptr);
+Point3f SampleSphericalRectangle(const Point3f &p, const Point3f &v00, const Vector3f &ex,
+                                 const Vector3f &ey, const Point2f &u,
+                                 Float *pdf = nullptr);
 PBRT_CPU_GPU
-Point2f InvertSphericalQuadSample(const Point3f &pRef, const Point3f &v00,
-                                  const Vector3f &ex, const Vector3f &ey,
-                                  const Point3f &pQuad);
+Point2f InvertSphericalRectangleSample(const Point3f &pRef, const Point3f &v00,
+                                       const Vector3f &ex, const Vector3f &ey,
+                                       const Point3f &pQuad);
 
 PBRT_CPU_GPU
 Vector3f SampleHenyeyGreenstein(const Vector3f &wo, Float g, const Point2f &u,

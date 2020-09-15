@@ -185,8 +185,9 @@ Point2f InvertSphericalTriangleSample(const pstd::array<Point3f, 3> &v, const Po
     return Point2f(Clamp(u0, 0, 1), Clamp(u1, 0, 1));
 }
 
-Point3f SampleSphericalQuad(const Point3f &pRef, const Point3f &s, const Vector3f &ex,
-                            const Vector3f &ey, const Point2f &u, Float *pdf) {
+Point3f SampleSphericalRectangle(const Point3f &pRef, const Point3f &s,
+                                 const Vector3f &ex, const Vector3f &ey, const Point2f &u,
+                                 Float *pdf) {
     // SphQuadInit()
     // local reference system 'R'
     Float exl = Length(ex), eyl = Length(ey);
@@ -267,9 +268,9 @@ Point3f SampleSphericalQuad(const Point3f &pRef, const Point3f &s, const Vector3
     return pRef + R.FromLocal(Vector3f(xu, yv, z0));
 }
 
-Point2f InvertSphericalQuadSample(const Point3f &pRef, const Point3f &s,
-                                  const Vector3f &ex, const Vector3f &ey,
-                                  const Point3f &pQuad) {
+Point2f InvertSphericalRectangleSample(const Point3f &pRef, const Point3f &s,
+                                       const Vector3f &ex, const Vector3f &ey,
+                                       const Point3f &pQuad) {
     // TODO: Delete anything unused in the below...
 
     // SphQuadInit()
