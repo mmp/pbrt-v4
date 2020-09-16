@@ -547,7 +547,7 @@ bool Curve::IntersectRay(const Ray &r, Float tMax,
     // Transform _Ray_ to curve's object space
     Ray ray = (*common->objectFromRender)(r);
 
-    // Compute object-space control points for curve segment, _cpObj_
+    // Get object-space control points for curve segment, _cpObj_
     pstd::array<Point3f, 4> cpObj =
         CubicBezierControlPoints(pstd::span<const Point3f>(common->cpObj), uMin, uMax);
 
@@ -596,38 +596,23 @@ bool Curve::RecursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Poin
     if (depth > 0) {
         // Split curve segment into sub-segments and test for intersection
         pstd::array<Point3f, 7> cpSplit = SubdivideCubicBezier(cp);
-        Float u[3] = {u0, (u0 + u1) / 2.f, u1};
+        Float u[3] = {u0, (u0 + u1) / 2, u1};
         for (int seg = 0; seg < 2; ++seg) {
             // Check ray against curve segment's bounding box
             Float maxWidth =
                 std::max(Lerp(u[seg], common->width[0], common->width[1]),
                          Lerp(u[seg + 1], common->width[0], common->width[1]));
-
-            // As above, check y first, since it most commonly lets us exit
-            // out early.
             pstd::span<const Point3f> cps = pstd::MakeConstSpan(&cpSplit[3 * seg], 4);
-            if (std::max({cps[0].y, cps[1].y, cps[2].y, cps[3].y}) + 0.5f * maxWidth <
-                    0 ||
-                std::min({cps[0].y, cps[1].y, cps[2].y, cps[3].y}) - 0.5f * maxWidth > 0)
-                continue;
-
-            if (std::max({cps[0].x, cps[1].x, cps[2].x, cps[3].x}) + 0.5f * maxWidth <
-                    0 ||
-                std::min({cps[0].x, cps[1].x, cps[2].x, cps[3].x}) - 0.5f * maxWidth > 0)
-                continue;
-
-            Float zMax = rayLength * ((si && *si) ? (*si)->tHit : tMax);
-            if (std::max({cps[0].z, cps[1].z, cps[2].z, cps[3].z}) + 0.5f * maxWidth <
-                    0 ||
-                std::min({cps[0].z, cps[1].z, cps[2].z, cps[3].z}) - 0.5f * maxWidth >
-                    zMax)
+            Bounds3f curveBounds =
+                Union(Bounds3f(cps[0], cps[1]), Bounds3f(cps[2], cps[3]));
+            curveBounds = Expand(curveBounds, 0.5f * maxWidth);
+            Bounds3f rayBounds(Point3f(0, 0, 0), Point3f(0, 0, Length(ray.d) * tMax));
+            if (!Overlaps(rayBounds, curveBounds))
                 continue;
 
             // Recursively test ray-segment intersection
             bool hit = RecursiveIntersect(ray, tMax, cps, ObjectFromRay, u[seg],
                                           u[seg + 1], depth - 1, si);
-            // If we found an intersection and this is a shadow ray,
-            // we can exit out immediately.
             if (hit && si == nullptr)
                 return true;
         }
@@ -646,12 +631,12 @@ bool Curve::RecursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Poin
         if (edge < 0)
             return false;
 
-        // Compute line $w$ that gives minimum distance to sample point
-        Vector2f segmentDirection = Point2f(cp[3].x, cp[3].y) - Point2f(cp[0].x, cp[0].y);
-        Float denom = LengthSquared(segmentDirection);
+        // Find line $w$ that gives minimum distance to sample point
+        Vector2f segmentDir = Point2f(cp[3].x, cp[3].y) - Point2f(cp[0].x, cp[0].y);
+        Float denom = LengthSquared(segmentDir);
         if (denom == 0)
             return false;
-        Float w = Dot(-Vector2f(cp[0].x, cp[0].y), segmentDirection) / denom;
+        Float w = Dot(-Vector2f(cp[0].x, cp[0].y), segmentDir) / denom;
 
         // Compute $u$ coordinate of curve intersection point and _hitWidth_
         Float u = Clamp(Lerp(w, u0, u1), u0, u1);
@@ -668,29 +653,28 @@ bool Curve::RecursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Poin
 
         // Test intersection point against curve width
         Vector3f dpcdw;
-        Point3f pc = EvaluateCubicBezier(pstd::MakeConstSpan(cp), Clamp(w, 0, 1), &dpcdw);
+        Point3f pc =
+            EvaluateCubicBezier(pstd::span<const Point3f>(cp), Clamp(w, 0, 1), &dpcdw);
         Float ptCurveDist2 = pc.x * pc.x + pc.y * pc.y;
         if (ptCurveDist2 > hitWidth * hitWidth * .25f)
             return false;
-        Float zMax = rayLength * tMax;
-        if (pc.z < 0 || pc.z > zMax)
+        if (pc.z < 0 || pc.z > rayLength * tMax)
             return false;
 
-        // Compute hit _t_ and partial derivatives for curve intersection
         if (si != nullptr) {
+            // Initialize _ShapeIntersection_ for curve intersection
+            // Compute _tHit_ for curve intersection
+            // FIXME: this tHit isn't quite right for ribbons...
+            Float tHit = pc.z / rayLength;
+            if (si->has_value() && tHit > si->value().tHit)
+                return false;
+
+            // Initialize _SurfaceInteraction_ _intr_ for curve intersection
             // Compute $v$ coordinate of curve intersection point
             Float ptCurveDist = std::sqrt(ptCurveDist2);
             Float edgeFunc = dpcdw.x * -pc.y + pc.x * dpcdw.y;
             Float v = (edgeFunc > 0) ? 0.5f + ptCurveDist / hitWidth
                                      : 0.5f - ptCurveDist / hitWidth;
-
-            // FIXME: this tHit isn't quite right for ribbons...
-            Float tHit = pc.z / rayLength;
-            DCHECK_LT(tHit, 1.0001 * tMax);
-            if (*si)
-                DCHECK_LT(tHit, 1.001 * (*si)->tHit);  // ???
-            // Compute error bounds for curve intersection
-            Vector3f pError(2 * hitWidth, 2 * hitWidth, 2 * hitWidth);
 
             // Compute $\dpdu$ and $\dpdv$ for curve intersection
             Vector3f dpdu, dpdv;
@@ -712,15 +696,18 @@ bool Curve::RecursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Poin
                 dpdv = ObjectFromRay(dpdvPlane);
             }
 
-            Point3f pHit = ray(tHit);
-            Point3fi pe(pHit, pError);
-            *si = {{(*common->renderFromObject)(SurfaceInteraction(
-                        pe, Point2f(u, v), -ray.d, dpdu, dpdv, Normal3f(0, 0, 0),
-                        Normal3f(0, 0, 0), ray.time,
-                        OrientationIsReversed() ^ TransformSwapsHandedness())),
-                    tHit}};
-        }
+            // Compute error bounds for curve intersection
+            Vector3f pError(2 * hitWidth, 2 * hitWidth, 2 * hitWidth);
 
+            bool flipNormal =
+                common->reverseOrientation ^ common->transformSwapsHandedness;
+            Point3fi pi(ray(tHit), pError);
+            SurfaceInteraction intr(pi, {u, v}, -ray.d, dpdu, dpdv, Normal3f(),
+                                    Normal3f(), ray.time, flipNormal);
+            intr = (*common->renderFromObject)(intr);
+
+            *si = ShapeIntersection{intr, tHit};
+        }
 #ifndef PBRT_IS_GPU_CODE
         ++nCurveHits;
 #endif

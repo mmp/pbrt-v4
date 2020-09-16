@@ -1237,11 +1237,6 @@ class Curve {
     PBRT_CPU_GPU
     Float PDF(const ShapeSampleContext &ctx, const Vector3f &wi) const;
 
-    PBRT_CPU_GPU
-    bool OrientationIsReversed() const { return common->reverseOrientation; }
-    PBRT_CPU_GPU
-    bool TransformSwapsHandedness() const { return common->transformSwapsHandedness; }
-
     std::string ToString() const;
 
     Curve(const CurveCommon *common, Float uMin, Float uMax)
