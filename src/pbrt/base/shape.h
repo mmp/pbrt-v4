@@ -7,8 +7,6 @@
 
 #include <pbrt/pbrt.h>
 
-#include <pbrt/util/buffercache.h>
-#include <pbrt/util/float.h>
 #include <pbrt/util/taggedptr.h>
 #include <pbrt/util/vecmath.h>
 

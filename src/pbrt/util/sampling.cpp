@@ -87,16 +87,12 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v,
     Float sinBetap = SafeSqrt(1 - cosBetap * cosBetap);
 
     // Compute $c'$ along the arc between $b'$ and $a$
-    // Gram-Schmidt
-    auto GS = [](const Vector3f &a, const Vector3f &b) {
-        return Normalize(a - Dot(a, b) * b);
-    };
-    Vector3f cp = cosBetap * a + sinBetap * GS(c, a);
+    Vector3f cp = cosBetap * a + sinBetap * Normalize(GramSchmidt(c, a));
 
     // Compute sampled spherical triangle direction and return barycentrics
     Float cosTheta = 1 - u[1] * (1 - Dot(cp, b));
     Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
-    Vector3f w = cosTheta * b + sinTheta * GS(cp, b);
+    Vector3f w = cosTheta * b + sinTheta * Normalize(GramSchmidt(cp, b));
     // Find barycentric coordinates for sampled direction _w_
     Vector3f e1(v[1] - v[0]), e2(v[2] - v[0]);
     Vector3f s1 = Cross(w, e2);
@@ -126,6 +122,7 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v,
 // Via Jim Arvo's SphTri.C
 Point2f InvertSphericalTriangleSample(const pstd::array<Point3f, 3> &v, const Point3f &p,
                                       const Vector3f &w) {
+    // TODO: is double precision really necessary here??
     using Vector3d = Vector3<double>;
     Vector3d a(v[0] - p), b(v[1] - p), c(v[2] - p);
     CHECK_GT(LengthSquared(a), 0);
@@ -207,10 +204,8 @@ Point3f SampleSphericalRectangle(const Point3f &pRef, const Point3f &s,
     Vector3f v10(x1, y0, z0), v11(x1, y1, z0);
     Vector3f n0 = Normalize(Cross(v00, v10)), n1 = Normalize(Cross(v10, v11));
     Vector3f n2 = Normalize(Cross(v11, v01)), n3 = Normalize(Cross(v01, v00));
-    Float g0 = AngleBetween(-n0, n1);
-    Float g1 = AngleBetween(-n1, n2);
-    Float g2 = AngleBetween(-n2, n3);
-    Float g3 = AngleBetween(-n3, n0);
+    Float g0 = AngleBetween(-n0, n1), g1 = AngleBetween(-n1, n2);
+    Float g2 = AngleBetween(-n2, n3), g3 = AngleBetween(-n3, n0);
 
     // Compute spherical rectangle solid angle and PDF
     Float solidAngle = double(g0) + double(g1) + double(g2) + double(g3) - 2. * Pi;
@@ -250,7 +245,7 @@ Point3f SampleSphericalRectangle(const Point3f &pRef, const Point3f &s,
 
 Point2f InvertSphericalRectangleSample(const Point3f &pRef, const Point3f &s,
                                        const Vector3f &ex, const Vector3f &ey,
-                                       const Point3f &pQuad) {
+                                       const Point3f &pRect) {
     // TODO: Delete anything unused in the below...
 
     // SphQuadInit()
@@ -299,11 +294,11 @@ Point2f InvertSphericalRectangleSample(const Point3f &pRef, const Point3f &s,
 
     // TODO: this (rarely) goes differently than sample. figure out why...
     if (solidAngle < 1e-3) {
-        Vector3f pq = pQuad - s;
+        Vector3f pq = pRect - s;
         return Point2f(Dot(pq, ex) / LengthSquared(ex), Dot(pq, ey) / LengthSquared(ey));
     }
 
-    Vector3f v = R.ToLocal(pQuad - pRef);
+    Vector3f v = R.ToLocal(pRect - pRef);
     Float xu = v.x, yv = v.y;
 
     xu = Clamp(xu, x0, x1);  // avoid Infs

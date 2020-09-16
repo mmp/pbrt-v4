@@ -44,7 +44,7 @@ Point3f SampleSphericalRectangle(const Point3f &p, const Point3f &v00, const Vec
 PBRT_CPU_GPU
 Point2f InvertSphericalRectangleSample(const Point3f &pRef, const Point3f &v00,
                                        const Vector3f &ex, const Vector3f &ey,
-                                       const Point3f &pQuad);
+                                       const Point3f &pRect);
 
 PBRT_CPU_GPU
 Vector3f SampleHenyeyGreenstein(const Vector3f &wo, Float g, const Point2f &u,

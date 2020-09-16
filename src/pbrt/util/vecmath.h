@@ -971,6 +971,11 @@ PBRT_CPU_GPU inline Float AngleBetween(const Normal3<T> &a, const Normal3<T> &b)
 }
 
 template <typename T>
+PBRT_CPU_GPU inline Vector3<T> GramSchmidt(const Vector3<T> &a, const Vector3<T> &b) {
+    return a - Dot(a, b) * b;
+}
+
+template <typename T>
 PBRT_CPU_GPU inline Vector3<T> Cross(const Vector3<T> &v, const Vector3<T> &w) {
     DCHECK(!v.HasNaN() && !w.HasNaN());
     return {DifferenceOfProducts(v.y, w.z, v.z, w.y),

@@ -507,11 +507,14 @@ pstd::vector<ShapeHandle> CreateCurve(const Transform *renderFromObject,
 
 // Curve Method Definitions
 Bounds3f Curve::Bounds() const {
-    Bounds3f b =
-        BoundCubicBezier<Bounds3f>(pstd::MakeConstSpan(common->cpObj), uMin, uMax);
+    pstd::span<const Point3f> cpSpan(common->cpObj);
+    Bounds3f objBounds = BoundCubicBezier<Bounds3f>(cpSpan, uMin, uMax);
+    // Expand _objBounds_ by maximum curve width over $u$ range
     Float width[2] = {Lerp(uMin, common->width[0], common->width[1]),
                       Lerp(uMax, common->width[0], common->width[1])};
-    return (*common->renderFromObject)(Expand(b, std::max(width[0], width[1]) * 0.5f));
+    objBounds = Expand(objBounds, std::max(width[0], width[1]) * 0.5f);
+
+    return (*common->renderFromObject)(objBounds);
 }
 
 Float Curve::Area() const {
@@ -528,72 +531,43 @@ Float Curve::Area() const {
 
 pstd::optional<ShapeIntersection> Curve::Intersect(const Ray &ray, Float tMax) const {
     pstd::optional<ShapeIntersection> si;
-    intersect(ray, tMax, &si);
+    IntersectRay(ray, tMax, &si);
     return si;
 }
 
 bool Curve::IntersectP(const Ray &ray, Float tMax) const {
-    return intersect(ray, tMax, nullptr);
+    return IntersectRay(ray, tMax, nullptr);
 }
 
-bool Curve::intersect(const Ray &r, Float tMax,
-                      pstd::optional<ShapeIntersection> *si) const {
+bool Curve::IntersectRay(const Ray &r, Float tMax,
+                         pstd::optional<ShapeIntersection> *si) const {
 #ifndef PBRT_IS_GPU_CODE
     ++nCurveTests;
 #endif
     // Transform _Ray_ to curve's object space
-    Point3fi oi = (*common->objectFromRender)(Point3fi(r.o));
-    Vector3fi di = (*common->objectFromRender)(Vector3fi(r.d));
-    Ray ray(Point3f(oi), Vector3f(di), r.time, r.medium);
+    Ray ray = (*common->objectFromRender)(r);
 
     // Compute object-space control points for curve segment, _cpObj_
     pstd::array<Point3f, 4> cpObj =
-        CubicBezierControlPoints(pstd::MakeConstSpan(common->cpObj), uMin, uMax);
+        CubicBezierControlPoints(pstd::span<const Point3f>(common->cpObj), uMin, uMax);
 
     // Project curve control points to plane perpendicular to ray
-    // Be careful to set the "up" direction passed to LookAt() to equal the
-    // vector from the first to the last control points.  In turn, this
-    // helps orient the curve to be roughly parallel to the x axis in the
-    // ray coordinate system.
-    //
-    // In turn (especially for curves that are approaching stright lines),
-    // we get curve bounds with minimal extent in y, which in turn lets us
-    // early out more quickly in recursiveIntersect().
     Vector3f dx = Cross(ray.d, cpObj[3] - cpObj[0]);
     if (LengthSquared(dx) == 0) {
-        // If the ray and the vector between the first and last control
-        // points are parallel, dx will be zero.  Generate an arbitrary xy
-        // orientation for the ray coordinate system so that intersection
-        // tests can proceeed in this unusual case.
         Vector3f dy;
         CoordinateSystem(ray.d, &dx, &dy);
     }
-
-    Transform RayFromObject = LookAt(ray.o, ray.o + ray.d, dx);
-    pstd::array<Point3f, 4> cp = {RayFromObject(cpObj[0]), RayFromObject(cpObj[1]),
-                                  RayFromObject(cpObj[2]), RayFromObject(cpObj[3])};
+    Transform rayFromObject = LookAt(ray.o, ray.o + ray.d, dx);
+    pstd::array<Point3f, 4> cp = {rayFromObject(cpObj[0]), rayFromObject(cpObj[1]),
+                                  rayFromObject(cpObj[2]), rayFromObject(cpObj[3])};
 
     // Test ray against bound of projected control points
-    // Before going any further, see if the ray's bounding box intersects
-    // the curve's bounding box. We start with the y dimension, since the y
-    // extent is generally the smallest (and is often tiny) due to our
-    // careful orientation of the ray coordinate system above.
     Float maxWidth = std::max(Lerp(uMin, common->width[0], common->width[1]),
                               Lerp(uMax, common->width[0], common->width[1]));
-    if (std::max({cp[0].y, cp[1].y, cp[2].y, cp[3].y}) + 0.5f * maxWidth < 0 ||
-        std::min({cp[0].y, cp[1].y, cp[2].y, cp[3].y}) - 0.5f * maxWidth > 0)
-        return false;
-
-    // Check for non-overlap in x.
-    if (std::max({cp[0].x, cp[1].x, cp[2].x, cp[3].x}) + 0.5f * maxWidth < 0 ||
-        std::min({cp[0].x, cp[1].x, cp[2].x, cp[3].x}) - 0.5f * maxWidth > 0)
-        return false;
-
-    // Check for non-overlap in z.
-    Float rayLength = Length(ray.d);
-    Float zMax = rayLength * tMax;
-    if (std::max({cp[0].z, cp[1].z, cp[2].z, cp[3].z}) + 0.5f * maxWidth < 0 ||
-        std::min({cp[0].z, cp[1].z, cp[2].z, cp[3].z}) - 0.5f * maxWidth > zMax)
+    Bounds3f curveBounds = Union(Bounds3f(cp[0], cp[1]), Bounds3f(cp[2], cp[3]));
+    curveBounds = Expand(curveBounds, 0.5f * maxWidth);
+    Bounds3f rayBounds(Point3f(0, 0, 0), Point3f(0, 0, Length(ray.d) * tMax));
+    if (!Overlaps(rayBounds, curveBounds))
         return false;
 
     // Compute refinement depth for curve, _maxDepth_
@@ -609,11 +583,13 @@ bool Curve::intersect(const Ray &r, Float tMax,
     int r0 = Log2Int(1.41421356237f * 6.f * L0 / (8.f * eps)) / 2;
     int maxDepth = Clamp(r0, 0, 10);
 
-    return recursiveIntersect(ray, tMax, pstd::MakeConstSpan(cp), Inverse(RayFromObject),
-                              uMin, uMax, maxDepth, si);
+    // Recursively test for ray--curve intersection
+    pstd::span<const Point3f> cpSpan(cp);
+    return RecursiveIntersect(ray, tMax, cpSpan, Inverse(rayFromObject), uMin, uMax,
+                              maxDepth, si);
 }
 
-bool Curve::recursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Point3f> cp,
+bool Curve::RecursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Point3f> cp,
                                const Transform &ObjectFromRay, Float u0, Float u1,
                                int depth, pstd::optional<ShapeIntersection> *si) const {
     Float rayLength = Length(ray.d);
@@ -648,7 +624,7 @@ bool Curve::recursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Poin
                 continue;
 
             // Recursively test ray-segment intersection
-            bool hit = recursiveIntersect(ray, tMax, cps, ObjectFromRay, u[seg],
+            bool hit = RecursiveIntersect(ray, tMax, cps, ObjectFromRay, u[seg],
                                           u[seg + 1], depth - 1, si);
             // If we found an intersection and this is a shadow ray,
             // we can exit out immediately.

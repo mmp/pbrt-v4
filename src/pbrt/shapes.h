@@ -10,6 +10,7 @@
 #include <pbrt/base/shape.h>
 #include <pbrt/interaction.h>
 #include <pbrt/ray.h>
+#include <pbrt/util/buffercache.h>
 #include <pbrt/util/mesh.h>
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/sampling.h>
@@ -1251,8 +1252,9 @@ class Curve {
 
   private:
     // Curve Private Methods
-    bool intersect(const Ray &r, Float tMax, pstd::optional<ShapeIntersection> *si) const;
-    bool recursiveIntersect(const Ray &r, Float tMax, pstd::span<const Point3f> cp,
+    bool IntersectRay(const Ray &r, Float tMax,
+                      pstd::optional<ShapeIntersection> *si) const;
+    bool RecursiveIntersect(const Ray &r, Float tMax, pstd::span<const Point3f> cp,
                             const Transform &ObjectFromRay, Float u0, Float u1, int depth,
                             pstd::optional<ShapeIntersection> *si) const;
 
@@ -1472,7 +1474,7 @@ class BilinearPatch {
                           sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
                     Transform r = Rotate(sinTheta, cosTheta, axis);
                     Vector3f sdpdu = r(dpdu), sdpdv = r(dpdv);
-                    sdpdu -= Dot(sdpdu, ns) * Vector3f(ns);
+                    sdpdu = GramSchmidt(sdpdu, Vector3f(ns));
                     isect.SetShadingGeometry(ns, sdpdu, sdpdv, dndu, dndv, true);
                 }
             }
