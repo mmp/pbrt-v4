@@ -321,7 +321,7 @@ Point2f InvertSphericalRectangleSample(const Point3f &pRef, const Point3f &s,
     // inaccuracy in sqrt/au.
     //
     // For fu, the main issue comes adding a small value to 1+ in invcusq
-    // and then having b0sq be close to one, so having catistrophic
+    // and then having b0sq be close to one, so having catastrophic
     // cancellation affect fusq. Approximating it as z0sq / Sqr(xu) when
     // b0sq is close to one doesn't help, however..
     //

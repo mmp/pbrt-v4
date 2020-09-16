@@ -11,6 +11,7 @@
 #include <limits.h>
 #include <cassert>
 #include <cstddef>
+#include <cstring>
 #include <initializer_list>
 #include <iterator>
 #include <list>
@@ -27,6 +28,20 @@ PBRT_CPU_GPU inline void swap(T &a, T &b) {
     T tmp = std::move(a);
     a = std::move(b);
     b = std::move(tmp);
+}
+
+template <class To, class From>
+PBRT_CPU_GPU typename std::enable_if_t<sizeof(To) == sizeof(From) &&
+                                           std::is_trivially_copyable_v<From> &&
+                                           std::is_trivially_copyable_v<To>,
+                                       To>
+bit_cast(const From &src) noexcept {
+    static_assert(std::is_trivially_constructible_v<To>,
+                  "This implementation requires the destination type to be trivially "
+                  "constructible");
+    To dst;
+    std::memcpy(&dst, &src, sizeof(To));
+    return dst;
 }
 
 template <typename T, int N>

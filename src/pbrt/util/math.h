@@ -110,6 +110,41 @@ inline Float Lerp(Float t, Float a, Float b) {
     return (1 - t) * a + t * b;
 }
 
+PBRT_CPU_GPU
+inline float FMA(float a, float b, float c) {
+    return std::fma(a, b, c);
+}
+
+PBRT_CPU_GPU
+inline double FMA(double a, double b, double c) {
+    return std::fma(a, b, c);
+}
+inline long double FMA(long double a, long double b, long double c) {
+    return std::fma(a, b, c);
+}
+
+template <typename T>
+inline PBRT_CPU_GPU typename std::enable_if_t<std::is_integral<T>::value, T> FMA(T a, T b,
+                                                                                 T c) {
+    return a * b + c;
+}
+
+template <typename Ta, typename Tb, typename Tc, typename Td>
+PBRT_CPU_GPU inline auto DifferenceOfProducts(Ta a, Tb b, Tc c, Td d) {
+    auto cd = c * d;
+    auto differenceOfProducts = FMA(a, b, -cd);
+    auto error = FMA(-c, d, cd);
+    return differenceOfProducts + error;
+}
+
+template <typename Ta, typename Tb, typename Tc, typename Td>
+PBRT_CPU_GPU inline auto SumOfProducts(Ta a, Tb b, Tc c, Td d) {
+    auto cd = c * d;
+    auto sumOfProducts = FMA(a, b, cd);
+    auto error = FMA(c, d, -cd);
+    return sumOfProducts + error;
+}
+
 // http://www.plunk.org/~hatch/rightway.php
 PBRT_CPU_GPU
 inline Float SinXOverX(Float x) {
@@ -175,25 +210,6 @@ inline Float Radians(Float deg) {
 PBRT_CPU_GPU
 inline Float Degrees(Float rad) {
     return (180 / Pi) * rad;
-}
-
-PBRT_CPU_GPU
-inline float FMA(float a, float b, float c) {
-    return std::fma(a, b, c);
-}
-
-PBRT_CPU_GPU
-inline double FMA(double a, double b, double c) {
-    return std::fma(a, b, c);
-}
-inline long double FMA(long double a, long double b, long double c) {
-    return std::fma(a, b, c);
-}
-// Needed so can use e.g. EvaluatePolynomial() with ints
-template <typename T>
-PBRT_CPU_GPU inline typename std::enable_if_t<std::is_integral<T>::value, T> FMA(T a, T b,
-                                                                                 T c) {
-    return a * b + c;
 }
 
 PBRT_CPU_GPU
@@ -574,27 +590,6 @@ PBRT_CPU_GPU inline CompensatedFloat TwoSum(Float a, Float b) {
     Float da = a - ap;
     Float db = b - bp;
     return {s, da + db};
-}
-
-// Returns ab-cd with <1.5 ulps of error
-// Claude-Pierre Jeannerod, Nicolas Louvet, and Jean-Michel Muller,
-//  "Further Analysis of Kahan's Algorithm for the Accurate Computation
-//  of 2x2 Determinants". Mathematics of Computation, Vol. 82, No. 284,
-//  Oct. 2013, pp. 2245-2264
-template <typename Ta, typename Tb, typename Tc, typename Td>
-PBRT_CPU_GPU inline auto DifferenceOfProducts(Ta a, Tb b, Tc c, Td d) {
-    auto cd = c * d;
-    auto err = FMA(-c, d, cd);  // Error (exact)
-    auto dop = FMA(a, b, -cd);
-    return dop + err;
-}
-
-template <typename Ta, typename Tb, typename Tc, typename Td>
-PBRT_CPU_GPU inline auto SumOfProducts(Ta a, Tb b, Tc c, Td d) {
-    auto cd = c * d;
-    auto err = FMA(c, d, -cd);  // Error (exact)
-    auto sop = FMA(a, b, cd);
-    return sop + err;
 }
 
 namespace internal {
@@ -1164,7 +1159,7 @@ PBRT_CPU_GPU inline Interval<Float> DifferenceOfProducts(Interval<Float> a,
                                       c[cdLowIndex & 1], d[cdLowIndex >> 1]);
     DCHECK_LE(low, high);
 
-    return {NextFloatDown(low, 2), NextFloatUp(high, 2)};
+    return {NextFloatDown(NextFloatDown(low)), NextFloatUp(NextFloatUp(high))};
 }
 
 template <typename Float>

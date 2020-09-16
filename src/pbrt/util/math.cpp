@@ -344,6 +344,11 @@ Vector3f EqualAreaSquareToSphere(const Point2f &p) {
     // Compute the z coordinate (flip sign based on signed distance)
     Float r2 = r * r;
     Float z = 1 - r2;
+
+    // Return a float with a's magnitude, but negated if b is negative.
+    auto FlipSign = [](Float a, Float b) {
+        return BitsToFloat(FloatToBits(a) ^ SignBit(b));
+    };
     z = FlipSign(z, sd);
     Float sinTheta = r * SafeSqrt(2 - r2);
 
@@ -399,6 +404,11 @@ Point2f EqualAreaSphereToSquare(const Vector3f &d) {
         u = 1 - u;
         v = 1 - v;
     }
+
+    // Return a float with a's magnitude, but negated if b is negative.
+    auto FlipSign = [](Float a, Float b) {
+        return BitsToFloat(FloatToBits(a) ^ SignBit(b));
+    };
 
     // Move (u,v) to the correct quadrant based on the signs of (x,y)
     u = FlipSign(u, d.x);
