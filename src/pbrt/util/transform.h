@@ -139,41 +139,41 @@ class Transform {
         Float zp = (m[2][0] * x + m[2][1] * y) + (m[2][2] * z + m[2][3]);
         Float wp = (m[3][0] * x + m[3][1] * y) + (m[3][2] * z + m[3][3]);
 
-        // Compute absolute error for transformed point
-        Vector3f pOutError;
+        // Compute absolute error for transformed point, _pError_
+        Vector3f pError;
         if (p.IsExact()) {
             // Compute error for transformed exact _p_
-            pOutError.x = gamma(3) * (std::abs(m[0][0] * x) + std::abs(m[0][1] * y) +
-                                      std::abs(m[0][2] * z) + std::abs(m[0][3]));
-            pOutError.y = gamma(3) * (std::abs(m[1][0] * x) + std::abs(m[1][1] * y) +
-                                      std::abs(m[1][2] * z) + std::abs(m[1][3]));
-            pOutError.z = gamma(3) * (std::abs(m[2][0] * x) + std::abs(m[2][1] * y) +
-                                      std::abs(m[2][2] * z) + std::abs(m[2][3]));
+            pError.x = gamma(3) * (std::abs(m[0][0] * x) + std::abs(m[0][1] * y) +
+                                   std::abs(m[0][2] * z) + std::abs(m[0][3]));
+            pError.y = gamma(3) * (std::abs(m[1][0] * x) + std::abs(m[1][1] * y) +
+                                   std::abs(m[1][2] * z) + std::abs(m[1][3]));
+            pError.z = gamma(3) * (std::abs(m[2][0] * x) + std::abs(m[2][1] * y) +
+                                   std::abs(m[2][2] * z) + std::abs(m[2][3]));
 
         } else {
             // Compute error for transformed approximate _p_
             Vector3f pInError = p.Error();
-            pOutError.x = (gamma(3) + 1) * (std::abs(m[0][0]) * pInError.x +
-                                            std::abs(m[0][1]) * pInError.y +
-                                            std::abs(m[0][2]) * pInError.z) +
-                          gamma(3) * (std::abs(m[0][0] * x) + std::abs(m[0][1] * y) +
-                                      std::abs(m[0][2] * z) + std::abs(m[0][3]));
-            pOutError.y = (gamma(3) + 1) * (std::abs(m[1][0]) * pInError.x +
-                                            std::abs(m[1][1]) * pInError.y +
-                                            std::abs(m[1][2]) * pInError.z) +
-                          gamma(3) * (std::abs(m[1][0] * x) + std::abs(m[1][1] * y) +
-                                      std::abs(m[1][2] * z) + std::abs(m[1][3]));
-            pOutError.z = (gamma(3) + 1) * (std::abs(m[2][0]) * pInError.x +
-                                            std::abs(m[2][1]) * pInError.y +
-                                            std::abs(m[2][2]) * pInError.z) +
-                          gamma(3) * (std::abs(m[2][0] * x) + std::abs(m[2][1] * y) +
-                                      std::abs(m[2][2] * z) + std::abs(m[2][3]));
+            pError.x = (gamma(3) + 1) * (std::abs(m[0][0]) * pInError.x +
+                                         std::abs(m[0][1]) * pInError.y +
+                                         std::abs(m[0][2]) * pInError.z) +
+                       gamma(3) * (std::abs(m[0][0] * x) + std::abs(m[0][1] * y) +
+                                   std::abs(m[0][2] * z) + std::abs(m[0][3]));
+            pError.y = (gamma(3) + 1) * (std::abs(m[1][0]) * pInError.x +
+                                         std::abs(m[1][1]) * pInError.y +
+                                         std::abs(m[1][2]) * pInError.z) +
+                       gamma(3) * (std::abs(m[1][0] * x) + std::abs(m[1][1] * y) +
+                                   std::abs(m[1][2] * z) + std::abs(m[1][3]));
+            pError.z = (gamma(3) + 1) * (std::abs(m[2][0]) * pInError.x +
+                                         std::abs(m[2][1]) * pInError.y +
+                                         std::abs(m[2][2]) * pInError.z) +
+                       gamma(3) * (std::abs(m[2][0] * x) + std::abs(m[2][1] * y) +
+                                   std::abs(m[2][2] * z) + std::abs(m[2][3]));
         }
 
         if (wp == 1)
-            return Point3fi(Point3f(xp, yp, zp), pOutError);
+            return Point3fi(Point3f(xp, yp, zp), pError);
         else
-            return Point3fi(Point3f(xp, yp, zp), pOutError) / wp;
+            return Point3fi(Point3f(xp, yp, zp), pError) / wp;
     }
 
     PBRT_CPU_GPU
@@ -322,8 +322,7 @@ inline Ray Transform::operator()(const Ray &r, Float *tMax) const {
     Point3fi o = (*this)(Point3fi(r.o));
     Vector3f d = (*this)(r.d);
     // Offset ray origin to edge of error bounds and compute _tMax_
-    Float lengthSquared = LengthSquared(d);
-    if (lengthSquared > 0) {
+    if (Float lengthSquared = LengthSquared(d); lengthSquared > 0) {
         Float dt = Dot(Abs(d), oError) / lengthSquared;
         o += d * dt;
         if (tMax)

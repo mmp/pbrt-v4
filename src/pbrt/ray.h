@@ -75,11 +75,13 @@ class RayDifferential : public Ray {
 
 // Ray Inline Functions
 PBRT_CPU_GPU inline Point3f OffsetRayOrigin(Point3fi pi, Normal3f n, Vector3f w) {
+    // Find vector _offset_ to corner of error bounds and compute initial _po_
     Float d = Dot(Abs(n), pi.Error());
     Vector3f offset = d * Vector3f(n);
     if (Dot(w, n) < 0)
         offset = -offset;
     Point3f po = Point3f(pi) + offset;
+
     // Round offset point _po_ away from _p_
     for (int i = 0; i < 3; ++i) {
         if (offset[i] > 0)
@@ -91,10 +93,13 @@ PBRT_CPU_GPU inline Point3f OffsetRayOrigin(Point3fi pi, Normal3f n, Vector3f w)
     return po;
 }
 
+PBRT_CPU_GPU inline Ray SpawnRay(Point3fi pi, Normal3f n, Float time, Vector3f d) {
+    return Ray(OffsetRayOrigin(pi, n, d), d, time);
+}
+
 PBRT_CPU_GPU inline Ray SpawnRayTo(Point3fi pFrom, Normal3f n, Float time, Point3f pTo) {
     Vector3f d = pTo - Point3f(pFrom);
-    Point3f o = OffsetRayOrigin(pFrom, n, d);
-    return Ray(o, d, time);
+    return SpawnRay(pFrom, n, time, d);
 }
 
 PBRT_CPU_GPU inline Ray SpawnRayTo(Point3fi pFrom, Normal3f nFrom, Float time,
@@ -102,11 +107,6 @@ PBRT_CPU_GPU inline Ray SpawnRayTo(Point3fi pFrom, Normal3f nFrom, Float time,
     Point3f pf = OffsetRayOrigin(pFrom, nFrom, Point3f(pTo) - Point3f(pFrom));
     Point3f pt = OffsetRayOrigin(pTo, nTo, pf - Point3f(pTo));
     return Ray(pf, pt - pf, time);
-}
-
-PBRT_CPU_GPU inline Ray SpawnRay(Point3fi pi, Normal3f n, Float time, Vector3f d) {
-    Point3f o = OffsetRayOrigin(pi, n, d);
-    return Ray(o, d, time);
 }
 
 }  // namespace pbrt
