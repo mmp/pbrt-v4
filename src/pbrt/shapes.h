@@ -157,18 +157,12 @@ class Sphere {
         FloatInterval b = 2 * (di.x * oi.x + di.y * oi.y + di.z * oi.z);
         FloatInterval c = SumSquares(oi.x, oi.y, oi.z) - Sqr(FloatInterval(radius));
 
-// Compute sphere quadratic discriminant _discrim_
-#if 0
-// Original
-FloatInterval b2 = Sqr(b), ac = 4 * a * c;
-FloatInterval odiscrim = b2 - ac; // b * b - FloatInterval(4) * a * c;
-#endif
-        FloatInterval f = b / (2 * a);  // (o . d) / LengthSquared(d)
+        // Compute sphere quadratic discriminant _discrim_
+        FloatInterval f = b / (2 * a);
         Point3fi fp = oi - f * di;
-        // There's a bit more precision if you compute x^2-y^2 as (x+y)(x-y).
-        FloatInterval sqrtf = Sqrt(SumSquares(fp.x, fp.y, fp.z));
+        FloatInterval sqrtf = Sqrt(Sqr(fp.x) + Sqr(fp.y) + Sqr(fp.z));
         FloatInterval discrim =
-            4 * a * ((FloatInterval(radius)) - sqrtf) * ((FloatInterval(radius)) + sqrtf);
+            4 * a * (FloatInterval(radius) + sqrtf) * (FloatInterval(radius) - sqrtf);
         if (discrim.LowerBound() < 0)
             return {};
 
@@ -618,11 +612,9 @@ class Cylinder {
         FloatInterval c = SumSquares(oi.x, oi.y) - Sqr(FloatInterval(radius));
 
         // Compute cylinder quadratic discriminant _discrim_
-        // FloatInterval discrim = B * B - FloatInterval(4) * A * C;
-        FloatInterval f = b / (2 * a);  // (o . d) / LengthSquared(d)
-        FloatInterval fx = oi.x - f * di.x;
-        FloatInterval fy = oi.y - f * di.y;
-        FloatInterval sqrtf = Sqrt(SumSquares(fx, fy));
+        FloatInterval f = b / (2 * a);
+        FloatInterval fx = oi.x - f * di.x, fy = oi.y - f * di.y;
+        FloatInterval sqrtf = Sqrt(Sqr(fx) + Sqr(fy));
         FloatInterval discrim =
             4 * a * (FloatInterval(radius) + sqrtf) * (FloatInterval(radius) - sqrtf);
         if (discrim.LowerBound() < 0)
@@ -1443,7 +1435,7 @@ class BilinearPatch {
 
         // Initialize bilinear patch intersection point error _pError_
         Vector3f pError =
-            gamma(6) * Vector3f(Max(Max(Abs(p00), Abs(p10)), Max(Abs(p01), Abs(p11))));
+            gamma(4) * Vector3f(Max(Max(Abs(p00), Abs(p10)), Max(Abs(p01), Abs(p11))));
 
         // Initialize _SurfaceInteraction_ for bilinear patch intersection
         int faceIndex = mesh->faceIndices ? mesh->faceIndices[patchIndex] : 0;
