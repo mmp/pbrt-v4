@@ -232,6 +232,18 @@ class SurfaceInteraction : public Interaction {
 
     std::string ToString() const;
 
+    void SetIntersectionProperties(MaterialHandle mtl, LightHandle area,
+                                   const MediumInterface *mi, MediumHandle med) {
+        material = mtl;
+        areaLight = area;
+        CHECK_GE(Dot(n, shading.n), 0.);
+        // Set medium properties at surface intersection
+        if (mi && mi->IsMediumTransition())
+            mediumInterface = mi;
+        else
+            medium = med;
+    }
+
     PBRT_CPU_GPU
     BSDF GetBSDF(const RayDifferential &ray, SampledWavelengths &lambda,
                  CameraHandle camera, ScratchBuffer &scratchBuffer,

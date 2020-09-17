@@ -185,11 +185,6 @@ BVHAccel::BVHAccel(std::vector<PrimitiveHandle> p, int maxPrimsInNode,
     CHECK_EQ(totalNodes.load(), offset);
 }
 
-Bounds3f BVHAccel::Bounds() const {
-    CHECK(nodes != nullptr);
-    return nodes[0].bounds;
-}
-
 BVHBuildNode *BVHAccel::recursiveBuild(std::vector<Allocator> &threadAllocators,
                                        std::vector<BVHPrimitiveInfo> &primitiveInfo,
                                        int start, int end, std::atomic<int> *totalNodes,
@@ -521,6 +516,11 @@ int BVHAccel::flattenBVHTree(BVHBuildNode *node, int *offset) {
         linearNode->secondChildOffset = flattenBVHTree(node->children[1], offset);
     }
     return myOffset;
+}
+
+Bounds3f BVHAccel::Bounds() const {
+    CHECK(nodes != nullptr);
+    return nodes[0].bounds;
 }
 
 pstd::optional<ShapeIntersection> BVHAccel::Intersect(const Ray &ray, Float tMax) const {

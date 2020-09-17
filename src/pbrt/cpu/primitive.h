@@ -74,6 +74,7 @@ class SimplePrimitive {
     SimplePrimitive(ShapeHandle shape, MaterialHandle material);
 
   private:
+    // SimplePrimitive Private Members
     ShapeHandle shape;
     MaterialHandle material;
 };
@@ -102,14 +103,14 @@ class TransformedPrimitive {
 class AnimatedPrimitive {
   public:
     // AnimatedPrimitive Public Methods
+    Bounds3f Bounds() const {
+        return renderFromPrimitive.MotionBounds(primitive.Bounds());
+    }
+
     AnimatedPrimitive(PrimitiveHandle primitive,
                       const AnimatedTransform &renderFromPrimitive);
     pstd::optional<ShapeIntersection> Intersect(const Ray &r, Float tMax) const;
     bool IntersectP(const Ray &r, Float tMax) const;
-
-    Bounds3f Bounds() const {
-        return renderFromPrimitive.MotionBounds(primitive.Bounds());
-    }
 
   private:
     // AnimatedPrimitive Private Members

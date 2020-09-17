@@ -45,6 +45,10 @@ GeometricPrimitive::GeometricPrimitive(ShapeHandle shape, MaterialHandle materia
     primitiveMemory += sizeof(*this);
 }
 
+Bounds3f GeometricPrimitive::Bounds() const {
+    return shape.Bounds();
+}
+
 pstd::optional<ShapeIntersection> GeometricPrimitive::Intersect(const Ray &r,
                                                                 Float tMax) const {
     pstd::optional<ShapeIntersection> si = shape.Intersect(r, tMax);
@@ -54,17 +58,14 @@ pstd::optional<ShapeIntersection> GeometricPrimitive::Intersect(const Ray &r,
     // Test intersection against alpha texture, if present
     if (alpha) {
         if (Float a = alpha.Evaluate(si->intr); a < 1) {
-            Float u = (a <= 0)
-                          ? 1.f
-                          : (uint32_t(Hash(r.o.x, r.o.y, r.o.z, r.d.x, r.d.y, r.d.z)) *
-                             0x1p-32f);
+            // Potentially skip intersection, depending on stochastic alpha test
+            Float u = (a <= 0) ? 1.f : (uint32_t(Hash(r.o, r.d)) * 0x1p-32f);
             if (u > a) {
-                // Ignore this hit and trace a new ray.
+                // Ignore this intersection and trace a new ray
                 Ray rNext = si->intr.SpawnRay(r.d);
                 pstd::optional<ShapeIntersection> siNext =
                     Intersect(rNext, tMax - si->tHit);
                 if (siNext)
-                    // The returned t value has to account for both ray segments.
                     siNext->tHit += si->tHit;
                 return siNext;
             }
@@ -72,13 +73,7 @@ pstd::optional<ShapeIntersection> GeometricPrimitive::Intersect(const Ray &r,
     }
 
     // Initialize _SurfaceInteraction_ after _Shape_ intersection
-    si->intr.areaLight = areaLight;
-    si->intr.material = material;
-    CHECK_GE(Dot(si->intr.n, si->intr.shading.n), 0.);
-    if (mediumInterface.IsMediumTransition())
-        si->intr.mediumInterface = &mediumInterface;
-    else
-        si->intr.medium = r.medium;
+    si->intr.SetIntersectionProperties(material, areaLight, &mediumInterface, r.medium);
 
     return si;
 }
@@ -88,14 +83,11 @@ bool GeometricPrimitive::IntersectP(const Ray &r, Float tMax) const {
     if (material && material.IsTransparent())
         return false;
 
+    // Perform shadow intersection with test, handling alpha if necessary
     if (alpha)
         return Intersect(r, tMax).has_value();
     else
         return shape.IntersectP(r, tMax);
-}
-
-Bounds3f GeometricPrimitive::Bounds() const {
-    return shape.Bounds();
 }
 
 // SimplePrimitive Method Definitions
@@ -120,12 +112,8 @@ pstd::optional<ShapeIntersection> SimplePrimitive::Intersect(const Ray &r,
     if (!si)
         return {};
 
-    CHECK_LT(si->tHit, 1.001 * tMax);
-    si->intr.areaLight = nullptr;
-    si->intr.material = material;
+    si->intr.SetIntersectionProperties(material, nullptr, nullptr, r.medium);
 
-    CHECK_GE(Dot(si->intr.n, si->intr.shading.n), 0.);
-    si->intr.medium = r.medium;
     return si;
 }
 
