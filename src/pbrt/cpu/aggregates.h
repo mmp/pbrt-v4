@@ -69,14 +69,14 @@ class BVHAggregate {
     LinearBVHNode *nodes = nullptr;
 };
 
-struct KdAccelNode;
+struct KdTreeNode;
 struct BoundEdge;
 
 // KdTreeAggregate Definition
 class KdTreeAggregate {
   public:
     // KdTreeAggregate Public Methods
-    KdTreeAggregate(std::vector<PrimitiveHandle> p, int isectCost = 80,
+    KdTreeAggregate(std::vector<PrimitiveHandle> p, int isectCost = 5,
                     int traversalCost = 1, Float emptyBonus = 0.5, int maxPrims = 1,
                     int maxDepth = -1);
     static KdTreeAggregate *Create(std::vector<PrimitiveHandle> prims,
@@ -92,14 +92,14 @@ class KdTreeAggregate {
     void buildTree(int nodeNum, const Bounds3f &bounds,
                    const std::vector<Bounds3f> &primBounds, int *primNums, int nprims,
                    int depth, const std::unique_ptr<BoundEdge[]> edges[3], int *prims0,
-                   int *prims1, int badRefines = 0);
+                   int *prims1, int badRefines);
 
     // KdTreeAggregate Private Members
     int isectCost, traversalCost, maxPrims;
     Float emptyBonus;
     std::vector<PrimitiveHandle> primitives;
     std::vector<int> primitiveIndices;
-    KdAccelNode *nodes;
+    KdTreeNode *nodes;
     int nAllocedNodes, nextFreeNode;
     Bounds3f bounds;
 };

@@ -16,6 +16,7 @@
 #include <pbrt/util/stats.h>
 
 #include <algorithm>
+#include <tuple>
 
 namespace pbrt {
 
@@ -550,6 +551,7 @@ pstd::optional<ShapeIntersection> BVHAggregate::Intersect(const Ray &ray,
             if (node->nPrimitives > 0) {
                 // Intersect ray with primitives in leaf BVH node
                 for (int i = 0; i < node->nPrimitives; ++i) {
+                    // Check for intersection with primitive in BVH node
                     pstd::optional<ShapeIntersection> primSi =
                         primitives[node->primitivesOffset + i].Intersect(ray, tMax);
                     if (primSi) {
@@ -747,15 +749,15 @@ BVHAggregate *BVHAggregate::Create(std::vector<PrimitiveHandle> prims,
     return new BVHAggregate(std::move(prims), maxPrimsInNode, splitMethod);
 }
 
-// KdToDo Definition
-struct KdToDo {
-    const KdAccelNode *node;
+// KdNodeToVisit Definition
+struct KdNodeToVisit {
+    const KdTreeNode *node;
     Float tMin, tMax;
 };
 
-// KdAccelNode Definition
-struct alignas(8) KdAccelNode {
-    // KdAccelNode Methods
+// KdTreeNode Definition
+struct alignas(8) KdTreeNode {
+    // KdTreeNode Methods
     void InitLeaf(int *primNums, int np, std::vector<int> *primitiveIndices);
 
     void InitInterior(int axis, int ac, Float s) {
@@ -841,10 +843,10 @@ KdTreeAggregate::KdTreeAggregate(std::vector<PrimitiveHandle> p, int isectCost,
 
     // Start recursive construction of kd-tree
     buildTree(0, bounds, primBounds, primNums.get(), primitives.size(), maxDepth, edges,
-              prims0.get(), prims1.get());
+              prims0.get(), prims1.get(), 0);
 }
 
-void KdAccelNode::InitLeaf(int *primNums, int np, std::vector<int> *primitiveIndices) {
+void KdTreeNode::InitLeaf(int *primNums, int np, std::vector<int> *primitiveIndices) {
     flags = 3;
     nPrims |= (np << 2);
     // Store primitive ids for leaf node
@@ -868,9 +870,9 @@ void KdTreeAggregate::buildTree(int nodeNum, const Bounds3f &nodeBounds,
     // Get next free node from _nodes_ array
     if (nextFreeNode == nAllocedNodes) {
         int nNewAllocNodes = std::max(2 * nAllocedNodes, 512);
-        KdAccelNode *n = new KdAccelNode[nNewAllocNodes];
+        KdTreeNode *n = new KdTreeNode[nNewAllocNodes];
         if (nAllocedNodes > 0) {
-            memcpy(n, nodes, nAllocedNodes * sizeof(KdAccelNode));
+            memcpy(n, nodes, nAllocedNodes * sizeof(KdTreeNode));
             delete[] nodes;
         }
         nodes = n;
@@ -887,14 +889,12 @@ void KdTreeAggregate::buildTree(int nodeNum, const Bounds3f &nodeBounds,
     // Initialize interior node and continue recursion
     // Choose split axis position for interior node
     int bestAxis = -1, bestOffset = -1;
-    Float bestCost = Infinity;
-    Float oldCost = isectCost * Float(nPrimitives);
-    Float totalSA = nodeBounds.SurfaceArea();
-    Float invTotalSA = 1 / totalSA;
-    Vector3f d = nodeBounds.pMax - nodeBounds.pMin;
+    Float bestCost = Infinity, leafCost = isectCost * nPrimitives;
+    Float invTotalSA = 1 / nodeBounds.SurfaceArea();
     // Choose which axis to split along
     int axis = nodeBounds.MaxDimension();
 
+    // Choose split along axis and attempt to partition primitives
     int retries = 0;
 retrySplit:
     // Initialize edges for _axis_
@@ -907,10 +907,7 @@ retrySplit:
     // Sort _edges_ for _axis_
     std::sort(&edges[axis][0], &edges[axis][2 * nPrimitives],
               [](const BoundEdge &e0, const BoundEdge &e1) -> bool {
-                  if (e0.t == e1.t)
-                      return (int)e0.type < (int)e1.type;
-                  else
-                      return e0.t < e1.t;
+                  return std::tie(e0.t, e0.type) < std::tie(e1.t, e1.type);
               });
 
     // Compute cost of all splits for _axis_ to find best
@@ -920,8 +917,8 @@ retrySplit:
             --nAbove;
         Float edgeT = edges[axis][i].t;
         if (edgeT > nodeBounds.pMin[axis] && edgeT < nodeBounds.pMax[axis]) {
-            // Compute cost for split at _i_th edge
             // Compute child surface areas for split at _edgeT_
+            Vector3f d = nodeBounds.pMax - nodeBounds.pMin;
             int otherAxis0 = (axis + 1) % 3, otherAxis1 = (axis + 2) % 3;
             Float belowSA =
                 2 * (d[otherAxis0] * d[otherAxis1] +
@@ -930,8 +927,8 @@ retrySplit:
                 2 * (d[otherAxis0] * d[otherAxis1] +
                      (nodeBounds.pMax[axis] - edgeT) * (d[otherAxis0] + d[otherAxis1]));
 
-            Float pBelow = belowSA * invTotalSA;
-            Float pAbove = aboveSA * invTotalSA;
+            // Compute cost for split at _i_th edge
+            Float pBelow = belowSA * invTotalSA, pAbove = aboveSA * invTotalSA;
             Float eb = (nAbove == 0 || nBelow == 0) ? emptyBonus : 0;
             Float cost = traversalCost +
                          isectCost * (1 - eb) * (pBelow * nBelow + pAbove * nAbove);
@@ -953,9 +950,9 @@ retrySplit:
         axis = (axis + 1) % 3;
         goto retrySplit;
     }
-    if (bestCost > oldCost)
+    if (bestCost > leafCost)
         ++badRefines;
-    if ((bestCost > 4 * oldCost && nPrimitives < 16) || bestAxis == -1 ||
+    if ((bestCost > 4 * leafCost && nPrimitives < 16) || bestAxis == -1 ||
         badRefines == 3) {
         nodes[nodeNum].InitLeaf(primNums, nPrimitives, &primitiveIndices);
         return;
@@ -983,36 +980,36 @@ retrySplit:
 }
 
 pstd::optional<ShapeIntersection> KdTreeAggregate::Intersect(const Ray &ray,
-                                                             Float raytMax) const {
+                                                             Float rayTMax) const {
     // Compute initial parametric range of ray inside kd-tree extent
     Float tMin, tMax;
-    if (!bounds.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax))
+    if (!bounds.IntersectP(ray.o, ray.d, rayTMax, &tMin, &tMax))
         return {};
 
     // Prepare to traverse kd-tree for ray
     Vector3f invDir(1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z);
-    constexpr int maxTodo = 64;
-    KdToDo todo[maxTodo];
-    int todoPos = 0;
+    constexpr int maxToVisit = 64;
+    KdNodeToVisit toVisit[maxToVisit];
+    int toVisitIndex = 0;
     int nodesVisited = 0;
 
     // Traverse kd-tree nodes in order for ray
     pstd::optional<ShapeIntersection> si;
-    const KdAccelNode *node = &nodes[0];
+    const KdTreeNode *node = &nodes[0];
     while (node != nullptr) {
         // Bail out if we found a hit closer than the current node
-        if (raytMax < tMin)
+        if (rayTMax < tMin)
             break;
 
         ++nodesVisited;
         if (!node->IsLeaf()) {
-            // Process kd-tree interior node
+            // Visit kd-tree interior node
             // Compute parametric distance along ray to split plane
             int axis = node->SplitAxis();
             Float tSplit = (node->SplitPos() - ray.o[axis]) * invDir[axis];
 
             // Get node children pointers for ray
-            const KdAccelNode *firstChild, *secondChild;
+            const KdTreeNode *firstChild, *secondChild;
             int belowFirst = (ray.o[axis] < node->SplitPos()) ||
                              (ray.o[axis] == node->SplitPos() && ray.d[axis] <= 0);
             if (belowFirst) {
@@ -1030,10 +1027,10 @@ pstd::optional<ShapeIntersection> KdTreeAggregate::Intersect(const Ray &ray,
                 node = secondChild;
             else {
                 // Enqueue _secondChild_ in todo list
-                todo[todoPos].node = secondChild;
-                todo[todoPos].tMin = tSplit;
-                todo[todoPos].tMax = tMax;
-                ++todoPos;
+                toVisit[toVisitIndex].node = secondChild;
+                toVisit[toVisitIndex].tMin = tSplit;
+                toVisit[toVisitIndex].tMax = tMax;
+                ++toVisitIndex;
 
                 node = firstChild;
                 tMax = tSplit;
@@ -1045,10 +1042,10 @@ pstd::optional<ShapeIntersection> KdTreeAggregate::Intersect(const Ray &ray,
             if (nPrimitives == 1) {
                 const PrimitiveHandle &p = primitives[node->onePrimitive];
                 // Check one primitive inside leaf node
-                pstd::optional<ShapeIntersection> primSi = p.Intersect(ray, raytMax);
+                pstd::optional<ShapeIntersection> primSi = p.Intersect(ray, rayTMax);
                 if (primSi) {
                     si = primSi;
-                    raytMax = si->tHit;
+                    rayTMax = si->tHit;
                 }
 
             } else {
@@ -1056,20 +1053,20 @@ pstd::optional<ShapeIntersection> KdTreeAggregate::Intersect(const Ray &ray,
                     int index = primitiveIndices[node->primitiveIndicesOffset + i];
                     const PrimitiveHandle &p = primitives[index];
                     // Check one primitive inside leaf node
-                    pstd::optional<ShapeIntersection> primSi = p.Intersect(ray, raytMax);
+                    pstd::optional<ShapeIntersection> primSi = p.Intersect(ray, rayTMax);
                     if (primSi) {
                         si = primSi;
-                        raytMax = si->tHit;
+                        rayTMax = si->tHit;
                     }
                 }
             }
 
-            // Grab next node to process from todo list
-            if (todoPos > 0) {
-                --todoPos;
-                node = todo[todoPos].node;
-                tMin = todo[todoPos].tMin;
-                tMax = todo[todoPos].tMax;
+            // Grab next node to visit from todo list
+            if (toVisitIndex > 0) {
+                --toVisitIndex;
+                node = toVisit[toVisitIndex].node;
+                tMin = toVisit[toVisitIndex].tMin;
+                tMax = toVisit[toVisitIndex].tMax;
             } else
                 break;
         }
@@ -1087,10 +1084,10 @@ bool KdTreeAggregate::IntersectP(const Ray &ray, Float raytMax) const {
     // Prepare to traverse kd-tree for ray
     Vector3f invDir(1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z);
     constexpr int maxTodo = 64;
-    KdToDo todo[maxTodo];
-    int todoPos = 0;
+    KdNodeToVisit toVisit[maxTodo];
+    int toVisitIndex = 0;
     int nodesVisited = 0;
-    const KdAccelNode *node = &nodes[0];
+    const KdTreeNode *node = &nodes[0];
     while (node != nullptr) {
         ++nodesVisited;
         if (node->IsLeaf()) {
@@ -1115,11 +1112,11 @@ bool KdTreeAggregate::IntersectP(const Ray &ray, Float raytMax) const {
             }
 
             // Grab next node to process from todo list
-            if (todoPos > 0) {
-                --todoPos;
-                node = todo[todoPos].node;
-                tMin = todo[todoPos].tMin;
-                tMax = todo[todoPos].tMax;
+            if (toVisitIndex > 0) {
+                --toVisitIndex;
+                node = toVisit[toVisitIndex].node;
+                tMin = toVisit[toVisitIndex].tMin;
+                tMax = toVisit[toVisitIndex].tMax;
             } else
                 break;
         } else {
@@ -1130,10 +1127,9 @@ bool KdTreeAggregate::IntersectP(const Ray &ray, Float raytMax) const {
             Float tSplit = (node->SplitPos() - ray.o[axis]) * invDir[axis];
 
             // Get node children pointers for ray
-            const KdAccelNode *firstChild, *secondChild;
-            int belowFirst =
-                static_cast<int>((ray.o[axis] < node->SplitPos()) ||
-                                 (ray.o[axis] == node->SplitPos() && ray.d[axis] <= 0));
+            const KdTreeNode *firstChild, *secondChild;
+            int belowFirst = (ray.o[axis] < node->SplitPos()) ||
+                             (ray.o[axis] == node->SplitPos() && ray.d[axis] <= 0);
             if (belowFirst != 0) {
                 firstChild = node + 1;
                 secondChild = &nodes[node->AboveChild()];
@@ -1149,10 +1145,10 @@ bool KdTreeAggregate::IntersectP(const Ray &ray, Float raytMax) const {
                 node = secondChild;
             else {
                 // Enqueue _secondChild_ in todo list
-                todo[todoPos].node = secondChild;
-                todo[todoPos].tMin = tSplit;
-                todo[todoPos].tMax = tMax;
-                ++todoPos;
+                toVisit[toVisitIndex].node = secondChild;
+                toVisit[toVisitIndex].tMin = tSplit;
+                toVisit[toVisitIndex].tMax = tMax;
+                ++toVisitIndex;
                 node = firstChild;
                 tMax = tSplit;
             }
@@ -1164,7 +1160,7 @@ bool KdTreeAggregate::IntersectP(const Ray &ray, Float raytMax) const {
 
 KdTreeAggregate *KdTreeAggregate::Create(std::vector<PrimitiveHandle> prims,
                                          const ParameterDictionary &parameters) {
-    int isectCost = parameters.GetOneInt("intersectcost", 80);
+    int isectCost = parameters.GetOneInt("intersectcost", 5);
     int travCost = parameters.GetOneInt("traversalcost", 1);
     Float emptyBonus = parameters.GetOneFloat("emptybonus", 0.5f);
     int maxPrims = parameters.GetOneInt("maxprims", 1);
