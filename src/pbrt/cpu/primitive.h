@@ -26,13 +26,13 @@ class SimplePrimitive;
 class GeometricPrimitive;
 class TransformedPrimitive;
 class AnimatedPrimitive;
-class BVHAccel;
-class KdTreeAccel;
+class BVHAggregate;
+class KdTreeAggregate;
 
 // PrimitiveHandle Definition
 class PrimitiveHandle
     : public TaggedPointer<SimplePrimitive, GeometricPrimitive, TransformedPrimitive,
-                           AnimatedPrimitive, BVHAccel, KdTreeAccel> {
+                           AnimatedPrimitive, BVHAggregate, KdTreeAggregate> {
   public:
     // Primitive Interface
     using TaggedPointer::TaggedPointer;

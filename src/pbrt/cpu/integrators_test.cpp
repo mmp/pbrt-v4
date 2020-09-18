@@ -5,7 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <pbrt/cameras.h>
-#include <pbrt/cpu/accelerators.h>
+#include <pbrt/cpu/aggregates.h>
 #include <pbrt/cpu/integrators.h>
 #include <pbrt/filters.h>
 #include <pbrt/lights.h>
@@ -85,7 +85,7 @@ std::vector<TestScene> GetScenes() {
         std::vector<PrimitiveHandle> prims;
         prims.push_back(PrimitiveHandle(
             new GeometricPrimitive(sphere, material, nullptr, mediumInterface)));
-        PrimitiveHandle bvh(new BVHAccel(std::move(prims)));
+        PrimitiveHandle bvh(new BVHAggregate(std::move(prims)));
 
         // We have to do this little dance here to make sure the spectrum is
         // properly normalized (this is usually all handled inside *Light::Create())
@@ -112,7 +112,7 @@ std::vector<TestScene> GetScenes() {
         std::vector<PrimitiveHandle> prims;
         prims.push_back(PrimitiveHandle(
             new GeometricPrimitive(sphere, material, nullptr, mediumInterface)));
-        PrimitiveHandle bvh(new BVHAccel(std::move(prims)));
+        PrimitiveHandle bvh(new BVHAggregate(std::move(prims)));
 
         // We have to do this little dance here to make sure the spectrum is
         // properly normalized (this is usually all handled inside *Light::Create())
@@ -153,7 +153,7 @@ std::vector<TestScene> GetScenes() {
         std::vector<PrimitiveHandle> prims;
         prims.push_back(PrimitiveHandle(
             new GeometricPrimitive(sphere, material, lights.back(), mediumInterface)));
-        PrimitiveHandle bvh(new BVHAccel(std::move(prims)));
+        PrimitiveHandle bvh(new BVHAggregate(std::move(prims)));
 
         scenes.push_back({bvh, lights, "Sphere, Kd = 0.5, Le = 0.5", 1.0});
     }
@@ -185,7 +185,7 @@ std::vector<TestScene> GetScenes() {
         std::vector<PrimitiveHandle> prims;
         prims.push_back(PrimitiveHandle(new GeometricPrimitive(
             sphere, material, nullptr, mediumInterface)));
-        PrimitiveHandle bvh(new BVHAccel(std::move(prims)));
+        PrimitiveHandle bvh(new BVHAggregate(std::move(prims)));
 
         static ConstantSpectrum I(3. * Pi);
         std::vector<LightHandle> lights;
@@ -228,7 +228,7 @@ std::vector<TestScene> GetScenes() {
     std::vector<std::shared_ptr<Primitive>> prims;
     prims.push_back(PrimitiveHandle(new GeometricPrimitive(
         sphere, material, areaLight, mediumInterface)));
-    PrimitiveHandle bvh(new BVHAccel(std::move(prims)));
+    PrimitiveHandle bvh(new BVHAggregate(std::move(prims)));
 
     std::vector<std::shared_ptr<Light>> lights;
     lights.push_back(std::move(areaLight));

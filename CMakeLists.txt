@@ -414,7 +414,7 @@ set (PBRT_SOURCE
   src/pbrt/shapes.cpp
   src/pbrt/textures.cpp
 
-  src/pbrt/cpu/accelerators.cpp
+  src/pbrt/cpu/aggregates.cpp
   src/pbrt/cpu/integrators.cpp
   src/pbrt/cpu/primitive.cpp
   src/pbrt/cpu/render.cpp

@@ -2,8 +2,8 @@
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
 
-#ifndef PBRT_CPU_ACCELERATORS_H
-#define PBRT_CPU_ACCELERATORS_H
+#ifndef PBRT_CPU_AGGREGATES_H
+#define PBRT_CPU_AGGREGATES_H
 
 #include <pbrt/pbrt.h>
 
@@ -20,40 +20,40 @@ PrimitiveHandle CreateAccelerator(const std::string &name,
                                   const ParameterDictionary &parameters);
 
 struct BVHBuildNode;
-struct BVHPrimitiveInfo;
+struct BVHPrimitive;
 struct LinearBVHNode;
 struct MortonPrimitive;
 
-// BVHAccel Definition
-class BVHAccel {
+// BVHAggregate Definition
+class BVHAggregate {
   public:
-    // BVHAccel Public Types
+    // BVHAggregate Public Types
     enum class SplitMethod { SAH, HLBVH, Middle, EqualCounts };
 
-    // BVHAccel Public Methods
-    BVHAccel(std::vector<PrimitiveHandle> p, int maxPrimsInNode = 1,
-             SplitMethod splitMethod = SplitMethod::SAH);
+    // BVHAggregate Public Methods
+    BVHAggregate(std::vector<PrimitiveHandle> p, int maxPrimsInNode = 1,
+                 SplitMethod splitMethod = SplitMethod::SAH);
 
-    static BVHAccel *Create(std::vector<PrimitiveHandle> prims,
-                            const ParameterDictionary &parameters);
+    static BVHAggregate *Create(std::vector<PrimitiveHandle> prims,
+                                const ParameterDictionary &parameters);
 
     Bounds3f Bounds() const;
     pstd::optional<ShapeIntersection> Intersect(const Ray &ray, Float tMax) const;
     bool IntersectP(const Ray &ray, Float tMax) const;
 
   private:
-    // BVHAccel Private Methods
-    BVHBuildNode *recursiveBuild(std::vector<Allocator> &threadAllocators,
-                                 std::vector<BVHPrimitiveInfo> &primitiveInfo, int start,
+    // BVHAggregate Private Methods
+    BVHBuildNode *buildRecursive(std::vector<Allocator> &threadAllocators,
+                                 std::vector<BVHPrimitive> &primitiveInfo, int start,
                                  int end, std::atomic<int> *totalNodes,
                                  std::vector<PrimitiveHandle> &orderedPrims,
                                  std::atomic<int> *orderedPrimsOffset);
-    BVHBuildNode *HLBVHBuild(Allocator alloc,
-                             const std::vector<BVHPrimitiveInfo> &primitiveInfo,
+    BVHBuildNode *buildHLBVH(Allocator alloc,
+                             const std::vector<BVHPrimitive> &primitiveInfo,
                              std::atomic<int> *totalNodes,
                              std::vector<PrimitiveHandle> &orderedPrims);
     BVHBuildNode *emitLBVH(BVHBuildNode *&buildNodes,
-                           const std::vector<BVHPrimitiveInfo> &primitiveInfo,
+                           const std::vector<BVHPrimitive> &primitiveInfo,
                            MortonPrimitive *mortonPrims, int nPrimitives, int *totalNodes,
                            std::vector<PrimitiveHandle> &orderedPrims,
                            std::atomic<int> *orderedPrimsOffset, int bitIndex);
@@ -62,24 +62,25 @@ class BVHAccel {
                                 int end, std::atomic<int> *totalNodes) const;
     int flattenBVHTree(BVHBuildNode *node, int *offset);
 
-    // BVHAccel Private Members
+    // BVHAggregate Private Members
     int maxPrimsInNode;
-    SplitMethod splitMethod;
     std::vector<PrimitiveHandle> primitives;
+    SplitMethod splitMethod;
     LinearBVHNode *nodes = nullptr;
 };
 
 struct KdAccelNode;
 struct BoundEdge;
 
-// KdTreeAccel Definition
-class KdTreeAccel {
+// KdTreeAggregate Definition
+class KdTreeAggregate {
   public:
-    // KdTreeAccel Public Methods
-    KdTreeAccel(std::vector<PrimitiveHandle> p, int isectCost = 80, int traversalCost = 1,
-                Float emptyBonus = 0.5, int maxPrims = 1, int maxDepth = -1);
-    static KdTreeAccel *Create(std::vector<PrimitiveHandle> prims,
-                               const ParameterDictionary &parameters);
+    // KdTreeAggregate Public Methods
+    KdTreeAggregate(std::vector<PrimitiveHandle> p, int isectCost = 80,
+                    int traversalCost = 1, Float emptyBonus = 0.5, int maxPrims = 1,
+                    int maxDepth = -1);
+    static KdTreeAggregate *Create(std::vector<PrimitiveHandle> prims,
+                                   const ParameterDictionary &parameters);
     pstd::optional<ShapeIntersection> Intersect(const Ray &ray, Float tMax) const;
 
     Bounds3f Bounds() const { return bounds; }
@@ -87,13 +88,13 @@ class KdTreeAccel {
     bool IntersectP(const Ray &ray, Float tMax) const;
 
   private:
-    // KdTreeAccel Private Methods
+    // KdTreeAggregate Private Methods
     void buildTree(int nodeNum, const Bounds3f &bounds,
                    const std::vector<Bounds3f> &primBounds, int *primNums, int nprims,
                    int depth, const std::unique_ptr<BoundEdge[]> edges[3], int *prims0,
                    int *prims1, int badRefines = 0);
 
-    // KdTreeAccel Private Members
+    // KdTreeAggregate Private Members
     int isectCost, traversalCost, maxPrims;
     Float emptyBonus;
     std::vector<PrimitiveHandle> primitives;
@@ -105,4 +106,4 @@ class KdTreeAccel {
 
 }  // namespace pbrt
 
-#endif  // PBRT_CPU_ACCELERATORS_H
+#endif  // PBRT_CPU_AGGREGATES_H

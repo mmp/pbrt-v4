@@ -5,7 +5,7 @@
 #include <pbrt/cpu/render.h>
 
 #include <pbrt/cameras.h>
-#include <pbrt/cpu/accelerators.h>
+#include <pbrt/cpu/aggregates.h>
 #include <pbrt/cpu/integrators.h>
 #include <pbrt/film.h>
 #include <pbrt/filters.h>
@@ -238,7 +238,7 @@ void CPURender(ParsedScene &parsedScene) {
 
             // Create single _Primitive_ for _prims_
             if (prims.size() > 1) {
-                PrimitiveHandle bvh = new BVHAccel(std::move(prims));
+                PrimitiveHandle bvh = new BVHAggregate(std::move(prims));
                 prims.clear();
                 prims.push_back(bvh);
             }
@@ -268,7 +268,7 @@ void CPURender(ParsedScene &parsedScene) {
             instanceDefinitions[inst.first] = nullptr;
         } else {
             if (instancePrimitives.size() > 1) {
-                PrimitiveHandle bvh = new BVHAccel(std::move(instancePrimitives));
+                PrimitiveHandle bvh = new BVHAggregate(std::move(instancePrimitives));
                 instancePrimitives.clear();
                 instancePrimitives.push_back(bvh);
             }
