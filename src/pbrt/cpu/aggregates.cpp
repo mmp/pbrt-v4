@@ -357,7 +357,7 @@ BVHBuildNode *BVHAggregate::buildRecursive(std::vector<Allocator> &threadAllocat
 
             BVHBuildNode *children[2];
             // Recursively build BVHs for _children_
-            if (end - start > 16 * 1024) {
+            if (end - start > 128 * 1024) {
                 // Recursively build child BVHs in parallel
                 ParallelFor(0, 2, [&](int i) {
                     if (i == 0)
