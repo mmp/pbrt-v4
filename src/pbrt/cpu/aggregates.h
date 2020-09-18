@@ -46,8 +46,8 @@ class BVHAggregate {
     BVHBuildNode *buildRecursive(std::vector<Allocator> &threadAllocators,
                                  std::vector<BVHPrimitive> &primitiveInfo, int start,
                                  int end, std::atomic<int> *totalNodes,
-                                 std::vector<PrimitiveHandle> &orderedPrims,
-                                 std::atomic<int> *orderedPrimsOffset);
+                                 std::atomic<int> *orderedPrimsOffset,
+                                 std::vector<PrimitiveHandle> &orderedPrims);
     BVHBuildNode *buildHLBVH(Allocator alloc,
                              const std::vector<BVHPrimitive> &primitiveInfo,
                              std::atomic<int> *totalNodes,
