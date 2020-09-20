@@ -243,8 +243,7 @@ pstd::optional<SquareMatrix<3>> PixelSensor::SolveXYZFromSensorRGB(
     RGB outputWhite = IlluminantToSensorRGB(outputIllum);
     for (size_t i = 0; i < swatchReflectances.size(); ++i) {
         RGB rgb = ProjectReflectance<RGB>(swatchReflectances[i], sensorIllum, &r_bar,
-                                          &g_bar, &b_bar) /
-                  outputWhite;
+                                          &g_bar, &b_bar);
         for (int c = 0; c < 3; ++c)
             rgbCamera[i][c] = rgb[c];
     }
