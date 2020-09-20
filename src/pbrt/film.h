@@ -56,10 +56,6 @@ class PixelSensor {
         if (!m)
             ErrorExit("Sensor XYZ from RGB matrix could not be solved.");
         XYZFromSensorRGB = *m;
-
-        // Compute sensor's RGB normalization factor
-        RGB white = IlluminantToSensorRGB(&outputColorSpace->illuminant);
-        cameraRGBWhiteNorm = RGB(1, 1, 1) / white;
     }
 
     PBRT_CPU_GPU
@@ -82,10 +78,9 @@ class PixelSensor {
 
     PBRT_CPU_GPU
     RGB ToSensorRGB(const SampledSpectrum &s, const SampledWavelengths &lambda) const {
-        RGB rgb((r_bar.Sample(lambda) * s).Average(),
-                (g_bar.Sample(lambda) * s).Average(),
-                (b_bar.Sample(lambda) * s).Average());
-        return rgb * cameraRGBWhiteNorm;
+        return RGB((r_bar.Sample(lambda) * s).Average(),
+                      (g_bar.Sample(lambda) * s).Average(),
+                      (b_bar.Sample(lambda) * s).Average());
     }
 
     // PixelSensor Public Members
@@ -111,7 +106,6 @@ class PixelSensor {
     DenselySampledSpectrum r_bar, g_bar, b_bar;
     Float imagingRatio;
     static std::vector<SpectrumHandle> swatchReflectances;
-    RGB cameraRGBWhiteNorm = RGB(1, 1, 1);
 };
 
 // PixelSensor Inline Methods
