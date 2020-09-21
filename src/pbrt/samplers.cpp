@@ -31,12 +31,44 @@ std::string SamplerHandle::ToString() const {
 // HaltonSampler Method Definitions
 HaltonSampler::HaltonSampler(int samplesPerPixel, const Point2i &fullResolution,
                              pstd::vector<DigitPermutation> *dp, Allocator alloc)
-    : digitPermutations(dp),
-      samplesPerPixel(samplesPerPixel),
-      haltonPixelIndexer(fullResolution) {
+    : digitPermutations(dp), samplesPerPixel(samplesPerPixel) {
     // Generate random digit permutations for Halton sampler
     if (!dp)
         digitPermutations = ComputeRadicalInversePermutations(0, alloc);
+
+    // Find radical inverse base scales and exponents that cover sampling area
+    for (int i = 0; i < 2; ++i) {
+        int base = (i == 0) ? 2 : 3;
+        int scale = 1, exp = 0;
+        while (scale < std::min(fullResolution[i], MaxHaltonResolution)) {
+            scale *= base;
+            ++exp;
+        }
+        baseScales[i] = scale;
+        baseExponents[i] = exp;
+    }
+
+    // Compute multiplicative inverses for _baseScales_
+    multInverse[0] = multiplicativeInverse(baseScales[1], baseScales[0]);
+    multInverse[1] = multiplicativeInverse(baseScales[0], baseScales[1]);
+}
+
+uint64_t HaltonSampler::multiplicativeInverse(int64_t a, int64_t n) {
+    int64_t x, y;
+    extendedGCD(a, n, &x, &y);
+    return Mod(x, n);
+}
+
+void HaltonSampler::extendedGCD(uint64_t a, uint64_t b, int64_t *x, int64_t *y) {
+    if (b == 0) {
+        *x = 1;
+        *y = 0;
+        return;
+    }
+    int64_t d = a / b, xp, yp;
+    extendedGCD(b, a % b, &xp, &yp);
+    *x = yp;
+    *y = xp - (d * yp);
 }
 
 std::vector<SamplerHandle> HaltonSampler::Clone(int n, Allocator alloc) {
@@ -50,10 +82,9 @@ std::vector<SamplerHandle> HaltonSampler::Clone(int n, Allocator alloc) {
 }
 
 std::string HaltonSampler::ToString() const {
-    return StringPrintf("[ HaltonSampler digitPermutations: %p haltonPixelIndexer: %s "
-                        "pixel: %s sampleIndex: %d dimension: %d samplesPerPixel: %d ]",
-                        digitPermutations, haltonPixelIndexer, pixel, sampleIndex,
-                        dimension, samplesPerPixel);
+    return StringPrintf("[ HaltonSampler digitPermutations: %p "
+                        "sampleIndex: %d dimension: %d samplesPerPixel: %d ]",
+                        digitPermutations, sampleIndex, dimension, samplesPerPixel);
 }
 
 HaltonSampler *HaltonSampler::Create(const ParameterDictionary &parameters,

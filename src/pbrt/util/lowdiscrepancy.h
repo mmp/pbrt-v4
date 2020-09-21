@@ -30,8 +30,7 @@ class DigitPermutation {
         CHECK_LT(base, 65536);  // uint16_t
         // Compute number of digits needed for _base_
         nDigits = 0;
-        Float invBase = (Float)1 / (Float)base;
-        Float invBaseN = 1;
+        Float invBase = (Float)1 / (Float)base, invBaseN = 1;
         while (1 - invBaseN < 1) {
             ++nDigits;
             invBaseN *= invBase;
@@ -40,10 +39,11 @@ class DigitPermutation {
         permutations = alloc.allocate_object<uint16_t>(nDigits * base);
         for (int digitIndex = 0; digitIndex < nDigits; ++digitIndex) {
             // Compute random permutation for _digitIndex_
-            uint32_t digitSeed = (base * 32 + digitIndex) ^ seed;
-            for (int digitValue = 0; digitValue < base; ++digitValue)
-                Perm(digitIndex, digitValue) =
-                    PermutationElement(digitValue, base, digitSeed);
+            uint32_t digitSeed = MixBits(((base << 8) + digitIndex) ^ seed);
+            for (int digitValue = 0; digitValue < base; ++digitValue) {
+                int index = digitIndex * base + digitValue;
+                permutations[index] = PermutationElement(digitValue, base, digitSeed);
+            }
         }
     }
 
@@ -56,17 +56,9 @@ class DigitPermutation {
 
     std::string ToString() const;
 
-    int base;
-
   private:
-    // DigitPermutation Private Methods
-    PBRT_CPU_GPU
-    uint16_t &Perm(int digitIndex, int digitValue) {
-        return permutations[digitIndex * base + digitValue];
-    }
-
-    int nDigits;
-    // indexed by [digitIndex * base + digitValue]
+    // DigitPermutation Private Members
+    int base, nDigits;
     uint16_t *permutations;
 };
 
@@ -94,9 +86,8 @@ struct NoRandomizer {
 // Low Discrepancy Inline Functions
 PBRT_CPU_GPU inline Float RadicalInverse(int baseIndex, uint64_t a) {
     int base = Primes[baseIndex];
-    Float invBase = (Float)1 / (Float)base;
+    Float invBase = (Float)1 / (Float)base, invBaseN = 1;
     uint64_t reversedDigits = 0;
-    Float invBaseN = 1;
     while (a) {
         // Extract least significant digit from _a_ and update _reversedDigits_
         uint64_t next = a / base;
@@ -122,11 +113,11 @@ inline uint64_t InverseRadicalInverse(uint64_t inverse, int base, int nDigits) {
 PBRT_CPU_GPU inline Float ScrambledRadicalInverse(int baseIndex, uint64_t a,
                                                   const DigitPermutation &perm) {
     int base = Primes[baseIndex];
-    const Float invBase = (Float)1 / (Float)base;
+    Float invBase = (Float)1 / (Float)base, invBaseN = 1;
     uint64_t reversedDigits = 0;
-    Float invBaseN = 1;
     int digitIndex = 0;
     while (1 - invBaseN < 1) {
+        // Permute least significant digit from _a_ and update _reversedDigits_
         uint64_t next = a / base;
         int digitValue = a - next * base;
         reversedDigits = reversedDigits * base + perm.Permute(digitIndex, digitValue);
@@ -228,66 +219,6 @@ struct OwenScrambler {
     uint32_t operator()(uint32_t v) const { return OwenScramble(v, seed); }
 
     uint32_t seed;
-};
-
-// HaltonPixelIndexer Defintion
-class HaltonPixelIndexer {
-  public:
-    // HaltonPixelIndexer Public Methods
-    HaltonPixelIndexer(const Point2i &fullResolution);
-
-    PBRT_CPU_GPU
-    void SetPixel(const Point2i &p) {
-        pixelSampleForIndex = 0;
-
-        int sampleStride = baseScales[0] * baseScales[1];
-        if (sampleStride > 1) {
-            Point2i pm(Mod(p[0], MaxHaltonResolution), Mod(p[1], MaxHaltonResolution));
-            for (int i = 0; i < 2; ++i) {
-                uint64_t dimOffset =
-                    (i == 0) ? InverseRadicalInverse(pm[i], 2, baseExponents[i])
-                             : InverseRadicalInverse(pm[i], 3, baseExponents[i]);
-                pixelSampleForIndex +=
-                    dimOffset * (sampleStride / baseScales[i]) * multInverse[i];
-            }
-            pixelSampleForIndex %= sampleStride;
-        }
-    }
-
-    PBRT_CPU_GPU
-    void SetPixelSample(int pixelSample) {
-        int sampleStride = baseScales[0] * baseScales[1];
-        sampleIndex = pixelSampleForIndex + pixelSample * sampleStride;
-    }
-
-    PBRT_CPU_GPU
-    Point2f SampleFirst2D() const {
-        return {RadicalInverse(0, sampleIndex >> baseExponents[0]),
-                RadicalInverse(1, sampleIndex / baseScales[1])};
-    }
-
-    PBRT_CPU_GPU
-    int64_t SampleIndex() const { return sampleIndex; }
-
-    std::string ToString() const {
-        return StringPrintf("[ HaltonPixelIndexer pixelSampleForIndex: %d "
-                            "sampleIndex: %d baseScales: %s baseExponents: %s "
-                            "multInverse[0]: %d multInverse[1]: %d ]",
-                            pixelSampleForIndex, sampleIndex, baseScales, baseExponents,
-                            multInverse[0], multInverse[1]);
-    }
-
-  private:
-    // HaltonPixelIndexer Private Methods
-    static uint64_t multiplicativeInverse(int64_t a, int64_t n);
-    static void extendedGCD(uint64_t a, uint64_t b, int64_t *x, int64_t *y);
-
-    // HaltonPixelIndexer Private Members
-    static constexpr int MaxHaltonResolution = 128;
-    Point2i baseScales, baseExponents;
-    int multInverse[2];
-    int64_t pixelSampleForIndex;
-    int64_t sampleIndex;
 };
 
 enum class RandomizeStrategy { None, CranleyPatterson, Xor, Owen };

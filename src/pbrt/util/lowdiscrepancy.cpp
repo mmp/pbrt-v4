@@ -29,46 +29,6 @@ std::string DigitPermutation::ToString() const {
     return s + " ]";
 }
 
-// HaltonIndexer Local Constants
-constexpr int HaltonPixelIndexer::MaxHaltonResolution;
-
-// HaltonIndexer Method Definitions
-HaltonPixelIndexer::HaltonPixelIndexer(const Point2i &fullResolution) {
-    // Find radical inverse base scales and exponents that cover sampling area
-    for (int i = 0; i < 2; ++i) {
-        int base = (i == 0) ? 2 : 3;
-        int scale = 1, exp = 0;
-        while (scale < std::min(fullResolution[i], MaxHaltonResolution)) {
-            scale *= base;
-            ++exp;
-        }
-        baseScales[i] = scale;
-        baseExponents[i] = exp;
-    }
-
-    // Compute multiplicative inverses for _baseScales_
-    multInverse[0] = multiplicativeInverse(baseScales[1], baseScales[0]);
-    multInverse[1] = multiplicativeInverse(baseScales[0], baseScales[1]);
-}
-
-uint64_t HaltonPixelIndexer::multiplicativeInverse(int64_t a, int64_t n) {
-    int64_t x, y;
-    extendedGCD(a, n, &x, &y);
-    return Mod(x, n);
-}
-
-void HaltonPixelIndexer::extendedGCD(uint64_t a, uint64_t b, int64_t *x, int64_t *y) {
-    if (b == 0) {
-        *x = 1;
-        *y = 0;
-        return;
-    }
-    int64_t d = a / b, xp, yp;
-    extendedGCD(b, a % b, &xp, &yp);
-    *x = yp;
-    *y = xp - (d * yp);
-}
-
 std::string ToString(RandomizeStrategy r) {
     switch (r) {
     case RandomizeStrategy::None:

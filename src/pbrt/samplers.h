@@ -46,12 +46,21 @@ class HaltonSampler {
 
     PBRT_CPU_GPU
     void StartPixelSample(const Point2i &p, int index, int dim) {
-        if (p != pixel)
-            haltonPixelIndexer.SetPixel(p);
-        haltonPixelIndexer.SetPixelSample(index);
+        int sampleStride = baseScales[0] * baseScales[1];
+        int64_t pixelSampleForIndex = 0;
 
-        pixel = p;
-        sampleIndex = index;
+        if (sampleStride > 1) {
+            Point2i pm(Mod(p[0], MaxHaltonResolution), Mod(p[1], MaxHaltonResolution));
+            for (int i = 0; i < 2; ++i) {
+                uint64_t dimOffset =
+                    (i == 0) ? InverseRadicalInverse(pm[i], 2, baseExponents[i])
+                             : InverseRadicalInverse(pm[i], 3, baseExponents[i]);
+                pixelSampleForIndex +=
+                    dimOffset * (sampleStride / baseScales[i]) * multInverse[i];
+            }
+            pixelSampleForIndex %= sampleStride;
+        }
+        sampleIndex = pixelSampleForIndex + index * sampleStride;
         dimension = dim;
     }
 
@@ -60,24 +69,23 @@ class HaltonSampler {
         if (dimension >= PrimeTableSize)
             dimension = 2;
         int dim = dimension++;
-        return ScrambledRadicalInverse(dim, haltonPixelIndexer.SampleIndex(),
-                                       (*digitPermutations)[dim]);
+        return ScrambledRadicalInverse(dim, sampleIndex, (*digitPermutations)[dim]);
     }
 
     PBRT_CPU_GPU
     Point2f Get2D() {
         if (dimension == 0) {
             dimension += 2;
-            return haltonPixelIndexer.SampleFirst2D();
+            return {RadicalInverse(0, sampleIndex >> baseExponents[0]),
+                    RadicalInverse(1, sampleIndex / baseScales[1])};
         } else {
             if (dimension + 1 >= PrimeTableSize)
                 dimension = 2;
 
             int dim = dimension;
             dimension += 2;
-            return {ScrambledRadicalInverse(dim, haltonPixelIndexer.SampleIndex(),
-                                            (*digitPermutations)[dim]),
-                    ScrambledRadicalInverse(dim + 1, haltonPixelIndexer.SampleIndex(),
+            return {ScrambledRadicalInverse(dim, sampleIndex, (*digitPermutations)[dim]),
+                    ScrambledRadicalInverse(dim + 1, sampleIndex,
                                             (*digitPermutations)[dim + 1])};
         }
     }
@@ -86,14 +94,18 @@ class HaltonSampler {
     std::string ToString() const;
 
   private:
+    // HaltonSampler Private Methods
+    static uint64_t multiplicativeInverse(int64_t a, int64_t n);
+    static void extendedGCD(uint64_t a, uint64_t b, int64_t *x, int64_t *y);
+
     // HaltonSampler Private Members
     pstd::vector<DigitPermutation> *digitPermutations;
     int samplesPerPixel;
-    HaltonPixelIndexer haltonPixelIndexer;
-    Point2i pixel =
-        Point2i(std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
-    int sampleIndex = 0;
+    static constexpr int MaxHaltonResolution = 128;
+    int64_t sampleIndex = 0;
     int dimension = 0;
+    Point2i baseScales, baseExponents;
+    int multInverse[2];
 };
 
 // PaddedSobolSampler Definition

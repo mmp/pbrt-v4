@@ -240,7 +240,6 @@ pstd::optional<SquareMatrix<3>> PixelSensor::SolveXYZFromSensorRGB(
     SpectrumHandle sensorIllum, SpectrumHandle outputIllum) const {
     Float rgbCamera[24][3], xyzOutput[24][3];
     // Compute _rgbCamera_ values for training swatches
-    RGB outputWhite = IlluminantToSensorRGB(outputIllum);
     for (size_t i = 0; i < swatchReflectances.size(); ++i) {
         RGB rgb = ProjectReflectance<RGB>(swatchReflectances[i], sensorIllum, &r_bar,
                                           &g_bar, &b_bar);
@@ -264,8 +263,8 @@ pstd::optional<SquareMatrix<3>> PixelSensor::SolveXYZFromSensorRGB(
 }
 
 // Swatch reflectances are taken from Danny Pascale's Macbeth chart measurements
-// BabelColor ColorChecker data: Copyright © 2004-2012 Danny Pascale (www.babelcolor.com);
-// used by permission.
+// BabelColor ColorChecker data: Copyright (c) 2004-2012 Danny Pascale
+// (www.babelcolor.com); used by permission.
 // http://www.babelcolor.com/index_htm_files/ColorChecker_RGB_and_spectra.zip
 std::vector<SpectrumHandle> PixelSensor::swatchReflectances{
     PiecewiseLinearSpectrum::FromInterleaved(

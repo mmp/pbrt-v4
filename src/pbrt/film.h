@@ -79,8 +79,8 @@ class PixelSensor {
     PBRT_CPU_GPU
     RGB ToSensorRGB(const SampledSpectrum &s, const SampledWavelengths &lambda) const {
         return RGB((r_bar.Sample(lambda) * s).Average(),
-                      (g_bar.Sample(lambda) * s).Average(),
-                      (b_bar.Sample(lambda) * s).Average());
+                   (g_bar.Sample(lambda) * s).Average(),
+                   (b_bar.Sample(lambda) * s).Average());
     }
 
     // PixelSensor Public Members
