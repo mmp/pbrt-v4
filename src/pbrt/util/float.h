@@ -42,12 +42,12 @@ static constexpr Float Infinity = std::numeric_limits<Float>::infinity();
 
 static constexpr Float MachineEpsilon = std::numeric_limits<Float>::epsilon() * 0.5;
 
-static const double DoubleOneMinusEpsilon = 0x1.fffffffffffffp-1;
-static const float FloatOneMinusEpsilon = 0x1.fffffep-1;
+static constexpr double DoubleOneMinusEpsilon = 0x1.fffffffffffffp-1;
+static constexpr float FloatOneMinusEpsilon = 0x1.fffffep-1;
 #ifdef PBRT_FLOAT_IS_DOUBLE
-static const double OneMinusEpsilon = DoubleOneMinusEpsilon;
+static constexpr double OneMinusEpsilon = DoubleOneMinusEpsilon;
 #else
-static const float OneMinusEpsilon = FloatOneMinusEpsilon;
+static constexpr float OneMinusEpsilon = FloatOneMinusEpsilon;
 #endif
 
 #endif  // PBRT_IS_GPU_CODE

@@ -292,9 +292,9 @@ class RandomSampler {
     int SamplesPerPixel() const { return samplesPerPixel; }
 
     PBRT_CPU_GPU
-    void StartPixelSample(const Point2i &p, int pixelSample, int dimension) {
+    void StartPixelSample(const Point2i &p, int sampleIndex, int dimension) {
         rng.SetSequence((p.x + p.y * 65536) | (uint64_t(seed) << 32));
-        rng.Advance(pixelSample * 65536 + dimension * 1024);
+        rng.Advance(sampleIndex * 65536 + dimension);
     }
 
     PBRT_CPU_GPU
@@ -408,8 +408,8 @@ class StratifiedSampler {
     StratifiedSampler(int xPixelSamples, int yPixelSamples, bool jitter, int seed = 0)
         : xPixelSamples(xPixelSamples),
           yPixelSamples(yPixelSamples),
-          jitter(jitter),
-          seed(seed) {}
+          seed(seed),
+          jitter(jitter) {}
 
     static StratifiedSampler *Create(const ParameterDictionary &parameters,
                                      const FileLoc *loc, Allocator alloc);
@@ -425,29 +425,30 @@ class StratifiedSampler {
         sampleIndex = index;
         dimension = dim;
         rng.SetSequence((p.x + p.y * 65536) | (uint64_t(seed) << 32));
-        rng.Advance(sampleIndex * 65536 + dimension * 1024);
+        rng.Advance(sampleIndex * 65536 + dimension);
     }
 
     PBRT_CPU_GPU
     Float Get1D() {
+        // Compute _stratum_ index for current pixel and dimension
         uint64_t hash = MixBits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
-                                ((uint64_t)dimension << 16) ^ GetOptions().seed);
-        ++dimension;
-
+                                ((uint64_t)dimension << 16) ^ seed);
         int stratum = PermutationElement(sampleIndex, SamplesPerPixel(), hash);
+
+        ++dimension;
         Float delta = jitter ? rng.Uniform<Float>() : 0.5f;
         return (stratum + delta) / SamplesPerPixel();
     }
 
     PBRT_CPU_GPU
     Point2f Get2D() {
+        // Compute _stratum_ index for current pixel and dimension
         uint64_t hash = MixBits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
-                                ((uint64_t)dimension << 16) ^ GetOptions().seed);
-        dimension += 2;
-
+                                ((uint64_t)dimension << 16) ^ seed);
         int stratum = PermutationElement(sampleIndex, SamplesPerPixel(), hash);
-        int x = stratum % xPixelSamples;
-        int y = stratum / xPixelSamples;
+
+        dimension += 2;
+        int x = stratum % xPixelSamples, y = stratum / xPixelSamples;
         Float dx = jitter ? rng.Uniform<Float>() : 0.5f;
         Float dy = jitter ? rng.Uniform<Float>() : 0.5f;
         return {(x + dx) / xPixelSamples, (y + dy) / yPixelSamples};
@@ -458,13 +459,11 @@ class StratifiedSampler {
 
   private:
     // StratifiedSampler Private Members
-    int xPixelSamples, yPixelSamples;
+    int xPixelSamples, yPixelSamples, seed;
     bool jitter;
-    int seed;
     RNG rng;
     Point2i pixel;
-    int sampleIndex = 0;
-    int dimension = 0;
+    int sampleIndex = 0, dimension = 0;
 };
 
 // MLTSampler Definition

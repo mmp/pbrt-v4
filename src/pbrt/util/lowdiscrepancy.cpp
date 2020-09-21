@@ -85,42 +85,6 @@ std::string ToString(RandomizeStrategy r) {
     }
 }
 
-// Low Discrepancy Static Functions
-template <int base>
-PBRT_NOINLINE PBRT_CPU_GPU static Float RadicalInverseSpecialized(uint64_t a) {
-    const Float invBase = (Float)1 / (Float)base;
-    uint64_t reversedDigits = 0;
-    Float invBaseN = 1;
-    while (a) {
-        uint64_t next = a / base;
-        uint64_t digit = a - next * base;
-        reversedDigits = reversedDigits * base + digit;
-        invBaseN *= invBase;
-        a = next;
-    }
-    DCHECK_LT(reversedDigits * invBaseN, 1.00001);
-    return std::min(reversedDigits * invBaseN, OneMinusEpsilon);
-}
-
-template <int base>
-PBRT_NOINLINE PBRT_CPU_GPU static Float ScrambledRadicalInverseSpecialized(
-    uint64_t a, const DigitPermutation &perm) {
-    CHECK_EQ(perm.base, base);
-    const Float invBase = (Float)1 / (Float)base;
-    uint64_t reversedDigits = 0;
-    Float invBaseN = 1;
-    int digitIndex = 0;
-    while (1 - invBaseN < 1) {
-        uint64_t next = a / base;
-        int digitValue = a - next * base;
-        reversedDigits = reversedDigits * base + perm.Permute(digitIndex, digitValue);
-        invBaseN *= invBase;
-        ++digitIndex;
-        a = next;
-    }
-    return std::min(invBaseN * reversedDigits, OneMinusEpsilon);
-}
-
 // Low Discrepancy Function Definitions
 pstd::vector<DigitPermutation> *ComputeRadicalInversePermutations(uint32_t seed,
                                                                   Allocator alloc) {

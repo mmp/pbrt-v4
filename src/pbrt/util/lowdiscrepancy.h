@@ -94,10 +94,11 @@ struct NoRandomizer {
 // Low Discrepancy Inline Functions
 PBRT_CPU_GPU inline Float RadicalInverse(int baseIndex, uint64_t a) {
     int base = Primes[baseIndex];
-    const Float invBase = (Float)1 / (Float)base;
+    Float invBase = (Float)1 / (Float)base;
     uint64_t reversedDigits = 0;
     Float invBaseN = 1;
     while (a) {
+        // Extract least significant digit from _a_ and update _reversedDigits_
         uint64_t next = a / base;
         uint64_t digit = a - next * base;
         reversedDigits = reversedDigits * base + digit;
@@ -107,8 +108,8 @@ PBRT_CPU_GPU inline Float RadicalInverse(int baseIndex, uint64_t a) {
     return std::min(reversedDigits * invBaseN, OneMinusEpsilon);
 }
 
-template <int base>
-PBRT_CPU_GPU inline uint64_t InverseRadicalInverse(uint64_t inverse, int nDigits) {
+PBRT_CPU_GPU
+inline uint64_t InverseRadicalInverse(uint64_t inverse, int base, int nDigits) {
     uint64_t index = 0;
     for (int i = 0; i < nDigits; ++i) {
         uint64_t digit = inverse % base;
@@ -244,8 +245,8 @@ class HaltonPixelIndexer {
             Point2i pm(Mod(p[0], MaxHaltonResolution), Mod(p[1], MaxHaltonResolution));
             for (int i = 0; i < 2; ++i) {
                 uint64_t dimOffset =
-                    (i == 0) ? InverseRadicalInverse<2>(pm[i], baseExponents[i])
-                             : InverseRadicalInverse<3>(pm[i], baseExponents[i]);
+                    (i == 0) ? InverseRadicalInverse(pm[i], 2, baseExponents[i])
+                             : InverseRadicalInverse(pm[i], 3, baseExponents[i]);
                 pixelSampleForIndex +=
                     dimOffset * (sampleStride / baseScales[i]) * multInverse[i];
             }

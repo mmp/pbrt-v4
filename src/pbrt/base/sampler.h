@@ -36,8 +36,8 @@ class DebugMLTSampler;
 
 // SamplerHandle Definition
 class SamplerHandle
-    : public TaggedPointer<HaltonSampler, PaddedSobolSampler, PMJ02BNSampler,
-                           RandomSampler, SobolSampler, StratifiedSampler, MLTSampler,
+    : public TaggedPointer<RandomSampler, StratifiedSampler, HaltonSampler,
+                           PaddedSobolSampler, SobolSampler, PMJ02BNSampler, MLTSampler,
                            DebugMLTSampler> {
   public:
     // Sampler Interface
