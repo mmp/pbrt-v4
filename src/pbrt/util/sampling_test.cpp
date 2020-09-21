@@ -14,7 +14,6 @@
 #include <pbrt/util/print.h>
 #include <pbrt/util/rng.h>
 #include <pbrt/util/sampling.h>
-#include <pbrt/util/shuffle.h>
 
 #include <algorithm>
 #include <array>
@@ -980,22 +979,6 @@ TEST(VarianceEstimator, MergeTwo) {
 
     Float varError = std::abs(ve[0].Variance() - veBoth.Variance()) / veBoth.Variance();
     EXPECT_LT(varError, 1e-5);
-}
-
-// Make sure that the permute function is in fact a valid permutation.
-TEST(Sampling, PermutationElement) {
-    for (int len = 2; len < 1024; ++len) {
-        for (int iter = 0; iter < 10; ++iter) {
-            std::vector<bool> seen(len, false);
-
-            for (int i = 0; i < len; ++i) {
-                int offset = PermutationElement(i, len, iter);
-                ASSERT_TRUE(offset >= 0 && offset < seen.size()) << offset;
-                EXPECT_FALSE(seen[offset]);
-                seen[offset] = true;
-            }
-        }
-    }
 }
 
 TEST(WeightedReservoir, Basic) {

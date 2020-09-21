@@ -11,6 +11,7 @@
 #include <pbrt/util/float.h>
 #include <pbrt/util/math.h>
 #include <pbrt/util/rng.h>
+#include <pbrt/util/shuffle.h>
 #include <pbrt/util/vecmath.h>
 
 #include <vector>
@@ -946,5 +947,76 @@ TEST(Math, InnerProduct) {
         Float dab = double(a[0]) * double(b[0]) + double(a[1]) * double(b[1]) +
                     double(a[2]) * double(b[2]) + double(a[3]) * double(b[3]);
         EXPECT_EQ(ab, dab);
+    }
+}
+
+// Make sure that the permute function is in fact a valid permutation.
+TEST(PermutationElement, Valid) {
+    for (int len = 2; len < 1024; ++len) {
+        for (int iter = 0; iter < 10; ++iter) {
+            std::vector<bool> seen(len, false);
+
+            for (int i = 0; i < len; ++i) {
+                int offset = PermutationElement(i, len, MixBits(1+iter));
+                ASSERT_TRUE(offset >= 0 && offset < seen.size()) << offset;
+                EXPECT_FALSE(seen[offset]) << StringPrintf("len %d index %d", len, i);
+                seen[offset] = true;
+            }
+        }
+    }
+}
+
+TEST(PermutationElement, Uniform) {
+    for (int n : { 2, 3, 4, 5, 9, 14, 16, 22, 27, 36 }) {
+        std::vector<int> count(n * n);
+
+        int numIters = 60000 * n;
+        for (int seed = 0; seed < numIters; ++seed) {
+            for (int i = 0; i < n; ++i) {
+                int ip = PermutationElement(i, n, MixBits(seed));
+                int offset = ip * n + i;
+                ++count[offset];
+            }
+        }
+
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
+                Float tol = 0.03f;
+                int offset = j * n + i;
+                EXPECT_TRUE(count[offset] >= (1 - tol) * numIters / n &&
+                            count[offset] <=(1 + tol) * numIters / n) <<
+                StringPrintf("Got count %d for %d -> %d (perm size %d). Expected +/- %d.\n",
+                                 count[offset], i, j, n, numIters / n);
+            }
+        }
+    }
+}
+
+TEST(PermutationElement, UniformDelta) {
+    for (int n : { 2, 3, 4, 5, 9, 14, 16, 22, 27, 36 }) {
+        std::vector<int> count(n * n);
+
+        int numIters = 60000 * n;
+        for (int seed = 0; seed < numIters; ++seed) {
+            for (int i = 0; i < n; ++i) {
+                int ip = PermutationElement(i, n, MixBits(seed));
+                int delta = ip - i;
+                if (delta < 0) delta += n;
+                CHECK_LT(delta, n);
+                int offset = delta * n + i;
+                ++count[offset];
+            }
+        }
+
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
+                Float tol = 0.03f;
+                int offset = j * n + i;
+                EXPECT_TRUE(count[offset] >= (1 - tol) * numIters / n &&
+                            count[offset] <=(1 + tol) * numIters / n) <<
+                StringPrintf("Got count %d for %d -> %d (perm size %d). Expected +/- %d.\n",
+                                 count[offset], i, j, n, numIters / n);
+            }
+        }
     }
 }
