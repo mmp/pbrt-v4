@@ -163,8 +163,7 @@ class PaddedSobolSampler {
         // Return randomized 1D van der Corput sample for dimension _dim_
         if (randomizeStrategy == RandomizeStrategy::CranleyPatterson)
             // Return 1D sample randomized with Cranley-Patterson rotation
-            return SobolSample(index, 0,
-                               CranleyPattersonRotator(BlueNoise(dim, pixel.x, pixel.y)));
+            return SobolSample(index, 0, CranleyPattersonRotator(BlueNoise(dim, pixel)));
 
         else
             return SampleDimension(0, index, hash >> 32);
@@ -182,12 +181,9 @@ class PaddedSobolSampler {
         // Return randomized 2D Sobol' sample
         if (randomizeStrategy == RandomizeStrategy::CranleyPatterson) {
             // Return 2D sample randomized with Cranley-Patterson rotation
-            return {
-                SobolSample(index, 0,
-                            CranleyPattersonRotator(BlueNoise(dim, pixel.x, pixel.y))),
-                SobolSample(
-                    index, 1,
-                    CranleyPattersonRotator(BlueNoise(dim + 1, pixel.x, pixel.y)))};
+            return {SobolSample(index, 0, CranleyPattersonRotator(BlueNoise(dim, pixel))),
+                    SobolSample(index, 1,
+                                CranleyPattersonRotator(BlueNoise(dim + 1, pixel)))};
 
         } else
             return {SampleDimension(0, index, hash >> 8),
@@ -225,7 +221,7 @@ class PaddedSobolSampler {
 class PMJ02BNSampler {
   public:
     // PMJ02BNSampler Public Methods
-    PMJ02BNSampler(int samplesPerPixel, Allocator alloc = {});
+    PMJ02BNSampler(int samplesPerPixel, int seed = 0, Allocator alloc = {});
 
     PBRT_CPU_GPU
     static constexpr const char *Name() { return "PMJ02BNSampler"; }
@@ -244,46 +240,46 @@ class PMJ02BNSampler {
 
     PBRT_CPU_GPU
     Float Get1D() {
+        // Find permuted sample index for 1D PMJ02BNSampler sample
         uint64_t hash = MixBits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
-                                ((uint64_t)dimension << 16) ^ GetOptions().seed);
-
+                                ((uint64_t)dimension << 16) ^ seed);
         int index = PermutationElement(sampleIndex, samplesPerPixel, hash);
-        Float cpOffset = BlueNoise(dimension, pixel.x, pixel.y);
-        Float u = (index + cpOffset) / samplesPerPixel;
-        if (u >= 1)
-            u -= 1;
+
+        Float delta = BlueNoise(dimension, pixel);
         ++dimension;
-        return std::min(u, OneMinusEpsilon);
+        return std::min((index + delta) / samplesPerPixel, OneMinusEpsilon);
     }
 
     PBRT_CPU_GPU
     Point2f Get2D() {
-        // Don't start permuting until the second time through: when we
-        // permute, that breaks the progressive part of the pattern and in
-        // turn, convergence is similar to random until the very end. This way,
-        // we generally do well for intermediate images as well.
-        int index = sampleIndex;
-        int pmjInstance = dimension;
-        if (pmjInstance >= nPMJ02bnSets) {
-            uint64_t hash =
-                MixBits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
-                        ((uint64_t)dimension << 16) ^ GetOptions().seed);
-            index = PermutationElement(sampleIndex, samplesPerPixel, hash);
-        }
-
         if (dimension == 0) {
-            // special case the pixel sample
-            int offset = pixelSampleOffset(Point2i(pixel));
+            // Return pmj02bn pixel sample
+            int px = pixel.x % pixelTileSize, py = pixel.y % pixelTileSize;
+            int offset = (px + py * pixelTileSize) * samplesPerPixel;
             dimension += 2;
-            return (*pixelSamples)[offset + index];
+            return (*pixelSamples)[offset + sampleIndex];
+
         } else {
-            Vector2f cpOffset(BlueNoise(dimension, pixel.x, pixel.y),
-                              BlueNoise(dimension + 1, pixel.x, pixel.y));
-            Point2f u = GetPMJ02BNSample(pmjInstance % nPMJ02bnSets, index) + cpOffset;
+            // Compute index for 2D pmj02bn sample
+            int index = sampleIndex;
+            int pmjInstance = dimension / 2;
+            if (pmjInstance >= nPMJ02bnSets) {
+                // Permute index to be used for pmj02bn sample array
+                uint64_t hash =
+                    MixBits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
+                            ((uint64_t)dimension << 16) ^ seed);
+                index = PermutationElement(sampleIndex, samplesPerPixel, hash);
+            }
+
+            // Return randomized pmj02bn sample for current dimension
+            Point2f u = GetPMJ02BNSample(pmjInstance, index);
+            // Apply Cranley-Patterson rotation to pmj02bn sample _u_
+            u += Vector2f(BlueNoise(dimension, pixel), BlueNoise(dimension + 1, pixel));
             if (u.x >= 1)
                 u.x -= 1;
             if (u.y >= 1)
                 u.y -= 1;
+
             dimension += 2;
             return {std::min(u.x, OneMinusEpsilon), std::min(u.y, OneMinusEpsilon)};
         }
@@ -293,22 +289,12 @@ class PMJ02BNSampler {
     std::string ToString() const;
 
   private:
-    // PMJ02BNSampler Private Methods
-    PBRT_CPU_GPU
-    int pixelSampleOffset(Point2i p) const {
-        DCHECK(p.x >= 0 && p.y >= 0);
-        int px = p.x % pixelTileSize, py = p.y % pixelTileSize;
-        return (px + py * pixelTileSize) * samplesPerPixel;
-    }
-
     // PMJ02BNSampler Private Members
-    Point2i pixel;
-    int sampleIndex = 0;
-    int dimension = 0;
-
-    int samplesPerPixel;
+    int samplesPerPixel, seed;
     int pixelTileSize;
     pstd::vector<Point2f> *pixelSamples;
+    Point2i pixel;
+    int sampleIndex, dimension;
 };
 
 // RandomSampler Definition

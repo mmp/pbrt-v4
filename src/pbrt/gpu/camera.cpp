@@ -41,7 +41,7 @@ void GPUPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
 
         // Sample wavelengths for the ray path for the pixel sample.
         // Use a blue noise pattern rather than the Sampler.
-        Float lu = RadicalInverse(1, sampleIndex) + BlueNoise(47, pPixel.x, pPixel.y);
+        Float lu = RadicalInverse(1, sampleIndex) + BlueNoise(47, pPixel);
         if (lu >= 1)
             lu -= 1;
         if (GetOptions().disableWavelengthJitter)

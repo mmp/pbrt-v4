@@ -1391,7 +1391,7 @@ bool Image::WritePNG(const std::string &name, const ImageMetadata &metadata) con
         for (int y = 0; y < resolution.y; ++y)
             for (int x = 0; x < resolution.x; ++x)
                 for (int c = 0; c < 3; ++c) {
-                    Float dither = -.5f + BlueNoise(c, x, y);
+                    Float dither = -.5f + BlueNoise(c, {x, y});
                     Float v = GetChannel({x, y}, c);
                     if (v < 0 || v > 1)
                         ++nOutOfGamut;
@@ -1405,7 +1405,7 @@ bool Image::WritePNG(const std::string &name, const ImageMetadata &metadata) con
             std::make_unique<uint8_t[]>(resolution.x * resolution.y);
         for (int y = 0; y < resolution.y; ++y)
             for (int x = 0; x < resolution.x; ++x) {
-                Float dither = -.5f + BlueNoise(0, x, y);
+                Float dither = -.5f + BlueNoise(0, {x, y});
                 Float v = GetChannel({x, y}, 0);
                 if (v < 0 || v > 1)
                     ++nOutOfGamut;

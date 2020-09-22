@@ -273,7 +273,7 @@ void RayIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleIndex,
     CameraSample cameraSample = GetCameraSample(sampler, pPixel, filter);
 
     // Sample wavelengths for the ray
-    Float lu = RadicalInverse(1, sampleIndex) + BlueNoise(47, pPixel.x, pPixel.y);
+    Float lu = RadicalInverse(1, sampleIndex) + BlueNoise(47, pPixel);
     if (lu >= 1)
         lu -= 1;
     if (Options->disableWavelengthJitter)
@@ -566,7 +566,7 @@ void LightPathIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleI
     (void)sampler.Get2D();
 
     // Sample wavelengths for the ray
-    Float lu = RadicalInverse(1, sampleIndex) + BlueNoise(47, pPixel.x, pPixel.y);
+    Float lu = RadicalInverse(1, sampleIndex) + BlueNoise(47, pPixel);
     if (lu >= 1)
         lu -= 1;
     if (Options->disableWavelengthJitter)

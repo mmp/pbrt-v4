@@ -8,6 +8,7 @@
 #include <pbrt/pbrt.h>
 
 #include <pbrt/util/check.h>
+#include <pbrt/util/vecmath.h>
 
 namespace pbrt {
 
@@ -19,10 +20,10 @@ extern PBRT_CONST uint16_t
 
 // Returns a sample in [0,1].
 PBRT_CPU_GPU
-inline float BlueNoise(int textureIndex, int px, int py) {
-    CHECK(textureIndex >= 0 && px >= 0 && py >= 0);
+inline float BlueNoise(int textureIndex, Point2i p) {
+    CHECK(textureIndex >= 0 && p.x >= 0 && p.y >= 0);
     textureIndex %= NumBlueNoiseTextures;
-    int x = px % BlueNoiseResolution, y = py % BlueNoiseResolution;
+    int x = p.x % BlueNoiseResolution, y = p.y % BlueNoiseResolution;
     return BlueNoiseTextures[textureIndex][x][y] / 65535.f;
 }
 

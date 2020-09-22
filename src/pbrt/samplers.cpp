@@ -136,12 +136,40 @@ PaddedSobolSampler *PaddedSobolSampler::Create(const ParameterDictionary &parame
 }
 
 // PMJ02BNSampler Method Definitions
-PMJ02BNSampler::PMJ02BNSampler(int samplesPerPixel, Allocator alloc)
-    : samplesPerPixel(samplesPerPixel) {
+PMJ02BNSampler::PMJ02BNSampler(int samplesPerPixel, int seed, Allocator alloc)
+    : samplesPerPixel(samplesPerPixel), seed(seed) {
     if (!IsPowerOf4(samplesPerPixel))
         Warning("PMJ02BNSampler results are best with power-of-4 samples per "
                 "pixel (1, 4, 16, 64, ...)");
-    pixelSamples = GetSortedPMJ02BNPixelSamples(samplesPerPixel, alloc, &pixelTileSize);
+    // Get sorted pmj02bn samples for pixel samples
+    if (samplesPerPixel > nPMJ02bnSamples)
+        Error("PMJ02BNSampler only supports up to %d samples per pixel", nPMJ02bnSamples);
+    // Compute _pixelTileSize_ for pmj02bn pixel samples and allocate _pixelSamples_
+    pixelTileSize =
+        1 << (Log4Int(nPMJ02bnSamples) - Log4Int(RoundUpPow4(samplesPerPixel)));
+    int nPixelSamples = pixelTileSize * pixelTileSize * samplesPerPixel;
+    pixelSamples = alloc.new_object<pstd::vector<Point2f>>(nPixelSamples, alloc);
+
+    // Loop over pmj02bn samples and associate them with their pixels
+    std::vector<int> nStored(pixelTileSize * pixelTileSize, 0);
+    for (int i = 0; i < nPMJ02bnSamples; ++i) {
+        Point2f p = GetPMJ02BNSample(0, i);
+        p *= pixelTileSize;
+        int pixelOffset = int(p.x) + int(p.y) * pixelTileSize;
+        if (nStored[pixelOffset] == samplesPerPixel) {
+            CHECK(!IsPowerOf4(samplesPerPixel));
+            continue;
+        }
+        int sampleOffset = pixelOffset * samplesPerPixel + nStored[pixelOffset];
+        CHECK((*pixelSamples)[sampleOffset] == Point2f(0, 0));
+        (*pixelSamples)[sampleOffset] = Point2f(p - Floor(p));
+        ++nStored[pixelOffset];
+    }
+
+    for (int i = 0; i < nStored.size(); ++i)
+        CHECK_EQ(nStored[i], samplesPerPixel);
+    for (int c : nStored)
+        DCHECK_EQ(c, samplesPerPixel);
 }
 
 PMJ02BNSampler *PMJ02BNSampler::Create(const ParameterDictionary &parameters,
@@ -151,7 +179,8 @@ PMJ02BNSampler *PMJ02BNSampler::Create(const ParameterDictionary &parameters,
         nsamp = *Options->pixelSamples;
     if (Options->quickRender)
         nsamp = 1;
-    return alloc.new_object<PMJ02BNSampler>(nsamp, alloc);
+    int seed = parameters.GetOneInt("seed", Options->seed);
+    return alloc.new_object<PMJ02BNSampler>(nsamp, seed, alloc);
 }
 
 std::vector<SamplerHandle> PMJ02BNSampler::Clone(int n, Allocator alloc) {
