@@ -63,8 +63,8 @@ class DigitPermutation {
 };
 
 // Low Discrepancy Declarations
-inline PBRT_CPU_GPU uint64_t SobolIntervalToIndex(const uint32_t log2Resolution,
-                                                  uint64_t sampleNum, const Point2i &p);
+inline PBRT_CPU_GPU uint64_t SobolIntervalToIndex(const uint32_t log2Scale,
+                                                  uint64_t sampleIndex, const Point2i &p);
 
 PBRT_CPU_GPU
 Float RadicalInverse(int baseIndex, uint64_t a);
@@ -138,25 +138,13 @@ PBRT_CPU_GPU inline uint32_t MultiplyGenerator(pstd::span<const uint32_t> C, uin
 
 // Laine et al., Stratified Sampling for Stochastic Transparency, Sec 3.1...
 PBRT_CPU_GPU inline uint32_t OwenScramble(uint32_t v, uint32_t hash) {
-    // Expect already reversed?
     v = ReverseBits32(v);
     v += hash;
     v ^= v * 0x6c50b47cu;
-    v ^= hash;
     v ^= v * 0xb82f1e52u;
+    v ^= v * 0xc7afe638u;
+    v ^= v * 0x8d22f6e6u;
     return ReverseBits32(v);
-}
-
-template <typename R>
-PBRT_CPU_GPU inline Float SampleGeneratorMatrix(pstd::span<const uint32_t> C, uint32_t a,
-                                                R randomizer) {
-    return std::min(randomizer(MultiplyGenerator(C, a)) * Float(0x1p-32),
-                    OneMinusEpsilon);
-}
-
-PBRT_CPU_GPU inline Float SampleGeneratorMatrix(pstd::span<const uint32_t> C,
-                                                uint32_t a) {
-    return SampleGeneratorMatrix(C, a, NoRandomizer());
 }
 
 template <typename R>
@@ -168,102 +156,52 @@ PBRT_CPU_GPU inline Float SobolSample(int64_t index, int dimension, R randomizer
 #endif
 }
 
-PBRT_CPU_GPU inline uint32_t SobolSampleBits32(int64_t a, int dimension);
 template <typename R>
 PBRT_CPU_GPU inline float SobolSampleFloat(int64_t a, int dimension, R randomizer) {
-    CHECK_LT(dimension, NSobolDimensions);
-    uint32_t v = SobolSampleBits32(a, dimension);
-    v = randomizer(v);
-    return std::min(v * 0x1p-32f /* 1/2^32 */, FloatOneMinusEpsilon);
-}
-
-PBRT_CPU_GPU
-inline uint32_t SobolSampleBits32(int64_t a, int dimension) {
+    DCHECK_LT(dimension, NSobolDimensions);
+    // Compute initial Sobol sample _v_ using generator matrices
     uint32_t v = 0;
     for (int i = dimension * SobolMatrixSize; a != 0; a >>= 1, i++)
         if (a & 1)
             v ^= SobolMatrices32[i];
-    return v;
+
+    v = randomizer(v);
+    return std::min(v * 0x1p-32f, FloatOneMinusEpsilon);
 }
 
 // CranleyPattersonRotator Definition
 struct CranleyPattersonRotator {
     PBRT_CPU_GPU
-    CranleyPattersonRotator(Float v) : offset(v * (1ull << 32)) {}
+    CranleyPattersonRotator(Float v) : delta(v * (1ull << 32)) {}
     PBRT_CPU_GPU
-    CranleyPattersonRotator(uint32_t offset) : offset(offset) {}
-
+    CranleyPattersonRotator(uint32_t delta) : delta(delta) {}
     PBRT_CPU_GPU
-    uint32_t operator()(uint32_t v) const { return v + offset; }
-
-    uint32_t offset;
+    uint32_t operator()(uint32_t v) const { return v + delta; }
+    uint32_t delta;
 };
 
 // XORScrambler Definition
 struct XORScrambler {
     PBRT_CPU_GPU
-    XORScrambler(uint32_t s) : s(s) {}
-
+    XORScrambler(uint32_t permutation) : permutation(permutation) {}
     PBRT_CPU_GPU
-    uint32_t operator()(uint32_t v) const { return s ^ v; }
-
-    uint32_t s;
+    uint32_t operator()(uint32_t v) const { return permutation ^ v; }
+    uint32_t permutation;
 };
 
 // OwenScrambler Definition
 struct OwenScrambler {
     PBRT_CPU_GPU
     OwenScrambler(uint32_t seed) : seed(seed) {}
-
     PBRT_CPU_GPU
     uint32_t operator()(uint32_t v) const { return OwenScramble(v, seed); }
-
     uint32_t seed;
 };
 
-enum class RandomizeStrategy { None, CranleyPatterson, Xor, Owen };
+// RandomizeStrategy Definition
+enum class RandomizeStrategy { None, CranleyPatterson, XOR, Owen };
 
 std::string ToString(RandomizeStrategy r);
-
-// Define _CVanDerCorput_ Generator Matrix
-PBRT_CONST uint32_t CVanDerCorput[32] = {
-    // clang-format off
-    0b10000000000000000000000000000000,
-    0b1000000000000000000000000000000,
-    0b100000000000000000000000000000,
-    0b10000000000000000000000000000,
-    // Remainder of Van Der Corput generator matrix entries
-0b1000000000000000000000000000,
-  0b100000000000000000000000000,
-  0b10000000000000000000000000,
-  0b1000000000000000000000000,
-  0b100000000000000000000000,
-  0b10000000000000000000000,
-  0b1000000000000000000000,
-  0b100000000000000000000,
-  0b10000000000000000000,
-  0b1000000000000000000,
-  0b100000000000000000,
-  0b10000000000000000,
-  0b1000000000000000,
-  0b100000000000000,
-  0b10000000000000,
-  0b1000000000000,
-  0b100000000000,
-  0b10000000000,
-  0b1000000000,
-  0b100000000,
-  0b10000000,
-  0b1000000,
-  0b100000,
-  0b10000,
-  0b1000,
-  0b100,
-  0b10,
-  0b1,
-
-    // clang-format on
-};
 
 PBRT_CPU_GPU
 inline uint64_t SobolIntervalToIndex(uint32_t m, uint64_t frame, const Point2i &p) {

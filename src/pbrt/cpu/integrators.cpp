@@ -2767,7 +2767,7 @@ void SPPMIntegrator::Render() {
     // Allocate samplers for SPPM rendering
     std::unique_ptr<pstd::vector<DigitPermutation>> digitPermutations(
         ComputeRadicalInversePermutations(digitPermutationsSeed));
-    HaltonSampler sampler(nIterations, camera.GetFilm().FullResolution());
+    HaltonSampler sampler(nIterations, camera.GetFilm().FullResolution(), Options->seed);
     std::vector<SamplerHandle> tileSamplers =
         sampler.Clone(MaxThreadIndex(), Allocator());
 

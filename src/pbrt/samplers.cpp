@@ -29,18 +29,15 @@ std::string SamplerHandle::ToString() const {
 }
 
 // HaltonSampler Method Definitions
-HaltonSampler::HaltonSampler(int samplesPerPixel, const Point2i &fullResolution,
-                             pstd::vector<DigitPermutation> *dp, Allocator alloc)
-    : digitPermutations(dp), samplesPerPixel(samplesPerPixel) {
-    // Generate random digit permutations for Halton sampler
-    if (!dp)
-        digitPermutations = ComputeRadicalInversePermutations(0, alloc);
-
+HaltonSampler::HaltonSampler(int samplesPerPixel, const Point2i &fullRes, int seed,
+                             Allocator alloc)
+    : samplesPerPixel(samplesPerPixel) {
+    digitPermutations = ComputeRadicalInversePermutations(seed, alloc);
     // Find radical inverse base scales and exponents that cover sampling area
     for (int i = 0; i < 2; ++i) {
         int base = (i == 0) ? 2 : 3;
         int scale = 1, exp = 0;
-        while (scale < std::min(fullResolution[i], MaxHaltonResolution)) {
+        while (scale < std::min(fullRes[i], MaxHaltonResolution)) {
             scale *= base;
             ++exp;
         }
@@ -51,24 +48,6 @@ HaltonSampler::HaltonSampler(int samplesPerPixel, const Point2i &fullResolution,
     // Compute multiplicative inverses for _baseScales_
     multInverse[0] = multiplicativeInverse(baseScales[1], baseScales[0]);
     multInverse[1] = multiplicativeInverse(baseScales[0], baseScales[1]);
-}
-
-uint64_t HaltonSampler::multiplicativeInverse(int64_t a, int64_t n) {
-    int64_t x, y;
-    extendedGCD(a, n, &x, &y);
-    return Mod(x, n);
-}
-
-void HaltonSampler::extendedGCD(uint64_t a, uint64_t b, int64_t *x, int64_t *y) {
-    if (b == 0) {
-        *x = 1;
-        *y = 0;
-        return;
-    }
-    int64_t d = a / b, xp, yp;
-    extendedGCD(b, a % b, &xp, &yp);
-    *x = yp;
-    *y = xp - (d * yp);
 }
 
 std::vector<SamplerHandle> HaltonSampler::Clone(int n, Allocator alloc) {
@@ -83,8 +62,10 @@ std::vector<SamplerHandle> HaltonSampler::Clone(int n, Allocator alloc) {
 
 std::string HaltonSampler::ToString() const {
     return StringPrintf("[ HaltonSampler digitPermutations: %p "
-                        "sampleIndex: %d dimension: %d samplesPerPixel: %d ]",
-                        digitPermutations, sampleIndex, dimension, samplesPerPixel);
+                        "haltonIndex: %d dimension: %d samplesPerPixel: %d "
+                        "baseScales: %s baseExponents: %s multInverse: [ %d %d ] ]",
+                        digitPermutations, haltonIndex, dimension, samplesPerPixel,
+                        baseScales, baseExponents, multInverse[0], multInverse[1]);
 }
 
 HaltonSampler *HaltonSampler::Create(const ParameterDictionary &parameters,
@@ -97,8 +78,7 @@ HaltonSampler *HaltonSampler::Create(const ParameterDictionary &parameters,
     if (Options->quickRender)
         nsamp = 1;
 
-    auto digitPermutations = ComputeRadicalInversePermutations(seed, alloc);
-    return alloc.new_object<HaltonSampler>(nsamp, fullResolution, digitPermutations);
+    return alloc.new_object<HaltonSampler>(nsamp, fullResolution, seed, alloc);
 }
 
 std::vector<SamplerHandle> SobolSampler::Clone(int n, Allocator alloc) {
@@ -109,14 +89,6 @@ std::vector<SamplerHandle> SobolSampler::Clone(int n, Allocator alloc) {
         samplers[i] = &samplerMem[i];
     }
     return samplers;
-}
-
-// PaddedSobolSampler Method Definitions
-PaddedSobolSampler::PaddedSobolSampler(int spp, RandomizeStrategy randomizer)
-    : samplesPerPixel(RoundUpPow2(spp)), randomizeStrategy(randomizer) {
-    if (!IsPowerOf2(spp))
-        Warning("Pixel samples being rounded up to power of 2 (from %d to %d).", spp,
-                samplesPerPixel);
 }
 
 std::string PaddedSobolSampler::ToString() const {
@@ -153,7 +125,7 @@ PaddedSobolSampler *PaddedSobolSampler::Create(const ParameterDictionary &parame
     else if (s == "cranleypatterson")
         randomizer = RandomizeStrategy::CranleyPatterson;
     else if (s == "xor")
-        randomizer = RandomizeStrategy::Xor;
+        randomizer = RandomizeStrategy::XOR;
     else if (s == "owen")
         randomizer = RandomizeStrategy::Owen;
     else
@@ -227,9 +199,9 @@ RandomSampler *RandomSampler::Create(const ParameterDictionary &parameters,
 // SobolSampler Method Definitions
 std::string SobolSampler::ToString() const {
     return StringPrintf("[ SobolSampler pixel: %s dimension: %d "
-                        "samplesPerPixel: %d resolution: %d sequenceIndex: %d "
+                        "samplesPerPixel: %d scale: %d sobolIndex: %d "
                         "randomizeStrategy: %s ]",
-                        pixel, dimension, samplesPerPixel, resolution, sequenceIndex,
+                        pixel, dimension, samplesPerPixel, scale, sobolIndex,
                         randomizeStrategy);
 }
 
@@ -249,7 +221,7 @@ SobolSampler *SobolSampler::Create(const ParameterDictionary &parameters,
     else if (s == "cranleypatterson")
         randomizer = RandomizeStrategy::CranleyPatterson;
     else if (s == "xor")
-        randomizer = RandomizeStrategy::Xor;
+        randomizer = RandomizeStrategy::XOR;
     else if (s == "owen")
         randomizer = RandomizeStrategy::Owen;
     else

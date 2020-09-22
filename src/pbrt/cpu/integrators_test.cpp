@@ -245,16 +245,13 @@ std::vector<std::pair<SamplerHandle, std::string>> GetSamplers(
     std::vector<std::pair<SamplerHandle, std::string>> samplers;
 
     samplers.push_back(std::make_pair(new HaltonSampler(256, resolution), "Halton 256"));
-    samplers.push_back(std::make_pair(new PaddedSobolSampler(256, RandomizeStrategy::Xor),
+    samplers.push_back(std::make_pair(new PaddedSobolSampler(256, RandomizeStrategy::XOR),
                                       "Padded Sobol 256"));
     samplers.push_back(
         std::make_pair(new SobolSampler(256, resolution, RandomizeStrategy::None),
                        "Sobol 256 Not Randomized"));
-    samplers.push_back(std::make_pair(
-        new SobolSampler(256, resolution, RandomizeStrategy::CranleyPatterson),
-        "Sobol 256 Cranley Patterson Randomization"));
     samplers.push_back(
-        std::make_pair(new SobolSampler(256, resolution, RandomizeStrategy::Xor),
+        std::make_pair(new SobolSampler(256, resolution, RandomizeStrategy::XOR),
                        "Sobol 256 XOR Scramble"));
     samplers.push_back(
         std::make_pair(new SobolSampler(256, resolution, RandomizeStrategy::Owen),

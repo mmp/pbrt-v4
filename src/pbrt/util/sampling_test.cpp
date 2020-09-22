@@ -144,34 +144,6 @@ TEST(LowDiscrepancy, RadicalInverse) {
     }
 }
 
-TEST(LowDiscrepancy, GeneratorMatrix) {
-    uint32_t C[32];
-    uint32_t Crev[32];
-    // Identity matrix, column-wise
-    for (int i = 0; i < 32; ++i) {
-        C[i] = 1 << i;
-        Crev[i] = ReverseBits32(C[i]);
-    }
-
-    for (int a = 0; a < 128; ++a) {
-        // Make sure identity generator matrix matches van der Corput
-        EXPECT_EQ(a, MultiplyGenerator(C, a));
-        EXPECT_EQ(RadicalInverse(0, a),
-                  ReverseBits32(MultiplyGenerator(C, a)) * 2.3283064365386963e-10f);
-        EXPECT_EQ(RadicalInverse(0, a), SampleGeneratorMatrix(Crev, a));
-    }
-
-    // Random / goofball generator matrix
-    RNG rng;
-    for (int i = 0; i < 32; ++i) {
-        C[i] = rng.Uniform<uint32_t>();
-        Crev[i] = ReverseBits32(C[i]);
-    }
-    for (int a = 0; a < 1024; ++a) {
-        EXPECT_EQ(ReverseBits32(MultiplyGenerator(C, a)), MultiplyGenerator(Crev, a));
-    }
-}
-
 TEST(LowDiscrepancy, Sobol) {
     // Check that float and double variants match (as float values).
     for (int i = 0; i < 256; ++i) {
