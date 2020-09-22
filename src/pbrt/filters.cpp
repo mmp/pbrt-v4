@@ -131,28 +131,20 @@ FilterHandle FilterHandle::Create(const std::string &name,
 }
 
 // FilterSampler Method Definitions
-FilterSampler::FilterSampler(FilterHandle filter, int freq, Allocator alloc)
+FilterSampler::FilterSampler(FilterHandle filter, Allocator alloc)
     : domain(Point2f(-filter.Radius()), Point2f(filter.Radius())),
-      values(int(16 * 2 * filter.Radius().x), int(16 * 2 * filter.Radius().y), alloc),
+      values(int(32 * filter.Radius().x), int(32 * filter.Radius().y), alloc),
       distrib(alloc) {
-    for (int y = 0; y < values.ySize(); ++y) {
-        for (int x = 0; x < values.xSize(); ++x) {
-            Point2f p = domain.Lerp(
-                Point2f((x + 0.5f) / values.xSize(), (y + 0.5f) / values.ySize()));
-            values(x, y) = std::abs(filter.Evaluate(p));
-        }
-    }
-
-    distrib = std::move(PiecewiseConstant2D(values, domain, alloc));
-
-    // And again without the abs() for use in Sample...
-    for (int y = 0; y < values.ySize(); ++y) {
+    // Tabularize filter function in _values_
+    for (int y = 0; y < values.ySize(); ++y)
         for (int x = 0; x < values.xSize(); ++x) {
             Point2f p = domain.Lerp(
                 Point2f((x + 0.5f) / values.xSize(), (y + 0.5f) / values.ySize()));
             values(x, y) = filter.Evaluate(p);
         }
-    }
+
+    // Compute sampling distribution for filter
+    distrib = PiecewiseConstant2D(values, domain, alloc);
 }
 
 std::string FilterSampler::ToString() const {

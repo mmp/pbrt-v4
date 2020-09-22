@@ -26,7 +26,7 @@ struct FilterSample {
 class FilterSampler {
   public:
     // FilterSampler Public Methods
-    FilterSampler(FilterHandle filter, int freq = 64, Allocator alloc = {});
+    FilterSampler(FilterHandle filter, Allocator alloc = {});
     std::string ToString() const;
 
     PBRT_CPU_GPU
@@ -86,7 +86,7 @@ class GaussianFilter {
           sigma(sigma),
           expX(Gaussian(radius.x, 0, sigma)),
           expY(Gaussian(radius.y, 0, sigma)),
-          sampler(this, 64, alloc) {}
+          sampler(this, alloc) {}
 
     static GaussianFilter *Create(const ParameterDictionary &parameters,
                                   const FileLoc *loc, Allocator alloc);
@@ -125,7 +125,7 @@ class MitchellFilter {
     // MitchellFilter Public Methods
     MitchellFilter(const Vector2f &radius, Float B = 1.f / 3.f, Float C = 1.f / 3.f,
                    Allocator alloc = {})
-        : radius(radius), B(B), C(C), sampler(this, 64, alloc) {}
+        : radius(radius), B(B), C(C), sampler(this, alloc) {}
 
     static MitchellFilter *Create(const ParameterDictionary &parameters,
                                   const FileLoc *loc, Allocator alloc);
@@ -137,7 +137,7 @@ class MitchellFilter {
 
     PBRT_CPU_GPU
     Float Evaluate(const Point2f &p) const {
-        return Mitchell1D(p.x / radius.x) * Mitchell1D(p.y / radius.y);
+        return Mitchell1D(2 * p.x / radius.x) * Mitchell1D(2 * p.y / radius.y);
     }
 
     PBRT_CPU_GPU
@@ -150,7 +150,7 @@ class MitchellFilter {
     // MitchellFilter Private Methods
     PBRT_CPU_GPU
     Float Mitchell1D(Float x) const {
-        x = std::abs(2 * x);
+        x = std::abs(x);
         if (x <= 1)
             return ((12 - 9 * B - 6 * C) * x * x * x + (-18 + 12 * B + 6 * C) * x * x +
                     (6 - 2 * B)) *
@@ -174,7 +174,7 @@ class LanczosSincFilter {
   public:
     // LanczosSincFilter Public Methods
     LanczosSincFilter(const Vector2f &radius, Float tau = 3.f, Allocator alloc = {})
-        : radius(radius), tau(tau), sampler(this, 64, alloc) {}
+        : radius(radius), tau(tau), sampler(this, alloc) {}
 
     static LanczosSincFilter *Create(const ParameterDictionary &parameters,
                                      const FileLoc *loc, Allocator alloc);
@@ -227,7 +227,7 @@ class TriangleFilter {
     }
 
     PBRT_CPU_GPU
-    Float Integral() const { return radius.x * radius.x * radius.y * radius.y; }
+    Float Integral() const { return Sqr(radius.x) * Sqr(radius.y); }
 
   private:
     Vector2f radius;

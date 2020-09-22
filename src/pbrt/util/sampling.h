@@ -200,6 +200,27 @@ inline Float InvertSmoothStepSample(Float x, Float a, Float b) {
 }
 
 PBRT_CPU_GPU
+inline Float NormalPDF(Float x, Float mu = 0, Float sigma = 1) {
+    return Gaussian(x, mu, sigma);
+}
+
+PBRT_CPU_GPU
+inline Float SampleNormal(Float u, Float mu = 0, Float sigma = 1) {
+    return mu + Sqrt2 * sigma * ErfInv(2 * u - 1);
+}
+
+PBRT_CPU_GPU
+inline Float InvertNormalSample(Float x, Float mu = 0, Float sigma = 1) {
+    return 0.5f * (1 + std::erf((x - mu) / (sigma * Sqrt2)));
+}
+
+PBRT_CPU_GPU
+inline Point2f SampleTwoNormal(const Point2f &u, Float mu = 0, Float sigma = 1) {
+    return {mu + sigma * std::sqrt(-2 * std::log(1 - u[0])) * std::cos(2 * Pi * u[1]),
+            mu + sigma * std::sqrt(-2 * std::log(1 - u[0])) * std::sin(2 * Pi * u[1])};
+}
+
+PBRT_CPU_GPU
 inline Vector3f SampleUniformHemisphere(const Point2f &u) {
     Float z = u[0];
     Float r = SafeSqrt(1 - z * z);
@@ -442,27 +463,6 @@ inline Float InvertTentSample(Float x, Float radius) {
 }
 
 PBRT_CPU_GPU
-inline Float NormalPDF(Float x, Float mu = 0, Float sigma = 1) {
-    return Gaussian(x, mu, sigma);
-}
-
-PBRT_CPU_GPU
-inline Float SampleNormal(Float u, Float mu = 0, Float sigma = 1) {
-    return mu + Sqrt2 * sigma * ErfInv(2 * u - 1);
-}
-
-PBRT_CPU_GPU
-inline Float InvertNormalSample(Float x, Float mu = 0, Float sigma = 1) {
-    return 0.5f * (1 + std::erf((x - mu) / (sigma * Sqrt2)));
-}
-
-PBRT_CPU_GPU
-inline Point2f SampleTwoNormal(const Point2f &u, Float mu = 0, Float sigma = 1) {
-    return {mu + sigma * std::sqrt(-2 * std::log(1 - u[0])) * std::cos(2 * Pi * u[1]),
-            mu + sigma * std::sqrt(-2 * std::log(1 - u[0])) * std::sin(2 * Pi * u[1])};
-}
-
-PBRT_CPU_GPU
 inline Vector3f SampleTrowbridgeReitz(Float alpha_x, Float alpha_y, const Point2f &u) {
     Float cosTheta = 0, phi = (2 * Pi) * u[1];
     if (alpha_x == alpha_y) {
@@ -699,6 +699,10 @@ class PiecewiseConstant1D {
                         Allocator alloc = {})
         : func(f.begin(), f.end(), alloc), cdf(f.size() + 1, alloc), min(min), max(max) {
         CHECK_GT(max, min);
+        // Take absolute value of _func_
+        for (Float &f : func)
+            f = std::abs(f);
+
         // Compute integral of step function at $x_i$
         cdf[0] = 0;
         size_t n = f.size();

@@ -163,8 +163,9 @@ std::string FilmBase::BaseToString() const {
 }
 
 Bounds2f FilmBase::SampleBounds() const {
-    return Bounds2f(Point2f(pixelBounds.pMin) - filter.Radius() + Vector2f(0.5f, 0.5f),
-                    Point2f(pixelBounds.pMax) + filter.Radius() - Vector2f(0.5f, 0.5f));
+    Vector2f radius = filter.Radius();
+    return Bounds2f(pixelBounds.pMin - radius + Vector2f(0.5f, 0.5f),
+                    pixelBounds.pMax + radius - Vector2f(0.5f, 0.5f));
 }
 
 // VisibleSurface Method Definitions
