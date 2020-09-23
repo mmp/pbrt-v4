@@ -105,23 +105,23 @@ ParsedScene::GraphicsState::GraphicsState() {
                     func);                                               \
     } while (false) /* swallow trailing semicolon */
 
-#define VERIFY_OPTIONS(func)                               \
-    VERIFY_INITIALIZED(func);                              \
-    if (currentApiState == APIState::WorldBlock) {         \
-        Error(&loc,                                        \
-              "Options cannot be set inside world block; " \
-              "\"%s\" not allowed.  Ignoring.",            \
-              func);                                       \
-        return;                                            \
-    } else /* swallow trailing semicolon */
-#define VERIFY_WORLD(func)                                     \
+#define VERIFY_OPTIONS(func)                                   \
     VERIFY_INITIALIZED(func);                                  \
-    if (currentApiState == APIState::OptionsBlock) {           \
-        Error(&loc,                                            \
-              "Scene description must be inside world block; " \
-              "\"%s\" not allowed. Ignoring.",                 \
-              func);                                           \
+    if (currentApiState == APIState::WorldBlock) {             \
+        ErrorExit(&loc,                                        \
+                  "Options cannot be set inside world block; " \
+                  "\"%s\" is not allowed.",                    \
+                  func);                                       \
         return;                                                \
+    } else /* swallow trailing semicolon */
+#define VERIFY_WORLD(func)                                         \
+    VERIFY_INITIALIZED(func);                                      \
+    if (currentApiState == APIState::OptionsBlock) {               \
+        ErrorExit(&loc,                                            \
+                  "Scene description must be inside world block; " \
+                  "\"%s\" is not allowed.",                        \
+                  func);                                           \
+        return;                                                    \
     } else /* swallow trailing semicolon */
 
 STAT_MEMORY_COUNTER("Memory/TransformCache", transformCacheBytes);
