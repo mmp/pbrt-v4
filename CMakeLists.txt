@@ -159,16 +159,16 @@ if (CMAKE_CUDA_COMPILER)
 
         # https://wagonhelm.github.io/articles/2018-03/detecting-cuda-capability-with-cmake
         # Get CUDA compute capability
-        set (OUTPUTFILE ${CMAKE_BINARY_DIR}/checkcuda)
+        set (CHECK_CUDA_OUTPUT_EXE ${CMAKE_BINARY_DIR}/checkcuda)
         if (MSVC)
-                execute_process (COMMAND nvcc -lcuda ${CMAKE_SOURCE_DIR}/cmake/checkcuda.cu -ccbin ${CMAKE_CXX_COMPILER} -o ${OUTPUTFILE})
+                execute_process (COMMAND nvcc -lcuda ${CMAKE_SOURCE_DIR}/cmake/checkcuda.cu -ccbin ${CMAKE_CXX_COMPILER} -o ${CHECK_CUDA_OUTPUT_EXE})
         else  ()
-                execute_process (COMMAND nvcc -lcuda ${CMAKE_SOURCE_DIR}/cmake/checkcuda.cu -o ${OUTPUTFILE})
+                execute_process (COMMAND nvcc -lcuda ${CMAKE_SOURCE_DIR}/cmake/checkcuda.cu -o ${CHECK_CUDA_OUTPUT_EXE})
         endif ()
 
-        execute_process (COMMAND ${OUTPUTFILE}
+        execute_process (COMMAND ${CHECK_CUDA_OUTPUT_EXE}
                          RESULT_VARIABLE CUDA_RETURN_CODE
-                         OUTPUT_VARIABLE ARCH)
+                         OUTPUT_VARIABLE CHECK_CUDA_OUTPUT)
 
         set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --std=c++17")
         if (CMAKE_BUILD_TYPE MATCHES Debug)
@@ -178,8 +178,9 @@ if (CMAKE_CUDA_COMPILER)
         endif ()
 
         if (NOT ${CUDA_RETURN_CODE} EQUAL 0)
-            message (SEND_ERROR "Unable to determine GPU's compute capability")
-        else ()
+            message (SEND_ERROR ${CHECK_CUDA_OUTPUT})
+          else ()
+            set(ARCH "${CHECK_CUDA_OUTPUT}")
             message (STATUS "CUDA Architecture: ${ARCH}")
             set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --gpu-architecture=${ARCH}")
         endif ()
