@@ -136,16 +136,23 @@ static MaterialHandle getMaterial(
 
 static FloatTextureHandle getAlphaTexture(
     const ShapeSceneEntity &shape,
-    const std::map<std::string, FloatTextureHandle> &floatTextures) {
+    const std::map<std::string, FloatTextureHandle> &floatTextures,
+    Allocator alloc) {
+    FloatTextureHandle alphaTextureHandle;
+
     std::string alphaTexName = shape.parameters.GetTexture("alpha");
-    if (alphaTexName.empty())
-        return nullptr;
+    if (alphaTexName.empty()) {
+        if (Float alpha = shape.parameters.GetOneFloat("alpha", 1.f); alpha < 1.f)
+            alphaTextureHandle = alloc.new_object<FloatConstantTexture>(alpha);
+        else
+            return nullptr;
+    } else {
+        auto iter = floatTextures.find(alphaTexName);
+        if (iter == floatTextures.end())
+            ErrorExit(&shape.loc, "%s: alpha texture not defined.", alphaTexName);
 
-    auto iter = floatTextures.find(alphaTexName);
-    if (iter == floatTextures.end())
-        ErrorExit(&shape.loc, "%s: alpha texture not defined.", alphaTexName);
-
-    FloatTextureHandle alphaTextureHandle = iter->second;
+        alphaTextureHandle = iter->second;
+    }
 
     if (!BasicTextureEvaluator().CanEvaluate({alphaTextureHandle}, {})) {
         // It would be nice to just use the UniversalTextureEvaluator (maybe
@@ -297,7 +304,7 @@ OptixTraversableHandle GPUAccel::createGASForTriangles(
 
         const auto &shape = shapes[shapeIndex];
 
-        FloatTextureHandle alphaTextureHandle = getAlphaTexture(shape, floatTextures);
+        FloatTextureHandle alphaTextureHandle = getAlphaTexture(shape, floatTextures, alloc);
         MaterialHandle materialHandle = getMaterial(shape, namedMaterials, materials);
 
         OptixBuildInput input = {};
@@ -403,7 +410,7 @@ OptixTraversableHandle GPUAccel::createGASForBLPs(
         *gasBounds = Union(*gasBounds, shapeBounds);
 
         MaterialHandle materialHandle = getMaterial(shape, namedMaterials, materials);
-        FloatTextureHandle alphaTextureHandle = getAlphaTexture(shape, floatTextures);
+        FloatTextureHandle alphaTextureHandle = getAlphaTexture(shape, floatTextures, alloc);
 
         flags.push_back(getOptixGeometryFlags(false, alphaTextureHandle, materialHandle));
 
@@ -493,7 +500,7 @@ OptixTraversableHandle GPUAccel::createGASForQuadrics(
 
         // Find alpha texture, if present.
         MaterialHandle materialHandle = getMaterial(shape, namedMaterials, materials);
-        FloatTextureHandle alphaTextureHandle = getAlphaTexture(shape, floatTextures);
+        FloatTextureHandle alphaTextureHandle = getAlphaTexture(shape, floatTextures, alloc);
         flags.push_back(getOptixGeometryFlags(false, alphaTextureHandle, materialHandle));
 
         HitgroupRecord hgRecord;

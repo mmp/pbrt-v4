@@ -113,8 +113,8 @@ void CPURender(ParsedScene &parsedScene) {
             else
                 ErrorExit(loc, "%s: couldn't find float texture for \"alpha\" parameter.",
                           alphaTexName);
-        } else if (parameters.GetOneFloat("alpha", 1.f) == 0.f)
-            return alloc.new_object<FloatConstantTexture>(0.f);
+        } else if (Float alpha = parameters.GetOneFloat("alpha", 1.f); alpha < 1.f)
+            return alloc.new_object<FloatConstantTexture>(alpha);
         else
             return nullptr;
     };
