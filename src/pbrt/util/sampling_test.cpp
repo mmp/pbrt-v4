@@ -345,6 +345,19 @@ TEST(PiecewiseConstant1D, InverseRandoms) {
     }
 }
 
+TEST(PiecewiseConstant1D, Integral) {
+    std::vector<Float> values{Float(1), Float(0.5), Float(0), Float(0.25)};
+
+    PiecewiseConstant1D dist(values);
+    EXPECT_EQ(0.4375f, dist.Integral());
+
+    PiecewiseConstant1D dist2(values, 0, 4);
+    EXPECT_EQ(1.75f, dist2.Integral());
+
+    PiecewiseConstant1D dist3(values, -3, 5);
+    EXPECT_EQ(3.5f, dist3.Integral());
+}
+
 TEST(PiecewiseConstant2D, InverseUniform) {
     std::vector<Float> values = {Float(1), Float(1), Float(1),
                                  Float(1), Float(1), Float(1)};
@@ -408,6 +421,23 @@ TEST(PiecewiseConstant2D, FromFuncLInfinity) {
         Float(Sqr(0.75) * Float(1)),   Float(Sqr(1) * Float(1))};
     PiecewiseConstant2D dExact(exact, 4, 2);
     PiecewiseConstant2D::TestCompareDistributions(dSampled, dExact);
+}
+
+TEST(PiecewiseConstant2D, Integral) {
+    std::vector<Float> values{Float(1), Float(2), Float(0), Float(7),
+                              Float(3), Float(1), Float(2), Float(0)};
+
+    PiecewiseConstant2D dist(values, 4, 2);
+    EXPECT_EQ(2, dist.Integral());
+
+    PiecewiseConstant2D dist2(values, 2, 4);
+    EXPECT_EQ(2, dist2.Integral());
+
+    PiecewiseConstant2D dist3(values, 4, 2, Bounds2f(Point2f(0, 0), Point2f(4, 2)));
+    EXPECT_EQ(16, dist3.Integral());
+
+    PiecewiseConstant2D dist4(values, 4, 2, Bounds2f(Point2f(-1, 0), Point2f(0, 4)));
+    EXPECT_EQ(8, dist4.Integral());
 }
 
 TEST(Sampling, SphericalTriangle) {

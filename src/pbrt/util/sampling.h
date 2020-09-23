@@ -722,6 +722,9 @@ class PiecewiseConstant1D {
     }
 
     PBRT_CPU_GPU
+    Float Integral() const { return funcInt; }
+
+    PBRT_CPU_GPU
     size_t size() const { return func.size(); }
 
     PBRT_CPU_GPU
@@ -825,6 +828,9 @@ class PiecewiseConstant2D {
         pMarginal =
             PiecewiseConstant1D(marginalFunc, domain.pMin[1], domain.pMax[1], alloc);
     }
+
+    PBRT_CPU_GPU
+    Float Integral() const { return pMarginal.Integral(); }
 
     PBRT_CPU_GPU
     Point2f Sample(const Point2f &u, Float *pdf = nullptr) const {

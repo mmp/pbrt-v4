@@ -110,6 +110,14 @@ inline Float Lerp(Float t, Float a, Float b) {
     return (1 - t) * a + t * b;
 }
 
+// http://www.plunk.org/~hatch/rightway.php
+PBRT_CPU_GPU
+inline Float SinXOverX(Float x) {
+    if (1 + x * x == 1)
+        return 1;
+    return std::sin(x) / x;
+}
+
 PBRT_CPU_GPU
 inline float FMA(float a, float b, float c) {
     return std::fma(a, b, c);
@@ -145,16 +153,7 @@ PBRT_CPU_GPU inline auto SumOfProducts(Ta a, Tb b, Tc c, Td d) {
     return sumOfProducts + error;
 }
 
-// http://www.plunk.org/~hatch/rightway.php
-PBRT_CPU_GPU
-inline Float SinXOverX(Float x) {
-    if (1 + x * x == 1)
-        return 1;
-    return std::sin(x) / x;
-}
-
-PBRT_CPU_GPU
-inline Float Sinc(Float x) {
+PBRT_CPU_GPU inline Float Sinc(Float x) {
     return SinXOverX(Pi * x);
 }
 
@@ -162,8 +161,7 @@ PBRT_CPU_GPU
 inline Float WindowedSinc(Float x, Float radius, Float tau) {
     if (std::abs(x) > radius)
         return 0;
-    Float lanczos = Sinc(x / tau);
-    return Sinc(x) * lanczos;
+    return Sinc(x) * Sinc(x / tau);
 }
 
 #ifdef PBRT_IS_MSVC

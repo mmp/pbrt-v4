@@ -38,6 +38,9 @@ class FilterSampler {
         return {p, values[pi] < 0 ? -1.f : 1.f};
     }
 
+    PBRT_CPU_GPU
+    Float Integral() const { return distrib.Integral(); }
+
   private:
     // FilterSampler Private Members
     Bounds2f domain;
@@ -103,19 +106,18 @@ class GaussianFilter {
     }
 
     PBRT_CPU_GPU
-    FilterSample Sample(const Point2f &u) const { return sampler.Sample(u); }
-
-    PBRT_CPU_GPU
     Float Integral() const {
         return ((GaussianIntegral(-radius.x, radius.x, 0, sigma) - 2 * radius.x * expX) *
                 (GaussianIntegral(-radius.y, radius.y, 0, sigma) - 2 * radius.y * expY));
     }
 
+    PBRT_CPU_GPU
+    FilterSample Sample(const Point2f &u) const { return sampler.Sample(u); }
+
   private:
     // GaussianFilter Private Members
     Vector2f radius;
-    Float sigma;
-    Float expX, expY;
+    Float sigma, expX, expY;
     FilterSampler sampler;
 };
 
@@ -196,6 +198,7 @@ class LanczosSincFilter {
     Float Integral() const;
 
   private:
+    // LanczosSincFilter Private Members
     Vector2f radius;
     Float tau;
     FilterSampler sampler;
