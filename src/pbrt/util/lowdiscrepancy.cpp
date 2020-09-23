@@ -5,10 +5,10 @@
 #include <pbrt/util/lowdiscrepancy.h>
 
 #include <pbrt/util/bits.h>
+#include <pbrt/util/math.h>
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/primes.h>
 #include <pbrt/util/print.h>
-#include <pbrt/util/shuffle.h>
 #include <pbrt/util/stats.h>
 
 namespace pbrt {

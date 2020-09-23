@@ -11,7 +11,6 @@
 #include <pbrt/util/float.h>
 #include <pbrt/util/math.h>
 #include <pbrt/util/rng.h>
-#include <pbrt/util/shuffle.h>
 #include <pbrt/util/vecmath.h>
 
 #include <vector>
