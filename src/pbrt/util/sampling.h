@@ -108,6 +108,8 @@ inline Float LinearPDF(Float x, Float a, Float b) {
 PBRT_CPU_GPU
 inline Float SampleLinear(Float u, Float a, Float b) {
     DCHECK(a >= 0 && b >= 0);
+    if (u == 0 && a == 0)
+        return 0;
     Float x = u * (a + b) / (a + std::sqrt(Lerp(u, Sqr(a), Sqr(b))));
     return std::min(x, OneMinusEpsilon);
 }
