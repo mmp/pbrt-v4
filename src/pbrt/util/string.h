@@ -7,8 +7,6 @@
 
 #include <pbrt/pbrt.h>
 
-#include <pbrt/util/pstd.h>
-
 #include <string>
 #include <string_view>
 #include <vector>
@@ -22,9 +20,9 @@ bool Atod(std::string_view str, double *);
 std::vector<std::string> SplitStringsFromWhitespace(std::string_view str);
 
 std::vector<std::string> SplitString(std::string_view str, char ch);
-pstd::optional<std::vector<int>> SplitStringToInts(std::string_view str, char ch);
-pstd::optional<std::vector<Float>> SplitStringToFloats(std::string_view str, char ch);
-pstd::optional<std::vector<double>> SplitStringToDoubles(std::string_view str, char ch);
+std::vector<int> SplitStringToInts(std::string_view str, char ch);
+std::vector<Float> SplitStringToFloats(std::string_view str, char ch);
+std::vector<double> SplitStringToDoubles(std::string_view str, char ch);
 
 }  // namespace pbrt
 

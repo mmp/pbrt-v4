@@ -51,26 +51,26 @@ bool initArg(const std::string &str, double *ptr) {
 }
 
 bool initArg(const std::string &str, pstd::span<float> out) {
-    pstd::optional<std::vector<Float>> v = SplitStringToFloats(str, ',');
-    if (!v || v->size() != out.size())
+    std::vector<Float> v = SplitStringToFloats(str, ',');
+    if (v.size() != out.size())
         return false;
-    std::copy(v->begin(), v->end(), out.begin());
+    std::copy(v.begin(), v.end(), out.begin());
     return true;
 }
 
 bool initArg(const std::string &str, pstd::span<double> out) {
-    pstd::optional<std::vector<double>> v = SplitStringToDoubles(str, ',');
-    if (!v || v->size() != out.size())
+    std::vector<double> v = SplitStringToDoubles(str, ',');
+    if (v.size() != out.size())
         return false;
-    std::copy(v->begin(), v->end(), out.begin());
+    std::copy(v.begin(), v.end(), out.begin());
     return true;
 }
 
 bool initArg(const std::string &str, pstd::span<int> out) {
-    pstd::optional<std::vector<int>> v = SplitStringToInts(str, ',');
-    if (!v || v->size() != out.size())
+    std::vector<int> v = SplitStringToInts(str, ',');
+    if (v.size() != out.size())
         return false;
-    std::copy(v->begin(), v->end(), out.begin());
+    std::copy(v.begin(), v.end(), out.begin());
     return true;
 }
 

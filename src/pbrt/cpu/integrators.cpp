@@ -113,16 +113,16 @@ Integrator::~Integrator() {}
 void ImageTileIntegrator::Render() {
     // Handle debugStart, if set
     if (!Options->debugStart.empty()) {
-        pstd::optional<std::vector<int>> c = SplitStringToInts(Options->debugStart, ',');
-        if (!c)
+        std::vector<int> c = SplitStringToInts(Options->debugStart, ',');
+        if (c.empty())
             ErrorExit("Didn't find integer values after --debugstart: %s",
                       Options->debugStart);
-        if (c->size() != 3)
+        if (c.size() != 3)
             ErrorExit("Didn't find three integer values after --debugstart: %s",
                       Options->debugStart);
 
-        Point2i pPixel((*c)[0], (*c)[1]);
-        int sampleIndex = (*c)[2];
+        Point2i pPixel(c[0], c[1]);
+        int sampleIndex = c[2];
 
         ScratchBuffer scratchBuffer(65536);
         SamplerHandle tileSampler = samplerPrototype.Clone(1, Allocator())[0];

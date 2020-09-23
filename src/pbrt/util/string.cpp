@@ -81,7 +81,7 @@ std::vector<std::string> SplitString(std::string_view str, char ch) {
     return strings;
 }
 
-pstd::optional<std::vector<int>> SplitStringToInts(std::string_view str, char ch) {
+std::vector<int> SplitStringToInts(std::string_view str, char ch) {
     std::vector<std::string> strs = SplitString(str, ch);
     std::vector<int> ints(strs.size());
 
@@ -91,7 +91,7 @@ pstd::optional<std::vector<int>> SplitStringToInts(std::string_view str, char ch
     return ints;
 }
 
-pstd::optional<std::vector<Float>> SplitStringToFloats(std::string_view str, char ch) {
+std::vector<Float> SplitStringToFloats(std::string_view str, char ch) {
     std::vector<std::string> strs = SplitString(str, ch);
     std::vector<Float> floats(strs.size());
 
@@ -101,7 +101,7 @@ pstd::optional<std::vector<Float>> SplitStringToFloats(std::string_view str, cha
     return floats;
 }
 
-pstd::optional<std::vector<double>> SplitStringToDoubles(std::string_view str, char ch) {
+std::vector<double> SplitStringToDoubles(std::string_view str, char ch) {
     std::vector<std::string> strs = SplitString(str, ch);
     std::vector<double> doubles(strs.size());
 

@@ -131,29 +131,27 @@ int main(int argc, char *argv[]) {
 
         std::string cropWindow, pixelBounds, pixel;
         if (ParseArg(&argv, "cropwindow", &cropWindow, onError)) {
-            pstd::optional<std::vector<Float>> c = SplitStringToFloats(cropWindow, ',');
-            if (!c || c->size() != 4) {
+            std::vector<Float> c = SplitStringToFloats(cropWindow, ',');
+            if (c.size() != 4) {
                 usage("Didn't find four values after --cropwindow");
                 return 1;
             }
-            options.cropWindow =
-                Bounds2f(Point2f((*c)[0], (*c)[2]), Point2f((*c)[1], (*c)[3]));
+            options.cropWindow = Bounds2f(Point2f(c[0], c[2]), Point2f(c[1], c[3]));
         } else if (ParseArg(&argv, "pixel", &pixel, onError)) {
-            pstd::optional<std::vector<int>> p = SplitStringToInts(pixel, ',');
-            if (!p || p->size() != 2) {
+            std::vector<int> p = SplitStringToInts(pixel, ',');
+            if (p.size() != 2) {
                 usage("Didn't find two values after --pixel");
                 return 1;
             }
             options.pixelBounds =
-                Bounds2i(Point2i((*p)[0], (*p)[1]), Point2i((*p)[0] + 1, (*p)[1] + 1));
+                Bounds2i(Point2i(p[0], p[1]), Point2i(p[0] + 1, p[1] + 1));
         } else if (ParseArg(&argv, "pixelbounds", &pixelBounds, onError)) {
-            pstd::optional<std::vector<int>> p = SplitStringToInts(pixelBounds, ',');
-            if (!p || p->size() != 4) {
+            std::vector<int> p = SplitStringToInts(pixelBounds, ',');
+            if (p.size() != 4) {
                 usage("Didn't find four integer values after --pixelbounds");
                 return 1;
             }
-            options.pixelBounds =
-                Bounds2i(Point2i((*p)[0], (*p)[2]), Point2i((*p)[1], (*p)[3]));
+            options.pixelBounds = Bounds2i(Point2i(p[0], p[2]), Point2i(p[1], p[3]));
         } else if (
 #ifdef PBRT_BUILD_GPU_RENDERER
             ParseArg(&argv, "gpu", &options.useGPU, onError) ||

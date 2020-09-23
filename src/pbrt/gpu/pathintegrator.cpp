@@ -343,13 +343,12 @@ void GPUPathIntegrator::Render(ImageMetadata *metadata) {
 
     int firstSampleIndex = 0, lastSampleIndex = spp;
     if (!Options->debugStart.empty()) {
-        pstd::optional<std::vector<int>> values =
-            SplitStringToInts(Options->debugStart, ',');
-        if (!values || values->size() != 2)
+        std::vector<int> values = SplitStringToInts(Options->debugStart, ',');
+        if (values.size() != 2)
             ErrorExit("Expected two integer values for --debugstart.");
 
-        firstSampleIndex = (*values)[0];
-        lastSampleIndex = firstSampleIndex + (*values)[1];
+        firstSampleIndex = values[0];
+        lastSampleIndex = firstSampleIndex + values[1];
     }
 
     ProgressReporter progress(lastSampleIndex - firstSampleIndex, "Rendering",
