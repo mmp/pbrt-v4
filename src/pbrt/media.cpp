@@ -153,15 +153,13 @@ HomogeneousMedium *HomogeneousMedium::Create(const ParameterDictionary &paramete
         sig_a =
             parameters.GetOneSpectrum("sigma_a", nullptr, SpectrumType::General, alloc);
         if (sig_a == nullptr)
-            sig_a = alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB,
-                                                  RGB(.0011f, .0024f, .014f));
+            sig_a = alloc.new_object<ConstantSpectrum>(1.f);
     }
     if (sig_s == nullptr) {
         sig_s =
             parameters.GetOneSpectrum("sigma_s", nullptr, SpectrumType::General, alloc);
         if (sig_s == nullptr)
-            sig_s = alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB,
-                                                  RGB(2.55f, 3.21f, 3.77f));
+            sig_s = alloc.new_object<ConstantSpectrum>(1.f);
     }
 
     SpectrumHandle Le =
