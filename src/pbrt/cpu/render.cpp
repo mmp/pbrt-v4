@@ -216,8 +216,7 @@ void CPURender(ParsedScene &parsedScene) {
                     const auto &areaLightEntity = parsedScene.areaLights[sh.lightIndex];
 
                     if (sh.renderFromObject.IsAnimated())
-                        Warning(&sh.loc, "Animated area lights aren't supported. Using "
-                                         "the start transform.");
+                        ErrorExit(&sh.loc, "Animated area lights are not supported.");
 
                     LightHandle area = LightHandle::CreateArea(
                         areaLightEntity.name, areaLightEntity.parameters,

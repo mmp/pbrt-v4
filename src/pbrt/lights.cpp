@@ -617,8 +617,7 @@ DiffuseAreaLight::DiffuseAreaLight(const Transform &renderFromLight,
     }
 
     // Warn if light has transformation with non-uniform scale, though not
-    // for Triangles, since this doesn't matter for them.
-    // FIXME: is this still true with animated transformations?
+    // for Triangles or bilinear patches, since this doesn't matter for them.
     if (renderFromLight.HasScale() && !shape.Is<Triangle>() && !shape.Is<BilinearPatch>())
         Warning("Scaling detected in world to light transformation! "
                 "The system has numerous assumptions, implicit and explicit, "

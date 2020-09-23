@@ -143,8 +143,7 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
             alloc.new_object<pstd::vector<LightHandle>>(alloc);
         for (ShapeHandle sh : shapeHandles) {
             if (renderFromLight.IsAnimated())
-                Warning(&shape.loc,
-                        "Animated lights aren't supported. Using the start transform.");
+                ErrorExit(&shape.loc, "Animated lights are not supported.");
             DiffuseAreaLight *area = DiffuseAreaLight::Create(
                 renderFromLight.startTransform, outsideMedium, areaLightEntity.parameters,
                 areaLightEntity.parameters.ColorSpace(), &areaLightEntity.loc, alloc, sh);
