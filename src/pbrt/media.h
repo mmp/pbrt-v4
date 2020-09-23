@@ -399,10 +399,6 @@ class UniformGridMediumProvider {
                                  Min(Point3i(Floor(ps[1])) + Vector3i(1, 1, 1),
                                      Point3i(nx - 1, ny - 1, nz - 1))};
 
-                std::vector<SampledWavelengths> lambdas;
-                for (Float u : Stratified1D(16))
-                    lambdas.push_back(SampledWavelengths::SampleXYZ(u));
-
                 Float maxDensity = 0;
                 for (int z = pi[0].z; z <= pi[1].z; ++z)
                     for (int y = pi[0].y; y <= pi[1].y; ++y)
@@ -414,13 +410,10 @@ class UniformGridMediumProvider {
                                 continue;
 
                             RGBSpectrum spec(*colorSpace, rgb);
-                            for (const SampledWavelengths &lambda : lambdas) {
-                                SampledSpectrum s = spec.Sample(lambda);
-                                maxDensity = std::max(maxDensity, s.MaxComponentValue());
-                            }
+                            maxDensity = std::max(maxDensity, spec.MaxValue());
                         }
 
-                return maxDensity * 1.025f;
+                return maxDensity;
             }
         };
 
