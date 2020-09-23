@@ -262,9 +262,12 @@ pstd::optional<TriangleIntersection> IntersectTriangle(const Ray &ray, Float tMa
 // Triangle Method Definitions
 pstd::vector<ShapeHandle> Triangle::CreateTriangles(const TriangleMesh *mesh,
                                                     Allocator alloc) {
+    static std::mutex allMeshesLock;
+    allMeshesLock.lock();
     CHECK_LT(allMeshes->size(), 1 << 31);
     int meshIndex = int(allMeshes->size());
     allMeshes->push_back(mesh);
+    allMeshesLock.unlock();
 
     pstd::vector<ShapeHandle> tris(mesh->nTriangles, alloc);
     Triangle *t = alloc.allocate_object<Triangle>(mesh->nTriangles);
@@ -972,10 +975,12 @@ BilinearPatchMesh *BilinearPatch::CreateMesh(const Transform *renderFromObject,
 
 pstd::vector<ShapeHandle> BilinearPatch::CreatePatches(const BilinearPatchMesh *mesh,
                                                        Allocator alloc) {
+    static std::mutex allMeshesLock;
+    allMeshesLock.lock();
     CHECK_LT(allMeshes->size(), 1 << 31);
     int meshIndex = int(allMeshes->size());
-
     allMeshes->push_back(mesh);
+    allMeshesLock.unlock();
 
     pstd::vector<ShapeHandle> blps(mesh->nPatches, alloc);
     BilinearPatch *patches = alloc.allocate_object<BilinearPatch>(mesh->nPatches);
