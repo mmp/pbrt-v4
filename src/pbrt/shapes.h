@@ -269,7 +269,8 @@ class Sphere {
         Float g = Dot(N, d2Pdvv);
 
         // Compute $\dndu$ and $\dndv$ from fundamental form coefficients
-        Float invEGF2 = 1 / (E * G - F * F);
+        Float EGF2 = DifferenceOfProducts(E, G, F, F);
+        Float invEGF2 = (EGF2 == 0) ? 0.f : 1.f / EGF2;
         Normal3f dndu =
             Normal3f((f * F - e * G) * invEGF2 * dpdu + (e * F - f * E) * invEGF2 * dpdv);
         Normal3f dndv =
@@ -711,7 +712,8 @@ class Cylinder {
         Float g = Dot(N, d2Pdvv);
 
         // Compute $\dndu$ and $\dndv$ from fundamental form coefficients
-        Float invEGF2 = 1 / (E * G - F * F);
+        Float EGF2 = DifferenceOfProducts(E, G, F, F);
+        Float invEGF2 = (EGF2 == 0) ? 0.f : 1.f / EGF2;
         Normal3f dndu =
             Normal3f((f * F - e * G) * invEGF2 * dpdu + (e * F - f * E) * invEGF2 * dpdv);
         Normal3f dndv =
@@ -1428,7 +1430,8 @@ class BilinearPatch {
         Float g = Dot(N, d2Pdvv);
 
         // Compute $\dndu$ and $\dndv$ from fundamental form coefficients
-        Float invEGF2 = 1 / (E * G - F * F);
+        Float EGF2 = DifferenceOfProducts(E, G, F, F);
+        Float invEGF2 = (EGF2 == 0) ? 0.f : 1.f / EGF2;
         Normal3f dndu =
             Normal3f((f * F - e * G) * invEGF2 * dpdu + (e * F - f * E) * invEGF2 * dpdv);
         Normal3f dndv =
