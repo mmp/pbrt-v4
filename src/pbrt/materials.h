@@ -163,7 +163,7 @@ class DielectricMaterial {
             lambda.TerminateSecondary();
         }
 
-        // Create microfacet distribution for \use{DielectricMaterial}
+        // Create microfacet distribution for _DielectricMaterial_
         Float urough = texEval(uRoughness, ctx), vrough = texEval(vRoughness, ctx);
         if (remapRoughness) {
             urough = TrowbridgeReitzDistribution::RoughnessToAlpha(urough);
@@ -171,7 +171,7 @@ class DielectricMaterial {
         }
         TrowbridgeReitzDistribution distrib(urough, vrough);
 
-        // Return BSDF for \use{DielectricMaterial}
+        // Return BSDF for _DielectricMaterial_
         *bxdf = DielectricInterfaceBxDF(eta, distrib);
         return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf, eta);
     }
@@ -208,7 +208,7 @@ class ThinDielectricMaterial {
             lambda.TerminateSecondary();
         }
 
-        // Return BSDF for \use{ThinDielectricMaterial}
+        // Return BSDF for _ThinDielectricMaterial_
         *bxdf = ThinDielectricBxDF(eta);
         return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf, eta);
     }

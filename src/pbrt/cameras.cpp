@@ -352,7 +352,7 @@ pstd::optional<CameraRayDifferential> OrthographicCamera::GenerateRayDifferentia
 
     // Compute ray differentials for _OrthographicCamera_
     if (lensRadius > 0) {
-        // Compute \use{OrthographicCamera} ray differentials accounting for lens
+        // Compute _OrthographicCamera_ ray differentials accounting for lens
         // Sample point on lens
         Point2f pLens = lensRadius * SampleUniformDiskConcentric(sample.pLens);
 
@@ -465,9 +465,9 @@ pstd::optional<CameraRayDifferential> PerspectiveCamera::GenerateRayDifferential
         ray.d = Normalize(pFocus - ray.o);
     }
 
-    // Compute offset rays for \use{PerspectiveCamera} ray differentials
+    // Compute offset rays for _PerspectiveCamera_ ray differentials
     if (lensRadius > 0) {
-        // Compute \use{PerspectiveCamera} ray differentials accounting for lens
+        // Compute _PerspectiveCamera_ ray differentials accounting for lens
         // Sample point on lens
         Point2f pLens = lensRadius * SampleUniformDiskConcentric(sample.pLens);
 

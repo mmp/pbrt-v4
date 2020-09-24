@@ -1481,6 +1481,9 @@ std::string FormattingScene::upgradeMaterial(std::string *name, ParameterDiction
         extra += indent(1) + "\"spectrum k\" [ \"metal-Ag-k\" ]\n";
 
         removeParamSilentIfConstant("Kr", 0);
+    } else if (*name == "disney") {
+        *name = "diffuse";
+        dict->RenameParameter("color", "reflectance");
     }
 
     return extra;

@@ -141,7 +141,6 @@ class CameraTransform;
 class Image;
 class ParameterDictionary;
 class TextureParameterDictionary;
-enum class BxDFFlags;
 struct ImageMetadata;
 struct MediumInterface;
 struct PBRTOptions;

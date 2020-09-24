@@ -413,7 +413,7 @@ class UniformGridMediumProvider {
                             maxDensity = std::max(maxDensity, spec.MaxValue());
                         }
 
-                return maxDensity;
+                return maxDensity * 1.025f;
             }
         };
 

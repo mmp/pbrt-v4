@@ -1689,34 +1689,27 @@ inline Float SphericalQuadArea(const Vector3f &a, const Vector3f &b, const Vecto
     return std::abs(alpha + beta + gamma + delta - 2 * Pi);
 }
 
-PBRT_CPU_GPU
-inline Float CosTheta(const Vector3f &w) {
+PBRT_CPU_GPU inline Float CosTheta(const Vector3f &w) {
     return w.z;
 }
-PBRT_CPU_GPU
-inline Float Cos2Theta(const Vector3f &w) {
+PBRT_CPU_GPU inline Float Cos2Theta(const Vector3f &w) {
     return w.z * w.z;
 }
-PBRT_CPU_GPU
-inline Float AbsCosTheta(const Vector3f &w) {
+PBRT_CPU_GPU inline Float AbsCosTheta(const Vector3f &w) {
     return std::abs(w.z);
 }
 
-PBRT_CPU_GPU
-inline Float Sin2Theta(const Vector3f &w) {
+PBRT_CPU_GPU inline Float Sin2Theta(const Vector3f &w) {
     return std::max<Float>(0, 1 - Cos2Theta(w));
 }
-PBRT_CPU_GPU
-inline Float SinTheta(const Vector3f &w) {
+PBRT_CPU_GPU inline Float SinTheta(const Vector3f &w) {
     return std::sqrt(Sin2Theta(w));
 }
 
-PBRT_CPU_GPU
-inline Float TanTheta(const Vector3f &w) {
+PBRT_CPU_GPU inline Float TanTheta(const Vector3f &w) {
     return SinTheta(w) / CosTheta(w);
 }
-PBRT_CPU_GPU
-inline Float Tan2Theta(const Vector3f &w) {
+PBRT_CPU_GPU inline Float Tan2Theta(const Vector3f &w) {
     return Sin2Theta(w) / Cos2Theta(w);
 }
 
@@ -1732,18 +1725,8 @@ inline Float SinPhi(const Vector3f &w) {
 }
 
 PBRT_CPU_GPU
-inline Float Cos2Phi(const Vector3f &w) {
-    return CosPhi(w) * CosPhi(w);
-}
-PBRT_CPU_GPU
-inline Float Sin2Phi(const Vector3f &w) {
-    return SinPhi(w) * SinPhi(w);
-}
-
-PBRT_CPU_GPU
 inline Float CosDPhi(const Vector3f &wa, const Vector3f &wb) {
-    Float waxy = wa.x * wa.x + wa.y * wa.y;
-    Float wbxy = wb.x * wb.x + wb.y * wb.y;
+    Float waxy = Sqr(wa.x) + Sqr(wa.y), wbxy = Sqr(wb.x) + Sqr(wb.y);
     if (waxy == 0 || wbxy == 0)
         return 1;
     return Clamp((wa.x * wb.x + wa.y * wb.y) / std::sqrt(waxy * wbxy), -1, 1);

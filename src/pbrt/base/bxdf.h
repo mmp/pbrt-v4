@@ -45,7 +45,7 @@ inline BxDFReflTransFlags &operator|=(BxDFReflTransFlags &a, BxDFReflTransFlags 
 std::string ToString(BxDFReflTransFlags flags);
 
 // BxDFFlags Definition
-enum class BxDFFlags {
+enum BxDFFlags {
     Unset = 0,
     Reflection = 1 << 0,
     Transmission = 1 << 1,
@@ -165,14 +165,14 @@ class BxDFHandle : public TaggedPointer<IdealDiffuseBxDF, DiffuseBxDF, CoatedDif
                                         ConductorBxDF, BSSRDFAdapter> {
   public:
     // BxDF Interface
-    using TaggedPointer::TaggedPointer;
-
-    std::string ToString() const;
+    PBRT_CPU_GPU inline SampledSpectrum f(Vector3f wo, Vector3f wi,
+                                          TransportMode mode) const;
 
     PBRT_CPU_GPU inline BxDFFlags Flags() const;
 
-    PBRT_CPU_GPU inline SampledSpectrum f(Vector3f wo, Vector3f wi,
-                                          TransportMode mode) const;
+    using TaggedPointer::TaggedPointer;
+
+    std::string ToString() const;
 
     PBRT_CPU_GPU inline BSDFSample Sample_f(
         Vector3f wo, Float uc, const Point2f &u, TransportMode mode,

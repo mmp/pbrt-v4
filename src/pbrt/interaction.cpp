@@ -123,7 +123,7 @@ void SurfaceInteraction::ComputeDifferentials(const RayDifferential &ray,
 
 RayDifferential SurfaceInteraction::SpawnRay(const RayDifferential &rayi,
                                              const BSDF &bsdf, const Vector3f &wi,
-                                             BxDFFlags flags) const {
+                                             int /*BxDFFlags*/ flags) const {
     RayDifferential rd(SpawnRay(wi));
     if (rayi.hasDifferentials) {
         // Compute ray differentials for specular reflection or transmission

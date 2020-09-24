@@ -258,7 +258,7 @@ class SurfaceInteraction : public Interaction {
     using Interaction::SpawnRay;
     PBRT_CPU_GPU
     RayDifferential SpawnRay(const RayDifferential &rayi, const BSDF &bsdf,
-                             const Vector3f &wi, BxDFFlags flags) const;
+                             const Vector3f &wi, int /*BxDFFlags*/ flags) const;
 
     PBRT_CPU_GPU
     void SkipIntersection(RayDifferential *ray, Float t) const;

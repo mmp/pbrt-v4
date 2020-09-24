@@ -62,7 +62,7 @@ class BSDF {
         Vector3f wi = RenderToLocal(wiRender), wo = RenderToLocal(woRender);
         if (wo.z == 0)
             return {};
-        return bxdf.f(wo, wi, mode) * GBump(woRender, wiRender, mode);
+        return bxdf.f(wo, wi, mode);
     }
 
     template <typename BxDF>
@@ -72,7 +72,7 @@ class BSDF {
         if (wo.z == 0)
             return {};
         const BxDF *specificBxDF = bxdf.Cast<BxDF>();
-        return specificBxDF->f(wo, wi, mode) * GBump(woW, wiW, mode);
+        return specificBxDF->f(wo, wi, mode);
     }
 
     PBRT_CPU_GPU
@@ -105,7 +105,6 @@ class BSDF {
                  shadingFrame.z.z, bs.f[0], bs.f[1], bs.f[2], bs.f[3], bs.pdf,
                  (bs.pdf > 0) ? (bs.f[0] / bs.pdf) : 0, bs.wi.x, bs.wi.y, bs.wi.z);
         bs.wi = LocalToRender(bs.wi);
-        bs.f *= GBump(woRender, bs.wi, mode);
         return bs;
     }
 
@@ -148,7 +147,6 @@ class BSDF {
                  (bs.pdf > 0) ? (bs.f[0] / bs.pdf) : 0, bs.wi.x, bs.wi.y, bs.wi.z);
 
         bs.wi = LocalToRender(bs.wi);
-        bs.f *= GBump(woRender, bs.wi, mode);
 
         return bs;
     }
@@ -174,30 +172,6 @@ class BSDF {
     Float eta;
 
   private:
-    friend class SOA<BSDF>;
-    // BSDF Private Methods
-    PBRT_CPU_GPU
-    Float GBump(Vector3f wo, Vector3f wi, TransportMode mode) const {
-        return 1;  // disable for now...
-
-        Vector3f w = (mode == TransportMode::Radiance) ? wi : wo;
-        Normal3f ngf = FaceForward(ng, w);
-        Normal3f nsf = FaceForward(Normal3f(shadingFrame.z), ngf);
-        Float cosThetaIs = std::max<Float>(0, Dot(nsf, w)), cosThetaIg = Dot(ngf, w);
-        Float cosThetaN = Dot(ngf, nsf);
-        CHECK_GE(cosThetaIs, 0);
-        CHECK_GE(cosThetaIg, 0);
-        CHECK_GE(cosThetaN, 0);
-
-        if (cosThetaIs == 0 || cosThetaIg == 0 || cosThetaN == 0)
-            return 0;
-        Float G = cosThetaIg / (cosThetaIs * cosThetaN);
-        if (G >= 1)
-            return 1;
-
-        return -G * G * G + G * G + G;
-    }
-
     // BSDF Private Members
     BxDFHandle bxdf;
     Frame shadingFrame;

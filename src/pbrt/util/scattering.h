@@ -159,7 +159,8 @@ class TrowbridgeReitzDistribution {
         Float cos4Theta = Cos2Theta(wm) * Cos2Theta(wm);
         if (cos4Theta < 1e-16f)
             return 0;
-        Float e = (Cos2Phi(wm) / Sqr(alpha_x) + Sin2Phi(wm) / Sqr(alpha_y)) * tan2Theta;
+        Float e =
+            (Sqr(CosPhi(wm)) / Sqr(alpha_x) + Sqr(SinPhi(wm)) / Sqr(alpha_y)) * tan2Theta;
         return 1 / (Pi * alpha_x * alpha_y * cos4Theta * Sqr(1 + e));
     }
 
@@ -175,7 +176,7 @@ class TrowbridgeReitzDistribution {
         if (IsInf(tan2Theta))
             return 0.;
         // Compute _alpha2_ for direction _w_
-        Float alpha2 = Cos2Phi(w) * Sqr(alpha_x) + Sin2Phi(w) * Sqr(alpha_y);
+        Float alpha2 = Sqr(CosPhi(w)) * Sqr(alpha_x) + Sqr(SinPhi(w)) * Sqr(alpha_y);
 
         return (-1 + std::sqrt(1.f + alpha2 * tan2Theta)) / 2;
     }
