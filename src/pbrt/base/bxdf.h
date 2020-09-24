@@ -84,25 +84,21 @@ inline BxDFFlags &operator|=(BxDFFlags &a, BxDFFlags b) {
     return a;
 }
 
-PBRT_CPU_GPU
-inline bool IsReflective(BxDFFlags flags) {
-    return (flags & BxDFFlags::Reflection) != 0;
+// BxDFFlags Inline Functions
+PBRT_CPU_GPU inline bool IsReflective(BxDFFlags f) {
+    return f & BxDFFlags::Reflection;
 }
-PBRT_CPU_GPU
-inline bool IsTransmissive(BxDFFlags flags) {
-    return (flags & BxDFFlags::Transmission) != 0;
+PBRT_CPU_GPU inline bool IsTransmissive(BxDFFlags f) {
+    return f & BxDFFlags::Transmission;
 }
-PBRT_CPU_GPU
-inline bool IsDiffuse(BxDFFlags flags) {
-    return (flags & BxDFFlags::Diffuse) != 0;
+PBRT_CPU_GPU inline bool IsDiffuse(BxDFFlags f) {
+    return f & BxDFFlags::Diffuse;
 }
-PBRT_CPU_GPU
-inline bool IsGlossy(BxDFFlags flags) {
-    return (flags & BxDFFlags::Glossy) != 0;
+PBRT_CPU_GPU inline bool IsGlossy(BxDFFlags f) {
+    return f & BxDFFlags::Glossy;
 }
-PBRT_CPU_GPU
-inline bool IsSpecular(BxDFFlags flags) {
-    return (flags & BxDFFlags::Specular) != 0;
+PBRT_CPU_GPU inline bool IsSpecular(BxDFFlags f) {
+    return f & BxDFFlags::Specular;
 }
 
 std::string ToString(BxDFFlags flags);
@@ -123,11 +119,9 @@ struct BSDFSample {
     // BSDFSample Public Methods
     BSDFSample() = default;
     PBRT_CPU_GPU
-    BSDFSample(const SampledSpectrum &f, const Vector3f &wi, Float pdf, BxDFFlags flags)
-        : f(f), wi(wi), pdf(pdf), flags(flags) {}
-
-    PBRT_CPU_GPU
-    operator bool() const { return pdf > 0; }
+    BSDFSample(SampledSpectrum f, Vector3f wi, Float pdf, BxDFFlags flags,
+               bool pdfIsProportional = false)
+        : f(f), wi(wi), pdf(pdf), flags(flags), pdfIsProportional(pdfIsProportional) {}
 
     PBRT_CPU_GPU
     bool IsReflection() const { return pbrt::IsReflective(flags); }
@@ -145,6 +139,7 @@ struct BSDFSample {
     Vector3f wi;
     Float pdf = 0;
     BxDFFlags flags;
+    bool pdfIsProportional;
 };
 
 class IdealDiffuseBxDF;
@@ -177,8 +172,6 @@ class BxDFHandle : public TaggedPointer<IdealDiffuseBxDF, DiffuseBxDF, CoatedDif
     PBRT_CPU_GPU inline pstd::optional<BSDFSample> Sample_f(
         Vector3f wo, Float uc, const Point2f &u, TransportMode mode,
         BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const;
-
-    PBRT_CPU_GPU inline bool SampledPDFIsProportional() const;
 
     PBRT_CPU_GPU inline Float PDF(
         Vector3f wo, Vector3f wi, TransportMode mode,

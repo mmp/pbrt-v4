@@ -85,7 +85,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                         bsdfSample->f[0] * AbsDot(wi, intr.ns), bsdfSample->pdf,
                         bsdfSample->f[0] * AbsDot(wi, intr.ns) / bsdfSample->pdf);
 
-                    if (bsdf.SampledPDFIsProportional()) {
+                    if (bsdfSample->pdfIsProportional) {
                         Float pdf = bsdf.PDF(wo, wi);
                         beta *= pdf / bsdfSample->pdf;
                         pdfUni *= pdf;

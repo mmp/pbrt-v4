@@ -782,7 +782,7 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
             break;
         // Update path state variables for after surface scattering
         beta *= bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
-        bsdfPDF = bsdf.SampledPDFIsProportional() ? bsdf.PDF(wo, bs->wi) : bs->pdf;
+        bsdfPDF = bs->pdfIsProportional ? bsdf.PDF(wo, bs->wi) : bs->pdf;
         DCHECK(!IsInf(beta.y(lambda)));
         specularBounce = bs->IsSpecular();
         anyNonSpecularBounces |= !bs->IsSpecular();
@@ -835,7 +835,6 @@ SampledSpectrum PathIntegrator::SampleLd(const SurfaceInteraction &intr, const B
         return f * ls.L / lightPDF;
     else {
         Float bsdfPDF = bsdf.PDF(wo, wi);
-        CHECK_RARE(1e-6, bsdf.SampledPDFIsProportional() == false && bsdfPDF == 0);
         Float weight = PowerHeuristic(1, lightPDF, 1, bsdfPDF);
         return f * ls.L * weight / lightPDF;
     }
@@ -1171,7 +1170,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
         // Update _beta_ and PDFs for BSDF scattering
         beta *= bs->f * AbsDot(bs->wi, isect.shading.n);
         pdfNEE = pdfUni;
-        if (bsdf.SampledPDFIsProportional()) {
+        if (bs->pdfIsProportional) {
             Float pdf = bsdf.PDF(wo, bs->wi);
             beta *= pdf / bs->pdf;
             pdfUni *= pdf;
@@ -3212,8 +3211,6 @@ SampledSpectrum SPPMIntegrator::SampleLd(const SurfaceInteraction &intr, const B
                         Ld = f * Li / lightPDF;
                     else {
                         Float bsdfPDF = bsdf.PDF(wo, wi);
-                        CHECK_RARE(1e-6, bsdf.SampledPDFIsProportional() == false &&
-                                             bsdfPDF == 0);
                         Float weight = PowerHeuristic(1, lightPDF, 1, bsdfPDF);
                         Ld = f * Li * weight / lightPDF;
                     }
@@ -3242,8 +3239,7 @@ SampledSpectrum SPPMIntegrator::SampleLd(const SurfaceInteraction &intr, const B
                 LightHandle areaLight(si->intr.areaLight);
                 Float lightPDF = lightSampler.PDF(intr, areaLight) *
                                  areaLight.PDF_Li(intr, wi, LightSamplingMode::WithMIS);
-                Float bsdfPDF =
-                    bsdf.SampledPDFIsProportional() ? bsdf.PDF(intr.wo, wi) : bs->pdf;
+                Float bsdfPDF = bs->pdfIsProportional ? bsdf.PDF(intr.wo, wi) : bs->pdf;
                 Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
                 Ld += f * Le * weight / bs->pdf;
             }
@@ -3257,8 +3253,7 @@ SampledSpectrum SPPMIntegrator::SampleLd(const SurfaceInteraction &intr, const B
                 // Compute MIS pdf...
                 Float lightPDF = lightSampler.PDF(intr, light) *
                                  light.PDF_Li(intr, wi, LightSamplingMode::WithMIS);
-                Float bsdfPDF =
-                    bsdf.SampledPDFIsProportional() ? bsdf.PDF(intr.wo, wi) : bs->pdf;
+                Float bsdfPDF = bs->pdfIsProportional ? bsdf.PDF(intr.wo, wi) : bs->pdf;
                 Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
                 Ld += f * Le * weight / bs->pdf;
             }

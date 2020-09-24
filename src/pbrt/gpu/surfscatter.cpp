@@ -123,7 +123,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                     bsdfSample->f[0] * AbsDot(wi, ns), bsdfSample->pdf,
                     bsdfSample->f[0] * AbsDot(wi, ns) / bsdfSample->pdf);
 
-                if (bsdf.SampledPDFIsProportional()) {
+                if (bsdfSample->pdfIsProportional) {
                     // The PDFs need to be handled slightly differently for
                     // stochastically-sampled layered materials..
                     Float pdf = bsdf.PDF(wo, wi);

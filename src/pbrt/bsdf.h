@@ -122,9 +122,6 @@ class BSDF {
         return bxdf.PDF(wo, wi, mode, sampleFlags);
     }
 
-    PBRT_CPU_GPU
-    bool SampledPDFIsProportional() const { return bxdf.SampledPDFIsProportional(); }
-
     template <typename BxDF>
     PBRT_CPU_GPU pstd::optional<BSDFSample> Sample_f(
         Vector3f woRender, Float u, const Point2f &u2,

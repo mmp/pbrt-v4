@@ -66,9 +66,6 @@ class IdealDiffuseBxDF {
     }
 
     PBRT_CPU_GPU
-    bool SampledPDFIsProportional() const { return false; }
-
-    PBRT_CPU_GPU
     static constexpr const char *Name() { return "IdealDiffuseBxDF"; }
 
     std::string ToString() const;
@@ -175,9 +172,6 @@ class DiffuseBxDF {
         else
             return pt / (pr + pt) * AbsCosTheta(wi) * InvPi;
     }
-
-    PBRT_CPU_GPU
-    bool SampledPDFIsProportional() const { return false; }
 
     PBRT_CPU_GPU
     static constexpr const char *Name() { return "DiffuseBxDF"; }
@@ -442,9 +436,6 @@ class DielectricInterfaceBxDF {
     }
 
     PBRT_CPU_GPU
-    bool SampledPDFIsProportional() const { return false; }
-
-    PBRT_CPU_GPU
     static constexpr const char *Name() { return "DielectricInterfaceBxDF"; }
 
     std::string ToString() const;
@@ -513,9 +504,6 @@ class ThinDielectricBxDF {
     }
 
     PBRT_CPU_GPU
-    bool SampledPDFIsProportional() const { return false; }
-
-    PBRT_CPU_GPU
     static constexpr const char *Name() { return "ThinDielectricBxDF"; }
 
     std::string ToString() const;
@@ -551,9 +539,6 @@ class ConductorBxDF {
         else
             return (BxDFFlags::Reflection | BxDFFlags::Glossy);
     }
-
-    PBRT_CPU_GPU
-    bool SampledPDFIsProportional() const { return false; }
 
     PBRT_CPU_GPU
     static constexpr const char *Name() { return "ConductorBxDF"; }
@@ -722,9 +707,6 @@ class LayeredBxDF {
         top.Regularize();
         bottom.Regularize();
     }
-
-    PBRT_CPU_GPU
-    bool SampledPDFIsProportional() const { return true; }
 
     PBRT_CPU_GPU
     BxDFFlags Flags() const {
@@ -1046,7 +1028,7 @@ f /= AbsCosTheta(w);
                                                         : BxDFFlags::GlossyTransmission;
                 if (flipWi)
                     w = -w;
-                return BSDFSample(f, w, pdf, flags);
+                return BSDFSample(f, w, pdf, flags, true);
             }
 
             // Scale _f_ by cosine term after scattering at the interface
@@ -1214,9 +1196,6 @@ class HairBxDF {
               BxDFReflTransFlags sampleFlags) const;
 
     PBRT_CPU_GPU
-    bool SampledPDFIsProportional() const { return false; }
-
-    PBRT_CPU_GPU
     void Regularize() {}
 
     PBRT_CPU_GPU
@@ -1326,9 +1305,6 @@ class MeasuredBxDF {
               BxDFReflTransFlags sampleFlags) const;
 
     PBRT_CPU_GPU
-    bool SampledPDFIsProportional() const { return false; }
-
-    PBRT_CPU_GPU
     void Regularize() {}
 
     PBRT_CPU_GPU
@@ -1387,9 +1363,6 @@ class BSSRDFAdapter {
     }
 
     PBRT_CPU_GPU
-    bool SampledPDFIsProportional() const { return false; }
-
-    PBRT_CPU_GPU
     void Regularize() {}
 
     PBRT_CPU_GPU
@@ -1441,11 +1414,6 @@ inline Float BxDFHandle::PDF(Vector3f wo, Vector3f wi, TransportMode mode,
                              BxDFReflTransFlags sampleFlags) const {
     auto pdf = [&](auto ptr) { return ptr->PDF(wo, wi, mode, sampleFlags); };
     return Dispatch(pdf);
-}
-
-inline bool BxDFHandle::SampledPDFIsProportional() const {
-    auto approx = [&](auto ptr) { return ptr->SampledPDFIsProportional(); };
-    return Dispatch(approx);
 }
 
 inline BxDFFlags BxDFHandle::Flags() const {
