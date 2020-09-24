@@ -91,6 +91,7 @@ void CPURender(ParsedScene &parsedScene) {
 
     // Lights (area lights will be done later, with shapes...)
     std::vector<LightHandle> lights;
+    std::mutex lightsMutex;
     lights.reserve(parsedScene.lights.size() + parsedScene.areaLights.size());
     for (const auto &light : parsedScene.lights) {
         MediumHandle outsideMedium = findMedium(light.medium, &light.loc);
@@ -100,6 +101,7 @@ void CPURender(ParsedScene &parsedScene) {
         LightHandle l = LightHandle::Create(
             light.name, light.parameters, light.renderFromObject.startTransform,
             parsedScene.camera.cameraTransform, outsideMedium, &light.loc, alloc);
+        // No need to hold the mutex here
         lights.push_back(l);
     }
 
@@ -122,11 +124,20 @@ void CPURender(ParsedScene &parsedScene) {
     // Non-animated shapes
     auto CreatePrimitivesForShapes =
         [&](const std::vector<ShapeSceneEntity> &shapes) -> std::vector<PrimitiveHandle> {
-        std::vector<PrimitiveHandle> primitives;
-        for (const auto &sh : shapes) {
-            pstd::vector<ShapeHandle> shapes =
+        // Parallelize ShapeHandle::Create calls, which will in turn
+        // parallelize PLY file loading, etc...
+        pstd::vector<pstd::vector<ShapeHandle>> shapeHandleVectors(shapes.size());
+        ParallelFor(0, shapes.size(), [&](int64_t i) {
+            const auto &sh = shapes[i];
+            shapeHandleVectors[i] =
                 ShapeHandle::Create(sh.name, sh.renderFromObject, sh.objectFromRender,
                                     sh.reverseOrientation, sh.parameters, &sh.loc, alloc);
+        });
+
+        std::vector<PrimitiveHandle> primitives;
+        for (size_t i = 0; i < shapes.size(); ++i) {
+            const auto &sh = shapes[i];
+            pstd::vector<ShapeHandle> &shapes = shapeHandleVectors[i];
             if (shapes.empty())
                 continue;
 
@@ -158,8 +169,10 @@ void CPURender(ParsedScene &parsedScene) {
                         areaLightEntity.name, areaLightEntity.parameters,
                         *sh.renderFromObject, mi, s, &areaLightEntity.loc, Allocator{});
                     areaHandle = area;
-                    if (area)
+                    if (area) {
+                        std::lock_guard<std::mutex> lock(lightsMutex);
                         lights.push_back(area);
+                    }
                 }
                 if (areaHandle == nullptr && !mi.IsMediumTransition() && !alphaTex)
                     primitives.push_back(new SimplePrimitive(s, mtl));
@@ -215,6 +228,7 @@ void CPURender(ParsedScene &parsedScene) {
                     CHECK_LT(sh.lightIndex, parsedScene.areaLights.size());
                     const auto &areaLightEntity = parsedScene.areaLights[sh.lightIndex];
 
+                    // TODO: shouldn't this always be true if we got here?
                     if (sh.renderFromObject.IsAnimated())
                         ErrorExit(&sh.loc, "Animated area lights are not supported.");
 
@@ -252,9 +266,14 @@ void CPURender(ParsedScene &parsedScene) {
 
     // Instance definitions
     std::map<std::string, PrimitiveHandle> instanceDefinitions;
-    for (const auto &inst : parsedScene.instanceDefinitions) {
-        if (instanceDefinitions.find(inst.first) != instanceDefinitions.end())
-            ErrorExit("%s: object instance redefined", inst.first);
+    std::mutex instanceDefinitionsMutex;
+    std::vector<std::map<std::string, InstanceDefinitionSceneEntity>::iterator>
+        instanceDefinitionIterators;
+    for (auto iter = parsedScene.instanceDefinitions.begin();
+         iter != parsedScene.instanceDefinitions.end(); ++iter)
+        instanceDefinitionIterators.push_back(iter);
+    ParallelFor(0, instanceDefinitionIterators.size(), [&](int64_t i) {
+        const auto &inst = *instanceDefinitionIterators[i];
 
         std::vector<PrimitiveHandle> instancePrimitives =
             CreatePrimitivesForShapes(inst.second.shapes);
@@ -263,17 +282,19 @@ void CPURender(ParsedScene &parsedScene) {
         instancePrimitives.insert(instancePrimitives.end(),
                                   movingInstancePrimitives.begin(),
                                   movingInstancePrimitives.end());
-        if (instancePrimitives.empty()) {
-            instanceDefinitions[inst.first] = nullptr;
-        } else {
-            if (instancePrimitives.size() > 1) {
-                PrimitiveHandle bvh = new BVHAggregate(std::move(instancePrimitives));
-                instancePrimitives.clear();
-                instancePrimitives.push_back(bvh);
-            }
-            instanceDefinitions[inst.first] = instancePrimitives[0];
+
+        if (instancePrimitives.size() > 1) {
+            PrimitiveHandle bvh = new BVHAggregate(std::move(instancePrimitives));
+            instancePrimitives.clear();
+            instancePrimitives.push_back(bvh);
         }
-    }
+
+        std::lock_guard<std::mutex> lock(instanceDefinitionsMutex);
+        if (instancePrimitives.empty())
+            instanceDefinitions[inst.first] = nullptr;
+        else
+            instanceDefinitions[inst.first] = instancePrimitives[0];
+    });
 
     // Instances
     for (const auto &inst : parsedScene.instances) {
