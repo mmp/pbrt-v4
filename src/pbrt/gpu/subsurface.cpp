@@ -75,26 +75,26 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                 Point2f u = raySamples.indirect.u;
                 Float uc = raySamples.indirect.uc;
 
-                BSDFSample bsdfSample = bsdf.Sample_f<BxDF>(wo, uc, u);
-                if (bsdfSample && bsdfSample.f) {
-                    Vector3f wi = bsdfSample.wi;
-                    SampledSpectrum beta = betap * bsdfSample.f * AbsDot(wi, intr.ns);
+                pstd::optional<BSDFSample> bsdfSample = bsdf.Sample_f<BxDF>(wo, uc, u);
+                if (bsdfSample) {
+                    Vector3f wi = bsdfSample->wi;
+                    SampledSpectrum beta = betap * bsdfSample->f * AbsDot(wi, intr.ns);
                     SampledSpectrum pdfUni = s.pdfUni, pdfNEE = pdfUni;
 
-                    PBRT_DBG("%s f*cos[0] %f bsdfSample.pdf %f f*cos/pdf %f\n", BxDF::Name(),
-                        bsdfSample.f[0] * AbsDot(wi, intr.ns), bsdfSample.pdf,
-                        bsdfSample.f[0] * AbsDot(wi, intr.ns) / bsdfSample.pdf);
+                    PBRT_DBG("%s f*cos[0] %f bsdfSample->pdf %f f*cos/pdf %f\n", BxDF::Name(),
+                        bsdfSample->f[0] * AbsDot(wi, intr.ns), bsdfSample->pdf,
+                        bsdfSample->f[0] * AbsDot(wi, intr.ns) / bsdfSample->pdf);
 
                     if (bsdf.SampledPDFIsProportional()) {
                         Float pdf = bsdf.PDF(wo, wi);
-                        beta *= pdf / bsdfSample.pdf;
+                        beta *= pdf / bsdfSample->pdf;
                         pdfUni *= pdf;
                         PBRT_DBG("Sampled PDF is proportional: pdf %f\n", pdf);
                     } else
-                        pdfUni *= bsdfSample.pdf;
+                        pdfUni *= bsdfSample->pdf;
 
                     Float etaScale = s.etaScale;
-                    if (bsdfSample.IsTransmission())
+                    if (bsdfSample->IsTransmission())
                         etaScale *= Sqr(bsdf.eta);
 
                     // Russian roulette
@@ -123,14 +123,14 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
 
                         nextRayQueue->PushIndirect(
                             ray, intr.pi, intr.n, intr.ns, beta, pdfUni, pdfNEE, lambda,
-                            etaScale, bsdfSample.IsSpecular(), anyNonSpecularBounces,
+                            etaScale, bsdfSample->IsSpecular(), anyNonSpecularBounces,
                             s.pixelIndex);
 
                         PBRT_DBG("Spawned indirect ray at depth %d. "
                             "Specular %d Beta %f %f %f %f pdfUni %f %f %f %f pdfNEE %f "
                             "%f %f %f "
                             "beta/pdfUni %f %f %f %f\n",
-                            depth + 1, int(bsdfSample.IsSpecular()),
+                            depth + 1, int(bsdfSample->IsSpecular()),
                             beta[0], beta[1], beta[2], beta[3], pdfUni[0], pdfUni[1],
                             pdfUni[2], pdfUni[3], pdfNEE[0], pdfNEE[1], pdfNEE[2],
                             pdfNEE[3], SafeDiv(beta, pdfUni)[0], SafeDiv(beta, pdfUni)[1],

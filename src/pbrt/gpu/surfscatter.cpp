@@ -98,9 +98,9 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                     Point2f u(RadicalInverse(1, i + 1), RadicalInverse(2, i + 1));
 
                     // Estimate one term of $\rho_\roman{hd}$
-                    BSDFSample bs = bsdf.Sample_f(me.wo, uc, u);
-                    if (bs && bs.pdf > 0)
-                        rho += bs.f * AbsDot(bs.wi, ns) / bs.pdf;
+                    pstd::optional<BSDFSample> bs = bsdf.Sample_f(me.wo, uc, u);
+                    if (bs)
+                        rho += bs->f * AbsDot(bs->wi, ns) / bs->pdf;
                 }
                 SampledSpectrum albedo = rho / nRhoSamples;
 
@@ -112,29 +112,29 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
             RaySamples raySamples = pixelSampleState.samples[me.pixelIndex];
 
             // Sample indirect lighting
-            BSDFSample bsdfSample =
+            pstd::optional<BSDFSample> bsdfSample =
                 bsdf.Sample_f<BxDF>(wo, raySamples.indirect.uc, raySamples.indirect.u);
-            if (bsdfSample && bsdfSample.f) {
-                Vector3f wi = bsdfSample.wi;
-                SampledSpectrum beta = me.beta * bsdfSample.f * AbsDot(wi, ns);
+            if (bsdfSample) {
+                Vector3f wi = bsdfSample->wi;
+                SampledSpectrum beta = me.beta * bsdfSample->f * AbsDot(wi, ns);
                 SampledSpectrum pdfUni = me.pdfUni, pdfNEE = pdfUni;
 
-                PBRT_DBG("%s f*cos[0] %f bsdfSample.pdf %f f*cos/pdf %f\n", BxDF::Name(),
-                    bsdfSample.f[0] * AbsDot(wi, ns), bsdfSample.pdf,
-                    bsdfSample.f[0] * AbsDot(wi, ns) / bsdfSample.pdf);
+                PBRT_DBG("%s f*cos[0] %f bsdfSample->pdf %f f*cos/pdf %f\n", BxDF::Name(),
+                    bsdfSample->f[0] * AbsDot(wi, ns), bsdfSample->pdf,
+                    bsdfSample->f[0] * AbsDot(wi, ns) / bsdfSample->pdf);
 
                 if (bsdf.SampledPDFIsProportional()) {
                     // The PDFs need to be handled slightly differently for
                     // stochastically-sampled layered materials..
                     Float pdf = bsdf.PDF(wo, wi);
-                    beta *= pdf / bsdfSample.pdf;
+                    beta *= pdf / bsdfSample->pdf;
                     pdfUni *= pdf;
                 } else
-                    pdfUni *= bsdfSample.pdf;
+                    pdfUni *= bsdfSample->pdf;
                 rescale(beta, pdfUni, pdfNEE);
 
                 Float etaScale = me.etaScale;
-                if (bsdfSample.IsTransmission())
+                if (bsdfSample->IsTransmission())
                     etaScale *= Sqr(bsdf.eta);
 
                 // Russian roulette
@@ -150,7 +150,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 }
 
                 if (beta) {
-                    if (bsdfSample.IsTransmission() &&
+                    if (bsdfSample->IsTransmission() &&
                         material->HasSubsurfaceScattering()) {
                         // There's a BSSRDF and the sampled ray scattered
                         // into the surface; enqueue a work item for
@@ -169,18 +169,18 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                         // || rather than | is intentional, to avoid the read if
                         // possible...
                         bool anyNonSpecularBounces =
-                            !bsdfSample.IsSpecular() || me.anyNonSpecularBounces;
+                            !bsdfSample->IsSpecular() || me.anyNonSpecularBounces;
 
                         // Spawn indriect ray.
                         nextRayQueue->PushIndirect(
                             ray, me.pi, me.n, ns, beta, pdfUni, pdfNEE, lambda, etaScale,
-                            bsdfSample.IsSpecular(), anyNonSpecularBounces,
+                            bsdfSample->IsSpecular(), anyNonSpecularBounces,
                             me.pixelIndex);
 
                         PBRT_DBG("Spawned indirect ray at depth %d from me.index %d. "
                             "Specular %d Beta %f %f %f %f pdfUni %f %f %f %f pdfNEE %f "
                             "%f %f %f beta/pdfUni %f %f %f %f\n",
-                            depth + 1, index, int(bsdfSample.IsSpecular()),
+                            depth + 1, index, int(bsdfSample->IsSpecular()),
                             beta[0], beta[1], beta[2], beta[3], pdfUni[0], pdfUni[1],
                             pdfUni[2], pdfUni[3], pdfNEE[0], pdfNEE[1], pdfNEE[2],
                             pdfNEE[3], SafeDiv(beta, pdfUni)[0], SafeDiv(beta, pdfUni)[1],

@@ -501,12 +501,12 @@ SampledSpectrum SimplePathIntegrator::Li(RayDifferential ray, SampledWavelengths
         if (sampleBSDF) {
             // Sample BSDF for new path direction
             Float u = sampler.Get1D();
-            BSDFSample bs = bsdf.Sample_f(wo, u, sampler.Get2D());
+            pstd::optional<BSDFSample> bs = bsdf.Sample_f(wo, u, sampler.Get2D());
             if (!bs)
                 break;
-            beta *= bs.f * AbsDot(bs.wi, isect.shading.n) / bs.pdf;
-            specularBounce = bs.IsSpecular();
-            ray = isect.SpawnRay(bs.wi);
+            beta *= bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
+            specularBounce = bs->IsSpecular();
+            ray = isect.SpawnRay(bs->wi);
 
         } else {
             // Uniformly sample sphere or hemisphere to get new path direction
@@ -637,12 +637,13 @@ void LightPathIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleI
 
         // Sample the BSDF...
         Float u = sampler.Get1D();
-        BSDFSample bs = bsdf.Sample_f(wo, u, sampler.Get2D(), TransportMode::Importance);
+        pstd::optional<BSDFSample> bs =
+            bsdf.Sample_f(wo, u, sampler.Get2D(), TransportMode::Importance);
         if (!bs)
             break;
 
-        beta *= bs.f * AbsDot(bs.wi, isect.shading.n) / bs.pdf;
-        ray = isect.SpawnRay(ray, bsdf, bs.wi, bs.flags);
+        beta *= bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
+        ray = isect.SpawnRay(ray, bsdf, bs->wi, bs->flags);
     }
 }
 
@@ -744,8 +745,8 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
 
                 // Estimate one term of $\rho_\roman{hd}$
                 auto bs = bsdf.Sample_f(si->intr.wo, uc, u);
-                if (bs && bs.pdf > 0)
-                    rho += bs.f * AbsDot(bs.wi, si->intr.shading.n) / bs.pdf;
+                if (bs)
+                    rho += bs->f * AbsDot(bs->wi, si->intr.shading.n) / bs->pdf;
             }
             SampledSpectrum albedo = rho / nRhoSamples;
 
@@ -776,20 +777,20 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
         // Sample BSDF to get new path direction
         Vector3f wo = -ray.d;
         Float u = sampler.Get1D();
-        BSDFSample bs = bsdf.Sample_f(wo, u, sampler.Get2D());
+        pstd::optional<BSDFSample> bs = bsdf.Sample_f(wo, u, sampler.Get2D());
         if (!bs)
             break;
         // Update path state variables for after surface scattering
-        beta *= bs.f * AbsDot(bs.wi, isect.shading.n) / bs.pdf;
-        bsdfPDF = bsdf.SampledPDFIsProportional() ? bsdf.PDF(wo, bs.wi) : bs.pdf;
+        beta *= bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
+        bsdfPDF = bsdf.SampledPDFIsProportional() ? bsdf.PDF(wo, bs->wi) : bs->pdf;
         DCHECK(!IsInf(beta.y(lambda)));
-        specularBounce = bs.IsSpecular();
-        anyNonSpecularBounces |= !bs.IsSpecular();
-        if (bs.IsTransmission())
+        specularBounce = bs->IsSpecular();
+        anyNonSpecularBounces |= !bs->IsSpecular();
+        if (bs->IsTransmission())
             etaScale *= Sqr(bsdf.eta);
         prevIntr = si->intr;
 
-        ray = isect.SpawnRay(ray, bsdf, bs.wi, bs.flags);
+        ray = isect.SpawnRay(ray, bsdf, bs->wi, bs->flags);
 
         // Possibly terminate the path with Russian roulette
         SampledSpectrum rrBeta = beta * etaScale;
@@ -1164,33 +1165,33 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
         // Sample BSDF to get new volumetric path direction
         Vector3f wo = -ray.d;
         Float u = sampler.Get1D();
-        BSDFSample bs = bsdf.Sample_f(wo, u, sampler.Get2D());
+        pstd::optional<BSDFSample> bs = bsdf.Sample_f(wo, u, sampler.Get2D());
         if (!bs)
             break;
         // Update _beta_ and PDFs for BSDF scattering
-        beta *= bs.f * AbsDot(bs.wi, isect.shading.n);
+        beta *= bs->f * AbsDot(bs->wi, isect.shading.n);
         pdfNEE = pdfUni;
         if (bsdf.SampledPDFIsProportional()) {
-            Float pdf = bsdf.PDF(wo, bs.wi);
-            beta *= pdf / bs.pdf;
+            Float pdf = bsdf.PDF(wo, bs->wi);
+            beta *= pdf / bs->pdf;
             pdfUni *= pdf;
         } else
-            pdfUni *= bs.pdf;
+            pdfUni *= bs->pdf;
         rescale(beta, pdfUni, pdfNEE);
 
-        PBRT_DBG("%s\n", StringPrintf("Sampled BSDF, f = %s, pdf = %f -> beta = %s", bs.f,
-                                      bs.pdf, beta)
+        PBRT_DBG("%s\n", StringPrintf("Sampled BSDF, f = %s, pdf = %f -> beta = %s",
+                                      bs->f, bs->pdf, beta)
                              .c_str());
         DCHECK(IsInf(beta.y(lambda)) == false);
-        specularBounce = bs.IsSpecular();
-        anyNonSpecularBounces |= !bs.IsSpecular();
-        if (bs.IsTransmission())
+        specularBounce = bs->IsSpecular();
+        anyNonSpecularBounces |= !bs->IsSpecular();
+        if (bs->IsTransmission())
             etaScale *= Sqr(bsdf.eta);
-        ray = isect.SpawnRay(ray, bsdf, bs.wi, bs.flags);
+        ray = isect.SpawnRay(ray, bsdf, bs->wi, bs->flags);
 
         // Account for attenuated subsurface scattering, if applicable
         BSSRDFHandle bssrdf = isect.GetBSSRDF(ray, lambda, camera, scratchBuffer);
-        if (bssrdf && bs.IsTransmission()) {
+        if (bssrdf && bs->IsTransmission()) {
             // Sample BSSRDF probe segment to find exit point
             BSSRDFProbeSegment probeSeg = bssrdf.Sample(sampler.Get1D(), sampler.Get2D());
             if (!probeSeg)
@@ -1245,16 +1246,16 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
 
             // Sample ray for indirect subsurface scattering
             Float u = sampler.Get1D();
-            BSDFSample bs = bsdf.Sample_f(pi.wo, u, sampler.Get2D());
+            pstd::optional<BSDFSample> bs = bsdf.Sample_f(pi.wo, u, sampler.Get2D());
             if (!bs)
                 break;
-            beta *= bs.f * AbsDot(bs.wi, pi.shading.n);
+            beta *= bs->f * AbsDot(bs->wi, pi.shading.n);
             pdfNEE = pdfUni;
-            pdfUni *= bs.pdf;
+            pdfUni *= bs->pdf;
             // don't increment depth this time...
             DCHECK(!IsInf(beta.y(lambda)));
-            specularBounce = bs.IsSpecular();
-            ray = RayDifferential(pi.SpawnRay(bs.wi));
+            specularBounce = bs->IsSpecular();
+            ray = RayDifferential(pi.SpawnRay(bs->wi));
         }
 
         // Possibly terminate volumetric path with Russian roulette
@@ -2092,23 +2093,23 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
         // Sample BSDF at current vertex and compute reverse probability
         Vector3f wo = isect.wo;
         Float u = sampler.Get1D();
-        BSDFSample bs = bsdf.Sample_f(wo, u, sampler.Get2D(), mode);
+        pstd::optional<BSDFSample> bs = bsdf.Sample_f(wo, u, sampler.Get2D(), mode);
         if (!bs)
             break;
-        pdfFwd = bs.pdf;
-        anyNonSpecularBounces |= !bs.IsSpecular();
-        beta *= bs.f * AbsDot(bs.wi, isect.shading.n) / bs.pdf;
+        pdfFwd = bs->pdf;
+        anyNonSpecularBounces |= !bs->IsSpecular();
+        beta *= bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
         // TODO: confirm. I believe that ~mode is right. Interestingly,
         // it makes no difference in the test suite either way.
-        pdfRev = bsdf.PDF(bs.wi, wo, ~mode);
-        if (bs.IsSpecular()) {
+        pdfRev = bsdf.PDF(bs->wi, wo, ~mode);
+        if (bs->IsSpecular()) {
             vertex.delta = true;
             pdfRev = pdfFwd = 0;
         }
         PBRT_DBG("%s\n",
                  StringPrintf("Random walk beta after shading normal correction %s", beta)
                      .c_str());
-        ray = isect.SpawnRay(ray, bsdf, bs.wi, bs.flags);
+        ray = isect.SpawnRay(ray, bsdf, bs->wi, bs->flags);
 
         // Compute reverse area density at preceding vertex
         prev.pdfRev = vertex.ConvertDensity(pdfRev, prev);
@@ -2881,15 +2882,16 @@ void SPPMIntegrator::Render() {
                         // Spawn ray from SPPM camera path vertex
                         if (depth < maxDepth - 1) {
                             Float u = tileSampler.Get1D();
-                            BSDFSample bs = bsdf.Sample_f(wo, u, tileSampler.Get2D());
+                            pstd::optional<BSDFSample> bs =
+                                bsdf.Sample_f(wo, u, tileSampler.Get2D());
                             if (!bs)
                                 break;
-                            specularBounce = bs.IsSpecular();
-                            anyNonSpecularBounces |= !bs.IsSpecular();
-                            if (bs.IsTransmission())
+                            specularBounce = bs->IsSpecular();
+                            anyNonSpecularBounces |= !bs->IsSpecular();
+                            if (bs->IsTransmission())
                                 etaScale *= Sqr(bsdf.eta);
 
-                            beta *= bs.f * AbsDot(bs.wi, isect.shading.n) / bs.pdf;
+                            beta *= bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
                             SampledSpectrum rrBeta = beta * etaScale;
                             if (rrBeta.MaxComponentValue() < 1) {
                                 Float q =
@@ -2898,7 +2900,7 @@ void SPPMIntegrator::Render() {
                                     break;
                                 beta /= 1 - q;
                             }
-                            ray = isect.SpawnRay(ray, bsdf, bs.wi, bs.flags);
+                            ray = isect.SpawnRay(ray, bsdf, bs->wi, bs->flags);
                         }
                     }
                 }
@@ -3064,12 +3066,12 @@ void SPPMIntegrator::Render() {
                     Vector3f wo = -photonRay.d;
                     Float bsdfSample = Sample1D();
                     Point2f bsdfSample2 = Sample2D();
-                    BSDFSample bs = photonBSDF.Sample_f(wo, bsdfSample, bsdfSample2,
-                                                        TransportMode::Importance);
+                    pstd::optional<BSDFSample> bs = photonBSDF.Sample_f(
+                        wo, bsdfSample, bsdfSample2, TransportMode::Importance);
                     if (!bs)
                         break;
                     SampledSpectrum bnew =
-                        beta * bs.f * AbsDot(bs.wi, isect.shading.n) / bs.pdf;
+                        beta * bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
 
                     // Possibly terminate photon path with Russian roulette
                     Float q = std::max<Float>(
@@ -3078,7 +3080,7 @@ void SPPMIntegrator::Render() {
                         break;
                     beta = bnew / (1 - q);
 
-                    photonRay = RayDifferential(isect.SpawnRay(bs.wi));
+                    photonRay = RayDifferential(isect.SpawnRay(bs->wi));
                 }
 
                 scratchBuffer.Reset();
@@ -3221,44 +3223,44 @@ SampledSpectrum SPPMIntegrator::SampleLd(const SurfaceInteraction &intr, const B
     }
 
     Float uScattering = sampler.Get1D();
-    BSDFSample bs = bsdf.Sample_f(intr.wo, uScattering, sampler.Get2D());
-    if (!bs || !bs.f)
+    pstd::optional<BSDFSample> bs = bsdf.Sample_f(intr.wo, uScattering, sampler.Get2D());
+    if (!bs)
         return Ld;
 
-    Vector3f wi = bs.wi;
-    SampledSpectrum f = bs.f * AbsDot(wi, intr.shading.n);
+    Vector3f wi = bs->wi;
+    SampledSpectrum f = bs->f * AbsDot(wi, intr.shading.n);
 
     Ray ray = intr.SpawnRay(wi);
     pstd::optional<ShapeIntersection> si = Intersect(ray);
     if (si) {
         SampledSpectrum Le = si->intr.Le(-ray.d, lambda);
         if (Le) {
-            if (bs.IsSpecular())
-                Ld += f * Le / bs.pdf;
+            if (bs->IsSpecular())
+                Ld += f * Le / bs->pdf;
             else {
                 // Compute MIS pdf...
                 LightHandle areaLight(si->intr.areaLight);
                 Float lightPDF = lightSampler.PDF(intr, areaLight) *
                                  areaLight.PDF_Li(intr, wi, LightSamplingMode::WithMIS);
                 Float bsdfPDF =
-                    bsdf.SampledPDFIsProportional() ? bsdf.PDF(intr.wo, wi) : bs.pdf;
+                    bsdf.SampledPDFIsProportional() ? bsdf.PDF(intr.wo, wi) : bs->pdf;
                 Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
-                Ld += f * Le * weight / bs.pdf;
+                Ld += f * Le * weight / bs->pdf;
             }
         }
     } else {
         for (const auto &light : infiniteLights) {
             SampledSpectrum Le = light.Le(ray, lambda);
-            if (bs.IsSpecular())
-                Ld += f * Le / bs.pdf;
+            if (bs->IsSpecular())
+                Ld += f * Le / bs->pdf;
             else {
                 // Compute MIS pdf...
                 Float lightPDF = lightSampler.PDF(intr, light) *
                                  light.PDF_Li(intr, wi, LightSamplingMode::WithMIS);
                 Float bsdfPDF =
-                    bsdf.SampledPDFIsProportional() ? bsdf.PDF(intr.wo, wi) : bs.pdf;
+                    bsdf.SampledPDFIsProportional() ? bsdf.PDF(intr.wo, wi) : bs->pdf;
                 Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
-                Ld += f * Le * weight / bs.pdf;
+                Ld += f * Le * weight / bs->pdf;
             }
         }
     }

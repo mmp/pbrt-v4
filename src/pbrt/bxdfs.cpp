@@ -214,8 +214,9 @@ pstd::array<Float, HairBxDF::pMax + 1> HairBxDF::ComputeApPDF(Float cosTheta_o) 
     return apPDF;
 }
 
-BSDFSample HairBxDF::Sample_f(Vector3f wo, Float uc, const Point2f &u, TransportMode mode,
-                              BxDFReflTransFlags sampleFlags) const {
+pstd::optional<BSDFSample> HairBxDF::Sample_f(Vector3f wo, Float uc, const Point2f &u,
+                                              TransportMode mode,
+                                              BxDFReflTransFlags sampleFlags) const {
     // Compute hair coordinate system terms related to _wo_
     Float sinTheta_o = wo.x;
     Float cosTheta_o = SafeSqrt(1 - Sqr(sinTheta_o));
@@ -849,9 +850,9 @@ SampledSpectrum MeasuredBxDF::f(Vector3f wo, Vector3f wi, TransportMode mode) co
            (4 * brdf->sigma.Evaluate(u_wi, params) * AbsCosTheta(wi));
 }
 
-BSDFSample MeasuredBxDF::Sample_f(Vector3f wo, Float uc, const Point2f &u,
-                                  TransportMode mode,
-                                  BxDFReflTransFlags sampleFlags) const {
+pstd::optional<BSDFSample> MeasuredBxDF::Sample_f(Vector3f wo, Float uc, const Point2f &u,
+                                                  TransportMode mode,
+                                                  BxDFReflTransFlags sampleFlags) const {
     if (!(sampleFlags & BxDFReflTransFlags::Reflection))
         return {};
 
@@ -961,7 +962,7 @@ SampledSpectrum BxDFHandle::rho(Vector3f wo, pstd::span<const Float> uc,
         // Estimate one term of $\rho_\roman{hd}$
         auto bs = Sample_f(wo, uc[i], u2[i], TransportMode::Radiance);
         if (bs)
-            r += bs.f * AbsCosTheta(bs.wi) / bs.pdf;
+            r += bs->f * AbsCosTheta(bs->wi) / bs->pdf;
     }
     return r / uc.size();
 }
@@ -981,7 +982,7 @@ SampledSpectrum BxDFHandle::rho(pstd::span<const Float> uc1, pstd::span<const Po
         Float pdfo = UniformHemispherePDF();
         auto bs = Sample_f(wo, uc2[i], u2[i], TransportMode::Radiance);
         if (bs)
-            r += bs.f * AbsCosTheta(bs.wi) * AbsCosTheta(wo) / (pdfo * bs.pdf);
+            r += bs->f * AbsCosTheta(bs->wi) * AbsCosTheta(wo) / (pdfo * bs->pdf);
     }
     return r / (Pi * u1.size());
 }

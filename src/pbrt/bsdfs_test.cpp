@@ -192,12 +192,12 @@ void FrequencyTable(const BSDF* bsdf, const Vector3f& wo, RNG& rng, int sampleCo
     for (int i = 0; i < sampleCount; ++i) {
         Float u = rng.Uniform<Float>();
         Point2f sample{rng.Uniform<Float>(), rng.Uniform<Float>()};
-        BSDFSample bs = bsdf->Sample_f(wo, u, sample);
+        pstd::optional<BSDFSample> bs = bsdf->Sample_f(wo, u, sample);
 
-        if (!bs || bs.IsSpecular())
+        if (!bs || bs->IsSpecular())
             continue;
 
-        Vector3f wiL = bsdf->RenderToLocal(bs.wi);
+        Vector3f wiL = bsdf->RenderToLocal(bs->wi);
 
         Point2f coords(SafeACos(wiL.z) * factorTheta,
                        std::atan2(wiL.y, wiL.x) * factorPhi);
@@ -504,9 +504,9 @@ static void TestEnergyConservation(
         for (int j = 0; j < nSamples; ++j) {
             Float u = rng.Uniform<Float>();
             Point2f ui{rng.Uniform<Float>(), rng.Uniform<Float>()};
-            BSDFSample bs = bsdf->Sample_f(wo, u, ui);
+            pstd::optional<BSDFSample> bs = bsdf->Sample_f(wo, u, ui);
             if (bs)
-                Lo += bs.f * AbsDot(bs.wi, si->intr.n) / bs.pdf;
+                Lo += bs->f * AbsDot(bs->wi, si->intr.n) / bs->pdf;
         }
         Lo /= nSamples;
 
@@ -707,10 +707,10 @@ TEST(Hair, WhiteFurnaceSampled) {
                 Float uc = RadicalInverse(2, i);
                 Point2f u(RadicalInverse(3, i), RadicalInverse(4, i));
 
-                BSDFSample bs = hair.Sample_f(wo, uc, u, TransportMode::Radiance,
-                                              BxDFReflTransFlags::All);
+                pstd::optional<BSDFSample> bs = hair.Sample_f(wo, uc, u, TransportMode::Radiance,
+                                                              BxDFReflTransFlags::All);
                 if (bs) {
-                    SampledSpectrum f = bs.f * AbsCosTheta(bs.wi) / bs.pdf;
+                    SampledSpectrum f = bs->f * AbsCosTheta(bs->wi) / bs->pdf;
                     ySum += f.y(lambda);
                 }
             }
@@ -738,14 +738,14 @@ TEST(Hair, SamplingWeights) {
                     SampleUniformSphere({RadicalInverse(1, i), RadicalInverse(2, i)});
                 Float uc = RadicalInverse(3, i);
                 Point2f u = {RadicalInverse(4, i), RadicalInverse(5, i)};
-                BSDFSample bs = hair.Sample_f(wo, uc, u, TransportMode::Radiance,
-                                              BxDFReflTransFlags::All);
+                pstd::optional<BSDFSample> bs = hair.Sample_f(wo, uc, u, TransportMode::Radiance,
+                                                              BxDFReflTransFlags::All);
                 if (bs) {
                     Float sum = 0;
                     int ny = 20;
                     for (Float u : Stratified1D(ny)) {
                         SampledWavelengths lambda = SampledWavelengths::SampleXYZ(u);
-                        sum += bs.f.y(lambda) * AbsCosTheta(bs.wi) / bs.pdf;
+                        sum += bs->f.y(lambda) * AbsCosTheta(bs->wi) / bs->pdf;
                     }
 
                     // Verify that hair BSDF sample weight is close to 1 for
@@ -778,11 +778,11 @@ TEST(Hair, SamplingConsistency) {
                 Vector3f wi;
                 Float uc = rng.Uniform<Float>();
                 Point2f u = {rng.Uniform<Float>(), rng.Uniform<Float>()};
-                BSDFSample bs = hair.Sample_f(wo, uc, u, TransportMode::Radiance,
-                                              BxDFReflTransFlags::All);
+                pstd::optional<BSDFSample> bs = hair.Sample_f(wo, uc, u, TransportMode::Radiance,
+                                                              BxDFReflTransFlags::All);
                 if (bs)
                     fImportance +=
-                        bs.f * Li(bs.wi) * AbsCosTheta(bs.wi) / (count * bs.pdf);
+                        bs->f * Li(bs->wi) * AbsCosTheta(bs->wi) / (count * bs->pdf);
                 wi = SampleUniformSphere(u);
                 fUniform += hair.f(wo, wi, TransportMode::Radiance) * Li(wi) *
                             AbsCosTheta(wi) / (count * UniformSpherePDF());

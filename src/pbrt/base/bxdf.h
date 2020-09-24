@@ -174,7 +174,7 @@ class BxDFHandle : public TaggedPointer<IdealDiffuseBxDF, DiffuseBxDF, CoatedDif
 
     std::string ToString() const;
 
-    PBRT_CPU_GPU inline BSDFSample Sample_f(
+    PBRT_CPU_GPU inline pstd::optional<BSDFSample> Sample_f(
         Vector3f wo, Float uc, const Point2f &u, TransportMode mode,
         BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const;
 

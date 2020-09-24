@@ -88,23 +88,27 @@ class BSDF {
     }
 
     PBRT_CPU_GPU
-    BSDFSample Sample_f(Vector3f woRender, Float u, const Point2f &u2,
-                        TransportMode mode = TransportMode::Radiance,
-                        BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
+    pstd::optional<BSDFSample> Sample_f(
+        Vector3f woRender, Float u, const Point2f &u2,
+        TransportMode mode = TransportMode::Radiance,
+        BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
         Vector3f wo = RenderToLocal(woRender);
         if (wo.z == 0 || !(bxdf.Flags() & sampleFlags))
             return {};
-        BSDFSample bs = bxdf.Sample_f(wo, u, u2, mode, sampleFlags);
-        if (!bs || !bs.f)
+        pstd::optional<BSDFSample> bs = bxdf.Sample_f(wo, u, u2, mode, sampleFlags);
+        if (bs)
+            DCHECK_GE(bs->pdf, 0);
+        if (!bs || !bs->f || bs->pdf == 0 || bs->wi.z == 0)
             return {};
-        DCHECK_GT(bs.pdf, 0);
         PBRT_DBG("For wo = (%f, %f, %f), ng %f %f %f ns %f %f %f "
                  "sampled f = %f %f %f %f, pdf = %f, ratio[0] = %f "
                  "wi = (%f, %f, %f)\n",
                  wo.x, wo.y, wo.z, ng.x, ng.y, ng.z, shadingFrame.z.x, shadingFrame.z.y,
-                 shadingFrame.z.z, bs.f[0], bs.f[1], bs.f[2], bs.f[3], bs.pdf,
-                 (bs.pdf > 0) ? (bs.f[0] / bs.pdf) : 0, bs.wi.x, bs.wi.y, bs.wi.z);
-        bs.wi = LocalToRender(bs.wi);
+                 shadingFrame.z.z, bs->f[0], bs->f[1], bs->f[2], bs->f[3], bs->pdf,
+                 (bs->pdf > 0) ? (bs->f[0] / bs->pdf) : 0, bs->wi.x, bs->wi.y, bs->wi.z);
+
+        bs->wi = LocalToRender(bs->wi);
+
         return bs;
     }
 
@@ -122,10 +126,10 @@ class BSDF {
     bool SampledPDFIsProportional() const { return bxdf.SampledPDFIsProportional(); }
 
     template <typename BxDF>
-    PBRT_CPU_GPU BSDFSample
-    Sample_f(Vector3f woRender, Float u, const Point2f &u2,
-             TransportMode mode = TransportMode::Radiance,
-             BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
+    PBRT_CPU_GPU pstd::optional<BSDFSample> Sample_f(
+        Vector3f woRender, Float u, const Point2f &u2,
+        TransportMode mode = TransportMode::Radiance,
+        BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
         Vector3f wo = RenderToLocal(woRender);
         if (wo.z == 0)
             return {};
@@ -134,19 +138,20 @@ class BSDF {
         if (!(specificBxDF->Flags() & sampleFlags))
             return {};
 
-        BSDFSample bs = specificBxDF->Sample_f(wo, u, u2, mode, sampleFlags);
-        if (!bs || !bs.f)
+        pstd::optional<BSDFSample> bs =
+            specificBxDF->Sample_f(wo, u, u2, mode, sampleFlags);
+        if (!bs || !bs->f)
             return {};
-        CHECK_GT(bs.pdf, 0);
+        CHECK_GT(bs->pdf, 0);
 
         PBRT_DBG("For wo = (%f, %f, %f), ng %f %f %f ns %f %f %f "
                  "sampled f = %f %f %f %f, pdf = %f, ratio[0] = %f "
                  "wi = (%f, %f, %f)\n",
                  wo.x, wo.y, wo.z, ng.x, ng.y, ng.z, shadingFrame.z.x, shadingFrame.z.y,
-                 shadingFrame.z.z, bs.f[0], bs.f[1], bs.f[2], bs.f[3], bs.pdf,
-                 (bs.pdf > 0) ? (bs.f[0] / bs.pdf) : 0, bs.wi.x, bs.wi.y, bs.wi.z);
+                 shadingFrame.z.z, bs->f[0], bs->f[1], bs->f[2], bs->f[3], bs->pdf,
+                 (bs->pdf > 0) ? (bs->f[0] / bs->pdf) : 0, bs->wi.x, bs->wi.y, bs->wi.z);
 
-        bs.wi = LocalToRender(bs.wi);
+        bs->wi = LocalToRender(bs->wi);
 
         return bs;
     }
