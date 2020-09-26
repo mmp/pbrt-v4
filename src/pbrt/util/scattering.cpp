@@ -29,15 +29,6 @@ Float FresnelMoment2(Float eta) {
     }
 }
 
-std::string FresnelConductor::ToString() const {
-    return StringPrintf("[ FresnelConductor eta: %s k: %s ]", eta, k);
-}
-
-std::string FresnelDielectric::ToString() const {
-    return StringPrintf("[ FrenselDielectric eta: %f opaque: %s ]", eta,
-                        opaque ? "true" : "false");
-}
-
 std::string TrowbridgeReitzDistribution::ToString() const {
     return StringPrintf("[ TrowbridgeReitzDistribution alpha_x: %f alpha_y: %f ]",
                         alpha_x, alpha_y);

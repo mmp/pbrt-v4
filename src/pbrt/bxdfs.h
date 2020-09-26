@@ -47,22 +47,21 @@ class IdealDiffuseBxDF {
         BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
         if (!(sampleFlags & BxDFReflTransFlags::Reflection))
             return {};
+        // Sample cosine-weighted hemisphere to compute _wi_ and _pdf_
         Vector3f wi = SampleCosineHemisphere(u);
         if (wo.z < 0)
             wi.z *= -1;
-        Float pdf = AbsCosTheta(wi) * InvPi;
-        return BSDFSample(f(wo, wi, mode), wi, pdf, BxDFFlags::DiffuseReflection);
+        Float pdf = CosineHemispherePDF(AbsCosTheta(wi));
+
+        return BSDFSample(R * InvPi, wi, pdf, BxDFFlags::DiffuseReflection);
     }
 
     PBRT_CPU_GPU
     Float PDF(Vector3f wo, Vector3f wi, TransportMode mode,
               BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
-        if (!(sampleFlags & BxDFReflTransFlags::Reflection))
+        if (!(sampleFlags & BxDFReflTransFlags::Reflection) || !SameHemisphere(wo, wi))
             return 0;
-        if (SameHemisphere(wo, wi))
-            return AbsCosTheta(wi) * InvPi;
-        else
-            return 0;
+        return CosineHemispherePDF(AbsCosTheta(wi));
     }
 
     PBRT_CPU_GPU
@@ -79,7 +78,6 @@ class IdealDiffuseBxDF {
     }
 
   private:
-    friend class SOA<IdealDiffuseBxDF>;
     SampledSpectrum R;
 };
 
@@ -89,8 +87,7 @@ class DiffuseBxDF {
     // DiffuseBxDF Public Methods
     DiffuseBxDF() = default;
     PBRT_CPU_GPU
-    DiffuseBxDF(const SampledSpectrum &R, const SampledSpectrum &T, Float sigma)
-        : R(R), T(T) {
+    DiffuseBxDF(SampledSpectrum R, SampledSpectrum T, Float sigma) : R(R), T(T) {
         Float sigma2 = Sqr(Radians(sigma));
         A = 1 - sigma2 / (2 * (sigma2 + 0.33f));
         B = 0.45f * sigma2 / (sigma2 + 0.09f);
@@ -98,19 +95,16 @@ class DiffuseBxDF {
 
     PBRT_CPU_GPU
     SampledSpectrum f(Vector3f wo, Vector3f wi, TransportMode mode) const {
+        // Return Lambertian BRDF for zero-roughness Oren--Nayar BRDF
         if (B == 0)
             return SameHemisphere(wo, wi) ? (R * InvPi) : (T * InvPi);
 
         if ((SameHemisphere(wo, wi) && !R) || (!SameHemisphere(wo, wi) && !T))
             return SampledSpectrum(0.);
-
+        // Evaluate Oren--Nayar BRDF for given directions
         Float sinTheta_i = SinTheta(wi), sinTheta_o = SinTheta(wo);
-        // Compute cosine term of Oren--Nayar model
-        Float maxCos = 0;
-        if (sinTheta_i > 0 && sinTheta_o > 0)
-            maxCos = std::max<Float>(0, CosDPhi(wi, wo));
-
-        // Compute sine and tangent terms of Oren--Nayar model
+        Float maxCos = std::max<Float>(0, CosDPhi(wi, wo));
+        // Compute $\sin \alpha$ and $\tan \beta$ terms of Oren--Nayar model
         Float sinAlpha, tanBeta;
         if (AbsCosTheta(wi) > AbsCosTheta(wo)) {
             sinAlpha = sinTheta_o;
@@ -120,6 +114,7 @@ class DiffuseBxDF {
             tanBeta = sinTheta_o / AbsCosTheta(wo);
         }
 
+        // Return final Oren--Nayar BSDF value
         if (SameHemisphere(wo, wi))
             return R * InvPi * (A + B * maxCos * sinAlpha * tanBeta);
         else
@@ -128,8 +123,9 @@ class DiffuseBxDF {
 
     PBRT_CPU_GPU
     pstd::optional<BSDFSample> Sample_f(
-        Vector3f wo, Float uc, const Point2f &u, TransportMode mode,
+        Vector3f wo, Float uc, Point2f u, TransportMode mode,
         BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
+        // Compute reflection and transmission probabilities for diffuse BSDF
         Float pr = R.MaxComponentValue(), pt = T.MaxComponentValue();
         if (!(sampleFlags & BxDFReflTransFlags::Reflection))
             pr = 0;
@@ -138,20 +134,22 @@ class DiffuseBxDF {
         if (pr == 0 && pt == 0)
             return {};
 
+        // Randomly sample diffuse BSDF reflection or transmission
         Float cpdf;
-        // TODO: rewrite to a single code path for the GPU. Good chance to
-        // discuss divergence.
         if (SampleDiscrete({pr, pt}, uc, &cpdf) == 0) {
+            // Sample diffuse BSDF reflection
             Vector3f wi = SampleCosineHemisphere(u);
             if (wo.z < 0)
                 wi.z *= -1;
-            Float pdf = AbsCosTheta(wi) * InvPi * cpdf;
+            Float pdf = CosineHemispherePDF(AbsCosTheta(wi)) * cpdf;
             return BSDFSample(f(wo, wi, mode), wi, pdf, BxDFFlags::DiffuseReflection);
+
         } else {
+            // Sample diffuse BSDF transmission
             Vector3f wi = SampleCosineHemisphere(u);
             if (wo.z > 0)
                 wi.z *= -1;
-            Float pdf = AbsCosTheta(wi) * InvPi * cpdf;
+            Float pdf = CosineHemispherePDF(AbsCosTheta(wi)) * cpdf;
             return BSDFSample(f(wo, wi, mode), wi, pdf, BxDFFlags::DiffuseTransmission);
         }
     }
@@ -159,18 +157,19 @@ class DiffuseBxDF {
     PBRT_CPU_GPU
     Float PDF(Vector3f wo, Vector3f wi, TransportMode mode,
               BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
+        // Compute reflection and transmission probabilities for diffuse BSDF
         Float pr = R.MaxComponentValue(), pt = T.MaxComponentValue();
         if (!(sampleFlags & BxDFReflTransFlags::Reflection))
             pr = 0;
         if (!(sampleFlags & BxDFReflTransFlags::Transmission))
             pt = 0;
         if (pr == 0 && pt == 0)
-            return 0;
+            return {};
 
         if (SameHemisphere(wo, wi))
-            return pr / (pr + pt) * AbsCosTheta(wi) * InvPi;
+            return pr / (pr + pt) * CosineHemispherePDF(AbsCosTheta(wi));
         else
-            return pt / (pr + pt) * AbsCosTheta(wi) * InvPi;
+            return pt / (pr + pt) * CosineHemispherePDF(AbsCosTheta(wi));
     }
 
     PBRT_CPU_GPU
@@ -188,7 +187,6 @@ class DiffuseBxDF {
     }
 
   private:
-    friend class SOA<DiffuseBxDF>;
     // DiffuseBxDF Private Members
     SampledSpectrum R, T;
     Float A, B;
@@ -206,13 +204,13 @@ class DielectricInterfaceBxDF {
     PBRT_CPU_GPU
     BxDFFlags Flags() const {
         return BxDFFlags(BxDFFlags::Reflection | BxDFFlags::Transmission |
-                         BxDFFlags(mfDistrib.EffectivelySpecular() ? BxDFFlags::Specular
-                                                                   : BxDFFlags::Glossy));
+                         BxDFFlags(mfDistrib.EffectivelySmooth() ? BxDFFlags::Specular
+                                                                 : BxDFFlags::Glossy));
     }
 
     PBRT_CPU_GPU
     SampledSpectrum f(Vector3f wo, Vector3f wi, TransportMode mode) const {
-        if (mfDistrib.EffectivelySpecular())
+        if (mfDistrib.EffectivelySmooth())
             return SampledSpectrum(0);
         if (SameHemisphere(wo, wi)) {
             // Compute reflection at non-delta dielectric interface
@@ -262,7 +260,7 @@ class DielectricInterfaceBxDF {
         if (wo.z == 0)
             return {};
 
-        if (mfDistrib.EffectivelySpecular()) {
+        if (mfDistrib.EffectivelySmooth()) {
             // Sample delta dielectric interface
             Float R = FrDielectric(CosTheta(wo), eta), T = 1 - R;
             // Compute probabilities _pr_ and _pt_ for sampling reflection and
@@ -382,7 +380,7 @@ class DielectricInterfaceBxDF {
     PBRT_CPU_GPU
     Float PDF(Vector3f wo, Vector3f wi, TransportMode mode,
               BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
-        if (mfDistrib.EffectivelySpecular())
+        if (mfDistrib.EffectivelySmooth())
             return 0;
         // Return PDF for non-delta dielectric interface
         if (SameHemisphere(wo, wi)) {
@@ -444,7 +442,6 @@ class DielectricInterfaceBxDF {
     void Regularize() { mfDistrib.Regularize(); }
 
   private:
-    friend class SOA<DielectricInterfaceBxDF>;
     // DielectricInterfaceBxDF Private Members
     Float eta;
     TrowbridgeReitzDistribution mfDistrib;
@@ -518,7 +515,6 @@ class ThinDielectricBxDF {
     }
 
   private:
-    friend class SOA<ThinDielectricBxDF>;
     Float eta;
 };
 
@@ -534,10 +530,8 @@ class ConductorBxDF {
 
     PBRT_CPU_GPU
     BxDFFlags Flags() const {
-        if (mfDistrib.EffectivelySpecular())
-            return (BxDFFlags::Reflection | BxDFFlags::Specular);
-        else
-            return (BxDFFlags::Reflection | BxDFFlags::Glossy);
+        return mfDistrib.EffectivelySmooth() ? BxDFFlags::SpecularReflection
+                                             : BxDFFlags::GlossyReflection;
     }
 
     PBRT_CPU_GPU
@@ -548,36 +542,38 @@ class ConductorBxDF {
     SampledSpectrum f(Vector3f wo, Vector3f wi, TransportMode mode) const {
         if (!SameHemisphere(wo, wi))
             return {};
-        if (mfDistrib.EffectivelySpecular())
+        if (mfDistrib.EffectivelySmooth())
             return {};
+        // Evaluate Torrance--Sparrow model for conductor BRDF
+        // Compute cosines and $\wh$ for conductor BRDF
         Float cosTheta_o = AbsCosTheta(wo), cosTheta_i = AbsCosTheta(wi);
-        Vector3f wh = wi + wo;
-        // Handle degenerate cases for microfacet reflection
         if (cosTheta_i == 0 || cosTheta_o == 0)
             return {};
+        Vector3f wh = wi + wo;
         if (wh.x == 0 && wh.y == 0 && wh.z == 0)
             return {};
-
         wh = Normalize(wh);
-        Float frCosTheta_i = AbsDot(wi, FaceForward(wh, Vector3f(0, 0, 1)));
+
+        // Evaluate Fresnel factor _F_ for conductor BRDF
+        Float frCosTheta_i = AbsDot(wi, wh);
         SampledSpectrum F = FrConductor(frCosTheta_i, eta, k);
+
         return mfDistrib.D(wh) * mfDistrib.G(wo, wi) * F / (4 * cosTheta_i * cosTheta_o);
     }
 
     PBRT_CPU_GPU
     pstd::optional<BSDFSample> Sample_f(
-        Vector3f wo, Float uc, const Point2f &u, TransportMode mode,
+        Vector3f wo, Float uc, Point2f u, TransportMode mode,
         BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
         if (!(sampleFlags & BxDFReflTransFlags::Reflection))
             return {};
-        if (mfDistrib.EffectivelySpecular()) {
-            // Compute perfect specular reflection direction
+        if (mfDistrib.EffectivelySmooth()) {
+            // Sample perfectly specular conductor BRDF
             Vector3f wi(-wo.x, -wo.y, wo.z);
-
             SampledSpectrum f = FrConductor(AbsCosTheta(wi), eta, k) / AbsCosTheta(wi);
             return BSDFSample(f, wi, 1, BxDFFlags::SpecularReflection);
         }
-
+        // Sample Torrance--Sparow model for conductor BRDF
         // Sample microfacet orientation $\wh$ and reflected direction $\wi$
         if (wo.z == 0)
             return {};
@@ -590,13 +586,13 @@ class ConductorBxDF {
         // Compute PDF of _wi_ for microfacet reflection
         Float pdf = mfDistrib.PDF(wo, wh) / (4 * Dot(wo, wh));
 
-        // TODO: reuse fragments from f()
         Float cosTheta_o = AbsCosTheta(wo), cosTheta_i = AbsCosTheta(wi);
-        // Handle degenerate cases for microfacet reflection
         if (cosTheta_i == 0 || cosTheta_o == 0)
             return {};
-        Float frCosTheta_i = AbsDot(wi, FaceForward(wh, Vector3f(0, 0, 1)));
+        // Evaluate Fresnel factor _F_ for conductor BRDF
+        Float frCosTheta_i = AbsDot(wi, wh);
         SampledSpectrum F = FrConductor(frCosTheta_i, eta, k);
+
         SampledSpectrum f =
             mfDistrib.D(wh) * mfDistrib.G(wo, wi) * F / (4 * cosTheta_i * cosTheta_o);
         return BSDFSample(f, wi, pdf, BxDFFlags::GlossyReflection);
@@ -609,8 +605,9 @@ class ConductorBxDF {
             return 0;
         if (!SameHemisphere(wo, wi))
             return 0;
-        if (mfDistrib.EffectivelySpecular())
+        if (mfDistrib.EffectivelySmooth())
             return 0;
+        // Return PDF for sampling Torrance--Sparrow conductor BRDF
         Vector3f wh = wo + wi;
         CHECK_RARE(1e-6, LengthSquared(wh) == 0);
         CHECK_RARE(1e-6, Dot(wo, wh) < 0);
@@ -624,7 +621,6 @@ class ConductorBxDF {
     void Regularize() { mfDistrib.Regularize(); }
 
   private:
-    friend class SOA<ConductorBxDF>;
     // ConductorBxDF Private Members
     TrowbridgeReitzDistribution mfDistrib;
     SampledSpectrum eta, k;
@@ -1212,7 +1208,6 @@ class HairBxDF {
                                                  const SampledWavelengths &lambda);
 
   private:
-    friend class SOA<HairBxDF>;
     // HairBSDF Constants
     static constexpr int pMax = 3;
 
@@ -1316,7 +1311,6 @@ class MeasuredBxDF {
     BxDFFlags Flags() const { return (BxDFFlags::Reflection | BxDFFlags::Glossy); }
 
   private:
-    friend class SOA<MeasuredBxDF>;
     // MeasuredBxDF Private Methods
     PBRT_CPU_GPU
     static Float u2theta(Float u) { return Sqr(u) * (Pi / 2.f); }

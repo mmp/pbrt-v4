@@ -955,36 +955,34 @@ std::string BSSRDFAdapter::ToString() const {
 SampledSpectrum BxDFHandle::rho(Vector3f wo, pstd::span<const Float> uc,
                                 pstd::span<const Point2f> u2) const {
     if (wo.z == 0)
-        return SampledSpectrum(0.f);
+        return {};
     SampledSpectrum r(0.);
     DCHECK_EQ(uc.size(), u2.size());
     for (size_t i = 0; i < uc.size(); ++i) {
-        // Estimate one term of $\rho_\roman{hd}$
-        auto bs = Sample_f(wo, uc[i], u2[i], TransportMode::Radiance);
+        // Compute estimate of $\rho_\roman{hd}$
+        pstd::optional<BSDFSample> bs = Sample_f(wo, uc[i], u2[i]);
         if (bs)
             r += bs->f * AbsCosTheta(bs->wi) / bs->pdf;
     }
     return r / uc.size();
 }
 
-SampledSpectrum BxDFHandle::rho(pstd::span<const Float> uc1, pstd::span<const Point2f> u1,
-                                pstd::span<const Float> uc2,
+SampledSpectrum BxDFHandle::rho(pstd::span<const Point2f> u1, pstd::span<const Float> uc,
                                 pstd::span<const Point2f> u2) const {
-    DCHECK_EQ(uc1.size(), u1.size());
-    DCHECK_EQ(uc2.size(), u2.size());
+    DCHECK_EQ(uc.size(), u1.size());
     DCHECK_EQ(u1.size(), u2.size());
     SampledSpectrum r(0.f);
-    for (size_t i = 0; i < uc1.size(); ++i) {
-        // Estimate one term of $\rho_\roman{hh}$
+    for (size_t i = 0; i < uc.size(); ++i) {
+        // Compute estimate of of $\rho_\roman{hh}$
         Vector3f wo = SampleUniformHemisphere(u1[i]);
         if (wo.z == 0)
             continue;
         Float pdfo = UniformHemispherePDF();
-        auto bs = Sample_f(wo, uc2[i], u2[i], TransportMode::Radiance);
+        pstd::optional<BSDFSample> bs = Sample_f(wo, uc[i], u2[i]);
         if (bs)
             r += bs->f * AbsCosTheta(bs->wi) * AbsCosTheta(wo) / (pdfo * bs->pdf);
     }
-    return r / (Pi * u1.size());
+    return r / (Pi * uc.size());
 }
 
 std::string BxDFHandle::ToString() const {

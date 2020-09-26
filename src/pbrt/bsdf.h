@@ -37,11 +37,6 @@ class BSDF {
     Vector3f LocalToRender(const Vector3f &v) const { return shadingFrame.FromLocal(v); }
 
     PBRT_CPU_GPU
-    BxDFHandle GetBxDF() const { return bxdf; }
-    PBRT_CPU_GPU
-    void SetBxDF(BxDFHandle b) { bxdf = b; }
-
-    PBRT_CPU_GPU
     bool IsNonSpecular() const {
         return (bxdf.Flags() & (BxDFFlags::Diffuse | BxDFFlags::Glossy));
     }
@@ -66,19 +61,19 @@ class BSDF {
     }
 
     template <typename BxDF>
-    PBRT_CPU_GPU SampledSpectrum f(Vector3f woW, Vector3f wiW,
+    PBRT_CPU_GPU SampledSpectrum f(Vector3f woRender, Vector3f wiRender,
                                    TransportMode mode = TransportMode::Radiance) const {
-        Vector3f wi = RenderToLocal(wiW), wo = RenderToLocal(woW);
+        Vector3f wi = RenderToLocal(wiRender), wo = RenderToLocal(woRender);
         if (wo.z == 0)
             return {};
-        const BxDF *specificBxDF = bxdf.Cast<BxDF>();
+        const BxDF *specificBxDF = bxdf.CastOrNullptr<BxDF>();
         return specificBxDF->f(wo, wi, mode);
     }
 
     PBRT_CPU_GPU
-    SampledSpectrum rho(pstd::span<const Float> uc1, pstd::span<const Point2f> u1,
-                        pstd::span<const Float> uc2, pstd::span<const Point2f> u2) const {
-        return bxdf.rho(uc1, u1, uc2, u2);
+    SampledSpectrum rho(pstd::span<const Point2f> u1, pstd::span<const Float> uc,
+                        pstd::span<const Point2f> u2) const {
+        return bxdf.rho(u1, uc, u2);
     }
     PBRT_CPU_GPU
     SampledSpectrum rho(const Vector3f &woRender, pstd::span<const Float> uc,
@@ -95,6 +90,7 @@ class BSDF {
         Vector3f wo = RenderToLocal(woRender);
         if (wo.z == 0 || !(bxdf.Flags() & sampleFlags))
             return {};
+        // Sample _bxdf_ and return _BSDFSample_
         pstd::optional<BSDFSample> bs = bxdf.Sample_f(wo, u, u2, mode, sampleFlags);
         if (bs)
             DCHECK_GE(bs->pdf, 0);
@@ -106,9 +102,7 @@ class BSDF {
                  wo.x, wo.y, wo.z, ng.x, ng.y, ng.z, shadingFrame.z.x, shadingFrame.z.y,
                  shadingFrame.z.z, bs->f[0], bs->f[1], bs->f[2], bs->f[3], bs->pdf,
                  (bs->pdf > 0) ? (bs->f[0] / bs->pdf) : 0, bs->wi.x, bs->wi.y, bs->wi.z);
-
         bs->wi = LocalToRender(bs->wi);
-
         return bs;
     }
 
@@ -137,9 +131,9 @@ class BSDF {
 
         pstd::optional<BSDFSample> bs =
             specificBxDF->Sample_f(wo, u, u2, mode, sampleFlags);
-        if (!bs || !bs->f)
+        if (!bs || !bs->f || bs->pdf == 0 || bs->wi.z == 0)
             return {};
-        CHECK_GT(bs->pdf, 0);
+        DCHECK_GT(bs->pdf, 0);
 
         PBRT_DBG("For wo = (%f, %f, %f), ng %f %f %f ns %f %f %f "
                  "sampled f = %f %f %f %f, pdf = %f, ratio[0] = %f "
@@ -176,8 +170,8 @@ class BSDF {
   private:
     // BSDF Private Members
     BxDFHandle bxdf;
-    Frame shadingFrame;
     Normal3f ng;
+    Frame shadingFrame;
 };
 
 }  // namespace pbrt

@@ -43,30 +43,6 @@ inline Float HenyeyGreenstein(Float cosTheta, Float g) {
 }
 
 // Fresnel Inline Functions
-PBRT_CPU_GPU
-inline Float FrDielectric(Float cosTheta_i, Float eta) {
-    cosTheta_i = Clamp(cosTheta_i, -1, 1);
-    // Potentially swap indices of refraction
-    bool entering = cosTheta_i > 0.f;
-    if (!entering) {
-        eta = 1 / eta;
-        cosTheta_i = std::abs(cosTheta_i);
-    }
-
-    // Compute _cosThetaT_ using Snell's law
-    Float sinTheta_i = SafeSqrt(1 - cosTheta_i * cosTheta_i);
-    Float sinTheta_t = sinTheta_i / eta;
-    // Handle total internal reflection
-    if (sinTheta_t >= 1)
-        return 1;
-
-    Float cosTheta_t = SafeSqrt(1 - sinTheta_t * sinTheta_t);
-
-    Float r_parl = (eta * cosTheta_i - cosTheta_t) / (eta * cosTheta_i + cosTheta_t);
-    Float r_perp = (cosTheta_i - eta * cosTheta_t) / (cosTheta_i + eta * cosTheta_t);
-    return (r_parl * r_parl + r_perp * r_perp) / 2;
-}
-
 // https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/
 PBRT_CPU_GPU
 inline SampledSpectrum FrConductor(Float cosTheta_i, const SampledSpectrum &eta,
@@ -95,62 +71,45 @@ inline SampledSpectrum FrConductor(Float cosTheta_i, const SampledSpectrum &eta,
 }
 
 PBRT_CPU_GPU
+inline Float FrDielectric(Float cosTheta_i, Float eta) {
+    cosTheta_i = Clamp(cosTheta_i, -1, 1);
+    // Potentially swap indices of refraction
+    bool entering = cosTheta_i > 0;
+    if (!entering) {
+        eta = 1 / eta;
+        cosTheta_i = std::abs(cosTheta_i);
+    }
+
+    // Compute _cosTheta_t_ using Snell's law
+    Float sinTheta_i = SafeSqrt(1 - cosTheta_i * cosTheta_i);
+    Float sinTheta_t = sinTheta_i / eta;
+    // Handle total internal reflection
+    if (sinTheta_t >= 1)
+        return 1;
+
+    Float cosTheta_t = SafeSqrt(1 - sinTheta_t * sinTheta_t);
+
+    Float r_parl = (eta * cosTheta_i - cosTheta_t) / (eta * cosTheta_i + cosTheta_t);
+    Float r_perp = (cosTheta_i - eta * cosTheta_t) / (cosTheta_i + eta * cosTheta_t);
+    return (r_parl * r_parl + r_perp * r_perp) / 2;
+}
+
+PBRT_CPU_GPU
 Float FresnelMoment1(Float invEta);
 PBRT_CPU_GPU
 Float FresnelMoment2(Float invEta);
-
-// FresnelConductor Definition
-class FresnelConductor {
-  public:
-    // FresnelConductor Public Methods
-    PBRT_CPU_GPU
-    FresnelConductor(const SampledSpectrum &eta, const SampledSpectrum &k)
-        : eta(eta), k(k) {}
-
-    PBRT_CPU_GPU
-    SampledSpectrum Evaluate(Float cosTheta_i) const {
-        return FrConductor(std::abs(cosTheta_i), eta, k);
-    }
-
-    std::string ToString() const;
-
-  private:
-    SampledSpectrum eta, k;
-};
-
-// FresnelDielectric Definition
-class FresnelDielectric {
-  public:
-    // FresnelDielectric Public Methods
-    PBRT_CPU_GPU
-    FresnelDielectric(Float eta, bool opaque = false) : eta(eta), opaque(opaque) {}
-
-    PBRT_CPU_GPU
-    SampledSpectrum Evaluate(Float cosTheta_i) const {
-        if (opaque)
-            cosTheta_i = std::abs(cosTheta_i);
-        return SampledSpectrum(FrDielectric(cosTheta_i, eta));
-    }
-
-    std::string ToString() const;
-
-  private:
-    Float eta;
-    bool opaque;
-};
 
 // TrowbridgeReitzDistribution Definition
 class TrowbridgeReitzDistribution {
   public:
     // TrowbridgeReitzDistribution Public Methods
-    PBRT_CPU_GPU
-    static inline Float RoughnessToAlpha(Float roughness) { return std::sqrt(roughness); }
-
     TrowbridgeReitzDistribution() = default;
     PBRT_CPU_GPU
     TrowbridgeReitzDistribution(Float alpha_x, Float alpha_y)
-        : alpha_x(std::max<Float>(1e-4, alpha_x)),
-          alpha_y(std::max<Float>(1e-4, alpha_y)) {}
+        : alpha_x(alpha_x), alpha_y(alpha_y) {}
+
+    PBRT_CPU_GPU
+    static Float RoughnessToAlpha(Float roughness) { return std::sqrt(roughness); }
 
     PBRT_CPU_GPU inline Float D(const Vector3f &wm) const {
         Float tan2Theta = Tan2Theta(wm);
@@ -160,12 +119,12 @@ class TrowbridgeReitzDistribution {
         if (cos4Theta < 1e-16f)
             return 0;
         Float e =
-            (Sqr(CosPhi(wm)) / Sqr(alpha_x) + Sqr(SinPhi(wm)) / Sqr(alpha_y)) * tan2Theta;
+            tan2Theta * (Sqr(CosPhi(wm)) / Sqr(alpha_x) + Sqr(SinPhi(wm)) / Sqr(alpha_y));
         return 1 / (Pi * alpha_x * alpha_y * cos4Theta * Sqr(1 + e));
     }
 
     PBRT_CPU_GPU
-    bool EffectivelySpecular() const { return std::min(alpha_x, alpha_y) < 1e-3f; }
+    bool EffectivelySmooth() const { return std::min(alpha_x, alpha_y) < 1e-3f; }
 
     PBRT_CPU_GPU
     Float G1(const Vector3f &w) const { return 1 / (1 + Lambda(w)); }
@@ -176,9 +135,9 @@ class TrowbridgeReitzDistribution {
         if (IsInf(tan2Theta))
             return 0.;
         // Compute _alpha2_ for direction _w_
-        Float alpha2 = Sqr(CosPhi(w)) * Sqr(alpha_x) + Sqr(SinPhi(w)) * Sqr(alpha_y);
+        Float alpha2 = Sqr(CosPhi(w) * alpha_x) + Sqr(SinPhi(w) * alpha_y);
 
-        return (-1 + std::sqrt(1.f + alpha2 * tan2Theta)) / 2;
+        return (-1 + std::sqrt(1 + alpha2 * tan2Theta)) / 2;
     }
 
     PBRT_CPU_GPU
@@ -187,7 +146,7 @@ class TrowbridgeReitzDistribution {
     }
 
     PBRT_CPU_GPU
-    Vector3f Sample_wm(const Point2f &u) const {
+    Vector3f Sample_wm(Point2f u) const {
         return SampleTrowbridgeReitz(alpha_x, alpha_y, u);
     }
 
@@ -197,21 +156,19 @@ class TrowbridgeReitzDistribution {
     }
 
     PBRT_CPU_GPU
-    Float PDF(const Vector3f &wo, const Vector3f &wm) const {
-        return D(wm) * G1(wo) * AbsDot(wo, wm) / AbsCosTheta(wo);
-    }
-
-    PBRT_CPU_GPU
-    Vector3f Sample_wm(const Vector3f &wo, const Point2f &u) const {
+    Vector3f Sample_wm(Vector3f wo, Point2f u) const {
         bool flip = wo.z < 0;
         Vector3f wm =
             SampleTrowbridgeReitzVisibleArea(flip ? -wo : wo, alpha_x, alpha_y, u);
-        if (flip)
-            wm = -wm;
-        return wm;
+        return flip ? -wm : wm;
     }
 
     std::string ToString() const;
+
+    PBRT_CPU_GPU
+    Float PDF(Vector3f wo, Vector3f wm) const {
+        return D(wm) * G1(wo) * AbsDot(wo, wm) / AbsCosTheta(wo);
+    }
 
     PBRT_CPU_GPU
     void Regularize() {
@@ -220,7 +177,6 @@ class TrowbridgeReitzDistribution {
     }
 
   private:
-    friend class SOA<TrowbridgeReitzDistribution>;
     // TrowbridgeReitzDistribution Private Members
     Float alpha_x, alpha_y;
 };

@@ -170,7 +170,8 @@ class BxDFHandle : public TaggedPointer<IdealDiffuseBxDF, DiffuseBxDF, CoatedDif
     std::string ToString() const;
 
     PBRT_CPU_GPU inline pstd::optional<BSDFSample> Sample_f(
-        Vector3f wo, Float uc, const Point2f &u, TransportMode mode,
+        Vector3f wo, Float uc, const Point2f &u,
+        TransportMode mode = TransportMode::Radiance,
         BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const;
 
     PBRT_CPU_GPU inline Float PDF(
@@ -180,8 +181,8 @@ class BxDFHandle : public TaggedPointer<IdealDiffuseBxDF, DiffuseBxDF, CoatedDif
     PBRT_CPU_GPU
     SampledSpectrum rho(Vector3f wo, pstd::span<const Float> uc,
                         pstd::span<const Point2f> u2) const;
-    SampledSpectrum rho(pstd::span<const Float> uc1, pstd::span<const Point2f> u1,
-                        pstd::span<const Float> uc2, pstd::span<const Point2f> u2) const;
+    SampledSpectrum rho(pstd::span<const Point2f> u1, pstd::span<const Float> uc2,
+                        pstd::span<const Point2f> u2) const;
 
     PBRT_CPU_GPU inline void Regularize();
 };

@@ -464,13 +464,17 @@ inline Float InvertTentSample(Float x, Float radius) {
         return 0.5f + InvertLinearSample(x / radius, 1, 0) / 2;
 }
 
-PBRT_CPU_GPU
-inline Vector3f SampleTrowbridgeReitz(Float alpha_x, Float alpha_y, const Point2f &u) {
-    Float cosTheta = 0, phi = (2 * Pi) * u[1];
+PBRT_CPU_GPU inline Vector3f SampleTrowbridgeReitz(Float alpha_x, Float alpha_y,
+                                                   Point2f u) {
+    Float cosTheta, phi;
     if (alpha_x == alpha_y) {
+        // Sample $\cos \theta$ for isotropic Trowbridge--Reitz distribution
         Float tanTheta2 = alpha_x * alpha_x * u[0] / (1 - u[0]);
         cosTheta = 1 / std::sqrt(1 + tanTheta2);
+        phi = 2 * Pi * u[1];
+
     } else {
+        // Sample $\cos \theta$ for anisotropic Trowbridge--Reitz distribution
         phi = std::atan(alpha_y / alpha_x * std::tan(2 * Pi * u[1] + .5f * Pi));
         if (u[1] > .5f)
             phi += Pi;
@@ -484,31 +488,26 @@ inline Vector3f SampleTrowbridgeReitz(Float alpha_x, Float alpha_y, const Point2
 }
 
 // Via Eric Heitz's jcgt sample code...
-PBRT_CPU_GPU
-inline Vector3f SampleTrowbridgeReitzVisibleArea(const Vector3f &w, Float alpha_x,
-                                                 Float alpha_y, const Point2f &u) {
-    // Section 3.2: transforming the view direction to the hemisphere
-    // configuration
+PBRT_CPU_GPU inline Vector3f SampleTrowbridgeReitzVisibleArea(Vector3f w, Float alpha_x,
+                                                              Float alpha_y, Point2f u) {
+    // Transform _w_ to hemispherical configuration for visible area sampling
     Vector3f wh = Normalize(Vector3f(alpha_x * w.x, alpha_y * w.y, w.z));
 
-    // Section 4.1: orthonormal basis. Can't use CoordinateSystem() since
-    // T1 has to be in the tangent plane w.r.t. (0,0,1).
+    // Find orthonormal basis for visible area microfacet sampling
     Vector3f T1 =
         (wh.z < 0.99999f) ? Normalize(Cross(Vector3f(0, 0, 1), wh)) : Vector3f(1, 0, 0);
     Vector3f T2 = Cross(wh, T1);
 
-    // Section 4.2: parameterization of the projected area
+    // Sample parameterization of projected microfacet area
     Float r = std::sqrt(u[0]);
     Float phi = 2 * Pi * u[1];
     Float t1 = r * std::cos(phi), t2 = r * std::sin(phi);
     Float s = 0.5f * (1 + wh.z);
     t2 = (1 - s) * std::sqrt(1 - t1 * t1) + s * t2;
 
-    // Section 4.3: reprojection onto hemisphere
+    // Reproject to hemisphere and transform normal to ellipsoid configuration
     Vector3f nh =
         t1 * T1 + t2 * T2 + std::sqrt(std::max<Float>(0, 1 - t1 * t1 - t2 * t2)) * wh;
-
-    // Section 3.4: transforming the normal back to the ellipsoid configuration
     CHECK_RARE(1e-6, nh.z == 0);
     return Normalize(
         Vector3f(alpha_x * nh.x, alpha_y * nh.y, std::max<Float>(1e-6f, nh.z)));
