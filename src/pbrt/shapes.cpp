@@ -581,10 +581,13 @@ bool Curve::IntersectRay(const Ray &r, Float tMax,
                                   std::abs(cp[i].y - 2 * cp[i + 1].y + cp[i + 2].y)),
                          std::abs(cp[i].z - 2 * cp[i + 1].z + cp[i + 2].z)));
 
-    Float eps = std::max(common->width[0], common->width[1]) * .05f;  // width / 20
-    // Compute log base 4 by dividing log2 in half.
-    int r0 = Log2Int(1.41421356237f * 6.f * L0 / (8.f * eps)) / 2;
-    int maxDepth = Clamp(r0, 0, 10);
+    int maxDepth = 0;
+    if (L0 > 0) {
+        Float eps = std::max(common->width[0], common->width[1]) * .05f;  // width / 20
+        // Compute log base 4 by dividing log2 in half.
+        int r0 = Log2Int(1.41421356237f * 6.f * L0 / (8.f * eps)) / 2;
+        maxDepth = Clamp(r0, 0, 10);
+    }
 
     // Recursively test for ray--curve intersection
     pstd::span<const Point3f> cpSpan(cp);
