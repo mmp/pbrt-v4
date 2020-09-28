@@ -67,7 +67,7 @@ pstd::optional<CameraRayDifferential> CameraHandle::GenerateRayDifferential(
     return Dispatch(gen);
 }
 
-void CameraHandle::ApproximatedPdxy(const SurfaceInteraction &si) const {
+void CameraHandle::ApproximatedPdxy(SurfaceInteraction &si) const {
     auto approx = [&](auto ptr) { return ptr->ApproximatedPdxy(si); };
     return Dispatch(approx);
 }
@@ -156,7 +156,7 @@ pstd::optional<CameraRayDifferential> CameraBase::GenerateRayDifferential(
     return CameraRayDifferential{rd, cr->weight};
 }
 
-void CameraBase::ApproximatedPdxy(const SurfaceInteraction &si) const {
+void CameraBase::ApproximatedPdxy(SurfaceInteraction &si) const {
     Point3f pc = CameraFromRender(si.p(), si.time);
     Float dist = Distance(pc, Point3f(0, 0, 0));
 
@@ -170,10 +170,6 @@ void CameraBase::ApproximatedPdxy(const SurfaceInteraction &si) const {
     si.dpdx = .5f * f.FromLocal(minPosDifferentialX + tx * minDirDifferentialX);
     Float ty = (dist - minPosDifferentialY.z) / (1 + minDirDifferentialY.z);
     si.dpdy = .5f * f.FromLocal(minPosDifferentialY + ty * minDirDifferentialY);
-}
-
-void CameraBase::InitMetadata(ImageMetadata *metadata) const {
-    metadata->cameraFromWorld = cameraTransform.CameraFromWorld(shutterOpen).GetMatrix();
 }
 
 void CameraBase::FindMinimumDifferentials(CameraHandle camera) {
@@ -222,6 +218,10 @@ void CameraBase::FindMinimumDifferentials(CameraHandle camera) {
                 minPosDifferentialY);
     LOG_VERBOSE("Camera min dir differentials: %s, %s", minDirDifferentialX,
                 minDirDifferentialY);
+}
+
+void CameraBase::InitMetadata(ImageMetadata *metadata) const {
+    metadata->cameraFromWorld = cameraTransform.CameraFromWorld(shutterOpen).GetMatrix();
 }
 
 std::string CameraBase::ToString() const {

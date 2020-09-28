@@ -135,7 +135,7 @@ class CameraBase {
     Float SampleTime(Float u) const { return Lerp(u, shutterOpen, shutterClose); }
 
     PBRT_CPU_GPU
-    void ApproximatedPdxy(const SurfaceInteraction &si) const;
+    void ApproximatedPdxy(SurfaceInteraction &si) const;
     void InitMetadata(ImageMetadata *metadata) const;
     std::string ToString() const;
 

@@ -84,7 +84,7 @@ class BSDF {
 
     PBRT_CPU_GPU
     pstd::optional<BSDFSample> Sample_f(
-        Vector3f woRender, Float u, const Point2f &u2,
+        Vector3f woRender, Float u, Point2f u2,
         TransportMode mode = TransportMode::Radiance,
         BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
         Vector3f wo = RenderToLocal(woRender);
@@ -118,7 +118,7 @@ class BSDF {
 
     template <typename BxDF>
     PBRT_CPU_GPU pstd::optional<BSDFSample> Sample_f(
-        Vector3f woRender, Float u, const Point2f &u2,
+        Vector3f woRender, Float u, Point2f u2,
         TransportMode mode = TransportMode::Radiance,
         BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
         Vector3f wo = RenderToLocal(woRender);

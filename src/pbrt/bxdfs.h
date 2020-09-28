@@ -43,7 +43,7 @@ class IdealDiffuseBxDF {
 
     PBRT_CPU_GPU
     pstd::optional<BSDFSample> Sample_f(
-        Vector3f wo, Float uc, const Point2f &u, TransportMode mode,
+        Vector3f wo, Float uc, Point2f u, TransportMode mode,
         BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
         if (!(sampleFlags & BxDFReflTransFlags::Reflection))
             return {};
@@ -135,13 +135,12 @@ class DiffuseBxDF {
             return {};
 
         // Randomly sample diffuse BSDF reflection or transmission
-        Float cpdf;
-        if (SampleDiscrete({pr, pt}, uc, &cpdf) == 0) {
+        if (uc < pr / (pr + pt)) {
             // Sample diffuse BSDF reflection
             Vector3f wi = SampleCosineHemisphere(u);
             if (wo.z < 0)
                 wi.z *= -1;
-            Float pdf = CosineHemispherePDF(AbsCosTheta(wi)) * cpdf;
+            Float pdf = CosineHemispherePDF(AbsCosTheta(wi)) * pr / (pr + pt);
             return BSDFSample(f(wo, wi, mode), wi, pdf, BxDFFlags::DiffuseReflection);
 
         } else {
@@ -149,7 +148,7 @@ class DiffuseBxDF {
             Vector3f wi = SampleCosineHemisphere(u);
             if (wo.z > 0)
                 wi.z *= -1;
-            Float pdf = CosineHemispherePDF(AbsCosTheta(wi)) * cpdf;
+            Float pdf = CosineHemispherePDF(AbsCosTheta(wi)) * pt / (pr + pt);
             return BSDFSample(f(wo, wi, mode), wi, pdf, BxDFFlags::DiffuseTransmission);
         }
     }
@@ -203,9 +202,8 @@ class DielectricInterfaceBxDF {
 
     PBRT_CPU_GPU
     BxDFFlags Flags() const {
-        return BxDFFlags(BxDFFlags::Reflection | BxDFFlags::Transmission |
-                         BxDFFlags(mfDistrib.EffectivelySmooth() ? BxDFFlags::Specular
-                                                                 : BxDFFlags::Glossy));
+        return BxDFFlags::Reflection | BxDFFlags::Transmission |
+               (mfDistrib.EffectivelySmooth() ? BxDFFlags::Specular : BxDFFlags::Glossy);
     }
 
     PBRT_CPU_GPU
@@ -239,10 +237,11 @@ class DielectricInterfaceBxDF {
                 return {};
             wh = FaceForward(Normalize(wh), Normal3f(0, 0, 1));
 
-            // both on same side?
+            // Return no transmission if _wi_ and _wo_ are on the same side of _wh_
             if (Dot(wi, wh) * Dot(wo, wh) > 0)
                 return {};
 
+            // Evaluate BTDF for transmission through microfacet interface
             Float F = FrDielectric(Dot(wo, wh), eta);
             Float sqrtDenom = Dot(wo, wh) + etap * Dot(wi, wh);
             Float factor = (mode == TransportMode::Radiance) ? Sqr(1 / etap) : 1;
@@ -255,11 +254,8 @@ class DielectricInterfaceBxDF {
 
     PBRT_CPU_GPU
     pstd::optional<BSDFSample> Sample_f(
-        Vector3f wo, Float uc, const Point2f &u, TransportMode mode,
+        Vector3f wo, Float uc, Point2f u, TransportMode mode,
         BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
-        if (wo.z == 0)
-            return {};
-
         if (mfDistrib.EffectivelySmooth()) {
             // Sample delta dielectric interface
             Float R = FrDielectric(CosTheta(wo), eta), T = 1 - R;
@@ -325,14 +321,13 @@ class DielectricInterfaceBxDF {
                 CHECK_RARE(1e-6, Dot(wo, wh) <= 0);
                 if (!SameHemisphere(wo, wi) || Dot(wo, wh) <= 0)
                     return {};
-
-                // Compute PDF of _wi_ for microfacet reflection
+                // Compute PDF of direction $\wi$ for microfacet reflection
                 Float pdf = mfDistrib.PDF(wo, wh) / (4 * Dot(wo, wh)) * pr / (pr + pt);
                 CHECK(!IsNaN(pdf));
 
-                // TODO: reuse fragments from f()
+                // Evaluate BRDF and return _BSDFSample_ for dielectric microfacet
+                // reflection
                 Float cosTheta_o = AbsCosTheta(wo), cosTheta_i = AbsCosTheta(wi);
-                // Handle degenerate cases for microfacet reflection
                 if (cosTheta_i == 0 || cosTheta_o == 0)
                     return {};
                 SampledSpectrum f(mfDistrib.D(wh) * mfDistrib.G(wo, wi) * F /
@@ -341,8 +336,6 @@ class DielectricInterfaceBxDF {
 
             } else {
                 // Sample transmission at non-delta dielectric interface
-                // FIXME (make consistent): this etap is 1/etap as used in
-                // specular...
                 Float etap = CosTheta(wo) > 0 ? eta : (1 / eta);
                 Vector3f wi;
                 bool tir = !Refract(wo, (Normal3f)wh, etap, &wi);
@@ -353,7 +346,6 @@ class DielectricInterfaceBxDF {
                     return {};
 
                 // Evaluate BSDF
-                // TODO: share fragments with f(), PDF()...
                 wh = FaceForward(wh, Normal3f(0, 0, 1));
 
                 Float sqrtDenom = Dot(wo, wh) + etap * Dot(wi, wh);
@@ -365,7 +357,6 @@ class DielectricInterfaceBxDF {
                              AbsDot(wo, wh) /
                              (AbsCosTheta(wi) * AbsCosTheta(wo) * Sqr(sqrtDenom))));
 
-                // Compute PDF
                 Float dwh_dwi =
                     /*Sqr(etap) * */ AbsDot(wi, wh) /
                     Sqr(Dot(wo, wh) + etap * Dot(wi, wh));
@@ -384,17 +375,18 @@ class DielectricInterfaceBxDF {
             return 0;
         // Return PDF for non-delta dielectric interface
         if (SameHemisphere(wo, wi)) {
+            // Return PDF for non-delta dielectric reflection
             if (!(sampleFlags & BxDFReflTransFlags::Reflection))
                 return 0;
-
+            // Compute half-angle vector _wh_ for dielectric reflection PDF
             Vector3f wh = wo + wi;
             CHECK_RARE(1e-6, LengthSquared(wh) == 0);
             CHECK_RARE(1e-6, Dot(wo, wh) < 0);
             if (LengthSquared(wh) == 0 || Dot(wo, wh) <= 0)
                 return 0;
-
             wh = Normalize(wh);
 
+            // Compute Fresnel factor and probabilities for dielectric reflection PDF
             Float F = FrDielectric(Dot(wi, FaceForward(wh, Vector3f(0, 0, 1))), eta);
             CHECK_RARE(1e-6, F == 0);
             Float pr = F, pt = 1 - F;
@@ -402,33 +394,31 @@ class DielectricInterfaceBxDF {
                 pt = 0;
 
             return mfDistrib.PDF(wo, wh) / (4 * Dot(wo, wh)) * pr / (pr + pt);
+
         } else {
+            // Return PDF for non-delta dielectric transmission
             if (!(sampleFlags & BxDFReflTransFlags::Transmission))
                 return 0;
-            // Compute $\wh$ from $\wo$ and $\wi$ for microfacet transmission
+            // Compute $\wh$ for dielectric transmission PDF
             Float etap = CosTheta(wo) > 0 ? eta : (1 / eta);
             Vector3f wh = wo + wi * etap;
             CHECK_RARE(1e-6, LengthSquared(wh) == 0);
             if (LengthSquared(wh) == 0)
                 return 0;
             wh = Normalize(wh);
-
-            // both on same side?
             if (Dot(wi, wh) * Dot(wo, wh) > 0)
                 return 0.;
 
+            // Compute Fresnel factor and probabilities for dielectric transmission PDF
             Float F = FrDielectric(Dot(wo, FaceForward(wh, Normal3f(0, 0, 1))), eta);
             Float pr = F, pt = 1 - F;
             if (pt == 0)
                 return 0;
+            CHECK_RARE(1e-6, (1 - F) == 0);
             if (!(sampleFlags & BxDFReflTransFlags::Reflection))
                 pr = 0;
 
-            // Compute change of variables _dwh\_dwi_ for microfacet
-            // transmission
-            Float dwh_dwi =
-                /*Sqr(etap) * */ AbsDot(wi, wh) / Sqr(Dot(wo, wh) + etap * Dot(wi, wh));
-            CHECK_RARE(1e-6, (1 - F) == 0);
+            Float dwh_dwi = AbsDot(wi, wh) / Sqr(Dot(wo, wh) + etap * Dot(wi, wh));
             return mfDistrib.PDF(wo, wh) * dwh_dwi * pt / (pr + pt);
         }
     }
@@ -450,7 +440,7 @@ class DielectricInterfaceBxDF {
 // ThinDielectricBxDF Definition
 class ThinDielectricBxDF {
   public:
-    // ThinDielectric Public Methods
+    // ThinDielectricBxDF Public Methods
     ThinDielectricBxDF() = default;
     PBRT_CPU_GPU
     ThinDielectricBxDF(Float eta) : eta(eta) {}
@@ -461,7 +451,7 @@ class ThinDielectricBxDF {
     }
 
     PBRT_CPU_GPU
-    pstd::optional<BSDFSample> Sample_f(Vector3f wo, Float uc, const Point2f &u,
+    pstd::optional<BSDFSample> Sample_f(Vector3f wo, Float uc, Point2f u,
                                         TransportMode mode,
                                         BxDFReflTransFlags sampleFlags) const {
         Float R = FrDielectric(CosTheta(wo), eta), T = 1 - R;
@@ -1184,7 +1174,7 @@ class HairBxDF {
     PBRT_CPU_GPU
     SampledSpectrum f(Vector3f wo, Vector3f wi, TransportMode mode) const;
     PBRT_CPU_GPU
-    pstd::optional<BSDFSample> Sample_f(Vector3f wo, Float uc, const Point2f &u,
+    pstd::optional<BSDFSample> Sample_f(Vector3f wo, Float uc, Point2f u,
                                         TransportMode mode,
                                         BxDFReflTransFlags sampleFlags) const;
     PBRT_CPU_GPU
@@ -1292,7 +1282,7 @@ class MeasuredBxDF {
     SampledSpectrum f(Vector3f wo, Vector3f wi, TransportMode mode) const;
 
     PBRT_CPU_GPU
-    pstd::optional<BSDFSample> Sample_f(Vector3f wo, Float uc, const Point2f &u,
+    pstd::optional<BSDFSample> Sample_f(Vector3f wo, Float uc, Point2f u,
                                         TransportMode mode,
                                         BxDFReflTransFlags sampleFlags) const;
     PBRT_CPU_GPU
@@ -1396,7 +1386,7 @@ inline SampledSpectrum BxDFHandle::f(Vector3f wo, Vector3f wi, TransportMode mod
 }
 
 inline pstd::optional<BSDFSample> BxDFHandle::Sample_f(
-    Vector3f wo, Float uc, const Point2f &u, TransportMode mode,
+    Vector3f wo, Float uc, Point2f u, TransportMode mode,
     BxDFReflTransFlags sampleFlags) const {
     auto sample_f = [&](auto ptr) -> pstd::optional<BSDFSample> {
         return ptr->Sample_f(wo, uc, u, mode, sampleFlags);

@@ -39,49 +39,8 @@ std::string MediumInteraction::ToString() const {
 }
 
 // SurfaceInteraction Method Definitions
-BSDF SurfaceInteraction::GetBSDF(const RayDifferential &ray, SampledWavelengths &lambda,
-                                 CameraHandle camera, ScratchBuffer &scratchBuffer,
-                                 SamplerHandle sampler) {
-    ComputeDifferentials(ray, camera);
-    while (material.Is<MixMaterial>()) {
-        MixMaterial *mix = material.CastOrNullptr<MixMaterial>();
-        material = mix->ChooseMaterial(UniversalTextureEvaluator(), *this);
-    }
-    if (!material)
-        return {};
-    // Evaluate bump map and compute shading normal
-    FloatTextureHandle displacement = material.GetDisplacement();
-    if (displacement) {
-        Vector3f dpdu, dpdv;
-        Bump(UniversalTextureEvaluator(), displacement, *this, &dpdu, &dpdv);
-        SetShadingGeometry(Normal3f(Normalize(Cross(dpdu, dpdv))), dpdu, dpdv,
-                           shading.dndu, shading.dndv, false);
-    }
-
-    // Return BSDF for surface interaction
-    BSDF bsdf =
-        material.GetBSDF(UniversalTextureEvaluator(), *this, lambda, scratchBuffer);
-    if (bsdf && GetOptions().forceDiffuse) {
-        SampledSpectrum r = bsdf.rho(wo, {sampler.Get1D()}, {sampler.Get2D()});
-        bsdf = BSDF(wo, n, shading.n, shading.dpdu,
-                    scratchBuffer.Alloc<IdealDiffuseBxDF>(r), bsdf.eta);
-    }
-    return bsdf;
-}
-
-BSSRDFHandle SurfaceInteraction::GetBSSRDF(const RayDifferential &ray,
-                                           SampledWavelengths &lambda,
-                                           CameraHandle camera,
-                                           ScratchBuffer &scratchBuffer) {
-    while (material.Is<MixMaterial>()) {
-        MixMaterial *mix = material.CastOrNullptr<MixMaterial>();
-        material = mix->ChooseMaterial(UniversalTextureEvaluator(), *this);
-    }
-    return material.GetBSSRDF(UniversalTextureEvaluator(), *this, lambda, scratchBuffer);
-}
-
 void SurfaceInteraction::ComputeDifferentials(const RayDifferential &ray,
-                                              CameraHandle camera) const {
+                                              CameraHandle camera) {
     if (ray.hasDifferentials && Dot(n, ray.rxDirection) != 0 &&
         Dot(n, ray.ryDirection) != 0) {
         // Estimate screen-space change in $\pt{}$
@@ -193,6 +152,47 @@ void SurfaceInteraction::SkipIntersection(RayDifferential *ray, Float t) const {
         ray->rxOrigin = ray->rxOrigin + t * ray->rxDirection;
         ray->ryOrigin = ray->ryOrigin + t * ray->ryDirection;
     }
+}
+
+BSDF SurfaceInteraction::GetBSDF(const RayDifferential &ray, SampledWavelengths &lambda,
+                                 CameraHandle camera, ScratchBuffer &scratchBuffer,
+                                 SamplerHandle sampler) {
+    ComputeDifferentials(ray, camera);
+    while (material.Is<MixMaterial>()) {
+        MixMaterial *mix = material.CastOrNullptr<MixMaterial>();
+        material = mix->ChooseMaterial(UniversalTextureEvaluator(), *this);
+    }
+    if (!material)
+        return {};
+    // Evaluate bump map and compute shading normal
+    FloatTextureHandle displacement = material.GetDisplacement();
+    if (displacement) {
+        Vector3f dpdu, dpdv;
+        Bump(UniversalTextureEvaluator(), displacement, *this, &dpdu, &dpdv);
+        SetShadingGeometry(Normal3f(Normalize(Cross(dpdu, dpdv))), dpdu, dpdv,
+                           shading.dndu, shading.dndv, false);
+    }
+
+    // Return BSDF for surface interaction
+    BSDF bsdf =
+        material.GetBSDF(UniversalTextureEvaluator(), *this, lambda, scratchBuffer);
+    if (bsdf && GetOptions().forceDiffuse) {
+        SampledSpectrum r = bsdf.rho(wo, {sampler.Get1D()}, {sampler.Get2D()});
+        bsdf = BSDF(wo, n, shading.n, shading.dpdu,
+                    scratchBuffer.Alloc<IdealDiffuseBxDF>(r), bsdf.eta);
+    }
+    return bsdf;
+}
+
+BSSRDFHandle SurfaceInteraction::GetBSSRDF(const RayDifferential &ray,
+                                           SampledWavelengths &lambda,
+                                           CameraHandle camera,
+                                           ScratchBuffer &scratchBuffer) {
+    while (material.Is<MixMaterial>()) {
+        MixMaterial *mix = material.CastOrNullptr<MixMaterial>();
+        material = mix->ChooseMaterial(UniversalTextureEvaluator(), *this);
+    }
+    return material.GetBSSRDF(UniversalTextureEvaluator(), *this, lambda, scratchBuffer);
 }
 
 SampledSpectrum SurfaceInteraction::Le(const Vector3f &w,

@@ -170,8 +170,7 @@ class BxDFHandle : public TaggedPointer<IdealDiffuseBxDF, DiffuseBxDF, CoatedDif
     std::string ToString() const;
 
     PBRT_CPU_GPU inline pstd::optional<BSDFSample> Sample_f(
-        Vector3f wo, Float uc, const Point2f &u,
-        TransportMode mode = TransportMode::Radiance,
+        Vector3f wo, Float uc, Point2f u, TransportMode mode = TransportMode::Radiance,
         BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const;
 
     PBRT_CPU_GPU inline Float PDF(

@@ -214,7 +214,7 @@ pstd::array<Float, HairBxDF::pMax + 1> HairBxDF::ComputeApPDF(Float cosTheta_o) 
     return apPDF;
 }
 
-pstd::optional<BSDFSample> HairBxDF::Sample_f(Vector3f wo, Float uc, const Point2f &u,
+pstd::optional<BSDFSample> HairBxDF::Sample_f(Vector3f wo, Float uc, Point2f u,
                                               TransportMode mode,
                                               BxDFReflTransFlags sampleFlags) const {
     // Compute hair coordinate system terms related to _wo_
@@ -850,7 +850,7 @@ SampledSpectrum MeasuredBxDF::f(Vector3f wo, Vector3f wi, TransportMode mode) co
            (4 * brdf->sigma.Evaluate(u_wi, params) * AbsCosTheta(wi));
 }
 
-pstd::optional<BSDFSample> MeasuredBxDF::Sample_f(Vector3f wo, Float uc, const Point2f &u,
+pstd::optional<BSDFSample> MeasuredBxDF::Sample_f(Vector3f wo, Float uc, Point2f u,
                                                   TransportMode mode,
                                                   BxDFReflTransFlags sampleFlags) const {
     if (!(sampleFlags & BxDFReflTransFlags::Reflection))

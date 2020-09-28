@@ -245,15 +245,7 @@ class SurfaceInteraction : public Interaction {
     }
 
     PBRT_CPU_GPU
-    BSDF GetBSDF(const RayDifferential &ray, SampledWavelengths &lambda,
-                 CameraHandle camera, ScratchBuffer &scratchBuffer,
-                 SamplerHandle sampler);
-    PBRT_CPU_GPU
-    BSSRDFHandle GetBSSRDF(const RayDifferential &ray, SampledWavelengths &lambda,
-                           CameraHandle camera, ScratchBuffer &scratchBuffer);
-
-    PBRT_CPU_GPU
-    void ComputeDifferentials(const RayDifferential &r, CameraHandle camera) const;
+    void ComputeDifferentials(const RayDifferential &r, CameraHandle camera);
 
     using Interaction::SpawnRay;
     PBRT_CPU_GPU
@@ -262,6 +254,14 @@ class SurfaceInteraction : public Interaction {
 
     PBRT_CPU_GPU
     void SkipIntersection(RayDifferential *ray, Float t) const;
+
+    PBRT_CPU_GPU
+    BSDF GetBSDF(const RayDifferential &ray, SampledWavelengths &lambda,
+                 CameraHandle camera, ScratchBuffer &scratchBuffer,
+                 SamplerHandle sampler);
+    PBRT_CPU_GPU
+    BSSRDFHandle GetBSSRDF(const RayDifferential &ray, SampledWavelengths &lambda,
+                           CameraHandle camera, ScratchBuffer &scratchBuffer);
 
     PBRT_CPU_GPU
     SampledSpectrum Le(const Vector3f &w, const SampledWavelengths &lambda) const;
@@ -277,8 +277,8 @@ class SurfaceInteraction : public Interaction {
     int faceIndex = 0;
     MaterialHandle material;
     LightHandle areaLight;
-    mutable Vector3f dpdx, dpdy;
-    mutable Float dudx = 0, dvdx = 0, dudy = 0, dvdy = 0;
+    Vector3f dpdx, dpdy;
+    Float dudx = 0, dvdx = 0, dudy = 0, dvdy = 0;
 };
 
 }  // namespace pbrt

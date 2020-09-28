@@ -20,8 +20,7 @@ inline Vector3f Reflect(const Vector3f &wo, const Vector3f &n) {
     return -wo + 2 * Dot(wo, n) * n;
 }
 
-PBRT_CPU_GPU
-inline bool Refract(const Vector3f &wi, const Normal3f &n, Float eta, Vector3f *wt) {
+PBRT_CPU_GPU inline bool Refract(Vector3f wi, Normal3f n, Float eta, Vector3f *wt) {
     // Compute $\cos\,\theta_\roman{t}$ using Snell's law
     Float cosTheta_i = Dot(n, wi);
     Float sin2Theta_i = std::max<Float>(0, 1 - cosTheta_i * cosTheta_i);
