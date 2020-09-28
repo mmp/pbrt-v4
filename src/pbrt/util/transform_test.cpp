@@ -70,3 +70,40 @@ TEST(AnimatedTransform, Randoms) {
         }
     }
 }
+
+TEST(RotateFromTo, Simple) {
+    {
+    // Same directions...
+    Vector3f from(0,0,1), to(0, 0, 1);
+    Transform r = RotateFromTo(from, to);
+    Vector3f toNew = r(from);
+    EXPECT_EQ(to, toNew);
+    }
+
+    {
+    Vector3f from(0,0,1), to(1,0,0);
+    Transform r = RotateFromTo(from, to);
+    Vector3f toNew = r(from);
+    EXPECT_EQ(to, toNew);
+    }
+
+    {
+    Vector3f from(0,0,1), to(0,1,0);
+    Transform r = RotateFromTo(from, to);
+    Vector3f toNew = r(from);
+    EXPECT_EQ(to, toNew);
+    }
+}
+
+TEST(RotateFromTo, Randoms) {
+    RNG rng;
+    for (int i = 0; i < 100; ++i) {
+        Vector3f from = SampleUniformSphere({rng.Uniform<Float>(), rng.Uniform<Float>()});
+        Vector3f to = SampleUniformSphere({rng.Uniform<Float>(), rng.Uniform<Float>()});
+
+        Transform r = RotateFromTo(from, to);
+        Vector3f toNew = r(from);
+        EXPECT_LT(std::abs(Length(toNew) - 1), 1e-3f);
+        EXPECT_GT(Dot(to, toNew), .999f);
+    }
+}

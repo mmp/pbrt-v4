@@ -251,6 +251,25 @@ inline Transform Rotate(Float theta, const Vector3f &axis) {
     return Rotate(sinTheta, cosTheta, axis);
 }
 
+// Hughes-Moller 1999-ish. (But with |x| computed differently to avoid edge case when it
+// happens to equal |to|.)
+PBRT_CPU_GPU inline Transform RotateFromTo(const Vector3f &from, const Vector3f &to) {
+    Vector3f x = Cross(from, to);
+    if (LengthSquared(x) == 0)
+        return Transform();
+    x = Normalize(x);
+
+    Vector3f u = x - from, v = x - to;
+    SquareMatrix<4> r;
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j) {
+            r[i][j] = ((i == j) ? 1 : 0) - 2 / Dot(u, u) * u[i] * u[j] -
+                      2 / Dot(v, v) * v[i] * v[j] +
+                      4 * Dot(u, v) / (Dot(u, u) * Dot(v, v)) * v[i] * u[j];
+        }
+    return Transform(r, Transpose(r));
+}
+
 inline Vector3fi Transform::operator()(const Vector3fi &v) const {
     Float x = Float(v.x), y = Float(v.y), z = Float(v.z);
     Vector3f vOutError;
