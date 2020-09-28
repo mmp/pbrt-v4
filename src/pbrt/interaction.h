@@ -245,7 +245,8 @@ class SurfaceInteraction : public Interaction {
     }
 
     PBRT_CPU_GPU
-    void ComputeDifferentials(const RayDifferential &r, CameraHandle camera);
+    void ComputeDifferentials(const RayDifferential &r, CameraHandle camera,
+                              int samplesPerPixel);
 
     using Interaction::SpawnRay;
     PBRT_CPU_GPU

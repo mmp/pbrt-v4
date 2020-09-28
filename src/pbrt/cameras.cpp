@@ -67,8 +67,8 @@ pstd::optional<CameraRayDifferential> CameraHandle::GenerateRayDifferential(
     return Dispatch(gen);
 }
 
-void CameraHandle::ApproximatedPdxy(SurfaceInteraction &si) const {
-    auto approx = [&](auto ptr) { return ptr->ApproximatedPdxy(si); };
+void CameraHandle::ApproximatedPdxy(SurfaceInteraction &si, int samplesPerPixel) const {
+    auto approx = [&](auto ptr) { return ptr->ApproximatedPdxy(si, samplesPerPixel); };
     return Dispatch(approx);
 }
 
@@ -156,20 +156,22 @@ pstd::optional<CameraRayDifferential> CameraBase::GenerateRayDifferential(
     return CameraRayDifferential{rd, cr->weight};
 }
 
-void CameraBase::ApproximatedPdxy(SurfaceInteraction &si) const {
+void CameraBase::ApproximatedPdxy(SurfaceInteraction &si, int samplesPerPixel) const {
     Point3f pc = CameraFromRender(si.p(), si.time);
     Float dist = Distance(pc, Point3f(0, 0, 0));
+
+    Float sppScale = GetOptions().disablePixelJitter
+                         ? 1
+                         : std::max<Float>(.125, 1 / std::sqrt((Float)samplesPerPixel));
 
     Frame f = Frame::FromZ(si.n);
     // ray plane:
     // (0,0,0) + minPosDifferential + ((0,0,1) + minDirDifferantial)) * t = (x,
     // x, dist)
     Float tx = (dist - minPosDifferentialX.z) / (1 + minDirDifferentialX.z);
-    // 0.5 factor to sharpen them up slightly (could be / should be based
-    // on spp?)
-    si.dpdx = .5f * f.FromLocal(minPosDifferentialX + tx * minDirDifferentialX);
+    si.dpdx = sppScale * f.FromLocal(minPosDifferentialX + tx * minDirDifferentialX);
     Float ty = (dist - minPosDifferentialY.z) / (1 + minDirDifferentialY.z);
-    si.dpdy = .5f * f.FromLocal(minPosDifferentialY + ty * minDirDifferentialY);
+    si.dpdy = sppScale * f.FromLocal(minPosDifferentialY + ty * minDirDifferentialY);
 }
 
 void CameraBase::FindMinimumDifferentials(CameraHandle camera) {

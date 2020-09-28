@@ -40,7 +40,7 @@ std::string MediumInteraction::ToString() const {
 
 // SurfaceInteraction Method Definitions
 void SurfaceInteraction::ComputeDifferentials(const RayDifferential &ray,
-                                              CameraHandle camera) {
+                                              CameraHandle camera, int samplesPerPixel) {
     if (ray.hasDifferentials && Dot(n, ray.rxDirection) != 0 &&
         Dot(n, ray.ryDirection) != 0) {
         // Estimate screen-space change in $\pt{}$
@@ -57,7 +57,7 @@ void SurfaceInteraction::ComputeDifferentials(const RayDifferential &ray,
         dpdy = py - p();
 
     } else
-        camera.ApproximatedPdxy(*this);
+        camera.ApproximatedPdxy(*this, samplesPerPixel);
     // Estimate screen-space change in $(u,v)$
     Float a00 = Dot(dpdu, dpdu), a01 = Dot(dpdu, dpdv), a11 = Dot(dpdv, dpdv);
     Float invDet = 1 / (DifferenceOfProducts(a00, a11, a01, a01));
@@ -157,7 +157,7 @@ void SurfaceInteraction::SkipIntersection(RayDifferential *ray, Float t) const {
 BSDF SurfaceInteraction::GetBSDF(const RayDifferential &ray, SampledWavelengths &lambda,
                                  CameraHandle camera, ScratchBuffer &scratchBuffer,
                                  SamplerHandle sampler) {
-    ComputeDifferentials(ray, camera);
+    ComputeDifferentials(ray, camera, sampler.SamplesPerPixel());
     while (material.Is<MixMaterial>()) {
         MixMaterial *mix = material.CastOrNullptr<MixMaterial>();
         material = mix->ChooseMaterial(UniversalTextureEvaluator(), *this);
