@@ -33,10 +33,12 @@ class MixMaterial;
 
 // MaterialHandle Definition
 class MaterialHandle
-    : public TaggedPointer<CoatedDiffuseMaterial, CoatedConductorMaterial,
-                           ConductorMaterial, DielectricMaterial, DiffuseMaterial,
-                           DiffuseTransmissionMaterial, HairMaterial, MeasuredMaterial,
-                           SubsurfaceMaterial, ThinDielectricMaterial, MixMaterial> {
+    : public TaggedPointer<  // Material Types
+          CoatedDiffuseMaterial, CoatedConductorMaterial, ConductorMaterial,
+          DielectricMaterial, DiffuseMaterial, DiffuseTransmissionMaterial, HairMaterial,
+          MeasuredMaterial, SubsurfaceMaterial, ThinDielectricMaterial, MixMaterial
+
+          > {
   public:
     // Material Interface
     using TaggedPointer::TaggedPointer;
@@ -49,9 +51,6 @@ class MaterialHandle
     std::string ToString() const;
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU inline bool CanEvaluateTextures(TextureEvaluator texEval) const;
-
-    template <typename TextureEvaluator>
     PBRT_CPU_GPU inline BSDF GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
                                      SampledWavelengths &lambda,
                                      ScratchBuffer &buf) const;
@@ -61,6 +60,9 @@ class MaterialHandle
                                                MaterialEvalContext ctx,
                                                SampledWavelengths &lambda,
                                                ScratchBuffer &buf) const;
+
+    template <typename TextureEvaluator>
+    PBRT_CPU_GPU inline bool CanEvaluateTextures(TextureEvaluator texEval) const;
 
     PBRT_CPU_GPU inline FloatTextureHandle GetDisplacement() const;
 

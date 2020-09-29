@@ -95,9 +95,7 @@ inline Float Grad(int x, int y, int z, Float dx, Float dy, Float dz) {
 }
 
 inline Float NoiseWeight(Float t) {
-    Float t3 = t * t * t;
-    Float t4 = t3 * t;
-    return 6 * t4 * t - 15 * t4 + 10 * t3;
+    return 6 * Pow<5>(t) - 15 * Pow<4>(t) + 10 * Pow<3>(t);
 }
 
 Float FBm(const Point3f &p, const Vector3f &dpdx, const Vector3f &dpdy, Float omega,

@@ -126,39 +126,32 @@ pstd::vector<Image> Image::GenerateMIPMap(Image image, WrapMode2D wrapMode,
     PixelFormat origFormat = image.format;
     int nChannels = image.NChannels();
     ColorEncodingHandle origEncoding = image.encoding;
-
-    // Set things up so we have a power-of-two sized image stored with
-    // floats.
-    if (!IsPowerOf2(image.resolution[0]) || !IsPowerOf2(image.resolution[1])) {
-        // Resample image to power-of-two resolution
+    // Prepare _image_ for building MIP map
+    if (!IsPowerOf2(image.resolution[0]) || !IsPowerOf2(image.resolution[1]))
         image = image.FloatResize(
             {RoundUpPow2(image.resolution[0]), RoundUpPow2(image.resolution[1])},
             wrapMode);
-    } else if (!Is32Bit(image.format))
+    else if (!Is32Bit(image.format))
         image = image.ConvertToFormat(PixelFormat::Float);
     CHECK(Is32Bit(image.format));
 
-    // Initialize levels of MIPMap from image
+    // Initialize levels of MIP map from _image_
     int nLevels = 1 + Log2Int(std::max(image.resolution[0], image.resolution[1]));
     pstd::vector<Image> pyramid(alloc);
     pyramid.reserve(nLevels);
-
     Point2i levelResolution = image.resolution;
     for (int i = 0; i < nLevels - 1; ++i) {
-        // Initialize $i+1$st MIPMap level from $i$th level and also convert
-        // i'th level to the internal format
+        // Initialize $i+1$st MIP map level from $i$th level and copy $i$th into pyramid
         pyramid.push_back(
             Image(origFormat, levelResolution, image.channelNames, origEncoding, alloc));
-
+        // Initialize _nextImage_ for $i+1$st MIP map level
         Point2i nextResolution(std::max(1, levelResolution[0] / 2),
                                std::max(1, levelResolution[1] / 2));
         Image nextImage(image.format, nextResolution, image.channelNames, origEncoding);
 
-        // Offsets from the base pixel to the four neighbors that we'll
-        // downfilter.
+        // Compute offsets from pixel to the 4 neighbors used for down filtering
         int srcDeltas[4] = {0, nChannels, nChannels * levelResolution[0],
                             nChannels * levelResolution[0] + nChannels};
-        // Clamp offsets once a dimension has a single texel.
         if (levelResolution[0] == 1) {
             srcDeltas[1] = 0;
             srcDeltas[3] -= nChannels;
@@ -168,40 +161,36 @@ pstd::vector<Image> Image::GenerateMIPMap(Image image, WrapMode2D wrapMode,
             srcDeltas[3] -= nChannels * levelResolution[0];
         }
 
-        // Work in scanlines for best cache coherence (vs 2d tiles).
-        ParallelFor(0, nextResolution[1], [&](int64_t y0, int64_t y1) {
-            for (int y = y0; y < y1; ++y) {
-                // Downfilter with a box filter for the next MIP level
-                int srcOffset = image.PixelOffset({0, 2 * y});
-                int nextOffset = nextImage.PixelOffset({0, y});
-                for (int x = 0; x < nextResolution[0]; ++x) {
-                    for (int c = 0; c < nChannels; ++c) {
-                        nextImage.p32[nextOffset] =
-                            .25f *
-                            (image.p32[srcOffset] + image.p32[srcOffset + srcDeltas[1]] +
-                             image.p32[srcOffset + srcDeltas[2]] +
-                             image.p32[srcOffset + srcDeltas[3]]);
-                        ++srcOffset;
-                        ++nextOffset;
-                    }
-                    srcOffset += nChannels;
+        ParallelFor(0, nextResolution[1], [&](int64_t y) {
+            // Loop over pixels in scanline $y$ and downfilter for the next MIP level
+            int srcOffset = image.PixelOffset({0, 2 * int(y)});
+            int nextOffset = nextImage.PixelOffset({0, int(y)});
+            for (int x = 0; x < nextResolution[0]; ++x) {
+                for (int c = 0; c < nChannels; ++c) {
+                    nextImage.p32[nextOffset] =
+                        .25f *
+                        (image.p32[srcOffset] + image.p32[srcOffset + srcDeltas[1]] +
+                         image.p32[srcOffset + srcDeltas[2]] +
+                         image.p32[srcOffset + srcDeltas[3]]);
+                    ++srcOffset;
+                    ++nextOffset;
                 }
-
-                // Copy the current level out to the current pyramid level
-                int yStart = 2 * y;
-                int yEnd = std::min(2 * y + 2, levelResolution[1]);
-                int offset = image.PixelOffset({0, yStart});
-                size_t count = (yEnd - yStart) * nChannels * levelResolution[0];
-                pyramid[i].CopyRectIn(Bounds2i({0, yStart}, {levelResolution[0], yEnd}),
-                                      {image.p32.data() + offset, count});
+                srcOffset += nChannels;
             }
-        });
 
+            // Copy the current level out to the current pyramid level
+            int yStart = 2 * y;
+            int yEnd = std::min(2 * int(y) + 2, levelResolution[1]);
+            int offset = image.PixelOffset({0, yStart});
+            size_t count = (yEnd - yStart) * nChannels * levelResolution[0];
+            pyramid[i].CopyRectIn(Bounds2i({0, yStart}, {levelResolution[0], yEnd}),
+                                  {image.p32.data() + offset, count});
+        });
         image = std::move(nextImage);
         levelResolution = nextResolution;
     }
 
-    // Top level
+    // Initialize top level of MIP map and return image pyramid
     CHECK(levelResolution[0] == 1 && levelResolution[1] == 1);
     pyramid.push_back(
         Image(origFormat, levelResolution, image.channelNames, origEncoding, alloc));

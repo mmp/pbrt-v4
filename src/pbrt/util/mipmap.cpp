@@ -54,7 +54,6 @@ std::string MIPMapFilterOptions::ToString() const {
             weightLut[i] = std::exp(-alpha * r2) - std::exp(-alpha);
         }
 */
-
 // MIPMap EWA Lookup Table Definition
 static constexpr int WeightLUTSize = 128;
 static PBRT_CONST Float weightLut[WeightLUTSize] = {
@@ -223,24 +222,27 @@ RGB MIPMap::Texel(int level, Point2i st) const {
 
 template <typename T>
 T MIPMap::Lookup(const Point2f &st, Float width) const {
-    // Compute MIPMap level
+    // Compute MIP Map level for _width_ and handle very wide filter
     int nLevels = Levels();
     Float level = nLevels - 1 + Log2(std::max<Float>(width, 1e-8));
-
     if (level >= Levels() - 1)
         return Texel<T>(Levels() - 1, {0, 0});
-
     int iLevel = std::max(0, int(std::floor(level)));
+
     if (options.filter == FilterFunction::Point) {
+        // Return point-sampled value at selected MIP level
         Point2i resolution = LevelResolution(iLevel);
         Point2i sti(std::round(st[0] * resolution[0] - 0.5f),
                     std::round(st[1] * resolution[1] - 0.5f));
         return Texel<T>(iLevel, sti);
-    } else if (options.filter == FilterFunction::Bilinear) {
-        return Bilerp<T>(iLevel, st);
-    } else {
-        CHECK(options.filter == FilterFunction::Trilinear);
 
+    } else if (options.filter == FilterFunction::Bilinear) {
+        // Return bilinear-filtered value at selected MIP level
+        return Bilerp<T>(iLevel, st);
+
+    } else {
+        // Return trilinear-filtered value at selected MIP level
+        CHECK(options.filter == FilterFunction::Trilinear);
         if (iLevel == 0)
             return Bilerp<T>(0, st);
         else {
@@ -248,6 +250,21 @@ T MIPMap::Lookup(const Point2f &st, Float width) const {
             CHECK_LE(delta, 1);
             return Lerp(delta, Bilerp<T>(iLevel, st), Bilerp<T>(iLevel + 1, st));
         }
+    }
+}
+
+template <>
+RGB MIPMap::Bilerp(int level, Point2f st) const {
+    CHECK(level >= 0 && level < pyramid.size());
+    if (pyramid[level].NChannels() == 3 || pyramid[level].NChannels() == 4) {
+        RGB rgb;
+        for (int c = 0; c < 3; ++c)
+            rgb[c] = pyramid[level].BilerpChannel(st, c, wrapMode);
+        return rgb;
+    } else {
+        CHECK_EQ(1, pyramid[level].NChannels());
+        Float v = pyramid[level].BilerpChannel(st, 0, wrapMode);
+        return RGB(v, v, v);
     }
 }
 
@@ -276,9 +293,6 @@ T MIPMap::Lookup(const Point2f &st, Vector2f dst0, Vector2f dst1) const {
     // Choose level of detail for EWA lookup and perform EWA filtering
     Float lod = std::max<Float>(0, Levels() - 1 + Log2(minorLength));
     int ilod = std::floor(lod);
-    // TODO: just do return EWA<T>(ilog, st, dst0, dst1);
-    // TODO: also, when scaling camera ray differentials, just do e.g.
-    // 1 / std::min(sqrtSamplesPerPixel, 8);
     return ((1 - (lod - ilod)) * EWA<T>(ilod, st, dst0, dst1) +
             (lod - ilod) * EWA<T>(ilod + 1, st, dst0, dst1));
 }
@@ -287,7 +301,6 @@ template <typename T>
 T MIPMap::EWA(int level, Point2f st, Vector2f dst0, Vector2f dst1) const {
     if (level >= Levels())
         return Texel<T>(Levels() - 1, {0, 0});
-
     // Convert EWA coordinates to appropriate scale for level
     Point2i levelRes = LevelResolution(level);
     st[0] = st[0] * levelRes[0] - 0.5f;
@@ -297,7 +310,7 @@ T MIPMap::EWA(int level, Point2f st, Vector2f dst0, Vector2f dst1) const {
     dst1[0] *= levelRes[0];
     dst1[1] *= levelRes[1];
 
-    // Compute ellipse coefficients to bound EWA filter region
+    // Find ellipse coefficients that bound EWA filter region
     Float A = dst0[1] * dst0[1] + dst1[1] * dst1[1] + 1;
     Float B = -2 * (dst0[0] * dst0[1] + dst1[0] * dst1[1]);
     Float C = dst0[0] * dst0[0] + dst1[0] * dst1[0] + 1;
@@ -315,14 +328,14 @@ T MIPMap::EWA(int level, Point2f st, Vector2f dst0, Vector2f dst1) const {
     int t0 = std::ceil(st[1] - 2 * invDet * vSqrt);
     int t1 = std::floor(st[1] + 2 * invDet * vSqrt);
 
-    // Scan over ellipse bound and compute quadratic equation
+    // Scan over ellipse bound and evaluate quadratic equation to filter image
     T sum{};
     Float sumWts = 0;
     for (int it = t0; it <= t1; ++it) {
         Float tt = it - st[1];
         for (int is = s0; is <= s1; ++is) {
             Float ss = is - st[0];
-            // Compute squared radius and filter texel if inside ellipse
+            // Compute squared radius and filter texel if it is inside the ellipse
             Float r2 = A * ss * ss + B * ss * tt + C * tt * tt;
             if (r2 < 1) {
                 int index = std::min<int>(r2 * WeightLUTSize, WeightLUTSize - 1);
@@ -335,11 +348,9 @@ T MIPMap::EWA(int level, Point2f st, Vector2f dst0, Vector2f dst1) const {
     return sum / sumWts;
 }
 
-std::unique_ptr<MIPMap> MIPMap::CreateFromFile(const std::string &filename,
-                                               const MIPMapFilterOptions &options,
-                                               WrapMode wrapMode,
-                                               ColorEncodingHandle encoding,
-                                               Allocator alloc) {
+MIPMap *MIPMap::CreateFromFile(const std::string &filename,
+                               const MIPMapFilterOptions &options, WrapMode wrapMode,
+                               ColorEncodingHandle encoding, Allocator alloc) {
     ImageAndMetadata imageAndMetadata = Image::Read(filename, alloc, encoding);
 
     Image &image = imageAndMetadata.image;
@@ -367,7 +378,7 @@ std::unique_ptr<MIPMap> MIPMap::CreateFromFile(const std::string &filename,
     }
 
     const RGBColorSpace *colorSpace = imageAndMetadata.metadata.GetColorSpace();
-    return std::make_unique<MIPMap>(std::move(image), colorSpace, wrapMode, alloc,
+    return alloc.new_object<MIPMap>(std::move(image), colorSpace, wrapMode, alloc,
                                     options);
 }
 
@@ -394,21 +405,6 @@ Float MIPMap::Bilerp(int level, Point2f st) const {
         return pyramid[level].BilerpChannel(st, 3, wrapMode);
     default:
         LOG_FATAL("Unexpected number of image channels: %d", pyramid[level].NChannels());
-    }
-}
-
-template <>
-RGB MIPMap::Bilerp(int level, Point2f st) const {
-    CHECK(level >= 0 && level < pyramid.size());
-    if (pyramid[level].NChannels() == 3 || pyramid[level].NChannels() == 4) {
-        RGB rgb;
-        for (int c = 0; c < 3; ++c)
-            rgb[c] = pyramid[level].BilerpChannel(st, c, wrapMode);
-        return rgb;
-    } else {
-        CHECK_EQ(1, pyramid[level].NChannels());
-        Float v = pyramid[level].BilerpChannel(st, 0, wrapMode);
-        return RGB(v, v, v);
     }
 }
 

@@ -89,7 +89,6 @@ std::string TransformMapping3D::ToString() const {
                         textureFromRender);
 }
 
-// ConstantTexture Method Definitions
 std::string FloatConstantTexture::ToString() const {
     return StringPrintf("[ FloatConstantTexture value: %f ]", value);
 }
@@ -113,7 +112,6 @@ SpectrumConstantTexture *SpectrumConstantTexture::Create(
     return alloc.new_object<SpectrumConstantTexture>(c);
 }
 
-// BilerpTexture Method Definitions
 FloatBilerpTexture *FloatBilerpTexture::Create(
     const Transform &renderFromTexture, const TextureParameterDictionary &parameters,
     const FileLoc *loc, Allocator alloc) {
@@ -160,30 +158,31 @@ pstd::array<Float, 2> Checkerboard(AAMethod aaMethod, TextureEvalContext ctx,
                                    const TextureMapping2DHandle map2D,
                                    const TextureMapping3DHandle map3D) {
     if (map2D) {
+        // Return weights for 2D checkerboard texture
         CHECK(!map3D);
         Vector2f dstdx, dstdy;
         Point2f st = map2D.Map(ctx, &dstdx, &dstdy);
         if (aaMethod == AAMethod::None) {
-            // Point sample _Checkerboard2DTexture_
+            // Return point-sampled 2D checkerboard texture weights
             if (((int)std::floor(st[0]) + (int)std::floor(st[1])) % 2 == 0)
                 return {Float(1), Float(0)};
             return {Float(0), Float(1)};
-        } else {
-            // Compute closed-form box-filtered _Checkerboard2DTexture_ value
 
+        } else {
+            // Return closed-form box filtered 2D checkerboard texture weights
             // Evaluate single check if filter is entirely inside one of them
             Float ds = std::max(std::abs(dstdx[0]), std::abs(dstdy[0]));
             Float dt = std::max(std::abs(dstdx[1]), std::abs(dstdy[1]));
             Float s0 = st[0] - ds, s1 = st[0] + ds;
             Float t0 = st[1] - dt, t1 = st[1] + dt;
             if (std::floor(s0) == std::floor(s1) && std::floor(t0) == std::floor(t1)) {
-                // Point sample _Checkerboard2DTexture_
+                // Return point-sampled 2D checkerboard texture weights
                 if (((int)std::floor(st[0]) + (int)std::floor(st[1])) % 2 == 0)
                     return {Float(1), Float(0)};
                 return {Float(0), Float(1)};
             }
 
-            // Apply box filter to checkerboard region
+            // Apply box filter to checkerboard region to compute weights
             auto bumpInt = [](Float x) {
                 return (int)std::floor(x / 2) +
                        2 * std::max(x / 2 - (int)std::floor(x / 2) - (Float)0.5,
@@ -196,7 +195,9 @@ pstd::array<Float, 2> Checkerboard(AAMethod aaMethod, TextureEvalContext ctx,
                 area2 = .5f;
             return {(1 - area2), area2};
         }
+
     } else {
+        // Return weights for 3D checkerboard texture
         CHECK(map3D);
         Vector3f dpdx, dpdy;
         Point3f p = map3D.Map(ctx, &dpdx, &dpdy);
@@ -308,7 +309,24 @@ std::string SpectrumCheckerboardTexture::ToString() const {
                         aaMethod == AAMethod::None ? "none" : "closed-form");
 }
 
-// DotsTexture Method Definitions
+// InsidePolkaDot Function Definition
+bool InsidePolkaDot(const Point2f &st) {
+    // Compute cell indices (_sCell_,_tCell_ for dots
+    int sCell = std::floor(st[0] + .5f), tCell = std::floor(st[1] + .5f);
+
+    if (Noise(sCell + .5f, tCell + .5f) > 0) {
+        // Determine dot position and test if _st_ is inside it
+        Float radius = .35f;
+        Float maxShift = 0.5f - radius;
+        Float sCenter = sCell + maxShift * Noise(sCell + 1.5f, tCell + 2.8f);
+        Float tCenter = tCell + maxShift * Noise(sCell + 4.5f, tCell + 9.8f);
+        Vector2f dst = st - Point2f(sCenter, tCenter);
+        if (LengthSquared(dst) < radius * radius)
+            return true;
+    }
+    return false;
+}
+
 FloatDotsTexture *FloatDotsTexture::Create(const Transform &renderFromTexture,
                                            const TextureParameterDictionary &parameters,
                                            const FileLoc *loc, Allocator alloc) {
@@ -363,52 +381,6 @@ std::string FBmTexture::ToString() const {
                         omega, octaves);
 }
 
-// ImageTextureBase Method Definitions
-ImageTextureBase::ImageTextureBase(TextureMapping2DHandle mapping,
-                                   const std::string &filename, const std::string &filter,
-                                   Float maxAniso, WrapMode wrapMode, Float scale,
-                                   ColorEncodingHandle encoding, Allocator alloc)
-    : mapping(std::move(mapping)), scale(scale) {
-    mipmap = GetTexture(filename, filter, maxAniso, wrapMode, encoding, alloc);
-}
-
-MIPMap *ImageTextureBase::GetTexture(const std::string &filename,
-                                     const std::string &filter, Float maxAniso,
-                                     WrapMode wrap, ColorEncodingHandle encoding,
-                                     Allocator alloc) {
-    // Return _MIPMap_ from texture cache if present
-    TexInfo texInfo(filename, filter, maxAniso, wrap, encoding);
-    std::unique_lock<std::mutex> lock(textureCacheMutex);
-    if (textureCache.find(texInfo) != textureCache.end())
-        return textureCache[texInfo].get();
-    else
-        lock.unlock();
-
-    // Create _MIPMap_ for _filename_
-    MIPMapFilterOptions options;
-    options.maxAnisotropy = maxAniso;
-
-    pstd::optional<FilterFunction> ff = ParseFilter(filter);
-    if (ff)
-        options.filter = *ff;
-    else
-        Warning("%s: filter function unknown", filter);
-
-    std::unique_ptr<MIPMap> mipmap =
-        MIPMap::CreateFromFile(filename, options, wrap, encoding, alloc);
-    if (mipmap) {
-        lock.lock();
-        // This is actually ok, but if it hits, it means we've wastefully
-        // loaded this texture. (Note that in that case, should just return
-        // the one that's already in there and not replace it.)
-        CHECK(textureCache.find(texInfo) == textureCache.end());
-        textureCache[texInfo] = std::move(mipmap);
-
-        return textureCache[texInfo].get();
-    } else
-        return nullptr;
-}
-
 // SpectrumImageTexture Method Definitions
 SampledSpectrum SpectrumImageTexture::Evaluate(TextureEvalContext ctx,
                                                SampledWavelengths lambda) const {
@@ -416,23 +388,24 @@ SampledSpectrum SpectrumImageTexture::Evaluate(TextureEvalContext ctx,
     assert(!"Should not be called in GPU code");
     return SampledSpectrum(0);
 #else
-    if (!mipmap)
-        return SampledSpectrum(scale);
+    // Apply texture mapping and flip $t$ coordinate for image texture lookup
     Vector2f dstdx, dstdy;
     Point2f st = mapping.Map(ctx, &dstdx, &dstdy);
-    // Texture coordinates are (0,0) in the lower left corner, but
-    // image coordinates are (0,0) in the upper left.
     st[1] = 1 - st[1];
+
+    // Lookup filtered RGB value in _MIPMap_
     RGB rgb = scale * mipmap->Lookup<RGB>(st, dstdx, dstdy);
-    const RGBColorSpace *cs = mipmap->GetRGBColorSpace();
-    if (cs != nullptr) {
-        if (std::max({rgb.r, rgb.g, rgb.b}) > 1)
-            return RGBSpectrum(*cs, rgb).Sample(lambda);
-        return RGBReflectanceSpectrum(*cs, rgb).Sample(lambda);
+
+    // Return _SampledSpectrum_ for RGB image texture value
+    if (const RGBColorSpace *cs = mipmap->GetRGBColorSpace(); cs != nullptr) {
+        if (std::max({rgb.r, rgb.g, rgb.b}) <= 1)
+            return RGBReflectanceSpectrum(*cs, rgb).Sample(lambda);
+        return RGBSpectrum(*cs, rgb).Sample(lambda);
     }
     // otherwise it better be a one-channel texture
-    CHECK(rgb[0] == rgb[1] && rgb[1] == rgb[2]);
+    DCHECK(rgb[0] == rgb[1] && rgb[1] == rgb[2]);
     return SampledSpectrum(rgb[0]);
+
 #endif
 }
 
@@ -447,13 +420,13 @@ std::string FloatImageTexture::ToString() const {
 }
 
 std::string TexInfo::ToString() const {
-    return StringPrintf("[ TexInfo filename: %s filter: %s maxAniso: %f "
-                        "wrapMode: %s encoding: %s ]",
-                        filename, filter, maxAniso, wrapMode, encoding);
+    return StringPrintf(
+        "[ TexInfo filename: %s filterOptions: %s wrapMode: %s encoding: %s ]", filename,
+        filterOptions, wrapMode, encoding);
 }
 
 std::mutex ImageTextureBase::textureCacheMutex;
-std::map<TexInfo, std::unique_ptr<MIPMap>> ImageTextureBase::textureCache;
+std::map<TexInfo, MIPMap *> ImageTextureBase::textureCache;
 
 FloatImageTexture *FloatImageTexture::Create(const Transform &renderFromTexture,
                                              const TextureParameterDictionary &parameters,
@@ -465,6 +438,14 @@ FloatImageTexture *FloatImageTexture::Create(const Transform &renderFromTexture,
     // Initialize _ImageTexture_ parameters
     Float maxAniso = parameters.GetOneFloat("maxanisotropy", 8.f);
     std::string filter = parameters.GetOneString("filter", "bilinear");
+    MIPMapFilterOptions filterOptions;
+    filterOptions.maxAnisotropy = maxAniso;
+    pstd::optional<FilterFunction> ff = ParseFilter(filter);
+    if (ff)
+        filterOptions.filter = *ff;
+    else
+        Error(loc, "%s: filter function unknown", filter);
+
     std::string wrapString = parameters.GetOneString("wrap", "repeat");
     pstd::optional<WrapMode> wrapMode = ParseWrapMode(wrapString.c_str());
     if (!wrapMode)
@@ -476,7 +457,7 @@ FloatImageTexture *FloatImageTexture::Create(const Transform &renderFromTexture,
     std::string encodingString = parameters.GetOneString("encoding", defaultEncoding);
     ColorEncodingHandle encoding = ColorEncodingHandle::Get(encodingString);
 
-    return alloc.new_object<FloatImageTexture>(map, filename, filter, maxAniso, *wrapMode,
+    return alloc.new_object<FloatImageTexture>(map, filename, filterOptions, *wrapMode,
                                                scale, encoding, alloc);
 }
 
@@ -490,6 +471,14 @@ SpectrumImageTexture *SpectrumImageTexture::Create(
     // Initialize _ImageTexture_ parameters
     Float maxAniso = parameters.GetOneFloat("maxanisotropy", 8.f);
     std::string filter = parameters.GetOneString("filter", "bilinear");
+    MIPMapFilterOptions filterOptions;
+    filterOptions.maxAnisotropy = maxAniso;
+    pstd::optional<FilterFunction> ff = ParseFilter(filter);
+    if (ff)
+        filterOptions.filter = *ff;
+    else
+        Error(loc, "%s: filter function unknown", filter);
+
     std::string wrapString = parameters.GetOneString("wrap", "repeat");
     pstd::optional<WrapMode> wrapMode = ParseWrapMode(wrapString.c_str());
     if (!wrapMode)
@@ -501,8 +490,8 @@ SpectrumImageTexture *SpectrumImageTexture::Create(
     std::string encodingString = parameters.GetOneString("encoding", defaultEncoding);
     ColorEncodingHandle encoding = ColorEncodingHandle::Get(encodingString);
 
-    return alloc.new_object<SpectrumImageTexture>(map, filename, filter, maxAniso,
-                                                  *wrapMode, scale, encoding, alloc);
+    return alloc.new_object<SpectrumImageTexture>(map, filename, filterOptions, *wrapMode,
+                                                  scale, encoding, alloc);
 }
 
 // MarbleTexture Method Definitions
@@ -766,7 +755,7 @@ FloatTextureHandle FloatScaledTexture::Create(
                 FloatImageTexture *imageCopy =
                     alloc.new_object<FloatImageTexture>(*image);
                 LOG_VERBOSE("Flattened scale %f * image texture", cs);
-                imageCopy->scale *= cs;
+                imageCopy->MultiplyScale(cs);
                 return imageCopy;
             }
 #if defined(PBRT_BUILD_GPU_RENDERER)
@@ -775,7 +764,7 @@ FloatTextureHandle FloatScaledTexture::Create(
                 GPUFloatImageTexture *gimageCopy =
                     alloc.new_object<GPUFloatImageTexture>(*gimage);
                 LOG_VERBOSE("Flattened scale %f * gpu image texture", cs);
-                gimageCopy->scale *= cs;
+                gimageCopy->MultiplyScale(cs);
                 return gimageCopy;
             }
 #endif
@@ -805,7 +794,7 @@ SpectrumTextureHandle SpectrumScaledTexture::Create(
             SpectrumImageTexture *imageCopy =
                 alloc.new_object<SpectrumImageTexture>(*image);
             LOG_VERBOSE("Flattened scale %f * image texture", cs);
-            imageCopy->scale *= cs;
+            imageCopy->MultiplyScale(cs);
             return imageCopy;
         }
 #if defined(PBRT_BUILD_GPU_RENDERER)
@@ -814,7 +803,7 @@ SpectrumTextureHandle SpectrumScaledTexture::Create(
             GPUSpectrumImageTexture *gimageCopy =
                 alloc.new_object<GPUSpectrumImageTexture>(*gimage);
             LOG_VERBOSE("Flattened scale %f * gpu image texture", cs);
-            gimageCopy->scale *= cs;
+            gimageCopy->MultiplyScale(cs);
             return gimageCopy;
         }
 #endif
@@ -1305,6 +1294,7 @@ SpectrumTextureHandle SpectrumTextureHandle::Create(
     return tex;
 }
 
+// UniversalTextureEvaluator Method Definitions
 Float UniversalTextureEvaluator::operator()(FloatTextureHandle tex,
                                             TextureEvalContext ctx) {
     return tex.Evaluate(ctx);

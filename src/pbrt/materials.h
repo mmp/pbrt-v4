@@ -42,6 +42,7 @@ struct MaterialEvalContext : public TextureEvalContext {
 
 // BumpEvalContext Definition
 struct BumpEvalContext {
+    // BumpEvalContext Public Methods
     BumpEvalContext() = default;
     PBRT_CPU_GPU
     BumpEvalContext(const SurfaceInteraction &si)
@@ -66,6 +67,7 @@ struct BumpEvalContext {
         return TextureEvalContext(p, dpdx, dpdy, uv, dudx, dudy, dvdx, dvdy, faceIndex);
     }
 
+    // BumpEvalContext Public Members
     Point3f p;
     Point2f uv;
     struct {
@@ -249,8 +251,10 @@ class ThinDielectricMaterial {
 // MixMaterial Definition
 class MixMaterial {
   public:
-    using BxDF = void;  // shouldn't be accessed...
+    // MixMaterial Type Definitions
+    using BxDF = void;
     using BSSRDF = void;
+
     // MixMaterial Public Methods
     MixMaterial(MaterialHandle m[2], FloatTextureHandle amount) : amount(amount) {
         materials[0] = m[0];
@@ -308,7 +312,7 @@ class MixMaterial {
     PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
                               SampledWavelengths &lambda, void *bxdf) const {
 #ifndef PBRT_IS_GPU_CODE
-        LOG_FATAL("Shouldn't be called");
+        LOG_FATAL("MixMaterial::GetBSDF() shouldn't be called");
 #endif
         return {};
     }
@@ -409,8 +413,10 @@ class HairMaterial {
 // DiffuseMaterial Definition
 class DiffuseMaterial {
   public:
+    // DiffuseMaterial Type Definitions
     using BxDF = DiffuseBxDF;
     using BSSRDF = void;
+
     // DiffuseMaterial Public Methods
     static const char *Name() { return "DiffuseMaterial"; }
 
@@ -441,7 +447,7 @@ class DiffuseMaterial {
     template <typename TextureEvaluator>
     PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
                               SampledWavelengths &lambda, DiffuseBxDF *bxdf) const {
-        // Evaluate textures for _DiffuseMaterial_ and allocate BSDF
+        // Evaluate textures for _DiffuseMaterial_ and return BSDF
         SampledSpectrum r = Clamp(texEval(reflectance, ctx, lambda), 0, 1);
         Float sig = Clamp(texEval(sigma, ctx), 0, 90);
         *bxdf = DiffuseBxDF(r, SampledSpectrum(0), sig);
