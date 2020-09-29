@@ -30,10 +30,12 @@ class WrinkledTexture;
 
 // FloatTextureHandle Definition
 class FloatTextureHandle
-    : public TaggedPointer<FloatImageTexture, GPUFloatImageTexture, FloatMixTexture,
-                           FloatScaledTexture, FloatConstantTexture, FloatBilerpTexture,
-                           FloatCheckerboardTexture, FloatDotsTexture, FBmTexture,
-                           FloatPtexTexture, WindyTexture, WrinkledTexture> {
+    : public TaggedPointer<  // FloatTextures
+          FloatImageTexture, GPUFloatImageTexture, FloatMixTexture, FloatScaledTexture,
+          FloatConstantTexture, FloatBilerpTexture, FloatCheckerboardTexture,
+          FloatDotsTexture, FBmTexture, FloatPtexTexture, WindyTexture, WrinkledTexture
+
+          > {
   public:
     // FloatTexture Interface
     using TaggedPointer::TaggedPointer;
@@ -63,11 +65,13 @@ class SpectrumScaledTexture;
 
 // SpectrumTextureHandle Definition
 class SpectrumTextureHandle
-    : public TaggedPointer<
-          RGBConstantTexture, RGBReflectanceConstantTexture, SpectrumImageTexture,
-          GPUSpectrumImageTexture, SpectrumMixTexture, SpectrumScaledTexture,
-          SpectrumConstantTexture, SpectrumBilerpTexture, SpectrumCheckerboardTexture,
-          MarbleTexture, SpectrumDotsTexture, SpectrumPtexTexture> {
+    : public TaggedPointer<  // SpectrumTextures
+          SpectrumImageTexture, GPUSpectrumImageTexture, SpectrumMixTexture,
+          SpectrumScaledTexture, SpectrumConstantTexture, SpectrumBilerpTexture,
+          SpectrumCheckerboardTexture, MarbleTexture, SpectrumDotsTexture,
+          SpectrumPtexTexture
+
+          > {
   public:
     // SpectrumTexture Interface
     using TaggedPointer::TaggedPointer;

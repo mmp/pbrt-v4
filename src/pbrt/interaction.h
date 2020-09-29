@@ -248,13 +248,13 @@ class SurfaceInteraction : public Interaction {
     void ComputeDifferentials(const RayDifferential &r, CameraHandle camera,
                               int samplesPerPixel);
 
-    using Interaction::SpawnRay;
-    PBRT_CPU_GPU
-    RayDifferential SpawnRay(const RayDifferential &rayi, const BSDF &bsdf,
-                             const Vector3f &wi, int /*BxDFFlags*/ flags) const;
-
     PBRT_CPU_GPU
     void SkipIntersection(RayDifferential *ray, Float t) const;
+
+    using Interaction::SpawnRay;
+    PBRT_CPU_GPU
+    RayDifferential SpawnRay(const RayDifferential &rayi, const BSDF &bsdf, Vector3f wi,
+                             int /*BxDFFlags*/ flags) const;
 
     PBRT_CPU_GPU
     BSDF GetBSDF(const RayDifferential &ray, SampledWavelengths &lambda,

@@ -157,21 +157,32 @@ pstd::optional<CameraRayDifferential> CameraBase::GenerateRayDifferential(
 }
 
 void CameraBase::ApproximatedPdxy(SurfaceInteraction &si, int samplesPerPixel) const {
-    Point3f pc = CameraFromRender(si.p(), si.time);
-    Float dist = Distance(pc, Point3f(0, 0, 0));
+    // Compute tangent plane equation for ray differential intersections
+    Point3f pCamera = CameraFromRender(si.p(), si.time);
+    Normal3f nCamera = CameraFromRender(si.n, si.time);
+    Transform DownZFromCamera =
+        RotateFromTo(Normalize(Vector3f(pCamera)), Vector3f(0, 0, 1));
+    Point3f pDownZ = DownZFromCamera(pCamera);
+    Normal3f nDownZ = DownZFromCamera(nCamera);
+    Float d = Dot(nDownZ, Vector3f(pDownZ));
 
+    // Find intersection points for approximated camera differential rays
+    Ray xRay(Point3f(0, 0, 0) + minPosDifferentialX,
+             Vector3f(0, 0, 1) + minDirDifferentialX);
+    Float tx = -(Dot(nDownZ, Vector3f(xRay.o)) - d) / Dot(nDownZ, xRay.d);
+    Ray yRay(Point3f(0, 0, 0) + minPosDifferentialY,
+             Vector3f(0, 0, 1) + minDirDifferentialY);
+    Float ty = -(Dot(nDownZ, Vector3f(yRay.o)) - d) / Dot(nDownZ, yRay.d);
+    Point3f px = xRay(tx), py = yRay(ty);
+
+    // Estimate $\dpdx$ and $\dpdy$ in tangent plane at intersection point
     Float sppScale = GetOptions().disablePixelJitter
                          ? 1
                          : std::max<Float>(.125, 1 / std::sqrt((Float)samplesPerPixel));
-
-    Frame f = Frame::FromZ(si.n);
-    // ray plane:
-    // (0,0,0) + minPosDifferential + ((0,0,1) + minDirDifferantial)) * t = (x,
-    // x, dist)
-    Float tx = (dist - minPosDifferentialX.z) / (1 + minDirDifferentialX.z);
-    si.dpdx = sppScale * f.FromLocal(minPosDifferentialX + tx * minDirDifferentialX);
-    Float ty = (dist - minPosDifferentialY.z) / (1 + minDirDifferentialY.z);
-    si.dpdy = sppScale * f.FromLocal(minPosDifferentialY + ty * minDirDifferentialY);
+    si.dpdx =
+        sppScale * RenderFromCamera(DownZFromCamera.ApplyInverse(px - pDownZ), si.time);
+    si.dpdy =
+        sppScale * RenderFromCamera(DownZFromCamera.ApplyInverse(py - pDownZ), si.time);
 }
 
 void CameraBase::FindMinimumDifferentials(CameraHandle camera) {

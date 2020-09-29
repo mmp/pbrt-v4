@@ -27,6 +27,7 @@ namespace pbrt {
 
 // TextureEvalContext Definition
 struct TextureEvalContext {
+    // TextureEvalContext Public Methods
     TextureEvalContext() = default;
     PBRT_CPU_GPU
     TextureEvalContext(const SurfaceInteraction &si)
@@ -93,12 +94,12 @@ class SphericalMapping2D {
 
     PBRT_CPU_GPU
     Point2f Map(TextureEvalContext ctx, Vector2f *dstdx, Vector2f *dstdy) const {
-        Point2f st = sphere(ctx.p);
+        Point2f st = Sphere(ctx.p);
         // Compute texture coordinate differentials for sphere $(u,v)$ mapping
-        const Float delta = .1f;
-        Point2f stDeltaX = sphere(ctx.p + delta * ctx.dpdx);
+        Float delta = .1f;
+        Point2f stDeltaX = Sphere(ctx.p + delta * ctx.dpdx);
         *dstdx = (stDeltaX - st) / delta;
-        Point2f stDeltaY = sphere(ctx.p + delta * ctx.dpdy);
+        Point2f stDeltaY = Sphere(ctx.p + delta * ctx.dpdy);
         *dstdy = (stDeltaY - st) / delta;
 
         // Handle sphere mapping discontinuity for coordinate differentials
@@ -117,7 +118,7 @@ class SphericalMapping2D {
   private:
     // SphericalMapping2D Private Methods
     PBRT_CPU_GPU
-    Point2f sphere(const Point3f &p) const {
+    Point2f Sphere(const Point3f &p) const {
         Vector3f vec = Normalize(textureFromRender(p) - Point3f(0, 0, 0));
         Float theta = SphericalTheta(vec), phi = SphericalPhi(vec);
         return {theta * InvPi, phi * Inv2Pi};
@@ -137,16 +138,16 @@ class CylindricalMapping2D {
 
     PBRT_CPU_GPU
     Point2f Map(TextureEvalContext ctx, Vector2f *dstdx, Vector2f *dstdy) const {
-        Point2f st = cylinder(ctx.p);
+        Point2f st = Cylinder(ctx.p);
         // Compute texture coordinate differentials for cylinder $(u,v)$ mapping
         const Float delta = .01f;
-        Point2f stDeltaX = cylinder(ctx.p + delta * ctx.dpdx);
+        Point2f stDeltaX = Cylinder(ctx.p + delta * ctx.dpdx);
         *dstdx = (stDeltaX - st) / delta;
         if ((*dstdx)[1] > .5)
             (*dstdx)[1] = 1.f - (*dstdx)[1];
         else if ((*dstdx)[1] < -.5f)
             (*dstdx)[1] = -((*dstdx)[1] + 1);
-        Point2f stDeltaY = cylinder(ctx.p + delta * ctx.dpdy);
+        Point2f stDeltaY = Cylinder(ctx.p + delta * ctx.dpdy);
         *dstdy = (stDeltaY - st) / delta;
         if ((*dstdy)[1] > .5)
             (*dstdy)[1] = 1.f - (*dstdy)[1];
@@ -159,7 +160,7 @@ class CylindricalMapping2D {
   private:
     // CylindricalMapping2D Private Methods
     PBRT_CPU_GPU
-    Point2f cylinder(const Point3f &p) const {
+    Point2f Cylinder(const Point3f &p) const {
         Vector3f vec = Normalize(textureFromRender(p) - Point3f(0, 0, 0));
         return Point2f((Pi + std::atan2(vec.y, vec.x)) * Inv2Pi, vec.z);
     }
@@ -172,7 +173,7 @@ class CylindricalMapping2D {
 class PlanarMapping2D {
   public:
     // PlanarMapping2D Public Methods
-    PlanarMapping2D(const Vector3f &vs, const Vector3f &vt, Float ds = 0, Float dt = 0)
+    PlanarMapping2D(Vector3f vs, Vector3f vt, Float ds, Float dt)
         : vs(vs), vt(vt), ds(ds), dt(dt) {}
 
     PBRT_CPU_GPU
@@ -263,6 +264,7 @@ inline Point3f TextureMapping3DHandle::Map(TextureEvalContext ctx, Vector3f *dpd
 // FloatConstantTexture Definition
 class FloatConstantTexture {
   public:
+    // FloatConstantTexture Public Methods
     FloatConstantTexture(Float value) : value(value) {}
 
     PBRT_CPU_GPU
@@ -278,42 +280,10 @@ class FloatConstantTexture {
     Float value;
 };
 
-// RGBConstantTexture Definition
-class RGBConstantTexture {
-  public:
-    RGBConstantTexture(const RGBColorSpace &cs, const RGB &rgb) : value(cs, rgb) {}
-
-    PBRT_CPU_GPU
-    SampledSpectrum Evaluate(TextureEvalContext ctx, SampledWavelengths lambda) const {
-        return value.Sample(lambda);
-    }
-
-    std::string ToString() const;
-
-  private:
-    RGBSpectrum value;
-};
-
-// RGBReflectanceConstantTexture Definition
-class RGBReflectanceConstantTexture {
-  public:
-    RGBReflectanceConstantTexture(const RGBColorSpace &cs, const RGB &rgb)
-        : value(cs, rgb) {}
-
-    PBRT_CPU_GPU
-    SampledSpectrum Evaluate(TextureEvalContext ctx, SampledWavelengths lambda) const {
-        return value.Sample(lambda);
-    }
-
-    std::string ToString() const;
-
-  private:
-    RGBReflectanceSpectrum value;
-};
-
 // SpectrumConstantTexture Definition
 class SpectrumConstantTexture {
   public:
+    // SpectrumConstantTexture Public Methods
     SpectrumConstantTexture(SpectrumHandle value) : value(value) { DCHECK(value); }
 
     PBRT_CPU_GPU
@@ -793,7 +763,7 @@ class MarbleTexture {
 // FloatMixTexture Definition
 class FloatMixTexture {
   public:
-    // MixTexture Public Methods
+    // FloatMixTexture Public Methods
     FloatMixTexture(FloatTextureHandle tex1, FloatTextureHandle tex2,
                     FloatTextureHandle amount)
         : tex1(tex1), tex2(tex2), amount(amount) {}
@@ -891,6 +861,7 @@ class SpectrumPtexTexture : public PtexTextureBase {
 // FloatScaledTexture Definition
 class FloatScaledTexture {
   public:
+    // FloatScaledTexture Public Methods
     FloatScaledTexture(FloatTextureHandle tex, FloatTextureHandle scale)
         : tex(tex), scale(scale) {}
 
@@ -994,6 +965,7 @@ inline SampledSpectrum SpectrumTextureHandle::Evaluate(TextureEvalContext ctx,
     return Dispatch(eval);
 }
 
+// UniversalTextureEvaluator Definition
 class UniversalTextureEvaluator {
   public:
     PBRT_CPU_GPU
@@ -1019,9 +991,8 @@ class BasicTextureEvaluator {
                 return false;
             }
         for (auto s : stex)
-            if (s && (!s.Is<SpectrumConstantTexture>() && !s.Is<RGBConstantTexture>() &&
-                      !s.Is<RGBReflectanceConstantTexture>() &&
-                      !s.Is<GPUSpectrumImageTexture>())) {
+            if (s &&
+                (!s.Is<SpectrumConstantTexture>() && !s.Is<GPUSpectrumImageTexture>())) {
                 return false;
             }
         return true;
@@ -1042,11 +1013,6 @@ class BasicTextureEvaluator {
                                SampledWavelengths lambda) {
         if (SpectrumConstantTexture *sc = tex.CastOrNullptr<SpectrumConstantTexture>())
             return sc->Evaluate(ctx, lambda);
-        else if (RGBConstantTexture *rgbc = tex.CastOrNullptr<RGBConstantTexture>())
-            return rgbc->Evaluate(ctx, lambda);
-        else if (RGBReflectanceConstantTexture *rgbc =
-                     tex.CastOrNullptr<RGBReflectanceConstantTexture>())
-            return rgbc->Evaluate(ctx, lambda);
         else if (GPUSpectrumImageTexture *sg =
                      tex.CastOrNullptr<GPUSpectrumImageTexture>())
             return sg->Evaluate(ctx, lambda);

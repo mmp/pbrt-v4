@@ -25,6 +25,7 @@ namespace pbrt {
 
 // MaterialEvalContext Definition
 struct MaterialEvalContext : public TextureEvalContext {
+    // MaterialEvalContext Public Methods
     MaterialEvalContext() = default;
     PBRT_CPU_GPU
     MaterialEvalContext(const SurfaceInteraction &si)

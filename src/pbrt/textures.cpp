@@ -100,14 +100,6 @@ FloatConstantTexture *FloatConstantTexture::Create(
     return alloc.new_object<FloatConstantTexture>(parameters.GetOneFloat("value", 1.f));
 }
 
-std::string RGBConstantTexture::ToString() const {
-    return StringPrintf("[ RGBConstantTexture value: %s ]", value);
-}
-
-std::string RGBReflectanceConstantTexture::ToString() const {
-    return StringPrintf("[ RGBReflectanceConstantTexture value: %s ]", value);
-}
-
 std::string SpectrumConstantTexture::ToString() const {
     return StringPrintf("[ SpectrumConstantTexture value: %s ]", value);
 }

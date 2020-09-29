@@ -80,9 +80,17 @@ void SurfaceInteraction::ComputeDifferentials(const RayDifferential &ray,
     dvdy = std::isfinite(dvdy) ? Clamp(dvdy, -1e8f, 1e8f) : 0.f;
 }
 
+void SurfaceInteraction::SkipIntersection(RayDifferential *ray, Float t) const {
+    *((Ray *)ray) = SpawnRay(ray->d);
+    if (ray->hasDifferentials) {
+        ray->rxOrigin = ray->rxOrigin + t * ray->rxDirection;
+        ray->ryOrigin = ray->ryOrigin + t * ray->ryDirection;
+    }
+}
+
 RayDifferential SurfaceInteraction::SpawnRay(const RayDifferential &rayi,
-                                             const BSDF &bsdf, const Vector3f &wi,
-                                             int /*BxDFFlags*/ flags) const {
+                                             const BSDF &bsdf, Vector3f wi,
+                                             int flags) const {
     RayDifferential rd(SpawnRay(wi));
     if (rayi.hasDifferentials) {
         // Compute ray differentials for specular reflection or transmission
@@ -92,66 +100,53 @@ RayDifferential SurfaceInteraction::SpawnRay(const RayDifferential &rayi,
         Normal3f dndy = shading.dndu * dudy + shading.dndv * dvdy;
         Vector3f dwodx = -rayi.rxDirection - wo, dwody = -rayi.ryDirection - wo;
 
-        if (flags == (BxDFFlags::Reflection | BxDFFlags::Specular)) {
+        if (flags == BxDFFlags::SpecularReflection) {
             // Initialize origins of specular differential rays
             rd.hasDifferentials = true;
             rd.rxOrigin = p() + dpdx;
             rd.ryOrigin = p() + dpdy;
 
             // Compute differential reflected directions
-            Float dDNdx = Dot(dwodx, ns) + Dot(wo, dndx);
-            Float dDNdy = Dot(dwody, ns) + Dot(wo, dndy);
-            rd.rxDirection = wi - dwodx + 2.f * Vector3f(Dot(wo, ns) * dndx + dDNdx * ns);
-            rd.ryDirection = wi - dwody + 2.f * Vector3f(Dot(wo, ns) * dndy + dDNdy * ns);
+            Float dwoDotNdx = Dot(dwodx, ns) + Dot(wo, dndx);
+            Float dwoDotNdy = Dot(dwody, ns) + Dot(wo, dndy);
+            rd.rxDirection =
+                wi - dwodx + 2 * Vector3f(Dot(wo, ns) * dndx + dwoDotNdx * ns);
+            rd.ryDirection =
+                wi - dwody + 2 * Vector3f(Dot(wo, ns) * dndy + dwoDotNdy * ns);
 
-        } else if (flags == (BxDFFlags::Transmission | BxDFFlags::Specular)) {
+        } else if (flags == BxDFFlags::SpecularTransmission) {
             // Initialize origins of specular differential rays
             rd.hasDifferentials = true;
             rd.rxOrigin = p() + dpdx;
             rd.ryOrigin = p() + dpdy;
 
             // Compute differential transmitted directions
-            // NOTE: eta coming in is now 1/eta from the derivation below, so
-            // there's a 1/ here now...
+            // Find _eta_ and oriented surface normal for transmission
             Float eta = 1 / bsdf.eta;
             if (Dot(wo, ns) < 0) {
                 ns = -ns;
                 dndx = -dndx;
                 dndy = -dndy;
             }
-            Float dDNdx = Dot(dwodx, ns) + Dot(wo, dndx);
-            Float dDNdy = Dot(dwody, ns) + Dot(wo, dndy);
+
             // Compute partial derivatives of $\mu$
+            Float dwoDotNdx = Dot(dwodx, ns) + Dot(wo, dndx);
+            Float dwoDotNdy = Dot(dwody, ns) + Dot(wo, dndy);
             Float mu = eta * Dot(wo, ns) - AbsDot(wi, ns);
-            Float dmudx = (eta - (eta * eta * Dot(wo, ns)) / AbsDot(wi, ns)) * dDNdx;
-            Float dmudy = (eta - (eta * eta * Dot(wo, ns)) / AbsDot(wi, ns)) * dDNdy;
+            Float dmudx = (eta - (eta * eta * Dot(wo, ns)) / AbsDot(wi, ns)) * dwoDotNdx;
+            Float dmudy = (eta - (eta * eta * Dot(wo, ns)) / AbsDot(wi, ns)) * dwoDotNdy;
 
             rd.rxDirection = wi - eta * dwodx + Vector3f(mu * dndx + dmudx * ns);
             rd.ryDirection = wi - eta * dwody + Vector3f(mu * dndy + dmudy * ns);
         }
     }
     // Squash potentially troublesome differentials
-    // After many specuar bounces (e.g. the Transparent Machines scenes),
-    // differentials can drift off to have large magnitudes, which ends up
-    // leaving a trail of Infs and NaNs in their wake. We'll disable the
-    // differentials when this seems to be happening.
-    //
-    // TODO: this is unsatisfying and would be nice to address in a more
-    // principled way.
     if (LengthSquared(rd.rxDirection) > 1e16f || LengthSquared(rd.ryDirection) > 1e16f ||
         LengthSquared(Vector3f(rd.rxOrigin)) > 1e16f ||
         LengthSquared(Vector3f(rd.ryOrigin)) > 1e16f)
         rd.hasDifferentials = false;
 
     return rd;
-}
-
-void SurfaceInteraction::SkipIntersection(RayDifferential *ray, Float t) const {
-    *((Ray *)ray) = SpawnRay(ray->d);
-    if (ray->hasDifferentials) {
-        ray->rxOrigin = ray->rxOrigin + t * ray->rxDirection;
-        ray->ryOrigin = ray->ryOrigin + t * ray->ryDirection;
-    }
 }
 
 BSDF SurfaceInteraction::GetBSDF(const RayDifferential &ray, SampledWavelengths &lambda,

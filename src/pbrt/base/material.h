@@ -54,13 +54,13 @@ class MaterialHandle
     template <typename TextureEvaluator>
     PBRT_CPU_GPU inline BSDF GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
                                      SampledWavelengths &lambda,
-                                     ScratchBuffer &scratchBuffer) const;
+                                     ScratchBuffer &buf) const;
 
     template <typename TextureEvaluator>
     PBRT_CPU_GPU inline BSSRDFHandle GetBSSRDF(TextureEvaluator texEval,
                                                MaterialEvalContext ctx,
                                                SampledWavelengths &lambda,
-                                               ScratchBuffer &scratchBuffer) const;
+                                               ScratchBuffer &buf) const;
 
     PBRT_CPU_GPU inline FloatTextureHandle GetDisplacement() const;
 

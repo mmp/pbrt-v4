@@ -835,13 +835,14 @@ SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTextureOrNull(
                 ErrorExit(&p->loc,
                           "Negative value provided for \"rgb\" parameter \"%s\".",
                           p->name);
+            SpectrumHandle s;
             if (spectrumType == SpectrumType::General)
-                return alloc.new_object<RGBConstantTexture>(*dict->ColorSpace(), rgb);
+                s = alloc.new_object<RGBSpectrum>(*dict->ColorSpace(), rgb);
             else {
                 CHECK(spectrumType == SpectrumType::Reflectance);
-                return alloc.new_object<RGBReflectanceConstantTexture>(
-                    *dict->ColorSpace(), rgb);
+                s = alloc.new_object<RGBReflectanceSpectrum>(*dict->ColorSpace(), rgb);
             }
+            return alloc.new_object<SpectrumConstantTexture>(s);
         } else if (p->type == "spectrum" || p->type == "blackbody") {
             SpectrumHandle s = GetOneSpectrum(name, nullptr, spectrumType, alloc);
             CHECK(s != nullptr);

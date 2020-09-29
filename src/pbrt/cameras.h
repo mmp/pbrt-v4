@@ -62,6 +62,11 @@ class CameraTransform {
     }
 
     PBRT_CPU_GPU
+    Normal3f RenderFromCamera(const Normal3f &n, Float time) const {
+        return renderFromCamera(n, time);
+    }
+
+    PBRT_CPU_GPU
     Ray RenderFromCamera(const Ray &r) const { return renderFromCamera(r); }
 
     PBRT_CPU_GPU
@@ -71,6 +76,11 @@ class CameraTransform {
 
     PBRT_CPU_GPU
     Vector3f CameraFromRender(const Vector3f &v, Float time) const {
+        return renderFromCamera.ApplyInverse(v, time);
+    }
+
+    PBRT_CPU_GPU
+    Normal3f CameraFromRender(const Normal3f &v, Float time) const {
         return renderFromCamera.ApplyInverse(v, time);
     }
 
@@ -172,12 +182,22 @@ class CameraBase {
     }
 
     PBRT_CPU_GPU
+    Normal3f RenderFromCamera(const Normal3f &v, Float time) const {
+        return cameraTransform.RenderFromCamera(v, time);
+    }
+
+    PBRT_CPU_GPU
     Point3f RenderFromCamera(const Point3f &p, Float time) const {
         return cameraTransform.RenderFromCamera(p, time);
     }
 
     PBRT_CPU_GPU
     Vector3f CameraFromRender(const Vector3f &v, Float time) const {
+        return cameraTransform.CameraFromRender(v, time);
+    }
+
+    PBRT_CPU_GPU
+    Normal3f CameraFromRender(const Normal3f &v, Float time) const {
         return cameraTransform.CameraFromRender(v, time);
     }
 
