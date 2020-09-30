@@ -396,9 +396,11 @@ SampledSpectrum SpectrumImageTexture::Evaluate(TextureEvalContext ctx,
 
     // Return _SampledSpectrum_ for RGB image texture value
     if (const RGBColorSpace *cs = mipmap->GetRGBColorSpace(); cs != nullptr) {
-        if (std::max({rgb.r, rgb.g, rgb.b}) <= 1)
+        if (spectrumType == SpectrumType::Reflectance) {
+            rgb = Clamp(rgb, 0, 1);
             return RGBReflectanceSpectrum(*cs, rgb).Sample(lambda);
-        return RGBSpectrum(*cs, rgb).Sample(lambda);
+        } else
+            return RGBSpectrum(*cs, rgb).Sample(lambda);
     }
     // otherwise it better be a one-channel texture
     DCHECK(rgb[0] == rgb[1] && rgb[1] == rgb[2]);
@@ -703,9 +705,12 @@ SampledSpectrum SpectrumPtexTexture::Evaluate(TextureEvalContext ctx,
     if (nc == 1)
         return SampledSpectrum(result[0]);
     DCHECK_EQ(3, nc);
-    return RGBReflectanceSpectrum(*RGBColorSpace::sRGB,
-                                  RGB(result[0], result[1], result[2]))
-        .Sample(lambda);
+    RGB rgb(result[0], result[1], result[2]);
+    if (spectrumType == SpectrumType::Reflectance) {
+        rgb = Clamp(rgb, 0, 1);
+        return RGBReflectanceSpectrum(*RGBColorSpace::sRGB, rgb).Sample(lambda);
+    } else
+        return RGBSpectrum(*RGBColorSpace::sRGB, rgb).Sample(lambda);
 #endif
 }
 
