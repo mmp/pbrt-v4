@@ -590,7 +590,7 @@ class FloatImageTexture : public ImageTextureBase {
         // Texture coordinates are (0,0) in the lower left corner, but
         // image coordinates are (0,0) in the upper left.
         st[1] = 1 - st[1];
-        return scale * mipmap->Lookup<Float>(st, dstdx, dstdy);
+        return scale * mipmap->Filter<Float>(st, dstdx, dstdy);
 #endif
     }
 

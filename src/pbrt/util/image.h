@@ -343,8 +343,8 @@ class Image {
 
     Image FloatResize(Point2i newResolution, WrapMode2D wrap) const;
     void FlipY();
-    static pstd::vector<Image> GenerateMIPMap(Image image, WrapMode2D wrapMode,
-                                              Allocator alloc = {});
+    static pstd::vector<Image> GeneratePyramid(Image image, WrapMode2D wrapMode,
+                                               Allocator alloc = {});
 
     PBRT_CPU_GPU
     PixelFormat Format() const { return format; }

@@ -17,6 +17,7 @@
 
 namespace pbrt {
 
+// FilterFunction Definition
 enum class FilterFunction { Point, Bilinear, Trilinear, EWA };
 
 inline pstd::optional<FilterFunction> ParseFilter(const std::string &f) {
@@ -55,9 +56,7 @@ class MIPMap {
                                   ColorEncodingHandle encoding, Allocator alloc);
 
     template <typename T>
-    T Lookup(const Point2f &st, Float width = 0.f) const;
-    template <typename T>
-    T Lookup(const Point2f &st, Vector2f dstdx, Vector2f dstdy) const;
+    T Filter(Point2f st, Vector2f dstdx, Vector2f dstdy) const;
 
     std::string ToString() const;
 
@@ -65,7 +64,6 @@ class MIPMap {
         CHECK(level >= 0 && level < pyramid.size());
         return pyramid[level].Resolution();
     }
-
     int Levels() const { return int(pyramid.size()); }
     const RGBColorSpace *GetRGBColorSpace() const { return colorSpace; }
 
