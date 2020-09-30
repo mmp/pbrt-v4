@@ -684,11 +684,9 @@ const FileLoc *ParameterDictionary::loc(const std::string &name) const {
 }
 
 // TextureParameterDictionary Method Definitions
-TextureParameterDictionary::TextureParameterDictionary(
-    const ParameterDictionary *dict,
-    const std::map<std::string, FloatTextureHandle> *floatTextures,
-    const std::map<std::string, SpectrumTextureHandle> *spectrumTextures)
-    : dict(dict), floatTextures(floatTextures), spectrumTextures(spectrumTextures) {}
+TextureParameterDictionary::TextureParameterDictionary(const ParameterDictionary *dict,
+                                                       const SceneTextures *textures)
+    : dict(dict), textures(textures) {}
 
 Float TextureParameterDictionary::GetOneFloat(const std::string &name, Float def) const {
     return dict->GetOneFloat(name, def);
@@ -802,6 +800,10 @@ SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTexture(
 
 SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTextureOrNull(
     const std::string &name, SpectrumType spectrumType, Allocator alloc) const {
+    const auto &spectrumTextures = (spectrumType == SpectrumType::Reflectance)
+                                       ? textures->spectrumReflectanceTextureMap
+                                       : textures->spectrumGeneralTextureMap;
+
     for (const ParsedParameter *p : dict->params) {
         if (p->name != name)
             continue;
@@ -816,8 +818,8 @@ SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTextureOrNull(
                           name);
 
             p->lookedUp = true;
-            auto iter = spectrumTextures->find(p->strings[0]);
-            if (iter != spectrumTextures->end())
+            auto iter = spectrumTextures.find(p->strings[0]);
+            if (iter != spectrumTextures.end())
                 return iter->second;
 
             ErrorExit(&p->loc,
@@ -876,8 +878,8 @@ FloatTextureHandle TextureParameterDictionary::GetFloatTextureOrNull(
                           name);
 
             p->lookedUp = true;
-            auto iter = floatTextures->find(p->strings[0]);
-            if (iter != floatTextures->end())
+            auto iter = textures->floatTextureMap.find(p->strings[0]);
+            if (iter != textures->floatTextureMap.end())
                 return iter->second;
 
             ErrorExit(&p->loc,

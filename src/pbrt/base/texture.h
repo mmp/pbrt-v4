@@ -79,7 +79,8 @@ class SpectrumTextureHandle
     static SpectrumTextureHandle Create(const std::string &name,
                                         const Transform &renderFromTexture,
                                         const TextureParameterDictionary &parameters,
-                                        const FileLoc *loc, Allocator alloc, bool gpu);
+                                        SpectrumType spectrumType, const FileLoc *loc,
+                                        Allocator alloc, bool gpu);
 
     std::string ToString() const;
 

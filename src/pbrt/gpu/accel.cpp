@@ -878,15 +878,12 @@ GPUAccel::GPUAccel(
     randomHitSBT.missRecordCount = 1;
 
     // Textures
-    std::map<std::string, FloatTextureHandle> floatTextures;
-    std::map<std::string, SpectrumTextureHandle> spectrumTextures;
-    scene.CreateTextures(&floatTextures, &spectrumTextures, alloc, true);
+    SceneTextures textures = scene.CreateTextures(alloc, true);
 
     // Materials
     std::map<std::string, MaterialHandle> namedMaterials;
     std::vector<MaterialHandle> materials;
-    scene.CreateMaterials(floatTextures, spectrumTextures, alloc, &namedMaterials,
-                          &materials);
+    scene.CreateMaterials(textures, alloc, &namedMaterials, &materials);
 
     // Report which Materials are actually present...
     std::function<void(MaterialHandle)> updateMaterialNeeds;
@@ -922,16 +919,16 @@ GPUAccel::GPUAccel(
 
     OptixTraversableHandle triangleGASTraversable = createGASForTriangles(
         scene.shapes, hitPGTriangle, anyhitPGShadowTriangle, hitPGRandomHitTriangle,
-        floatTextures, namedMaterials, materials, media, shapeIndexToAreaLights, &bounds);
+        textures.floatTextureMap, namedMaterials, materials, media, shapeIndexToAreaLights, &bounds);
     int bilinearSBTOffset = intersectHGRecords.size();
     OptixTraversableHandle bilinearPatchGASTraversable =
         createGASForBLPs(scene.shapes, hitPGBilinearPatch, anyhitPGShadowBilinearPatch,
-                         hitPGRandomHitBilinearPatch, floatTextures, namedMaterials,
+                         hitPGRandomHitBilinearPatch, textures.floatTextureMap, namedMaterials,
                          materials, media, shapeIndexToAreaLights, &bounds);
     int quadricSBTOffset = intersectHGRecords.size();
     OptixTraversableHandle quadricGASTraversable = createGASForQuadrics(
         scene.shapes, hitPGQuadric, anyhitPGShadowQuadric, hitPGRandomHitQuadric,
-        floatTextures, namedMaterials, materials, media, shapeIndexToAreaLights, &bounds);
+        textures.floatTextureMap, namedMaterials, materials, media, shapeIndexToAreaLights, &bounds);
 
     pstd::vector<OptixInstance> iasInstances(alloc);
 
@@ -974,7 +971,7 @@ GPUAccel::GPUAccel(
         inst.sbtOffset = intersectHGRecords.size();
         inst.handle = createGASForTriangles(
             def.second.shapes, hitPGTriangle, anyhitPGShadowTriangle,
-            hitPGRandomHitTriangle, floatTextures, namedMaterials, materials, media, {},
+            hitPGRandomHitTriangle, textures.floatTextureMap, namedMaterials, materials, media, {},
             &inst.bounds);
         instanceMap[def.first] = inst;
     }

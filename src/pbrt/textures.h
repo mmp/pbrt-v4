@@ -289,7 +289,8 @@ class SpectrumConstantTexture {
     // SpectrumConstantTexture Public Methods
     static SpectrumConstantTexture *Create(const Transform &renderFromTexture,
                                            const TextureParameterDictionary &parameters,
-                                           const FileLoc *loc, Allocator alloc);
+                                           SpectrumType spectrumType, const FileLoc *loc,
+                                           Allocator alloc);
     std::string ToString() const;
 
   private:
@@ -339,7 +340,8 @@ class SpectrumBilerpTexture {
 
     static SpectrumBilerpTexture *Create(const Transform &renderFromTexture,
                                          const TextureParameterDictionary &parameters,
-                                         const FileLoc *loc, Allocator alloc);
+                                         SpectrumType spectrumType, const FileLoc *loc,
+                                         Allocator alloc);
 
     std::string ToString() const;
 
@@ -399,7 +401,7 @@ class SpectrumCheckerboardTexture {
 
     static SpectrumCheckerboardTexture *Create(
         const Transform &renderFromTexture, const TextureParameterDictionary &parameters,
-        const FileLoc *loc, Allocator alloc);
+        SpectrumType spectrumType, const FileLoc *loc, Allocator alloc);
 
     std::string ToString() const;
 
@@ -469,7 +471,8 @@ class SpectrumDotsTexture {
 
     static SpectrumDotsTexture *Create(const Transform &renderFromTexture,
                                        const TextureParameterDictionary &parameters,
-                                       const FileLoc *loc, Allocator alloc);
+                                       SpectrumType spectrumType, const FileLoc *loc,
+                                       Allocator alloc);
 
     std::string ToString() const;
 
@@ -561,7 +564,7 @@ class ImageTextureBase {
     // ImageTextureBase Protected Members
     TextureMapping2DHandle mapping;
     Float scale;
-    MIPMap *mipmap = nullptr;
+    MIPMap *mipmap;
 
   private:
     // ImageTextureBase Private Members
@@ -604,18 +607,25 @@ class SpectrumImageTexture : public ImageTextureBase {
     // SpectrumImageTexture Public Methods
     SpectrumImageTexture(TextureMapping2DHandle mapping, std::string filename,
                          MIPMapFilterOptions filterOptions, WrapMode wrapMode,
-                         Float scale, ColorEncodingHandle encoding, Allocator alloc)
+                         Float scale, ColorEncodingHandle encoding,
+                         SpectrumType spectrumType, Allocator alloc)
         : ImageTextureBase(mapping, filename, filterOptions, wrapMode, scale, encoding,
-                           alloc) {}
+                           alloc),
+          spectrumType(spectrumType) {}
 
     PBRT_CPU_GPU
     SampledSpectrum Evaluate(TextureEvalContext ctx, SampledWavelengths lambda) const;
 
     static SpectrumImageTexture *Create(const Transform &renderFromTexture,
                                         const TextureParameterDictionary &parameters,
-                                        const FileLoc *loc, Allocator alloc);
+                                        SpectrumType spectrumType, const FileLoc *loc,
+                                        Allocator alloc);
 
     std::string ToString() const;
+
+  private:
+    // SpectrumImageTexture Private Members
+    SpectrumType spectrumType;
 };
 
 #if defined(PBRT_BUILD_GPU_RENDERER) && defined(__NVCC__)
@@ -623,12 +633,13 @@ class GPUSpectrumImageTexture {
   public:
     GPUSpectrumImageTexture(TextureMapping2DHandle mapping, cudaTextureObject_t texObj,
                             Float scale, bool isSingleChannel,
-                            const RGBColorSpace *colorSpace)
+                            const RGBColorSpace *colorSpace, SpectrumType spectrumType)
         : mapping(mapping),
           texObj(texObj),
           scale(scale),
           isSingleChannel(isSingleChannel),
-          colorSpace(colorSpace) {}
+          colorSpace(colorSpace),
+          spectrumType(spectrumType) {}
 
     PBRT_CPU_GPU
     SampledSpectrum Evaluate(TextureEvalContext ctx, SampledWavelengths lambda) const {
@@ -656,7 +667,8 @@ class GPUSpectrumImageTexture {
 
     static GPUSpectrumImageTexture *Create(const Transform &renderFromTexture,
                                            const TextureParameterDictionary &parameters,
-                                           const FileLoc *loc, Allocator alloc);
+                                           SpectrumType spectrumType, const FileLoc *loc,
+                                           Allocator alloc);
 
     std::string ToString() const { return "GPUSpectrumImageTexture"; }
 
@@ -667,6 +679,7 @@ class GPUSpectrumImageTexture {
     Float scale;
     bool isSingleChannel;
     const RGBColorSpace *colorSpace;
+    SpectrumType spectrumType;
 };
 
 class GPUFloatImageTexture {
@@ -713,7 +726,8 @@ class GPUSpectrumImageTexture {
 
     static GPUSpectrumImageTexture *Create(const Transform &renderFromTexture,
                                            const TextureParameterDictionary &parameters,
-                                           const FileLoc *loc, Allocator alloc) {
+                                           SpectrumType spectrumType, const FileLoc *loc,
+                                           Allocator alloc) {
         LOG_FATAL("GPUSpectrumImageTexture::Create called in non-GPU configuration.");
         return nullptr;
     }
@@ -818,7 +832,8 @@ class SpectrumMixTexture {
 
     static SpectrumMixTexture *Create(const Transform &renderFromTexture,
                                       const TextureParameterDictionary &parameters,
-                                      const FileLoc *loc, Allocator alloc);
+                                      SpectrumType spectrumType, const FileLoc *loc,
+                                      Allocator alloc);
 
     std::string ToString() const;
 
@@ -859,17 +874,22 @@ class FloatPtexTexture : public PtexTextureBase {
 
 class SpectrumPtexTexture : public PtexTextureBase {
   public:
-    SpectrumPtexTexture(const std::string &filename, ColorEncodingHandle encoding)
-        : PtexTextureBase(filename, encoding) {}
+    SpectrumPtexTexture(const std::string &filename, ColorEncodingHandle encoding,
+                        SpectrumType spectrumType)
+        : PtexTextureBase(filename, encoding), spectrumType(spectrumType) {}
 
     PBRT_CPU_GPU
     SampledSpectrum Evaluate(TextureEvalContext ctx, SampledWavelengths lambda) const;
 
     static SpectrumPtexTexture *Create(const Transform &renderFromTexture,
                                        const TextureParameterDictionary &parameters,
-                                       const FileLoc *loc, Allocator alloc);
+                                       SpectrumType spectrumType, const FileLoc *loc,
+                                       Allocator alloc);
 
     std::string ToString() const;
+
+  private:
+    SpectrumType spectrumType;
 };
 
 // FloatScaledTexture Definition
@@ -913,7 +933,8 @@ class SpectrumScaledTexture {
 
     static SpectrumTextureHandle Create(const Transform &renderFromTexture,
                                         const TextureParameterDictionary &parameters,
-                                        const FileLoc *loc, Allocator alloc);
+                                        SpectrumType spectrumType, const FileLoc *loc,
+                                        Allocator alloc);
 
     std::string ToString() const;
 

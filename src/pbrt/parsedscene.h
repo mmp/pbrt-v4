@@ -329,16 +329,11 @@ class ParsedScene : public SceneRepresentation {
 
     std::string ToString() const;
 
-    void CreateTextures(std::map<std::string, FloatTextureHandle> *floatTextureMap,
-                        std::map<std::string, SpectrumTextureHandle> *spectrumTextureMap,
-                        Allocator alloc, bool gpu) const;
+    SceneTextures CreateTextures(Allocator alloc, bool gpu) const;
 
-    void CreateMaterials(
-        /*const*/ std::map<std::string, FloatTextureHandle> &floatTextures,
-        /*const*/
-        std::map<std::string, SpectrumTextureHandle> &spectrumTextures, Allocator alloc,
-        std::map<std::string, MaterialHandle> *namedMaterials,
-        std::vector<MaterialHandle> *materials) const;
+    void CreateMaterials(/*const*/ SceneTextures &sceneTextures, Allocator alloc,
+                         std::map<std::string, MaterialHandle> *namedMaterials,
+                         std::vector<MaterialHandle> *materials) const;
 
     std::map<std::string, MediumHandle> CreateMedia(Allocator alloc) const;
 

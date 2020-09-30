@@ -753,9 +753,8 @@ void ParsedScene::ReverseOrientation(FileLoc loc) {
 }
 
 void ParsedScene::CreateMaterials(
-    /*const*/ std::map<std::string, FloatTextureHandle> &floatTextures,
-    /*const*/ std::map<std::string, SpectrumTextureHandle> &spectrumTextures,
-    Allocator alloc, std::map<std::string, MaterialHandle> *namedMaterialsOut,
+    /*const*/ SceneTextures &textures, Allocator alloc,
+    std::map<std::string, MaterialHandle> *namedMaterialsOut,
     std::vector<MaterialHandle> *materialsOut) const {
     // Named materials
     for (const auto &nm : namedMaterials) {
@@ -774,8 +773,7 @@ void ParsedScene::CreateMaterials(
                               name);
             continue;
         }
-        TextureParameterDictionary texDict(&mtl.parameters, &floatTextures,
-                                           &spectrumTextures);
+        TextureParameterDictionary texDict(&mtl.parameters, &textures);
         MaterialHandle m =
             MaterialHandle::Create(type, texDict, *namedMaterialsOut, &mtl.loc, alloc);
         (*namedMaterialsOut)[name] = m;
@@ -784,18 +782,16 @@ void ParsedScene::CreateMaterials(
     // Regular materials
     materialsOut->reserve(materials.size());
     for (const auto &mtl : materials) {
-        TextureParameterDictionary texDict(&mtl.parameters, &floatTextures,
-                                           &spectrumTextures);
+        TextureParameterDictionary texDict(&mtl.parameters, &textures);
         MaterialHandle m = MaterialHandle::Create(mtl.name, texDict, *namedMaterialsOut,
                                                   &mtl.loc, alloc);
         materialsOut->push_back(m);
     }
 }
 
-void ParsedScene::CreateTextures(
-    std::map<std::string, FloatTextureHandle> *floatTextureMap,
-    std::map<std::string, SpectrumTextureHandle> *spectrumTextureMap, Allocator alloc,
-    bool gpu) const {
+SceneTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
+    SceneTextures textures;
+
     std::set<std::string> seenFloatTextureFilenames, seenSpectrumTextureFilenames;
     std::vector<size_t> parallelFloatTextures, serialFloatTextures;
     std::vector<size_t> parallelSpectrumTextures, serialSpectrumTextures;
@@ -866,11 +862,11 @@ void ParsedScene::CreateTextures(
         pbrt::Transform renderFromTexture = tex.second.renderFromObject.startTransform;
         // Pass nullptr for the textures, since they shouldn't be accessed
         // anyway.
-        TextureParameterDictionary texDict(&tex.second.parameters, nullptr, nullptr);
+        TextureParameterDictionary texDict(&tex.second.parameters, nullptr);
         FloatTextureHandle t = FloatTextureHandle::Create(
             tex.second.texName, renderFromTexture, texDict, &tex.second.loc, alloc, gpu);
         std::lock_guard<std::mutex> lock(mutex);
-        (*floatTextureMap)[tex.first] = t;
+        textures.floatTextureMap[tex.first] = t;
     });
 
     ParallelFor(0, parallelSpectrumTextures.size(), [&](int64_t i) {
@@ -878,11 +874,18 @@ void ParsedScene::CreateTextures(
 
         pbrt::Transform renderFromTexture = tex.second.renderFromObject.startTransform;
         // nullptr for the textures, as above.
-        TextureParameterDictionary texDict(&tex.second.parameters, nullptr, nullptr);
-        SpectrumTextureHandle t = SpectrumTextureHandle::Create(
-            tex.second.texName, renderFromTexture, texDict, &tex.second.loc, alloc, gpu);
+        TextureParameterDictionary texDict(&tex.second.parameters, nullptr);
+        SpectrumTextureHandle reflectanceTex = SpectrumTextureHandle::Create(
+            tex.second.texName, renderFromTexture, texDict, SpectrumType::Reflectance,
+            &tex.second.loc, alloc, gpu);
+        // This one should be fast since it should hit the texture cache
+        SpectrumTextureHandle generalTex = SpectrumTextureHandle::Create(
+            tex.second.texName, renderFromTexture, texDict, SpectrumType::General,
+            &tex.second.loc, alloc, gpu);
+
         std::lock_guard<std::mutex> lock(mutex);
-        (*spectrumTextureMap)[tex.first] = t;
+        textures.spectrumReflectanceTextureMap[tex.first] = reflectanceTex;
+        textures.spectrumGeneralTextureMap[tex.first] = generalTex;
     });
 
     LOG_VERBOSE("Loading serial textures");
@@ -891,11 +894,10 @@ void ParsedScene::CreateTextures(
         const auto &tex = floatTextures[index];
 
         pbrt::Transform renderFromTexture = tex.second.renderFromObject.startTransform;
-        TextureParameterDictionary texDict(&tex.second.parameters, floatTextureMap,
-                                           spectrumTextureMap);
+        TextureParameterDictionary texDict(&tex.second.parameters, &textures);
         FloatTextureHandle t = FloatTextureHandle::Create(
             tex.second.texName, renderFromTexture, texDict, &tex.second.loc, alloc, gpu);
-        (*floatTextureMap)[tex.first] = t;
+        textures.floatTextureMap[tex.first] = t;
     }
     for (size_t index : serialSpectrumTextures) {
         const auto &tex = spectrumTextures[index];
@@ -905,14 +907,19 @@ void ParsedScene::CreateTextures(
                                      "Using start transform.");
 
         pbrt::Transform renderFromTexture = tex.second.renderFromObject.startTransform;
-        TextureParameterDictionary texDict(&tex.second.parameters, floatTextureMap,
-                                           spectrumTextureMap);
-        SpectrumTextureHandle t = SpectrumTextureHandle::Create(
-            tex.second.texName, renderFromTexture, texDict, &tex.second.loc, alloc, gpu);
-        (*spectrumTextureMap)[tex.first] = t;
+        TextureParameterDictionary texDict(&tex.second.parameters, &textures);
+        SpectrumTextureHandle reflectanceTex = SpectrumTextureHandle::Create(
+            tex.second.texName, renderFromTexture, texDict, SpectrumType::Reflectance,
+            &tex.second.loc, alloc, gpu);
+        SpectrumTextureHandle generalTex = SpectrumTextureHandle::Create(
+            tex.second.texName, renderFromTexture, texDict, SpectrumType::General,
+            &tex.second.loc, alloc, gpu);
+        textures.spectrumReflectanceTextureMap[tex.first] = reflectanceTex;
+        textures.spectrumGeneralTextureMap[tex.first] = generalTex;
     }
 
     LOG_VERBOSE("Done creating textures");
+    return textures;
 }
 
 std::map<std::string, MediumHandle> ParsedScene::CreateMedia(Allocator alloc) const {

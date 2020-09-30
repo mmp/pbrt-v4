@@ -42,6 +42,13 @@ enum class ParameterType {
 // SpectrumType Definition
 enum class SpectrumType { Reflectance, General };
 
+// SceneTextures Definition
+struct SceneTextures {
+    std::map<std::string, FloatTextureHandle> floatTextureMap;
+    std::map<std::string, SpectrumTextureHandle> spectrumReflectanceTextureMap;
+    std::map<std::string, SpectrumTextureHandle> spectrumGeneralTextureMap;
+};
+
 template <ParameterType PT>
 struct ParameterTypeTraits {};
 
@@ -149,10 +156,8 @@ class ParameterDictionary {
 class TextureParameterDictionary {
   public:
     // TextureParameterDictionary Public Methods
-    TextureParameterDictionary(
-        const ParameterDictionary *dict,
-        const std::map<std::string, FloatTextureHandle> *floatTextures,
-        const std::map<std::string, SpectrumTextureHandle> *spectrumTextures);
+    TextureParameterDictionary(const ParameterDictionary *dict,
+                               const SceneTextures *textures);
 
     operator const ParameterDictionary &() const { return *dict; }
 
@@ -199,8 +204,7 @@ class TextureParameterDictionary {
   private:
     // TextureParameterDictionary Private Members
     const ParameterDictionary *dict;
-    const std::map<std::string, FloatTextureHandle> *floatTextures;
-    const std::map<std::string, SpectrumTextureHandle> *spectrumTextures;
+    const SceneTextures *textures;
 };
 
 }  // namespace pbrt

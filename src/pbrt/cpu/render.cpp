@@ -72,15 +72,12 @@ void CPURender(ParsedScene &parsedScene) {
         camera.GetFilm().FullResolution(), &parsedScene.sampler.loc, alloc);
 
     // Textures
-    std::map<std::string, FloatTextureHandle> floatTextures;
-    std::map<std::string, SpectrumTextureHandle> spectrumTextures;
-    parsedScene.CreateTextures(&floatTextures, &spectrumTextures, alloc, false);
+    SceneTextures textures = parsedScene.CreateTextures(alloc, false);
 
     // Materials
     std::map<std::string, MaterialHandle> namedMaterials;
     std::vector<MaterialHandle> materials;
-    parsedScene.CreateMaterials(floatTextures, spectrumTextures, alloc, &namedMaterials,
-                                &materials);
+    parsedScene.CreateMaterials(textures, alloc, &namedMaterials, &materials);
     bool haveSubsurface = false;
     for (const auto &mtl : parsedScene.materials)
         if (mtl.name == "subsurface")
@@ -110,8 +107,9 @@ void CPURender(ParsedScene &parsedScene) {
                                const FileLoc *loc) -> FloatTextureHandle {
         std::string alphaTexName = parameters.GetTexture("alpha");
         if (!alphaTexName.empty()) {
-            if (floatTextures.find(alphaTexName) != floatTextures.end())
-                return floatTextures[alphaTexName];
+            if (textures.floatTextureMap.find(alphaTexName) !=
+                textures.floatTextureMap.end())
+                return textures.floatTextureMap[alphaTexName];
             else
                 ErrorExit(loc, "%s: couldn't find float texture for \"alpha\" parameter.",
                           alphaTexName);
