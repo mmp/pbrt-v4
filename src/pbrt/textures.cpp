@@ -155,9 +155,16 @@ std::string SpectrumBilerpTexture::ToString() const {
 // CheckerboardTexture Function Definitions
 Float Checkerboard(TextureEvalContext ctx, TextureMapping2DHandle map2D,
                    TextureMapping3DHandle map3D) {
-    // Define 1D checkerboard integral lambda function
-    auto bumpInt = [](Float x) {
-        return 1 - 2 * std::abs(x / 2 - std::floor(x / 2) - 0.5f);
+    // Define 1D checkerboard filtered integral functions
+    auto d = [](Float x) {
+        Float y = x / 2 - std::floor(x / 2) - 0.5f;
+        return x / 2 + y * (1 - 2 * std::abs(y));
+    };
+
+    auto bf = [&](Float x, Float w) -> Float {
+        if (std::floor(x - w) == std::floor(x + w))
+            return 1 - 2 * (int(std::floor(x)) & 1);
+        return (d(x + w) - 2 * d(x) + d(x - w)) / Sqr(w);
     };
 
     if (map2D) {
@@ -167,25 +174,20 @@ Float Checkerboard(TextureEvalContext ctx, TextureMapping2DHandle map2D,
         Point2f st = map2D.Map(ctx, &dstdx, &dstdy);
         Float ds = std::max(std::abs(dstdx[0]), std::abs(dstdy[0]));
         Float dt = std::max(std::abs(dstdx[1]), std::abs(dstdy[1]));
-        // Integrate 2D checkerboard function and take average to box filter it
-        Point2f integral(bumpInt(st[0] + ds) - bumpInt(st[0] - ds),
-                         bumpInt(st[1] + dt) - bumpInt(st[1] - dt));
-        Float area = 2 * ds * 2 * dt;
-        return 0.5f - 0.5f * integral.x * integral.y / area;
+        // Integrate product of 2D checkerboard function and triangle filter
+        ds *= 1.5f;
+        dt *= 1.5f;
+        return 0.5f - 0.5f * bf(st[0], ds) * bf(st[1], dt);
 
     } else {
         // Return weights for 3D checkerboard texture
         CHECK(map3D);
         Vector3f dpdx, dpdy;
         Point3f p = map3D.Map(ctx, &dpdx, &dpdy);
-        Float dx = std::max(std::abs(dpdx.x), std::abs(dpdy.x));
-        Float dy = std::max(std::abs(dpdx.y), std::abs(dpdy.y));
-        Float dz = std::max(std::abs(dpdx.z), std::abs(dpdy.z));
-        Point3f integral(bumpInt(p.x + dx) - bumpInt(p.x - dx),
-                         bumpInt(p.y + dy) - bumpInt(p.y - dy),
-                         bumpInt(p.z + dz) - bumpInt(p.z - dz));
-        Float volume = 2 * dx * 2 * dy * 2 * dz;
-        return 0.5f - 0.5f * integral.x * integral.y * integral.z / volume;
+        Float dx = 1.5f * std::max(std::abs(dpdx.x), std::abs(dpdy.x));
+        Float dy = 1.5f * std::max(std::abs(dpdx.y), std::abs(dpdy.y));
+        Float dz = 1.5f * std::max(std::abs(dpdx.z), std::abs(dpdy.z));
+        return 0.5f - 0.5f * bf(p.x, dx) * bf(p.y, dy) * bf(p.z, dz);
     }
 }
 
