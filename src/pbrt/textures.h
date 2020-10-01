@@ -351,30 +351,25 @@ class SpectrumBilerpTexture {
     SpectrumHandle v00, v01, v10, v11;
 };
 
-// AAMethod Definition
-enum class AAMethod { None, ClosedForm };
-
 PBRT_CPU_GPU
-pstd::array<Float, 2> Checkerboard(AAMethod aaMethod, TextureEvalContext ctx,
-                                   const TextureMapping2DHandle map2D,
-                                   const TextureMapping3DHandle map3D);
+Float Checkerboard(TextureEvalContext ctx, TextureMapping2DHandle map2D,
+                   TextureMapping3DHandle map3D);
 
 class FloatCheckerboardTexture {
   public:
     FloatCheckerboardTexture(TextureMapping2DHandle map2D, TextureMapping3DHandle map3D,
-                             FloatTextureHandle tex1, FloatTextureHandle tex2,
-                             AAMethod aaMethod)
-        : map2D(map2D), map3D(map3D), tex{tex1, tex2}, aaMethod(aaMethod) {}
+                             FloatTextureHandle tex1, FloatTextureHandle tex2)
+        : map2D(map2D), map3D(map3D), tex{tex1, tex2} {}
 
     PBRT_CPU_GPU
     Float Evaluate(TextureEvalContext ctx) const {
-        pstd::array<Float, 2> wt = Checkerboard(aaMethod, ctx, map2D, map3D);
-        if (wt[0] == 0)
-            return wt[1] * tex[1].Evaluate(ctx);
-        else if (wt[1] == 0)
-            return wt[0] * tex[0].Evaluate(ctx);
-        else
-            return wt[0] * tex[0].Evaluate(ctx) + wt[1] * tex[1].Evaluate(ctx);
+        Float w = Checkerboard(ctx, map2D, map3D);
+        Float t0 = 0, t1 = 0;
+        if (w != 1)
+            t0 = tex[0].Evaluate(ctx);
+        if (w != 0)
+            t1 = tex[1].Evaluate(ctx);
+        return (1 - w) * t0 + w * t1;
     }
 
     static FloatCheckerboardTexture *Create(const Transform &renderFromTexture,
@@ -387,7 +382,6 @@ class FloatCheckerboardTexture {
     TextureMapping2DHandle map2D;
     TextureMapping3DHandle map3D;
     FloatTextureHandle tex[2];
-    AAMethod aaMethod;
 };
 
 // SpectrumCheckerboardTexture Definition
@@ -396,8 +390,8 @@ class SpectrumCheckerboardTexture {
     // SpectrumCheckerboardTexture Public Methods
     SpectrumCheckerboardTexture(TextureMapping2DHandle map2D,
                                 TextureMapping3DHandle map3D, SpectrumTextureHandle tex1,
-                                SpectrumTextureHandle tex2, AAMethod aaMethod)
-        : map2D(map2D), map3D(map3D), tex{tex1, tex2}, aaMethod(aaMethod) {}
+                                SpectrumTextureHandle tex2)
+        : map2D(map2D), map3D(map3D), tex{tex1, tex2} {}
 
     static SpectrumCheckerboardTexture *Create(
         const Transform &renderFromTexture, const TextureParameterDictionary &parameters,
@@ -407,14 +401,13 @@ class SpectrumCheckerboardTexture {
 
     PBRT_CPU_GPU
     SampledSpectrum Evaluate(TextureEvalContext ctx, SampledWavelengths lambda) const {
-        pstd::array<Float, 2> wt = Checkerboard(aaMethod, ctx, map2D, map3D);
-        if (wt[0] == 0)
-            return wt[1] * tex[1].Evaluate(ctx, lambda);
-        else if (wt[1] == 0)
-            return wt[0] * tex[0].Evaluate(ctx, lambda);
-        else
-            return wt[0] * tex[0].Evaluate(ctx, lambda) +
-                   wt[1] * tex[1].Evaluate(ctx, lambda);
+        Float w = Checkerboard(ctx, map2D, map3D);
+        SampledSpectrum t0, t1;
+        if (w != 1)
+            t0 = tex[0].Evaluate(ctx, lambda);
+        if (w != 0)
+            t1 = tex[1].Evaluate(ctx, lambda);
+        return (1 - w) * t0 + w * t1;
     }
 
   private:
@@ -422,7 +415,6 @@ class SpectrumCheckerboardTexture {
     TextureMapping2DHandle map2D;
     TextureMapping3DHandle map3D;
     SpectrumTextureHandle tex[2];
-    AAMethod aaMethod;
 };
 
 PBRT_CPU_GPU

@@ -153,56 +153,39 @@ std::string SpectrumBilerpTexture::ToString() const {
 }
 
 // CheckerboardTexture Function Definitions
-pstd::array<Float, 2> Checkerboard(AAMethod aaMethod, TextureEvalContext ctx,
-                                   const TextureMapping2DHandle map2D,
-                                   const TextureMapping3DHandle map3D) {
+Float Checkerboard(TextureEvalContext ctx, TextureMapping2DHandle map2D,
+                   TextureMapping3DHandle map3D) {
+    // Define 1D checkerboard integral lambda function
+    auto bumpInt = [](Float x) {
+        return 1 - 2 * std::abs(x / 2 - std::floor(x / 2) - 0.5f);
+    };
+
     if (map2D) {
         // Return weights for 2D checkerboard texture
         CHECK(!map3D);
         Vector2f dstdx, dstdy;
         Point2f st = map2D.Map(ctx, &dstdx, &dstdy);
-        if (aaMethod == AAMethod::None) {
-            // Return point-sampled 2D checkerboard texture weights
-            if (((int)std::floor(st[0]) + (int)std::floor(st[1])) % 2 == 0)
-                return {Float(1), Float(0)};
-            return {Float(0), Float(1)};
-
-        } else {
-            // Return closed-form box filtered 2D checkerboard texture weights
-            // Evaluate single check if filter is entirely inside one of them
-            Float ds = std::max(std::abs(dstdx[0]), std::abs(dstdy[0]));
-            Float dt = std::max(std::abs(dstdx[1]), std::abs(dstdy[1]));
-            Float s0 = st[0] - ds, s1 = st[0] + ds;
-            Float t0 = st[1] - dt, t1 = st[1] + dt;
-            if (std::floor(s0) == std::floor(s1) && std::floor(t0) == std::floor(t1)) {
-                // Return point-sampled 2D checkerboard texture weights
-                if (((int)std::floor(st[0]) + (int)std::floor(st[1])) % 2 == 0)
-                    return {Float(1), Float(0)};
-                return {Float(0), Float(1)};
-            }
-
-            // Apply box filter to checkerboard region to compute weights
-            auto bumpInt = [](Float x) {
-                return (int)std::floor(x / 2) +
-                       2 * std::max(x / 2 - (int)std::floor(x / 2) - (Float)0.5,
-                                    (Float)0);
-            };
-            Float sint = (bumpInt(s1) - bumpInt(s0)) / (2 * ds);
-            Float tint = (bumpInt(t1) - bumpInt(t0)) / (2 * dt);
-            Float area2 = sint + tint - 2 * sint * tint;
-            if (ds > 1 || dt > 1)
-                area2 = .5f;
-            return {(1 - area2), area2};
-        }
+        Float ds = std::max(std::abs(dstdx[0]), std::abs(dstdy[0]));
+        Float dt = std::max(std::abs(dstdx[1]), std::abs(dstdy[1]));
+        // Integrate 2D checkerboard function and take average to box filter it
+        Point2f integral(bumpInt(st[0] + ds) - bumpInt(st[0] - ds),
+                         bumpInt(st[1] + dt) - bumpInt(st[1] - dt));
+        Float area = 2 * ds * 2 * dt;
+        return 0.5f - 0.5f * integral.x * integral.y / area;
 
     } else {
         // Return weights for 3D checkerboard texture
         CHECK(map3D);
         Vector3f dpdx, dpdy;
         Point3f p = map3D.Map(ctx, &dpdx, &dpdy);
-        if (((int)std::floor(p.x) + (int)std::floor(p.y) + (int)std::floor(p.z)) % 2 == 0)
-            return {Float(1), Float(0)};
-        return {Float(0), Float(1)};
+        Float dx = std::max(std::abs(dpdx.x), std::abs(dpdy.x));
+        Float dy = std::max(std::abs(dpdx.y), std::abs(dpdy.y));
+        Float dz = std::max(std::abs(dpdx.z), std::abs(dpdy.z));
+        Point3f integral(bumpInt(p.x + dx) - bumpInt(p.x - dx),
+                         bumpInt(p.y + dy) - bumpInt(p.y - dy),
+                         bumpInt(p.z + dz) - bumpInt(p.z - dz));
+        Float volume = 2 * dx * 2 * dy * 2 * dz;
+        return 0.5f - 0.5f * integral.x * integral.y * integral.z / volume;
     }
 }
 
@@ -221,37 +204,20 @@ FloatCheckerboardTexture *FloatCheckerboardTexture::Create(
         TextureMapping2DHandle map =
             TextureMapping2DHandle::Create(parameters, renderFromTexture, loc, alloc);
 
-        // Compute _aaMethod_ for _CheckerboardTexture_
-        std::string aa = parameters.GetOneString("aamode", "closedform");
-        AAMethod aaMethod;
-        if (aa == "none")
-            aaMethod = AAMethod::None;
-        else if (aa == "closedform")
-            aaMethod = AAMethod::ClosedForm;
-        else {
-            Warning(loc,
-                    "Antialiasing mode \"%s\" not understood by "
-                    "Checkerboard2DTexture; using \"closedform\"",
-                    aa);
-            aaMethod = AAMethod::ClosedForm;
-        }
-        return alloc.new_object<FloatCheckerboardTexture>(map, nullptr, tex1, tex2,
-                                                          aaMethod);
+        return alloc.new_object<FloatCheckerboardTexture>(map, nullptr, tex1, tex2);
     } else {
         // Initialize 3D texture mapping _map_ from _tp_
         TextureMapping3DHandle map =
             TextureMapping3DHandle::Create(parameters, renderFromTexture, loc, alloc);
-        return alloc.new_object<FloatCheckerboardTexture>(nullptr, map, tex1, tex2,
-                                                          AAMethod::None);
+        return alloc.new_object<FloatCheckerboardTexture>(nullptr, map, tex1, tex2);
     }
 }
 
 std::string FloatCheckerboardTexture::ToString() const {
     return StringPrintf("[ FloatCheckerboardTexture map2D: %s map3D: %s "
-                        "tex[0]: %s tex[1]: %s aaMethod: %s]",
+                        "tex[0]: %s tex[1]: %s ",
                         map2D ? map2D.ToString().c_str() : "(nullptr)",
-                        map3D ? map3D.ToString().c_str() : "(nullptr)", tex[0], tex[1],
-                        aaMethod == AAMethod::None ? "none" : "closed-form");
+                        map3D ? map3D.ToString().c_str() : "(nullptr)", tex[0], tex[1]);
 }
 
 SpectrumCheckerboardTexture *SpectrumCheckerboardTexture::Create(
@@ -275,37 +241,20 @@ SpectrumCheckerboardTexture *SpectrumCheckerboardTexture::Create(
         TextureMapping2DHandle map =
             TextureMapping2DHandle::Create(parameters, renderFromTexture, loc, alloc);
 
-        // Compute _aaMethod_ for _CheckerboardTexture_
-        std::string aa = parameters.GetOneString("aamode", "closedform");
-        AAMethod aaMethod;
-        if (aa == "none")
-            aaMethod = AAMethod::None;
-        else if (aa == "closedform")
-            aaMethod = AAMethod::ClosedForm;
-        else {
-            Warning(loc,
-                    "Antialiasing mode \"%s\" not understood by "
-                    "Checkerboard2DTexture; using \"closedform\"",
-                    aa);
-            aaMethod = AAMethod::ClosedForm;
-        }
-        return alloc.new_object<SpectrumCheckerboardTexture>(map, nullptr, tex1, tex2,
-                                                             aaMethod);
+        return alloc.new_object<SpectrumCheckerboardTexture>(map, nullptr, tex1, tex2);
     } else {
         // Initialize 3D texture mapping _map_ from _tp_
         TextureMapping3DHandle map =
             TextureMapping3DHandle::Create(parameters, renderFromTexture, loc, alloc);
-        return alloc.new_object<SpectrumCheckerboardTexture>(nullptr, map, tex1, tex2,
-                                                             AAMethod::None);
+        return alloc.new_object<SpectrumCheckerboardTexture>(nullptr, map, tex1, tex2);
     }
 }
 
 std::string SpectrumCheckerboardTexture::ToString() const {
     return StringPrintf("[ SpectrumCheckerboardTexture map2D: %s map3D: %s "
-                        "tex[0]: %s tex[1]: %s aaMethod: %s]",
+                        "tex[0]: %s tex[1]: %s ",
                         map2D ? map2D.ToString().c_str() : "(nullptr)",
-                        map3D ? map3D.ToString().c_str() : "(nullptr)", tex[0], tex[1],
-                        aaMethod == AAMethod::None ? "none" : "closed-form");
+                        map3D ? map3D.ToString().c_str() : "(nullptr)", tex[0], tex[1]);
 }
 
 // InsidePolkaDot Function Definition
