@@ -418,7 +418,7 @@ class SpectrumCheckerboardTexture {
 };
 
 PBRT_CPU_GPU
-bool InsidePolkaDot(const Point2f &st);
+bool InsidePolkaDot(Point2f st);
 
 class FloatDotsTexture {
   public:
@@ -484,8 +484,8 @@ class FBmTexture {
     PBRT_CPU_GPU
     Float Evaluate(TextureEvalContext ctx) const {
         Vector3f dpdx, dpdy;
-        Point3f P = mapping.Map(ctx, &dpdx, &dpdy);
-        return FBm(P, dpdx, dpdy, omega, octaves);
+        Point3f p = mapping.Map(ctx, &dpdx, &dpdy);
+        return FBm(p, dpdx, dpdy, omega, octaves);
     }
 
     static FBmTexture *Create(const Transform &renderFromTexture,
@@ -946,9 +946,9 @@ class WindyTexture {
     PBRT_CPU_GPU
     Float Evaluate(TextureEvalContext ctx) const {
         Vector3f dpdx, dpdy;
-        Point3f P = mapping.Map(ctx, &dpdx, &dpdy);
-        Float windStrength = FBm(.1f * P, .1f * dpdx, .1f * dpdy, .5, 3);
-        Float waveHeight = FBm(P, dpdx, dpdy, .5, 6);
+        Point3f p = mapping.Map(ctx, &dpdx, &dpdy);
+        Float windStrength = FBm(.1f * p, .1f * dpdx, .1f * dpdy, .5, 3);
+        Float waveHeight = FBm(p, dpdx, dpdy, .5, 6);
         return std::abs(windStrength) * waveHeight;
     }
 

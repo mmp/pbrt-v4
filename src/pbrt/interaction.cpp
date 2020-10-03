@@ -153,12 +153,16 @@ BSDF SurfaceInteraction::GetBSDF(const RayDifferential &ray, SampledWavelengths 
                                  CameraHandle camera, ScratchBuffer &scratchBuffer,
                                  SamplerHandle sampler) {
     ComputeDifferentials(ray, camera, sampler.SamplesPerPixel());
+    // Resolve _MixMaterial_ if necessary
     while (material.Is<MixMaterial>()) {
         MixMaterial *mix = material.CastOrNullptr<MixMaterial>();
         material = mix->ChooseMaterial(UniversalTextureEvaluator(), *this);
     }
+
+    // Return unset _BSDF_ if surface has a null material
     if (!material)
         return {};
+
     // Evaluate bump map and compute shading normal
     FloatTextureHandle displacement = material.GetDisplacement();
     if (displacement) {
@@ -172,6 +176,7 @@ BSDF SurfaceInteraction::GetBSDF(const RayDifferential &ray, SampledWavelengths 
     BSDF bsdf =
         material.GetBSDF(UniversalTextureEvaluator(), *this, lambda, scratchBuffer);
     if (bsdf && GetOptions().forceDiffuse) {
+        // Override _bsdf_ with diffuse equivalent
         SampledSpectrum r = bsdf.rho(wo, {sampler.Get1D()}, {sampler.Get2D()});
         bsdf = BSDF(wo, n, shading.n, shading.dpdu,
                     scratchBuffer.Alloc<IdealDiffuseBxDF>(r), bsdf.eta);
@@ -183,10 +188,12 @@ BSSRDFHandle SurfaceInteraction::GetBSSRDF(const RayDifferential &ray,
                                            SampledWavelengths &lambda,
                                            CameraHandle camera,
                                            ScratchBuffer &scratchBuffer) {
+    // Resolve _MixMaterial_ if necessary
     while (material.Is<MixMaterial>()) {
         MixMaterial *mix = material.CastOrNullptr<MixMaterial>();
         material = mix->ChooseMaterial(UniversalTextureEvaluator(), *this);
     }
+
     return material.GetBSSRDF(UniversalTextureEvaluator(), *this, lambda, scratchBuffer);
 }
 

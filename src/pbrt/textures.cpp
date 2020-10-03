@@ -11,6 +11,7 @@
 #include <pbrt/util/error.h>
 #include <pbrt/util/file.h>
 #include <pbrt/util/float.h>
+#include <pbrt/util/splines.h>
 #include <pbrt/util/stats.h>
 
 #include <mutex>
@@ -260,7 +261,7 @@ std::string SpectrumCheckerboardTexture::ToString() const {
 }
 
 // InsidePolkaDot Function Definition
-bool InsidePolkaDot(const Point2f &st) {
+bool InsidePolkaDot(Point2f st) {
     // Compute cell indices (_sCell_,_tCell_ for dots
     int sCell = std::floor(st[0] + .5f), tCell = std::floor(st[1] + .5f);
 
@@ -453,7 +454,7 @@ SampledSpectrum MarbleTexture::Evaluate(TextureEvalContext ctx,
     p *= scale;
     Float marble = p.y + variation * FBm(p, scale * dpdx, scale * dpdy, omega, octaves);
     Float t = .5f + .5f * std::sin(marble);
-    // Evaluate marble spline at _t_
+    // Evaluate marble spline at $t$ to compute color _rgb_
     const RGB c[] = {
         {.58f, .58f, .6f}, {.58f, .58f, .6f}, {.58f, .58f, .6f},
         {.5f, .5f, .5f},   {.6f, .59f, .58f}, {.58f, .58f, .6f},
@@ -461,19 +462,13 @@ SampledSpectrum MarbleTexture::Evaluate(TextureEvalContext ctx,
     };
     int nSeg = PBRT_ARRAYSIZE(c) - 3;
     int first = std::min<int>(std::floor(t * nSeg), nSeg - 1);
-    t = (t * nSeg - first);
-    // Bezier spline evaluated with de Castilejau's algorithm
-    RGB s0 = Lerp(t, c[first], c[first + 1]);
-    RGB s1 = Lerp(t, c[first + 1], c[first + 2]);
-    RGB s2 = Lerp(t, c[first + 2], c[first + 3]);
-    s0 = Lerp(t, s0, s1);
-    s1 = Lerp(t, s1, s2);
-    // Extra scale of 1.5 to increase variation among colors
-    s0 = 1.5f * Lerp(t, s0, s1);
+    t = t * nSeg - first;
+    RGB rgb = 1.5f * EvaluateCubicBezier(pstd::span(c + first, 4), t);
+
 #ifdef PBRT_IS_GPU_CODE
-    return RGBReflectanceSpectrum(*RGBColorSpace_sRGB, s0).Sample(lambda);
+    return RGBReflectanceSpectrum(*RGBColorSpace_sRGB, rgb).Sample(lambda);
 #else
-    return RGBReflectanceSpectrum(*RGBColorSpace::sRGB, s0).Sample(lambda);
+    return RGBReflectanceSpectrum(*RGBColorSpace::sRGB, rgb).Sample(lambda);
 #endif
 }
 
