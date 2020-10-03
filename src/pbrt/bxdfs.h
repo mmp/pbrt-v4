@@ -820,11 +820,12 @@ beta /= AbsCosTheta(w);
                         f += beta * albedo * phase.p(-w, -wis->wi) * wt * te * betaExit;
 
                         // Sample phase function and update layered path state
-                        PhaseFunctionSample ps = phase.Sample_p(-w, Point2f(r(), r()));
-                        if (!ps || ps.wi.z == 0)
+                        pstd::optional<PhaseFunctionSample> ps =
+                            phase.Sample_p(-w, Point2f(r(), r()));
+                        if (!ps || ps->pdf == 0 || ps->wi.z == 0)
                             continue;
-                        beta *= albedo * ps.p / ps.pdf;
-                        w = ps.wi;
+                        beta *= albedo * ps->p / ps->pdf;
+                        w = ps->wi;
                         z = zp;
 
                         if (!IsSpecular(exitInterface.Flags())) {
@@ -833,8 +834,8 @@ beta /= AbsCosTheta(w);
                             if (fExit) {
                                 Float exitPDF = exitInterface.PDF(
                                     -w, wi, mode, BxDFReflTransFlags::Transmission);
-                                Float weight = PowerHeuristic(1, ps.pdf, 1, exitPDF);
-                                f += beta * Tr(zp - exitZ, ps.wi) * fExit * weight;
+                                Float weight = PowerHeuristic(1, ps->pdf, 1, exitPDF);
+                                f += beta * Tr(zp - exitZ, ps->wi) * fExit * weight;
                             }
                         }
 
@@ -969,12 +970,13 @@ f *= AbsCosTheta(w) / sigma_t;
 // include it when we leave a surface.
 f /= AbsCosTheta(w);
 #endif
-                    PhaseFunctionSample ps = phase.Sample_p(-w, Point2f(r(), r()));
-                    if (!ps || ps.wi.z == 0)
+                    pstd::optional<PhaseFunctionSample> ps =
+                        phase.Sample_p(-w, Point2f(r(), r()));
+                    if (!ps || ps->pdf == 0 || ps->wi.z == 0)
                         return {};
-                    f *= albedo * ps.p;
-                    pdf *= ps.pdf;
-                    w = ps.wi;
+                    f *= albedo * ps->p;
+                    pdf *= ps->pdf;
+                    w = ps->wi;
                     z = zp;
 
                     continue;

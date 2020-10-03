@@ -281,13 +281,13 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
             }
 
             // Sample indirect lighting.
-            PhaseFunctionSample phaseSample =
+            pstd::optional<PhaseFunctionSample> phaseSample =
                 ms.phase.Sample_p(wo, raySamples.indirect.u);
-            if (!phaseSample)
+            if (!phaseSample || phaseSample->pdf == 0)
                 return;
 
-            SampledSpectrum beta = ms.beta * phaseSample.p;
-            SampledSpectrum pdfUni = ms.pdfUni * phaseSample.pdf;
+            SampledSpectrum beta = ms.beta * phaseSample->p;
+            SampledSpectrum pdfUni = ms.pdfUni * phaseSample->pdf;
             SampledSpectrum pdfNEE = ms.pdfUni;
 
             // Russian roulette
@@ -306,7 +306,7 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                 pdfNEE *= 1 - q;
             }
 
-            Ray ray(ms.p, phaseSample.wi, time, ms.medium);
+            Ray ray(ms.p, phaseSample->wi, time, ms.medium);
             bool isSpecularBounce = false;
             bool anyNonSpecularBounces = true;
 

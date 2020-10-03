@@ -21,11 +21,11 @@ TEST(HenyeyGreenstein, SamplingMatch) {
                 SampleUniformSphere({rng.Uniform<Float>(), rng.Uniform<Float>()});
             Point2f u{rng.Uniform<Float>(), rng.Uniform<Float>()};
             auto ps = hg.Sample_p(wo, u);
-            EXPECT_TRUE(ps);
+            EXPECT_TRUE(ps.has_value());
             // Phase function is normalized, and the sampling method should be
             // exact.
-            EXPECT_EQ(ps.p, ps.pdf);
-            EXPECT_NEAR(ps.p, hg.p(wo, ps.wi), 1e-4f) << "Failure with g = " << g;
+            EXPECT_EQ(ps->p, ps->pdf);
+            EXPECT_NEAR(ps->p, hg.p(wo, ps->wi), 1e-4f) << "Failure with g = " << g;
         }
     }
 }
@@ -36,8 +36,8 @@ TEST(HenyeyGreenstein, SamplingOrientationForward) {
     int nForward = 0, nBackward = 0;
     for (Point2f u : Uniform2D(100)) {
         auto ps = hg.Sample_p(wo, u);
-        EXPECT_TRUE(ps);
-        if (ps.wi.x > 0)
+        EXPECT_TRUE(ps.has_value());
+        if (ps->wi.x > 0)
             ++nForward;
         else
             ++nBackward;
@@ -52,8 +52,8 @@ TEST(HenyeyGreenstein, SamplingOrientationBackward) {
     int nForward = 0, nBackward = 0;
     for (Point2f u : Uniform2D(100)) {
         auto ps = hg.Sample_p(wo, u);
-        EXPECT_TRUE(ps);
-        if (ps.wi.x > 0)
+        EXPECT_TRUE(ps.has_value());
+        if (ps->wi.x > 0)
             ++nForward;
         else
             ++nBackward;

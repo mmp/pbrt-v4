@@ -19,10 +19,9 @@ namespace pbrt {
 
 // PhaseFunctionSample Definition
 struct PhaseFunctionSample {
-    PBRT_CPU_GPU operator bool() const { return pdf > 0; }
     Float p;
     Vector3f wi;
-    Float pdf = 0;
+    Float pdf;
 };
 
 // PhaseFunctionHandle Definition
@@ -37,8 +36,8 @@ class PhaseFunctionHandle : public TaggedPointer<HGPhaseFunction> {
 
     PBRT_CPU_GPU inline Float p(const Vector3f &wo, const Vector3f &wi) const;
 
-    PBRT_CPU_GPU inline PhaseFunctionSample Sample_p(const Vector3f &wo,
-                                                     const Point2f &u) const;
+    PBRT_CPU_GPU inline pstd::optional<PhaseFunctionSample> Sample_p(
+        const Vector3f &wo, const Point2f &u) const;
     PBRT_CPU_GPU inline Float PDF(const Vector3f &wo, const Vector3f &wi) const;
 };
 

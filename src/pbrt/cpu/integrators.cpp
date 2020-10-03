@@ -1047,20 +1047,20 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                             lambda.PDF());
 
                         // Sample indirect lighting at volume scattering event
-                        PhaseFunctionSample ps =
+                        pstd::optional<PhaseFunctionSample> ps =
                             intr.phase.Sample_p(-ray.d, sampler.Get2D());
-                        if (!ps) {
+                        if (!ps || ps->pdf == 0) {
                             terminated = true;
                             return false;
                         }
                         // Update ray path state for indirect volume scattering
-                        beta *= ps.p;
+                        beta *= ps->p;
                         pdfNEE = pdfUni;
-                        pdfUni *= ps.pdf;
+                        pdfUni *= ps->pdf;
                         prevMediumIntr = intr;
                         prevSurfaceIntr.reset();
                         scattered = true;
-                        ray = intr.SpawnRay(ps.wi);
+                        ray = intr.SpawnRay(ps->wi);
                         specularBounce = false;
                         anyNonSpecularBounces = true;
 
@@ -2029,15 +2029,15 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
 
                         // Sample direction and compute reverse density at preceding
                         // vertex
-                        PhaseFunctionSample ps =
+                        pstd::optional<PhaseFunctionSample> ps =
                             intr.phase.Sample_p(-ray.d, sampler.Get2D());
-                        if (!ps) {
+                        if (!ps || ps->pdf == 0) {
                             terminated = true;
                             return false;
                         }
-                        pdfFwd = pdfRev = ps.pdf;
-                        beta *= ps.p / pdfFwd;
-                        ray = intr.SpawnRay(ps.wi);
+                        pdfFwd = pdfRev = ps->pdf;
+                        beta *= ps->p / pdfFwd;
+                        ray = intr.SpawnRay(ps->wi);
                         anyNonSpecularBounces = true;
 
                         // Compute reverse area density at preceding vertex

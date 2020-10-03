@@ -50,7 +50,8 @@ class HGPhaseFunction {
     }
 
     PBRT_CPU_GPU
-    PhaseFunctionSample Sample_p(const Vector3f &wo, const Point2f &u) const {
+    pstd::optional<PhaseFunctionSample> Sample_p(const Vector3f &wo,
+                                                 const Point2f &u) const {
         Float pdf;
         Vector3f wi = SampleHenyeyGreenstein(wo, g, u, &pdf);
         return PhaseFunctionSample{pdf, wi, pdf};
@@ -721,8 +722,8 @@ inline Float PhaseFunctionHandle::p(const Vector3f &wo, const Vector3f &wi) cons
     return Dispatch(p);
 }
 
-inline PhaseFunctionSample PhaseFunctionHandle::Sample_p(const Vector3f &wo,
-                                                         const Point2f &u) const {
+inline pstd::optional<PhaseFunctionSample> PhaseFunctionHandle::Sample_p(
+    const Vector3f &wo, const Point2f &u) const {
     auto sample = [&](auto ptr) { return ptr->Sample_p(wo, u); };
     return Dispatch(sample);
 }
