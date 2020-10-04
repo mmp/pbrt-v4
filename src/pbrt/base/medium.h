@@ -34,11 +34,11 @@ class PhaseFunctionHandle : public TaggedPointer<HGPhaseFunction> {
 
     std::string ToString() const;
 
-    PBRT_CPU_GPU inline Float p(const Vector3f &wo, const Vector3f &wi) const;
+    PBRT_CPU_GPU inline Float p(Vector3f wo, Vector3f wi) const;
 
-    PBRT_CPU_GPU inline pstd::optional<PhaseFunctionSample> Sample_p(
-        const Vector3f &wo, const Point2f &u) const;
-    PBRT_CPU_GPU inline Float PDF(const Vector3f &wo, const Vector3f &wi) const;
+    PBRT_CPU_GPU inline pstd::optional<PhaseFunctionSample> Sample_p(Vector3f wo,
+                                                                     Point2f u) const;
+    PBRT_CPU_GPU inline Float PDF(Vector3f wo, Vector3f wi) const;
 };
 
 class HomogeneousMedium;
@@ -66,11 +66,11 @@ class MediumHandle : public TaggedPointer<HomogeneousMedium, UniformGridMedium,
 
     std::string ToString() const;
 
-    template <typename F>
-    PBRT_CPU_GPU void SampleTmaj(const Ray &ray, Float tMax, RNG &rng,
-                                 const SampledWavelengths &lambda, F callback) const;
-
     bool IsEmissive() const;
+
+    template <typename F>
+    PBRT_CPU_GPU void SampleTmaj(Ray ray, Float tMax, RNG &rng,
+                                 const SampledWavelengths &lambda, F callback) const;
 };
 
 // MediumInterface Definition

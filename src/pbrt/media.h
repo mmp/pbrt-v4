@@ -45,20 +45,17 @@ class HGPhaseFunction {
     HGPhaseFunction(Float g) : g(g) {}
 
     PBRT_CPU_GPU
-    Float p(const Vector3f &wo, const Vector3f &wi) const {
-        return HenyeyGreenstein(Dot(wo, wi), g);
-    }
+    Float p(Vector3f wo, Vector3f wi) const { return HenyeyGreenstein(Dot(wo, wi), g); }
 
     PBRT_CPU_GPU
-    pstd::optional<PhaseFunctionSample> Sample_p(const Vector3f &wo,
-                                                 const Point2f &u) const {
+    pstd::optional<PhaseFunctionSample> Sample_p(Vector3f wo, Point2f u) const {
         Float pdf;
         Vector3f wi = SampleHenyeyGreenstein(wo, g, u, &pdf);
         return PhaseFunctionSample{pdf, wi, pdf};
     }
 
     PBRT_CPU_GPU
-    Float PDF(const Vector3f &wo, const Vector3f &wi) const { return p(wo, wi); }
+    Float PDF(Vector3f wo, Vector3f wi) const { return p(wo, wi); }
 
     std::string ToString() const;
 
@@ -98,12 +95,14 @@ class HomogeneousMedium {
     static HomogeneousMedium *Create(const ParameterDictionary &parameters,
                                      const FileLoc *loc, Allocator alloc);
 
+    bool IsEmissive() const { return Le_spec.MaxValue() > 0; }
+
     template <typename F>
-    PBRT_CPU_GPU void SampleTmaj(const Ray &ray, Float tMax, RNG &rng,
+    PBRT_CPU_GPU void SampleTmaj(Ray ray, Float tMax, RNG &rng,
                                  const SampledWavelengths &lambda, F callback) const {
         // Compute normalized ray in medium, _rayp_
         tMax *= Length(ray.d);
-        Ray rayp(ray.o, Normalize(ray.d));
+        ray.d = Normalize(ray.d);
 
         // Compute _SampledSpectrum_ scattering properties for medium
         SampledSpectrum sigma_a = sigScale * sigma_a_spec.Sample(lambda);
@@ -111,7 +110,7 @@ class HomogeneousMedium {
         SampledSpectrum sigma_t = sigma_a + sigma_s;
         SampledSpectrum sigma_maj = sigma_t;
 
-        // Sample exponential funciton to find _t_ for scattering event
+        // Sample exponential function to find _t_ for scattering event
         if (sigma_maj[0] == 0)
             return;
         Float u = rng.Uniform<Float>();
@@ -125,13 +124,11 @@ class HomogeneousMedium {
             // Report scattering event in homogeneous medium
             SampledSpectrum Tmaj = FastExp(-t * sigma_maj);
             SampledSpectrum Le = Le_spec.Sample(lambda);
-            MediumInteraction intr(rayp(t), -rayp.d, ray.time, sigma_a, sigma_s,
-                                   sigma_maj, Le, this, &phase);
+            MediumInteraction intr(ray(t), -ray.d, ray.time, sigma_a, sigma_s, sigma_maj,
+                                   Le, this, &phase);
             callback(MediumSample(intr, Tmaj));
         }
     }
-
-    bool IsEmissive() const { return Le_spec.MaxValue() > 0; }
 
     std::string ToString() const;
 
@@ -717,24 +714,24 @@ class NanoVDBMediumProvider {
     Float LeScale, temperatureCutoff, temperatureScale;
 };
 
-inline Float PhaseFunctionHandle::p(const Vector3f &wo, const Vector3f &wi) const {
+inline Float PhaseFunctionHandle::p(Vector3f wo, Vector3f wi) const {
     auto p = [&](auto ptr) { return ptr->p(wo, wi); };
     return Dispatch(p);
 }
 
 inline pstd::optional<PhaseFunctionSample> PhaseFunctionHandle::Sample_p(
-    const Vector3f &wo, const Point2f &u) const {
+    Vector3f wo, Point2f u) const {
     auto sample = [&](auto ptr) { return ptr->Sample_p(wo, u); };
     return Dispatch(sample);
 }
 
-inline Float PhaseFunctionHandle::PDF(const Vector3f &wo, const Vector3f &wi) const {
+inline Float PhaseFunctionHandle::PDF(Vector3f wo, Vector3f wi) const {
     auto pdf = [&](auto ptr) { return ptr->PDF(wo, wi); };
     return Dispatch(pdf);
 }
 
 template <typename F>
-void MediumHandle::SampleTmaj(const Ray &ray, Float tMax, RNG &rng,
+void MediumHandle::SampleTmaj(Ray ray, Float tMax, RNG &rng,
                               const SampledWavelengths &lambda, F func) const {
     auto sampletn = [&](auto ptr) { ptr->SampleTmaj(ray, tMax, rng, lambda, func); };
     Dispatch(sampletn);

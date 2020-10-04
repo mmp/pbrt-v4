@@ -35,8 +35,7 @@ PBRT_CPU_GPU inline bool Refract(Vector3f wi, Normal3f n, Float eta, Vector3f *w
     return true;
 }
 
-PBRT_CPU_GPU
-inline Float HenyeyGreenstein(Float cosTheta, Float g) {
+PBRT_CPU_GPU inline Float HenyeyGreenstein(Float cosTheta, Float g) {
     Float denom = 1 + g * g + 2 * g * cosTheta;
     return Inv4Pi * (1 - g * g) / (denom * SafeSqrt(denom));
 }

@@ -47,8 +47,7 @@ Point2f InvertSphericalRectangleSample(const Point3f &pRef, const Point3f &v00,
                                        const Point3f &pRect);
 
 PBRT_CPU_GPU
-Vector3f SampleHenyeyGreenstein(const Vector3f &wo, Float g, const Point2f &u,
-                                Float *pdf = nullptr);
+Vector3f SampleHenyeyGreenstein(Vector3f wo, Float g, Point2f u, Float *pdf = nullptr);
 
 PBRT_CPU_GPU
 Float SampleCatmullRom(pstd::span<const Float> nodes, pstd::span<const Float> f,

@@ -143,10 +143,9 @@ class MediumInteraction : public Interaction {
     PBRT_CPU_GPU
     MediumInteraction() : phase(nullptr) {}
     PBRT_CPU_GPU
-    MediumInteraction(const Point3f &p, const Vector3f &wo, Float time,
-                      const SampledSpectrum &sigma_a, const SampledSpectrum &sigma_s,
-                      const SampledSpectrum &sigma_maj, const SampledSpectrum &Le,
-                      MediumHandle medium, PhaseFunctionHandle phase)
+    MediumInteraction(Point3f p, Vector3f wo, Float time, SampledSpectrum sigma_a,
+                      SampledSpectrum sigma_s, SampledSpectrum sigma_maj,
+                      SampledSpectrum Le, MediumHandle medium, PhaseFunctionHandle phase)
         : Interaction(p, wo, time, medium),
           phase(phase),
           sigma_a(sigma_a),
@@ -164,7 +163,7 @@ class MediumInteraction : public Interaction {
 
     std::string ToString() const;
 
-    // MediumInteraction Public Data
+    // MediumInteraction Public Members
     PhaseFunctionHandle phase;
     SampledSpectrum sigma_a, sigma_s, sigma_maj, Le;
 };
@@ -233,15 +232,16 @@ class SurfaceInteraction : public Interaction {
     std::string ToString() const;
 
     void SetIntersectionProperties(MaterialHandle mtl, LightHandle area,
-                                   const MediumInterface *mi, MediumHandle med) {
+                                   const MediumInterface *primitiveMediumInterface,
+                                   MediumHandle rayMedium) {
         material = mtl;
         areaLight = area;
         CHECK_GE(Dot(n, shading.n), 0.);
         // Set medium properties at surface intersection
-        if (mi && mi->IsMediumTransition())
-            mediumInterface = mi;
+        if (primitiveMediumInterface && primitiveMediumInterface->IsMediumTransition())
+            mediumInterface = primitiveMediumInterface;
         else
-            medium = med;
+            medium = rayMedium;
     }
 
     PBRT_CPU_GPU

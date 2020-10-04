@@ -369,8 +369,7 @@ Point2f InvertSphericalRectangleSample(const Point3f &pRef, const Point3f &s,
     return u;
 }
 
-Vector3f SampleHenyeyGreenstein(const Vector3f &wo, Float g, const Point2f &u,
-                                Float *pdf) {
+Vector3f SampleHenyeyGreenstein(Vector3f wo, Float g, Point2f u, Float *pdf) {
     // Compute $\cos \theta$ for Henyey--Greenstein sample
     Float cosTheta;
     if (std::abs(g) < 1e-3)
