@@ -11,6 +11,7 @@
 #include <pbrt/util/color.h>
 #include <pbrt/util/colorspace.h>
 #include <pbrt/util/error.h>
+#include <pbrt/util/file.h>
 #include <pbrt/util/memory.h>
 #include <pbrt/util/print.h>
 #include <pbrt/util/sampling.h>
@@ -297,7 +298,7 @@ static nanovdb::GridHandle<Buffer> readGrid(const std::string &filename,
 
 NanoVDBMediumProvider *NanoVDBMediumProvider::Create(
     const ParameterDictionary &parameters, const FileLoc *loc, Allocator alloc) {
-    std::string filename = parameters.GetOneString("filename", "");
+    std::string filename = ResolveFilename(parameters.GetOneString("filename", ""));
     if (filename.empty())
         ErrorExit(loc, "Must supply \"filename\" to \"nanovdb\" medium.");
 
