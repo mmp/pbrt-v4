@@ -100,7 +100,7 @@ class HomogeneousMedium {
     template <typename F>
     PBRT_CPU_GPU void SampleTmaj(Ray ray, Float tMax, RNG &rng,
                                  const SampledWavelengths &lambda, F callback) const {
-        // Compute normalized ray in medium, _rayp_
+        // Normalize ray direction for homogeneous medium sampling
         tMax *= Length(ray.d);
         ray.d = Normalize(ray.d);
 
