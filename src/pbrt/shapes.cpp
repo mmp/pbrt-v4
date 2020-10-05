@@ -647,10 +647,15 @@ bool Curve::RecursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Poin
         Normal3f nHit;
         if (common->type == CurveType::Ribbon) {
             // Scale _hitWidth_ based on ribbon orientation
-            Float sin0 =
-                std::sin((1 - u) * common->normalAngle) * common->invSinNormalAngle;
-            Float sin1 = std::sin(u * common->normalAngle) * common->invSinNormalAngle;
-            nHit = sin0 * common->n[0] + sin1 * common->n[1];
+            if ( common->normalAngle == 0 )
+                nHit = common->n[0];
+            else {
+                Float sin0 =
+                    std::sin((1 - u) * common->normalAngle) * common->invSinNormalAngle;
+                Float sin1 =
+                    std::sin(u * common->normalAngle) * common->invSinNormalAngle;
+                nHit = sin0 * common->n[0] + sin1 * common->n[1];
+            }
             hitWidth *= AbsDot(nHit, ray.d) / rayLength;
         }
 
