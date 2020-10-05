@@ -188,31 +188,25 @@ class CuboidMedium {
 
         // Set up 3D DDA for ray through grid
         Vector3f diag = mediumBounds.Diagonal();
-        Ray rayGrid(Point3f((ray.o.x - mediumBounds.pMin.x) / diag.x,
-                            (ray.o.y - mediumBounds.pMin.y) / diag.y,
-                            (ray.o.z - mediumBounds.pMin.z) / diag.z),
+        Ray rayGrid(Point3f(mediumBounds.Offset(ray.o)),
                     Vector3f(ray.d.x / diag.x, ray.d.y / diag.y, ray.d.z / diag.z));
         Point3f gridIntersect = rayGrid(tMin);
-        float nextCrossingT[3], deltaT[3];
+        Float nextCrossingT[3], deltaT[3];
         int step[3], voxelLimit[3], voxel[3];
-        Vector3f voxelWidth(1.f / gridResolution.x, 1.f / gridResolution.y,
-                            1.f / gridResolution.z);
         for (int axis = 0; axis < 3; ++axis) {
             // Initialize ray stepping parameters for axis
-            // Handle negative zero ray direction
-            if (rayGrid.d[axis] == -0.f)
-                rayGrid.d[axis] = 0.f;
-
-            // Compute current voxel for axis
+            // Compute current voxel for axis and handle negative zero direction
             voxel[axis] = Clamp(gridIntersect[axis] * gridResolution[axis], 0,
                                 gridResolution[axis] - 1);
+            if (rayGrid.d[axis] == -0.f)
+                rayGrid.d[axis] = 0.f;
 
             if (rayGrid.d[axis] >= 0) {
                 // Handle ray with positive direction for voxel stepping
                 Float nextVoxelPos = Float(voxel[axis] + 1) / gridResolution[axis];
                 nextCrossingT[axis] =
                     tMin + (nextVoxelPos - gridIntersect[axis]) / rayGrid.d[axis];
-                deltaT[axis] = voxelWidth[axis] / rayGrid.d[axis];
+                deltaT[axis] = 1 / (rayGrid.d[axis] * gridResolution[axis]);
                 step[axis] = 1;
                 voxelLimit[axis] = gridResolution[axis];
 
@@ -221,7 +215,7 @@ class CuboidMedium {
                 Float nextVoxelPos = Float(voxel[axis]) / gridResolution[axis];
                 nextCrossingT[axis] =
                     tMin + (nextVoxelPos - gridIntersect[axis]) / rayGrid.d[axis];
-                deltaT[axis] = -voxelWidth[axis] / rayGrid.d[axis];
+                deltaT[axis] = -1 / (rayGrid.d[axis] * gridResolution[axis]);
                 step[axis] = -1;
                 voxelLimit[axis] = -1;
             }
