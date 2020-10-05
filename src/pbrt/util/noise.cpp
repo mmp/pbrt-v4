@@ -82,8 +82,16 @@ Float Noise(Float x, Float y, Float z) {
     return Lerp(wz, y0, y1);
 }
 
-Float Noise(const Point3f &p) {
+Float Noise(Point3f p) {
     return Noise(p.x, p.y, p.z);
+}
+
+Vector3f DNoise(Point3f p) {
+    Float delta = .01f;
+    Float n = Noise(p);
+    Point3f noiseDelta(Noise(p + Vector3f(delta, 0, 0)), Noise(p + Vector3f(0, delta, 0)),
+                       Noise(p + Vector3f(0, 0, delta)));
+    return (noiseDelta - Point3f(n, n, n)) / delta;
 }
 
 inline Float Grad(int x, int y, int z, Float dx, Float dy, Float dz) {
@@ -98,8 +106,7 @@ inline Float NoiseWeight(Float t) {
     return 6 * Pow<5>(t) - 15 * Pow<4>(t) + 10 * Pow<3>(t);
 }
 
-Float FBm(const Point3f &p, const Vector3f &dpdx, const Vector3f &dpdy, Float omega,
-          int maxOctaves) {
+Float FBm(Point3f p, Vector3f dpdx, Vector3f dpdy, Float omega, int maxOctaves) {
     // Compute number of octaves for antialiased FBm
     Float len2 = std::max(LengthSquared(dpdx), LengthSquared(dpdy));
     Float n = Clamp(-1 - .5f * Log2(len2), 0, maxOctaves);
@@ -118,8 +125,7 @@ Float FBm(const Point3f &p, const Vector3f &dpdx, const Vector3f &dpdy, Float om
     return sum;
 }
 
-Float Turbulence(const Point3f &p, const Vector3f &dpdx, const Vector3f &dpdy,
-                 Float omega, int maxOctaves) {
+Float Turbulence(Point3f p, Vector3f dpdx, Vector3f dpdy, Float omega, int maxOctaves) {
     // Compute number of octaves for antialiased FBm
     Float len2 = std::max(LengthSquared(dpdx), LengthSquared(dpdy));
     Float n = Clamp(-1 - .5f * Log2(len2), 0, maxOctaves);

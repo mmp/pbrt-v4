@@ -12,13 +12,13 @@ namespace pbrt {
 PBRT_CPU_GPU
 Float Noise(Float x, Float y = .5f, Float z = .5f);
 PBRT_CPU_GPU
-Float Noise(const Point3f &p);
+Float Noise(Point3f p);
 PBRT_CPU_GPU
-Float FBm(const Point3f &p, const Vector3f &dpdx, const Vector3f &dpdy, Float omega,
-          int octaves);
+Vector3f DNoise(Point3f p);
 PBRT_CPU_GPU
-Float Turbulence(const Point3f &p, const Vector3f &dpdx, const Vector3f &dpdy,
-                 Float omega, int octaves);
+Float FBm(Point3f p, Vector3f dpdx, Vector3f dpdy, Float omega, int octaves);
+PBRT_CPU_GPU
+Float Turbulence(Point3f p, Vector3f dpdx, Vector3f dpdy, Float omega, int octaves);
 
 }  // namespace pbrt
 

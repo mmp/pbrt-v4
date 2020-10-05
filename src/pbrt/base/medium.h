@@ -42,14 +42,14 @@ class PhaseFunctionHandle : public TaggedPointer<HGPhaseFunction> {
 };
 
 class HomogeneousMedium;
-template <typename DensityProvider>
-class GeneralMedium;
+template <typename Provider>
+class CuboidMedium;
 class UniformGridMediumProvider;
-using UniformGridMedium = GeneralMedium<UniformGridMediumProvider>;
+using UniformGridMedium = CuboidMedium<UniformGridMediumProvider>;
 class CloudMediumProvider;
-using CloudMedium = GeneralMedium<CloudMediumProvider>;
+using CloudMedium = CuboidMedium<CloudMediumProvider>;
 class NanoVDBMediumProvider;
-using NanoVDBMedium = GeneralMedium<NanoVDBMediumProvider>;
+using NanoVDBMedium = CuboidMedium<NanoVDBMediumProvider>;
 struct MediumSample;
 
 // MediumHandle Definition

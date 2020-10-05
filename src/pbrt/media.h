@@ -139,42 +139,43 @@ class HomogeneousMedium {
     HGPhaseFunction phase;
 };
 
-// GeneralMedium Definition
-template <typename DensityProvider>
-class GeneralMedium {
+// CuboidMedium Definition
+template <typename Provider>
+class CuboidMedium {
   public:
-    // GeneralMedium Public Methods
-    GeneralMedium(const DensityProvider *provider, SpectrumHandle sigma_a,
-                  SpectrumHandle sigma_s, Float sigScale, Float g,
-                  const Transform &renderFromMedium, Allocator alloc)
+    // CuboidMedium Public Methods
+    CuboidMedium(const Provider *provider, SpectrumHandle sigma_a, SpectrumHandle sigma_s,
+                 Float sigScale, Float g, const Transform &renderFromMedium,
+                 Allocator alloc)
         : provider(provider),
           mediumBounds(provider->Bounds()),
           sigma_a_spec(sigma_a, alloc),
           sigma_s_spec(sigma_s, alloc),
           sigScale(sigScale),
           phase(g),
-          mediumFromRender(Inverse(renderFromMedium)),
           renderFromMedium(renderFromMedium),
           maxDensityGrid(alloc) {
+        // Initialize _maxDensityGrid_
         maxDensityGrid = provider->GetMaxDensityGrid(alloc, &gridResolution);
     }
 
     std::string ToString() const {
-        return StringPrintf(
-            "[ GeneralMedium provider: %s mediumBounds: %s "
-            "sigma_a_spec: %s sigma_s_spec: %s sigScale: %f phase: %s "
-            "mediumFromRender: %s maxDensityGrid: %s gridResolution: %s ]",
-            *provider, mediumBounds, sigma_a_spec, sigma_s_spec, sigScale, phase,
-            mediumFromRender, maxDensityGrid, gridResolution);
+        return StringPrintf("[ CuboidMedium provider: %s mediumBounds: %s "
+                            "sigma_a_spec: %s sigma_s_spec: %s sigScale: %f phase: %s "
+                            "maxDensityGrid: %s gridResolution: %s ]",
+                            *provider, mediumBounds, sigma_a_spec, sigma_s_spec, sigScale,
+                            phase, maxDensityGrid, gridResolution);
     }
+
     bool IsEmissive() const { return provider->IsEmissive(); }
 
     template <typename F>
-    PBRT_CPU_GPU void SampleTmaj(const Ray &rRender, Float raytMax, RNG &rng,
+    PBRT_CPU_GPU void SampleTmaj(Ray rRender, Float raytMax, RNG &rng,
                                  const SampledWavelengths &lambda, F callback) const {
         // Transform ray to grid density's space and compute bounds overlap
-        raytMax *= Length(rRender.d);
-        Ray ray = mediumFromRender(Ray(rRender.o, Normalize(rRender.d)), &raytMax);
+        Ray ray = renderFromMedium.ApplyInverse(rRender, &raytMax);
+        raytMax *= Length(ray.d);
+        ray.d = Normalize(ray.d);
         Float tMin, tMax;
         if (!mediumBounds.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax))
             return;
@@ -292,10 +293,10 @@ class GeneralMedium {
         }
     }
 
-    static GeneralMedium<DensityProvider> *Create(const DensityProvider *provider,
-                                                  const ParameterDictionary &parameters,
-                                                  const Transform &renderFromMedium,
-                                                  const FileLoc *loc, Allocator alloc) {
+    static CuboidMedium<Provider> *Create(const Provider *provider,
+                                          const ParameterDictionary &parameters,
+                                          const Transform &renderFromMedium,
+                                          const FileLoc *loc, Allocator alloc) {
         SpectrumHandle sig_a = nullptr, sig_s = nullptr;
         std::string preset = parameters.GetOneString("preset", "");
         if (!preset.empty()) {
@@ -304,14 +305,14 @@ class GeneralMedium {
         }
 
         if (sig_a == nullptr) {
-            sig_a = parameters.GetOneSpectrum("sigma_a", nullptr, SpectrumType::General,
-                                              alloc);
+            sig_a = parameters.GetOneSpectrum("sigma_a", nullptr,
+                                              SpectrumType::Reflectance, alloc);
             if (sig_a == nullptr)
                 sig_a = alloc.new_object<ConstantSpectrum>(1.f);
         }
         if (sig_s == nullptr) {
-            sig_s = parameters.GetOneSpectrum("sigma_s", nullptr, SpectrumType::General,
-                                              alloc);
+            sig_s = parameters.GetOneSpectrum("sigma_s", nullptr,
+                                              SpectrumType::Reflectance, alloc);
             if (sig_s == nullptr)
                 sig_s = alloc.new_object<ConstantSpectrum>(1.f);
         }
@@ -320,18 +321,18 @@ class GeneralMedium {
 
         Float g = parameters.GetOneFloat("g", 0.0f);
 
-        return alloc.new_object<GeneralMedium<DensityProvider>>(
-            provider, sig_a, sig_s, sigScale, g, renderFromMedium, alloc);
+        return alloc.new_object<CuboidMedium<Provider>>(provider, sig_a, sig_s, sigScale,
+                                                        g, renderFromMedium, alloc);
     }
 
   private:
-    // GeneralMedium Private Members
-    const DensityProvider *provider;
+    // CuboidMedium Private Members
+    const Provider *provider;
     Bounds3f mediumBounds;
     DenselySampledSpectrum sigma_a_spec, sigma_s_spec;
     Float sigScale;
     HGPhaseFunction phase;
-    Transform mediumFromRender, renderFromMedium;
+    Transform renderFromMedium;
     pstd::vector<Float> maxDensityGrid;
     Point3i gridResolution;
 };
@@ -357,7 +358,7 @@ class UniformGridMediumProvider {
     bool IsEmissive() const { return Le_spec.MaxValue() > 0; }
 
     PBRT_CPU_GPU
-    SampledSpectrum Le(const Point3f &p, const SampledWavelengths &lambda) const {
+    SampledSpectrum Le(Point3f p, const SampledWavelengths &lambda) const {
         Point3f pp = Point3f(bounds.Offset(p));
         return Le_spec.Sample(lambda) * LeScaleGrid.Lookup(pp);
     }
@@ -374,9 +375,9 @@ class UniformGridMediumProvider {
     }
 
     pstd::vector<Float> GetMaxDensityGrid(Allocator alloc, Point3i *res) const {
-        pstd::vector<Float> maxGrid(alloc);
         // Set _gridResolution_ and allocate _maxGrid_
         *res = Point3i(4, 4, 4);
+        pstd::vector<Float> maxGrid(alloc);
         maxGrid.resize(res->x * res->y * res->z);
 
         // Define _getMaxDensity_ lambda
@@ -417,13 +418,12 @@ class UniformGridMediumProvider {
 
         // Compute maximum density for each _maxGrid_ cell
         int offset = 0;
-        for (int z = 0; z < res->z; ++z)
-            for (int y = 0; y < res->y; ++y)
-                for (int x = 0; x < res->x; ++x) {
+        for (Float z = 0; z < res->z; ++z)
+            for (Float y = 0; y < res->y; ++y)
+                for (Float x = 0; x < res->x; ++x) {
                     Bounds3f bounds(
-                        Point3f(Float(x) / res->x, Float(y) / res->y, Float(z) / res->z),
-                        Point3f(Float(x + 1) / res->x, Float(y + 1) / res->y,
-                                Float(z + 1) / res->z));
+                        Point3f(x / res->x, y / res->y, z / res->z),
+                        Point3f((x + 1) / res->x, (y + 1) / res->y, (z + 1) / res->z));
                     maxGrid[offset++] = getMaxDensity(bounds);
                 }
 
@@ -449,22 +449,50 @@ class CloudMediumProvider {
 
     std::string ToString() const {
         return StringPrintf("[ CloudMediumProvider bounds: %s density: %f "
-                            "wispiness: %f extent: %f ]",
-                            bounds, density, wispiness, extent);
+                            "wispiness: %f frequency: %f ]",
+                            bounds, density, wispiness, frequency);
     }
 
     CloudMediumProvider(const Bounds3f &bounds, Float density, Float wispiness,
-                        Float extent)
-        : bounds(bounds), density(density), wispiness(wispiness), extent(extent) {}
+                        Float frequency)
+        : bounds(bounds), density(density), wispiness(wispiness), frequency(frequency) {}
 
     PBRT_CPU_GPU
     const Bounds3f &Bounds() const { return bounds; }
 
+    PBRT_CPU_GPU
     bool IsEmissive() const { return false; }
 
     PBRT_CPU_GPU
-    SampledSpectrum Le(const Point3f &p, const SampledWavelengths &lambda) const {
+    SampledSpectrum Le(Point3f p, const SampledWavelengths &lambda) const {
         return SampledSpectrum(0.f);
+    }
+
+    PBRT_CPU_GPU
+    SampledSpectrum Density(Point3f p, const SampledWavelengths &) const {
+        Point3f pp = frequency * p;
+        if (wispiness > 0) {
+            // Perturb cloud lookup point _pp_ using noise
+            Float vomega = .05f * wispiness, vlambda = 10.f;
+            for (int i = 0; i < 2; ++i) {
+                pp += vomega * DNoise(vlambda * pp);
+                vomega *= 0.5f;
+                vlambda *= 1.99f;
+            }
+        }
+        // Sum scales of noise to approximate cloud density
+        Float d = 0;
+        Float omega = .5, lambda = 1.f;
+        for (int i = 0; i < 5; ++i) {
+            d += omega * Noise(lambda * pp);
+            omega *= 0.5f;
+            lambda *= 1.99f;
+        }
+
+        // Model decrease in density with altitude and return final cloud density
+        d = Clamp((1 - p.y) * 4.5f * density * d, 0, 1);
+        d += 2 * std::max<Float>(0, .5f - p.y);
+        return SampledSpectrum(Clamp(d, 0, 1));
     }
 
     pstd::vector<Float> GetMaxDensityGrid(Allocator alloc, Point3i *res) const {
@@ -472,43 +500,10 @@ class CloudMediumProvider {
         return pstd::vector<Float>(1, 1.f, alloc);
     }
 
-    PBRT_CPU_GPU
-    SampledSpectrum Density(const Point3f &p, const SampledWavelengths &lambda) const {
-        Point3f pp = 5 * extent * p;
-
-        // Use noise to perturb the lookup point.
-        if (wispiness > 0) {
-            Float vscale = .05f * wispiness, vlac = 10.f;
-            for (int i = 0; i < 2; ++i) {
-                Float delta = .01f;
-                // TODO: update Noise() to return the gradient?
-                Float base = Noise(vlac * pp);
-                Point3f pd(Noise(vlac * pp + Vector3f(delta, 0, 0)),
-                           Noise(vlac * pp + Vector3f(0, delta, 0)),
-                           Noise(vlac * pp + Vector3f(0, 0, delta)));
-                pp += vscale * (pd - Vector3f(base, base, base)) / delta;
-                vscale *= 0.5f;
-                vlac *= 2.01f;
-            }
-        }
-
-        Float d = 0;
-        Float scale = .5, lac = 1.f;
-        for (int i = 0; i < 5; ++i) {
-            d += scale * Noise(lac * pp);
-            scale *= 0.5f;
-            lac *= 2.01f;
-        }
-
-        d = Clamp((1 - p.y) * 4.5f * density * d, 0, 1);
-        d += 2 * std::max<Float>(0, .5f - p.y);
-        return SampledSpectrum(Clamp(d, 0, 1));
-    }
-
   private:
     // CloudMediumProvider Private Members
     Bounds3f bounds;
-    Float density, wispiness, extent;
+    Float density, wispiness, frequency;
 };
 
 // NanoVDBMediumProvider Definition
