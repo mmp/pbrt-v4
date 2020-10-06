@@ -354,14 +354,14 @@ Float HairBxDF::PDF(Vector3f wo, Vector3f wi, TransportMode mode,
     return pdf;
 }
 
-RGBIlluminantSpectrum HairBxDF::SigmaAFromConcentration(Float ce, Float cp) {
+RGBSpectrum HairBxDF::SigmaAFromConcentration(Float ce, Float cp) {
     RGB eumelaninSigmaA(0.419f, 0.697f, 1.37f);
     RGB pheomelaninSigmaA(0.187f, 0.4f, 1.05f);
     RGB sigma_a = ce * eumelaninSigmaA + cp * pheomelaninSigmaA;
 #ifdef PBRT_IS_GPU_CODE
-    return RGBIlluminantSpectrum(*RGBColorSpace_sRGB, sigma_a);
+    return RGBSpectrum(*RGBColorSpace_sRGB, sigma_a);
 #else
-    return RGBIlluminantSpectrum(*RGBColorSpace::sRGB, sigma_a);
+    return RGBSpectrum(*RGBColorSpace::sRGB, sigma_a);
 #endif
 }
 

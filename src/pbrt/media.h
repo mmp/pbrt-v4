@@ -357,7 +357,7 @@ class UniformGridMediumProvider {
             return SampledSpectrum(densityGrid->Lookup(pp));
         else {
             RGB rgb = rgbDensityGrid->Lookup(pp);
-            return RGBIlluminantSpectrum(*colorSpace, rgb).Sample(lambda);
+            return RGBSpectrum(*colorSpace, rgb).Sample(lambda);
         }
     }
 
@@ -395,7 +395,7 @@ class UniformGridMediumProvider {
                             if (maxComponent == 0)
                                 continue;
 
-                            RGBIlluminantSpectrum spec(*colorSpace, rgb);
+                            RGBSpectrum spec(*colorSpace, rgb);
                             maxDensity = std::max(maxDensity, spec.MaxValue());
                         }
 

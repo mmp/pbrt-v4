@@ -38,7 +38,7 @@ DielectricMaterial *DielectricMaterial::Create(
     const TextureParameterDictionary &parameters, const FileLoc *loc, Allocator alloc) {
     FloatTextureHandle etaF = parameters.GetFloatTextureOrNull("eta", alloc);
     SpectrumTextureHandle etaS =
-        parameters.GetSpectrumTextureOrNull("eta", SpectrumType::Illuminant, alloc);
+        parameters.GetSpectrumTextureOrNull("eta", SpectrumType::General, alloc);
     if (etaF && etaS) {
         Warning(loc, "Both \"float\" and \"spectrum\" variants of \"eta\" parameter "
                      "were provided. Ignoring the \"float\" one.");
@@ -71,7 +71,7 @@ ThinDielectricMaterial *ThinDielectricMaterial::Create(
     const TextureParameterDictionary &parameters, const FileLoc *loc, Allocator alloc) {
     FloatTextureHandle etaF = parameters.GetFloatTextureOrNull("eta", alloc);
     SpectrumTextureHandle etaS =
-        parameters.GetSpectrumTextureOrNull("eta", SpectrumType::Illuminant, alloc);
+        parameters.GetSpectrumTextureOrNull("eta", SpectrumType::General, alloc);
     if (etaF && etaS) {
         Warning(loc, "Both \"float\" and \"spectrum\" variants of \"eta\" parameter "
                      "were provided. Ignoring the \"float\" one.");
@@ -126,7 +126,7 @@ std::string HairMaterial::ToString() const {
 HairMaterial *HairMaterial::Create(const TextureParameterDictionary &parameters,
                                    const FileLoc *loc, Allocator alloc) {
     SpectrumTextureHandle sigma_a =
-        parameters.GetSpectrumTextureOrNull("sigma_a", SpectrumType::Illuminant, alloc);
+        parameters.GetSpectrumTextureOrNull("sigma_a", SpectrumType::General, alloc);
     SpectrumTextureHandle color =
         parameters.GetSpectrumTextureOrNull("color", SpectrumType::General, alloc);
     FloatTextureHandle eumelanin = parameters.GetFloatTextureOrNull("eumelanin", alloc);
@@ -160,8 +160,7 @@ HairMaterial *HairMaterial::Create(const TextureParameterDictionary &parameters,
     } else {
         // Default: brown-ish hair.
         sigma_a = alloc.new_object<SpectrumConstantTexture>(
-            alloc.new_object<RGBIlluminantSpectrum>(
-                HairBxDF::SigmaAFromConcentration(1.3, 0.)));
+            alloc.new_object<RGBSpectrum>(HairBxDF::SigmaAFromConcentration(1.3, 0.)));
     }
 
     FloatTextureHandle eta = parameters.GetFloatTexture("eta", 1.55f, alloc);
@@ -203,9 +202,9 @@ std::string ConductorMaterial::ToString() const {
 ConductorMaterial *ConductorMaterial::Create(const TextureParameterDictionary &parameters,
                                              const FileLoc *loc, Allocator alloc) {
     SpectrumTextureHandle eta = parameters.GetSpectrumTexture(
-        "eta", GetNamedSpectrum("metal-Cu-eta"), SpectrumType::Illuminant, alloc);
+        "eta", GetNamedSpectrum("metal-Cu-eta"), SpectrumType::General, alloc);
     SpectrumTextureHandle k = parameters.GetSpectrumTexture(
-        "k", GetNamedSpectrum("metal-Cu-k"), SpectrumType::Illuminant, alloc);
+        "k", GetNamedSpectrum("metal-Cu-k"), SpectrumType::General, alloc);
 
     FloatTextureHandle uRoughness = parameters.GetFloatTextureOrNull("uroughness", alloc);
     FloatTextureHandle vRoughness = parameters.GetFloatTextureOrNull("vroughness", alloc);
@@ -301,11 +300,10 @@ CoatedConductorMaterial *CoatedConductorMaterial::Create(
     if (!conductorVRoughness)
         conductorVRoughness =
             parameters.GetFloatTexture("conductor.roughness", 0.f, alloc);
-    SpectrumTextureHandle conductorEta =
-        parameters.GetSpectrumTexture("conductor.eta", GetNamedSpectrum("metal-Cu-eta"),
-                                      SpectrumType::Illuminant, alloc);
+    SpectrumTextureHandle conductorEta = parameters.GetSpectrumTexture(
+        "conductor.eta", GetNamedSpectrum("metal-Cu-eta"), SpectrumType::General, alloc);
     SpectrumTextureHandle k = parameters.GetSpectrumTexture(
-        "conductor.k", GetNamedSpectrum("metal-Cu-k"), SpectrumType::Illuminant, alloc);
+        "conductor.k", GetNamedSpectrum("metal-Cu-k"), SpectrumType::General, alloc);
 
     LayeredBxDFConfig config;
     config.maxDepth = parameters.GetOneInt("maxdepth", config.maxDepth);
@@ -359,10 +357,10 @@ SubsurfaceMaterial *SubsurfaceMaterial::Create(
         sigma_s = alloc.new_object<SpectrumConstantTexture>(sig_s);
     } else {
         // 2. sigma_a and sigma_s directly specified
-        sigma_a = parameters.GetSpectrumTextureOrNull("sigma_a", SpectrumType::Illuminant,
-                                                      alloc);
-        sigma_s = parameters.GetSpectrumTextureOrNull("sigma_s", SpectrumType::Illuminant,
-                                                      alloc);
+        sigma_a =
+            parameters.GetSpectrumTextureOrNull("sigma_a", SpectrumType::General, alloc);
+        sigma_s =
+            parameters.GetSpectrumTextureOrNull("sigma_s", SpectrumType::General, alloc);
         if (sigma_a && !sigma_s)
             ErrorExit(loc, "Provided \"sigma_a\" parameter without \"sigma_s\".");
         if (sigma_s && !sigma_a)
@@ -374,16 +372,14 @@ SubsurfaceMaterial *SubsurfaceMaterial::Create(
                 "reflectance", SpectrumType::General, alloc);
             if (reflectance) {
                 SpectrumHandle one = alloc.new_object<ConstantSpectrum>(1.);
-                mfp = parameters.GetSpectrumTexture("mfp", one, SpectrumType::Illuminant,
+                mfp = parameters.GetSpectrumTexture("mfp", one, SpectrumType::General,
                                                     alloc);
             } else {
                 // 4. nothing specified -- use defaults
-                RGBIlluminantSpectrum *defaultSigma_a =
-                    alloc.new_object<RGBIlluminantSpectrum>(*RGBColorSpace::sRGB,
-                                                            RGB(.0011f, .0024f, .014f));
-                RGBIlluminantSpectrum *defaultSigma_s =
-                    alloc.new_object<RGBIlluminantSpectrum>(*RGBColorSpace::sRGB,
-                                                            RGB(2.55f, 3.21f, 3.77f));
+                RGBSpectrum *defaultSigma_a = alloc.new_object<RGBSpectrum>(
+                    *RGBColorSpace::sRGB, RGB(.0011f, .0024f, .014f));
+                RGBSpectrum *defaultSigma_s = alloc.new_object<RGBSpectrum>(
+                    *RGBColorSpace::sRGB, RGB(2.55f, 3.21f, 3.77f));
                 sigma_a = alloc.new_object<SpectrumConstantTexture>(defaultSigma_a);
                 sigma_s = alloc.new_object<SpectrumConstantTexture>(defaultSigma_s);
             }

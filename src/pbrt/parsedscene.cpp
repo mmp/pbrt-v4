@@ -1420,8 +1420,7 @@ std::string FormattingScene::upgradeMaterial(std::string *name, ParameterDiction
                         rgb->r, rgb->g, rgb->b, avg);
                 extra += indent(1) + StringPrintf("\"float amount\" [ %f ]\n", avg);
             }
-        } else if (dict->GetSpectrumArray("amount", SpectrumType::Illuminant, {}).size() >
-                   0)
+        } else if (dict->GetSpectrumArray("amount", SpectrumType::General, {}).size() > 0)
             ErrorExitDeferred(
                 &loc, "Unable to update non-RGB spectrum \"amount\" to a scalar: %s",
                 dict->ToParameterDefinition("amount"));
@@ -1574,7 +1573,7 @@ void FormattingScene::NamedMaterial(const std::string &name, FileLoc loc) {
 static bool upgradeRGBToScale(ParameterDictionary *dict, const char *name,
                               Float *totalScale) {
     std::vector<SpectrumHandle> s =
-        dict->GetSpectrumArray(name, SpectrumType::Illuminant, {});
+        dict->GetSpectrumArray(name, SpectrumType::General, {});
     if (s.empty())
         return true;
 
