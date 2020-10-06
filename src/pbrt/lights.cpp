@@ -273,8 +273,8 @@ pstd::optional<LightLiSample> ProjectionLight::SampleLi(LightSampleContext ctx, 
     Point3f p = renderFromLight(Point3f(0, 0, 0));
     Vector3f wi = Normalize(p - ctx.p());
     Vector3f wl = renderFromLight.ApplyInverse(-wi);
-    return LightLiSample(this, Projection(wl, lambda) / DistanceSquared(p, ctx.p()), wi,
-                         1, Interaction(p, 0 /* time */, &mediumInterface));
+    return LightLiSample(Projection(wl, lambda) / DistanceSquared(p, ctx.p()), wi, 1,
+                         Interaction(p, 0 /* time */, &mediumInterface));
 }
 
 Float ProjectionLight::PDF_Li(LightSampleContext, Vector3f,
@@ -458,7 +458,7 @@ pstd::optional<LightLiSample> GoniometricLight::SampleLi(LightSampleContext ctx,
     Vector3f wi = Normalize(p - ctx.p());
     SampledSpectrum L =
         Scale(renderFromLight.ApplyInverse(-wi), lambda) / DistanceSquared(p, ctx.p());
-    return LightLiSample(this, L, wi, 1, Interaction(p, 0 /* time */, &mediumInterface));
+    return LightLiSample(L, wi, 1, Interaction(p, 0 /* time */, &mediumInterface));
 }
 
 Float GoniometricLight::PDF_Li(LightSampleContext, Vector3f,
@@ -817,7 +817,7 @@ pstd::optional<LightLiSample> UniformInfiniteLight::SampleLi(
     Vector3f wi = SampleUniformSphere(u);
     Float pdf = UniformSpherePDF();
     return LightLiSample(
-        this, scale * Lemit.Sample(lambda), wi, pdf,
+        scale * Lemit.Sample(lambda), wi, pdf,
         Interaction(ctx.p() + wi * (2 * sceneRadius), 0 /* time */, &mediumInterface));
 }
 
@@ -1095,7 +1095,7 @@ pstd::optional<LightLiSample> PortalImageInfiniteLight::SampleLi(
     SampledSpectrum L = ImageLookup(uv, lambda);
 
     return LightLiSample(
-        this, L, wi, pdf,
+        L, wi, pdf,
         Interaction(ctx.p() + wi * (2 * sceneRadius), 0 /* time */, &mediumInterface));
 }
 
@@ -1212,7 +1212,7 @@ pstd::optional<LightLiSample> SpotLight::SampleLi(LightSampleContext ctx, Point2
         scale * I.Sample(lambda) * Falloff(wl) / DistanceSquared(p, ctx.p());
     if (!L)
         return {};
-    return LightLiSample(this, L, wi, 1, Interaction(p, 0 /* time */, &mediumInterface));
+    return LightLiSample(L, wi, 1, Interaction(p, 0 /* time */, &mediumInterface));
 }
 
 Float SpotLight::PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const {
