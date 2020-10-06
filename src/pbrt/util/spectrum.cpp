@@ -32,13 +32,13 @@ namespace pbrt {
 
 // Spectrum Function Definitions
 Float SpectrumToPhotometric(SpectrumHandle s) {
-    // We have to handle RGBSpectrum separately here as it's composed of an
+    // We have to handle RGBIlluminantSpectrum separately here as it's composed of an
     // illuminant spectrum and an RGB multiplier. We only want to consider the
     // illuminant for the sake of this calculation, and we should consider the
     // RGB separately for the purposes of target power/illuminance computation
     // in the lights themselves (but we currently don't)
-    if (s.Is<RGBSpectrum>())
-        s = s.Cast<RGBSpectrum>()->Illluminant();
+    if (s.Is<RGBIlluminantSpectrum>())
+        s = s.Cast<RGBIlluminantSpectrum>()->Illluminant();
 
     Float y = 0;
     for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda)
@@ -261,26 +261,18 @@ RGB SampledSpectrum::ToRGB(const SampledWavelengths &lambda,
     return cs.ToRGB(xyz);
 }
 
-RGBReflectanceSpectrum::RGBReflectanceSpectrum(const RGBColorSpace &cs, const RGB &rgb)
+RGBSpectrum::RGBSpectrum(const RGBColorSpace &cs, const RGB &rgb)
     : rgb(rgb), rsp(cs.ToRGBCoeffs(rgb)) {}
 
-RGBSpectrum::RGBSpectrum(const RGBColorSpace &cs, const RGB &rgb)
+RGBIlluminantSpectrum::RGBIlluminantSpectrum(const RGBColorSpace &cs, const RGB &rgb)
     : rgb(rgb), illuminant(&cs.illuminant) {
     Float m = std::max({rgb.r, rgb.g, rgb.b});
     scale = 2 * m;
     rsp = cs.ToRGBCoeffs(scale ? rgb / scale : RGB(0, 0, 0));
 }
 
-std::string RGBReflectanceSpectrum::ToString() const {
-    return StringPrintf("[ RGBReflectanceSpectrum rsp: %s ]", rsp);
-}
-
-std::string RGBReflectanceSpectrum::ParameterType() const {
-    return "rgb";
-}
-
-std::string RGBReflectanceSpectrum::ParameterString() const {
-    return StringPrintf("%f %f %f", rgb.r, rgb.g, rgb.b);
+std::string RGBSpectrum::ToString() const {
+    return StringPrintf("[ RGBSpectrum rsp: %s ]", rsp);
 }
 
 std::string RGBSpectrum::ParameterType() const {
@@ -291,9 +283,18 @@ std::string RGBSpectrum::ParameterString() const {
     return StringPrintf("%f %f %f", rgb.r, rgb.g, rgb.b);
 }
 
-std::string RGBSpectrum::ToString() const {
-    return StringPrintf("[ RGBSpectrum rgb: %s rsp: %s scale: %f illuminant: %s ]", rgb,
-                        rsp, scale, *illuminant);
+std::string RGBIlluminantSpectrum::ParameterType() const {
+    return "rgb";
+}
+
+std::string RGBIlluminantSpectrum::ParameterString() const {
+    return StringPrintf("%f %f %f", rgb.r, rgb.g, rgb.b);
+}
+
+std::string RGBIlluminantSpectrum::ToString() const {
+    return StringPrintf(
+        "[ RGBIlluminantSpectrum rgb: %s rsp: %s scale: %f illuminant: %s ]", rgb, rsp,
+        scale, *illuminant);
 }
 
 namespace {

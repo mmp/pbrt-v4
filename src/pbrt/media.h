@@ -292,14 +292,14 @@ class CuboidMedium {
         }
 
         if (sig_a == nullptr) {
-            sig_a = parameters.GetOneSpectrum("sigma_a", nullptr,
-                                              SpectrumType::Reflectance, alloc);
+            sig_a = parameters.GetOneSpectrum("sigma_a", nullptr, SpectrumType::General,
+                                              alloc);
             if (sig_a == nullptr)
                 sig_a = alloc.new_object<ConstantSpectrum>(1.f);
         }
         if (sig_s == nullptr) {
-            sig_s = parameters.GetOneSpectrum("sigma_s", nullptr,
-                                              SpectrumType::Reflectance, alloc);
+            sig_s = parameters.GetOneSpectrum("sigma_s", nullptr, SpectrumType::General,
+                                              alloc);
             if (sig_s == nullptr)
                 sig_s = alloc.new_object<ConstantSpectrum>(1.f);
         }
@@ -357,7 +357,7 @@ class UniformGridMediumProvider {
             return SampledSpectrum(densityGrid->Lookup(pp));
         else {
             RGB rgb = rgbDensityGrid->Lookup(pp);
-            return RGBSpectrum(*colorSpace, rgb).Sample(lambda);
+            return RGBIlluminantSpectrum(*colorSpace, rgb).Sample(lambda);
         }
     }
 
@@ -395,7 +395,7 @@ class UniformGridMediumProvider {
                             if (maxComponent == 0)
                                 continue;
 
-                            RGBSpectrum spec(*colorSpace, rgb);
+                            RGBIlluminantSpectrum spec(*colorSpace, rgb);
                             maxDensity = std::max(maxDensity, spec.MaxValue());
                         }
 

@@ -78,13 +78,13 @@ TEST(RGBColorSpace, StdIllumWhiteACES2065_1) {
     EXPECT_LE(rgb.b, 1.01);
 }
 
-TEST(RGBSpectrum, MaxValue) {
+TEST(RGBIlluminantSpectrum, MaxValue) {
     RNG rng;
     for (const auto &cs :
          {*RGBColorSpace::sRGB, *RGBColorSpace::Rec2020, *RGBColorSpace::ACES2065_1}) {
         for (int i = 0; i < 100; ++i) {
             RGB rgb(rng.Uniform<Float>(), rng.Uniform<Float>(), rng.Uniform<Float>());
-            RGBReflectanceSpectrum rs(cs, rgb);
+            RGBSpectrum rs(cs, rgb);
 
             Float m = rs.MaxValue();
             Float sm = 0;
@@ -96,13 +96,13 @@ TEST(RGBSpectrum, MaxValue) {
     }
 }
 
-TEST(RGBSpectrum, RoundTripsRGB) {
+TEST(RGBIlluminantSpectrum, RoundTripsRGB) {
     RNG rng;
     const RGBColorSpace &cs = *RGBColorSpace::sRGB;
 
     for (int i = 0; i < 100; ++i) {
         RGB rgb(rng.Uniform<Float>(), rng.Uniform<Float>(), rng.Uniform<Float>());
-        RGBReflectanceSpectrum rs(cs, rgb);
+        RGBSpectrum rs(cs, rgb);
 
         DenselySampledSpectrum rsIllum = DenselySampledSpectrum::SampleFunction(
             [&](Float lambda) { return rs(lambda) * cs.illuminant(lambda); });
@@ -120,14 +120,14 @@ TEST(RGBSpectrum, RoundTripsRGB) {
     }
 }
 
-TEST(RGBSpectrum, RoundTripRec2020) {
+TEST(RGBIlluminantSpectrum, RoundTripRec2020) {
     RNG rng;
     const RGBColorSpace &cs = *RGBColorSpace::Rec2020;
 
     for (int i = 0; i < 100; ++i) {
         RGB rgb(.1 + .7 * rng.Uniform<Float>(), .1 + .7 * rng.Uniform<Float>(),
                 .1 + .7 * rng.Uniform<Float>());
-        RGBReflectanceSpectrum rs(cs, rgb);
+        RGBSpectrum rs(cs, rgb);
 
         DenselySampledSpectrum rsIllum = DenselySampledSpectrum::SampleFunction(
             [&](Float lambda) { return rs(lambda) * cs.illuminant(lambda); });
@@ -144,14 +144,14 @@ TEST(RGBSpectrum, RoundTripRec2020) {
     }
 }
 
-TEST(RGBSpectrum, RoundTripACES) {
+TEST(RGBIlluminantSpectrum, RoundTripACES) {
     RNG rng;
     const RGBColorSpace &cs = *RGBColorSpace::ACES2065_1;
 
     for (int i = 0; i < 100; ++i) {
         RGB rgb(.3 + .4 * rng.Uniform<Float>(), .3 + .4 * rng.Uniform<Float>(),
                 .3 + .4 * rng.Uniform<Float>());
-        RGBReflectanceSpectrum rs(cs, rgb);
+        RGBSpectrum rs(cs, rgb);
 
         DenselySampledSpectrum rsIllum = DenselySampledSpectrum::SampleFunction(
             [&](Float lambda) { return rs(lambda) * cs.illuminant(lambda); });

@@ -651,11 +651,11 @@ class GPUSpectrumImageTexture {
             float4 tex = tex2D<float4>(texObj, st[0], 1 - st[1]);
             rgb = scale * RGB(tex.x, tex.y, tex.z);
         }
-        if (spectrumType == SpectrumType::Reflectance) {
+        if (spectrumType == SpectrumType::General) {
             rgb = Clamp(rgb, 0, 1);
-            return RGBReflectanceSpectrum(*colorSpace, rgb).Sample(lambda);
-        } else
             return RGBSpectrum(*colorSpace, rgb).Sample(lambda);
+        } else
+            return RGBIlluminantSpectrum(*colorSpace, rgb).Sample(lambda);
 #endif
     }
 

@@ -103,12 +103,12 @@ TEST(Spectrum, MaxValue) {
     RNG rng;
     for (int i = 0; i < 20; ++i) {
         RGB rgb(rng.Uniform<Float>(), rng.Uniform<Float>(), rng.Uniform<Float>());
-        RGBReflectanceSpectrum sr(*RGBColorSpace::sRGB, rgb);
+        RGBSpectrum sr(*RGBColorSpace::sRGB, rgb);
         Float m = sr.MaxValue() * 1.00001f;
         for (Float lambda = 360; lambda < 830; lambda += .92)
             EXPECT_LE(sr(lambda), m);
 
-        RGBSpectrum si(*RGBColorSpace::sRGB, rgb);
+        RGBIlluminantSpectrum si(*RGBColorSpace::sRGB, rgb);
         m = si.MaxValue() * 1.00001f;
         for (Float lambda = 360; lambda < 830; lambda += .92)
             EXPECT_LE(si(lambda), m);

@@ -40,7 +40,7 @@ enum class ParameterType {
 };
 
 // SpectrumType Definition
-enum class SpectrumType { Reflectance, General };
+enum class SpectrumType { General, Illuminant };
 
 // SceneTextures Definition
 struct SceneTextures {

@@ -876,11 +876,11 @@ SceneTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
         // nullptr for the textures, as above.
         TextureParameterDictionary texDict(&tex.second.parameters, nullptr);
         SpectrumTextureHandle reflectanceTex = SpectrumTextureHandle::Create(
-            tex.second.texName, renderFromTexture, texDict, SpectrumType::Reflectance,
+            tex.second.texName, renderFromTexture, texDict, SpectrumType::General,
             &tex.second.loc, alloc, gpu);
         // This one should be fast since it should hit the texture cache
         SpectrumTextureHandle generalTex = SpectrumTextureHandle::Create(
-            tex.second.texName, renderFromTexture, texDict, SpectrumType::General,
+            tex.second.texName, renderFromTexture, texDict, SpectrumType::Illuminant,
             &tex.second.loc, alloc, gpu);
 
         std::lock_guard<std::mutex> lock(mutex);
@@ -909,10 +909,10 @@ SceneTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
         pbrt::Transform renderFromTexture = tex.second.renderFromObject.startTransform;
         TextureParameterDictionary texDict(&tex.second.parameters, &textures);
         SpectrumTextureHandle reflectanceTex = SpectrumTextureHandle::Create(
-            tex.second.texName, renderFromTexture, texDict, SpectrumType::Reflectance,
+            tex.second.texName, renderFromTexture, texDict, SpectrumType::General,
             &tex.second.loc, alloc, gpu);
         SpectrumTextureHandle generalTex = SpectrumTextureHandle::Create(
-            tex.second.texName, renderFromTexture, texDict, SpectrumType::General,
+            tex.second.texName, renderFromTexture, texDict, SpectrumType::Illuminant,
             &tex.second.loc, alloc, gpu);
         textures.spectrumReflectanceTextureMap[tex.first] = reflectanceTex;
         textures.spectrumGeneralTextureMap[tex.first] = generalTex;
@@ -1368,7 +1368,7 @@ std::string FormattingScene::upgradeMaterial(std::string *name, ParameterDiction
         bool matches = (rgb && rgb->r == value && rgb->g == value && rgb->b == value);
 
         if (!matches &&
-            !dict->GetSpectrumArray(paramName, SpectrumType::Reflectance, {}).empty())
+            !dict->GetSpectrumArray(paramName, SpectrumType::General, {}).empty())
             Warning(&loc,
                     "Parameter is being removed when converting "
                     "to \"%s\" material: %s",
@@ -1396,7 +1396,7 @@ std::string FormattingScene::upgradeMaterial(std::string *name, ParameterDiction
             return "";
         }
 
-        if (dict->GetSpectrumArray("opacity", SpectrumType::Reflectance, {}).empty())
+        if (dict->GetSpectrumArray("opacity", SpectrumType::General, {}).empty())
             return "";
 
         pstd::optional<RGB> opacity = dict->GetOneRGB("opacity");
@@ -1420,7 +1420,8 @@ std::string FormattingScene::upgradeMaterial(std::string *name, ParameterDiction
                         rgb->r, rgb->g, rgb->b, avg);
                 extra += indent(1) + StringPrintf("\"float amount\" [ %f ]\n", avg);
             }
-        } else if (dict->GetSpectrumArray("amount", SpectrumType::General, {}).size() > 0)
+        } else if (dict->GetSpectrumArray("amount", SpectrumType::Illuminant, {}).size() >
+                   0)
             ErrorExitDeferred(
                 &loc, "Unable to update non-RGB spectrum \"amount\" to a scalar: %s",
                 dict->ToParameterDefinition("amount"));
@@ -1573,7 +1574,7 @@ void FormattingScene::NamedMaterial(const std::string &name, FileLoc loc) {
 static bool upgradeRGBToScale(ParameterDictionary *dict, const char *name,
                               Float *totalScale) {
     std::vector<SpectrumHandle> s =
-        dict->GetSpectrumArray(name, SpectrumType::General, {});
+        dict->GetSpectrumArray(name, SpectrumType::Illuminant, {});
     if (s.empty())
         return true;
 

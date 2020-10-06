@@ -40,12 +40,13 @@ class BlackbodySpectrum;
 class ConstantSpectrum;
 class PiecewiseLinearSpectrum;
 class DenselySampledSpectrum;
-class RGBReflectanceSpectrum;
 class RGBSpectrum;
+class RGBIlluminantSpectrum;
 
-class SpectrumHandle : public TaggedPointer<ConstantSpectrum, DenselySampledSpectrum,
-                                            PiecewiseLinearSpectrum, RGBSpectrum,
-                                            RGBReflectanceSpectrum, BlackbodySpectrum> {
+class SpectrumHandle
+    : public TaggedPointer<ConstantSpectrum, DenselySampledSpectrum,
+                           PiecewiseLinearSpectrum, RGBIlluminantSpectrum, RGBSpectrum,
+                           BlackbodySpectrum> {
   public:
     // SpectrumHandle Public Methods
     using TaggedPointer::TaggedPointer;
@@ -517,16 +518,16 @@ class BlackbodySpectrum {
     Float normalizationFactor;
 };
 
-class RGBReflectanceSpectrum {
+class RGBSpectrum {
   public:
-    // RGBReflectanceSpectrum Public Methods
+    // RGBSpectrum Public Methods
     PBRT_CPU_GPU
     Float operator()(Float lambda) const { return scale * rsp(lambda); }
     PBRT_CPU_GPU
     Float MaxValue() const { return scale * rsp.MaxValue(); }
 
     PBRT_CPU_GPU
-    RGBReflectanceSpectrum(const RGBColorSpace &cs, const RGB &rgb);
+    RGBSpectrum(const RGBColorSpace &cs, const RGB &rgb);
 
     PBRT_CPU_GPU
     SampledSpectrum Sample(const SampledWavelengths &lambda) const {
@@ -541,18 +542,18 @@ class RGBReflectanceSpectrum {
     std::string ParameterString() const;
 
   private:
-    // RGBReflectanceSpectrum Private Members
+    // RGBSpectrum Private Members
     Float scale = 1;
     RGB rgb;
     RGBSigmoidPolynomial rsp;
 };
 
-class RGBSpectrum {
+class RGBIlluminantSpectrum {
   public:
-    // RGBSpectrum Public Methods
-    RGBSpectrum() = default;
+    // RGBIlluminantSpectrum Public Methods
+    RGBIlluminantSpectrum() = default;
     PBRT_CPU_GPU
-    RGBSpectrum(const RGBColorSpace &cs, const RGB &rgb);
+    RGBIlluminantSpectrum(const RGBColorSpace &cs, const RGB &rgb);
 
     PBRT_CPU_GPU
     Float operator()(Float lambda) const {
@@ -577,7 +578,7 @@ class RGBSpectrum {
     std::string ParameterString() const;
 
   private:
-    // RGBSpectrum Private Members
+    // RGBIlluminantSpectrum Private Members
     RGB rgb;
     Float scale;
     RGBSigmoidPolynomial rsp;

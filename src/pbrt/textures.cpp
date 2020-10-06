@@ -348,11 +348,11 @@ SampledSpectrum SpectrumImageTexture::Evaluate(TextureEvalContext ctx,
 
     // Return _SampledSpectrum_ for RGB image texture value
     if (const RGBColorSpace *cs = mipmap->GetRGBColorSpace(); cs != nullptr) {
-        if (spectrumType == SpectrumType::Reflectance) {
+        if (spectrumType == SpectrumType::General) {
             rgb = Clamp(rgb, 0, 1);
-            return RGBReflectanceSpectrum(*cs, rgb).Sample(lambda);
-        } else
             return RGBSpectrum(*cs, rgb).Sample(lambda);
+        } else
+            return RGBIlluminantSpectrum(*cs, rgb).Sample(lambda);
     }
     // otherwise it better be a one-channel texture
     DCHECK(rgb[0] == rgb[1] && rgb[1] == rgb[2]);
@@ -466,9 +466,9 @@ SampledSpectrum MarbleTexture::Evaluate(TextureEvalContext ctx,
     RGB rgb = 1.5f * EvaluateCubicBezier(pstd::span(c + first, 4), t);
 
 #ifdef PBRT_IS_GPU_CODE
-    return RGBReflectanceSpectrum(*RGBColorSpace_sRGB, rgb).Sample(lambda);
+    return RGBSpectrum(*RGBColorSpace_sRGB, rgb).Sample(lambda);
 #else
-    return RGBReflectanceSpectrum(*RGBColorSpace::sRGB, rgb).Sample(lambda);
+    return RGBSpectrum(*RGBColorSpace::sRGB, rgb).Sample(lambda);
 #endif
 }
 
@@ -652,11 +652,11 @@ SampledSpectrum SpectrumPtexTexture::Evaluate(TextureEvalContext ctx,
         return SampledSpectrum(result[0]);
     DCHECK_EQ(3, nc);
     RGB rgb(result[0], result[1], result[2]);
-    if (spectrumType == SpectrumType::Reflectance) {
+    if (spectrumType == SpectrumType::General) {
         rgb = Clamp(rgb, 0, 1);
-        return RGBReflectanceSpectrum(*RGBColorSpace::sRGB, rgb).Sample(lambda);
-    } else
         return RGBSpectrum(*RGBColorSpace::sRGB, rgb).Sample(lambda);
+    } else
+        return RGBIlluminantSpectrum(*RGBColorSpace::sRGB, rgb).Sample(lambda);
 #endif
 }
 

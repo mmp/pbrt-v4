@@ -508,7 +508,7 @@ class DiffuseAreaLight : public LightBase {
             RGB rgb;
             for (int c = 0; c < 3; ++c)
                 rgb[c] = image.BilerpChannel(uv, c);
-            return scale * RGBSpectrum(*imageColorSpace, rgb).Sample(lambda);
+            return scale * RGBIlluminantSpectrum(*imageColorSpace, rgb).Sample(lambda);
         } else
             return scale * Lemit.Sample(lambda);
     }
@@ -667,7 +667,7 @@ class ImageInfiniteLight : public LightBase {
         RGB rgb;
         for (int c = 0; c < 3; ++c)
             rgb[c] = image.LookupNearestChannel(st, c, wrapMode);
-        return scale * RGBSpectrum(*imageColorSpace, rgb).Sample(lambda);
+        return scale * RGBIlluminantSpectrum(*imageColorSpace, rgb).Sample(lambda);
     }
 
     // ImageInfiniteLight Private Members

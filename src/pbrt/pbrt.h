@@ -129,7 +129,7 @@ class TriangleMesh;
 class RGB;
 class RGBColorSpace;
 class RGBSigmoidPolynomial;
-class RGBSpectrum;
+class RGBIlluminantSpectrum;
 class SampledSpectrum;
 class SampledWavelengths;
 class SpectrumWavelengths;

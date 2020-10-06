@@ -378,20 +378,20 @@ std::vector<SpectrumHandle> ParameterDictionary::extractSpectrumArray(
                 RGB rgb(v[0], v[1], v[2]);
                 const RGBColorSpace &cs =
                     param.colorSpace ? *param.colorSpace : *colorSpace;
-                if (spectrumType == SpectrumType::Reflectance) {
+                if (spectrumType == SpectrumType::General) {
                     if (std::min({v[0], v[1], v[2]}) < 0 ||
                         std::max({v[0], v[1], v[2]}) > 1)
                         ErrorExit(&param.loc,
                                   "RGB reflectance parameter \"%s\" has "
                                   "parameter outside of [0,1].",
                                   param.name);
-                    return alloc.new_object<RGBReflectanceSpectrum>(cs, rgb);
+                    return alloc.new_object<RGBSpectrum>(cs, rgb);
                 } else {
-                    CHECK(spectrumType == SpectrumType::General);
+                    CHECK(spectrumType == SpectrumType::Illuminant);
                     if (std::min({v[0], v[1], v[2]}) < 0)
                         ErrorExit(&param.loc,
                                   "RGB parameter \"%s\" has negative component value.");
-                    return alloc.new_object<RGBSpectrum>(cs, rgb);
+                    return alloc.new_object<RGBIlluminantSpectrum>(cs, rgb);
                 }
             });
     else if (param.type == "blackbody")
@@ -800,7 +800,7 @@ SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTexture(
 
 SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTextureOrNull(
     const std::string &name, SpectrumType spectrumType, Allocator alloc) const {
-    const auto &spectrumTextures = (spectrumType == SpectrumType::Reflectance)
+    const auto &spectrumTextures = (spectrumType == SpectrumType::General)
                                        ? textures->spectrumReflectanceTextureMap
                                        : textures->spectrumGeneralTextureMap;
 
@@ -838,11 +838,11 @@ SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTextureOrNull(
                           "Negative value provided for \"rgb\" parameter \"%s\".",
                           p->name);
             SpectrumHandle s;
-            if (spectrumType == SpectrumType::General)
-                s = alloc.new_object<RGBSpectrum>(*dict->ColorSpace(), rgb);
+            if (spectrumType == SpectrumType::Illuminant)
+                s = alloc.new_object<RGBIlluminantSpectrum>(*dict->ColorSpace(), rgb);
             else {
-                CHECK(spectrumType == SpectrumType::Reflectance);
-                s = alloc.new_object<RGBReflectanceSpectrum>(*dict->ColorSpace(), rgb);
+                CHECK(spectrumType == SpectrumType::General);
+                s = alloc.new_object<RGBSpectrum>(*dict->ColorSpace(), rgb);
             }
             return alloc.new_object<SpectrumConstantTexture>(s);
         } else if (p->type == "spectrum" || p->type == "blackbody") {

@@ -109,7 +109,7 @@ PointLight *PointLight::Create(const Transform &renderFromLight, MediumHandle me
                                const RGBColorSpace *colorSpace, const FileLoc *loc,
                                Allocator alloc) {
     SpectrumHandle I = parameters.GetOneSpectrum("I", &colorSpace->illuminant,
-                                                 SpectrumType::General, alloc);
+                                                 SpectrumType::Illuminant, alloc);
     Float sc = parameters.GetOneFloat("scale", 1);
 
     sc /= SpectrumToPhotometric(I);
@@ -168,7 +168,7 @@ DistantLight *DistantLight::Create(const Transform &renderFromLight,
                                    const RGBColorSpace *colorSpace, const FileLoc *loc,
                                    Allocator alloc) {
     SpectrumHandle L = parameters.GetOneSpectrum("L", &colorSpace->illuminant,
-                                                 SpectrumType::General, alloc);
+                                                 SpectrumType::Illuminant, alloc);
     Float sc = parameters.GetOneFloat("scale", 1);
 
     Point3f from = parameters.GetOnePoint3f("from", Point3f(0, 0, 0));
@@ -331,7 +331,7 @@ SampledSpectrum ProjectionLight::Projection(const Vector3f &wl,
     for (int c = 0; c < 3; ++c)
         rgb[c] = image.LookupNearestChannel(st, c);
 
-    return scale * RGBSpectrum(*imageColorSpace, rgb).Sample(lambda);
+    return scale * RGBIlluminantSpectrum(*imageColorSpace, rgb).Sample(lambda);
 }
 
 SampledSpectrum ProjectionLight::Phi(const SampledWavelengths &lambda) const {
@@ -348,7 +348,8 @@ SampledSpectrum ProjectionLight::Phi(const SampledWavelengths &lambda) const {
             for (int c = 0; c < 3; ++c)
                 rgb[c] = image.GetChannel({u, v}, c);
 
-            SampledSpectrum L = RGBSpectrum(*imageColorSpace, rgb).Sample(lambda);
+            SampledSpectrum L =
+                RGBIlluminantSpectrum(*imageColorSpace, rgb).Sample(lambda);
 
             sum += L * dwdA;
         }
@@ -376,7 +377,8 @@ LightLeSample ProjectionLight::SampleLe(const Point2f &u1, const Point2f &u2,
     for (int c = 0; c < 3; ++c)
         rgb[c] = image.LookupNearestChannel(p, c);
 
-    SampledSpectrum L = scale * RGBSpectrum(*imageColorSpace, rgb).Sample(lambda);
+    SampledSpectrum L =
+        scale * RGBIlluminantSpectrum(*imageColorSpace, rgb).Sample(lambda);
 
     return LightLeSample(L, ray, 1, pdfDir);
 }
@@ -526,7 +528,7 @@ GoniometricLight *GoniometricLight::Create(const Transform &renderFromLight,
                                            const RGBColorSpace *colorSpace,
                                            const FileLoc *loc, Allocator alloc) {
     SpectrumHandle I = parameters.GetOneSpectrum("I", &colorSpace->illuminant,
-                                                 SpectrumType::General, alloc);
+                                                 SpectrumType::Illuminant, alloc);
     Float sc = parameters.GetOneFloat("scale", 1);
 
     Image image(alloc);
@@ -634,7 +636,7 @@ SampledSpectrum DiffuseAreaLight::Phi(const SampledWavelengths &lambda) const {
                 RGB rgb;
                 for (int c = 0; c < 3; ++c)
                     rgb[c] = image.GetChannel({x, y}, c);
-                phi += RGBSpectrum(*imageColorSpace, rgb).Sample(lambda);
+                phi += RGBIlluminantSpectrum(*imageColorSpace, rgb).Sample(lambda);
             }
         phi /= image.Resolution().x * image.Resolution().y;
 
@@ -726,7 +728,7 @@ DiffuseAreaLight *DiffuseAreaLight::Create(const Transform &renderFromLight,
                                            const FileLoc *loc, Allocator alloc,
                                            const ShapeHandle shape) {
     SpectrumHandle L =
-        parameters.GetOneSpectrum("L", nullptr, SpectrumType::General, alloc);
+        parameters.GetOneSpectrum("L", nullptr, SpectrumType::Illuminant, alloc);
     Float scale = parameters.GetOneFloat("scale", 1);
     bool twoSided = parameters.GetOneBool("twosided", false);
 
@@ -904,7 +906,7 @@ SampledSpectrum ImageInfiniteLight::Phi(const SampledWavelengths &lambda) const 
             RGB rgb;
             for (int c = 0; c < 3; ++c)
                 rgb[c] = image.GetChannel({u, v}, c, wrapMode);
-            sumL += RGBSpectrum(*imageColorSpace, rgb).Sample(lambda);
+            sumL += RGBIlluminantSpectrum(*imageColorSpace, rgb).Sample(lambda);
         }
     }
     // Integrating over the sphere, so 4pi for that.  Then one more for Pi
@@ -1039,7 +1041,7 @@ SampledSpectrum PortalImageInfiniteLight::Phi(const SampledWavelengths &lambda) 
             Float duv_dw;
             (void)RenderFromImage(st, &duv_dw);
 
-            sumL += RGBSpectrum(*imageColorSpace, rgb).Sample(lambda) / duv_dw;
+            sumL += RGBIlluminantSpectrum(*imageColorSpace, rgb).Sample(lambda) / duv_dw;
         }
     }
 
@@ -1063,7 +1065,7 @@ SampledSpectrum PortalImageInfiniteLight::ImageLookup(
     RGB rgb;
     for (int c = 0; c < 3; ++c)
         rgb[c] = image.LookupNearestChannel(st, c);
-    return scale * RGBSpectrum(*imageColorSpace, rgb).Sample(lambda);
+    return scale * RGBIlluminantSpectrum(*imageColorSpace, rgb).Sample(lambda);
 }
 
 LightLiSample PortalImageInfiniteLight::SampleLi(LightSampleContext ctx, Point2f u,
@@ -1304,7 +1306,7 @@ SpotLight *SpotLight::Create(const Transform &renderFromLight, MediumHandle medi
                              const RGBColorSpace *colorSpace, const FileLoc *loc,
                              Allocator alloc) {
     SpectrumHandle I = parameters.GetOneSpectrum("I", &colorSpace->illuminant,
-                                                 SpectrumType::General, alloc);
+                                                 SpectrumType::Illuminant, alloc);
     Float sc = parameters.GetOneFloat("scale", 1);
 
     Float coneangle = parameters.GetOneFloat("coneangle", 30.);
@@ -1397,7 +1399,7 @@ LightHandle LightHandle::Create(const std::string &name,
     else if (name == "infinite") {
         const RGBColorSpace *colorSpace = parameters.ColorSpace();
         std::vector<SpectrumHandle> L =
-            parameters.GetSpectrumArray("L", SpectrumType::General, alloc);
+            parameters.GetSpectrumArray("L", SpectrumType::Illuminant, alloc);
         Float scale = parameters.GetOneFloat("scale", 1);
         std::vector<Point3f> portal = parameters.GetPoint3fArray("portal");
         std::string filename = ResolveFilename(parameters.GetOneString("filename", ""));
