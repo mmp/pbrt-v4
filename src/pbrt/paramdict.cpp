@@ -378,15 +378,9 @@ std::vector<SpectrumHandle> ParameterDictionary::extractSpectrumArray(
                 RGB rgb(v[0], v[1], v[2]);
                 const RGBColorSpace &cs =
                     param.colorSpace ? *param.colorSpace : *colorSpace;
-                if (spectrumType == SpectrumType::General) {
-                    if (std::min({v[0], v[1], v[2]}) < 0 ||
-                        std::max({v[0], v[1], v[2]}) > 1)
-                        ErrorExit(&param.loc,
-                                  "RGB reflectance parameter \"%s\" has "
-                                  "parameter outside of [0,1].",
-                                  param.name);
+                if (spectrumType == SpectrumType::General)
                     return alloc.new_object<RGBSpectrum>(cs, rgb);
-                } else {
+                else {
                     CHECK(spectrumType == SpectrumType::Illuminant);
                     if (std::min({v[0], v[1], v[2]}) < 0)
                         ErrorExit(&param.loc,

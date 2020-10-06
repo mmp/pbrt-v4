@@ -261,8 +261,15 @@ RGB SampledSpectrum::ToRGB(const SampledWavelengths &lambda,
     return cs.ToRGB(xyz);
 }
 
-RGBSpectrum::RGBSpectrum(const RGBColorSpace &cs, const RGB &rgb)
-    : rgb(rgb), rsp(cs.ToRGBCoeffs(rgb)) {}
+RGBSpectrum::RGBSpectrum(const RGBColorSpace &cs, const RGB &rgb) {
+    Float m = std::max({rgb.r, rgb.g, rgb.b});
+    if (m <= 1)
+        rsp = cs.ToRGBCoeffs(rgb);
+    else {
+        scale = 2 * m;
+        rsp = cs.ToRGBCoeffs(scale ? rgb / scale : RGB(0, 0, 0));
+    }
+}
 
 RGBIlluminantSpectrum::RGBIlluminantSpectrum(const RGBColorSpace &cs, const RGB &rgb)
     : rgb(rgb), illuminant(&cs.illuminant) {
