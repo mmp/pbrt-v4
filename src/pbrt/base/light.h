@@ -38,10 +38,12 @@ struct LightLiSample;
 struct LightLeSample;
 
 // LightHandle Definition
-class LightHandle
-    : public TaggedPointer<PointLight, DistantLight, ProjectionLight, GoniometricLight,
-                           SpotLight, DiffuseAreaLight, UniformInfiniteLight,
-                           ImageInfiniteLight, PortalImageInfiniteLight> {
+class LightHandle : public TaggedPointer<  // Light Source Types
+                        PointLight, DistantLight, ProjectionLight, GoniometricLight,
+                        SpotLight, DiffuseAreaLight, UniformInfiniteLight,
+                        ImageInfiniteLight, PortalImageInfiniteLight
+
+                        > {
   public:
     // Light Interface
     using TaggedPointer::TaggedPointer;
@@ -65,7 +67,7 @@ class LightHandle
 
     SampledSpectrum Phi(const SampledWavelengths &lambda) const;
 
-    PBRT_CPU_GPU inline LightLiSample SampleLi(
+    PBRT_CPU_GPU inline pstd::optional<LightLiSample> SampleLi(
         LightSampleContext ctx, Point2f u, SampledWavelengths lambda,
         LightSamplingMode mode = LightSamplingMode::WithoutMIS) const;
 

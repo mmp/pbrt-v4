@@ -204,12 +204,12 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 __syncthreads();
 
                 // And now sample the light source itself.
-                LightLiSample ls = light.SampleLi(ctx, raySamples.direct.u, lambda,
+                pstd::optional<LightLiSample> ls = light.SampleLi(ctx, raySamples.direct.u, lambda,
                                                   LightSamplingMode::WithMIS);
-                if (!ls || !ls.L)
+                if (!ls || !ls->L || ls->pdf == 0)
                     return;
 
-                Vector3f wi = ls.wi;
+                Vector3f wi = ls->wi;
                 SampledSpectrum f = bsdf.f<BxDF>(wo, wi);
                 if (!f)
                     return;
@@ -222,19 +222,19 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 PBRT_DBG("me index %d depth %d beta %f %f %f %f f %f %f %f %f ls.L %f %f %f "
                     "%f ls.pdf %f\n",
                     index, depth, beta[0], beta[1], beta[2], beta[3], f[0], f[1],
-                    f[2], f[3], ls.L[0], ls.L[1], ls.L[2], ls.L[3], ls.pdf);
+                    f[2], f[3], ls->L[0], ls->L[1], ls->L[2], ls->L[3], ls->pdf);
 
                 // Compute light and BSDF PDFs for MIS.
-                Float lightPDF = ls.pdf * sampledLight->pdf;
+                Float lightPDF = ls->pdf * sampledLight->pdf;
                 // This causes pdfUni to be zero for the shadow ray, so that
                 // part of MIS just becomes a no-op.
                 Float bsdfPDF = IsDeltaLight(light.Type()) ? 0.f : bsdf.PDF<BxDF>(wo, wi);
                 SampledSpectrum pdfUni = me.pdfUni * bsdfPDF;
                 SampledSpectrum pdfNEE = me.pdfUni * lightPDF;
 
-                SampledSpectrum Ld = SafeDiv(beta * ls.L, lambda.PDF());
+                SampledSpectrum Ld = SafeDiv(beta * ls->L, lambda.PDF());
 
-                Ray ray = SpawnRayTo(me.pi, me.n, me.time, ls.pLight.pi, ls.pLight.n);
+                Ray ray = SpawnRayTo(me.pi, me.n, me.time, ls->pLight.pi, ls->pLight.n);
                 if (haveMedia)
                     ray.medium = Dot(ray.d, me.n) > 0 ? me.mediumInterface.outside
                                                       : me.mediumInterface.inside;

@@ -39,7 +39,7 @@ TEST(BVHLightSampling, OneSpot) {
         Interaction in(p, 0., (MediumHandle) nullptr);
         Point2f u(rng.Uniform<Float>(), rng.Uniform<Float>());
         SampledWavelengths lambda = SampledWavelengths::SampleUniform(0.5);
-        LightLiSample ls = lights[0].SampleLi(in, u, lambda);
+        pstd::optional<LightLiSample> ls = lights[0].SampleLi(in, u, lambda);
 
         pstd::optional<SampledLight> sampledLight =
             distrib.Sample(in, rng.Uniform<Float>());
@@ -52,7 +52,7 @@ TEST(BVHLightSampling, OneSpot) {
 
         EXPECT_EQ(1, sampledLight->pdf);
         EXPECT_TRUE(sampledLight->light == lights[0]);
-        EXPECT_TRUE((bool)ls.L) << ls.L << " @ " << p;
+        EXPECT_TRUE((bool)ls->L) << ls->L << " @ " << p;
     }
 }
 
@@ -213,7 +213,7 @@ TEST(BVHLightSampling, OneTri) {
         Interaction in(p, 0., (MediumHandle) nullptr);
         Point2f u(rng.Uniform<Float>(), rng.Uniform<Float>());
         SampledWavelengths lambda = SampledWavelengths::SampleUniform(0.5);
-        LightLiSample ls = lights[0].SampleLi(in, u, lambda);
+        pstd::optional<LightLiSample> ls = lights[0].SampleLi(in, u, lambda);
 
         pstd::optional<SampledLight> sampledLight =
             distrib.Sample(in, rng.Uniform<Float>());

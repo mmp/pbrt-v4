@@ -267,9 +267,9 @@ ProjectionLight::ProjectionLight(const Transform &renderFromLight,
     imageBytes += image.BytesUsed() + distrib.BytesUsed();
 }
 
-LightLiSample ProjectionLight::SampleLi(LightSampleContext ctx, Point2f u,
-                                        SampledWavelengths lambda,
-                                        LightSamplingMode mode) const {
+pstd::optional<LightLiSample> ProjectionLight::SampleLi(LightSampleContext ctx, Point2f u,
+                                                        SampledWavelengths lambda,
+                                                        LightSamplingMode mode) const {
     Point3f p = renderFromLight(Point3f(0, 0, 0));
     Vector3f wi = Normalize(p - ctx.p());
     Vector3f wl = renderFromLight.ApplyInverse(-wi);
@@ -450,9 +450,10 @@ GoniometricLight::GoniometricLight(const Transform &renderFromLight,
     imageBytes += image.BytesUsed() + distrib.BytesUsed();
 }
 
-LightLiSample GoniometricLight::SampleLi(LightSampleContext ctx, Point2f u,
-                                         SampledWavelengths lambda,
-                                         LightSamplingMode mode) const {
+pstd::optional<LightLiSample> GoniometricLight::SampleLi(LightSampleContext ctx,
+                                                         Point2f u,
+                                                         SampledWavelengths lambda,
+                                                         LightSamplingMode mode) const {
     Point3f p = renderFromLight(Point3f(0, 0, 0));
     Vector3f wi = Normalize(p - ctx.p());
     SampledSpectrum L =
@@ -810,9 +811,9 @@ SampledSpectrum UniformInfiniteLight::Phi(const SampledWavelengths &lambda) cons
     return 2 * Pi * Pi * Sqr(sceneRadius) * scale * Lemit.Sample(lambda);
 }
 
-LightLiSample UniformInfiniteLight::SampleLi(LightSampleContext ctx, Point2f u,
-                                             SampledWavelengths lambda,
-                                             LightSamplingMode mode) const {
+pstd::optional<LightLiSample> UniformInfiniteLight::SampleLi(
+    LightSampleContext ctx, Point2f u, SampledWavelengths lambda,
+    LightSamplingMode mode) const {
     Vector3f wi = SampleUniformSphere(u);
     Float pdf = UniformSpherePDF();
     return LightLiSample(
@@ -1068,9 +1069,9 @@ SampledSpectrum PortalImageInfiniteLight::ImageLookup(
     return scale * RGBIlluminantSpectrum(*imageColorSpace, rgb).Sample(lambda);
 }
 
-LightLiSample PortalImageInfiniteLight::SampleLi(LightSampleContext ctx, Point2f u,
-                                                 SampledWavelengths lambda,
-                                                 LightSamplingMode mode) const {
+pstd::optional<LightLiSample> PortalImageInfiniteLight::SampleLi(
+    LightSampleContext ctx, Point2f u, SampledWavelengths lambda,
+    LightSamplingMode mode) const {
     Bounds2f b = ImageBounds(ctx.p());
 
     // Find $(u,v)$ sample coordinates in infinite light texture
@@ -1201,9 +1202,9 @@ SpotLight::SpotLight(const Transform &renderFromLight,
     CHECK_LE(falloffStart, totalWidth);
 }
 
-LightLiSample SpotLight::SampleLi(LightSampleContext ctx, Point2f u,
-                                  SampledWavelengths lambda,
-                                  LightSamplingMode mode) const {
+pstd::optional<LightLiSample> SpotLight::SampleLi(LightSampleContext ctx, Point2f u,
+                                                  SampledWavelengths lambda,
+                                                  LightSamplingMode mode) const {
     Point3f p = renderFromLight(Point3f(0, 0, 0));
     Vector3f wi = Normalize(p - ctx.p());
     Vector3f wl = Normalize(renderFromLight.ApplyInverse(-wi));
