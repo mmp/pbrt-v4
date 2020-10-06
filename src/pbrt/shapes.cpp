@@ -580,7 +580,6 @@ bool Curve::IntersectRay(const Ray &r, Float tMax,
             L0, std::max(std::max(std::abs(cp[i].x - 2 * cp[i + 1].x + cp[i + 2].x),
                                   std::abs(cp[i].y - 2 * cp[i + 1].y + cp[i + 2].y)),
                          std::abs(cp[i].z - 2 * cp[i + 1].z + cp[i + 2].z)));
-
     int maxDepth = 0;
     if (L0 > 0) {
         Float eps = std::max(common->width[0], common->width[1]) * .05f;  // width / 20
@@ -650,7 +649,7 @@ bool Curve::RecursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Poin
         Normal3f nHit;
         if (common->type == CurveType::Ribbon) {
             // Scale _hitWidth_ based on ribbon orientation
-            if ( common->normalAngle == 0 )
+            if (common->normalAngle == 0)
                 nHit = common->n[0];
             else {
                 Float sin0 =

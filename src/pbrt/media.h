@@ -222,7 +222,7 @@ class CuboidMedium {
         }
 
         // Walk ray through maximum density grid and sample scattering
-        Float t0 = tMin, u = rng.Uniform<Float>();
+        Float t0 = tMin;
         while (true) {
             // Find _stepAxis_ for stepping to next voxel and exit point _t1_
             int bits = ((nextCrossingT[0] < nextCrossingT[1]) << 2) +
@@ -242,36 +242,29 @@ class CuboidMedium {
             if (sigma_maj[0] > 0) {
                 while (true) {
                     // Sample medium in current voxel
-                    // Compute _uEnd_ for exiting voxel and continue if no valid event
-                    Float uEnd = InvertExponentialSample(t1 - t0, sigma_maj[0]);
-                    if (u >= uEnd) {
-                        u = std::min((u - uEnd) / (1 - uEnd), OneMinusEpsilon);
-                        break;
-                    }
-
                     // Sample _t_ for scattering event and check validity
+                    Float u = rng.Uniform<Float>();
                     Float t = t0 + SampleExponential(u, sigma_maj[0]);
-                    if (t >= tMax) {
-                        callback(MediumSample(SampledSpectrum(1.f)));
-                        return;
-                    }
+                    if (t >= t1)
+                        break;
 
                     // Report scattering event in grid to callback function
-                    Point3f p = ray(t);
-                    SampledSpectrum Tmaj = FastExp(-sigma_maj * (t - t0));
-                    // Compute _density_ and _Le_ at sampled point in grid
-                    SampledSpectrum density = provider->Density(p, lambda);
-                    SampledSpectrum Le = provider->Le(p, lambda);
+                    if (t < tMax) {
+                        Point3f p = ray(t);
+                        SampledSpectrum Tmaj = FastExp(-sigma_maj * (t - t0));
+                        // Compute _density_ and _Le_ at sampled point in grid
+                        SampledSpectrum density = provider->Density(p, lambda);
+                        SampledSpectrum Le = provider->Le(p, lambda);
 
-                    MediumInteraction intr(renderFromMedium(p), -Normalize(rRender.d),
-                                           rRender.time, sigma_a * density,
-                                           sigma_s * density, sigma_maj, Le, this,
-                                           &phase);
-                    if (!callback(MediumSample(intr, Tmaj)))
-                        return;
+                        MediumInteraction intr(renderFromMedium(p), -Normalize(rRender.d),
+                                               rRender.time, sigma_a * density,
+                                               sigma_s * density, sigma_maj, Le, this,
+                                               &phase);
+                        if (!callback(MediumSample(intr, Tmaj)))
+                            return;
+                    }
 
-                    // Update _u_ and _t0_ after grid medium event
-                    u = rng.Uniform<Float>();
+                    // Update _t0_ after medium interaction
                     t0 = t;
                 }
             }
