@@ -1412,7 +1412,8 @@ AOIntegrator::AOIntegrator(bool cosSample, Float maxDist, CameraHandle camera,
     : RayIntegrator(camera, sampler, aggregate, lights),
       cosSample(cosSample),
       maxDist(maxDist),
-      illuminant(illuminant) {}
+      illuminant(illuminant),
+      illumScale(1.f / SpectrumToPhotometric(illuminant)) {}
 
 SampledSpectrum AOIntegrator::Li(RayDifferential ray, SampledWavelengths &lambda,
                                  SamplerHandle sampler, ScratchBuffer &scratchBuffer,
@@ -1455,8 +1456,11 @@ retry:
 
         // Divide by pi so that fully visible is one.
         Ray r = isect.SpawnRay(wi);
-        if (!IntersectP(r, maxDist))
-            return illuminant.Sample(lambda) * SampledSpectrum(Dot(wi, n) / (Pi * pdf));
+        if (!IntersectP(r, maxDist)) {
+            SampledSpectrum L = illumScale * illuminant.Sample(lambda) *
+                                SampledSpectrum(Dot(wi, n) / (Pi * pdf));
+            return SafeDiv(L, lambda.PDF());
+        }
     }
     return SampledSpectrum(0.);
 }
