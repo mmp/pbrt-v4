@@ -299,7 +299,7 @@ SampledSpectrum ProjectionLight::Projection(Vector3f wl,
         rgb[c] = image.LookupNearestChannel(st, c);
 
     // Return scaled wavelength samples corresponding to RGB
-    RGBIlluminantSpectrum s(*imageColorSpace, rgb);
+    RGBIlluminantSpectrum s(*imageColorSpace, ClampZero(rgb));
     return scale * s.Sample(lambda);
 }
 
@@ -319,7 +319,7 @@ SampledSpectrum ProjectionLight::Phi(const SampledWavelengths &lambda) const {
             RGB rgb;
             for (int c = 0; c < 3; ++c)
                 rgb[c] = image.GetChannel({x, y}, c);
-            RGBIlluminantSpectrum s(*imageColorSpace, rgb);
+            RGBIlluminantSpectrum s(*imageColorSpace, ClampZero(rgb));
             sum += s.Sample(lambda) * dwdA;
         }
     // Return final power for projection light
@@ -638,7 +638,8 @@ SampledSpectrum DiffuseAreaLight::Phi(const SampledWavelengths &lambda) const {
                 RGB rgb;
                 for (int c = 0; c < 3; ++c)
                     rgb[c] = image.GetChannel({x, y}, c);
-                phi += RGBIlluminantSpectrum(*imageColorSpace, rgb).Sample(lambda);
+                phi += RGBIlluminantSpectrum(*imageColorSpace, ClampZero(rgb))
+                           .Sample(lambda);
             }
         phi /= image.Resolution().x * image.Resolution().y;
 
@@ -907,7 +908,8 @@ SampledSpectrum ImageInfiniteLight::Phi(const SampledWavelengths &lambda) const 
             RGB rgb;
             for (int c = 0; c < 3; ++c)
                 rgb[c] = image.GetChannel({u, v}, c, wrapMode);
-            sumL += RGBIlluminantSpectrum(*imageColorSpace, rgb).Sample(lambda);
+            sumL +=
+                RGBIlluminantSpectrum(*imageColorSpace, ClampZero(rgb)).Sample(lambda);
         }
     }
     // Integrating over the sphere, so 4pi for that.  Then one more for Pi
@@ -1042,7 +1044,9 @@ SampledSpectrum PortalImageInfiniteLight::Phi(const SampledWavelengths &lambda) 
             Float duv_dw;
             (void)RenderFromImage(st, &duv_dw);
 
-            sumL += RGBIlluminantSpectrum(*imageColorSpace, rgb).Sample(lambda) / duv_dw;
+            sumL +=
+                RGBIlluminantSpectrum(*imageColorSpace, ClampZero(rgb)).Sample(lambda) /
+                duv_dw;
         }
     }
 
@@ -1066,7 +1070,7 @@ SampledSpectrum PortalImageInfiniteLight::ImageLookup(
     RGB rgb;
     for (int c = 0; c < 3; ++c)
         rgb[c] = image.LookupNearestChannel(st, c);
-    return scale * RGBIlluminantSpectrum(*imageColorSpace, rgb).Sample(lambda);
+    return scale * RGBIlluminantSpectrum(*imageColorSpace, ClampZero(rgb)).Sample(lambda);
 }
 
 pstd::optional<LightLiSample> PortalImageInfiniteLight::SampleLi(
