@@ -506,10 +506,11 @@ class DiffuseAreaLight : public LightBase {
 
         if (image) {
             RGB rgb;
+            Point2f st = uv;
+            st[1] = 1 - st[1];
             for (int c = 0; c < 3; ++c)
-                rgb[c] = image.BilerpChannel(uv, c);
-            return scale *
-                   RGBIlluminantSpectrum(*imageColorSpace, ClampZero(rgb)).Sample(lambda);
+                rgb[c] = image.BilerpChannel(st, c);
+            return scale * RGBIlluminantSpectrum(*imageColorSpace, ClampZero(rgb)).Sample(lambda);
         } else
             return scale * Lemit.Sample(lambda);
     }
