@@ -345,6 +345,7 @@ SampledSpectrum SpectrumImageTexture::Evaluate(TextureEvalContext ctx,
 
     // Lookup filtered RGB value in _MIPMap_
     RGB rgb = scale * mipmap->Filter<RGB>(st, dstdx, dstdy);
+    rgb = ClampZero(rgb);
 
     // Return _SampledSpectrum_ for RGB image texture value
     if (const RGBColorSpace *cs = mipmap->GetRGBColorSpace(); cs != nullptr) {

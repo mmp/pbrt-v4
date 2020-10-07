@@ -30,28 +30,22 @@ namespace pbrt {
 std::string ToString(LightType type);
 
 // Light Inline Functions
-PBRT_CPU_GPU
-inline bool IsDeltaLight(LightType type) {
+PBRT_CPU_GPU inline bool IsDeltaLight(LightType type) {
     return (type == LightType::DeltaPosition || type == LightType::DeltaDirection);
 }
 
 // LightLiSample Definition
 struct LightLiSample {
-  public:
     // LightLiSample Public Methods
-    PBRT_CPU_GPU
-    operator bool() const { return pdf > 0; }
-
     LightLiSample() = default;
     PBRT_CPU_GPU
-    LightLiSample(LightHandle light, const SampledSpectrum &L, const Vector3f &wi,
-                  Float pdf, const Interaction &pLight)
-        : L(L), wi(wi), pdf(pdf), light(light), pLight(pLight) {}
+    LightLiSample(const SampledSpectrum &L, Vector3f wi, Float pdf,
+                  const Interaction &pLight)
+        : L(L), wi(wi), pdf(pdf), pLight(pLight) {}
 
     SampledSpectrum L;
     Vector3f wi;
-    Float pdf = 0;
-    LightHandle light;
+    Float pdf;
     Interaction pLight;
 };
 
@@ -85,6 +79,7 @@ struct LightLeSample {
 // LightSampleContext Definition
 class LightSampleContext {
   public:
+    // LightSampleContext Public Methods
     LightSampleContext() = default;
     PBRT_CPU_GPU
     LightSampleContext(const SurfaceInteraction &si)
@@ -92,12 +87,12 @@ class LightSampleContext {
     PBRT_CPU_GPU
     LightSampleContext(const Interaction &intr) : pi(intr.pi) {}
     PBRT_CPU_GPU
-    LightSampleContext(const Point3fi &pi, const Normal3f &n, const Normal3f &ns)
-        : pi(pi), n(n), ns(ns) {}
+    LightSampleContext(Point3fi pi, Normal3f n, Normal3f ns) : pi(pi), n(n), ns(ns) {}
 
     PBRT_CPU_GPU
     Point3f p() const { return Point3f(pi); }
 
+    // LightSampleContext Public Members
     Point3fi pi;
     Normal3f n, ns;
 };
@@ -229,18 +224,19 @@ LightBounds Union(const LightBounds &a, const LightBounds &b);
 class LightBase {
   public:
     // LightBase Public Methods
-    LightBase(LightType flags, const Transform &renderFromLight,
+    LightBase(LightType type, const Transform &renderFromLight,
               const MediumInterface &mediumInterface);
 
     PBRT_CPU_GPU
     LightType Type() const { return type; }
+
     PBRT_CPU_GPU
-    SampledSpectrum L(const Point3f &p, const Normal3f &n, const Point2f &uv,
-                      const Vector3f &w, const SampledWavelengths &lambda) const {
+    SampledSpectrum L(Point3f p, Normal3f n, Point2f uv, Vector3f w,
+                      const SampledWavelengths &lambda) const {
         return SampledSpectrum(0.f);
     }
     PBRT_CPU_GPU
-    SampledSpectrum Le(const Ray &ray, const SampledWavelengths &lambda) const {
+    SampledSpectrum Le(const Ray &, const SampledWavelengths &) const {
         return SampledSpectrum(0.f);
     }
 
@@ -248,15 +244,15 @@ class LightBase {
     std::string BaseToString() const;
     // LightBase Protected Members
     LightType type;
-    MediumInterface mediumInterface;
     Transform renderFromLight;
+    MediumInterface mediumInterface;
 };
 
 // PointLight Definition
 class PointLight : public LightBase {
   public:
     // PointLight Public Methods
-    PointLight(const Transform &renderFromLight, const MediumInterface &mediumInterface,
+    PointLight(Transform renderFromLight, MediumInterface mediumInterface,
                SpectrumHandle I, Float scale, Allocator alloc)
         : LightBase(LightType::DeltaPosition, renderFromLight, mediumInterface),
           I(I, alloc),
@@ -285,12 +281,13 @@ class PointLight : public LightBase {
     std::string ToString() const;
 
     PBRT_CPU_GPU
-    LightLiSample SampleLi(LightSampleContext ctx, Point2f u, SampledWavelengths lambda,
-                           LightSamplingMode mode) const {
+    pstd::optional<LightLiSample> SampleLi(LightSampleContext ctx, Point2f u,
+                                           SampledWavelengths lambda,
+                                           LightSamplingMode mode) const {
         Point3f p = renderFromLight(Point3f(0, 0, 0));
         Vector3f wi = Normalize(p - ctx.p());
-        return LightLiSample(this, scale * I.Sample(lambda) / DistanceSquared(p, ctx.p()),
-                             wi, 1, Interaction(p, 0 /* time */, &mediumInterface));
+        SampledSpectrum Li = scale * I.Sample(lambda) / DistanceSquared(p, ctx.p());
+        return LightLiSample(Li, wi, 1, Interaction(p, &mediumInterface));
     }
 
     PBRT_CPU_GPU
@@ -339,12 +336,13 @@ class DistantLight : public LightBase {
     }
 
     PBRT_CPU_GPU
-    LightLiSample SampleLi(LightSampleContext ctx, Point2f u, SampledWavelengths lambda,
-                           LightSamplingMode mode) const {
+    pstd::optional<LightLiSample> SampleLi(LightSampleContext ctx, Point2f u,
+                                           SampledWavelengths lambda,
+                                           LightSamplingMode mode) const {
         Vector3f wi = Normalize(renderFromLight(Vector3f(0, 0, 1)));
         Point3f pOutside = ctx.p() + wi * (2 * sceneRadius);
-        return LightLiSample(this, scale * Lemit.Sample(lambda), wi, 1,
-                             Interaction(pOutside, 0 /* time */, &mediumInterface));
+        return LightLiSample(scale * Lemit.Sample(lambda), wi, 1,
+                             Interaction(pOutside, &mediumInterface));
     }
 
   private:
@@ -359,9 +357,9 @@ class DistantLight : public LightBase {
 class ProjectionLight : public LightBase {
   public:
     // ProjectionLight Public Methods
-    ProjectionLight(const Transform &renderFromLight, const MediumInterface &medium,
-                    Image image, const RGBColorSpace *colorSpace, Float scale, Float fov,
-                    Float power, Allocator alloc);
+    ProjectionLight(Transform renderFromLight, MediumInterface medium, Image image,
+                    const RGBColorSpace *colorSpace, Float scale, Float fov, Float power,
+                    Allocator alloc);
 
     static ProjectionLight *Create(const Transform &renderFromLight, MediumHandle medium,
                                    const ParameterDictionary &parameters,
@@ -370,10 +368,11 @@ class ProjectionLight : public LightBase {
     void Preprocess(const Bounds3f &sceneBounds) {}
 
     PBRT_CPU_GPU
-    LightLiSample SampleLi(LightSampleContext ctx, Point2f u, SampledWavelengths lambda,
-                           LightSamplingMode mode) const;
+    pstd::optional<LightLiSample> SampleLi(LightSampleContext ctx, Point2f u,
+                                           SampledWavelengths lambda,
+                                           LightSamplingMode mode) const;
     PBRT_CPU_GPU
-    SampledSpectrum Projection(const Vector3f &w, const SampledWavelengths &lambda) const;
+    SampledSpectrum Projection(Vector3f w, const SampledWavelengths &lambda) const;
 
     SampledSpectrum Phi(const SampledWavelengths &lambda) const;
 
@@ -401,9 +400,9 @@ class ProjectionLight : public LightBase {
     const RGBColorSpace *imageColorSpace;
     Float scale;
     Bounds2f screenBounds;
-    Float hither;
-    Transform ScreenFromLight, LightFromScreen;
-    Float A, cosTotalWidth;
+    Float hither = 1e-3f;
+    Transform screenFromLight, lightFromScreen;
+    Float A;
     PiecewiseConstant2D distrib;
 };
 
@@ -424,8 +423,9 @@ class GoniometricLight : public LightBase {
     void Preprocess(const Bounds3f &sceneBounds) {}
 
     PBRT_CPU_GPU
-    LightLiSample SampleLi(LightSampleContext ctx, Point2f u, SampledWavelengths lambda,
-                           LightSamplingMode mode) const;
+    pstd::optional<LightLiSample> SampleLi(LightSampleContext ctx, Point2f u,
+                                           SampledWavelengths lambda,
+                                           LightSamplingMode mode) const;
 
     SampledSpectrum Phi(const SampledWavelengths &lambda) const;
 
@@ -499,8 +499,8 @@ class DiffuseAreaLight : public LightBase {
     std::string ToString() const;
 
     PBRT_CPU_GPU
-    SampledSpectrum L(const Point3f &p, const Normal3f &n, const Point2f &uv,
-                      const Vector3f &w, const SampledWavelengths &lambda) const {
+    SampledSpectrum L(Point3f p, Normal3f n, Point2f uv, Vector3f w,
+                      const SampledWavelengths &lambda) const {
         if (!twoSided && Dot(n, w) < 0)
             return SampledSpectrum(0.f);
 
@@ -510,14 +510,15 @@ class DiffuseAreaLight : public LightBase {
             st[1] = 1 - st[1];
             for (int c = 0; c < 3; ++c)
                 rgb[c] = image.BilerpChannel(st, c);
-            return scale * RGBIlluminantSpectrum(*imageColorSpace, rgb).Sample(lambda);
+            return scale * RGBIlluminantSpectrum(*imageColorSpace, ClampZero(rgb)).Sample(lambda);
         } else
             return scale * Lemit.Sample(lambda);
     }
 
     PBRT_CPU_GPU
-    LightLiSample SampleLi(LightSampleContext ctx, Point2f u, SampledWavelengths lambda,
-                           LightSamplingMode mode) const {
+    pstd::optional<LightLiSample> SampleLi(LightSampleContext ctx, Point2f u,
+                                           SampledWavelengths lambda,
+                                           LightSamplingMode mode) const {
         // Sample point on shape for _DiffuseAreaLight_
         ShapeSampleContext shapeCtx(ctx.pi, ctx.n, ctx.ns, 0 /* time */);
         pstd::optional<ShapeSample> ss = shape.Sample(shapeCtx, u);
@@ -533,7 +534,7 @@ class DiffuseAreaLight : public LightBase {
         SampledSpectrum Le = L(ss->intr.p(), ss->intr.n, ss->intr.uv, -wi, lambda);
         if (!Le)
             return {};
-        return LightLiSample(this, Le, wi, ss->pdf, ss->intr);
+        return LightLiSample(Le, wi, ss->pdf, ss->intr);
     }
 
     PBRT_CPU_GPU
@@ -569,8 +570,9 @@ class UniformInfiniteLight : public LightBase {
     PBRT_CPU_GPU
     SampledSpectrum Le(const Ray &ray, const SampledWavelengths &lambda) const;
     PBRT_CPU_GPU
-    LightLiSample SampleLi(LightSampleContext ctx, Point2f u, SampledWavelengths lambda,
-                           LightSamplingMode mode) const;
+    pstd::optional<LightLiSample> SampleLi(LightSampleContext ctx, Point2f u,
+                                           SampledWavelengths lambda,
+                                           LightSamplingMode mode) const;
     PBRT_CPU_GPU
     Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
 
@@ -635,8 +637,9 @@ class ImageInfiniteLight : public LightBase {
     }
 
     PBRT_CPU_GPU
-    LightLiSample SampleLi(LightSampleContext ctx, Point2f u, SampledWavelengths lambda,
-                           LightSamplingMode mode) const {
+    pstd::optional<LightLiSample> SampleLi(LightSampleContext ctx, Point2f u,
+                                           SampledWavelengths lambda,
+                                           LightSamplingMode mode) const {
         // Find $(u,v)$ sample coordinates in infinite light texture
         Float mapPDF;
         Point2f uv = (mode == LightSamplingMode::WithMIS)
@@ -655,9 +658,8 @@ class ImageInfiniteLight : public LightBase {
         // Return radiance value for infinite light direction
         SampledSpectrum L = LookupLe(uv, lambda);
 
-        return LightLiSample(this, L, wi, pdf,
-                             Interaction(ctx.p() + wi * (2 * sceneRadius), 0 /* time */,
-                                         &mediumInterface));
+        return LightLiSample(
+            L, wi, pdf, Interaction(ctx.p() + wi * (2 * sceneRadius), &mediumInterface));
     }
 
     LightBounds Bounds() const { return {}; }
@@ -669,7 +671,8 @@ class ImageInfiniteLight : public LightBase {
         RGB rgb;
         for (int c = 0; c < 3; ++c)
             rgb[c] = image.LookupNearestChannel(st, c, wrapMode);
-        return scale * RGBIlluminantSpectrum(*imageColorSpace, rgb).Sample(lambda);
+        return scale *
+               RGBIlluminantSpectrum(*imageColorSpace, ClampZero(rgb)).Sample(lambda);
     }
 
     // ImageInfiniteLight Private Members
@@ -703,8 +706,9 @@ class PortalImageInfiniteLight : public LightBase {
     SampledSpectrum Le(const Ray &ray, const SampledWavelengths &lambda) const;
 
     PBRT_CPU_GPU
-    LightLiSample SampleLi(LightSampleContext ctx, Point2f u, SampledWavelengths lambda,
-                           LightSamplingMode mode) const;
+    pstd::optional<LightLiSample> SampleLi(LightSampleContext ctx, Point2f u,
+                                           SampledWavelengths lambda,
+                                           LightSamplingMode mode) const;
 
     PBRT_CPU_GPU
     Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
@@ -798,9 +802,6 @@ class SpotLight : public LightBase {
     void Preprocess(const Bounds3f &sceneBounds) {}
 
     PBRT_CPU_GPU
-    LightLiSample SampleLi(LightSampleContext ctx, Point2f u, SampledWavelengths lambda,
-                           LightSamplingMode mode) const;
-    PBRT_CPU_GPU
     Float Falloff(const Vector3f &w) const;
 
     SampledSpectrum Phi(const SampledWavelengths &lambda) const;
@@ -823,16 +824,32 @@ class SpotLight : public LightBase {
 
     std::string ToString() const;
 
+    PBRT_CPU_GPU
+    pstd::optional<LightLiSample> SampleLi(LightSampleContext ctx, Point2f u,
+                                           SampledWavelengths lambda,
+                                           LightSamplingMode mode) const {
+        Point3f p = renderFromLight(Point3f(0, 0, 0));
+        Vector3f wi = Normalize(p - ctx.p());
+        // Compute incident radiance _Li_ for _SpotLight_
+        Vector3f wl = Normalize(renderFromLight.ApplyInverse(-wi));
+        SampledSpectrum Li =
+            scale * I.Sample(lambda) * Falloff(wl) / DistanceSquared(p, ctx.p());
+
+        if (!Li)
+            return {};
+        return LightLiSample(Li, wi, 1, Interaction(p, &mediumInterface));
+    }
+
   private:
     // SpotLight Private Members
     DenselySampledSpectrum I;
-    Float scale;
-    Float cosFalloffStart, cosFalloffEnd;
+    Float scale, cosFalloffStart, cosFalloffEnd;
 };
 
-inline LightLiSample LightHandle::SampleLi(LightSampleContext ctx, Point2f u,
-                                           SampledWavelengths lambda,
-                                           LightSamplingMode mode) const {
+inline pstd::optional<LightLiSample> LightHandle::SampleLi(LightSampleContext ctx,
+                                                           Point2f u,
+                                                           SampledWavelengths lambda,
+                                                           LightSamplingMode mode) const {
     auto sample = [&](auto ptr) { return ptr->SampleLi(ctx, u, lambda, mode); };
     return Dispatch(sample);
 }
@@ -843,8 +860,7 @@ inline Float LightHandle::PDF_Li(LightSampleContext ctx, Vector3f wi,
     return Dispatch(pdf);
 }
 
-inline SampledSpectrum LightHandle::L(const Point3f &p, const Normal3f &n,
-                                      const Point2f &uv, const Vector3f &w,
+inline SampledSpectrum LightHandle::L(Point3f p, Normal3f n, Point2f uv, Vector3f w,
                                       const SampledWavelengths &lambda) const {
     CHECK(Type() == LightType::Area);
     auto l = [&](auto ptr) { return ptr->L(p, n, uv, w, lambda); };

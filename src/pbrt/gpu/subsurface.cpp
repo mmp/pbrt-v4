@@ -148,12 +148,12 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                     return;
                 LightHandle light = sampledLight->light;
 
-                LightLiSample ls = light.SampleLi(ctx, raySamples.direct.u, lambda,
+                pstd::optional<LightLiSample> ls = light.SampleLi(ctx, raySamples.direct.u, lambda,
                                                   LightSamplingMode::WithMIS);
-                if (!ls || !ls.L)
+                if (!ls || !ls->L || ls->pdf == 0)
                     return;
 
-                Vector3f wi = ls.wi;
+                Vector3f wi = ls->wi;
                 SampledSpectrum f = bsdf.f<BxDF>(wo, wi);
                 if (!f)
                     return;
@@ -163,16 +163,16 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                 PBRT_DBG("depth %d beta %f %f %f %f f %f %f %f %f ls.L %f %f %f %f ls.pdf "
                     "%f\n",
                     depth, beta[0], beta[1], beta[2], beta[3], f[0], f[1], f[2], f[3],
-                    ls.L[0], ls.L[1], ls.L[2], ls.L[3], ls.pdf);
+                    ls->L[0], ls->L[1], ls->L[2], ls->L[3], ls->pdf);
 
-                Float lightPDF = ls.pdf * sampledLight->pdf;
+                Float lightPDF = ls->pdf * sampledLight->pdf;
                 // This causes pdfUni to be zero for the shadow ray, so that
                 // part of MIS just becomes a no-op.
                 Float bsdfPDF = IsDeltaLight(light.Type()) ? 0.f : bsdf.PDF<BxDF>(wo, wi);
                 SampledSpectrum pdfUni = s.pdfUni * bsdfPDF;
                 SampledSpectrum pdfNEE = s.pdfUni * lightPDF;
 
-                SampledSpectrum Ld = SafeDiv(beta * ls.L, lambda.PDF());
+                SampledSpectrum Ld = SafeDiv(beta * ls->L, lambda.PDF());
 
                 PBRT_DBG("depth %d Ld %f %f %f %f "
                     "new beta %f %f %f %f beta/uni %f %f %f %f Ld/uni %f %f %f %f\n",
@@ -182,7 +182,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                     SafeDiv(Ld, pdfUni)[0], SafeDiv(Ld, pdfUni)[1],
                     SafeDiv(Ld, pdfUni)[2], SafeDiv(Ld, pdfUni)[3]);
 
-                Ray ray = SpawnRayTo(intr.pi, intr.n, time, ls.pLight.pi, ls.pLight.n);
+                Ray ray = SpawnRayTo(intr.pi, intr.n, time, ls->pLight.pi, ls->pLight.n);
                 if (haveMedia)
                     // TODO: as above, always take outside here?
                     ray.medium = Dot(ray.d, intr.n) > 0 ? s.mediumInterface.outside

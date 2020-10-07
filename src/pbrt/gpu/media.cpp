@@ -248,24 +248,24 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
             if (sampledLight) {
                 LightHandle light = sampledLight->light;
                 // And now sample a point on the light.
-                LightLiSample ls = light.SampleLi(ctx, raySamples.direct.u, ms.lambda,
+                pstd::optional<LightLiSample> ls = light.SampleLi(ctx, raySamples.direct.u, ms.lambda,
                                                   LightSamplingMode::WithMIS);
-                if (ls && ls.L) {
-                    Vector3f wi = ls.wi;
+                if (ls && ls->L && ls->pdf > 0) {
+                    Vector3f wi = ls->wi;
                     SampledSpectrum beta = ms.beta * ms.phase.p(wo, wi);
 
                     PBRT_DBG("Phase phase beta %f %f %f %f\n", beta[0], beta[1], beta[2],
                         beta[3]);
 
                     // Compute PDFs for direct lighting MIS calculation.
-                    Float lightPDF = ls.pdf * sampledLight->pdf;
+                    Float lightPDF = ls->pdf * sampledLight->pdf;
                     Float phasePDF =
                         IsDeltaLight(light.Type()) ? 0.f : ms.phase.PDF(wo, wi);
                     SampledSpectrum pdfUni = ms.pdfUni * phasePDF;
                     SampledSpectrum pdfNEE = ms.pdfUni * lightPDF;
 
-                    SampledSpectrum Ld = SafeDiv(beta * ls.L, ms.lambda.PDF());
-                    Ray ray(ms.p, ls.pLight.p() - ms.p, time, ms.medium);
+                    SampledSpectrum Ld = SafeDiv(beta * ls->L, ms.lambda.PDF());
+                    Ray ray(ms.p, ls->pLight.p() - ms.p, time, ms.medium);
 
                     // Enqueue shadow ray
                     shadowRayQueue->Push(ray, 1 - ShadowEpsilon, ms.lambda, Ld,

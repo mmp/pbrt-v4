@@ -24,7 +24,7 @@ class TabulatedBSSRDF;
 
 class BSSRDFHandle : public TaggedPointer<TabulatedBSSRDF> {
   public:
-    // BSSRDFHandle Public Interface
+    // BSSRDF Interface
     using TaggedPointer::TaggedPointer;
 
     PBRT_CPU_GPU inline SampledSpectrum S(const Point3f &p, const Vector3f &wi);

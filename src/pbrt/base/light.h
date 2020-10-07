@@ -17,7 +17,7 @@
 namespace pbrt {
 
 // LightType Definition
-enum class LightType : int { DeltaPosition, DeltaDirection, Area, Infinite };
+enum class LightType { DeltaPosition, DeltaDirection, Area, Infinite };
 
 // LightSamplingMode Definition
 enum class LightSamplingMode { WithMIS, WithoutMIS };
@@ -38,10 +38,12 @@ struct LightLiSample;
 struct LightLeSample;
 
 // LightHandle Definition
-class LightHandle
-    : public TaggedPointer<PointLight, DistantLight, ProjectionLight, GoniometricLight,
-                           SpotLight, DiffuseAreaLight, UniformInfiniteLight,
-                           ImageInfiniteLight, PortalImageInfiniteLight> {
+class LightHandle : public TaggedPointer<  // Light Source Types
+                        PointLight, DistantLight, ProjectionLight, GoniometricLight,
+                        SpotLight, DiffuseAreaLight, UniformInfiniteLight,
+                        ImageInfiniteLight, PortalImageInfiniteLight
+
+                        > {
   public:
     // Light Interface
     using TaggedPointer::TaggedPointer;
@@ -59,13 +61,11 @@ class LightHandle
                                   const ShapeHandle shape, const FileLoc *loc,
                                   Allocator alloc);
 
-    void Preprocess(const Bounds3f &sceneBounds);
+    SampledSpectrum Phi(const SampledWavelengths &lambda) const;
 
     PBRT_CPU_GPU inline LightType Type() const;
 
-    SampledSpectrum Phi(const SampledWavelengths &lambda) const;
-
-    PBRT_CPU_GPU inline LightLiSample SampleLi(
+    PBRT_CPU_GPU inline pstd::optional<LightLiSample> SampleLi(
         LightSampleContext ctx, Point2f u, SampledWavelengths lambda,
         LightSamplingMode mode = LightSamplingMode::WithoutMIS) const;
 
@@ -76,15 +76,14 @@ class LightHandle
     std::string ToString() const;
 
     // AreaLights only
-    PBRT_CPU_GPU inline SampledSpectrum L(const Point3f &p, const Normal3f &n,
-                                          const Point2f &uv, const Vector3f &w,
+    PBRT_CPU_GPU inline SampledSpectrum L(Point3f p, Normal3f n, Point2f uv, Vector3f w,
                                           const SampledWavelengths &lambda) const;
-    PBRT_CPU_GPU
-    void PDF_Le(const Interaction &intr, Vector3f &w, Float *pdfPos, Float *pdfDir) const;
 
     // InfiniteAreaLights only
     PBRT_CPU_GPU inline SampledSpectrum Le(const Ray &ray,
                                            const SampledWavelengths &lambda) const;
+
+    void Preprocess(const Bounds3f &sceneBounds);
 
     LightBounds Bounds() const;
 
@@ -95,6 +94,10 @@ class LightHandle
     // Note shouldn't be called for area lights..
     PBRT_CPU_GPU
     void PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const;
+
+    // AreaLights only
+    PBRT_CPU_GPU
+    void PDF_Le(const Interaction &intr, Vector3f &w, Float *pdfPos, Float *pdfDir) const;
 };
 
 }  // namespace pbrt

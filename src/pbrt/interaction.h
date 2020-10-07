@@ -70,6 +70,9 @@ class Interaction {
     Interaction(const Point3f &p, Float time, MediumHandle medium)
         : pi(p), time(time), medium(medium) {}
     PBRT_CPU_GPU
+    Interaction(const Point3f &p, const MediumInterface *mediumInterface)
+        : pi(p), mediumInterface(mediumInterface) {}
+    PBRT_CPU_GPU
     Interaction(const Point3f &p, Float time, const MediumInterface *mediumInterface)
         : pi(p), time(time), mediumInterface(mediumInterface) {}
     PBRT_CPU_GPU

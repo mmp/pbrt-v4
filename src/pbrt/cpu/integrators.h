@@ -305,6 +305,7 @@ class AOIntegrator : public RayIntegrator {
     bool cosSample;
     Float maxDist;
     SpectrumHandle illuminant;
+    Float illumScale;
 };
 
 // LightPathIntegrator Definition

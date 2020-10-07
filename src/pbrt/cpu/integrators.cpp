@@ -485,14 +485,15 @@ SampledSpectrum SimplePathIntegrator::Li(RayDifferential ray, SampledWavelengths
             if (sampledLight) {
                 // Sample point on _sampledLight_ to estimate direct illumination
                 Point2f uLight = sampler.Get2D();
-                LightLiSample ls = sampledLight->light.SampleLi(isect, uLight, lambda);
-                if (ls && ls.L) {
+                pstd::optional<LightLiSample> ls =
+                    sampledLight->light.SampleLi(isect, uLight, lambda);
+                if (ls && ls->L && ls->pdf > 0) {
                     // Evaluate BSDF for light and possibly add scattered radiance
-                    Vector3f wi = ls.wi;
+                    Vector3f wi = ls->wi;
                     SampledSpectrum f = bsdf.f(wo, wi) * AbsDot(wi, isect.shading.n);
-                    if (f && Unoccluded(isect, ls.pLight))
-                        L += SafeDiv(beta * f * ls.L,
-                                     sampledLight->pdf * ls.pdf * lambda.PDF());
+                    if (f && Unoccluded(isect, ls->pLight))
+                        L += SafeDiv(beta * f * ls->L,
+                                     sampledLight->pdf * ls->pdf * lambda.PDF());
                 }
             }
         }
@@ -819,24 +820,25 @@ SampledSpectrum PathIntegrator::SampleLd(const SurfaceInteraction &intr, const B
     DCHECK(light != nullptr && sampledLight->pdf > 0);
 
     // Sample a point on the light source for direct lighting
-    LightLiSample ls = light.SampleLi(intr, uLight, lambda, LightSamplingMode::WithMIS);
-    if (!ls || !ls.L)
+    pstd::optional<LightLiSample> ls =
+        light.SampleLi(intr, uLight, lambda, LightSamplingMode::WithMIS);
+    if (!ls || !ls->L || ls->pdf == 0)
         return {};
 
     // Evaluate BSDF for light sample and check light visibility
-    Vector3f wo = intr.wo, wi = ls.wi;
+    Vector3f wo = intr.wo, wi = ls->wi;
     SampledSpectrum f = bsdf.f(wo, wi) * AbsDot(wi, intr.shading.n);
-    if (!f || !Unoccluded(intr, ls.pLight))
+    if (!f || !Unoccluded(intr, ls->pLight))
         return {};
 
     // Return light's contribution to reflected radiance
-    Float lightPDF = sampledLight->pdf * ls.pdf;
+    Float lightPDF = sampledLight->pdf * ls->pdf;
     if (IsDeltaLight(light.Type()))
-        return f * ls.L / lightPDF;
+        return f * ls->L / lightPDF;
     else {
         Float bsdfPDF = bsdf.PDF(wo, wi);
         Float weight = PowerHeuristic(1, lightPDF, 1, bsdfPDF);
-        return f * ls.L * weight / lightPDF;
+        return f * ls->L * weight / lightPDF;
     }
 }
 
@@ -1295,15 +1297,16 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
         ctx = LightSampleContext(intr.AsSurface());
     else
         ctx = LightSampleContext(intr);
-    LightLiSample ls = light.SampleLi(ctx, uLight, lambda, LightSamplingMode::WithMIS);
-    if (!ls || !ls.L)
+    pstd::optional<LightLiSample> ls =
+        light.SampleLi(ctx, uLight, lambda, LightSamplingMode::WithMIS);
+    if (!ls || !ls->L || ls->pdf == 0)
         return SampledSpectrum(0.f);
-    Float lightPDF = sampledLight->pdf * ls.pdf;
+    Float lightPDF = sampledLight->pdf * ls->pdf;
 
     // Evaluate BSDF or phase function for light sample direction
     Float scatterPDF;
     SampledSpectrum betaLight = beta;
-    Vector3f wo = intr.wo, wi = ls.wi;
+    Vector3f wo = intr.wo, wi = ls->wi;
     if (bsdf) {
         // Update _bsdfLight_ and _scatterPDF_ accounting for the BSDF
         betaLight *= bsdf->f(wo, wi) * AbsDot(wi, intr.AsSurface().shading.n);
@@ -1320,7 +1323,7 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
         return SampledSpectrum(0.f);
 
     // Declare path state variables for ray to light source
-    Ray lightRay = intr.SpawnRayTo(ls.pLight);
+    Ray lightRay = intr.SpawnRayTo(ls->pLight);
     SampledSpectrum throughput(1.f), pdfLight(1.f), pdfUni(1.f);
     RNG rng(Hash(lightRay.o), Hash(lightRay.d));
 
@@ -1371,16 +1374,16 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
             return SampledSpectrum(0.f);
         if (!si)
             break;
-        lightRay = si->intr.SpawnRayTo(ls.pLight);
+        lightRay = si->intr.SpawnRayTo(ls->pLight);
     }
     // Return weighted light contribution to direct lighting
     pdfLight *= pathPDF * lightPDF;  // p_nee in paper
     if (IsDeltaLight(light.Type()))
         // pdfUni unused...
-        return betaLight * ls.L * throughput / pdfLight.Average();
+        return betaLight * ls->L * throughput / pdfLight.Average();
     else {
         pdfUni *= pathPDF * scatterPDF;
-        return betaLight * ls.L * throughput / (pdfLight + pdfUni).Average();
+        return betaLight * ls->L * throughput / (pdfLight + pdfUni).Average();
     }
 }
 
@@ -1409,7 +1412,8 @@ AOIntegrator::AOIntegrator(bool cosSample, Float maxDist, CameraHandle camera,
     : RayIntegrator(camera, sampler, aggregate, lights),
       cosSample(cosSample),
       maxDist(maxDist),
-      illuminant(illuminant) {}
+      illuminant(illuminant),
+      illumScale(1.f / SpectrumToPhotometric(illuminant)) {}
 
 SampledSpectrum AOIntegrator::Li(RayDifferential ray, SampledWavelengths &lambda,
                                  SamplerHandle sampler, ScratchBuffer &scratchBuffer,
@@ -1452,8 +1456,11 @@ retry:
 
         // Divide by pi so that fully visible is one.
         Ray r = isect.SpawnRay(wi);
-        if (!IntersectP(r, maxDist))
-            return illuminant.Sample(lambda) * SampledSpectrum(Dot(wi, n) / (Pi * pdf));
+        if (!IntersectP(r, maxDist)) {
+            SampledSpectrum L = illumScale * illuminant.Sample(lambda) *
+                                SampledSpectrum(Dot(wi, n) / (Pi * pdf));
+            return SafeDiv(L, lambda.PDF());
+        }
     }
     return SampledSpectrum(0.);
 }
@@ -2357,20 +2364,21 @@ SampledSpectrum ConnectBDPT(const Integrator &integrator, SampledWavelengths &la
                     ctx = LightSampleContext(pt.GetInteraction().AsSurface());
                 else
                     ctx = LightSampleContext(pt.GetInteraction());
-                LightLiSample lightWeight = light.SampleLi(ctx, sampler.Get2D(), lambda);
+                pstd::optional<LightLiSample> lightWeight =
+                    light.SampleLi(ctx, sampler.Get2D(), lambda);
                 if (lightWeight) {
-                    EndpointInteraction ei(lightWeight.pLight, light);
+                    EndpointInteraction ei(lightWeight->pLight, light);
                     sampled = Vertex::CreateLight(
-                        ei, lightWeight.L / (lightWeight.pdf * lightPDF), 0);
+                        ei, lightWeight->L / (lightWeight->pdf * lightPDF), 0);
                     sampled.pdfFwd = sampled.PdfLightOrigin(integrator.infiniteLights, pt,
                                                             lightSampler);
                     L = pt.beta * pt.f(sampled, TransportMode::Radiance) * sampled.beta;
                     if (pt.IsOnSurface())
-                        L *= AbsDot(lightWeight.wi, pt.ns());
+                        L *= AbsDot(lightWeight->wi, pt.ns());
                     // Only check visibility if the path would carry radiance.
                     if (L) {
                         RNG rng(Hash(ctx.p()), Hash(ctx.n));
-                        L *= integrator.Tr(pt.GetInteraction(), lightWeight.pLight,
+                        L *= integrator.Tr(pt.GetInteraction(), lightWeight->pLight,
                                            lambda, rng);
                     }
                 }
@@ -3196,17 +3204,17 @@ SampledSpectrum SPPMIntegrator::SampleLd(const SurfaceInteraction &intr, const B
         DCHECK(light != nullptr && sampledLight->pdf > 0);
 
         // Sample light source with multiple importance sampling
-        LightLiSample ls =
+        pstd::optional<LightLiSample> ls =
             light.SampleLi(intr, uLight, lambda, LightSamplingMode::WithMIS);
-        if (ls && ls.L) {
+        if (ls && ls->L && ls->pdf > 0) {
             // Evaluate BSDF for light sampling strategy
-            Vector3f wo = intr.wo, wi = ls.wi;
+            Vector3f wo = intr.wo, wi = ls->wi;
             SampledSpectrum f = bsdf.f(wo, wi) * AbsDot(wi, intr.shading.n);
             if (f) {
-                SampledSpectrum Li = ls.L;
-                if (Unoccluded(intr, ls.pLight)) {
+                SampledSpectrum Li = ls->L;
+                if (Unoccluded(intr, ls->pLight)) {
                     // Add light's contribution to reflected radiance
-                    Float lightPDF = sampledLight->pdf * ls.pdf;
+                    Float lightPDF = sampledLight->pdf * ls->pdf;
                     if (IsDeltaLight(light.Type()))
                         Ld = f * Li / lightPDF;
                     else {

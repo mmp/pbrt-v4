@@ -248,22 +248,22 @@ class CuboidMedium {
                     if (t >= t1)
                         break;
 
-                    // Report scattering event in grid to callback function
                     if (t < tMax) {
-                        Point3f p = ray(t);
+                        // Compute medium properties at sampled point in grid
                         SampledSpectrum Tmaj = FastExp(-sigma_maj * (t - t0));
-                        // Compute _density_ and _Le_ at sampled point in grid
-                        SampledSpectrum density = provider->Density(p, lambda);
+                        Point3f p = ray(t);
+                        SampledSpectrum d = provider->Density(p, lambda);
                         SampledSpectrum Le = provider->Le(p, lambda);
+                        SampledSpectrum sigmap_a = sigma_a * d, sigmap_s = sigma_s * d;
 
-                        MediumInteraction intr(renderFromMedium(p), -Normalize(rRender.d),
-                                               rRender.time, sigma_a * density,
-                                               sigma_s * density, sigma_maj, Le, this,
-                                               &phase);
+                        // Report scattering event in grid to callback function
+                        Point3f pRender = renderFromMedium(p);
+                        MediumInteraction intr(pRender, -Normalize(rRender.d),
+                                               rRender.time, sigmap_a, sigmap_s,
+                                               sigma_maj, Le, this, &phase);
                         if (!callback(MediumSample(intr, Tmaj)))
                             return;
                     }
-
                     // Update _t0_ after medium interaction
                     t0 = t;
                 }
