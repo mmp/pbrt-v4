@@ -200,8 +200,8 @@ DistantLight *DistantLight::Create(const Transform &renderFromLight,
 STAT_MEMORY_COUNTER("Memory/Light image and distributions", imageBytes);
 
 // ProjectionLight Method Definitions
-ProjectionLight::ProjectionLight(const Transform &renderFromLight,
-                                 const MediumInterface &mediumInterface, Image im,
+ProjectionLight::ProjectionLight(Transform renderFromLight,
+                                 MediumInterface mediumInterface, Image im,
                                  const RGBColorSpace *imageColorSpace, Float lscale,
                                  Float fov, Float phi_v, Allocator alloc)
     : LightBase(LightType::DeltaPosition, renderFromLight, mediumInterface),
@@ -209,25 +209,19 @@ ProjectionLight::ProjectionLight(const Transform &renderFromLight,
       imageColorSpace(imageColorSpace),
       scale(lscale),
       distrib(alloc) {
-    // Initialize ProjectionLight projection matrix
+    // _ProjectionLight_ constructor implementation
+    // Initialize _ProjectionLight_ projection matrix
     Float aspect = Float(image.Resolution().x) / Float(image.Resolution().y);
     if (aspect > 1)
         screenBounds = Bounds2f(Point2f(-aspect, -1), Point2f(aspect, 1));
     else
         screenBounds = Bounds2f(Point2f(-1, -1 / aspect), Point2f(1, 1 / aspect));
-    hither = 1e-3f;
-    Float yon = 1e30f;
-    ScreenFromLight = Perspective(fov, hither, yon);
-    LightFromScreen = Inverse(ScreenFromLight);
+    screenFromLight = Perspective(fov, hither, 1e30f /* yon */);
+    lightFromScreen = Inverse(screenFromLight);
 
-    // Compute cosine of cone surrounding projection directions
+    // Compute projection image area _A_
     Float opposite = std::tan(Radians(fov) / 2.f);
-    // Area of the image on projection plane.
     A = 4 * opposite * opposite * (aspect > 1 ? aspect : 1 / aspect);
-
-    Point3f pCorner(screenBounds.pMax.x, screenBounds.pMax.y, 0);
-    Vector3f wCorner = Normalize(Vector3f(LightFromScreen(pCorner)));
-    cosTotalWidth = wCorner.z;
 
     // Compute sampling distribution for _ProjectionLight_
     ImageChannelDesc channelDesc = image.GetChannelDesc({"R", "G", "B"});
@@ -236,31 +230,30 @@ ProjectionLight::ProjectionLight(const Transform &renderFromLight,
     CHECK_EQ(3, channelDesc.size());
     CHECK(channelDesc.IsIdentity());
     auto dwdA = [&](const Point2f &p) {
-        Vector3f w = Vector3f(LightFromScreen(Point3f(p.x, p.y, 0)));
+        Vector3f w = Vector3f(lightFromScreen(Point3f(p.x, p.y, 0)));
         w = Normalize(w);
         return Pow<3>(w.z);
     };
     Array2D<Float> d = image.GetSamplingDistribution(dwdA, screenBounds);
     distrib = PiecewiseConstant2D(d, screenBounds);
 
-    // scale radiance to 1 nit
+    // Set _ProjectionLight::scale_ based on photometric settings
     scale /= SpectrumToPhotometric(&imageColorSpace->illuminant);
-    // scale to target photometric power if requested
     if (phi_v > 0) {
+        // Update _scale_ for target photometric power
         Float sum = 0;
         RGB luminance = imageColorSpace->LuminanceVector();
-        for (int v = 0; v < image.Resolution().y; ++v)
-            for (int u = 0; u < image.Resolution().x; ++u) {
+        for (int y = 0; y < image.Resolution().y; ++y)
+            for (int x = 0; x < image.Resolution().x; ++x) {
                 Point2f ps = screenBounds.Lerp(
-                    {(u + .5f) / image.Resolution().x, (v + .5f) / image.Resolution().y});
-                Vector3f w = Vector3f(LightFromScreen(Point3f(ps.x, ps.y, 0)));
+                    {(x + .5f) / image.Resolution().x, (y + .5f) / image.Resolution().y});
+                Vector3f w = Vector3f(lightFromScreen(Point3f(ps.x, ps.y, 0)));
                 w = Normalize(w);
                 Float dwdA = Pow<3>(w.z);
 
                 for (int c = 0; c < 3; ++c)
-                    sum += image.GetChannel({u, v}, c) * luminance[c] * dwdA;
+                    sum += image.GetChannel({x, y}, c) * luminance[c] * dwdA;
             }
-
         scale *= phi_v / (A * sum / (image.Resolution().x * image.Resolution().y));
     }
 
@@ -270,16 +263,67 @@ ProjectionLight::ProjectionLight(const Transform &renderFromLight,
 pstd::optional<LightLiSample> ProjectionLight::SampleLi(LightSampleContext ctx, Point2f u,
                                                         SampledWavelengths lambda,
                                                         LightSamplingMode mode) const {
+    // Return sample for incident radiance from _ProjectionLight_
     Point3f p = renderFromLight(Point3f(0, 0, 0));
     Vector3f wi = Normalize(p - ctx.p());
     Vector3f wl = renderFromLight.ApplyInverse(-wi);
-    return LightLiSample(Projection(wl, lambda) / DistanceSquared(p, ctx.p()), wi, 1,
-                         Interaction(p, 0 /* time */, &mediumInterface));
+    SampledSpectrum Li = Projection(wl, lambda) / DistanceSquared(p, ctx.p());
+    if (!Li)
+        return {};
+    return LightLiSample(Li, wi, 1, Interaction(p, &mediumInterface));
 }
 
 Float ProjectionLight::PDF_Li(LightSampleContext, Vector3f,
                               LightSamplingMode mode) const {
     return 0.f;
+}
+
+std::string ProjectionLight::ToString() const {
+    return StringPrintf("[ ProjectionLight %s scale: %f A: %f ]", BaseToString(), scale,
+                        A);
+}
+
+SampledSpectrum ProjectionLight::Projection(Vector3f wl,
+                                            const SampledWavelengths &lambda) const {
+    // Discard directions behind projection light
+    if (wl.z < hither)
+        return SampledSpectrum(0.);
+
+    // Project point onto projection plane and compute RGB
+    Point3f ps = screenFromLight(Point3f(wl.x, wl.y, wl.z));
+    if (!Inside(Point2f(ps.x, ps.y), screenBounds))
+        return SampledSpectrum(0.f);
+    Point2f st = Point2f(screenBounds.Offset(Point2f(ps.x, ps.y)));
+    RGB rgb;
+    for (int c = 0; c < 3; ++c)
+        rgb[c] = image.LookupNearestChannel(st, c);
+
+    // Return scaled wavelength samples corresponding to RGB
+    RGBIlluminantSpectrum s(*imageColorSpace, rgb);
+    return scale * s.Sample(lambda);
+}
+
+SampledSpectrum ProjectionLight::Phi(const SampledWavelengths &lambda) const {
+    SampledSpectrum sum(0.f);
+    for (int y = 0; y < image.Resolution().y; ++y)
+        for (int x = 0; x < image.Resolution().x; ++x) {
+            // Add pixel $(x,y)$'s contribution to projection light power
+            // Compute change of variables factor _dwdA_ for projection light pixel
+            Point2f ps = screenBounds.Lerp(Point2f((x + .5f) / image.Resolution().x,
+                                                   (y + .5f) / image.Resolution().y));
+            Vector3f w = Vector3f(lightFromScreen(Point3f(ps.x, ps.y, 0)));
+            w = Normalize(w);
+            Float dwdA = Pow<3>(CosTheta(w));
+
+            // Update _sum_ for projection light pixel
+            RGB rgb;
+            for (int c = 0; c < 3; ++c)
+                rgb[c] = image.GetChannel({x, y}, c);
+            RGBIlluminantSpectrum s(*imageColorSpace, rgb);
+            sum += s.Sample(lambda) * dwdA;
+        }
+    // Return final power for projection light
+    return scale * A * sum / (image.Resolution().x * image.Resolution().y);
 }
 
 LightBounds ProjectionLight::Bounds() const {
@@ -290,7 +334,7 @@ LightBounds ProjectionLight::Bounds() const {
         for (int u = 0; u < image.Resolution().x; ++u) {
             Point2f ps = screenBounds.Lerp({(u + .5f) / image.Resolution().x,
                                             (v + .5f) / image.Resolution().y});
-            Vector3f w = Vector3f(LightFromScreen(Point3f(ps.x, ps.y, 0)));
+            Vector3f w = Vector3f(lightFromScreen(Point3f(ps.x, ps.y, 0)));
             w = Normalize(w);
             Float dwdA = Pow<3>(w.z);
             sum += image.GetChannels({u, v}, rgbChannelDesc).MaxValue() * dwdA;
@@ -305,56 +349,13 @@ LightBounds ProjectionLight::Bounds() const {
                              image.GetChannel({u, v}, 2)});
     Float phi = scale * sum / (image.Resolution().x * image.Resolution().y);
 #endif
+    Point3f pCorner(screenBounds.pMax.x, screenBounds.pMax.y, 0);
+    Vector3f wCorner = Normalize(Vector3f(lightFromScreen(pCorner)));
+    Float cosTotalWidth = CosTheta(wCorner);
+
     Point3f p = renderFromLight(Point3f(0, 0, 0));
     Vector3f w = Normalize(renderFromLight(Vector3f(0, 0, 1)));
     return LightBounds(p, w, phi, 0.f, std::acos(cosTotalWidth), false);
-}
-
-std::string ProjectionLight::ToString() const {
-    return StringPrintf("[ ProjectionLight %s scale: %f A: %f cosTotalWidth: %f ]",
-                        BaseToString(), scale, A, cosTotalWidth);
-}
-
-// Takes wl already in light coordinate system!
-SampledSpectrum ProjectionLight::Projection(const Vector3f &wl,
-                                            const SampledWavelengths &lambda) const {
-    // Discard directions behind projection light
-    if (wl.z < hither)
-        return SampledSpectrum(0.);
-
-    // Project point onto projection plane and compute RGB
-    Point3f ps = ScreenFromLight(Point3f(wl.x, wl.y, wl.z));
-    if (!Inside(Point2f(ps.x, ps.y), screenBounds))
-        return SampledSpectrum(0.f);
-    Point2f st = Point2f(screenBounds.Offset(Point2f(ps.x, ps.y)));
-    RGB rgb;
-    for (int c = 0; c < 3; ++c)
-        rgb[c] = image.LookupNearestChannel(st, c);
-
-    return scale * RGBIlluminantSpectrum(*imageColorSpace, rgb).Sample(lambda);
-}
-
-SampledSpectrum ProjectionLight::Phi(const SampledWavelengths &lambda) const {
-    SampledSpectrum sum(0.f);
-    for (int v = 0; v < image.Resolution().y; ++v)
-        for (int u = 0; u < image.Resolution().x; ++u) {
-            Point2f ps = screenBounds.Lerp(
-                {(u + .5f) / image.Resolution().x, (v + .5f) / image.Resolution().y});
-            Vector3f w = Vector3f(LightFromScreen(Point3f(ps.x, ps.y, 0)));
-            w = Normalize(w);
-            Float dwdA = Pow<3>(w.z);
-
-            RGB rgb;
-            for (int c = 0; c < 3; ++c)
-                rgb[c] = image.GetChannel({u, v}, c);
-
-            SampledSpectrum L =
-                RGBIlluminantSpectrum(*imageColorSpace, rgb).Sample(lambda);
-
-            sum += L * dwdA;
-        }
-
-    return scale * A * sum / (image.Resolution().x * image.Resolution().y);
 }
 
 LightLeSample ProjectionLight::SampleLe(const Point2f &u1, const Point2f &u2,
@@ -364,7 +365,7 @@ LightLeSample ProjectionLight::SampleLe(const Point2f &u1, const Point2f &u2,
     if (pdf == 0)
         return {};
 
-    Vector3f w = Vector3f(LightFromScreen(Point3f(ps.x, ps.y, 0)));
+    Vector3f w = Vector3f(lightFromScreen(Point3f(ps.x, ps.y, 0)));
 
     Ray ray = renderFromLight(
         Ray(Point3f(0, 0, 0), Normalize(w), time, mediumInterface.outside));
@@ -391,7 +392,7 @@ void ProjectionLight::PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const
         *pdfDir = 0;
         return;
     }
-    Point3f ps = ScreenFromLight(Point3f(w));
+    Point3f ps = screenFromLight(Point3f(w));
     if (!Inside(Point2f(ps.x, ps.y), screenBounds)) {
         *pdfDir = 0;
         return;
@@ -458,12 +459,24 @@ pstd::optional<LightLiSample> GoniometricLight::SampleLi(LightSampleContext ctx,
     Vector3f wi = Normalize(p - ctx.p());
     SampledSpectrum L =
         Scale(renderFromLight.ApplyInverse(-wi), lambda) / DistanceSquared(p, ctx.p());
-    return LightLiSample(L, wi, 1, Interaction(p, 0 /* time */, &mediumInterface));
+    return LightLiSample(L, wi, 1, Interaction(p, &mediumInterface));
 }
 
 Float GoniometricLight::PDF_Li(LightSampleContext, Vector3f,
                                LightSamplingMode mode) const {
     return 0.f;
+}
+
+SampledSpectrum GoniometricLight::Phi(const SampledWavelengths &lambda) const {
+    // integrate over speherical coordinates [0,Pi], [0,2pi]
+    Float sumY = 0;
+    int width = image.Resolution().x, height = image.Resolution().y;
+    for (int v = 0; v < height; ++v) {
+        Float sinTheta = std::sin(Pi * Float(v + .5f) / Float(height));
+        for (int u = 0; u < width; ++u)
+            sumY += sinTheta * image.GetChannels({u, v}, wrapMode).Average();
+    }
+    return scale * I.Sample(lambda) * 2 * Pi * Pi * sumY / (width * height);
 }
 
 LightBounds GoniometricLight::Bounds() const {
@@ -483,18 +496,6 @@ LightBounds GoniometricLight::Bounds() const {
     Point3f p = renderFromLight(Point3f(0, 0, 0));
     // Bound it as an isotropic point light.
     return LightBounds(p, Vector3f(0, 0, 1), phi, Pi, Pi / 2, false);
-}
-
-SampledSpectrum GoniometricLight::Phi(const SampledWavelengths &lambda) const {
-    // integrate over speherical coordinates [0,Pi], [0,2pi]
-    Float sumY = 0;
-    int width = image.Resolution().x, height = image.Resolution().y;
-    for (int v = 0; v < height; ++v) {
-        Float sinTheta = std::sin(Pi * Float(v + .5f) / Float(height));
-        for (int u = 0; u < width; ++u)
-            sumY += sinTheta * image.GetChannels({u, v}, wrapMode).Average();
-    }
-    return scale * I.Sample(lambda) * 2 * Pi * Pi * sumY / (width * height);
 }
 
 LightLeSample GoniometricLight::SampleLe(const Point2f &u1, const Point2f &u2,
@@ -816,9 +817,8 @@ pstd::optional<LightLiSample> UniformInfiniteLight::SampleLi(
     LightSamplingMode mode) const {
     Vector3f wi = SampleUniformSphere(u);
     Float pdf = UniformSpherePDF();
-    return LightLiSample(
-        scale * Lemit.Sample(lambda), wi, pdf,
-        Interaction(ctx.p() + wi * (2 * sceneRadius), 0 /* time */, &mediumInterface));
+    return LightLiSample(scale * Lemit.Sample(lambda), wi, pdf,
+                         Interaction(ctx.p() + wi * (2 * sceneRadius), &mediumInterface));
 }
 
 Float UniformInfiniteLight::PDF_Li(LightSampleContext ctx, Vector3f w,
@@ -1094,9 +1094,8 @@ pstd::optional<LightLiSample> PortalImageInfiniteLight::SampleLi(
 
     SampledSpectrum L = ImageLookup(uv, lambda);
 
-    return LightLiSample(
-        L, wi, pdf,
-        Interaction(ctx.p() + wi * (2 * sceneRadius), 0 /* time */, &mediumInterface));
+    return LightLiSample(L, wi, pdf,
+                         Interaction(ctx.p() + wi * (2 * sceneRadius), &mediumInterface));
 }
 
 Float PortalImageInfiniteLight::PDF_Li(LightSampleContext ctx, Vector3f w,
@@ -1202,28 +1201,17 @@ SpotLight::SpotLight(const Transform &renderFromLight,
     CHECK_LE(falloffStart, totalWidth);
 }
 
-pstd::optional<LightLiSample> SpotLight::SampleLi(LightSampleContext ctx, Point2f u,
-                                                  SampledWavelengths lambda,
-                                                  LightSamplingMode mode) const {
-    Point3f p = renderFromLight(Point3f(0, 0, 0));
-    Vector3f wi = Normalize(p - ctx.p());
-    Vector3f wl = Normalize(renderFromLight.ApplyInverse(-wi));
-    SampledSpectrum L =
-        scale * I.Sample(lambda) * Falloff(wl) / DistanceSquared(p, ctx.p());
-    if (!L)
-        return {};
-    return LightLiSample(L, wi, 1, Interaction(p, 0 /* time */, &mediumInterface));
-}
-
 Float SpotLight::PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const {
     return 0.f;
 }
 
 Float SpotLight::Falloff(const Vector3f &wl) const {
-    Float cosTheta = CosTheta(wl);
-    if (cosTheta >= cosFalloffStart)
-        return 1;
-    return SmoothStep(cosTheta, cosFalloffEnd, cosFalloffStart);
+    return SmoothStep(CosTheta(wl), cosFalloffEnd, cosFalloffStart);
+}
+
+SampledSpectrum SpotLight::Phi(const SampledWavelengths &lambda) const {
+    return scale * I.Sample(lambda) * 2 * Pi *
+           ((1 - cosFalloffStart) + (cosFalloffStart - cosFalloffEnd) / 2);
 }
 
 LightBounds SpotLight::Bounds() const {
@@ -1244,15 +1232,6 @@ LightBounds SpotLight::Bounds() const {
 #endif
 
     return LightBounds(p, w, phi, 0.f, std::acos(cosFalloffEnd), false);
-}
-
-SampledSpectrum SpotLight::Phi(const SampledWavelengths &lambda) const {
-    // int_0^start sin theta dtheta = 1 - cosFalloffStart
-    // See notes/sample-spotlight.nb for the falloff part:
-    // int_start^end smoothstep(cost, end, start) sin theta dtheta =
-    //  (cosStart - cosEnd) / 2
-    return scale * I.Sample(lambda) * 2 * Pi *
-           ((1 - cosFalloffStart) + (cosFalloffStart - cosFalloffEnd) / 2);
 }
 
 LightLeSample SpotLight::SampleLe(const Point2f &u1, const Point2f &u2,

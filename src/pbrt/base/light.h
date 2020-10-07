@@ -75,11 +75,9 @@ class LightHandle : public TaggedPointer<  // Light Source Types
 
     std::string ToString() const;
 
-    PBRT_CPU_GPU inline SampledSpectrum L(const Point3f &p, const Normal3f &n,
-                                          const Point2f &uv, const Vector3f &w,
+    // AreaLights only
+    PBRT_CPU_GPU inline SampledSpectrum L(Point3f p, Normal3f n, Point2f uv, Vector3f w,
                                           const SampledWavelengths &lambda) const;
-    PBRT_CPU_GPU
-    void PDF_Le(const Interaction &intr, Vector3f &w, Float *pdfPos, Float *pdfDir) const;
 
     // InfiniteAreaLights only
     PBRT_CPU_GPU inline SampledSpectrum Le(const Ray &ray,
@@ -96,6 +94,10 @@ class LightHandle : public TaggedPointer<  // Light Source Types
     // Note shouldn't be called for area lights..
     PBRT_CPU_GPU
     void PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const;
+
+    // AreaLights only
+    PBRT_CPU_GPU
+    void PDF_Le(const Interaction &intr, Vector3f &w, Float *pdfPos, Float *pdfDir) const;
 };
 
 }  // namespace pbrt
