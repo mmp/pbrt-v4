@@ -147,10 +147,10 @@ static std::map<std::string, CommandUsage> commandUsage = {
     --outfile <name>   Filename for output image.
     --plusminus        Visualize green > 0, red < 0.
 )")}},
-    {"makeenv", {"makeenv [options] <filename>", std::string(R"(
-    --outfile <name>   Filename of environment map image.
-    --resolution <n>   Resolution of environment map. Default: calculated
-                       from resolution of provited lat-long environment map.
+    {"makeequiarea", {"makeequiarea [options] <filename>", std::string(R"(
+    --outfile <name>   Filename of lat-long (equirect) environment map image.
+    --resolution <n>   Resolution of output image. Default: calculated
+                       from resolution of provided image.
 )")}},
     {"makeemitters", {"makeemitters [options] <filename>", std::string(R"(
     --downsample <n>   Downsample the image by a factor of n in both dimensions
@@ -1767,12 +1767,12 @@ int makeemitters(int argc, char *argv[]) {
     return 0;
 }
 
-int makeenv(int argc, char *argv[]) {
+int makeequiarea(int argc, char *argv[]) {
     std::string inFilename, outFilename;
     int resolution = 0;
 
     auto onError = [](const std::string &err) {
-        usage("makeenv", "%s", err.c_str());
+        usage("makeequiarea", "%s", err.c_str());
         exit(1);
     };
     while (*argv != nullptr) {
@@ -1780,17 +1780,17 @@ int makeenv(int argc, char *argv[]) {
             ParseArg(&argv, "outfile", &outFilename, onError)) {
             // success
         } else if (argv[0][0] == '-')
-            usage("makeenv", "%s: unknown command flag", *argv);
+            usage("makeequiarea", "%s: unknown command flag", *argv);
         else if (inFilename.empty()) {
             inFilename = *argv;
             ++argv;
         } else
-            usage("makeenv", "multiple input filenames provided.");
+            usage("makeequiarea", "multiple input filenames provided.");
     }
     if (inFilename.empty())
-        usage("makeenv", "input image filename must be provided.");
+        usage("makeequiarea", "input image filename must be provided.");
     if (outFilename.empty())
-        usage("makeenv", "output image filename must be provided.");
+        usage("makeequiarea", "output image filename must be provided.");
 
     ImageAndMetadata latlong = Image::Read(inFilename);
     const Image &latlongImage = latlong.image;
@@ -2274,8 +2274,8 @@ int main(int argc, char *argv[]) {
         return help(argc - 2, argv + 2);
     else if (strcmp(argv[1], "info") == 0)
         return info(argc - 2, argv + 2);
-    else if (strcmp(argv[1], "makeenv") == 0)
-        return makeenv(argc - 2, argv + 2);
+    else if (strcmp(argv[1], "makeequiarea") == 0)
+        return makeequiarea(argc - 2, argv + 2);
     else if (strcmp(argv[1], "makeemitters") == 0)
         return makeemitters(argc - 2, argv + 2);
     else if (strcmp(argv[1], "makesky") == 0)
