@@ -787,16 +787,12 @@ SampledSpectrum UniformInfiniteLight::Le(const Ray &ray,
     return scale * Lemit.Sample(lambda);
 }
 
-SampledSpectrum UniformInfiniteLight::Phi(const SampledWavelengths &lambda) const {
-    // TODO: is there another Pi or so for the hemisphere?
-    // pi r^2 for disk
-    // 2pi for cosine-weighted sphere
-    return 2 * Pi * Pi * Sqr(sceneRadius) * scale * Lemit.Sample(lambda);
-}
-
 pstd::optional<LightLiSample> UniformInfiniteLight::SampleLi(
     LightSampleContext ctx, Point2f u, SampledWavelengths lambda,
     LightSamplingMode mode) const {
+    if (mode == LightSamplingMode::WithMIS)
+        return {};
+    // Return uniform spherical sample for uniform infinite light
     Vector3f wi = SampleUniformSphere(u);
     Float pdf = UniformSpherePDF();
     return LightLiSample(scale * Lemit.Sample(lambda), wi, pdf,
@@ -805,7 +801,13 @@ pstd::optional<LightLiSample> UniformInfiniteLight::SampleLi(
 
 Float UniformInfiniteLight::PDF_Li(LightSampleContext ctx, Vector3f w,
                                    LightSamplingMode mode) const {
+    if (mode == LightSamplingMode::WithMIS)
+        return 0;
     return UniformSpherePDF();
+}
+
+SampledSpectrum UniformInfiniteLight::Phi(const SampledWavelengths &lambda) const {
+    return 4 * Pi * Pi * Sqr(sceneRadius) * scale * Lemit.Sample(lambda);
 }
 
 LightLeSample UniformInfiniteLight::SampleLe(const Point2f &u1, const Point2f &u2,
