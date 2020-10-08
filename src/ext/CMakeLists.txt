@@ -1,6 +1,10 @@
 
 cmake_minimum_required (VERSION 3.12)
 
+if (MSVC)
+  add_definitions(/D _CRT_SECURE_NO_WARNINGS)
+endif ()
+
 ###########################################################################
 # stb
 

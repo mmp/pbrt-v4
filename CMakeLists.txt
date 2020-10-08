@@ -74,8 +74,7 @@ find_package ( Threads )
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 if (MSVC)
-  add_definitions (/D _CRT_SECURE_NO_WARNINGS)
-  set(PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_IS_MSVC)
+  set(PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_IS_MSVC _CRT_SECURE_NO_WARNINGS)
 endif ()
 
 #######################################
@@ -189,10 +188,6 @@ if (CMAKE_CUDA_COMPILER)
         # optix
         # FIXME
         include_directories (${PBRT_OPTIX7_PATH}/include)
-        # FIXME. Sigh. I'm not sure how else to pass this through to cuda_compile_ptx...
-        include_directories (src)
-        include_directories (${CMAKE_BINARY_DIR})
-        include_directories (${NANOVDB_INCLUDE})
 
         # from Ingo's configure_optix.cmake (Apache licensed)
         find_program (BIN2C bin2c DOC "Path to the CUDA SDK bin2c executable.")
@@ -207,21 +202,32 @@ if (CMAKE_CUDA_COMPILER)
         #    that PTX string 'embedded' as a global constant.
         # 4) assign the name of the intermediary .o file to the cmake variable
         #    'output_var', which can then be added to cmake targets.
-        macro (cuda_compile_and_embed output_var cuda_file)
+        macro (cuda_compile_and_embed output_var cuda_file lib_name)
+          add_library ("${lib_name}" OBJECT "${cuda_file}")
+          set_property (TARGET "${lib_name}" PROPERTY CUDA_PTX_COMPILATION ON)
+          target_compile_options ("${lib_name}"
+            PRIVATE
+                # disable "extern declaration... is treated as a static definition" warning
+                -Xcudafe=--display_error_number -Xcudafe=--diag_suppress=3089
+                )
+          target_compile_definitions("${lib_name}" PRIVATE ${PBRT_DEFINITIONS})
+          target_include_directories ("${lib_name}" PRIVATE src ${CMAKE_BINARY_DIR})
+          target_include_directories ("${lib_name}" SYSTEM PRIVATE ${NANOVDB_INCLUDE})
+          add_dependencies ("${lib_name}" pbrt_soa_generated)
           set (c_var_name ${output_var})
-          cuda_compile_ptx (ptx_files ${cuda_file}
-                            OPTIONS --std=c++17 -O3 ${PBRT_CUDA_DIAG_FLAGS} -DNDEBUG --use_fast_math
-                                     # disable "extern declaration... is treated as a static definition" warning
-                                    -Xcudafe=--display_error_number -Xcudafe=--diag_suppress=3089
-                                    --gpu-architecture=${ARCH} -D PBRT_BUILD_GPU_RENDERER)
-          list (GET ptx_files 0 ptx_file)
-          set (embedded_file ${ptx_file}_embedded.c)
+          set (embedded_file ${cuda_file}.ptx_embedded.c)
           add_custom_command (
-            OUTPUT ${embedded_file}
-            COMMAND ${BIN2C} -c --padd 0 --type char --name ${c_var_name} ${ptx_file} > ${embedded_file}
-            DEPENDS ${ptx_file}
+            OUTPUT "${embedded_file}"
+            COMMAND ${CMAKE_COMMAND}
+              "-DBIN_TO_C_COMMAND=${BIN2C}"
+              "-DOBJECTS=$<TARGET_OBJECTS:${lib_name}>"
+              "-DVAR_NAME=${c_var_name}"
+              "-DOUTPUT=${embedded_file}"
+              -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/bin2c_wrapper.cmake
+            VERBATIM
+            DEPENDS "${lib_name}"
             COMMENT "compiling (and embedding ptx from) ${cuda_file}"
-            )
+          )
           set (${output_var} ${embedded_file})
         endmacro ()
     endif ()
@@ -597,7 +603,7 @@ if (PBRT_CUDA_ENABLED)
     PROPERTIES LANGUAGE CUDA
   )
 
-  cuda_compile_and_embed (PBRT_EMBEDDED_PTX src/pbrt/gpu/optix.cu)
+  cuda_compile_and_embed (PBRT_EMBEDDED_PTX src/pbrt/gpu/optix.cu optix.cu)
 endif ()
 
 source_group("Source Files" FILES ${PBRT_SOURCE})
