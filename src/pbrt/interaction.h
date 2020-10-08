@@ -268,7 +268,7 @@ class SurfaceInteraction : public Interaction {
                            CameraHandle camera, ScratchBuffer &scratchBuffer);
 
     PBRT_CPU_GPU
-    SampledSpectrum Le(const Vector3f &w, const SampledWavelengths &lambda) const;
+    SampledSpectrum Le(Vector3f w, const SampledWavelengths &lambda) const;
 
     // SurfaceInteraction Public Members
     Vector3f dpdu, dpdv;

@@ -33,7 +33,7 @@ TEST(SpotLight, Power) {
     double phiSampled = 0;
     for (int i = 0; i < nSamples; ++i) {
         Vector3f w = SampleUniformSphere({RadicalInverse(0, i), RadicalInverse(1, i)});
-        phiSampled += (I.Sample(lambda) * light.Falloff(w))[0];
+        phiSampled += light.I(w, lambda)[0];
     }
     phiSampled /= (nSamples * UniformSpherePDF());
 
@@ -151,7 +151,7 @@ TEST(ProjectionLight, Power) {
         double phiSampled = 0;
         for (Point2f u : Hammersley2D(nSamples)) {
             Vector3f w = SampleUniformSphere(u);
-            phiSampled += light.Projection(w, lambda)[0];
+            phiSampled += light.I(w, lambda)[0];
         }
         phiSampled /= (nSamples * UniformSpherePDF());
 

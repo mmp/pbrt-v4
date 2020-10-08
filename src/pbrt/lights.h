@@ -303,8 +303,11 @@ class PointLight : public LightBase {
 class DistantLight : public LightBase {
   public:
     // DistantLight Public Methods
-    DistantLight(const Transform &renderFromLight, SpectrumHandle L, Float scale,
-                 Allocator alloc);
+    DistantLight(const Transform &renderFromLight, SpectrumHandle Lemit, Float scale,
+                 Allocator alloc)
+        : LightBase(LightType::DeltaDirection, renderFromLight, MediumInterface()),
+          Lemit(Lemit, alloc),
+          scale(scale) {}
 
     static DistantLight *Create(const Transform &renderFromLight,
                                 const ParameterDictionary &parameters,
@@ -372,7 +375,7 @@ class ProjectionLight : public LightBase {
                                            SampledWavelengths lambda,
                                            LightSamplingMode mode) const;
     PBRT_CPU_GPU
-    SampledSpectrum Projection(Vector3f w, const SampledWavelengths &lambda) const;
+    SampledSpectrum I(Vector3f w, const SampledWavelengths &lambda) const;
 
     SampledSpectrum Phi(const SampledWavelengths &lambda) const;
 
@@ -449,12 +452,12 @@ class GoniometricLight : public LightBase {
     PBRT_CPU_GPU
     SampledSpectrum I(Vector3f wl, const SampledWavelengths &lambda) const {
         Point2f uv = EqualAreaSphereToSquare(wl);
-        return scale * Ispec.Sample(lambda) * image.LookupNearestChannel(uv, 0);
+        return scale * Iemit.Sample(lambda) * image.LookupNearestChannel(uv, 0);
     }
 
   private:
     // GoniometricLight Private Members
-    DenselySampledSpectrum Ispec;
+    DenselySampledSpectrum Iemit;
     Float scale;
     Image image;
     PiecewiseConstant2D distrib;
@@ -499,8 +502,8 @@ class DiffuseAreaLight : public LightBase {
                       const SampledWavelengths &lambda) const {
         if (!twoSided && Dot(n, w) < 0)
             return SampledSpectrum(0.f);
-
         if (image) {
+            // Return _DiffuseAreaLight_ emission using image
             RGB rgb;
             Point2f st = uv;
             st[1] = 1 - st[1];
@@ -508,6 +511,7 @@ class DiffuseAreaLight : public LightBase {
                 rgb[c] = image.BilerpChannel(st, c);
             return scale *
                    RGBIlluminantSpectrum(*imageColorSpace, ClampZero(rgb)).Sample(lambda);
+
         } else
             return scale * Lemit.Sample(lambda);
     }
@@ -519,12 +523,10 @@ class DiffuseAreaLight : public LightBase {
         // Sample point on shape for _DiffuseAreaLight_
         ShapeSampleContext shapeCtx(ctx.pi, ctx.n, ctx.ns, 0 /* time */);
         pstd::optional<ShapeSample> ss = shape.Sample(shapeCtx, u);
-        if (!ss)
+        DCHECK(!IsNaN(ss->pdf));
+        if (!ss || ss->pdf == 0 || LengthSquared(ss->intr.p() - ctx.p()) == 0)
             return {};
         ss->intr.mediumInterface = &mediumInterface;
-        DCHECK(!IsNaN(ss->pdf));
-        if (ss->pdf == 0 || LengthSquared(ss->intr.p() - ctx.p()) == 0)
-            return {};
 
         // Return _LightLiSample_ for sampled point on shape
         Vector3f wi = Normalize(ss->intr.p() - ctx.p());
@@ -535,20 +537,20 @@ class DiffuseAreaLight : public LightBase {
     }
 
     PBRT_CPU_GPU
-    Float PDF_Li(LightSampleContext ctx, Vector3f wi, LightSamplingMode mode) const {
+    Float PDF_Li(LightSampleContext ctx, Vector3f wi, LightSamplingMode) const {
         ShapeSampleContext shapeCtx(ctx.pi, ctx.n, ctx.ns, 0 /* time */);
         return shape.PDF(shapeCtx, wi);
     }
 
   private:
     // DiffuseAreaLight Private Members
+    ShapeHandle shape;
+    Float area;
+    bool twoSided;
     DenselySampledSpectrum Lemit;
     Float scale;
-    ShapeHandle shape;
-    bool twoSided;
-    Float area;
-    const RGBColorSpace *imageColorSpace;
     Image image;
+    const RGBColorSpace *imageColorSpace;
 };
 
 // UniformInfiniteLight Definition
@@ -799,7 +801,7 @@ class SpotLight : public LightBase {
     void Preprocess(const Bounds3f &sceneBounds) {}
 
     PBRT_CPU_GPU
-    Float Falloff(const Vector3f &w) const;
+    SampledSpectrum I(Vector3f w, const SampledWavelengths &) const;
 
     SampledSpectrum Phi(const SampledWavelengths &lambda) const;
 
@@ -829,8 +831,7 @@ class SpotLight : public LightBase {
         Vector3f wi = Normalize(p - ctx.p());
         // Compute incident radiance _Li_ for _SpotLight_
         Vector3f wl = Normalize(renderFromLight.ApplyInverse(-wi));
-        SampledSpectrum Li =
-            scale * I.Sample(lambda) * Falloff(wl) / DistanceSquared(p, ctx.p());
+        SampledSpectrum Li = I(wl, lambda) / DistanceSquared(p, ctx.p());
 
         if (!Li)
             return {};
@@ -839,7 +840,7 @@ class SpotLight : public LightBase {
 
   private:
     // SpotLight Private Members
-    DenselySampledSpectrum I;
+    DenselySampledSpectrum Iemit;
     Float scale, cosFalloffStart, cosFalloffEnd;
 };
 
