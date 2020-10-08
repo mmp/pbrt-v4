@@ -1144,9 +1144,10 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(Point2f u) const {
     // Sample bilinear patch parametric $(u,v)$ coordinates
     Float pdf = 1;
     Point2f uv;
-    if (mesh->imageDistribution)
+    if (mesh->imageDistribution) {
         uv = mesh->imageDistribution->Sample(u, &pdf);
-    else if (!IsRectangle()) {
+        uv[1] = 1 - uv[1];
+    } else if (!IsRectangle()) {
         // Sample patch $(u,v)$ with approximate uniform area sampling
         // Initialize _w_ array with differential area at bilinear patch corners
         pstd::array<Float, 4> w = {
@@ -1191,7 +1192,7 @@ Float BilinearPatch::PDF(const Interaction &intr) const {
     // Compute PDF for sampling the $(u,v)$ coordinates given by _intr.uv_
     Float pdf;
     if (mesh->imageDistribution)
-        pdf = mesh->imageDistribution->PDF(intr.uv);
+        pdf = mesh->imageDistribution->PDF(Point2f(intr.uv[0], 1 - intr.uv[1]));
     else if (!IsRectangle()) {
         // Initialize _w_ array with differential area at bilinear patch corners
         pstd::array<Float, 4> w = {
