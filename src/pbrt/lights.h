@@ -447,18 +447,16 @@ class GoniometricLight : public LightBase {
     std::string ToString() const;
 
     PBRT_CPU_GPU
-    SampledSpectrum Scale(Vector3f wl, const SampledWavelengths &lambda) const {
-        Float theta = SphericalTheta(wl), phi = SphericalPhi(wl);
-        Point2f st(phi * Inv2Pi, theta * InvPi);
-        return scale * I.Sample(lambda) * image.LookupNearestChannel(st, 0);
+    SampledSpectrum I(Vector3f wl, const SampledWavelengths &lambda) const {
+        Point2f uv = EqualAreaSphereToSquare(wl);
+        return scale * Ispec.Sample(lambda) * image.LookupNearestChannel(uv, 0);
     }
 
   private:
     // GoniometricLight Private Members
-    DenselySampledSpectrum I;
+    DenselySampledSpectrum Ispec;
     Float scale;
     Image image;
-    WrapMode2D wrapMode;
     PiecewiseConstant2D distrib;
 };
 

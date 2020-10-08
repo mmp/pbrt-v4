@@ -432,20 +432,18 @@ ProjectionLight *ProjectionLight::Create(const Transform &renderFromLight,
 // GoniometricLight Method Definitions
 GoniometricLight::GoniometricLight(const Transform &renderFromLight,
                                    const MediumInterface &mediumInterface,
-                                   SpectrumHandle I, Float scale, Image im,
+                                   SpectrumHandle Ispec, Float scale, Image im,
                                    Allocator alloc)
     : LightBase(LightType::DeltaPosition, renderFromLight, mediumInterface),
-      I(I, alloc),
+      Ispec(Ispec, alloc),
       scale(scale),
       image(std::move(im)),
-      wrapMode(WrapMode::Repeat, WrapMode::Clamp),
       distrib(alloc) {
     CHECK_EQ(1, image.NChannels());
+    CHECK_EQ(image.Resolution().x, image.Resolution().y);
     // Compute sampling distribution for _GoniometricLight_
-    Bounds2f domain(Point2f(0, 0), Point2f(2 * Pi, Pi));
-    auto dpdA = [](const Point2f &p) { return std::sin(p.y); };
-    Array2D<Float> d = image.GetSamplingDistribution(dpdA, domain);
-    distrib = PiecewiseConstant2D(d, domain);
+    Array2D<Float> d = image.GetSamplingDistribution();
+    distrib = PiecewiseConstant2D(d);
 
     imageBytes += image.BytesUsed() + distrib.BytesUsed();
 }
@@ -457,7 +455,7 @@ pstd::optional<LightLiSample> GoniometricLight::SampleLi(LightSampleContext ctx,
     Point3f p = renderFromLight(Point3f(0, 0, 0));
     Vector3f wi = Normalize(p - ctx.p());
     SampledSpectrum L =
-        Scale(renderFromLight.ApplyInverse(-wi), lambda) / DistanceSquared(p, ctx.p());
+        I(renderFromLight.ApplyInverse(-wi), lambda) / DistanceSquared(p, ctx.p());
     return LightLiSample(L, wi, 1, Interaction(p, &mediumInterface));
 }
 
@@ -467,30 +465,21 @@ Float GoniometricLight::PDF_Li(LightSampleContext, Vector3f,
 }
 
 SampledSpectrum GoniometricLight::Phi(const SampledWavelengths &lambda) const {
-    // integrate over speherical coordinates [0,Pi], [0,2pi]
     Float sumY = 0;
-    int width = image.Resolution().x, height = image.Resolution().y;
-    for (int v = 0; v < height; ++v) {
-        Float sinTheta = std::sin(Pi * Float(v + .5f) / Float(height));
-        for (int u = 0; u < width; ++u)
-            sumY += sinTheta * image.GetChannels({u, v}, wrapMode).Average();
-    }
-    return scale * I.Sample(lambda) * 2 * Pi * Pi * sumY / (width * height);
+    for (int y = 0; y < image.Resolution().y; ++y)
+        for (int x = 0; x < image.Resolution().x; ++x)
+            sumY += image.GetChannel({x, y}, 0);
+    return scale * Ispec.Sample(lambda) * 4 * Pi * sumY /
+           (image.Resolution().x * image.Resolution().y);
 }
 
 LightBounds GoniometricLight::Bounds() const {
-    // Like Phi() method, but compute the weighted max component value of
-    // the image map.
-    Float weightedMaxImageSum = 0;
-    int width = image.Resolution().x, height = image.Resolution().y;
-    for (int v = 0; v < height; ++v) {
-        Float sinTheta = std::sin(Pi * Float(v + .5f) / Float(height));
-        for (int u = 0; u < width; ++u)
-            weightedMaxImageSum +=
-                sinTheta * image.GetChannels({u, v}, wrapMode).MaxValue();
-    }
-    Float phi =
-        scale * I.MaxValue() * 2 * Pi * Pi * weightedMaxImageSum / (width * height);
+    Float sumY = 0;
+    for (int y = 0; y < image.Resolution().y; ++y)
+        for (int x = 0; x < image.Resolution().x; ++x)
+            sumY += image.GetChannel({x, y}, 0);
+    Float phi = scale * Ispec.MaxValue() * 4 * Pi * sumY /
+                (image.Resolution().x * image.Resolution().y);
 
     Point3f p = renderFromLight(Point3f(0, 0, 0));
     // Bound it as an isotropic point light.
@@ -501,26 +490,24 @@ LightLeSample GoniometricLight::SampleLe(const Point2f &u1, const Point2f &u2,
                                          SampledWavelengths &lambda, Float time) const {
     Float pdf;
     Point2f uv = distrib.Sample(u1, &pdf);
-    Float theta = uv[1], phi = uv[0];
-    Float cosTheta = std::cos(theta), sinTheta = std::sin(theta);
-    Vector3f wl = SphericalDirection(sinTheta, cosTheta, phi);
-    Float pdfDir = sinTheta == 0 ? 0 : pdf / sinTheta;
+    Vector3f wl = EqualAreaSquareToSphere(uv);
+    Float pdfDir = pdf / (4 * Pi);
 
     Ray ray = renderFromLight(Ray(Point3f(0, 0, 0), wl, time, mediumInterface.inside));
-    return LightLeSample(Scale(wl, lambda), ray, 1, pdfDir);
+    return LightLeSample(I(wl, lambda), ray, 1, pdfDir);
 }
 
 void GoniometricLight::PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
     *pdfPos = 0.f;
 
     Vector3f wl = Normalize(renderFromLight.ApplyInverse(ray.d));
-    Float theta = SphericalTheta(wl), phi = SphericalPhi(wl);
-    *pdfDir = distrib.PDF(Point2f(phi, theta)) / std::sin(theta);
+    Point2f uv = EqualAreaSphereToSquare(wl);
+    *pdfDir = distrib.PDF(uv) / (4 * Pi);
 }
 
 std::string GoniometricLight::ToString() const {
-    return StringPrintf("[ GoniometricLight %s I: %s scale: %f ]", BaseToString(), I,
-                        scale);
+    return StringPrintf("[ GoniometricLight %s Ispec: %s scale: %f ]", BaseToString(),
+                        Ispec, scale);
 }
 
 GoniometricLight *GoniometricLight::Create(const Transform &renderFromLight,
@@ -535,8 +522,18 @@ GoniometricLight *GoniometricLight::Create(const Transform &renderFromLight,
     Image image(alloc);
 
     std::string texname = ResolveFilename(parameters.GetOneString("filename", ""));
-    if (!texname.empty()) {
+    if (texname.empty())
+        Warning(loc, "No \"filename\" parameter provided for goniometric light.");
+    else {
         ImageAndMetadata imageAndMetadata = Image::Read(texname, alloc);
+
+        if (imageAndMetadata.image.Resolution().x !=
+            imageAndMetadata.image.Resolution().y)
+            ErrorExit("%s: image resolution (%d, %d) is non-square. It's unlikely "
+                      "this is an equal-area environment map.",
+                      texname, imageAndMetadata.image.Resolution().x,
+                      imageAndMetadata.image.Resolution().y);
+
         ImageChannelDesc rgbDesc = imageAndMetadata.image.GetChannelDesc({"R", "G", "B"});
         ImageChannelDesc yDesc = imageAndMetadata.image.GetChannelDesc({"Y"});
 
@@ -566,16 +563,11 @@ GoniometricLight *GoniometricLight::Create(const Transform &renderFromLight,
 
     Float phi_v = parameters.GetOneFloat("power", -1);
     if (phi_v > 0) {
-        WrapMode2D wrapMode(WrapMode::Repeat, WrapMode::Clamp);
-        // integrate over speherical coordinates [0,Pi], [0,2pi]
         Float sumY = 0;
-        int width = image.Resolution().x, height = image.Resolution().y;
-        for (int v = 0; v < height; ++v) {
-            Float sinTheta = std::sin(Pi * Float(v + .5f) / Float(height));
-            for (int u = 0; u < width; ++u)
-                sumY += sinTheta * image.GetChannels({u, v}, wrapMode).Average();
-        }
-        Float k_e = 2 * Pi * Pi * sumY / (width * height);
+        for (int y = 0; y < image.Resolution().y; ++y)
+            for (int x = 0; x < image.Resolution().x; ++x)
+                sumY += image.GetChannel({x, y}, 0);
+        Float k_e = 4 * Pi * sumY / (image.Resolution().x * image.Resolution().y);
         sc *= phi_v / k_e;
     }
 
@@ -871,7 +863,7 @@ ImageInfiniteLight::ImageInfiniteLight(const Transform &renderFromLight, Image i
     CHECK(channelDesc.IsIdentity());
     if (image.Resolution().x != image.Resolution().y)
         ErrorExit("%s: image resolution (%d, %d) is non-square. It's unlikely "
-                  "this is an equirect environment map.",
+                  "this is an equal area environment map.",
                   filename, image.Resolution().x, image.Resolution().y);
     Array2D<Float> d = image.GetSamplingDistribution();
     Bounds2f domain = Bounds2f(Point2f(0, 0), Point2f(1, 1));

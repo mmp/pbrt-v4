@@ -83,7 +83,7 @@ static Image MakeLightImage(Point2i res) {
 }
 
 TEST(GoniometricLight, Power) {
-    Image image = MakeLightImage({512, 256});
+    Image image = MakeLightImage({256, 256});
     image = image.SelectChannels(image.GetChannelDesc({"R"}));
 
     SampledWavelengths lambda = SampledWavelengths::SampleUniform(0.5);
@@ -98,11 +98,11 @@ TEST(GoniometricLight, Power) {
     double phiSampled = 0;
     for (Point2f u : Hammersley2D(nSamples)) {
         Vector3f w = SampleUniformSphere(u);
-        phiSampled += light.Scale(w, lambda)[0];
+        phiSampled += light.I(w, lambda).Average();
     }
     phiSampled /= (nSamples * UniformSpherePDF());
 
-    EXPECT_LT(std::abs(phiSampled - phi[0]), 1e-3)
+    EXPECT_LT(std::abs(phiSampled - phi[0]), 3e-3)
         << " qmc: " << phiSampled << ", closed-form: " << phi[0];
 }
 
@@ -126,7 +126,7 @@ static void testPhiVsSampled(LightHandle light, SampledWavelengths &lambda) {
 }
 
 TEST(GoniometricLight, Sampling) {
-    Image image = MakeLightImage({512, 256});
+    Image image = MakeLightImage({256, 256});
     image = image.SelectChannels(image.GetChannelDesc({"R"}));
 
     static ConstantSpectrum I(10.);
