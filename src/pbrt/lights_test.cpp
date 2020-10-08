@@ -89,8 +89,7 @@ TEST(GoniometricLight, Power) {
     SampledWavelengths lambda = SampledWavelengths::SampleUniform(0.5);
     static ConstantSpectrum I(10.);
     Transform id;
-    GoniometricLight light(id, MediumInterface(), &I, 1.f, std::move(image),
-                           RGBColorSpace::sRGB, Allocator());
+    GoniometricLight light(id, MediumInterface(), &I, 1.f, std::move(image), Allocator());
 
     SampledSpectrum phi = light.Phi(lambda);
 
@@ -132,8 +131,7 @@ TEST(GoniometricLight, Sampling) {
 
     static ConstantSpectrum I(10.);
     static Transform id;
-    GoniometricLight light(id, MediumInterface(), &I, 1.f, std::move(image),
-                           RGBColorSpace::sRGB, Allocator());
+    GoniometricLight light(id, MediumInterface(), &I, 1.f, std::move(image), Allocator());
     SampledWavelengths lambda = SampledWavelengths::SampleUniform(0.5);
     testPhiVsSampled(LightHandle(&light), lambda);
 }

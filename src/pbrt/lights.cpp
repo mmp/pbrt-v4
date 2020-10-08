@@ -433,12 +433,11 @@ ProjectionLight *ProjectionLight::Create(const Transform &renderFromLight,
 GoniometricLight::GoniometricLight(const Transform &renderFromLight,
                                    const MediumInterface &mediumInterface,
                                    SpectrumHandle I, Float scale, Image im,
-                                   const RGBColorSpace *imageColorSpace, Allocator alloc)
+                                   Allocator alloc)
     : LightBase(LightType::DeltaPosition, renderFromLight, mediumInterface),
       I(I, alloc),
       scale(scale),
       image(std::move(im)),
-      imageColorSpace(imageColorSpace),
       wrapMode(WrapMode::Repeat, WrapMode::Clamp),
       distrib(alloc) {
     CHECK_EQ(1, image.NChannels());
@@ -534,15 +533,12 @@ GoniometricLight *GoniometricLight::Create(const Transform &renderFromLight,
     Float sc = parameters.GetOneFloat("scale", 1);
 
     Image image(alloc);
-    const RGBColorSpace *imageColorSpace = nullptr;
 
     std::string texname = ResolveFilename(parameters.GetOneString("filename", ""));
     if (!texname.empty()) {
         ImageAndMetadata imageAndMetadata = Image::Read(texname, alloc);
         ImageChannelDesc rgbDesc = imageAndMetadata.image.GetChannelDesc({"R", "G", "B"});
         ImageChannelDesc yDesc = imageAndMetadata.image.GetChannelDesc({"Y"});
-
-        imageColorSpace = imageAndMetadata.metadata.GetColorSpace();
 
         if (rgbDesc) {
             if (yDesc)
@@ -588,7 +584,7 @@ GoniometricLight *GoniometricLight::Create(const Transform &renderFromLight,
     Transform finalRenderFromLight = renderFromLight * t;
 
     return alloc.new_object<GoniometricLight>(finalRenderFromLight, medium, I, sc,
-                                              std::move(image), imageColorSpace, alloc);
+                                              std::move(image), alloc);
 }
 
 // DiffuseAreaLight Method Definitions

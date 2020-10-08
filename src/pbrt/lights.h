@@ -412,8 +412,7 @@ class GoniometricLight : public LightBase {
     // GoniometricLight Public Methods
     GoniometricLight(const Transform &renderFromLight,
                      const MediumInterface &mediumInterface, SpectrumHandle I,
-                     Float scale, Image image, const RGBColorSpace *imageColorSpace,
-                     Allocator alloc);
+                     Float scale, Image image, Allocator alloc);
 
     static GoniometricLight *Create(const Transform &renderFromLight, MediumHandle medium,
                                     const ParameterDictionary &parameters,
@@ -459,7 +458,6 @@ class GoniometricLight : public LightBase {
     DenselySampledSpectrum I;
     Float scale;
     Image image;
-    const RGBColorSpace *imageColorSpace;
     WrapMode2D wrapMode;
     PiecewiseConstant2D distrib;
 };
@@ -510,7 +508,8 @@ class DiffuseAreaLight : public LightBase {
             st[1] = 1 - st[1];
             for (int c = 0; c < 3; ++c)
                 rgb[c] = image.BilerpChannel(st, c);
-            return scale * RGBIlluminantSpectrum(*imageColorSpace, ClampZero(rgb)).Sample(lambda);
+            return scale *
+                   RGBIlluminantSpectrum(*imageColorSpace, ClampZero(rgb)).Sample(lambda);
         } else
             return scale * Lemit.Sample(lambda);
     }

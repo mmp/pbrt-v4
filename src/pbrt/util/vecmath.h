@@ -1647,48 +1647,6 @@ inline Float SphericalPhi(const Vector3f &v) {
     return (p < 0) ? (p + 2 * Pi) : p;
 }
 
-PBRT_CPU_GPU inline Float SphericalTriangleArea(const Vector3f &a, const Vector3f &b,
-                                                const Vector3f &c) {
-    // Compute normalized cross products of all direction pairs
-    Vector3f n_ab = Cross(a, b), n_bc = Cross(b, c), n_ca = Cross(c, a);
-    if (LengthSquared(n_ab) == 0 || LengthSquared(n_bc) == 0 || LengthSquared(n_ca) == 0)
-        return {};
-    n_ab = Normalize(n_ab);
-    n_bc = Normalize(n_bc);
-    n_ca = Normalize(n_ca);
-
-    // Compute angles $\alpha$, $\beta$, and $\gamma$ at spherical triangle vertices
-    Float alpha = AngleBetween(n_ab, -n_ca);
-    Float beta = AngleBetween(n_bc, -n_ab);
-    Float gamma = AngleBetween(n_ca, -n_bc);
-
-    return std::abs(alpha + beta + gamma - Pi);
-}
-
-PBRT_CPU_GPU inline Float SphericalQuadArea(const Vector3f &a, const Vector3f &b,
-                                            const Vector3f &c, const Vector3f &d);
-
-PBRT_CPU_GPU
-inline Float SphericalQuadArea(const Vector3f &a, const Vector3f &b, const Vector3f &c,
-                               const Vector3f &d) {
-    Vector3f axb = Cross(a, b), bxc = Cross(b, c);
-    Vector3f cxd = Cross(c, d), dxa = Cross(d, a);
-    if (LengthSquared(axb) == 0 || LengthSquared(bxc) == 0 || LengthSquared(cxd) == 0 ||
-        LengthSquared(dxa) == 0)
-        return 0;
-    axb = Normalize(axb);
-    bxc = Normalize(bxc);
-    cxd = Normalize(cxd);
-    dxa = Normalize(dxa);
-
-    Float alpha = AngleBetween(dxa, -axb);
-    Float beta = AngleBetween(axb, -bxc);
-    Float gamma = AngleBetween(bxc, -cxd);
-    Float delta = AngleBetween(cxd, -dxa);
-
-    return std::abs(alpha + beta + gamma + delta - 2 * Pi);
-}
-
 PBRT_CPU_GPU inline Float CosTheta(const Vector3f &w) {
     return w.z;
 }
@@ -1730,6 +1688,48 @@ inline Float CosDPhi(const Vector3f &wa, const Vector3f &wb) {
     if (waxy == 0 || wbxy == 0)
         return 1;
     return Clamp((wa.x * wb.x + wa.y * wb.y) / std::sqrt(waxy * wbxy), -1, 1);
+}
+
+PBRT_CPU_GPU inline Float SphericalTriangleArea(const Vector3f &a, const Vector3f &b,
+                                                const Vector3f &c) {
+    // Compute normalized cross products of all direction pairs
+    Vector3f n_ab = Cross(a, b), n_bc = Cross(b, c), n_ca = Cross(c, a);
+    if (LengthSquared(n_ab) == 0 || LengthSquared(n_bc) == 0 || LengthSquared(n_ca) == 0)
+        return {};
+    n_ab = Normalize(n_ab);
+    n_bc = Normalize(n_bc);
+    n_ca = Normalize(n_ca);
+
+    // Compute angles $\alpha$, $\beta$, and $\gamma$ at spherical triangle vertices
+    Float alpha = AngleBetween(n_ab, -n_ca);
+    Float beta = AngleBetween(n_bc, -n_ab);
+    Float gamma = AngleBetween(n_ca, -n_bc);
+
+    return std::abs(alpha + beta + gamma - Pi);
+}
+
+PBRT_CPU_GPU inline Float SphericalQuadArea(const Vector3f &a, const Vector3f &b,
+                                            const Vector3f &c, const Vector3f &d);
+
+PBRT_CPU_GPU
+inline Float SphericalQuadArea(const Vector3f &a, const Vector3f &b, const Vector3f &c,
+                               const Vector3f &d) {
+    Vector3f axb = Cross(a, b), bxc = Cross(b, c);
+    Vector3f cxd = Cross(c, d), dxa = Cross(d, a);
+    if (LengthSquared(axb) == 0 || LengthSquared(bxc) == 0 || LengthSquared(cxd) == 0 ||
+        LengthSquared(dxa) == 0)
+        return 0;
+    axb = Normalize(axb);
+    bxc = Normalize(bxc);
+    cxd = Normalize(cxd);
+    dxa = Normalize(dxa);
+
+    Float alpha = AngleBetween(dxa, -axb);
+    Float beta = AngleBetween(axb, -bxc);
+    Float gamma = AngleBetween(bxc, -cxd);
+    Float delta = AngleBetween(cxd, -dxa);
+
+    return std::abs(alpha + beta + gamma + delta - 2 * Pi);
 }
 
 PBRT_CPU_GPU
