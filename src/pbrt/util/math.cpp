@@ -161,20 +161,16 @@ int NextPrime(int x) {
 }
 
 #ifndef PBRT_IS_GPU_CODE
-template <>
-const Interval<float> Interval<float>::Pi = Interval<float>(3.1415925, 3.14159274);
-template <>
-const Interval<double> Interval<double>::Pi = Interval<double>(3.1415926535897931,
-                                                               3.1415926535897936);
+#ifdef PBRT_FLOAT_IS_DOUBLE
+const Interval Interval::Pi(3.1415926535897931, 3.1415926535897936);
+#else
+const Interval Interval::Pi = Interval(3.1415925f, 3.14159274f);
+#endif
 #endif
 
-template <typename Float>
-std::string Interval<Float>::ToString() const {
+std::string Interval::ToString() const {
     return StringPrintf("[ Interval [%f, %f] ]", low, high);
 }
-
-template std::string Interval<float>::ToString() const;
-template std::string Interval<double>::ToString() const;
 
 // Spline Interpolation Function Definitions
 Float CatmullRom(pstd::span<const Float> nodes, pstd::span<const Float> values, Float x) {

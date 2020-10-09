@@ -15,13 +15,12 @@
 namespace pbrt {
 
 template <>
-std::string internal::ToString2<FloatInterval>(FloatInterval x, FloatInterval y) {
+std::string internal::ToString2<Interval>(Interval x, Interval y) {
     return StringPrintf("[ %s %s ]", x, y);
 }
 
 template <>
-std::string internal::ToString3<FloatInterval>(FloatInterval x, FloatInterval y,
-                                               FloatInterval z) {
+std::string internal::ToString3<Interval>(Interval x, Interval y, Interval z) {
     return StringPrintf("[ %s %s %s ]", x, y, z);
 }
 

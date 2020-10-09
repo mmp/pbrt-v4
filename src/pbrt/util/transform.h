@@ -518,7 +518,7 @@ class AnimatedTransform {
     // AnimatedTransform Private Methods
     PBRT_CPU_GPU
     static void FindZeros(Float c1, Float c2, Float c3, Float c4, Float c5, Float theta,
-                          FloatInterval tInterval, pstd::span<Float> zeros, int *nZeros,
+                          Interval tInterval, pstd::span<Float> zeros, int *nZeros,
                           int depth = 8);
 
     // AnimatedTransform Private Members

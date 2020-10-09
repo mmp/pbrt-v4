@@ -40,6 +40,7 @@ class LightSamplerHandle : public TaggedPointer<UniformLightSampler, PowerLightS
 
     PBRT_CPU_GPU inline pstd::optional<SampledLight> Sample(const LightSampleContext &ctx,
                                                             Float u) const;
+
     PBRT_CPU_GPU inline Float PDF(const LightSampleContext &ctx, LightHandle light) const;
 
     PBRT_CPU_GPU inline pstd::optional<SampledLight> Sample(Float u) const;

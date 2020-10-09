@@ -30,12 +30,11 @@ class RNG {
   public:
     // RNG Public Methods
     PBRT_CPU_GPU
-    RNG();
-
+    RNG() : state(PCG32_DEFAULT_STATE), inc(PCG32_DEFAULT_STREAM) {}
     PBRT_CPU_GPU
-    RNG(uint64_t sequenceIndex, uint64_t seed) { SetSequence(sequenceIndex, seed); }
+    RNG(uint64_t seqIndex, uint64_t start) { SetSequence(seqIndex, start); }
     PBRT_CPU_GPU
-    RNG(uint64_t sequenceIndex) { SetSequence(sequenceIndex); }
+    RNG(uint64_t seqIndex) { SetSequence(seqIndex); }
 
     PBRT_CPU_GPU
     void SetSequence(uint64_t sequenceIndex, uint64_t seed);
@@ -48,8 +47,7 @@ class RNG {
     PBRT_CPU_GPU T Uniform();
 
     template <typename T>
-    PBRT_CPU_GPU T
-    Uniform(T b, typename std::enable_if_t<std::is_integral<T>::value> * = nullptr) {
+    PBRT_CPU_GPU typename std::enable_if_t<std::is_integral_v<T>, T> Uniform(T b) {
         T threshold = (~b + 1u) % b;
         while (true) {
             T r = Uniform<T>();
@@ -59,48 +57,25 @@ class RNG {
     }
 
     PBRT_CPU_GPU
-    void Advance(int64_t idelta) {
-        uint64_t curMult = PCG32_MULT, curPlus = inc, accMult = 1u;
-        uint64_t accPlus = 0u, delta = (uint64_t)idelta;
-        while (delta > 0) {
-            if (delta & 1) {
-                accMult *= curMult;
-                accPlus = accPlus * curMult + curPlus;
-            }
-            curPlus = (curMult + 1) * curPlus;
-            curMult *= curMult;
-            delta /= 2;
-        }
-        state = accMult * state + accPlus;
-    }
-
+    void Advance(int64_t idelta);
     PBRT_CPU_GPU
-    int64_t operator-(const RNG &other) const {
-        CHECK_EQ(inc, other.inc);
-        uint64_t curMult = PCG32_MULT, curPlus = inc, curState = other.state;
-        uint64_t theBit = 1u, distance = 0u;
-        while (state != curState) {
-            if ((state & theBit) != (curState & theBit)) {
-                curState = curState * curMult + curPlus;
-                distance |= theBit;
-            }
-            CHECK_EQ(state & theBit, curState & theBit);
-            theBit <<= 1;
-            curPlus = (curMult + 1ULL) * curPlus;
-            curMult *= curMult;
-        }
-        return (int64_t)distance;
-    }
+    int64_t operator-(const RNG &other) const;
 
     std::string ToString() const;
 
   private:
-    // RNG Private Data
+    // RNG Private Members
     uint64_t state, inc;
 };
 
 // RNG Inline Method Definitions
-inline RNG::RNG() : state(PCG32_DEFAULT_STATE), inc(PCG32_DEFAULT_STREAM) {}
+template <typename T>
+inline T RNG::Uniform() {
+    return T::unimplemented;
+}
+
+template <>
+inline uint32_t RNG::Uniform<uint32_t>();
 
 template <>
 inline uint32_t RNG::Uniform<uint32_t>() {
@@ -122,9 +97,7 @@ inline int32_t RNG::Uniform<int32_t>() {
     // https://stackoverflow.com/a/13208789
     uint32_t v = Uniform<uint32_t>();
     if (v <= (uint32_t)std::numeric_limits<int32_t>::max())
-        // Safe to type convert directly.
         return int32_t(v);
-
     DCHECK_GE(v, (uint32_t)std::numeric_limits<int32_t>::min());
     return int32_t(v - std::numeric_limits<int32_t>::min()) +
            std::numeric_limits<int32_t>::min();
@@ -137,10 +110,17 @@ inline int64_t RNG::Uniform<int64_t>() {
     if (v <= (uint64_t)std::numeric_limits<int64_t>::max())
         // Safe to type convert directly.
         return int64_t(v);
-
     DCHECK_GE(v, (uint64_t)std::numeric_limits<int64_t>::min());
     return int64_t(v - std::numeric_limits<int64_t>::min()) +
            std::numeric_limits<int64_t>::min();
+}
+
+inline void RNG::SetSequence(uint64_t sequenceIndex, uint64_t seed) {
+    state = 0u;
+    inc = (sequenceIndex << 1u) | 1u;
+    Uniform<uint32_t>();
+    state += seed;
+    Uniform<uint32_t>();
 }
 
 template <>
@@ -153,17 +133,37 @@ inline double RNG::Uniform<double>() {
     return std::min<double>(OneMinusEpsilon, Uniform<uint64_t>() * 0x1p-64);
 }
 
-template <typename T>
-inline T RNG::Uniform() {
-    return T::unimplemented;
+inline void RNG::Advance(int64_t idelta) {
+    uint64_t curMult = PCG32_MULT, curPlus = inc, accMult = 1u;
+    uint64_t accPlus = 0u, delta = (uint64_t)idelta;
+    while (delta > 0) {
+        if (delta & 1) {
+            accMult *= curMult;
+            accPlus = accPlus * curMult + curPlus;
+        }
+        curPlus = (curMult + 1) * curPlus;
+        curMult *= curMult;
+        delta /= 2;
+    }
+    state = accMult * state + accPlus;
 }
 
-inline void RNG::SetSequence(uint64_t sequenceIndex, uint64_t seed) {
-    state = 0u;
-    inc = (sequenceIndex << 1u) | 1u;
-    Uniform<uint32_t>();
-    state += seed;
-    Uniform<uint32_t>();
+PBRT_CPU_GPU
+inline int64_t RNG::operator-(const RNG &other) const {
+    CHECK_EQ(inc, other.inc);
+    uint64_t curMult = PCG32_MULT, curPlus = inc, curState = other.state;
+    uint64_t theBit = 1u, distance = 0u;
+    while (state != curState) {
+        if ((state & theBit) != (curState & theBit)) {
+            curState = curState * curMult + curPlus;
+            distance |= theBit;
+        }
+        CHECK_EQ(state & theBit, curState & theBit);
+        theBit <<= 1;
+        curPlus = (curMult + 1ULL) * curPlus;
+        curMult *= curMult;
+    }
+    return (int64_t)distance;
 }
 
 }  // namespace pbrt

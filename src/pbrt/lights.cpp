@@ -837,15 +837,13 @@ std::string UniformInfiniteLight::ToString() const {
 }
 
 // ImageInfiniteLight Method Definitions
-ImageInfiniteLight::ImageInfiniteLight(const Transform &renderFromLight, Image im,
+ImageInfiniteLight::ImageInfiniteLight(Transform renderFromLight, Image im,
                                        const RGBColorSpace *imageColorSpace, Float scale,
-                                       const std::string &filename, Allocator alloc)
+                                       std::string filename, Allocator alloc)
     : LightBase(LightType::Infinite, renderFromLight, MediumInterface()),
       image(std::move(im)),
       imageColorSpace(imageColorSpace),
       scale(scale),
-      filename(filename),
-      wrapMode(WrapMode::OctahedralSphere, WrapMode::OctahedralSphere),
       distribution(alloc),
       compensatedDistribution(alloc) {
     // Initialize sampling PDFs for image infinite area light
@@ -874,15 +872,14 @@ ImageInfiniteLight::ImageInfiniteLight(const Transform &renderFromLight, Image i
 Float ImageInfiniteLight::PDF_Li(LightSampleContext ctx, Vector3f w,
                                  LightSamplingMode mode) const {
     Vector3f wl = renderFromLight.ApplyInverse(w);
-    Float pdf = (mode == LightSamplingMode::WithMIS)
-                    ? compensatedDistribution.PDF(EqualAreaSphereToSquare(wl))
-                    : distribution.PDF(EqualAreaSphereToSquare(wl));
+    Point2f uv = EqualAreaSphereToSquare(wl);
+    Float pdf = (mode == LightSamplingMode::WithMIS) ? compensatedDistribution.PDF(uv)
+                                                     : distribution.PDF(uv);
     return pdf / (4 * Pi);
 }
 
 SampledSpectrum ImageInfiniteLight::Phi(const SampledWavelengths &lambda) const {
-    // We're really computing fluence, then converting to power, for what
-    // that's worth..
+    // We're computing fluence, then converting to power...
     SampledSpectrum sumL(0.);
 
     int width = image.Resolution().x, height = image.Resolution().y;
@@ -890,7 +887,7 @@ SampledSpectrum ImageInfiniteLight::Phi(const SampledWavelengths &lambda) const 
         for (int u = 0; u < width; ++u) {
             RGB rgb;
             for (int c = 0; c < 3; ++c)
-                rgb[c] = image.GetChannel({u, v}, c, wrapMode);
+                rgb[c] = image.GetChannel({u, v}, c, WrapMode::OctahedralSphere);
             sumL +=
                 RGBIlluminantSpectrum(*imageColorSpace, ClampZero(rgb)).Sample(lambda);
         }
@@ -918,7 +915,7 @@ LightLeSample ImageInfiniteLight::SampleLe(const Point2f &u1, const Point2f &u2,
     Float pdfDir = mapPDF / (4 * Pi);
     Float pdfPos = 1 / (Pi * Sqr(sceneRadius));
 
-    return LightLeSample(LookupLe(uv, lambda), ray, pdfPos, pdfDir);
+    return LightLeSample(Le(uv, lambda), ray, pdfPos, pdfDir);
 }
 
 void ImageInfiniteLight::PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
@@ -929,8 +926,7 @@ void ImageInfiniteLight::PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) co
 }
 
 std::string ImageInfiniteLight::ToString() const {
-    return StringPrintf("[ ImageInfiniteLight %s filename:%s scale: %f ]", BaseToString(),
-                        filename, scale);
+    return StringPrintf("[ ImageInfiniteLight %s scale: %f ]", BaseToString(), scale);
 }
 
 // PortalImageInfiniteLight Method Definitions
@@ -992,12 +988,11 @@ PortalImageInfiniteLight::PortalImageInfiniteLight(
 
             w = Normalize(renderFromLight.ApplyInverse(w));
 
-            WrapMode2D equiAreaWrap(WrapMode::OctahedralSphere,
-                                    WrapMode::OctahedralSphere);
             Point2f stEqui = EqualAreaSphereToSquare(w);
             for (int c = 0; c < 3; ++c)
-                image.SetChannel({x, y}, c,
-                                 equiAreaImage.BilerpChannel(stEqui, c, equiAreaWrap));
+                image.SetChannel(
+                    {x, y}, c,
+                    equiAreaImage.BilerpChannel(stEqui, c, WrapMode::OctahedralSphere));
         }
     });
 

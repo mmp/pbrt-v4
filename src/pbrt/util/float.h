@@ -78,6 +78,19 @@ inline PBRT_CPU_GPU typename std::enable_if_t<std::is_integral<T>::value, bool> 
 }
 
 PBRT_CPU_GPU
+inline float FMA(float a, float b, float c) {
+    return std::fma(a, b, c);
+}
+
+PBRT_CPU_GPU
+inline double FMA(double a, double b, double c) {
+    return std::fma(a, b, c);
+}
+inline long double FMA(long double a, long double b, long double c) {
+    return std::fma(a, b, c);
+}
+
+PBRT_CPU_GPU
 inline uint32_t FloatToBits(float f) {
 #ifdef PBRT_IS_GPU_CODE
     return __float_as_uint(f);
@@ -145,10 +158,6 @@ inline float NextFloatUp(float v) {
     return BitsToFloat(ui);
 }
 
-inline constexpr Float gamma(int n) {
-    return (n * MachineEpsilon) / (1 - n * MachineEpsilon);
-}
-
 PBRT_CPU_GPU
 inline float NextFloatDown(float v) {
     // Handle infinity and positive zero for _NextFloatDown()_
@@ -162,6 +171,10 @@ inline float NextFloatDown(float v) {
     else
         ++ui;
     return BitsToFloat(ui);
+}
+
+inline constexpr Float gamma(int n) {
+    return (n * MachineEpsilon) / (1 - n * MachineEpsilon);
 }
 
 PBRT_CPU_GPU

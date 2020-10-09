@@ -152,24 +152,24 @@ class Sphere {
         Vector3fi di = (*objectFromRender)(Vector3fi(r.d));
 
         // Solve quadratic equation to compute sphere _t0_ and _t1_
-        FloatInterval t0, t1;
+        Interval t0, t1;
         // Compute sphere quadratic coefficients
-        FloatInterval a = SumSquares(di.x, di.y, di.z);
-        FloatInterval b = 2 * (di.x * oi.x + di.y * oi.y + di.z * oi.z);
-        FloatInterval c = SumSquares(oi.x, oi.y, oi.z) - Sqr(FloatInterval(radius));
+        Interval a = SumSquares(di.x, di.y, di.z);
+        Interval b = 2 * (di.x * oi.x + di.y * oi.y + di.z * oi.z);
+        Interval c = SumSquares(oi.x, oi.y, oi.z) - Sqr(Interval(radius));
 
         // Compute sphere quadratic discriminant _discrim_
-        FloatInterval f = b / (2 * a);
+        Interval f = b / (2 * a);
         Point3fi fp = oi - f * di;
-        FloatInterval sqrtf = Sqrt(Sqr(fp.x) + Sqr(fp.y) + Sqr(fp.z));
-        FloatInterval discrim =
-            4 * a * (FloatInterval(radius) + sqrtf) * (FloatInterval(radius) - sqrtf);
+        Interval sqrtf = Sqrt(Sqr(fp.x) + Sqr(fp.y) + Sqr(fp.z));
+        Interval discrim =
+            4 * a * (Interval(radius) + sqrtf) * (Interval(radius) - sqrtf);
         if (discrim.LowerBound() < 0)
             return {};
 
         // Compute quadratic $t$ values
-        FloatInterval rootDiscrim = Sqrt(discrim);
-        FloatInterval q;
+        Interval rootDiscrim = Sqrt(discrim);
+        Interval q;
         if ((Float)b < 0)
             q = -.5f * (b - rootDiscrim);
         else
@@ -183,7 +183,7 @@ class Sphere {
         // Check quadric shape _t0_ and _t1_ for nearest intersection
         if (t0.UpperBound() > tMax || t1.LowerBound() <= 0)
             return {};
-        FloatInterval tShapeHit = t0;
+        Interval tShapeHit = t0;
         if (tShapeHit.LowerBound() <= 0) {
             tShapeHit = t1;
             if (tShapeHit.UpperBound() > tMax)
@@ -607,24 +607,24 @@ class Cylinder {
         Vector3fi di = (*objectFromRender)(Vector3fi(r.d));
 
         // Solve quadratic equation to find cylinder _t0_ and _t1_ values
-        FloatInterval t0, t1;
+        Interval t0, t1;
         // Compute cylinder quadratic coefficients
-        FloatInterval a = SumSquares(di.x, di.y);
-        FloatInterval b = 2 * (di.x * oi.x + di.y * oi.y);
-        FloatInterval c = SumSquares(oi.x, oi.y) - Sqr(FloatInterval(radius));
+        Interval a = SumSquares(di.x, di.y);
+        Interval b = 2 * (di.x * oi.x + di.y * oi.y);
+        Interval c = SumSquares(oi.x, oi.y) - Sqr(Interval(radius));
 
         // Compute cylinder quadratic discriminant _discrim_
-        FloatInterval f = b / (2 * a);
-        FloatInterval fx = oi.x - f * di.x, fy = oi.y - f * di.y;
-        FloatInterval sqrtf = Sqrt(Sqr(fx) + Sqr(fy));
-        FloatInterval discrim =
-            4 * a * (FloatInterval(radius) + sqrtf) * (FloatInterval(radius) - sqrtf);
+        Interval f = b / (2 * a);
+        Interval fx = oi.x - f * di.x, fy = oi.y - f * di.y;
+        Interval sqrtf = Sqrt(Sqr(fx) + Sqr(fy));
+        Interval discrim =
+            4 * a * (Interval(radius) + sqrtf) * (Interval(radius) - sqrtf);
         if (discrim.LowerBound() < 0)
             return {};
 
         // Compute quadratic $t$ values
-        FloatInterval rootDiscrim = Sqrt(discrim);
-        FloatInterval q;
+        Interval rootDiscrim = Sqrt(discrim);
+        Interval q;
         if ((Float)b < 0)
             q = -.5f * (b - rootDiscrim);
         else
@@ -638,7 +638,7 @@ class Cylinder {
         // Check quadric shape _t0_ and _t1_ for nearest intersection
         if (t0.UpperBound() > tMax || t1.LowerBound() <= 0)
             return {};
-        FloatInterval tShapeHit = t0;
+        Interval tShapeHit = t0;
         if (tShapeHit.LowerBound() <= 0) {
             tShapeHit = t1;
             if (tShapeHit.UpperBound() > tMax)

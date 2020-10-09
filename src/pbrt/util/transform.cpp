@@ -1108,7 +1108,7 @@ Bounds3f AnimatedTransform::BoundPointMotion(const Point3f &p) const {
         Float zeros[8];
         int nZeros = 0;
         FindZeros(c1[c].Eval(p), c2[c].Eval(p), c3[c].Eval(p), c4[c].Eval(p),
-                  c5[c].Eval(p), theta, FloatInterval(0., 1.), zeros, &nZeros);
+                  c5[c].Eval(p), theta, Interval(0., 1.), zeros, &nZeros);
         CHECK_LE(nZeros, PBRT_ARRAYSIZE(zeros));
 
         // Expand bounding box for any motion derivative zeros found
@@ -1121,14 +1121,13 @@ Bounds3f AnimatedTransform::BoundPointMotion(const Point3f &p) const {
 }
 
 void AnimatedTransform::FindZeros(Float c1, Float c2, Float c3, Float c4, Float c5,
-                                  Float theta, FloatInterval tInterval,
+                                  Float theta, Interval tInterval,
                                   pstd::span<Float> zeros, int *nZeros, int depth) {
     // Evaluate motion derivative in interval form, return if no zeros
-    FloatInterval dadt = FloatInterval(c1) +
-                         (FloatInterval(c2) + FloatInterval(c3) * tInterval) *
-                             Cos(FloatInterval(2 * theta) * tInterval) +
-                         (FloatInterval(c4) + FloatInterval(c5) * tInterval) *
-                             Sin(FloatInterval(2 * theta) * tInterval);
+    Interval dadt =
+        Interval(c1) +
+        (Interval(c2) + Interval(c3) * tInterval) * Cos(Interval(2 * theta) * tInterval) +
+        (Interval(c4) + Interval(c5) * tInterval) * Sin(Interval(2 * theta) * tInterval);
     if (dadt.LowerBound() > 0 || dadt.UpperBound() < 0 ||
         dadt.LowerBound() == dadt.UpperBound())
         return;
@@ -1137,10 +1136,10 @@ void AnimatedTransform::FindZeros(Float c1, Float c2, Float c3, Float c4, Float 
     if (depth > 0 && dadt.Width() > 1e-3) {
         // Split _tInterval_ and check both resulting intervals
         Float mid = tInterval.Midpoint();
-        FindZeros(c1, c2, c3, c4, c5, theta, FloatInterval(tInterval.LowerBound(), mid),
-                  zeros, nZeros, depth - 1);
-        FindZeros(c1, c2, c3, c4, c5, theta, FloatInterval(mid, tInterval.UpperBound()),
-                  zeros, nZeros, depth - 1);
+        FindZeros(c1, c2, c3, c4, c5, theta, Interval(tInterval.LowerBound(), mid), zeros,
+                  nZeros, depth - 1);
+        FindZeros(c1, c2, c3, c4, c5, theta, Interval(mid, tInterval.UpperBound()), zeros,
+                  nZeros, depth - 1);
 
     } else {
         // Use Newton's method to refine zero

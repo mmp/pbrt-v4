@@ -38,9 +38,8 @@ extern template std::string internal::ToString3(int, int, int);
 
 namespace {
 
-template <typename T>
-PBRT_CPU_GPU inline bool IsNaN(Interval<T> fi) {
-    return pbrt::IsNaN(T(fi));
+PBRT_CPU_GPU inline bool IsNaN(Interval fi) {
+    return pbrt::IsNaN(Float(fi));
 }
 
 // TupleLength Definition
@@ -59,9 +58,9 @@ struct TupleLength<long double> {
     using type = long double;
 };
 
-template <typename T>
-struct TupleLength<Interval<T>> {
-    using type = Interval<typename TupleLength<T>::type>;
+template <>
+struct TupleLength<Interval> {
+    using type = Interval;
 };
 
 }  // anonymous namespace
@@ -516,40 +515,35 @@ using Vector3f = Vector3<Float>;
 using Vector3i = Vector3<int>;
 
 // Vector3fi Definition
-class Vector3fi : public Vector3<Interval<Float>> {
+class Vector3fi : public Vector3<Interval> {
   public:
     // Vector3fi Public Methods
-    using Vector3<Interval<Float>>::x;
-    using Vector3<Interval<Float>>::y;
-    using Vector3<Interval<Float>>::z;
-    using Vector3<Interval<Float>>::HasNaN;
-    using Vector3<Interval<Float>>::operator+;
-    using Vector3<Interval<Float>>::operator+=;
-    using Vector3<Interval<Float>>::operator*;
-    using Vector3<Interval<Float>>::operator*=;
+    using Vector3<Interval>::x;
+    using Vector3<Interval>::y;
+    using Vector3<Interval>::z;
+    using Vector3<Interval>::HasNaN;
+    using Vector3<Interval>::operator+;
+    using Vector3<Interval>::operator+=;
+    using Vector3<Interval>::operator*;
+    using Vector3<Interval>::operator*=;
 
     Vector3fi() = default;
     PBRT_CPU_GPU
     Vector3fi(Float x, Float y, Float z)
-        : Vector3<Interval<Float>>(Interval<Float>(x), Interval<Float>(y),
-                                   Interval<Float>(z)) {}
+        : Vector3<Interval>(Interval(x), Interval(y), Interval(z)) {}
     PBRT_CPU_GPU
-    Vector3fi(FloatInterval x, FloatInterval y, FloatInterval z)
-        : Vector3<Interval<Float>>(x, y, z) {}
+    Vector3fi(Interval x, Interval y, Interval z) : Vector3<Interval>(x, y, z) {}
     PBRT_CPU_GPU
     Vector3fi(const Vector3f &p)
-        : Vector3<Interval<Float>>(Interval<Float>(p.x), Interval<Float>(p.y),
-                                   Interval<Float>(p.z)) {}
+        : Vector3<Interval>(Interval(p.x), Interval(p.y), Interval(p.z)) {}
 
-    template <typename F>
-    PBRT_CPU_GPU Vector3fi(const Vector3<Interval<F>> &pfi)
-        : Vector3<Interval<Float>>(pfi) {}
+    PBRT_CPU_GPU Vector3fi(const Vector3<Interval> &pfi) : Vector3<Interval>(pfi) {}
 
     PBRT_CPU_GPU
     Vector3fi(const Vector3f &p, const Vector3f &e)
-        : Vector3<Interval<Float>>(Interval<Float>::FromValueAndError(p.x, e.x),
-                                   Interval<Float>::FromValueAndError(p.y, e.y),
-                                   Interval<Float>::FromValueAndError(p.z, e.z)) {}
+        : Vector3<Interval>(Interval::FromValueAndError(p.x, e.x),
+                            Interval::FromValueAndError(p.y, e.y),
+                            Interval::FromValueAndError(p.z, e.z)) {}
 
     PBRT_CPU_GPU
     Vector3f Error() const { return {x.Width() / 2, y.Width() / 2, z.Width() / 2}; }
@@ -700,34 +694,32 @@ using Point3f = Point3<Float>;
 using Point3i = Point3<int>;
 
 // Point3fi Definition
-class Point3fi : public Point3<FloatInterval> {
+class Point3fi : public Point3<Interval> {
   public:
-    using Point3<FloatInterval>::x;
-    using Point3<FloatInterval>::y;
-    using Point3<FloatInterval>::z;
-    using Point3<FloatInterval>::HasNaN;
-    using Point3<FloatInterval>::operator+;
-    using Point3<FloatInterval>::operator*;
-    using Point3<FloatInterval>::operator*=;
+    using Point3<Interval>::x;
+    using Point3<Interval>::y;
+    using Point3<Interval>::z;
+    using Point3<Interval>::HasNaN;
+    using Point3<Interval>::operator+;
+    using Point3<Interval>::operator*;
+    using Point3<Interval>::operator*=;
 
     Point3fi() = default;
     PBRT_CPU_GPU
-    Point3fi(FloatInterval x, FloatInterval y, FloatInterval z)
-        : Point3<FloatInterval>(x, y, z) {}
+    Point3fi(Interval x, Interval y, Interval z) : Point3<Interval>(x, y, z) {}
     PBRT_CPU_GPU
     Point3fi(Float x, Float y, Float z)
-        : Point3<FloatInterval>(FloatInterval(x), FloatInterval(y), FloatInterval(z)) {}
+        : Point3<Interval>(Interval(x), Interval(y), Interval(z)) {}
     PBRT_CPU_GPU
     Point3fi(const Point3f &p)
-        : Point3<FloatInterval>(FloatInterval(p.x), FloatInterval(p.y),
-                                FloatInterval(p.z)) {}
-    template <typename F>
-    PBRT_CPU_GPU Point3fi(const Point3<Interval<F>> &pfi) : Point3<FloatInterval>(pfi) {}
+        : Point3<Interval>(Interval(p.x), Interval(p.y), Interval(p.z)) {}
+    PBRT_CPU_GPU
+    Point3fi(const Point3<Interval> &p) : Point3<Interval>(p) {}
     PBRT_CPU_GPU
     Point3fi(const Point3f &p, const Vector3f &e)
-        : Point3<FloatInterval>(FloatInterval::FromValueAndError(p.x, e.x),
-                                FloatInterval::FromValueAndError(p.y, e.y),
-                                FloatInterval::FromValueAndError(p.z, e.z)) {}
+        : Point3<Interval>(Interval::FromValueAndError(p.x, e.x),
+                           Interval::FromValueAndError(p.y, e.y),
+                           Interval::FromValueAndError(p.z, e.z)) {}
 
     PBRT_CPU_GPU
     Vector3f Error() const { return {x.Width() / 2, y.Width() / 2, z.Width() / 2}; }

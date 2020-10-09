@@ -13,7 +13,7 @@ flat LayeredBxDFConfig;
 soa SampledSpectrum;
 soa SampledWavelengths;
 
-soa FloatInterval {
+soa Interval {
     Float low, high;
 };
 
@@ -22,7 +22,7 @@ soa Point2i { int x, y; };
 soa Point3f { Float x, y, z; };
 soa Vector3f { Float x, y, z; };
 soa Normal3f { Float x, y, z; };
-soa Point3fi { FloatInterval x, y, z; };
+soa Point3fi { Interval x, y, z; };
 
 soa Ray {
     Point3f o;

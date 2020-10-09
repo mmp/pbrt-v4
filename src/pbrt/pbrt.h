@@ -150,7 +150,6 @@ class PiecewiseConstant2D;
 class ProgressReporter;
 class RNG;
 struct FileLoc;
-template <typename Float>
 class Interval;
 template <typename T>
 class Array2D;

@@ -563,7 +563,7 @@ TEST(PointVector, Interval) {
     p += v;
     p = (p - v);
     p = p + 4 * v;
-    FloatInterval d = Dot(v, v);
+    Interval d = Dot(v, v);
     d = DistanceSquared(p, q);
     d = Distance(p, q);
 

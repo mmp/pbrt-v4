@@ -602,9 +602,9 @@ class UniformInfiniteLight : public LightBase {
 class ImageInfiniteLight : public LightBase {
   public:
     // ImageInfiniteLight Public Methods
-    ImageInfiniteLight(const Transform &renderFromLight, Image image,
+    ImageInfiniteLight(Transform renderFromLight, Image image,
                        const RGBColorSpace *imageColorSpace, Float scale,
-                       const std::string &filename, Allocator alloc);
+                       std::string filename, Allocator alloc);
 
     void Preprocess(const Bounds3f &sceneBounds) {
         sceneBounds.BoundingSphere(&sceneCenter, &sceneRadius);
@@ -631,8 +631,8 @@ class ImageInfiniteLight : public LightBase {
     PBRT_CPU_GPU
     SampledSpectrum Le(const Ray &ray, const SampledWavelengths &lambda) const {
         Vector3f wl = Normalize(renderFromLight.ApplyInverse(ray.d));
-        Point2f st = EqualAreaSphereToSquare(wl);
-        return LookupLe(st, lambda);
+        Point2f uv = EqualAreaSphereToSquare(wl);
+        return Le(uv, lambda);
     }
 
     PBRT_CPU_GPU
@@ -655,10 +655,9 @@ class ImageInfiniteLight : public LightBase {
         Float pdf = mapPDF / (4 * Pi);
 
         // Return radiance value for infinite light direction
-        SampledSpectrum L = LookupLe(uv, lambda);
-
         return LightLiSample(
-            L, wi, pdf, Interaction(ctx.p() + wi * (2 * sceneRadius), &mediumInterface));
+            Le(uv, lambda), wi, pdf,
+            Interaction(ctx.p() + wi * (2 * sceneRadius), &mediumInterface));
     }
 
     LightBounds Bounds() const { return {}; }
@@ -666,20 +665,18 @@ class ImageInfiniteLight : public LightBase {
   private:
     // ImageInfiniteLight Private Methods
     PBRT_CPU_GPU
-    SampledSpectrum LookupLe(Point2f st, const SampledWavelengths &lambda) const {
+    SampledSpectrum Le(Point2f uv, const SampledWavelengths &lambda) const {
         RGB rgb;
         for (int c = 0; c < 3; ++c)
-            rgb[c] = image.LookupNearestChannel(st, c, wrapMode);
+            rgb[c] = image.LookupNearestChannel(uv, c, WrapMode::OctahedralSphere);
         return scale *
                RGBIlluminantSpectrum(*imageColorSpace, ClampZero(rgb)).Sample(lambda);
     }
 
     // ImageInfiniteLight Private Members
-    std::string filename;
     Image image;
     const RGBColorSpace *imageColorSpace;
     Float scale;
-    WrapMode2D wrapMode;
     Point3f sceneCenter;
     Float sceneRadius;
     PiecewiseConstant2D distribution;

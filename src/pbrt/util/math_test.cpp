@@ -576,10 +576,10 @@ TEST(FindInterval, Basics) {
 }
 
 ///////////////////////////////////////////////////////////////////////////
-// FloatInterval tests
+// Interval tests
 
 // Return an exponentially-distributed floating-point value.
-static FloatInterval getFloat(RNG &rng, Float minExp = -6., Float maxExp = 6.) {
+static Interval getFloat(RNG &rng, Float minExp = -6., Float maxExp = 6.) {
     Float logu = Lerp(rng.Uniform<Float>(), minExp, maxExp);
     Float val = std::pow(10, logu);
 
@@ -608,12 +608,12 @@ static FloatInterval getFloat(RNG &rng, Float minExp = -6., Float maxExp = 6.) {
     }
     }
     Float sign = rng.Uniform<Float>() < .5 ? -1. : 1.;
-    return FloatInterval::FromValueAndError(sign * val, err);
+    return Interval::FromValueAndError(sign * val, err);
 }
 
-// Given an FloatInterval covering some range, choose a double-precision
-// "precise" value that is in the FloatInterval's range.
-static double getPrecise(const FloatInterval &ef, RNG &rng) {
+// Given an Interval covering some range, choose a double-precision
+// "precise" value that is in the Interval's range.
+static double getPrecise(const Interval &ef, RNG &rng) {
     switch (rng.Uniform<uint32_t>(3)) {
     // 2/3 of the time, pick a value that is right at the end of the range;
     // this is a maximally difficult / adversarial choice, so should help
@@ -623,7 +623,7 @@ static double getPrecise(const FloatInterval &ef, RNG &rng) {
     case 1:
         return ef.UpperBound();
     case 2: {
-        // Otherwise choose a value uniformly inside the FloatInterval's range.
+        // Otherwise choose a value uniformly inside the Interval's range.
         Float t = rng.Uniform<Float>();
         double p = (1 - t) * ef.LowerBound() + t * ef.UpperBound();
         if (p > ef.UpperBound())
@@ -642,10 +642,10 @@ TEST(FloatInterval, Abs) {
     for (int trial = 0; trial < kFloatIntervalIters; ++trial) {
         RNG rng(trial);
 
-        FloatInterval ef = getFloat(rng);
+        Interval ef = getFloat(rng);
         double precise = getPrecise(ef, rng);
 
-        FloatInterval efResult = Abs(ef);
+        Interval efResult = Abs(ef);
         double preciseResult = std::abs(precise);
 
         EXPECT_GE(preciseResult, efResult.LowerBound());
@@ -657,10 +657,10 @@ TEST(FloatInterval, Sqrt) {
     for (int trial = 0; trial < kFloatIntervalIters; ++trial) {
         RNG rng(trial);
 
-        FloatInterval ef = getFloat(rng);
+        Interval ef = getFloat(rng);
         double precise = getPrecise(ef, rng);
 
-        FloatInterval efResult = Sqrt(Abs(ef));
+        Interval efResult = Sqrt(Abs(ef));
         double preciseResult = std::sqrt(std::abs(precise));
 
         EXPECT_GE(preciseResult, efResult.LowerBound());
@@ -672,10 +672,10 @@ TEST(FloatInterval, Add) {
     for (int trial = 0; trial < kFloatIntervalIters; ++trial) {
         RNG rng(trial);
 
-        FloatInterval ef[2] = {getFloat(rng), getFloat(rng)};
+        Interval ef[2] = {getFloat(rng), getFloat(rng)};
         double precise[2] = {getPrecise(ef[0], rng), getPrecise(ef[1], rng)};
 
-        FloatInterval efResult = ef[0] + ef[1];
+        Interval efResult = ef[0] + ef[1];
         float preciseResult = precise[0] + precise[1];
 
         EXPECT_GE(preciseResult, efResult.LowerBound());
@@ -687,10 +687,10 @@ TEST(FloatInterval, Sub) {
     for (int trial = 0; trial < kFloatIntervalIters; ++trial) {
         RNG rng(trial);
 
-        FloatInterval ef[2] = {getFloat(rng), getFloat(rng)};
+        Interval ef[2] = {getFloat(rng), getFloat(rng)};
         double precise[2] = {getPrecise(ef[0], rng), getPrecise(ef[1], rng)};
 
-        FloatInterval efResult = ef[0] - ef[1];
+        Interval efResult = ef[0] - ef[1];
         float preciseResult = precise[0] - precise[1];
 
         EXPECT_GE(preciseResult, efResult.LowerBound());
@@ -702,10 +702,10 @@ TEST(FloatInterval, Mul) {
     for (int trial = 0; trial < kFloatIntervalIters; ++trial) {
         RNG rng(trial);
 
-        FloatInterval ef[2] = {getFloat(rng), getFloat(rng)};
+        Interval ef[2] = {getFloat(rng), getFloat(rng)};
         double precise[2] = {getPrecise(ef[0], rng), getPrecise(ef[1], rng)};
 
-        FloatInterval efResult = ef[0] * ef[1];
+        Interval efResult = ef[0] * ef[1];
         float preciseResult = precise[0] * precise[1];
 
         EXPECT_GE(preciseResult, efResult.LowerBound());
@@ -717,14 +717,14 @@ TEST(FloatInterval, Div) {
     for (int trial = 0; trial < kFloatIntervalIters; ++trial) {
         RNG rng(trial);
 
-        FloatInterval ef[2] = {getFloat(rng), getFloat(rng)};
+        Interval ef[2] = {getFloat(rng), getFloat(rng)};
         double precise[2] = {getPrecise(ef[0], rng), getPrecise(ef[1], rng)};
 
         // Things get messy if the denominator's interval straddles zero...
         if (ef[1].LowerBound() * ef[1].UpperBound() < 0.)
             continue;
 
-        FloatInterval efResult = ef[0] / ef[1];
+        Interval efResult = ef[0] / ef[1];
         float preciseResult = precise[0] / precise[1];
 
         EXPECT_GE(preciseResult, efResult.LowerBound());
@@ -739,11 +739,11 @@ TEST(FloatInterval, FMA) {
     int nBetter = 0;
     for (int i = 0; i < nTrials; ++i) {
         RNG rng(i);
-        FloatInterval v = Abs(getFloat(rng));
+        Interval v = Abs(getFloat(rng));
         for (int j = 0; j < nIters; ++j) {
-            FloatInterval a = v;
-            FloatInterval b = getFloat(rng);
-            FloatInterval c = getFloat(rng);
+            Interval a = v;
+            Interval b = getFloat(rng);
+            Interval c = getFloat(rng);
 
             v = FMA(a, b, c);
 
@@ -758,7 +758,7 @@ TEST(FloatInterval, FMA) {
             EXPECT_GE(preciseResult, v.LowerBound()) << v;
             EXPECT_LE(preciseResult, v.UpperBound()) << v;
 
-            FloatInterval vp = a * b + c;
+            Interval vp = a * b + c;
             EXPECT_GE(v.LowerBound(), vp.LowerBound()) << v << " vs " << vp;
             EXPECT_LE(v.UpperBound(), vp.UpperBound()) << v << " vs " << vp;
 
@@ -771,14 +771,14 @@ TEST(FloatInterval, FMA) {
 }
 
 TEST(FloatInterval, Sqr) {
-    FloatInterval a = FloatInterval(1.75, 2.25);
-    FloatInterval as = Sqr(a), at = a * a;
+    Interval a = Interval(1.75, 2.25);
+    Interval as = Sqr(a), at = a * a;
     EXPECT_EQ(as.UpperBound(), at.UpperBound());
     EXPECT_EQ(as.LowerBound(), at.LowerBound());
 
     // Straddle 0
-    FloatInterval b = FloatInterval(-.75, 1.25);
-    FloatInterval bs = Sqr(b), b2 = b * b;
+    Interval b = Interval(-.75, 1.25);
+    Interval bs = Sqr(b), b2 = b * b;
     EXPECT_EQ(bs.UpperBound(), b2.UpperBound());
     EXPECT_EQ(0, bs.LowerBound());
     EXPECT_LT(b2.LowerBound(), 0);
@@ -786,7 +786,7 @@ TEST(FloatInterval, Sqr) {
 
 TEST(FloatInterval, SumSquares) {
     {
-        FloatInterval a(1), b(2), c(3);
+        Interval a(1), b(2), c(3);
         EXPECT_EQ(1, Float(SumSquares(a)));
         EXPECT_EQ(4, Float(SumSquares(b)));
         EXPECT_EQ(5, Float(SumSquares(a, b)));
@@ -794,63 +794,14 @@ TEST(FloatInterval, SumSquares) {
     }
 }
 
-TEST(FloatInterval, FloatDouble) {
-    Interval<float> f = Interval<float>(2);
-    Interval<double> d = Interval<double>(2);
-
-    EXPECT_GT(Sqrt(d).LowerBound(), Sqrt(f).LowerBound());
-    EXPECT_LT(Sqrt(d).UpperBound(), Sqrt(f).UpperBound());
-
-    EXPECT_GT(Sqr(d).LowerBound(), Sqr(f).LowerBound());
-    EXPECT_LT(Sqr(d).UpperBound(), Sqr(f).UpperBound());
-
-    Interval<float> ff = Interval<float>(-.25, -.24);
-    Interval<double> dd = Interval<double>(-.25, -.24);
-
-    EXPECT_GT((d + dd).LowerBound(), (f + ff).LowerBound());
-    EXPECT_LT((d + dd).UpperBound(), (f + ff).UpperBound());
-    EXPECT_TRUE(InRange(1.75, f + ff));
-    EXPECT_TRUE(InRange(1.75, d + dd));
-
-    EXPECT_GT((d - dd).LowerBound(), (f - ff).LowerBound());
-    EXPECT_LT((d - dd).UpperBound(), (f - ff).UpperBound());
-    EXPECT_TRUE(InRange(2.25, f - ff));
-    EXPECT_TRUE(InRange(2.25, d - dd));
-
-    EXPECT_GT((d * dd).LowerBound(), (f * ff).LowerBound());
-    EXPECT_LT((d * dd).UpperBound(), (f * ff).UpperBound());
-    EXPECT_TRUE(InRange(-0.5, f * ff));
-    EXPECT_TRUE(InRange(-0.5, d * dd));
-
-    EXPECT_GT((d / dd).LowerBound(), (f / ff).LowerBound());
-    EXPECT_LT((d / dd).UpperBound(), (f / ff).UpperBound());
-    EXPECT_TRUE(InRange(-8, f / ff));
-    EXPECT_TRUE(InRange(-8, d / dd));
-
-    // Also, make sure all these variants of mixed types compile...
-    EXPECT_TRUE(InRange(4, f + d));
-    EXPECT_TRUE(InRange(0, f - d));
-    EXPECT_TRUE(InRange(4, f * d));
-    EXPECT_TRUE(InRange(1, f / d));
-
-    f += d;
-    EXPECT_TRUE(InRange(4, f));
-    f *= d;
-    EXPECT_TRUE(InRange(8, f));
-    f /= d;
-    EXPECT_TRUE(InRange(4, f));
-    f -= d;
-    EXPECT_TRUE(InRange(2, f));
-}
-
 TEST(FloatInterval, DifferenceOfProducts) {
     for (int trial = 0; trial < kFloatIntervalIters; ++trial) {
         RNG rng(trial);
 
-        FloatInterval a = Abs(getFloat(rng));
-        FloatInterval b = Abs(getFloat(rng));
-        FloatInterval c = Abs(getFloat(rng));
-        FloatInterval d = Abs(getFloat(rng));
+        Interval a = Abs(getFloat(rng));
+        Interval b = Abs(getFloat(rng));
+        Interval c = Abs(getFloat(rng));
+        Interval d = Abs(getFloat(rng));
 
         Float sign = rng.Uniform<Float>() < -0.5 ? -1 : 1;
         b *= sign;
@@ -861,7 +812,7 @@ TEST(FloatInterval, DifferenceOfProducts) {
         double pc = getPrecise(c, rng);
         double pd = getPrecise(d, rng);
 
-        FloatInterval r = DifferenceOfProducts(a, b, c, d);
+        Interval r = DifferenceOfProducts(a, b, c, d);
         double pr = DifferenceOfProducts(pa, pb, pc, pd);
 
         EXPECT_GE(pr, r.LowerBound()) << trial;
@@ -874,10 +825,10 @@ TEST(FloatInterval, SumOfProducts) {
         RNG rng(trial);
 
         // Make sure signs are mixed
-        FloatInterval a = Abs(getFloat(rng));
-        FloatInterval b = Abs(getFloat(rng));
-        FloatInterval c = Abs(getFloat(rng));
-        FloatInterval d = -Abs(getFloat(rng));
+        Interval a = Abs(getFloat(rng));
+        Interval b = Abs(getFloat(rng));
+        Interval c = Abs(getFloat(rng));
+        Interval d = -Abs(getFloat(rng));
 
         Float sign = rng.Uniform<Float>() < -0.5 ? -1 : 1;
         b *= sign;
@@ -888,7 +839,7 @@ TEST(FloatInterval, SumOfProducts) {
         double pc = getPrecise(c, rng);
         double pd = getPrecise(d, rng);
 
-        FloatInterval r = SumOfProducts(a, b, c, d);
+        Interval r = SumOfProducts(a, b, c, d);
         double pr = SumOfProducts(pa, pb, pc, pd);
 
         EXPECT_GE(pr, r.LowerBound()) << trial;
