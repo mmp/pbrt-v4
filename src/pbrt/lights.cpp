@@ -1430,26 +1430,23 @@ LightHandle LightHandle::Create(const std::string &name,
                 // units
                 float illuminance = 0;
                 const Image &image = imageAndMetadata.image;
-                int ye = image.Resolution().y / 2;
-                int ys = 0;
-                int xs = 0;
-                int xe = image.Resolution().x;
                 RGB lum = imageAndMetadata.metadata.GetColorSpace()->LuminanceVector();
-                for (int y = ys; y < ye; ++y) {
+                for (int y = 0; y < image.Resolution().y; ++y) {
                     float v = (float(y) + 0.5f) / float(image.Resolution().y);
-                    float theta = (v - 0.5f) * Pi;
-                    float cosTheta = std::cos(theta);
-                    float sinTheta = std::sin(theta);
-                    for (int x = xs; x < xe; ++x) {
+                    for (int x = 0; x < image.Resolution().x; ++x) {
+                        Float u = (x + 0.5f) / image.Resolution().x;
+                        Vector3f w = EqualAreaSquareToSphere(Point2f(u, v));
+                        // We could be more clever and see if we're in the inner rotated
+                        // square, but not a big deal...
+                        if (w.z <= 0)
+                            continue;
+
                         ImageChannelValues values = image.GetChannels({x, y});
-                        for (int c = 0; c < 3; ++c) {
-                            illuminance += values[c] * lum[c] * std::abs(cosTheta) *
-                                           std::abs(sinTheta);
-                        }
+                        for (int c = 0; c < 3; ++c)
+                            illuminance += values[c] * lum[c] * CosTheta(w);
                     }
                 }
-                illuminance /= float(ye - ys) * float(xe - xs);
-                illuminance *= Pi * Pi;
+                illuminance *= 2 * Pi / (image.Resolution().x * image.Resolution().y);
 
                 // scaling factor is just the ratio of the target
                 // illuminance and the illuminance of the map multiplied by
