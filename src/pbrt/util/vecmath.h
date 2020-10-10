@@ -540,10 +540,10 @@ class Vector3fi : public Vector3<Interval> {
     PBRT_CPU_GPU Vector3fi(const Vector3<Interval> &pfi) : Vector3<Interval>(pfi) {}
 
     PBRT_CPU_GPU
-    Vector3fi(const Vector3f &p, const Vector3f &e)
-        : Vector3<Interval>(Interval::FromValueAndError(p.x, e.x),
-                            Interval::FromValueAndError(p.y, e.y),
-                            Interval::FromValueAndError(p.z, e.z)) {}
+    Vector3fi(const Vector3f &v, const Vector3f &e)
+        : Vector3<Interval>(Interval::FromValueAndError(v.x, e.x),
+                            Interval::FromValueAndError(v.y, e.y),
+                            Interval::FromValueAndError(v.z, e.z)) {}
 
     PBRT_CPU_GPU
     Vector3f Error() const { return {x.Width() / 2, y.Width() / 2, z.Width() / 2}; }

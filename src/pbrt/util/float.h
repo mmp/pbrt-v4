@@ -177,6 +177,132 @@ inline constexpr Float gamma(int n) {
     return (n * MachineEpsilon) / (1 - n * MachineEpsilon);
 }
 
+inline PBRT_CPU_GPU Float AddRoundUp(Float a, Float b) {
+#ifdef PBRT_IS_GPU_CODE
+#ifdef PBRT_FLOAT_IS_DOUBLE
+    return __dadd_ru(a, b);
+#else
+    return __fadd_ru(a, b);
+#endif
+#else  // GPU
+    return NextFloatUp(a + b);
+#endif
+}
+inline PBRT_CPU_GPU Float AddRoundDown(Float a, Float b) {
+#ifdef PBRT_IS_GPU_CODE
+#ifdef PBRT_FLOAT_IS_DOUBLE
+    return __dadd_rd(a, b);
+#else
+    return __fadd_rd(a, b);
+#endif
+#else  // GPU
+    return NextFloatDown(a + b);
+#endif
+}
+
+inline PBRT_CPU_GPU Float SubRoundUp(Float a, Float b) {
+    return AddRoundUp(a, -b);
+}
+inline PBRT_CPU_GPU Float SubRoundDown(Float a, Float b) {
+    return AddRoundDown(a, -b);
+}
+
+inline PBRT_CPU_GPU Float MulRoundUp(Float a, Float b) {
+#ifdef PBRT_IS_GPU_CODE
+#ifdef PBRT_FLOAT_IS_DOUBLE
+    return __dmul_ru(a, b);
+#else
+    return __fmul_ru(a, b);
+#endif
+#else  // GPU
+    return NextFloatUp(a * b);
+#endif
+}
+
+inline PBRT_CPU_GPU Float MulRoundDown(Float a, Float b) {
+#ifdef PBRT_IS_GPU_CODE
+#ifdef PBRT_FLOAT_IS_DOUBLE
+    return __dmul_rd(a, b);
+#else
+    return __fmul_rd(a, b);
+#endif
+#else  // GPU
+    return NextFloatDown(a * b);
+#endif
+}
+
+inline PBRT_CPU_GPU Float DivRoundUp(Float a, Float b) {
+#ifdef PBRT_IS_GPU_CODE
+#ifdef PBRT_FLOAT_IS_DOUBLE
+    return __ddiv_ru(a, b);
+#else
+    return __fdiv_ru(a, b);
+#endif
+#else  // GPU
+    return NextFloatUp(a / b);
+#endif
+}
+
+inline PBRT_CPU_GPU Float DivRoundDown(Float a, Float b) {
+#ifdef PBRT_IS_GPU_CODE
+#ifdef PBRT_FLOAT_IS_DOUBLE
+    return __ddiv_rd(a, b);
+#else
+    return __fdiv_rd(a, b);
+#endif
+#else  // GPU
+    return NextFloatDown(a / b);
+#endif
+}
+
+inline PBRT_CPU_GPU Float SqrtRoundUp(Float a) {
+#ifdef PBRT_IS_GPU_CODE
+#ifdef PBRT_FLOAT_IS_DOUBLE
+    return __dsqrt_ru(a);
+#else
+    return __fsqrt_ru(a);
+#endif
+#else  // GPU
+    return NextFloatUp(std::sqrt(a));
+#endif
+}
+
+inline PBRT_CPU_GPU Float SqrtRoundDown(Float a) {
+#ifdef PBRT_IS_GPU_CODE
+#ifdef PBRT_FLOAT_IS_DOUBLE
+    return __dsqrt_rd(a);
+#else
+    return __fsqrt_rd(a);
+#endif
+#else  // GPU
+    return std::max<Float>(0, NextFloatDown(std::sqrt(a)));
+#endif
+}
+
+inline PBRT_CPU_GPU Float FMARoundUp(Float a, Float b, Float c) {
+#ifdef PBRT_IS_GPU_CODE
+#ifdef PBRT_FLOAT_IS_DOUBLE
+    return __fma_ru(a, b, c);  // FIXME: what to do here?
+#else
+    return __fma_ru(a, b, c);
+#endif
+#else  // GPU
+    return NextFloatUp(FMA(a, b, c));
+#endif
+}
+
+inline PBRT_CPU_GPU Float FMARoundDown(Float a, Float b, Float c) {
+#ifdef PBRT_IS_GPU_CODE
+#ifdef PBRT_FLOAT_IS_DOUBLE
+    return __fma_rd(a, b, c);  // FIXME: what to do here?
+#else
+    return __fma_rd(a, b, c);
+#endif
+#else  // GPU
+    return NextFloatDown(FMA(a, b, c));
+#endif
+}
+
 PBRT_CPU_GPU
 inline double NextFloatUp(double v) {
     if (IsInf(v) && v > 0.)
