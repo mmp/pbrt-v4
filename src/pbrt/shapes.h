@@ -1324,7 +1324,7 @@ PBRT_CPU_GPU inline pstd::optional<BilinearIntersection> IntersectBilinearPatch(
 class BilinearPatch {
   public:
     // BilinearPatch Public Methods
-    BilinearPatch(int meshIndex, int blpIndex);
+    BilinearPatch(const BilinearPatchMesh *mesh, int meshIndex, int blpIndex);
 
     static void Init(Allocator alloc);
 

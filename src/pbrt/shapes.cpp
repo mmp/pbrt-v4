@@ -992,7 +992,7 @@ pstd::vector<ShapeHandle> BilinearPatch::CreatePatches(const BilinearPatchMesh *
     pstd::vector<ShapeHandle> blps(mesh->nPatches, alloc);
     BilinearPatch *patches = alloc.allocate_object<BilinearPatch>(mesh->nPatches);
     for (int i = 0; i < mesh->nPatches; ++i) {
-        alloc.construct(&patches[i], meshIndex, i);
+        alloc.construct(&patches[i], mesh, meshIndex, i);
         blps[i] = &patches[i];
     }
 
@@ -1016,16 +1016,13 @@ void BilinearPatch::Init(Allocator alloc) {
 STAT_MEMORY_COUNTER("Memory/Bilinear patches", blpBytes);
 
 // BilinearPatch Method Definitions
-BilinearPatch::BilinearPatch(int meshIndex, int blpIndex)
+BilinearPatch::BilinearPatch(const BilinearPatchMesh *mesh, int meshIndex, int blpIndex)
     : meshIndex(meshIndex), blpIndex(blpIndex) {
     blpBytes += sizeof(*this);
     // Store area of bilinear patch in _area_
-    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
-    const BilinearPatchMesh *mesh = GetMesh();
     const int *v = &mesh->vertexIndices[4 * blpIndex];
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
-
     if (IsRectangle())
         area = Distance(p00, p01) * Distance(p00, p10);
     else {
