@@ -253,11 +253,16 @@ template <typename Float, typename C>
 PBRT_CPU_GPU inline constexpr Float EvaluatePolynomial(Float t, C c) {
     return c;
 }
+
 template <typename Float, typename C, typename... Args>
 PBRT_CPU_GPU inline constexpr Float EvaluatePolynomial(Float t, C c, Args... cRemaining) {
-    using FMAT = typename std::common_type<Float, C>::type;
-    return FMA(FMAT(t), FMAT(EvaluatePolynomial(t, cRemaining...)), FMAT(c));
+    return FMA(t, EvaluatePolynomial(t, cRemaining...), c);
 }
+
+PBRT_CPU_GPU
+inline Float ApproxSin(Float x);
+PBRT_CPU_GPU
+inline Float ApproxCos(Float x);
 
 PBRT_CPU_GPU
 inline Float ApproxSin(Float x) {
@@ -397,10 +402,9 @@ inline int Log2Int(int64_t v) {
     return Log2Int((uint64_t)v);
 }
 
-// log4(x) = log2(x) / log2(4) = 1/2 log2(x) = log2(x) >> 1
 template <typename T>
 PBRT_CPU_GPU inline int Log4Int(T v) {
-    return Log2Int(v) >> 1;
+    return Log2Int(v) / 2;
 }
 
 // https://stackoverflow.com/a/10792321
@@ -409,55 +413,37 @@ inline float FastExp(float x) {
 #ifdef PBRT_IS_GPU_CODE
     return __expf(x);
 #else
-    /* exp(x) = 2^i * 2^f; i = floor (log2(e) * x), 0 <= f <= 1 */
-    float t = x * 1.442695041f;
-    float fi = std::floor(t);
-    float f = t - fi;
-    int i = (int)fi;
+    // Compute $x'$ such that $\roman{e}^x = 2^{x'}$
+    float xp = x * 1.442695041f;
 
-    // TODO: figure out what these should be.
-    if (i < -30)
-        return 0;
-    if (i > 30)
-        return Infinity;
+    // Find integer and fractional components of $x'$
+    float fxp = std::floor(xp), f = xp - fxp;
+    int i = (int)fxp;
 
-    // built-in exp on OSX is about 69ms, so 1.55x speedup.
-    // approximations to 2^f over [0,1]...
-
-    // quadratic:
-    // quadratic, from stack exchange: max error: 0.001725, 40.3ms
-    // float twoToF = EvaluatePolynomial(f, 1.00172476f, 0.657636276f,
-    // 0.3371894346f);
-
-    // mathematica quadratic polynomial via Fit: max error: 0.003699, 40.3ms
-    // float twoToF = EvaluatePolynomial(f, 1.00375f, 0.649445f, 0.342662f);
-
-    // mathematica quadratic polynomial via FindFit, Linfinity norm
-    // max error: 0.002431, 40.5ms
-    // float twoToF = EvaluatePolynomial(f, 1.00248f, 0.651047f, 0.344001f);
-
-    // cubic polynomial via Fit: max error: 0.000183, 44.5ms
+    // Evaluate polynomial approximation of $2^f$
     float twoToF = EvaluatePolynomial(f, 0.999813f, 0.696834f, 0.224131f, 0.0790209f);
 
-    // mathematcia rational polynomial via FindFit: max err 0.00059, 47.291ms
-    // float twoToF = EvaluatePolynomial(f, 0.263371f, 0.128038f, 0.0268998f) /
-    //(0.263355f - 0.0542072f * f);
-
-    // scale by 2^i, including the case of i being negative....
+    // Scale $2^f$ by $2^i$ and return final result
+    int exponent = Exponent(twoToF) + i;
+    if (exponent < -126)
+        return 0;
+    if (exponent > 127)
+        return Infinity;
     uint32_t bits = FloatToBits(twoToF);
-    bits += (i << 23);
+    bits &= 0b10000000011111111111111111111111u;
+    bits |= (exponent + 127) << 23;
     return BitsToFloat(bits);
+
 #endif
 }
 
-PBRT_CPU_GPU
-inline Float Gaussian(Float x, Float mu = 0, Float sigma = 1) {
+PBRT_CPU_GPU inline Float Gaussian(Float x, Float mu = 0, Float sigma = 1) {
     return 1 / std::sqrt(2 * Pi * sigma * sigma) *
            FastExp(-Sqr(x - mu) / (2 * sigma * sigma));
 }
 
-PBRT_CPU_GPU
-inline Float GaussianIntegral(Float x0, Float x1, Float mu = 0, Float sigma = 1) {
+PBRT_CPU_GPU inline Float GaussianIntegral(Float x0, Float x1, Float mu = 0,
+                                           Float sigma = 1) {
     DCHECK_GT(sigma, 0);
     Float sigmaRoot2 = sigma * Float(1.414213562373095);
     return 0.5f * (std::erf((mu - x0) / sigmaRoot2) - std::erf((mu - x1) / sigmaRoot2));
@@ -487,38 +473,18 @@ inline Float I0(Float x);
 PBRT_CPU_GPU
 inline Float LogI0(Float x);
 
-/**
- * \brief Find an interval in an ordered set
- *
- * This function is very similar to \c std::upper_bound, but it uses a functor
- * rather than an actual array to permit working with procedurally defined
- * data. It returns the index \c i such that pred(i) is \c true and pred(i+1)
- * is \c false. See below for special cases.
- *
- * This function is primarily used to locate an interval (i, i+1) for linear
- * interpolation, hence its name. To avoid issues out of bounds accesses, and
- * to deal with predicates that evaluate to \c true or \c false on the entire
- * domain, the returned left interval index is clamped to the range <tt>[left,
- * right-2]</tt>.
- * In particular:
- * If there is no index such that pred(i) is true, we return (left).
- * If there is no index such that pred(i+1) is false, we return (right-2).
- */
 template <typename Predicate>
-PBRT_CPU_GPU inline size_t FindInterval(size_t size_, const Predicate &pred) {
-    using ssize_t = std::make_signed_t<size_t>;  // Not all platforms have ssize_t
-    ssize_t size = (ssize_t)size_ - 2, first = 1;
-
+PBRT_CPU_GPU inline size_t FindInterval(size_t sz, const Predicate &pred) {
+    using ssize_t = std::make_signed_t<size_t>;
+    ssize_t size = (ssize_t)sz - 2, first = 1;
     while (size > 0) {
+        // Evaluate predicate at midpoint and update _first_ and _size_
         size_t half = (size_t)size >> 1, middle = first + half;
-
-        // .. and recurse into the left or right side
         bool predResult = pred(middle);
         first = predResult ? middle + 1 : first;
         size = predResult ? size - (half + 1) : half;
     }
-
-    return (size_t)Clamp((ssize_t)first - 1, 0, size_ - 2);
+    return (size_t)Clamp((ssize_t)first - 1, 0, sz - 2);
 }
 
 template <typename T>
@@ -531,8 +497,7 @@ PBRT_CPU_GPU inline bool IsPowerOf4(T v) {
     return v == 1 << (2 * Log4Int(v));
 }
 
-PBRT_CPU_GPU
-inline constexpr int32_t RoundUpPow2(int32_t v) {
+PBRT_CPU_GPU inline constexpr int32_t RoundUpPow2(int32_t v) {
     v--;
     v |= v >> 1;
     v |= v >> 2;
