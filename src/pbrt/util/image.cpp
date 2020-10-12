@@ -92,7 +92,7 @@ const RGBColorSpace *ImageMetadata::GetColorSpace() const {
 }
 
 template <typename F>
-void ForExtent(const Bounds2i &extent, WrapMode2D wrapMode, Image &image, F op) {
+void ForExtent(const Bounds2i &extent, WrapMode2D wrapMode, const Image &image, F op) {
     CHECK_LT(extent.pMin.x, extent.pMax.x);
     CHECK_LT(extent.pMin.y, extent.pMax.y);
 
@@ -128,7 +128,7 @@ pstd::vector<Image> Image::GeneratePyramid(Image image, WrapMode2D wrapMode,
     ColorEncodingHandle origEncoding = image.encoding;
     // Prepare _image_ for building pyramid
     if (!IsPowerOf2(image.resolution[0]) || !IsPowerOf2(image.resolution[1]))
-        image = image.FloatResize(
+        image = image.FloatResizeUp(
             {RoundUpPow2(image.resolution[0]), RoundUpPow2(image.resolution[1])},
             wrapMode);
     else if (!Is32Bit(image.format))
@@ -190,6 +190,160 @@ pstd::vector<Image> Image::GeneratePyramid(Image image, WrapMode2D wrapMode,
     pyramid[nLevels - 1].CopyRectIn({{0, 0}, {1, 1}},
                                     {image.p32.data(), size_t(nChannels)});
     return pyramid;
+}
+
+Image Image::GaussianFilter(const ImageChannelDesc &desc, int halfWidth,
+                            Float sigma) const {
+    // Compute filter weights
+    std::vector<Float> wts(2 * halfWidth + 1, Float(0));
+    for (int d = 0; d < 2 * halfWidth + 1; ++d)
+        wts[d] = Gaussian(d - halfWidth, 0, sigma);
+
+    // Normalize weights
+    Float wtSum = std::accumulate(wts.begin(), wts.end(), Float(0));
+    for (Float &w : wts)
+        w /= wtSum;
+
+    // Separable blur; first blur in x into blurx, selecting out the
+    // desired channels along the way.
+    Image blurx(PixelFormat::Float, resolution, ChannelNames(desc));
+    int nc = desc.size();
+    ParallelFor(0, resolution.y, [&](int64_t y0, int64_t y1) {
+        for (int y = y0; y < y1; ++y) {
+            for (int x = 0; x < resolution.x; ++x) {
+                ImageChannelValues result(desc.size());
+                for (int r = -halfWidth; r <= halfWidth; ++r) {
+                    ImageChannelValues cv = GetChannels({x + r, y}, desc);
+                    for (int c = 0; c < nc; ++c)
+                        result[c] += wts[r + halfWidth] * cv[c];
+                }
+                blurx.SetChannels({x, y}, result);
+            }
+        }
+    });
+
+    // Now blur in y from blur x to the result; blurx has just the
+    // channels we want already.
+    Image blury(PixelFormat::Float, resolution, ChannelNames(desc));
+    ParallelFor(0, resolution.y, [&](int64_t y0, int64_t y1) {
+        for (int y = y0; y < y1; ++y) {
+            for (int x = 0; x < resolution.x; ++x) {
+                ImageChannelValues result(desc.size());
+                for (int r = -halfWidth; r <= halfWidth; ++r) {
+                    ImageChannelValues cv = blurx.GetChannels({x, y + r});
+                    for (int c = 0; c < nc; ++c)
+                        result[c] += wts[r + halfWidth] * cv[c];
+                }
+                blury.SetChannels({x, y}, result);
+            }
+        }
+    });
+    return blury;
+}
+
+std::vector<ResampleWeight> Image::ResampleWeights(int oldRes, int newRes) {
+    CHECK_GE(newRes, oldRes);
+    std::vector<ResampleWeight> wt(newRes);
+    Float filterRadius = 2, tau = 2;
+    for (int i = 0; i < newRes; ++i) {
+        // Compute image resampling weights for _i_th pixel
+        Float center = (i + .5f) * oldRes / newRes;
+        wt[i].firstPixel = std::floor((center - filterRadius) + 0.5f);
+        for (int j = 0; j < 4; ++j) {
+            Float pos = wt[i].firstPixel + j + .5f;
+            wt[i].weight[j] = WindowedSinc(pos - center, filterRadius, tau);
+        }
+
+        // Normalize filter weights for pixel resampling
+        Float invSumWts =
+            1 / (wt[i].weight[0] + wt[i].weight[1] + wt[i].weight[2] + wt[i].weight[3]);
+        for (int j = 0; j < 4; ++j)
+            wt[i].weight[j] *= invSumWts;
+    }
+    return wt;
+}
+
+Image Image::FloatResizeUp(Point2i newRes, WrapMode2D wrapMode) const {
+    CHECK_GE(newRes.x, resolution.x);
+    CHECK_GE(newRes.y, resolution.y);
+    Image resampledImage(PixelFormat::Float, newRes, channelNames);
+    // Compute $x$ and $y$ resampling weights for image resizing
+    std::vector<ResampleWeight> xWeights, yWeights;
+    xWeights = ResampleWeights(resolution[0], newRes[0]);
+    yWeights = ResampleWeights(resolution[1], newRes[1]);
+
+    // Resize image in parallel, working by tiles
+    ParallelFor2D(Bounds2i({0, 0}, newRes), [&](Bounds2i outExtent) {
+        // Determine extent in source image and copy pixel values to _inBuf_
+        Bounds2i inExtent(Point2i(xWeights[outExtent.pMin.x].firstPixel,
+                                  yWeights[outExtent.pMin.y].firstPixel),
+                          Point2i(xWeights[outExtent.pMax.x - 1].firstPixel + 4,
+                                  yWeights[outExtent.pMax.y - 1].firstPixel + 4));
+        std::vector<float> inBuf(NChannels() * inExtent.Area());
+        CopyRectOut(inExtent, pstd::span<float>(inBuf), wrapMode);
+
+        // Resize image in the $x$ dimension
+        // Compute image extents and allocate _xBuf_
+        int nxOut = outExtent.pMax.x - outExtent.pMin.x;
+        int nyOut = outExtent.pMax.y - outExtent.pMin.y;
+        int nxIn = inExtent.pMax.x - inExtent.pMin.x;
+        int nyIn = inExtent.pMax.y - inExtent.pMin.y;
+        std::vector<float> xBuf(NChannels() * nyIn * nxOut);
+
+        int xBufOffset = 0;
+        for (int yOut = inExtent.pMin.y; yOut < inExtent.pMax.y; ++yOut) {
+            for (int xOut = outExtent.pMin.x; xOut < outExtent.pMax.x; ++xOut) {
+                // Resample image pixel _(xOut, yOut)_
+                DCHECK(xOut >= 0 && xOut < xWeights.size());
+                const ResampleWeight &rsw = xWeights[xOut];
+                // Compute _inOffset_ into _inBuf_ for _(xOut, yOut)_
+                // w.r.t. inBuf
+                int xIn = rsw.firstPixel - inExtent.pMin.x;
+                DCHECK_GE(xIn, 0);
+                DCHECK_LT(xIn + 3, nxIn);
+                int yIn = yOut - inExtent.pMin.y;
+                int inOffset = NChannels() * (xIn + yIn * nxIn);
+                DCHECK_GE(inOffset, 0);
+                DCHECK_LT(inOffset + 3 * NChannels(), inBuf.size());
+
+                for (int c = 0; c < NChannels(); ++c, ++xBufOffset, ++inOffset)
+                    xBuf[xBufOffset] = rsw.weight[0] * inBuf[inOffset] +
+                                       rsw.weight[1] * inBuf[inOffset + NChannels()] +
+                                       rsw.weight[2] * inBuf[inOffset + 2 * NChannels()] +
+                                       rsw.weight[3] * inBuf[inOffset + 3 * NChannels()];
+            }
+        }
+
+        // Resize image in the $y$ dimension
+        std::vector<float> outBuf(NChannels() * nxOut * nyOut);
+        for (int x = 0; x < nxOut; ++x) {
+            for (int y = 0; y < nyOut; ++y) {
+                int yOut = y + outExtent[0][1];
+                DCHECK(yOut >= 0 && yOut < yWeights.size());
+                const ResampleWeight &rsw = yWeights[yOut];
+
+                DCHECK_GE(rsw.firstPixel - inExtent[0][1], 0);
+                int xBufOffset =
+                    NChannels() * (x + nxOut * (rsw.firstPixel - inExtent[0][1]));
+                DCHECK_GE(xBufOffset, 0);
+                int step = NChannels() * nxOut;
+                DCHECK_LT(xBufOffset + 3 * step, xBuf.size());
+
+                int outOffset = NChannels() * (x + y * nxOut);
+                for (int c = 0; c < NChannels(); ++c, ++outOffset, ++xBufOffset)
+                    outBuf[outOffset] =
+                        std::max<Float>(0, (rsw.weight[0] * xBuf[xBufOffset] +
+                                            rsw.weight[1] * xBuf[xBufOffset + step] +
+                                            rsw.weight[2] * xBuf[xBufOffset + 2 * step] +
+                                            rsw.weight[3] * xBuf[xBufOffset + 3 * step]));
+            }
+        }
+
+        // Copy resampled image pixels out into _resampledImage_
+        resampledImage.CopyRectIn(outExtent, outBuf);
+    });
+
+    return resampledImage;
 }
 
 Image::Image(PixelFormat format, Point2i resolution,
@@ -266,177 +420,6 @@ void Image::SetChannels(Point2i p, const ImageChannelDesc &desc,
     CHECK_LE(values.size(), NChannels());
     for (size_t i = 0; i < values.size(); ++i)
         SetChannel(p, desc.offset[i], values[i]);
-}
-
-Image Image::GaussianFilter(const ImageChannelDesc &desc, int halfWidth,
-                            Float sigma) const {
-    // Compute filter weights
-    std::vector<Float> wts(2 * halfWidth + 1, Float(0));
-    for (int d = 0; d < 2 * halfWidth + 1; ++d)
-        wts[d] = Gaussian(d - halfWidth, 0, sigma);
-
-    // Normalize weights
-    Float wtSum = std::accumulate(wts.begin(), wts.end(), Float(0));
-    for (Float &w : wts)
-        w /= wtSum;
-
-    // Separable blur; first blur in x into blurx, selecting out the
-    // desired channels along the way.
-    Image blurx(PixelFormat::Float, resolution, ChannelNames(desc));
-    int nc = desc.size();
-    ParallelFor(0, resolution.y, [&](int64_t y0, int64_t y1) {
-        for (int y = y0; y < y1; ++y) {
-            for (int x = 0; x < resolution.x; ++x) {
-                ImageChannelValues result(desc.size());
-                for (int r = -halfWidth; r <= halfWidth; ++r) {
-                    ImageChannelValues cv = GetChannels({x + r, y}, desc);
-                    for (int c = 0; c < nc; ++c)
-                        result[c] += wts[r + halfWidth] * cv[c];
-                }
-                blurx.SetChannels({x, y}, result);
-            }
-        }
-    });
-
-    // Now blur in y from blur x to the result; blurx has just the
-    // channels we want already.
-    Image blury(PixelFormat::Float, resolution, ChannelNames(desc));
-    ParallelFor(0, resolution.y, [&](int64_t y0, int64_t y1) {
-        for (int y = y0; y < y1; ++y) {
-            for (int x = 0; x < resolution.x; ++x) {
-                ImageChannelValues result(desc.size());
-                for (int r = -halfWidth; r <= halfWidth; ++r) {
-                    ImageChannelValues cv = blurx.GetChannels({x, y + r});
-                    for (int c = 0; c < nc; ++c)
-                        result[c] += wts[r + halfWidth] * cv[c];
-                }
-                blury.SetChannels({x, y}, result);
-            }
-        }
-    });
-    return blury;
-}
-
-std::vector<ResampleWeight> Image::resampleWeights(int oldRes, int newRes) {
-    CHECK_GE(newRes, oldRes);
-    std::vector<ResampleWeight> wt(newRes);
-    Float filterwidth = 2.f;
-    for (int i = 0; i < newRes; ++i) {
-        // Compute image resampling weights for _i_th texel
-        Float center = (i + .5f) * oldRes / newRes;
-        wt[i].firstTexel = std::floor((center - filterwidth) + 0.5f);
-        for (int j = 0; j < 4; ++j) {
-            Float pos = wt[i].firstTexel + j + .5f;
-            wt[i].weight[j] = WindowedSinc(pos - center, filterwidth, 2.f);
-        }
-
-        // Normalize filter weights for texel resampling
-        Float invSumWts =
-            1 / (wt[i].weight[0] + wt[i].weight[1] + wt[i].weight[2] + wt[i].weight[3]);
-        for (int j = 0; j < 4; ++j)
-            wt[i].weight[j] *= invSumWts;
-    }
-    return wt;
-}
-
-Image Image::FloatResize(Point2i newResolution, WrapMode2D wrapMode) const {
-    CHECK_GE(newResolution.x, resolution.x);
-    CHECK_GE(newResolution.y, resolution.y);
-
-    std::vector<ResampleWeight> xWeights =
-        resampleWeights(resolution[0], newResolution[0]);
-    std::vector<ResampleWeight> yWeights =
-        resampleWeights(resolution[1], newResolution[1]);
-    Image resampledImage(PixelFormat::Float, newResolution, channelNames);
-
-    // Note: these aren't freed until the corresponding worker thread
-    // exits, but that's probably ok...
-    thread_local std::vector<float> inBuf, xBuf, outBuf;
-
-    ParallelFor2D(Bounds2i({0, 0}, newResolution), [&](Bounds2i outExtent) {
-        Bounds2i inExtent(
-            {xWeights[outExtent[0][0]].firstTexel, yWeights[outExtent[0][1]].firstTexel},
-            {xWeights[outExtent[1][0] - 1].firstTexel + 4,
-             yWeights[outExtent[1][1] - 1].firstTexel + 4});
-
-        if (inBuf.size() < NChannels() * inExtent.Area())
-            inBuf.resize(NChannels() * inExtent.Area());
-
-        // Copy the tile of the input image into inBuf. (The
-        // main motivation for this copy is to convert it
-        // into floats all at once, rather than repeatedly
-        // and pixel-by-pixel during the first resampling
-        // step.)
-        // FIXME CAST
-        ((Image *)this)->CopyRectOut(inExtent, pstd::MakeSpan(inBuf), wrapMode);
-
-        // Zoom in x. We need to do this across all scanlines
-        // in inExtent's y dimension so we have the border
-        // pixels available for the zoom in y.
-        int nxOut = outExtent[1][0] - outExtent[0][0];
-        int nyOut = outExtent[1][1] - outExtent[0][1];
-        int nxIn = inExtent[1][0] - inExtent[0][0];
-        int nyIn = inExtent[1][1] - inExtent[0][1];
-
-        if (xBuf.size() < NChannels() * nyIn * nxOut)
-            xBuf.resize(NChannels() * nyIn * nxOut);
-
-        int xBufOffset = 0;
-        for (int y = 0; y < nyIn; ++y) {
-            for (int x = 0; x < nxOut; ++x) {
-                int xOut = x + outExtent[0][0];
-                DCHECK(xOut >= 0 && xOut < xWeights.size());
-                const ResampleWeight &rsw = xWeights[xOut];
-
-                // w.r.t. inBuf
-                int xIn = rsw.firstTexel - inExtent[0][0];
-                DCHECK_GE(xIn, 0);
-                DCHECK_LT(xIn + 3, nxIn);
-
-                int inOffset = NChannels() * (xIn + y * nxIn);
-                DCHECK_GE(inOffset, 0);
-                DCHECK_LT(inOffset + 3 * NChannels(), inBuf.size());
-                for (int c = 0; c < NChannels(); ++c, ++xBufOffset, ++inOffset) {
-                    xBuf[xBufOffset] =
-                        (rsw.weight[0] * inBuf[inOffset] +
-                         rsw.weight[1] * inBuf[inOffset + NChannels()] +
-                         rsw.weight[2] * inBuf[inOffset + 2 * NChannels()] +
-                         rsw.weight[3] * inBuf[inOffset + 3 * NChannels()]);
-                }
-            }
-        }
-
-        if (outBuf.size() < NChannels() * nxOut * nyOut)
-            outBuf.resize(NChannels() * nxOut * nyOut);
-
-        // Zoom in y from xBuf to outBuf
-        for (int x = 0; x < nxOut; ++x) {
-            for (int y = 0; y < nyOut; ++y) {
-                int yOut = y + outExtent[0][1];
-                DCHECK(yOut >= 0 && yOut < yWeights.size());
-                const ResampleWeight &rsw = yWeights[yOut];
-
-                DCHECK_GE(rsw.firstTexel - inExtent[0][1], 0);
-                int xBufOffset =
-                    NChannels() * (x + nxOut * (rsw.firstTexel - inExtent[0][1]));
-                DCHECK_GE(xBufOffset, 0);
-                int step = NChannels() * nxOut;
-                DCHECK_LT(xBufOffset + 3 * step, xBuf.size());
-
-                int outOffset = NChannels() * (x + y * nxOut);
-                for (int c = 0; c < NChannels(); ++c, ++outOffset, ++xBufOffset)
-                    outBuf[outOffset] =
-                        std::max<Float>(0, (rsw.weight[0] * xBuf[xBufOffset] +
-                                            rsw.weight[1] * xBuf[xBufOffset + step] +
-                                            rsw.weight[2] * xBuf[xBufOffset + 2 * step] +
-                                            rsw.weight[3] * xBuf[xBufOffset + 3 * step]));
-            }
-        }
-        // Copy out...
-        resampledImage.CopyRectIn(outExtent, outBuf);
-    });
-
-    return resampledImage;
 }
 
 Image::Image(pstd::vector<uint8_t> p8c, Point2i resolution,
@@ -521,8 +504,8 @@ std::vector<std::string> Image::ChannelNames(const ImageChannelDesc &desc) const
     return names;
 }
 
-ImageChannelValues Image::L1Error(const ImageChannelDesc &desc, const Image &ref,
-                                  Image *errorImage) const {
+ImageChannelValues Image::MAE(const ImageChannelDesc &desc, const Image &ref,
+                              Image *errorImage) const {
     std::vector<double> sumError(desc.size(), 0.);
 
     ImageChannelDesc refDesc = ref.GetChannelDesc(ChannelNames(desc));
@@ -636,7 +619,7 @@ ImageChannelValues Image::Average(const ImageChannelDesc &desc) const {
 }
 
 void Image::CopyRectOut(const Bounds2i &extent, pstd::span<float> buf,
-                        WrapMode2D wrapMode) {
+                        WrapMode2D wrapMode) const {
     CHECK_GE(buf.size(), extent.Area() * NChannels());
 
     auto bufIter = buf.begin();
@@ -921,7 +904,7 @@ ImageAndMetadata Image::Read(const std::string &name, Allocator alloc,
     }
 }
 
-bool Image::Write(const std::string &name, const ImageMetadata &metadata) const {
+bool Image::Write(std::string name, const ImageMetadata &metadata) const {
     if (metadata.pixelBounds)
         CHECK_EQ(metadata.pixelBounds->Area(), resolution.x * resolution.y);
 

@@ -197,8 +197,7 @@ inline Float Degrees(Float rad) {
     return (180 / Pi) * rad;
 }
 
-PBRT_CPU_GPU
-inline float SafeSqrt(float x) {
+PBRT_CPU_GPU inline float SafeSqrt(float x) {
     DCHECK_GE(x, -1e-3f);  // not too negative
     return std::sqrt(std::max(0.f, x));
 }
@@ -218,7 +217,8 @@ PBRT_CPU_GPU inline constexpr T Sqr(T v) {
 // https://stackoverflow.com/questions/5101516/why-function-template-cannot-be-partially-specialized
 template <int n>
 PBRT_CPU_GPU inline constexpr float Pow(float v) {
-    static_assert(n > 0, "Power can't be negative");
+    if constexpr (n < 0)
+        return 1 / Pow<-n>(v);
     float n2 = Pow<n / 2>(v);
     return n2 * n2 * Pow<n & 1>(v);
 }
@@ -227,7 +227,6 @@ template <>
 PBRT_CPU_GPU inline constexpr float Pow<1>(float v) {
     return v;
 }
-
 template <>
 PBRT_CPU_GPU inline constexpr float Pow<0>(float v) {
     return 1;
@@ -254,7 +253,6 @@ template <typename Float, typename C>
 PBRT_CPU_GPU inline constexpr Float EvaluatePolynomial(Float t, C c) {
     return c;
 }
-
 template <typename Float, typename C, typename... Args>
 PBRT_CPU_GPU inline constexpr Float EvaluatePolynomial(Float t, C c, Args... cRemaining) {
     using FMAT = typename std::common_type<Float, C>::type;

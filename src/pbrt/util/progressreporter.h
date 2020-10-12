@@ -46,26 +46,12 @@ class ProgressReporter {
     ProgressReporter() : quiet(true) {}
     ProgressReporter(int64_t totalWork, const std::string &title, bool quiet,
                      bool gpu = false);
+
     ~ProgressReporter();
 
-    void Update(int64_t num = 1) {
-#ifdef PBRT_BUILD_GPU_RENDERER
-        if (gpuEvents.size() > 0) {
-            CHECK_LE(gpuEventsLaunchedOffset + num, gpuEvents.size());
-            while (num-- > 0) {
-                CHECK_EQ(cudaEventRecord(gpuEvents[gpuEventsLaunchedOffset]),
-                         cudaSuccess);
-                ++gpuEventsLaunchedOffset;
-            }
-            return;
-        }
-#endif
-        if (num == 0 || quiet)
-            return;
-        workDone += num;
-    }
-    double ElapsedSeconds() const { return timer.ElapsedSeconds(); }
+    void Update(int64_t num = 1);
     void Done();
+    double ElapsedSeconds() const;
 
     std::string ToString() const;
 
@@ -74,7 +60,7 @@ class ProgressReporter {
     void launchThread();
     void printBar();
 
-    // ProgressReporter Private Data
+    // ProgressReporter Private Members
     int64_t totalWork;
     std::string title;
     bool quiet;
@@ -89,6 +75,26 @@ class ProgressReporter {
     int gpuEventsFinishedOffset;
 #endif
 };
+// ProgressReporter Inline Method Definitions
+inline double ProgressReporter::ElapsedSeconds() const {
+    return timer.ElapsedSeconds();
+}
+
+inline void ProgressReporter::Update(int64_t num) {
+#ifdef PBRT_BUILD_GPU_RENDERER
+    if (gpuEvents.size() > 0) {
+        CHECK_LE(gpuEventsLaunchedOffset + num, gpuEvents.size());
+        while (num-- > 0) {
+            CHECK_EQ(cudaEventRecord(gpuEvents[gpuEventsLaunchedOffset]), cudaSuccess);
+            ++gpuEventsLaunchedOffset;
+        }
+        return;
+    }
+#endif
+    if (num == 0 || quiet)
+        return;
+    workDone += num;
+}
 
 }  // namespace pbrt
 

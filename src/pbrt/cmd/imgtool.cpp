@@ -119,7 +119,7 @@ static std::map<std::string, CommandUsage> commandUsage = {
     --crop <x0,x1,y0,y1> Crop images before performing diff.
     --difftol <v>      Acceptable image difference percentage before differences
                        are reported. Default: 0
-    --metric <name>    Error metric to use. (Options: "L1", "MSE", "MRSE")
+    --metric <name>    Error metric to use. (Options: "MAE", "MSE", "MRSE")
     --outfile <name>   Filename to use for saving an image that encodes the
                        absolute value of per-pixel differences.
     --reference <name> Filename for reference image
@@ -728,8 +728,8 @@ int error(int argc, char *argv[]) {
 
         Image diffImage;
         ImageChannelValues error(referenceImage.NChannels());
-        if (metric == "L1")
-            error = im.L1Error(im.AllChannelsDesc(), referenceImage, &diffImage);
+        if (metric == "MAE")
+            error = im.MAE(im.AllChannelsDesc(), referenceImage, &diffImage);
         else if (metric == "MSE")
             error = im.MSE(im.AllChannelsDesc(), referenceImage, &diffImage);
         else
@@ -908,8 +908,8 @@ int diff(int argc, char *argv[]) {
 
     Image diffImage;
     ImageChannelValues error(refImage.NChannels());
-    if (metric == "L1")
-        error = image.L1Error(image.AllChannelsDesc(), refImage, &diffImage);
+    if (metric == "MAE")
+        error = image.MAE(image.AllChannelsDesc(), refImage, &diffImage);
     else if (metric == "MSE")
         error = image.MSE(image.AllChannelsDesc(), refImage, &diffImage);
     else

@@ -394,19 +394,18 @@ class ColorEncodingHandle
     : public TaggedPointer<LinearColorEncoding, sRGBColorEncoding, GammaColorEncoding> {
   public:
     using TaggedPointer::TaggedPointer;
-    // ColorEncodingHandle Public Methods
+    // ColorEncoding Interface
     PBRT_CPU_GPU inline void ToLinear(pstd::span<const uint8_t> vin,
                                       pstd::span<Float> vout) const;
-
-    PBRT_CPU_GPU inline Float ToFloatLinear(Float v) const;
-
     PBRT_CPU_GPU inline void FromLinear(pstd::span<const Float> vin,
                                         pstd::span<uint8_t> vout) const;
 
-    std::string ToString() const;
+    PBRT_CPU_GPU inline Float ToFloatLinear(Float v) const;
 
     static const ColorEncodingHandle Linear;
     static const ColorEncodingHandle sRGB;
+
+    std::string ToString() const;
 
     static const ColorEncodingHandle Get(const std::string &name);
 };
