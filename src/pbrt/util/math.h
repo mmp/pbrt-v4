@@ -56,6 +56,7 @@ constexpr Float Sqrt2 = 1.41421356237309504880;
 template <typename Float>
 class CompensatedSum {
   public:
+    // CompensatedSum Public Methods
     CompensatedSum() = default;
     PBRT_CPU_GPU
     explicit CompensatedSum(Float v) : sum(v) {}
@@ -88,17 +89,16 @@ class CompensatedSum {
 // CompensatedFloat Definition
 struct CompensatedFloat {
   public:
+    // CompensatedFloat Public Methods
     PBRT_CPU_GPU
-    CompensatedFloat(Float v, Float err) : v(v), err(err) {}
-
+    CompensatedFloat(Float v, Float err = 0) : v(v), err(err) {}
     PBRT_CPU_GPU
     explicit operator float() const { return v + err; }
     PBRT_CPU_GPU
     explicit operator double() const { return double(v) + double(err); }
+    std::string ToString() const;
 
     Float v, err;
-
-    std::string ToString() const;
 };
 
 template <int N>
@@ -122,22 +122,6 @@ template <typename T>
 inline PBRT_CPU_GPU typename std::enable_if_t<std::is_integral<T>::value, T> FMA(T a, T b,
                                                                                  T c) {
     return a * b + c;
-}
-
-template <typename Ta, typename Tb, typename Tc, typename Td>
-PBRT_CPU_GPU inline auto DifferenceOfProducts(Ta a, Tb b, Tc c, Td d) {
-    auto cd = c * d;
-    auto differenceOfProducts = FMA(a, b, -cd);
-    auto error = FMA(-c, d, cd);
-    return differenceOfProducts + error;
-}
-
-template <typename Ta, typename Tb, typename Tc, typename Td>
-PBRT_CPU_GPU inline auto SumOfProducts(Ta a, Tb b, Tc c, Td d) {
-    auto cd = c * d;
-    auto sumOfProducts = FMA(a, b, cd);
-    auto error = FMA(c, d, -cd);
-    return sumOfProducts + error;
 }
 
 PBRT_CPU_GPU inline Float Sinc(Float x) {
@@ -524,24 +508,34 @@ PBRT_CPU_GPU inline T RoundUpPow4(T v) {
     return IsPowerOf4(v) ? v : (1 << (2 * (1 + Log4Int(v))));
 }
 
-template <typename Float>
 PBRT_CPU_GPU inline CompensatedFloat TwoProd(Float a, Float b) {
     Float ab = a * b;
     return {ab, FMA(a, b, -ab)};
 }
 
-template <typename Float>
 PBRT_CPU_GPU inline CompensatedFloat TwoSum(Float a, Float b) {
-    Float s = a + b;
-    Float ap = s - b;
-    Float bp = s - ap;
-    Float da = a - ap;
-    Float db = b - bp;
-    return {s, da + db};
+    Float s = a + b, delta = s - a;
+    return {s, (a - (s - delta)) + (b - delta)};
+}
+
+template <typename Ta, typename Tb, typename Tc, typename Td>
+PBRT_CPU_GPU inline auto DifferenceOfProducts(Ta a, Tb b, Tc c, Td d) {
+    auto cd = c * d;
+    auto differenceOfProducts = FMA(a, b, -cd);
+    auto error = FMA(-c, d, cd);
+    return differenceOfProducts + error;
+}
+
+template <typename Ta, typename Tb, typename Tc, typename Td>
+PBRT_CPU_GPU inline auto SumOfProducts(Ta a, Tb b, Tc c, Td d) {
+    auto cd = c * d;
+    auto sumOfProducts = FMA(a, b, cd);
+    auto error = FMA(c, d, -cd);
+    return sumOfProducts + error;
 }
 
 namespace internal {
-
+// InnerProduct Helper Functions
 template <typename Float>
 PBRT_CPU_GPU inline CompensatedFloat InnerProduct(Float a, Float b) {
     return TwoProd(a, b);
@@ -552,10 +546,6 @@ PBRT_CPU_GPU inline CompensatedFloat InnerProduct(Float a, Float b) {
 //
 // Accurate summation, dot product and polynomial evaluation in complex
 // floating point arithmetic, Graillat and Menissier-Morain.
-//
-// Precision same as if in working with doubles. Unfortunately is about
-// 4.6x slower than plain old float dot product. Going to doubles is just
-// ~2x slower...
 template <typename Float, typename... T>
 PBRT_CPU_GPU inline CompensatedFloat InnerProduct(Float a, Float b, T... terms) {
     CompensatedFloat ab = TwoProd(a, b);
@@ -575,16 +565,17 @@ InnerProduct(T... terms) {
 
 PBRT_CPU_GPU
 inline bool Quadratic(float a, float b, float c, float *t0, float *t1) {
+    // Handle case of $a=0$ for quadratic solution
+    if (a == 0) {
+        *t0 = *t1 = -c / b;
+        return true;
+    }
+
     // Find quadratic discriminant
     float discrim = DifferenceOfProducts(b, b, 4 * a, c);
     if (discrim < 0)
         return false;
     float rootDiscrim = std::sqrt(discrim);
-
-    if (a == 0) {
-        *t0 = *t1 = -c / b;
-        return true;
-    }
 
     // Compute quadratic _t_ values
     float q = -0.5f * (b + std::copysign(rootDiscrim, b));
@@ -592,6 +583,7 @@ inline bool Quadratic(float a, float b, float c, float *t0, float *t1) {
     *t1 = c / q;
     if (*t0 > *t1)
         pstd::swap(*t0, *t1);
+
     return true;
 }
 
@@ -617,12 +609,10 @@ inline bool Quadratic(double a, double b, double c, double *t0, double *t1) {
     return true;
 }
 
-// Solve f[x] == 0 over [x0, x1]. f should return a std::pair<FloatType,
-// FloatType>[f(x), f'(x)]. Only enabled for float and double.
-template <typename FloatType, typename Func>
-PBRT_CPU_GPU inline FloatType NewtonBisection(
-    FloatType x0, FloatType x1, Func f, Float xEps = 1e-6f, Float fEps = 1e-6f,
-    typename std::enable_if_t<std::is_floating_point<FloatType>::value> * = nullptr) {
+template <typename Func>
+PBRT_CPU_GPU inline Float NewtonBisection(Float x0, Float x1, Func f, Float xEps = 1e-6f,
+                                          Float fEps = 1e-6f) {
+    // Check function endpoints for roots
     DCHECK_LT(x0, x1);
     Float fx0 = f(x0).first, fx1 = f(x1).first;
     if (std::abs(fx0) < fEps)
@@ -630,37 +620,30 @@ PBRT_CPU_GPU inline FloatType NewtonBisection(
     if (std::abs(fx1) < fEps)
         return x1;
     bool startIsNegative = fx0 < 0;
-    // Implicit line equation: (y-y0)/(y1-y0) = (x-x0)/(x1-x0).
-    // Solve for y = 0 to find x for starting point.
-    FloatType xMid = x0 + (x1 - x0) * -fx0 / (fx1 - fx0);
+
+    // Set initial midpoint using linear approximation of _f_
+    Float xMid = x0 + (x1 - x0) * -fx0 / (fx1 - fx0);
 
     while (true) {
+        // Fall back to bisection if _xMid_ is out of bounds
         if (!(x0 < xMid && xMid < x1))
-            // Fall back to bisection.
             xMid = (x0 + x1) / 2;
 
-        std::pair<FloatType, FloatType> fxMid = f(xMid);
+        // Evaluate function and narrow bracket range _[x0, x1]_
+        std::pair<Float, Float> fxMid = f(xMid);
         DCHECK(!IsNaN(fxMid.first));
-
-        if (startIsNegative == fxMid.first < 0)
+        if (startIsNegative == (fxMid.first < 0))
             x0 = xMid;
         else
             x1 = xMid;
 
+        // Stop the iteration if converged
         if ((x1 - x0) < xEps || std::abs(fxMid.first) < fEps)
             return xMid;
 
-        // Try a Newton step.
+        // Perform a Newton step
         xMid -= fxMid.first / fxMid.second;
     }
-}
-
-// If an integral type is used for x0 and x1, assume Float.
-template <typename NotFloatType, typename Func>
-PBRT_CPU_GPU inline Float NewtonBisection(
-    NotFloatType x0, NotFloatType x1, Func f, Float xEps = 1e-6f, Float fEps = 1e-6f,
-    typename std::enable_if_t<std::is_integral<NotFloatType>::value> * = nullptr) {
-    return NewtonBisection(Float(x0), Float(x1), f, xEps, fEps);
 }
 
 PBRT_CPU_GPU
@@ -680,7 +663,7 @@ pstd::optional<SquareMatrix<3>> LinearLeastSquares(const Float A[][3], const Flo
 
 // Permutation Inline Function Declarations
 PBRT_CPU_GPU
-inline int PermutationElement(uint32_t i, uint32_t l, uint32_t p);
+inline int PermutationElement(uint32_t i, uint32_t n, uint32_t seed);
 
 PBRT_CPU_GPU
 inline int PermutationElement(uint32_t i, uint32_t l, uint32_t p) {

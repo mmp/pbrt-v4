@@ -16,7 +16,7 @@ using namespace pbrt;
 TEST(Spline, BezierBounds) {
     // Simple
     std::array<Point3f, 4> cp;
-    Bounds3f b = BoundCubicBezier<Bounds3f>(pstd::MakeConstSpan(cp), 0.f, 1.f);
+    Bounds3f b = BoundCubicBezier(pstd::MakeConstSpan(cp), 0.f, 1.f);
     b = Expand(b, 1e-3 * Length(b.Diagonal()));
     for (Float u = 0; u <= 1.f; u += 1.f / 1024.f) {
         Point3f p = EvaluateCubicBezier(pstd::MakeConstSpan(cp), u);
@@ -30,7 +30,7 @@ TEST(Spline, BezierBounds) {
             for (int c = 0; c < 3; ++c)
                 cp[j][c] = -5.f + 10.f * rng.Uniform<Float>();
 
-        Bounds3f b = BoundCubicBezier<Bounds3f>(pstd::MakeConstSpan(cp), 0.f, 1.f);
+        Bounds3f b = BoundCubicBezier(pstd::MakeConstSpan(cp), 0.f, 1.f);
         b = Expand(b, 1e-3 * Length(b.Diagonal()));
         for (Float u = 0; u <= 1.f; u += 1.f / 1024.f) {
             Point3f p = EvaluateCubicBezier(pstd::MakeConstSpan(cp), u);

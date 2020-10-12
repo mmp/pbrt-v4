@@ -34,13 +34,13 @@ void Error(const FileLoc *loc, const char *message);
 
 // Error Reporting Inline Functions
 template <typename... Args>
-inline void Warning(const char *fmt, Args &&... args) {
-    Warning(nullptr, StringPrintf(fmt, std::forward<Args>(args)...).c_str());
+inline void Warning(const FileLoc *loc, const char *fmt, Args &&... args) {
+    Warning(loc, StringPrintf(fmt, std::forward<Args>(args)...).c_str());
 }
 
 template <typename... Args>
-inline void Warning(const FileLoc *loc, const char *fmt, Args &&... args) {
-    Warning(loc, StringPrintf(fmt, std::forward<Args>(args)...).c_str());
+inline void Warning(const char *fmt, Args &&... args) {
+    Warning(nullptr, StringPrintf(fmt, std::forward<Args>(args)...).c_str());
 }
 
 template <typename... Args>

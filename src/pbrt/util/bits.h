@@ -43,17 +43,6 @@ inline uint64_t ReverseBits64(uint64_t n) {
 #endif
 }
 
-// http://zimbry.blogspot.ch/2011/09/better-bit-mixing-improving-on.html
-PBRT_CPU_GPU
-inline uint64_t MixBits(uint64_t v) {
-    v ^= (v >> 31);
-    v *= 0x7fb5d329728ea185;
-    v ^= (v >> 27);
-    v *= 0x81dadef4bc2dd44d;
-    v ^= (v >> 33);
-    return v;
-}
-
 // https://fgiesen.wordpress.com/2009/12/13/decoding-morton-codes/
 // "Insert" a 0 bit after each of the 16 low bits of x
 PBRT_CPU_GPU
@@ -126,6 +115,19 @@ inline uint32_t Compact1By2(uint32_t x) {
     x = (x ^ (x >> 8)) & 0xff0000ff;   // x = ---- --98 ---- ---- ---- ---- 7654 3210
     x = (x ^ (x >> 16)) & 0x000003ff;  // x = ---- ---- ---- ---- ---- --98 7654 3210
     return x;
+}
+
+// http://zimbry.blogspot.ch/2011/09/better-bit-mixing-improving-on.html
+PBRT_CPU_GPU
+inline uint64_t MixBits(uint64_t v);
+
+inline uint64_t MixBits(uint64_t v) {
+    v ^= (v >> 31);
+    v *= 0x7fb5d329728ea185;
+    v ^= (v >> 27);
+    v *= 0x81dadef4bc2dd44d;
+    v ^= (v >> 33);
+    return v;
 }
 
 }  // namespace pbrt

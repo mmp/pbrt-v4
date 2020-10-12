@@ -511,7 +511,7 @@ pstd::vector<ShapeHandle> CreateCurve(const Transform *renderFromObject,
 // Curve Method Definitions
 Bounds3f Curve::Bounds() const {
     pstd::span<const Point3f> cpSpan(common->cpObj);
-    Bounds3f objBounds = BoundCubicBezier<Bounds3f>(cpSpan, uMin, uMax);
+    Bounds3f objBounds = BoundCubicBezier(cpSpan, uMin, uMax);
     // Expand _objBounds_ by maximum curve width over $u$ range
     Float width[2] = {Lerp(uMin, common->width[0], common->width[1]),
                       Lerp(uMax, common->width[0], common->width[1])};

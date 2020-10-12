@@ -76,6 +76,7 @@ PBRT_CPU_GPU
 inline uint64_t HashBuffer(const void *ptr, size_t size, uint64_t seed = 0) {
     return MurmurHash64A(ptr, size, seed);
 }
+
 template <size_t size>
 PBRT_CPU_GPU inline uint64_t HashBuffer(const void *ptr, uint64_t seed = 0) {
     return MurmurHash64A(ptr, size, seed);

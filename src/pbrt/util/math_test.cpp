@@ -81,16 +81,6 @@ TEST(Math, NewtonBisection) {
     zero = NewtonBisection(.01, 9.42477798, f);
     // Extra slop for a messy function.
     EXPECT_LT(std::abs(f(zero).first), 1e-2);
-
-    // Ill-behaved function with derivatives that go to infinity (and also
-    // multiple zeros).
-    auto fd = [](double x) -> std::pair<double, double> {
-        return {std::pow(Sqr(std::sin(x)), .05) - 0.3,
-                0.1 * std::cos(x) * std::sin(x) / std::pow(Sqr(std::sin(x)), 0.95)};
-    };
-    double dzero = NewtonBisection(.01, 9.42477798, fd, 0, 1e-10);
-    // Expect to come closer via double precision and tighter tolerances
-    EXPECT_LT(std::abs(fd(dzero).first), 1e-10);
 }
 
 TEST(Math, EvaluatePolynomial) {
