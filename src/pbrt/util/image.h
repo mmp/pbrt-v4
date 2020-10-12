@@ -403,7 +403,7 @@ class Image {
     // Image Private Members
     PixelFormat format;
     Point2i resolution;
-    std::vector<std::string> channelNames;
+    pstd::vector<std::string> channelNames;
     ColorEncodingHandle encoding = nullptr;
     pstd::vector<uint8_t> p8;
     pstd::vector<Half> p16;
