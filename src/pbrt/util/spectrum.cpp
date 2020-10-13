@@ -60,16 +60,6 @@ std::string SpectrumHandle::ToString() const {
     return DispatchCPU(tostr);
 }
 
-std::string SpectrumHandle::ParameterType() const {
-    auto pt = [&](auto ptr) { return ptr->ParameterType(); };
-    return DispatchCPU(pt);
-}
-
-std::string SpectrumHandle::ParameterString() const {
-    auto ps = [&](auto ptr) { return ptr->ParameterString(); };
-    return DispatchCPU(ps);
-}
-
 // Spectrum Method Definitions
 Float PiecewiseLinearSpectrum::operator()(Float lambda) const {
     // Handle _PiecewiseLinearSpectrum_ corner cases
@@ -100,22 +90,14 @@ PiecewiseLinearSpectrum::PiecewiseLinearSpectrum(pstd::span<const Float> l,
 }
 
 std::string PiecewiseLinearSpectrum::ToString() const {
-    return std::string("[ PiecewiseLinearSpectrum ") + ParameterString() + " ]";
-}
-
-std::string PiecewiseLinearSpectrum::ParameterType() const {
-    return "spectrum";
-}
-
-std::string PiecewiseLinearSpectrum::ParameterString() const {
     std::string name = FindMatchingNamedSpectrum(this);
     if (!name.empty())
         return StringPrintf("\"%s\"", name);
 
-    std::string ret;
+    std::string ret = "[ PiecewiseLinearSpectrum ";
     for (size_t i = 0; i < lambdas.size(); ++i)
         ret += StringPrintf("%f %f ", lambdas[i], values[i]);
-    return ret;
+    return ret + " ]";
 }
 
 pstd::optional<SpectrumHandle> PiecewiseLinearSpectrum::Read(const std::string &fn,
@@ -173,30 +155,12 @@ std::string BlackbodySpectrum::ToString() const {
     return StringPrintf("[ BlackbodySpectrum T: %f ]", T);
 }
 
-std::string BlackbodySpectrum::ParameterType() const {
-    return "blackbody";
-}
-
-std::string BlackbodySpectrum::ParameterString() const {
-    return StringPrintf("%f", T);
-}
-
 SampledSpectrum ConstantSpectrum::Sample(const SampledWavelengths &) const {
     return SampledSpectrum(c);
 }
 
 std::string ConstantSpectrum::ToString() const {
     return StringPrintf("[ ConstantSpectrum c: %f ]", c);
-}
-
-std::string ConstantSpectrum::ParameterType() const {
-    LOG_FATAL("Shouldn't be called");
-    return {};
-}
-
-std::string ConstantSpectrum::ParameterString() const {
-    LOG_FATAL("Shouldn't be called");
-    return {};
 }
 
 std::string DenselySampledSpectrum::ToString() const {
@@ -207,16 +171,6 @@ std::string DenselySampledSpectrum::ToString() const {
         s += StringPrintf("%f ", values[i]);
     s += "] ]";
     return s;
-}
-
-std::string DenselySampledSpectrum::ParameterType() const {
-    LOG_FATAL("Shouldn't be called");
-    return {};
-}
-
-std::string DenselySampledSpectrum::ParameterString() const {
-    LOG_FATAL("Shouldn't be called");
-    return {};
 }
 
 std::string SampledWavelengths::ToString() const {
@@ -261,7 +215,7 @@ RGB SampledSpectrum::ToRGB(const SampledWavelengths &lambda,
     return cs.ToRGB(xyz);
 }
 
-RGBSpectrum::RGBSpectrum(const RGBColorSpace &cs, const RGB &rgb) {
+RGBSpectrum::RGBSpectrum(const RGBColorSpace &cs, const RGB &rgb) : rgb(rgb) {
     Float m = std::max({rgb.r, rgb.g, rgb.b});
     if (m <= 1)
         rsp = cs.ToRGBCoeffs(rgb);
@@ -279,23 +233,7 @@ RGBIlluminantSpectrum::RGBIlluminantSpectrum(const RGBColorSpace &cs, const RGB 
 }
 
 std::string RGBSpectrum::ToString() const {
-    return StringPrintf("[ RGBSpectrum rsp: %s ]", rsp);
-}
-
-std::string RGBSpectrum::ParameterType() const {
-    return "rgb";
-}
-
-std::string RGBSpectrum::ParameterString() const {
-    return StringPrintf("%f %f %f", rgb.r, rgb.g, rgb.b);
-}
-
-std::string RGBIlluminantSpectrum::ParameterType() const {
-    return "rgb";
-}
-
-std::string RGBIlluminantSpectrum::ParameterString() const {
-    return StringPrintf("%f %f %f", rgb.r, rgb.g, rgb.b);
+    return StringPrintf("[ RGBSpectrum rgb: %s rsp: %s ]", rgb, rsp);
 }
 
 std::string RGBIlluminantSpectrum::ToString() const {

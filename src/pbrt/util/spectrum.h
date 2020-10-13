@@ -51,8 +51,6 @@ class SpectrumHandle
     // SpectrumHandle Public Methods
     using TaggedPointer::TaggedPointer;
     std::string ToString() const;
-    std::string ParameterType() const;
-    std::string ParameterString() const;
 
     PBRT_CPU_GPU
     Float operator()(Float lambda) const;
@@ -360,8 +358,6 @@ class ConstantSpectrum {
     Float MaxValue() const { return c; }
 
     std::string ToString() const;
-    std::string ParameterType() const;
-    std::string ParameterString() const;
 
     ConstantSpectrum(Float c) : c(c) {}
 
@@ -401,8 +397,6 @@ class DenselySampledSpectrum {
     Float MaxValue() const { return *std::max_element(values.begin(), values.end()); }
 
     std::string ToString() const;
-    std::string ParameterType() const;
-    std::string ParameterString() const;
 
     DenselySampledSpectrum(SpectrumHandle spec, int lambda_min = Lambda_min,
                            int lambda_max = Lambda_max, Allocator alloc = {})
@@ -465,8 +459,6 @@ class PiecewiseLinearSpectrum {
     Float operator()(Float lambda) const;
 
     std::string ToString() const;
-    std::string ParameterType() const;
-    std::string ParameterString() const;
 
     PiecewiseLinearSpectrum(pstd::span<const Float> lambdas,
                             pstd::span<const Float> values, Allocator alloc = {});
@@ -509,8 +501,6 @@ class BlackbodySpectrum {
     Float MaxValue() const { return 1.f; }
 
     std::string ToString() const;
-    std::string ParameterType() const;
-    std::string ParameterString() const;
 
   private:
     // BlackbodySpectrum Private Members
@@ -538,8 +528,6 @@ class RGBSpectrum {
     }
 
     std::string ToString() const;
-    std::string ParameterType() const;
-    std::string ParameterString() const;
 
   private:
     // RGBSpectrum Private Members
@@ -574,8 +562,6 @@ class RGBIlluminantSpectrum {
     }
 
     std::string ToString() const;
-    std::string ParameterType() const;
-    std::string ParameterString() const;
 
   private:
     // RGBIlluminantSpectrum Private Members
