@@ -63,7 +63,6 @@ struct DispatchSplit {
     template <typename F, typename Tp, typename... Ts>
     PBRT_CPU_GPU inline auto operator()(F func, Tp tp, int tag, TypePack<Ts...> types) {
         constexpr int mid = n / 2;
-
         if (tag - 1 < mid)  // 0-based indexing here to be more traditional
             return DispatchSplit<mid>()(
                 func, tp, tag, typename TakeFirstN<mid, TypePack<Ts...>>::type());
@@ -145,10 +144,11 @@ struct DispatchSplitCPU {
 template <typename... Ts>
 class TaggedPointer {
   public:
+    // TaggedPointer Public Types
     using Types = TypePack<Ts...>;
 
+    // TaggedPointer Public Methods
     TaggedPointer() = default;
-
     template <typename T>
     PBRT_CPU_GPU TaggedPointer(T *ptr) {
         uintptr_t iptr = reinterpret_cast<uintptr_t>(ptr);
@@ -171,6 +171,18 @@ class TaggedPointer {
     }
 
     template <typename T>
+    PBRT_CPU_GPU static constexpr uint16_t TypeIndex() {
+        return uint16_t(detail::TypeIndexHelper<T, Ts...>::value);
+    }
+
+    PBRT_CPU_GPU
+    uint16_t Tag() const { return uint16_t((bits & tagMask) >> tagShift); }
+    PBRT_CPU_GPU
+    static constexpr uint16_t MaxTag() { return sizeof...(Ts); }
+    PBRT_CPU_GPU
+    static constexpr uint16_t NumTags() { return MaxTag() + 1; }
+
+    template <typename T>
     PBRT_CPU_GPU bool Is() const {
         return Tag() == TypeIndex<T>();
     }
@@ -186,11 +198,13 @@ class TaggedPointer {
         DCHECK(Is<T>());
         return reinterpret_cast<T *>(ptr());
     }
+
     template <typename T>
     PBRT_CPU_GPU const T *Cast() const {
         DCHECK(Is<T>());
         return reinterpret_cast<const T *>(ptr());
     }
+
     template <typename T>
     PBRT_CPU_GPU T *CastOrNullptr() {
         if (Is<T>())
@@ -204,18 +218,6 @@ class TaggedPointer {
             return reinterpret_cast<const T *>(ptr());
         else
             return nullptr;
-    }
-
-    PBRT_CPU_GPU
-    uint16_t Tag() const { return uint16_t((bits & tagMask) >> tagShift); }
-    PBRT_CPU_GPU
-    static constexpr uint16_t MaxTag() { return sizeof...(Ts); }
-    PBRT_CPU_GPU
-    static constexpr uint16_t NumTags() { return MaxTag() + 1; }
-
-    template <typename T>
-    PBRT_CPU_GPU static constexpr uint16_t TypeIndex() {
-        return uint16_t(detail::TypeIndexHelper<T, Ts...>::value);
     }
 
     std::string ToString() const {
@@ -281,11 +283,10 @@ class TaggedPointer {
 
   private:
     static_assert(sizeof(uintptr_t) == 8, "Expected uintptr_t to be 64 bits");
-
+    // TaggedPointer Private Members
     static constexpr int tagShift = 48;
     static constexpr uint64_t tagMask = (((1ull << 16) - 1) << tagShift);
     static constexpr uint64_t ptrMask = ~tagMask;
-
     uintptr_t bits = 0;
 };
 

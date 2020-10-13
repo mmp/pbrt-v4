@@ -114,7 +114,7 @@ struct HasType<T, TypePack<Tfirst, Ts...>> {
 template <typename T>
 class Array2D {
   public:
-    // Array2D Type Declarations
+    // Array2D Type Definitions
     using value_type = T;
     using iterator = value_type *;
     using const_iterator = const value_type *;
@@ -122,6 +122,7 @@ class Array2D {
 
     // Array2D Public Methods
     Array2D(allocator_type allocator = {}) : Array2D({{0, 0}, {0, 0}}, allocator) {}
+
     Array2D(const Bounds2i &extent, allocator_type allocator = {})
         : extent(extent), allocator(allocator) {
         int n = extent.Area();
@@ -129,6 +130,7 @@ class Array2D {
         for (int i = 0; i < n; ++i)
             allocator.construct(values + i);
     }
+
     Array2D(const Bounds2i &extent, T def, allocator_type allocator = {})
         : Array2D(extent, allocator) {
         std::fill(begin(), end(), def);
@@ -225,6 +227,7 @@ class Array2D {
     iterator begin() { return values; }
     PBRT_CPU_GPU
     iterator end() { return begin() + size(); }
+
     PBRT_CPU_GPU
     const_iterator begin() const { return values; }
     PBRT_CPU_GPU
@@ -590,6 +593,7 @@ template <typename Key, typename Value, typename Hash,
               pstd::pmr::polymorphic_allocator<pstd::optional<std::pair<Key, Value>>>>
 class HashMap {
   public:
+    // HashMap Type Definitions
     using TableEntry = pstd::optional<std::pair<Key, Value>>;
 
     class Iterator {
@@ -633,7 +637,9 @@ class HashMap {
     using iterator = Iterator;
     using const_iterator = const iterator;
 
+    // HashMap Public Methods
     HashMap(Allocator alloc) : table(8, alloc), alloc(alloc) {}
+
     HashMap(const HashMap &) = delete;
     HashMap &operator=(const HashMap &) = delete;
 
@@ -660,6 +666,12 @@ class HashMap {
     }
 
     PBRT_CPU_GPU
+    size_t size() const { return nStored; }
+    PBRT_CPU_GPU
+    size_t capacity() const { return table.size(); }
+    void Clear() { table.clear(); }
+
+    PBRT_CPU_GPU
     iterator begin() {
         Iterator iter(table.data(), table.data() + table.size());
         while (iter.ptr < iter.end && !iter.ptr->has_value())
@@ -671,14 +683,8 @@ class HashMap {
         return Iterator(table.data() + table.size(), table.data() + table.size());
     }
 
-    PBRT_CPU_GPU
-    size_t size() const { return nStored; }
-    PBRT_CPU_GPU
-    size_t capacity() const { return table.size(); }
-
-    void Clear() { table.clear(); }
-
   private:
+    // HashMap Private Methods
     PBRT_CPU_GPU
     size_t FindOffset(const Key &key) const {
         size_t baseOffset = Hash()(key) & (capacity() - 1);
@@ -695,15 +701,13 @@ class HashMap {
     void Grow() {
         size_t currentCapacity = capacity();
         pstd::vector<TableEntry> newTable(std::max<size_t>(64, 2 * currentCapacity));
-
         size_t newCapacity = newTable.size();
         for (size_t i = 0; i < currentCapacity; ++i) {
+            // Insert _table[i]_ into _newTable_ if it is set
             if (!table[i].has_value())
                 continue;
-
             size_t baseOffset = Hash()(table[i]->first) & (newCapacity - 1);
             for (int nProbes = 0;; ++nProbes) {
-                // Quadratic probing.
                 size_t offset = (baseOffset + nProbes / 2 + nProbes * nProbes / 2) &
                                 (newCapacity - 1);
                 if (!newTable[offset]) {
@@ -712,10 +716,10 @@ class HashMap {
                 }
             }
         }
-
         table = std::move(newTable);
     }
 
+    // HashMap Private Members
     pstd::vector<TableEntry> table;
     size_t nStored = 0;
     Allocator alloc;
@@ -726,7 +730,7 @@ template <typename T>
 class SampledGrid {
   public:
     using const_iterator = typename pstd::vector<T>::const_iterator;
-
+    // SampledGrid Public Methods
     SampledGrid() = default;
     SampledGrid(Allocator alloc) : values(alloc) {}
     SampledGrid(pstd::span<const T> v, int nx, int ny, int nz, Allocator alloc)
@@ -735,7 +739,6 @@ class SampledGrid {
     }
 
     size_t BytesAllocated() const { return values.size() * sizeof(T); }
-
     int xSize() const { return nx; }
     int ySize() const { return ny; }
     int zSize() const { return nz; }
@@ -794,6 +797,7 @@ class SampledGrid {
     }
 
   private:
+    // SampledGrid Private Members
     pstd::vector<T> values;
     int nx, ny, nz;
 };

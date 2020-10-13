@@ -35,6 +35,14 @@ void PrintStackTrace();
 // CHECK Macro Definitions
 #define CHECK(x) (!(!(x) && (LOG_FATAL("Check failed: %s", #x), true)))
 
+#define CHECK_EQ(a, b) CHECK_IMPL(a, b, ==)
+#define CHECK_NE(a, b) CHECK_IMPL(a, b, !=)
+#define CHECK_GT(a, b) CHECK_IMPL(a, b, >)
+#define CHECK_GE(a, b) CHECK_IMPL(a, b, >=)
+#define CHECK_LT(a, b) CHECK_IMPL(a, b, <)
+#define CHECK_LE(a, b) CHECK_IMPL(a, b, <=)
+
+// CHECK\_IMPL Macro Definition
 #define CHECK_IMPL(a, b, op)                                                           \
     do {                                                                               \
         auto va = a;                                                                   \
@@ -44,13 +52,6 @@ void PrintStackTrace();
                       va, #b, vb);                                                     \
         }                                                                              \
     } while (false) /* swallow semicolon */
-
-#define CHECK_EQ(a, b) CHECK_IMPL(a, b, ==)
-#define CHECK_NE(a, b) CHECK_IMPL(a, b, !=)
-#define CHECK_GT(a, b) CHECK_IMPL(a, b, >)
-#define CHECK_GE(a, b) CHECK_IMPL(a, b, >=)
-#define CHECK_LT(a, b) CHECK_IMPL(a, b, <)
-#define CHECK_LE(a, b) CHECK_IMPL(a, b, <=)
 
 #endif  // PBRT_IS_GPU_CODE
 
@@ -115,7 +116,9 @@ void PrintStackTrace();
 // CheckCallbackScope Definition
 class CheckCallbackScope {
   public:
+    // CheckCallbackScope Public Methods
     CheckCallbackScope(std::function<std::string(void)> callback);
+
     ~CheckCallbackScope();
 
     CheckCallbackScope(const CheckCallbackScope &) = delete;
@@ -124,6 +127,7 @@ class CheckCallbackScope {
     static void Fail();
 
   private:
+    // CheckCallbackScope Private Members
     static std::vector<std::function<std::string(void)>> callbacks;
 };
 

@@ -51,7 +51,7 @@ void ReportThreadStats() {
     StatRegisterer::CallCallbacks(statsAccumulator);
     if (pixelStatsEnabled) {
         statsAccumulator.AccumulatePixelStats(threadStatsState.accum);
-        threadStatsState.accum = PixelStatsAccumulator();  // FIXME: memory leaks
+        threadStatsState.accum = PixelStatsAccumulator();
     }
 }
 

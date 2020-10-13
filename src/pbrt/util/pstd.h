@@ -562,7 +562,7 @@ class monotonic_buffer_resource : public memory_resource {
                 currentBlock = {};
             }
 
-            // Get new block of memory for _MemoryArena_
+            // Get new block of memory for _ScratchBuffer_
 
             // Try to get memory block from _availableBlocks_
             for (auto iter = availableBlocks.begin(); iter != availableBlocks.end();

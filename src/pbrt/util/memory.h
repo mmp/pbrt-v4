@@ -118,40 +118,29 @@ struct AllocationTraits<T[n]> {
 // ScratchBuffer Definition
 class alignas(PBRT_L1_CACHE_LINE_SIZE) ScratchBuffer {
   public:
+    // ScratchBuffer Public Methods
     ScratchBuffer() = default;
     ScratchBuffer(int size) : allocatedBytes(size) {
         ptr = (uint8_t *)Allocator().allocate_bytes(size, align);
-        freePtr = true;
     }
-    PBRT_CPU_GPU
-    ScratchBuffer(uint8_t *ptr, int size) : ptr(ptr), allocatedBytes(size) {}
 
     ScratchBuffer(const ScratchBuffer &) = delete;
 
     ScratchBuffer(ScratchBuffer &&b) {
         ptr = b.ptr;
-        freePtr = b.freePtr;
         allocatedBytes = b.allocatedBytes;
         offset = b.offset;
 
         b.ptr = nullptr;
-        b.freePtr = false;
         b.allocatedBytes = b.offset = 0;
     }
 
-    PBRT_CPU_GPU
-    ~ScratchBuffer() {
-#ifndef PBRT_IS_GPU_CODE
-        if (freePtr)
-            Allocator().deallocate_bytes(ptr, allocatedBytes, align);
-#endif
-    }
+    ~ScratchBuffer() { Allocator().deallocate_bytes(ptr, allocatedBytes, align); }
 
     ScratchBuffer &operator=(const ScratchBuffer &) = delete;
 
     ScratchBuffer &operator=(ScratchBuffer &&b) {
         std::swap(b.ptr, ptr);
-        std::swap(b.freePtr, freePtr);
         std::swap(b.allocatedBytes, allocatedBytes);
         std::swap(b.offset, offset);
         return *this;
@@ -162,7 +151,6 @@ class alignas(PBRT_L1_CACHE_LINE_SIZE) ScratchBuffer {
         if ((offset % align) != 0)
             offset += align - (offset % align);
         CHECK_LE(offset + size, allocatedBytes);
-
         void *p = ptr + offset;
         offset += size;
         return p;
@@ -188,9 +176,9 @@ class alignas(PBRT_L1_CACHE_LINE_SIZE) ScratchBuffer {
     void Reset() { offset = 0; }
 
   private:
+    // ScratchBuffer Private Members
     static constexpr int align = PBRT_L1_CACHE_LINE_SIZE;
     uint8_t *ptr = nullptr;
-    bool freePtr = false;
     int allocatedBytes = 0, offset = 0;
 };
 

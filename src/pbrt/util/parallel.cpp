@@ -40,11 +40,11 @@ bool Barrier::Block() {
 // ParallelJob Definition
 class ParallelJob {
   public:
+    // ParallelJob Public Methods
     virtual ~ParallelJob() { DCHECK(removed); }
 
-    // *lock should be locked going in and and unlocked coming out.
-    virtual void RunStep(std::unique_lock<std::mutex> *lock) = 0;
     virtual bool HaveWork() const = 0;
+    virtual void RunStep(std::unique_lock<std::mutex> *lock) = 0;
 
     bool Finished() const { return !HaveWork() && activeWorkers == 0; }
 
@@ -56,17 +56,19 @@ class ParallelJob {
     }
 
   private:
+    // ParallelJob Private Members
     friend class ThreadPool;
-
-    ParallelJob *prev = nullptr, *next = nullptr;
     int activeWorkers = 0;
+    ParallelJob *prev = nullptr, *next = nullptr;
     bool removed = false;
 };
 
 // ThreadPool Definition
 class ThreadPool {
   public:
+    // ThreadPool Public Methods
     explicit ThreadPool(int nThreads);
+
     ~ThreadPool();
 
     size_t size() const { return threads.size(); }
@@ -81,17 +83,15 @@ class ThreadPool {
     std::string ToString() const;
 
   private:
+    // ThreadPool Private Methods
     void workerFunc(int tIndex);
 
-    ParallelJob *jobList = nullptr;
-    // Protects jobList
-    mutable std::mutex jobListMutex;
-    // Signaled both when a new job is added to the list and when a job has
-    // finished.
-    std::condition_variable jobListCondition;
-
+    // ThreadPool Private Members
     std::vector<std::thread> threads;
+    mutable std::mutex mutex;
     bool shutdownThreads = false;
+    ParallelJob *jobList = nullptr;
+    std::condition_variable jobListCondition;
 };
 
 thread_local int ThreadIndex;
@@ -102,47 +102,31 @@ static bool maxThreadIndexCalled = false;
 // ThreadPool Method Definitions
 ThreadPool::ThreadPool(int nThreads) {
     ThreadIndex = 0;
-
-    // Launch one fewer worker thread than the total number we want doing
-    // work, since the main thread helps out, too.
     for (int i = 0; i < nThreads - 1; ++i)
         threads.push_back(std::thread(&ThreadPool::workerFunc, this, i + 1));
-}
-
-std::unique_lock<std::mutex> ThreadPool::AddToJobList(ParallelJob *job) {
-    std::unique_lock<std::mutex> lock(jobListMutex);
-    if (jobList != nullptr)
-        jobList->prev = job;
-    job->next = jobList;
-    jobList = job;
-    jobListCondition.notify_all();
-    return lock;
-}
-
-void ThreadPool::RemoveFromJobList(ParallelJob *job) {
-    DCHECK(!job->removed);
-
-    if (job->prev != nullptr) {
-        job->prev->next = job->next;
-    } else {
-        DCHECK(jobList == job);
-        jobList = job->next;
-    }
-    if (job->next != nullptr)
-        job->next->prev = job->prev;
-
-    job->removed = true;
 }
 
 void ThreadPool::workerFunc(int tIndex) {
     LOG_VERBOSE("Started execution in worker thread %d", tIndex);
     ThreadIndex = tIndex;
 
-    std::unique_lock<std::mutex> lock(jobListMutex);
+    std::unique_lock<std::mutex> lock(mutex);
     while (!shutdownThreads)
         WorkOrWait(&lock);
 
     LOG_VERBOSE("Exiting worker thread %d", tIndex);
+}
+
+std::unique_lock<std::mutex> ThreadPool::AddToJobList(ParallelJob *job) {
+    std::unique_lock<std::mutex> lock(mutex);
+    // Add _job_ to head of _jobList_
+    if (jobList != nullptr)
+        jobList->prev = job;
+    job->next = jobList;
+    jobList = job;
+
+    jobListCondition.notify_all();
+    return lock;
 }
 
 void ThreadPool::WorkOrWait(std::unique_lock<std::mutex> *lock) {
@@ -152,23 +136,33 @@ void ThreadPool::WorkOrWait(std::unique_lock<std::mutex> *lock) {
     while ((job != nullptr) && !job->HaveWork())
         job = job->next;
     if (job != nullptr) {
-        // Run a chunk of loop iterations for _loop_
+        // Execute work for _job_
         job->activeWorkers++;
-
         job->RunStep(lock);
-
         DCHECK(!lock->owns_lock());
         lock->lock();
-
-        // Update _loop_ to reflect completion of iterations
         job->activeWorkers--;
-
         if (job->Finished())
             jobListCondition.notify_all();
+
     } else
-        // Wait for something to change (new work, or this loop being
-        // finished).
+        // Wait for new work to arrive or the job to finish
         jobListCondition.wait(*lock);
+}
+
+void ThreadPool::RemoveFromJobList(ParallelJob *job) {
+    DCHECK(!job->removed);
+
+    if (job->prev != nullptr)
+        job->prev->next = job->next;
+    else {
+        DCHECK(jobList == job);
+        jobList = job->next;
+    }
+    if (job->next != nullptr)
+        job->next->prev = job->prev;
+
+    job->removed = true;
 }
 
 void ThreadPool::ForEachThread(std::function<void(void)> func) {
@@ -186,7 +180,7 @@ ThreadPool::~ThreadPool() {
         return;
 
     {
-        std::lock_guard<std::mutex> lock(jobListMutex);
+        std::lock_guard<std::mutex> lock(mutex);
         shutdownThreads = true;
         jobListCondition.notify_all();
     }
@@ -198,7 +192,7 @@ ThreadPool::~ThreadPool() {
 std::string ThreadPool::ToString() const {
     std::string s = StringPrintf("[ ThreadPool threads.size(): %d shutdownThreads: %s ",
                                  threads.size(), shutdownThreads);
-    if (jobListMutex.try_lock()) {
+    if (mutex.try_lock()) {
         s += "jobList: [ ";
         ParallelJob *job = jobList;
         while (job) {
@@ -206,7 +200,7 @@ std::string ThreadPool::ToString() const {
             job = job->next;
         }
         s += "] ";
-        jobListMutex.unlock();
+        mutex.unlock();
     } else
         s += "(job list mutex locked) ";
     return s + "]";
@@ -215,23 +209,28 @@ std::string ThreadPool::ToString() const {
 // ParallelForLoop1D Definition
 class ParallelForLoop1D : public ParallelJob {
   public:
-    ParallelForLoop1D(int64_t start, int64_t end, int chunkSize,
+    // ParallelForLoop1D Public Methods
+    ParallelForLoop1D(int64_t startIndex, int64_t endIndex, int chunkSize,
                       std::function<void(int64_t, int64_t)> func)
-        : func(std::move(func)), nextIndex(start), maxIndex(end), chunkSize(chunkSize) {}
+        : func(std::move(func)),
+          nextIndex(startIndex),
+          endIndex(endIndex),
+          chunkSize(chunkSize) {}
 
-    bool HaveWork() const { return nextIndex < maxIndex; }
+    bool HaveWork() const { return nextIndex < endIndex; }
+
     void RunStep(std::unique_lock<std::mutex> *lock);
 
     std::string ToString() const {
-        return StringPrintf("[ ParallelForLoop1D nextIndex: %d maxIndex: %d "
+        return StringPrintf("[ ParallelForLoop1D nextIndex: %d endIndex: %d "
                             "chunkSize: %d ]",
-                            nextIndex, maxIndex, chunkSize);
+                            nextIndex, endIndex, chunkSize);
     }
 
   private:
+    // ParallelForLoop1D Private Members
     std::function<void(int64_t, int64_t)> func;
-    int64_t nextIndex;
-    int64_t maxIndex;
+    int64_t nextIndex, endIndex;
     int chunkSize;
 };
 
@@ -262,19 +261,17 @@ class ParallelForLoop2D : public ParallelJob {
 
 // ParallelForLoop1D Method Definitions
 void ParallelForLoop1D::RunStep(std::unique_lock<std::mutex> *lock) {
-    // Find the set of loop iterations to run next
+    // Determine the range of loop iterations to run in this step
     int64_t indexStart = nextIndex;
-    int64_t indexEnd = std::min(indexStart + chunkSize, maxIndex);
-
-    // Update _loop_ to reflect iterations this thread will run
+    int64_t indexEnd = std::min(indexStart + chunkSize, endIndex);
     nextIndex = indexEnd;
 
+    // Remove job from list if all work has been started
     if (!HaveWork())
         threadPool->RemoveFromJobList(this);
 
+    // Release lock and execute loop iterations in _[indexStart, indexEnd)_
     lock->unlock();
-
-    // Run loop indices in _[indexStart, indexEnd)_
     func(indexStart, indexEnd);
 }
 
@@ -303,13 +300,14 @@ void ParallelForLoop2D::RunStep(std::unique_lock<std::mutex> *lock) {
 // Parallel Function Defintions
 void ParallelFor(int64_t start, int64_t end, std::function<void(int64_t, int64_t)> func) {
     CHECK(threadPool);
+    // Compute chunk size and possibly run entire loop on current thread
     int64_t chunkSize = std::max<int64_t>(1, (end - start) / (8 * RunningThreads()));
     if (end - start < chunkSize) {
         func(start, end);
         return;
     }
 
-    // Create and enqueue _ParallelJob_ for this loop
+    // Create and enqueue _ParallelForLoop1D_ for this loop
     ParallelForLoop1D loop(start, end, chunkSize, std::move(func));
     std::unique_lock<std::mutex> lock = threadPool->AddToJobList(&loop);
 
