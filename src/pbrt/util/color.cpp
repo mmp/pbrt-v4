@@ -35,13 +35,18 @@ RGBSigmoidPolynomial RGBToSpectrumTable::operator()(const RGB &rgb) const {
     CHECK(rgb[0] >= 0.f && rgb[1] >= 0.f && rgb[2] >= 0.f && rgb[0] <= 1.f &&
           rgb[1] <= 1.f && rgb[2] <= 1.f);
 
-    // Find largest RGB component and handle black _rgb_
+    /// Analytic solution for uniform RGB values
+    if (rgb[0] == rgb[1] && rgb[1] == rgb[2]) {
+        Float v = rgb[0],
+              inv = (v - .5f) / std::sqrt(v*(1.f - v));
+        return {Float(0), Float(0), inv};
+    }
+
+    // Find largest RGB component
     int i = 0;
     for (int j = 1; j < 3; ++j)
         if (rgb[j] >= rgb[i])
             i = j;
-    if (rgb[i] == 0)
-        return {Float(0), Float(0), -std::numeric_limits<Float>::infinity()};
 
     // Compute floating-point offsets into polynomial coefficient table
     float z = rgb[i], sc = (res - 1) / z, x = rgb[(i + 1) % 3] * sc,
