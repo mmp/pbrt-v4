@@ -193,7 +193,7 @@ class PathIntegrator : public RayIntegrator {
 
   private:
     // PathIntegrator Private Methods
-    SampledSpectrum SampleLd(const SurfaceInteraction &intr, const BSDF &bsdf,
+    SampledSpectrum SampleLd(const SurfaceInteraction &intr, const BSDF *bsdf,
                              SampledWavelengths &lambda, SamplerHandle sampler) const;
 
     // PathIntegrator Private Members
@@ -457,7 +457,7 @@ class SPPMIntegrator : public Integrator {
 
   private:
     // SPPMIntegrator Private Methods
-    SampledSpectrum SampleLd(const SurfaceInteraction &intr, const BSDF &bsdf,
+    SampledSpectrum SampleLd(const SurfaceInteraction &intr, const BSDF *bsdf,
                              SampledWavelengths &lambda, SamplerHandle sampler,
                              LightSamplerHandle lightSampler) const;
 
