@@ -29,43 +29,31 @@ struct TypePack {
 };
 
 // TypePack Operations
-template <typename F, typename... Ts>
-void ForEachType(F func, TypePack<Ts...>);
-
-template <typename F>
-void ForEachType(F func, TypePack<>) {}
-
-template <typename F, typename T, typename... Ts>
-void ForEachType(F func, TypePack<T, Ts...>) {
-    func.template operator()<T>();
-    ForEachType(func, TypePack<Ts...>());
-}
-
-template <typename T>
-struct MaxSize;
-template <typename T>
-struct MaxSize<TypePack<T>> {
-    static constexpr size_t size = sizeof(T);
-};
 template <typename T, typename... Ts>
-struct MaxSize<TypePack<T, Ts...>> {
-    static constexpr size_t size = (sizeof(T) > MaxSize<TypePack<Ts...>>::size)
-                                       ? sizeof(T)
-                                       : MaxSize<TypePack<Ts...>>::size;
+struct TypeIndex {
+    static constexpr int count = 0;
+    static_assert(!std::is_same_v<T, T>, "Type not present in TypePack");
 };
 
-template <typename... Ts>
-struct Prepend;
 template <typename T, typename... Ts>
-struct Prepend<T, TypePack<Ts...>> {
-    using type = TypePack<T, Ts...>;
+struct TypeIndex<T, TypePack<T, Ts...>> {
+    static constexpr int count = 0;
 };
 
-template <typename T>
-struct RemoveFirst {};
+template <typename T, typename U, typename... Ts>
+struct TypeIndex<T, TypePack<U, Ts...>> {
+    static constexpr int count = 1 + TypeIndex<T, TypePack<Ts...>>::count;
+};
+
 template <typename T, typename... Ts>
-struct RemoveFirst<TypePack<T, Ts...>> {
-    using type = TypePack<Ts...>;
+struct HasType {
+    static constexpr bool value = false;
+};
+
+template <typename T, typename Tfirst, typename... Ts>
+struct HasType<T, TypePack<Tfirst, Ts...>> {
+    static constexpr bool value =
+        (std::is_same<T, Tfirst>::value || HasType<T, TypePack<Ts...>>::value);
 };
 
 template <typename T>
@@ -75,14 +63,29 @@ struct GetFirst<TypePack<T, Ts...>> {
     using type = T;
 };
 
+template <typename T>
+struct RemoveFirst {};
+template <typename T, typename... Ts>
+struct RemoveFirst<TypePack<T, Ts...>> {
+    using type = TypePack<Ts...>;
+};
+
 template <int index, typename T, typename... Ts>
 struct RemoveFirstN;
 template <int index, typename T, typename... Ts>
 struct RemoveFirstN<index, TypePack<T, Ts...>> {
     using type = typename RemoveFirstN<index - 1, TypePack<Ts...>>::type;
 };
+
 template <typename T, typename... Ts>
 struct RemoveFirstN<0, TypePack<T, Ts...>> {
+    using type = TypePack<T, Ts...>;
+};
+
+template <typename... Ts>
+struct Prepend;
+template <typename T, typename... Ts>
+struct Prepend<T, TypePack<Ts...>> {
     using type = TypePack<T, Ts...>;
 };
 
@@ -98,17 +101,16 @@ struct TakeFirstN<1, TypePack<T, Ts...>> {
     using type = TypePack<T>;
 };
 
-template <typename T, typename... Ts>
-struct HasType {};
-template <typename T>
-struct HasType<T, TypePack<void>> {
-    static constexpr bool value = false;
-};
-template <typename T, typename Tfirst, typename... Ts>
-struct HasType<T, TypePack<Tfirst, Ts...>> {
-    static constexpr bool value =
-        (std::is_same<T, Tfirst>::value || HasType<T, TypePack<Ts...>>::value);
-};
+template <typename F, typename... Ts>
+void ForEachType(F func, TypePack<Ts...>);
+template <typename F, typename T, typename... Ts>
+void ForEachType(F func, TypePack<T, Ts...>) {
+    func.template operator()<T>();
+    ForEachType(func, TypePack<Ts...>());
+}
+
+template <typename F>
+void ForEachType(F func, TypePack<>) {}
 
 // Array2D Definition
 template <typename T>
@@ -123,7 +125,7 @@ class Array2D {
     // Array2D Public Methods
     Array2D(allocator_type allocator = {}) : Array2D({{0, 0}, {0, 0}}, allocator) {}
 
-    Array2D(const Bounds2i &extent, allocator_type allocator = {})
+    Array2D(const Bounds2i &extent, Allocator allocator = {})
         : extent(extent), allocator(allocator) {
         int n = extent.Area();
         values = allocator.allocate_object<T>(n);
@@ -255,7 +257,7 @@ class Array2D {
   private:
     // Array2D Private Members
     Bounds2i extent;
-    allocator_type allocator;
+    Allocator allocator;
     T *values;
 };
 
@@ -638,7 +640,16 @@ class HashMap {
     using const_iterator = const iterator;
 
     // HashMap Public Methods
-    HashMap(Allocator alloc) : table(8, alloc), alloc(alloc) {}
+    PBRT_CPU_GPU
+    size_t size() const { return nStored; }
+    PBRT_CPU_GPU
+    size_t capacity() const { return table.size(); }
+    void Clear() {
+        table.clear();
+        nStored = 0;
+    }
+
+    HashMap(Allocator alloc) : table(8, alloc) {}
 
     HashMap(const HashMap &) = delete;
     HashMap &operator=(const HashMap &) = delete;
@@ -646,7 +657,7 @@ class HashMap {
     void Insert(const Key &key, const Value &value) {
         size_t offset = FindOffset(key);
         if (table[offset].has_value() == false) {
-            // Not there already; possibly grow.
+            // Grow hash table if it is too full
             if (3 * ++nStored > capacity()) {
                 Grow();
                 offset = FindOffset(key);
@@ -666,21 +677,15 @@ class HashMap {
     }
 
     PBRT_CPU_GPU
-    size_t size() const { return nStored; }
-    PBRT_CPU_GPU
-    size_t capacity() const { return table.size(); }
-    void Clear() { table.clear(); }
-
-    PBRT_CPU_GPU
     iterator begin() {
-        Iterator iter(table.data(), table.data() + table.size());
+        Iterator iter(table.data(), table.data() + capacity());
         while (iter.ptr < iter.end && !iter.ptr->has_value())
             ++iter.ptr;
         return iter;
     }
     PBRT_CPU_GPU
     iterator end() {
-        return Iterator(table.data() + table.size(), table.data() + table.size());
+        return Iterator(table.data() + capacity(), table.data() + capacity());
     }
 
   private:
@@ -689,18 +694,18 @@ class HashMap {
     size_t FindOffset(const Key &key) const {
         size_t baseOffset = Hash()(key) & (capacity() - 1);
         for (int nProbes = 0;; ++nProbes) {
-            // Quadratic probing.
+            // Find offset for _key_ using quadratic probing
             size_t offset =
                 (baseOffset + nProbes / 2 + nProbes * nProbes / 2) & (capacity() - 1);
-            if (table[offset].has_value() == false || key == table[offset]->first) {
+            if (table[offset].has_value() == false || key == table[offset]->first)
                 return offset;
-            }
         }
     }
 
     void Grow() {
         size_t currentCapacity = capacity();
-        pstd::vector<TableEntry> newTable(std::max<size_t>(64, 2 * currentCapacity));
+        pstd::vector<TableEntry> newTable(std::max<size_t>(64, 2 * currentCapacity),
+                                          table.get_allocator());
         size_t newCapacity = newTable.size();
         for (size_t i = 0; i < currentCapacity; ++i) {
             // Insert _table[i]_ into _newTable_ if it is set
@@ -722,7 +727,6 @@ class HashMap {
     // HashMap Private Members
     pstd::vector<TableEntry> table;
     size_t nStored = 0;
-    Allocator alloc;
 };
 
 // SampledGrid Definition

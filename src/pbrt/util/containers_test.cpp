@@ -107,3 +107,24 @@ TEST(HashMap, Randoms) {
     EXPECT_EQ(nVisited, 10000);
     EXPECT_EQ(0, values.size());
 }
+
+TEST(TypePack, Index) {
+    using Pack = TypePack<int, float, double>;
+
+    // Extra parens so EXPECT_TRUE doesn't get confused by the comma
+    EXPECT_EQ(0, (TypeIndex<int, Pack>::count));
+    EXPECT_EQ(1, (TypeIndex<float, Pack>::count));
+    EXPECT_EQ(2, (TypeIndex<double, Pack>::count));
+}
+
+TEST(TypePack, HasType) {
+    using Pack = TypePack<signed int, float, double>;
+
+    // Extra parens so EXPECT_TRUE doesn't get confused by the comma
+    EXPECT_TRUE((HasType<int, Pack>::value));
+    EXPECT_TRUE((HasType<float, Pack>::value));
+    EXPECT_TRUE((HasType<double, Pack>::value));
+
+    EXPECT_FALSE((HasType<char, Pack>::value));
+    EXPECT_FALSE((HasType<unsigned int, Pack>::value));
+}
