@@ -193,6 +193,10 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
             if (bsdf.IsNonSpecular()) {
                 // Choose a light source using the LightSampler.
                 LightSampleContext ctx(me.pi, me.n, ns);
+                if (bsdf.HasReflection() && !bsdf.HasTransmission())
+                    ctx.pi = OffsetRayOrigin(ctx.pi, me.n, wo);
+                else if (bsdf.HasTransmission() && !bsdf.HasReflection())
+                    ctx.pi = OffsetRayOrigin(ctx.pi, me.n, -wo);
                 pstd::optional<SampledLight> sampledLight =
                     lightSampler.Sample(ctx, raySamples.direct.uc);
                 if (!sampledLight)
