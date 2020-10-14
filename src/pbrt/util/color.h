@@ -482,34 +482,18 @@ inline void ColorEncodingHandle::FromLinear(pstd::span<const Float> vin,
 }
 
 PBRT_CPU_GPU
-inline Float LinearToSRGBFull(Float value) {
+inline Float LinearToSRGB(Float value) {
     if (value <= 0.0031308f)
         return 12.92f * value;
-    return 1.055f * std::pow(value, (Float)(1.f / 2.4f)) - 0.055f;
-}
-
-struct PiecewiseLinearSegment {
-    Float base, slope;
-};
-
-// Piecewise linear fit to LinearToSRGBFull() (via Mathematica).
-// Table size 1024 gave avg error: 7.36217e-07, max: 0.000284649
-// 512 gave avg: 1.76644e-06, max: 0.000490334
-// 256 gave avg: 5.68012e-06, max: 0.00116351
-// 128 gave avg: 2.90114e-05, max: 0.00502084
-// 256 seemed like a reasonable trade-off.
-
-extern PBRT_CONST PiecewiseLinearSegment LinearToSRGBPiecewise[];
-constexpr int LinearToSRGBPiecewiseSize = 256;
-
-PBRT_CPU_GPU
-inline Float LinearToSRGB(Float value) {
-    int index = int(value * LinearToSRGBPiecewiseSize);
-    if (index < 0)
-        return 0;
-    if (index >= LinearToSRGBPiecewiseSize)
-        return 1;
-    return LinearToSRGBPiecewise[index].base + value * LinearToSRGBPiecewise[index].slope;
+    // Minimax polynomial approximation from enoki's color.h.
+    Float sqrtValue = SafeSqrt(value);
+    Float p = EvaluatePolynomial(sqrtValue, -0.0016829072605308378f, 0.03453868659826638f,
+                                 0.7642611304733891f, 2.0041169284241644f,
+                                 0.7551545191665577f, -0.016202083165206348f);
+    Float q = EvaluatePolynomial(sqrtValue, 4.178892964897981e-7f,
+                                 -0.00004375359692957097f, 0.03467195408529984f,
+                                 0.6085338522168684f, 1.8970238036421054f, 1.f);
+    return p / q * value;
 }
 
 PBRT_CPU_GPU
@@ -518,14 +502,20 @@ inline uint8_t LinearToSRGB8(Float value, Float dither = 0) {
         return 0;
     if (value >= 1)
         return 255;
-    return Clamp(255.f * LinearToSRGB(value) + dither, 0, 255);
+    return Clamp(std::round(255.f * LinearToSRGB(value) + dither), 0, 255);
 }
 
 PBRT_CPU_GPU
 inline Float SRGBToLinear(Float value) {
     if (value <= 0.04045f)
         return value * (1 / 12.92f);
-    return std::pow((value + 0.055f) * (1 / 1.055f), (Float)2.4f);
+    // Minimax polynomial approximation from enoki's color.h.
+    Float p = EvaluatePolynomial(value, -0.0163933279112946f, -0.7386328024653209f,
+                                 -11.199318357635072f, -47.46726633009393f,
+                                 -36.04572663838034f);
+    Float q = EvaluatePolynomial(value, -0.004261480793199332f, -19.140923959601675f,
+                                 -59.096406619244426f, -18.225745396846637f, 1.f);
+    return p / q * value;
 }
 
 extern PBRT_CONST Float SRGBToLinearLUT[256];

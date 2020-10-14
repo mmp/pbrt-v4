@@ -168,26 +168,26 @@ TEST(RGBIlluminantSpectrum, RoundTripACES) {
     }
 }
 
-TEST(SRGB, LUTAccuracy) {
-    const int n = 1024 * 1024;
-    double sumErr = 0, maxErr = 0;
-    RNG rng;
-    for (int i = 0; i < n; ++i) {
-        Float v = (i + rng.Uniform<Float>()) / n;
-        Float lut = LinearToSRGB(v);
-        Float precise = LinearToSRGBFull(v);
-        double err = std::abs(lut - precise);
-        sumErr += err;
-        maxErr = std::max(err, maxErr);
+TEST(sRGB, Conversion) {
+    // Check the basic 8 bit values
+    for (int i = 0; i < 256; ++i) {
+        Float x = SRGBToLinear(i * (1.f / 255.f));
+        Float y = SRGB8ToLinear(i);
+        EXPECT_LT(std::abs(x - y), 1e-5);
     }
-    // These bounds were measured empirically.
-    EXPECT_LT(sumErr / n, 6e-6);  // average error
-    EXPECT_LT(maxErr, 0.0015);
-}
 
-TEST(SRGB, 8ToLinearTable) {
-    for (int v = 0; v < 255; ++v) {
-        float err = std::abs(SRGBToLinear(v / 255.f) - SRGB8ToLinear(v));
-        EXPECT_LT(err, 1e-6);
+    // Round trip to linear and back
+    for (int i = 0; i < 256; ++i) {
+        Float x = SRGBToLinear(i * (1.f / 255.f));
+        Float y = LinearToSRGB(x) * 255.f;
+        EXPECT_LT(std::abs(i - y), 1e-4);
+    }
+
+    // Round trip the other way
+    for (int i = 0; i < 256; ++i) {
+        Float x = LinearToSRGB(i * (1.f / 255.f));
+        Float y = SRGBToLinear(x) * 255.f;
+        EXPECT_LT(std::abs(i - y), 3e-4) <<
+            StringPrintf("i = %d -> linear %f -> srgb %f", i, x, y);
     }
 }
