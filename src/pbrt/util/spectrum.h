@@ -532,7 +532,6 @@ class RGBSpectrum {
   private:
     // RGBSpectrum Private Members
     Float scale = 1;
-    RGB rgb;
     RGBSigmoidPolynomial rsp;
 };
 
@@ -565,7 +564,6 @@ class RGBIlluminantSpectrum {
 
   private:
     // RGBIlluminantSpectrum Private Members
-    RGB rgb;
     Float scale;
     RGBSigmoidPolynomial rsp;
     const DenselySampledSpectrum *illuminant;
