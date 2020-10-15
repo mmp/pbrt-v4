@@ -1023,7 +1023,7 @@ BilinearPatch::BilinearPatch(const BilinearPatchMesh *mesh, int meshIndex, int b
     const int *v = &mesh->vertexIndices[4 * blpIndex];
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
-    if (IsRectangle())
+    if (IsRectangle(mesh))
         area = Distance(p00, p01) * Distance(p00, p10);
     else {
         // Compute approximate area of bilinear patch
@@ -1144,7 +1144,7 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(Point2f u) const {
     if (mesh->imageDistribution) {
         uv = mesh->imageDistribution->Sample(u, &pdf);
         uv[1] = 1 - uv[1];
-    } else if (!IsRectangle()) {
+    } else if (!IsRectangle(mesh)) {
         // Sample patch $(u,v)$ with approximate uniform area sampling
         // Initialize _w_ array with differential area at bilinear patch corners
         pstd::array<Float, 4> w = {
@@ -1190,7 +1190,7 @@ Float BilinearPatch::PDF(const Interaction &intr) const {
     Float pdf;
     if (mesh->imageDistribution)
         pdf = mesh->imageDistribution->PDF(Point2f(intr.uv[0], 1 - intr.uv[1]));
-    else if (!IsRectangle()) {
+    else if (!IsRectangle(mesh)) {
         // Initialize _w_ array with differential area at bilinear patch corners
         pstd::array<Float, 4> w = {
             Length(Cross(p10 - p00, p01 - p00)), Length(Cross(p10 - p00, p11 - p10)),
@@ -1222,7 +1222,7 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,
     Vector3f v00 = Normalize(p00 - ctx.p()), v10 = Normalize(p10 - ctx.p());
     Vector3f v01 = Normalize(p01 - ctx.p()), v11 = Normalize(p11 - ctx.p());
 
-    if (IsRectangle() && !mesh->imageDistribution &&
+    if (IsRectangle(mesh) && !mesh->imageDistribution &&
         SphericalQuadArea(v00, v10, v11, v01) > MinSphericalSampleArea) {
         // Sample direction to rectanglular bilinear patch
         Float pdf = 1;
@@ -1291,7 +1291,7 @@ Float BilinearPatch::PDF(const ShapeSampleContext &ctx, const Vector3f &wi) cons
     Vector3f v00 = Normalize(p00 - ctx.p()), v10 = Normalize(p10 - ctx.p());
     Vector3f v01 = Normalize(p01 - ctx.p()), v11 = Normalize(p11 - ctx.p());
 
-    if (IsRectangle() && !GetMesh()->imageDistribution &&
+    if (IsRectangle(mesh) && !mesh->imageDistribution &&
         SphericalQuadArea(v00, v10, v11, v01) > MinSphericalSampleArea) {
         // Return PDF for sample in spherical rectangle
         Float pdf = 1 / SphericalQuadArea(v00, v10, v11, v01);

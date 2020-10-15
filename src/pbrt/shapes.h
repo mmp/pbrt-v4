@@ -1485,13 +1485,10 @@ class BilinearPatch {
     }
 
     PBRT_CPU_GPU
-    bool IsRectangle() const {
-        // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
-        const BilinearPatchMesh *mesh = GetMesh();
+    bool IsRectangle(const BilinearPatchMesh *mesh) const {
         const int *v = &mesh->vertexIndices[4 * blpIndex];
         const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
         const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
-
         if (p00 == p01 || p01 == p11 || p11 == p10 || p10 == p00)
             return false;
         // Check if bilinear patch vertices are coplanar
