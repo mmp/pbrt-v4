@@ -17,25 +17,25 @@ namespace pbrt {
 // RenderingCoordinateSystem Definition
 enum class RenderingCoordinateSystem { Camera, CameraWorld, World };
 
-// BasicOptions Definition
-struct BasicOptions {
-    int nThreads = 0;
+// BasicPBRTOptions Definition
+struct BasicPBRTOptions {
     int seed = 0;
-    bool quickRender = false;
     bool quiet = false;
-    bool recordPixelStatistics = false;
-    bool upgrade = false;
     bool disablePixelJitter = false, disableWavelengthJitter = false;
     bool forceDiffuse = false;
-    bool useGPU = false;
     RenderingCoordinateSystem renderingSpace = RenderingCoordinateSystem::CameraWorld;
 };
 
 // PBRTOptions Definiton
-struct PBRTOptions : BasicOptions {
+struct PBRTOptions : BasicPBRTOptions {
+    int nThreads = 0;
     LogLevel logLevel = LogLevel::Error;
+    bool useGPU = false;
+    bool recordPixelStatistics = false;
     pstd::optional<int> pixelSamples;
     pstd::optional<int> gpuDevice;
+    bool quickRender = false;
+    bool upgrade = false;
     std::string imageFile;
     std::string mseReferenceImage, mseReferenceOutput;
     std::string debugStart;
@@ -50,10 +50,13 @@ struct PBRTOptions : BasicOptions {
 extern PBRTOptions *Options;
 
 #if defined(PBRT_BUILD_GPU_RENDERER) && defined(__CUDACC__)
-extern __constant__ BasicOptions OptionsGPU;
+extern __constant__ BasicPBRTOptions OptionsGPU;
 #endif
 
-PBRT_CPU_GPU inline const BasicOptions &GetOptions() {
+// Options Inline Functions
+PBRT_CPU_GPU inline const BasicPBRTOptions &GetOptions();
+
+PBRT_CPU_GPU inline const BasicPBRTOptions &GetOptions() {
 #if defined(PBRT_IS_GPU_CODE)
     return OptionsGPU;
 #else

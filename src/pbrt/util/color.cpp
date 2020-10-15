@@ -35,14 +35,11 @@ RGBSigmoidPolynomial RGBToSpectrumTable::operator()(const RGB &rgb) const {
     CHECK(rgb[0] >= 0.f && rgb[1] >= 0.f && rgb[2] >= 0.f && rgb[0] <= 1.f &&
           rgb[1] <= 1.f && rgb[2] <= 1.f);
 
-    /// Analytic solution for uniform RGB values
+    // Find largest RGB component and handle uniform _rgb_
     if (rgb[0] == rgb[1] && rgb[1] == rgb[2]) {
-        Float v = rgb[0],
-              inv = (v - .5f) / std::sqrt(v*(1.f - v));
+        Float v = rgb[0], inv = (v - .5f) / std::sqrt(v * (1.f - v));
         return {Float(0), Float(0), inv};
     }
-
-    // Find largest RGB component
     int i = 0;
     for (int j = 1; j < 3; ++j)
         if (rgb[j] >= rgb[i])
@@ -207,6 +204,24 @@ std::string XYZ::ToString() const {
 }
 
 // ColorEncoding Method Definitions
+void sRGBColorEncoding::FromLinear(pstd::span<const Float> vin,
+                                   pstd::span<uint8_t> vout) const {
+    DCHECK_EQ(vin.size(), vout.size());
+    for (size_t i = 0; i < vin.size(); ++i)
+        vout[i] = LinearToSRGB8(vin[i]);
+}
+
+void sRGBColorEncoding::ToLinear(pstd::span<const uint8_t> vin,
+                                 pstd::span<Float> vout) const {
+    DCHECK_EQ(vin.size(), vout.size());
+    for (size_t i = 0; i < vin.size(); ++i)
+        vout[i] = SRGB8ToLinear(vin[i]);
+}
+
+Float sRGBColorEncoding::ToFloatLinear(Float v) const {
+    return SRGBToLinear(v);
+}
+
 std::string ColorEncodingHandle::ToString() const {
     if (!ptr())
         return "(nullptr)";
@@ -242,24 +257,6 @@ const ColorEncodingHandle ColorEncodingHandle::Get(const std::string &name) {
         LOG_VERBOSE("Added ColorEncoding %s for gamma %f -> %s", name, gamma, enc);
         return enc;
     }
-}
-
-void sRGBColorEncoding::ToLinear(pstd::span<const uint8_t> vin,
-                                 pstd::span<Float> vout) const {
-    DCHECK_EQ(vin.size(), vout.size());
-    for (size_t i = 0; i < vin.size(); ++i)
-        vout[i] = SRGB8ToLinear(vin[i]);
-}
-
-Float sRGBColorEncoding::ToFloatLinear(Float v) const {
-    return SRGBToLinear(v);
-}
-
-void sRGBColorEncoding::FromLinear(pstd::span<const Float> vin,
-                                   pstd::span<uint8_t> vout) const {
-    DCHECK_EQ(vin.size(), vout.size());
-    for (size_t i = 0; i < vin.size(); ++i)
-        vout[i] = LinearToSRGB8(vin[i]);
 }
 
 GammaColorEncoding::GammaColorEncoding(Float gamma) : gamma(gamma) {

@@ -112,9 +112,9 @@ TEST(TypePack, Index) {
     using Pack = TypePack<int, float, double>;
 
     // Extra parens so EXPECT_TRUE doesn't get confused by the comma
-    EXPECT_EQ(0, (TypeIndex<int, Pack>::count));
-    EXPECT_EQ(1, (TypeIndex<float, Pack>::count));
-    EXPECT_EQ(2, (TypeIndex<double, Pack>::count));
+    EXPECT_EQ(0, (IndexOf<int, Pack>::count));
+    EXPECT_EQ(1, (IndexOf<float, Pack>::count));
+    EXPECT_EQ(2, (IndexOf<double, Pack>::count));
 }
 
 TEST(TypePack, HasType) {

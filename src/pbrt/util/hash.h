@@ -72,8 +72,7 @@ PBRT_CPU_GPU inline uint64_t hashInternal(uint64_t hash, T v, Args... args) {
 }
 
 // Hashing Inline Functions
-PBRT_CPU_GPU
-inline uint64_t HashBuffer(const void *ptr, size_t size, uint64_t seed = 0) {
+PBRT_CPU_GPU inline uint64_t HashBuffer(const void *ptr, size_t size, uint64_t seed = 0) {
     return MurmurHash64A(ptr, size, seed);
 }
 

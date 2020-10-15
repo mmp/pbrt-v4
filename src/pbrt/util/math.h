@@ -83,7 +83,7 @@ class CompensatedSum {
     std::string ToString() const;
 
   private:
-    Float sum = 0., c = 0.;
+    Float sum = 0, c = 0;
 };
 
 // CompensatedFloat Definition
@@ -166,18 +166,15 @@ PBRT_CPU_GPU inline Float Mod(Float a, Float b) {
 }
 
 // (0,0): v[0], (1, 0): v[1], (0, 1): v[2], (1, 1): v[3]
-PBRT_CPU_GPU
-inline Float Bilerp(pstd::array<Float, 2> p, pstd::span<const Float> v) {
+PBRT_CPU_GPU inline Float Bilerp(pstd::array<Float, 2> p, pstd::span<const Float> v) {
     return ((1 - p[0]) * (1 - p[1]) * v[0] + p[0] * (1 - p[1]) * v[1] +
             (1 - p[0]) * p[1] * v[2] + p[0] * p[1] * v[3]);
 }
 
-PBRT_CPU_GPU
-inline Float Radians(Float deg) {
+PBRT_CPU_GPU inline Float Radians(Float deg) {
     return (Pi / 180) * deg;
 }
-PBRT_CPU_GPU
-inline Float Degrees(Float rad) {
+PBRT_CPU_GPU inline Float Degrees(Float rad) {
     return (180 / Pi) * rad;
 }
 
@@ -433,19 +430,16 @@ PBRT_CPU_GPU inline Float GaussianIntegral(Float x0, Float x1, Float mu = 0,
     return 0.5f * (std::erf((mu - x0) / sigmaRoot2) - std::erf((mu - x1) / sigmaRoot2));
 }
 
-PBRT_CPU_GPU
-inline Float Logistic(Float x, Float s) {
+PBRT_CPU_GPU inline Float Logistic(Float x, Float s) {
     x = std::abs(x);
     return std::exp(-x / s) / (s * Sqr(1 + std::exp(-x / s)));
 }
 
-PBRT_CPU_GPU
-inline Float LogisticCDF(Float x, Float s) {
+PBRT_CPU_GPU inline Float LogisticCDF(Float x, Float s) {
     return 1 / (1 + std::exp(-x / s));
 }
 
-PBRT_CPU_GPU
-inline Float TrimmedLogistic(Float x, Float s, Float a, Float b) {
+PBRT_CPU_GPU inline Float TrimmedLogistic(Float x, Float s, Float a, Float b) {
     DCHECK_LT(a, b);
     return Logistic(x, s) / (LogisticCDF(b, s) - LogisticCDF(a, s));
 }
@@ -646,6 +640,29 @@ PBRT_CPU_GPU inline Float NewtonBisection(Float x0, Float x1, Func f, Float xEps
     }
 }
 
+template <int N>
+pstd::optional<SquareMatrix<N>> LinearLeastSquares(const Float A[][N], const Float B[][N],
+                                                   int rows);
+
+template <int N>
+pstd::optional<SquareMatrix<N>> LinearLeastSquares(const Float A[][N], const Float B[][N],
+                                                   int rows) {
+    SquareMatrix<N> AtA = SquareMatrix<N>::Zero();
+    SquareMatrix<N> AtB = SquareMatrix<N>::Zero();
+
+    for (int i = 0; i < N; ++i)
+        for (int j = 0; j < N; ++j)
+            for (int r = 0; r < rows; ++r) {
+                AtA[i][j] += A[r][i] * A[r][j];
+                AtB[i][j] += A[r][i] * B[r][j];
+            }
+
+    auto AtAi = Inverse(AtA);
+    if (!AtAi)
+        return {};
+    return Transpose(*AtAi * AtB);
+}
+
 PBRT_CPU_GPU
 inline Float SmoothStep(Float x, Float a, Float b) {
     if (a == b)
@@ -658,12 +675,8 @@ inline Float SmoothStep(Float x, Float a, Float b) {
 // Math Function Declarations
 int NextPrime(int x);
 
-pstd::optional<SquareMatrix<3>> LinearLeastSquares(const Float A[][3], const Float B[][3],
-                                                   int rows);
-
 // Permutation Inline Function Declarations
-PBRT_CPU_GPU
-inline int PermutationElement(uint32_t i, uint32_t n, uint32_t seed);
+PBRT_CPU_GPU inline int PermutationElement(uint32_t i, uint32_t n, uint32_t seed);
 
 PBRT_CPU_GPU
 inline int PermutationElement(uint32_t i, uint32_t l, uint32_t p) {

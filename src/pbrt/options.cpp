@@ -11,7 +11,7 @@ namespace pbrt {
 PBRTOptions *Options;
 
 #if defined(PBRT_BUILD_GPU_RENDERER)
-__constant__ BasicOptions OptionsGPU;
+__constant__ BasicPBRTOptions OptionsGPU;
 #endif
 
 std::string PBRTOptions::ToString() const {

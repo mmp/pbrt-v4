@@ -260,7 +260,7 @@ pstd::optional<SquareMatrix<3>> PixelSensor::SolveXYZFromSensorRGB(
             xyzOutput[i][c] = xyz[c];
     }
 
-    return LinearLeastSquares(rgbCamera, xyzOutput, swatchReflectances.size());
+    return LinearLeastSquares<3>(rgbCamera, xyzOutput, swatchReflectances.size());
 }
 
 // Swatch reflectances are taken from Danny Pascale's Macbeth chart measurements

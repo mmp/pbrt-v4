@@ -16,36 +16,21 @@
 
 namespace pbrt {
 
-namespace detail {
-
 // TaggedPointer Helper Templates
-template <typename Enable, typename T, typename... Ts>
-struct TypeIndexHelper_impl;
-
-template <typename T, typename... Ts>
-struct TypeIndexHelper_impl<void, T, T, Ts...> {
-    static constexpr size_t value = 1;
-};
-
-template <typename T, typename U, typename... Ts>
-struct TypeIndexHelper_impl<
-    typename std::enable_if_t<std::is_base_of<U, T>::value && !std::is_same<T, U>::value>,
-    T, U, Ts...> {
-    static constexpr size_t value = 1;
-};
-
-template <typename T, typename U, typename... Ts>
-struct TypeIndexHelper_impl<typename std::enable_if_t<!std::is_base_of<U, T>::value &&
-                                                      !std::is_same<T, U>::value>,
-                            T, U, Ts...> {
-    static constexpr size_t value = 1 + TypeIndexHelper_impl<void, T, Ts...>::value;
-};
-
-template <typename T, typename... Ts>
-class TypeIndexHelper : public TypeIndexHelper_impl<void, T, Ts...> {};
-
 template <int n>
-struct DispatchSplit;
+struct DispatchSplit {
+    template <typename F, typename Tp, typename... Ts>
+    PBRT_CPU_GPU inline auto operator()(F func, Tp tp, int tag, TypePack<Ts...> types) {
+        // Recursively consider half of the candidate types depending on _tag_
+        constexpr int mid = n / 2;
+        if (tag - 1 < mid)
+            return DispatchSplit<mid>()(
+                func, tp, tag, typename TakeFirstN<mid, TypePack<Ts...>>::type());
+        else
+            return DispatchSplit<n - mid>()(
+                func, tp, tag - mid, typename RemoveFirstN<mid, TypePack<Ts...>>::type());
+    }
+};
 
 template <>
 struct DispatchSplit<1> {
@@ -55,20 +40,6 @@ struct DispatchSplit<1> {
         static_assert(sizeof...(Ts) == 1);
         using T = typename GetFirst<TypePack<Ts...>>::type;
         return func(tp.template Cast<T>());
-    }
-};
-
-template <int n>
-struct DispatchSplit {
-    template <typename F, typename Tp, typename... Ts>
-    PBRT_CPU_GPU inline auto operator()(F func, Tp tp, int tag, TypePack<Ts...> types) {
-        constexpr int mid = n / 2;
-        if (tag - 1 < mid)  // 0-based indexing here to be more traditional
-            return DispatchSplit<mid>()(
-                func, tp, tag, typename TakeFirstN<mid, TypePack<Ts...>>::type());
-        else
-            return DispatchSplit<n - mid>()(
-                func, tp, tag - mid, typename RemoveFirstN<mid, TypePack<Ts...>>::type());
     }
 };
 
@@ -138,8 +109,6 @@ struct DispatchSplitCPU {
     }
 };
 
-}  // namespace detail
-
 // TaggedPointer Definition
 template <typename... Ts>
 class TaggedPointer {
@@ -152,10 +121,8 @@ class TaggedPointer {
     template <typename T>
     PBRT_CPU_GPU TaggedPointer(T *ptr) {
         uintptr_t iptr = reinterpret_cast<uintptr_t>(ptr);
-        // Reminder: if this CHECK hits, it's likely that the class
-        // involved needs an alignas(8).
         DCHECK_EQ(iptr & ptrMask, iptr);
-        constexpr uint16_t type = TypeIndex<T>();
+        constexpr unsigned int type = TypeIndex<T>();
         bits = iptr | ((uintptr_t)type << tagShift);
     }
 
@@ -171,21 +138,25 @@ class TaggedPointer {
     }
 
     template <typename T>
-    PBRT_CPU_GPU static constexpr uint16_t TypeIndex() {
-        return uint16_t(detail::TypeIndexHelper<T, Ts...>::value);
+    PBRT_CPU_GPU static constexpr unsigned int TypeIndex() {
+        using Tp = typename std::remove_cv_t<T>;
+        if constexpr (std::is_same_v<Tp, std::nullptr_t>)
+            return 0;
+        else
+            return 1 + pbrt::IndexOf<Tp, Types>::count;
     }
 
     PBRT_CPU_GPU
-    uint16_t Tag() const { return uint16_t((bits & tagMask) >> tagShift); }
-    PBRT_CPU_GPU
-    static constexpr uint16_t MaxTag() { return sizeof...(Ts); }
-    PBRT_CPU_GPU
-    static constexpr uint16_t NumTags() { return MaxTag() + 1; }
-
+    unsigned int Tag() const { return ((bits & tagMask) >> tagShift); }
     template <typename T>
     PBRT_CPU_GPU bool Is() const {
         return Tag() == TypeIndex<T>();
     }
+
+    PBRT_CPU_GPU
+    static constexpr unsigned int MaxTag() { return sizeof...(Ts); }
+    PBRT_CPU_GPU
+    static constexpr unsigned int NumTags() { return MaxTag() + 1; }
 
     PBRT_CPU_GPU
     explicit operator bool() const { return (bits & ptrMask) != 0; }
@@ -212,6 +183,7 @@ class TaggedPointer {
         else
             return nullptr;
     }
+
     template <typename T>
     PBRT_CPU_GPU const T *CastOrNullptr() const {
         if (Is<T>())
@@ -231,49 +203,49 @@ class TaggedPointer {
 
     PBRT_CPU_GPU
     void *ptr() { return reinterpret_cast<void *>(bits & ptrMask); }
+
     PBRT_CPU_GPU
     const void *ptr() const { return reinterpret_cast<const void *>(bits & ptrMask); }
 
     template <typename F>
     PBRT_CPU_GPU inline auto Dispatch(F func) {
         DCHECK(ptr() != nullptr);
-        constexpr int n = MaxTag();
-        return detail::DispatchSplit<n>()(func, *this, Tag(), Types());
+        return DispatchSplit<MaxTag()>()(func, *this, Tag(), Types());
     }
 
     template <typename F>
     PBRT_CPU_GPU inline auto Dispatch(F func) const {
         DCHECK(ptr() != nullptr);
         constexpr int n = MaxTag();
-        return detail::DispatchSplit<n>()(func, *this, Tag(), Types());
+        return DispatchSplit<n>()(func, *this, Tag(), Types());
     }
 
     template <typename F>
     PBRT_CPU_GPU inline auto DispatchCRef(F func) -> auto && {
         DCHECK(ptr() != nullptr);
         constexpr int n = MaxTag();
-        return detail::DispatchSplitCRef<n>()(func, *this, Tag(), Types());
+        return DispatchSplitCRef<n>()(func, *this, Tag(), Types());
     }
 
     template <typename F>
     PBRT_CPU_GPU inline auto DispatchCRef(F func) const -> auto && {
         DCHECK(ptr() != nullptr);
         constexpr int n = MaxTag();
-        return detail::DispatchSplitCRef<n>()(func, *this, Tag(), Types());
+        return DispatchSplitCRef<n>()(func, *this, Tag(), Types());
     }
 
     template <typename F>
     inline auto DispatchCPU(F func) {
         DCHECK(ptr() != nullptr);
         constexpr int n = MaxTag();
-        return detail::DispatchSplitCPU<n>()(func, *this, Tag(), Types());
+        return DispatchSplitCPU<n>()(func, *this, Tag(), Types());
     }
 
     template <typename F>
     inline auto DispatchCPU(F func) const {
         DCHECK(ptr() != nullptr);
         constexpr int n = MaxTag();
-        return detail::DispatchSplitCPU<n>()(func, *this, Tag(), Types());
+        return DispatchSplitCPU<n>()(func, *this, Tag(), Types());
     }
 
     template <typename F>
@@ -285,7 +257,8 @@ class TaggedPointer {
     static_assert(sizeof(uintptr_t) == 8, "Expected uintptr_t to be 64 bits");
     // TaggedPointer Private Members
     static constexpr int tagShift = 48;
-    static constexpr uint64_t tagMask = (((1ull << 16) - 1) << tagShift);
+    static constexpr int tagBits = 64 - tagShift;
+    static constexpr uint64_t tagMask = ((1ull << tagBits) - 1) << tagShift;
     static constexpr uint64_t ptrMask = ~tagMask;
     uintptr_t bits = 0;
 };

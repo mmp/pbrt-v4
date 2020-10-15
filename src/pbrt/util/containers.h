@@ -30,19 +30,19 @@ struct TypePack {
 
 // TypePack Operations
 template <typename T, typename... Ts>
-struct TypeIndex {
+struct IndexOf {
     static constexpr int count = 0;
     static_assert(!std::is_same_v<T, T>, "Type not present in TypePack");
 };
 
 template <typename T, typename... Ts>
-struct TypeIndex<T, TypePack<T, Ts...>> {
+struct IndexOf<T, TypePack<T, Ts...>> {
     static constexpr int count = 0;
 };
 
 template <typename T, typename U, typename... Ts>
-struct TypeIndex<T, TypePack<U, Ts...>> {
-    static constexpr int count = 1 + TypeIndex<T, TypePack<Ts...>>::count;
+struct IndexOf<T, TypePack<U, Ts...>> {
+    static constexpr int count = 1 + IndexOf<T, TypePack<Ts...>>::count;
 };
 
 template <typename T, typename... Ts>
@@ -757,7 +757,7 @@ class SampledGrid {
         Point3i pi = (Point3i)Floor(pSamples);
         Vector3f d = pSamples - (Point3f)pi;
 
-        // Trilinearly interpolate density values to compute local density
+        // Return trilinearly interpolated voxel values
         T d00 = Lerp(d.x, Lookup(pi), Lookup(pi + Vector3i(1, 0, 0)));
         T d10 = Lerp(d.x, Lookup(pi + Vector3i(0, 1, 0)), Lookup(pi + Vector3i(1, 1, 0)));
         T d01 = Lerp(d.x, Lookup(pi + Vector3i(0, 0, 1)), Lookup(pi + Vector3i(1, 0, 1)));
@@ -768,32 +768,9 @@ class SampledGrid {
     }
 
     PBRT_CPU_GPU
-    T Lookup(const Point3i &p) const {
-        Bounds3i sampleBounds(Point3i(0, 0, 0), Point3i(nx, ny, nz));
-        if (!InsideExclusive(p, sampleBounds))
-            return {};
-        return values[(p.z * ny + p.y) * nx + p.x];
-    }
+    T Lookup(const Point3i &p) const;
 
-    T MaximumValue(const Bounds3f &bounds) const {
-        Point3f ps[2] = {Point3f(bounds.pMin.x * nx - .5f, bounds.pMin.y * ny - .5f,
-                                 bounds.pMin.z * nz - .5f),
-                         Point3f(bounds.pMax.x * nx - .5f, bounds.pMax.y * ny - .5f,
-                                 bounds.pMax.z * nz - .5f)};
-        Point3i pi[2] = {Max(Point3i(Floor(ps[0])), Point3i(0, 0, 0)),
-                         Min(Point3i(Floor(ps[1])) + Vector3i(1, 1, 1),
-                             Point3i(nx - 1, ny - 1, nz - 1))};
-
-        T maxValue = Lookup(Point3i(pi[0]));
-        for (int z = pi[0].z; z <= pi[1].z; ++z)
-            for (int y = pi[0].y; y <= pi[1].y; ++y)
-                for (int x = pi[0].x; x <= pi[1].x; ++x) {
-                    using std::max;
-                    maxValue = max(maxValue, Lookup(Point3i(x, y, z)));
-                }
-
-        return maxValue;
-    }
+    T MaximumValue(const Bounds3f &bounds) const;
 
     std::string ToString() const {
         return StringPrintf("[ SampledGrid nx: %d ny: %d nz: %d values: %s ]", nx, ny, nz,
@@ -805,6 +782,36 @@ class SampledGrid {
     pstd::vector<T> values;
     int nx, ny, nz;
 };
+
+// SampledGrid Inline Methods
+template <typename T>
+PBRT_CPU_GPU inline T SampledGrid<T>::Lookup(const Point3i &p) const {
+    Bounds3i sampleBounds(Point3i(0, 0, 0), Point3i(nx, ny, nz));
+    if (!InsideExclusive(p, sampleBounds))
+        return {};
+    return values[(p.z * ny + p.y) * nx + p.x];
+}
+
+template <typename T>
+inline T SampledGrid<T>::MaximumValue(const Bounds3f &bounds) const {
+    Point3f ps[2] = {Point3f(bounds.pMin.x * nx - .5f, bounds.pMin.y * ny - .5f,
+                             bounds.pMin.z * nz - .5f),
+                     Point3f(bounds.pMax.x * nx - .5f, bounds.pMax.y * ny - .5f,
+                             bounds.pMax.z * nz - .5f)};
+    Point3i pi[2] = {
+        Max(Point3i(Floor(ps[0])), Point3i(0, 0, 0)),
+        Min(Point3i(Floor(ps[1])) + Vector3i(1, 1, 1), Point3i(nx - 1, ny - 1, nz - 1))};
+
+    T maxValue = Lookup(Point3i(pi[0]));
+    for (int z = pi[0].z; z <= pi[1].z; ++z)
+        for (int y = pi[0].y; y <= pi[1].y; ++y)
+            for (int x = pi[0].x; x <= pi[1].x; ++x) {
+                using std::max;
+                maxValue = max(maxValue, Lookup(Point3i(x, y, z)));
+            }
+
+    return maxValue;
+}
 
 }  // namespace pbrt
 

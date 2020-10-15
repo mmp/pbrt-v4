@@ -402,12 +402,12 @@ class ColorEncodingHandle
 
     PBRT_CPU_GPU inline Float ToFloatLinear(Float v) const;
 
-    static const ColorEncodingHandle Linear;
-    static const ColorEncodingHandle sRGB;
-
     std::string ToString() const;
 
     static const ColorEncodingHandle Get(const std::string &name);
+
+    static const ColorEncodingHandle Linear;
+    static const ColorEncodingHandle sRGB;
 };
 
 class LinearColorEncoding {
@@ -434,6 +434,7 @@ class LinearColorEncoding {
 
 class sRGBColorEncoding {
   public:
+    // sRGBColorEncoding Public Methods
     PBRT_CPU_GPU
     void ToLinear(pstd::span<const uint8_t> vin, pstd::span<Float> vout) const;
     PBRT_CPU_GPU

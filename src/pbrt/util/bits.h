@@ -118,8 +118,7 @@ inline uint32_t Compact1By2(uint32_t x) {
 }
 
 // http://zimbry.blogspot.ch/2011/09/better-bit-mixing-improving-on.html
-PBRT_CPU_GPU
-inline uint64_t MixBits(uint64_t v);
+PBRT_CPU_GPU inline uint64_t MixBits(uint64_t v);
 
 inline uint64_t MixBits(uint64_t v) {
     v ^= (v >> 31);

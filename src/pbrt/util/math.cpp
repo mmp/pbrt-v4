@@ -112,25 +112,6 @@ template SquareMatrix<2> operator*(const SquareMatrix<2> &m1, const SquareMatrix
 template class SquareMatrix<3>;
 template class SquareMatrix<4>;
 
-// Math Function Definitions
-pstd::optional<SquareMatrix<3>> LinearLeastSquares(const Float A[][3], const Float B[][3],
-                                                   int rows) {
-    SquareMatrix<3> AtA = SquareMatrix<3>::Zero();
-    SquareMatrix<3> AtB = SquareMatrix<3>::Zero();
-
-    for (int i = 0; i < 3; ++i)
-        for (int j = 0; j < 3; ++j)
-            for (int r = 0; r < rows; ++r) {
-                AtA[i][j] += A[r][i] * A[r][j];
-                AtB[i][j] += A[r][i] * B[r][j];
-            }
-
-    auto AtAi = Inverse(AtA);
-    if (!AtAi)
-        return {};
-    return Transpose(*AtAi * AtB);
-}
-
 int NextPrime(int x) {
     if (x == 2)
         return 3;

@@ -47,10 +47,9 @@ void PrintStackTrace();
     do {                                                                               \
         auto va = a;                                                                   \
         auto vb = b;                                                                   \
-        if (!(va op vb)) {                                                             \
+        if (!(va op vb))                                                               \
             LOG_FATAL("Check failed: %s " #op " %s with %s = %s, %s = %s", #a, #b, #a, \
                       va, #b, vb);                                                     \
-        }                                                                              \
     } while (false) /* swallow semicolon */
 
 #endif  // PBRT_IS_GPU_CODE
