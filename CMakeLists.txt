@@ -10,6 +10,8 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 # For sanitizers
 set (CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
+include("${CMAKE_SOURCE_DIR}/cmake/UserConfig.cmake" OPTIONAL)
+
 # Configuration options
 
 option (PBRT_FLOAT_AS_DOUBLE "Use 64-bit floats" OFF)
