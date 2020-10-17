@@ -67,9 +67,10 @@ void CPURender(ParsedScene &parsedScene) {
         parsedScene.camera.cameraTransform, film, &parsedScene.camera.loc, alloc);
 
     // Create _Sampler_ for rendering
-    SamplerHandle sampler = SamplerHandle::Create(
-        parsedScene.sampler.name, parsedScene.sampler.parameters,
-        camera.GetFilm().FullResolution(), &parsedScene.sampler.loc, alloc);
+    Point2i fullImageResolution = camera.GetFilm().FullResolution();
+    SamplerHandle sampler =
+        SamplerHandle::Create(parsedScene.sampler.name, parsedScene.sampler.parameters,
+                              fullImageResolution, &parsedScene.sampler.loc, alloc);
 
     // Textures
     NamedTextures textures = parsedScene.CreateTextures(alloc, false);

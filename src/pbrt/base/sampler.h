@@ -45,7 +45,7 @@ class SamplerHandle
 
     static SamplerHandle Create(const std::string &name,
                                 const ParameterDictionary &parameters,
-                                const Point2i &fullResolution, const FileLoc *loc,
+                                Point2i fullResolution, const FileLoc *loc,
                                 Allocator alloc);
 
     PBRT_CPU_GPU inline int SamplesPerPixel() const;

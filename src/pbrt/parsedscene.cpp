@@ -178,9 +178,7 @@ void ParsedScene::Camera(const std::string &name, ParsedParameterVector params,
 
 void ParsedScene::AttributeBegin(FileLoc loc) {
     VERIFY_WORLD("AttributeBegin");
-
     pushedGraphicsStates.push_back(graphicsState);
-
     pushStack.push_back(std::make_pair('a', loc));
 }
 
@@ -190,7 +188,6 @@ void ParsedScene::AttributeEnd(FileLoc loc) {
         Error(&loc, "Unmatched AttributeEnd encountered. Ignoring it.");
         return;
     }
-
     // NOTE: must keep the following consistent with code in ObjectEnd
     graphicsState = std::move(pushedGraphicsStates.back());
     pushedGraphicsStates.pop_back();
@@ -248,11 +245,7 @@ void ParsedScene::LightSource(const std::string &name, ParsedParameterVector par
     VERIFY_WORLD("LightSource");
     ParameterDictionary dict(std::move(params), graphicsState.lightAttributes,
                              graphicsState.colorSpace);
-    AnimatedTransform renderFromLight(
-        RenderFromObject(0), graphicsState.transformStartTime, RenderFromObject(1),
-        graphicsState.transformEndTime);
-
-    lights.push_back(LightSceneEntity(name, std::move(dict), loc, renderFromLight,
+    lights.push_back(LightSceneEntity(name, std::move(dict), loc, RenderFromObject(),
                                       graphicsState.currentOutsideMedium));
 }
 
@@ -279,9 +272,7 @@ void ParsedScene::Shape(const std::string &name, ParsedParameterVector params,
             as = &currentInstance->animatedShapes;
         }
 
-        AnimatedTransform renderFromShape(
-            RenderFromObject(0), graphicsState.transformStartTime, RenderFromObject(1),
-            graphicsState.transformEndTime);
+        AnimatedTransform renderFromShape = RenderFromObject();
         const class Transform *identity = transformCache.Lookup(pbrt::Transform());
 
         as->push_back(AnimatedShapeSceneEntity(
@@ -541,11 +532,7 @@ void ParsedScene::MakeNamedMedium(const std::string &name, ParsedParameterVector
         return;
     }
 
-    AnimatedTransform renderFromMedium(
-        RenderFromObject(0), graphicsState.transformStartTime, RenderFromObject(1),
-        graphicsState.transformEndTime);
-
-    media[name] = TransformedSceneEntity(name, std::move(dict), loc, renderFromMedium);
+    media[name] = TransformedSceneEntity(name, std::move(dict), loc, RenderFromObject());
 }
 
 void ParsedScene::MediumInterface(const std::string &insideName,
@@ -561,10 +548,6 @@ void ParsedScene::Texture(const std::string &name, const std::string &type,
 
     ParameterDictionary dict(std::move(params), graphicsState.textureAttributes,
                              graphicsState.colorSpace);
-
-    AnimatedTransform renderFromTexture(
-        RenderFromObject(0), graphicsState.transformStartTime, RenderFromObject(1),
-        graphicsState.transformEndTime);
 
     if (type != "float" && type != "spectrum") {
         ErrorExitDeferred(
@@ -582,7 +565,7 @@ void ParsedScene::Texture(const std::string &name, const std::string &type,
         }
 
     textures.push_back(std::make_pair(
-        name, TextureSceneEntity(texname, std::move(dict), loc, renderFromTexture)));
+        name, TextureSceneEntity(texname, std::move(dict), loc, RenderFromObject())));
 }
 
 void ParsedScene::Material(const std::string &name, ParsedParameterVector params,

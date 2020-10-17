@@ -382,6 +382,11 @@ class ParsedScene : public SceneRepresentation {
         return pbrt::Transform((renderFromWorld * graphicsState.ctm[index]).GetMatrix());
     }
 
+    AnimatedTransform RenderFromObject() const {
+        return {RenderFromObject(0), graphicsState.transformStartTime,
+                RenderFromObject(1), graphicsState.transformEndTime};
+    }
+
     bool CTMIsAnimated() const { return graphicsState.ctm.IsAnimated(); }
 
     // ParsedScene Private Members
