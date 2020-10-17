@@ -10,7 +10,7 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 # For sanitizers
 set (CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
-include("${CMAKE_SOURCE_DIR}/cmake/UserConfig.cmake" OPTIONAL)
+include("${CMAKE_SOURCE_DIR}/cmake/UserConfig.cmake" REQUIRED)
 
 # Configuration options
 
