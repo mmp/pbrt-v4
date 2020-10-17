@@ -307,8 +307,6 @@ class ParsedScene : public SceneRepresentation {
     void AttributeBegin(FileLoc loc);
     void AttributeEnd(FileLoc loc);
     void Attribute(const std::string &target, ParsedParameterVector params, FileLoc loc);
-    void TransformBegin(FileLoc loc);
-    void TransformEnd(FileLoc loc);
     void Texture(const std::string &name, const std::string &type,
                  const std::string &texname, ParsedParameterVector params, FileLoc loc);
     void Material(const std::string &name, ParsedParameterVector params, FileLoc loc);
@@ -374,33 +372,30 @@ class ParsedScene : public SceneRepresentation {
         ParsedParameterVector textureAttributes;
         bool reverseOrientation = false;
         const RGBColorSpace *colorSpace = RGBColorSpace::sRGB;
+        TransformSet ctm;
+        uint32_t activeTransformBits = AllTransformsBits;
+        Float transformStartTime = 0, transformEndTime = 1;
     };
 
     // ParsedScene Private Methods
     class Transform RenderFromObject(int index) const {
-        return pbrt::Transform((renderFromWorld * curTransform[index]).GetMatrix());
+        return pbrt::Transform((renderFromWorld * graphicsState.ctm[index]).GetMatrix());
     }
 
-    bool CTMIsAnimated() const { return curTransform.IsAnimated(); }
+    bool CTMIsAnimated() const { return graphicsState.ctm.IsAnimated(); }
 
     // ParsedScene Private Members
     GraphicsState graphicsState;
     enum class BlockState { OptionsBlock, WorldBlock };
     BlockState currentBlock = BlockState::OptionsBlock;
-    TransformSet curTransform;
-    uint32_t activeTransformBits = AllTransformsBits;
     static constexpr int StartTransformBits = 1 << 0;
     static constexpr int EndTransformBits = 1 << 1;
     static constexpr int AllTransformsBits = (1 << MaxTransforms) - 1;
     std::map<std::string, TransformSet> namedCoordinateSystems;
     class Transform renderFromWorld;
     TransformCache transformCache;
-    Float transformStartTime = 0, transformEndTime = 1;
     std::vector<GraphicsState> pushedGraphicsStates;
-    std::vector<TransformSet> pushedTransforms;
-    std::vector<uint32_t> pushedActiveTransformBits;
-    std::vector<std::pair<char, FileLoc>>
-        pushStack;  // 'a': attribute, 't': transform, 'o': object
+    std::vector<std::pair<char, FileLoc>> pushStack;  // 'a': attribute, 'o': object
     InstanceDefinitionSceneEntity *currentInstance = nullptr;
 };
 
@@ -424,6 +419,8 @@ class FormattingScene : public SceneRepresentation {
     void ActiveTransformEndTime(FileLoc loc);
     void ActiveTransformStartTime(FileLoc loc);
     void TransformTimes(Float start, Float end, FileLoc loc);
+    void TransformBegin(FileLoc loc);
+    void TransformEnd(FileLoc loc);
     void ColorSpace(const std::string &n, FileLoc loc);
     void PixelFilter(const std::string &name, ParsedParameterVector params, FileLoc loc);
     void Film(const std::string &type, ParsedParameterVector params, FileLoc loc);
@@ -439,8 +436,6 @@ class FormattingScene : public SceneRepresentation {
     void AttributeBegin(FileLoc loc);
     void AttributeEnd(FileLoc loc);
     void Attribute(const std::string &target, ParsedParameterVector params, FileLoc loc);
-    void TransformBegin(FileLoc loc);
-    void TransformEnd(FileLoc loc);
     void Texture(const std::string &name, const std::string &type,
                  const std::string &texname, ParsedParameterVector params, FileLoc loc);
     void Material(const std::string &name, ParsedParameterVector params, FileLoc loc);

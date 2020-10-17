@@ -97,8 +97,6 @@ class SceneRepresentation {
     virtual void AttributeEnd(FileLoc loc) = 0;
     virtual void Attribute(const std::string &target, ParsedParameterVector params,
                            FileLoc loc) = 0;
-    virtual void TransformBegin(FileLoc loc) = 0;
-    virtual void TransformEnd(FileLoc loc) = 0;
     virtual void Texture(const std::string &name, const std::string &type,
                          const std::string &texname, ParsedParameterVector params,
                          FileLoc loc) = 0;

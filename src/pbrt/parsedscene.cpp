@@ -72,10 +72,10 @@ ParsedScene::GraphicsState::GraphicsState() {
         return;                                                    \
     } else /* swallow trailing semicolon */
 
-#define FOR_ACTIVE_TRANSFORMS(expr)           \
-    for (int i = 0; i < MaxTransforms; ++i)   \
-        if (activeTransformBits & (1 << i)) { \
-            expr                              \
+#define FOR_ACTIVE_TRANSFORMS(expr)                         \
+    for (int i = 0; i < MaxTransforms; ++i)                 \
+        if (graphicsState.activeTransformBits & (1 << i)) { \
+            expr                                            \
         }
 
 STAT_MEMORY_COUNTER("Memory/TransformCache", transformCacheBytes);
@@ -138,21 +138,21 @@ void ParsedScene::ColorSpace(const std::string &name, FileLoc loc) {
 }
 
 void ParsedScene::Identity(FileLoc loc) {
-    FOR_ACTIVE_TRANSFORMS(curTransform[i] = pbrt::Transform();)
+    FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] = pbrt::Transform();)
 }
 
 void ParsedScene::Translate(Float dx, Float dy, Float dz, FileLoc loc) {
-    FOR_ACTIVE_TRANSFORMS(curTransform[i] =
-                              curTransform[i] * pbrt::Translate(Vector3f(dx, dy, dz));)
+    FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] = graphicsState.ctm[i] *
+                                                 pbrt::Translate(Vector3f(dx, dy, dz));)
 }
 
 void ParsedScene::CoordinateSystem(const std::string &name, FileLoc loc) {
-    namedCoordinateSystems[name] = curTransform;
+    namedCoordinateSystems[name] = graphicsState.ctm;
 }
 
 void ParsedScene::CoordSysTransform(const std::string &name, FileLoc loc) {
     if (namedCoordinateSystems.find(name) != namedCoordinateSystems.end())
-        curTransform = namedCoordinateSystems[name];
+        graphicsState.ctm = namedCoordinateSystems[name];
     else
         Warning(&loc, "Couldn't find named coordinate system \"%s\"", name);
 }
@@ -163,12 +163,13 @@ void ParsedScene::Camera(const std::string &name, ParsedParameterVector params,
 
     VERIFY_OPTIONS("Camera");
 
-    TransformSet cameraFromWorld = curTransform;
-    TransformSet worldFromCamera = Inverse(curTransform);
+    TransformSet cameraFromWorld = graphicsState.ctm;
+    TransformSet worldFromCamera = Inverse(graphicsState.ctm);
     namedCoordinateSystems["camera"] = Inverse(cameraFromWorld);
 
-    CameraTransform cameraTransform(AnimatedTransform(
-        worldFromCamera[0], transformStartTime, worldFromCamera[1], transformEndTime));
+    CameraTransform cameraTransform(
+        AnimatedTransform(worldFromCamera[0], graphicsState.transformStartTime,
+                          worldFromCamera[1], graphicsState.transformEndTime));
     renderFromWorld = cameraTransform.RenderFromWorld();
 
     camera = CameraSceneEntity(name, std::move(dict), loc, cameraTransform,
@@ -179,9 +180,6 @@ void ParsedScene::AttributeBegin(FileLoc loc) {
     VERIFY_WORLD("AttributeBegin");
 
     pushedGraphicsStates.push_back(graphicsState);
-
-    pushedTransforms.push_back(curTransform);
-    pushedActiveTransformBits.push_back(activeTransformBits);
 
     pushStack.push_back(std::make_pair('a', loc));
 }
@@ -197,16 +195,7 @@ void ParsedScene::AttributeEnd(FileLoc loc) {
     graphicsState = std::move(pushedGraphicsStates.back());
     pushedGraphicsStates.pop_back();
 
-    curTransform = pushedTransforms.back();
-    pushedTransforms.pop_back();
-    activeTransformBits = pushedActiveTransformBits.back();
-    pushedActiveTransformBits.pop_back();
-
-    if (pushStack.back().first == 't')
-        ErrorExitDeferred(
-            &loc, "Mismatched nesting: open TransformBegin from %s at AttributeEnd",
-            pushStack.back().second);
-    else if (pushStack.back().first == 'o')
+    if (pushStack.back().first == 'o')
         ErrorExitDeferred(&loc,
                           "Mismatched nesting: open ObjectBegin from %s at AttributeEnd",
                           pushStack.back().second);
@@ -250,9 +239,8 @@ void ParsedScene::WorldBegin(FileLoc loc) {
     VERIFY_OPTIONS("WorldBegin");
     currentBlock = BlockState::WorldBlock;
     for (int i = 0; i < MaxTransforms; ++i)
-        curTransform[i] = pbrt::Transform();
-    activeTransformBits = AllTransformsBits;
-    namedCoordinateSystems["world"] = curTransform;
+        graphicsState.ctm[i] = pbrt::Transform();
+    namedCoordinateSystems["world"] = graphicsState.ctm;
 }
 
 void ParsedScene::LightSource(const std::string &name, ParsedParameterVector params,
@@ -260,8 +248,9 @@ void ParsedScene::LightSource(const std::string &name, ParsedParameterVector par
     VERIFY_WORLD("LightSource");
     ParameterDictionary dict(std::move(params), graphicsState.lightAttributes,
                              graphicsState.colorSpace);
-    AnimatedTransform renderFromLight(RenderFromObject(0), transformStartTime,
-                                      RenderFromObject(1), transformEndTime);
+    AnimatedTransform renderFromLight(
+        RenderFromObject(0), graphicsState.transformStartTime, RenderFromObject(1),
+        graphicsState.transformEndTime);
 
     lights.push_back(LightSceneEntity(name, std::move(dict), loc, renderFromLight,
                                       graphicsState.currentOutsideMedium));
@@ -290,8 +279,9 @@ void ParsedScene::Shape(const std::string &name, ParsedParameterVector params,
             as = &currentInstance->animatedShapes;
         }
 
-        AnimatedTransform renderFromShape(RenderFromObject(0), transformStartTime,
-                                          RenderFromObject(1), transformEndTime);
+        AnimatedTransform renderFromShape(
+            RenderFromObject(0), graphicsState.transformStartTime, RenderFromObject(1),
+            graphicsState.transformEndTime);
         const class Transform *identity = transformCache.Lookup(pbrt::Transform());
 
         as->push_back(AnimatedShapeSceneEntity(
@@ -323,8 +313,6 @@ void ParsedScene::Shape(const std::string &name, ParsedParameterVector params,
 void ParsedScene::ObjectBegin(const std::string &name, FileLoc loc) {
     VERIFY_WORLD("ObjectBegin");
     pushedGraphicsStates.push_back(graphicsState);
-    pushedTransforms.push_back(curTransform);
-    pushedActiveTransformBits.push_back(activeTransformBits);
 
     pushStack.push_back(std::make_pair('o', loc));
 
@@ -357,18 +345,9 @@ void ParsedScene::ObjectEnd(FileLoc loc) {
     graphicsState = std::move(pushedGraphicsStates.back());
     pushedGraphicsStates.pop_back();
 
-    curTransform = pushedTransforms.back();
-    pushedTransforms.pop_back();
-    activeTransformBits = pushedActiveTransformBits.back();
-    pushedActiveTransformBits.pop_back();
-
     ++nObjectInstancesCreated;
 
-    if (pushStack.back().first == 't')
-        ErrorExitDeferred(&loc,
-                          "Mismatched nesting: open TransformBegin from %s at ObjectEnd",
-                          pushStack.back().second);
-    else if (pushStack.back().first == 'a')
+    if (pushStack.back().first == 'a')
         ErrorExitDeferred(&loc,
                           "Mismatched nesting: open AttributeBegin from %s at ObjectEnd",
                           pushStack.back().second);
@@ -390,8 +369,8 @@ void ParsedScene::ObjectInstance(const std::string &name, FileLoc loc) {
 
     if (CTMIsAnimated()) {
         AnimatedTransform animatedRenderFromInstance(
-            RenderFromObject(0) * worldFromRender, transformStartTime,
-            RenderFromObject(1) * worldFromRender, transformEndTime);
+            RenderFromObject(0) * worldFromRender, graphicsState.transformStartTime,
+            RenderFromObject(1) * worldFromRender, graphicsState.transformEndTime);
 
         instances.push_back(
             InstanceSceneEntity(name, loc, animatedRenderFromInstance, nullptr));
@@ -412,11 +391,6 @@ void ParsedScene::EndOfFiles() {
     while (!pushedGraphicsStates.empty()) {
         ErrorExitDeferred("Missing end to AttributeBegin");
         pushedGraphicsStates.pop_back();
-        pushedTransforms.pop_back();
-    }
-    while (!pushedTransforms.empty()) {
-        ErrorExitDeferred("Missing end to TransformBegin");
-        pushedTransforms.pop_back();
     }
 
     if (errorExit)
@@ -473,48 +447,51 @@ void ParsedScene::Option(const std::string &name, const std::string &value, File
 }
 
 void ParsedScene::Transform(Float tr[16], FileLoc loc) {
-    FOR_ACTIVE_TRANSFORMS(curTransform[i] = Transpose(
+    FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] = Transpose(
                               pbrt::Transform(SquareMatrix<4>(pstd::MakeSpan(tr, 16))));)
 }
 
 void ParsedScene::ConcatTransform(Float tr[16], FileLoc loc) {
-    FOR_ACTIVE_TRANSFORMS(curTransform[i] =
-                              curTransform[i] * Transpose(pbrt::Transform(SquareMatrix<4>(
-                                                    pstd::MakeSpan(tr, 16))));)
+    FOR_ACTIVE_TRANSFORMS(
+        graphicsState.ctm[i] =
+            graphicsState.ctm[i] *
+            Transpose(pbrt::Transform(SquareMatrix<4>(pstd::MakeSpan(tr, 16))));)
 }
 
 void ParsedScene::Rotate(Float angle, Float dx, Float dy, Float dz, FileLoc loc) {
-    FOR_ACTIVE_TRANSFORMS(curTransform[i] = curTransform[i] *
-                                            pbrt::Rotate(angle, Vector3f(dx, dy, dz));)
+    FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] =
+                              graphicsState.ctm[i] *
+                              pbrt::Rotate(angle, Vector3f(dx, dy, dz));)
 }
 
 void ParsedScene::Scale(Float sx, Float sy, Float sz, FileLoc loc) {
-    FOR_ACTIVE_TRANSFORMS(curTransform[i] = curTransform[i] * pbrt::Scale(sx, sy, sz);)
+    FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] =
+                              graphicsState.ctm[i] * pbrt::Scale(sx, sy, sz);)
 }
 
 void ParsedScene::LookAt(Float ex, Float ey, Float ez, Float lx, Float ly, Float lz,
                          Float ux, Float uy, Float uz, FileLoc loc) {
     class Transform lookAt =
         pbrt::LookAt(Point3f(ex, ey, ez), Point3f(lx, ly, lz), Vector3f(ux, uy, uz));
-    FOR_ACTIVE_TRANSFORMS(curTransform[i] = curTransform[i] * lookAt;);
+    FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] = graphicsState.ctm[i] * lookAt;);
 }
 
 void ParsedScene::ActiveTransformAll(FileLoc loc) {
-    activeTransformBits = AllTransformsBits;
+    graphicsState.activeTransformBits = AllTransformsBits;
 }
 
 void ParsedScene::ActiveTransformEndTime(FileLoc loc) {
-    activeTransformBits = EndTransformBits;
+    graphicsState.activeTransformBits = EndTransformBits;
 }
 
 void ParsedScene::ActiveTransformStartTime(FileLoc loc) {
-    activeTransformBits = StartTransformBits;
+    graphicsState.activeTransformBits = StartTransformBits;
 }
 
 void ParsedScene::TransformTimes(Float start, Float end, FileLoc loc) {
     VERIFY_OPTIONS("TransformTimes");
-    transformStartTime = start;
-    transformEndTime = end;
+    graphicsState.transformStartTime = start;
+    graphicsState.transformEndTime = end;
 }
 
 void ParsedScene::PixelFilter(const std::string &name, ParsedParameterVector params,
@@ -564,8 +541,9 @@ void ParsedScene::MakeNamedMedium(const std::string &name, ParsedParameterVector
         return;
     }
 
-    AnimatedTransform renderFromMedium(RenderFromObject(0), transformStartTime,
-                                       RenderFromObject(1), transformEndTime);
+    AnimatedTransform renderFromMedium(
+        RenderFromObject(0), graphicsState.transformStartTime, RenderFromObject(1),
+        graphicsState.transformEndTime);
 
     media[name] = TransformedSceneEntity(name, std::move(dict), loc, renderFromMedium);
 }
@@ -576,37 +554,6 @@ void ParsedScene::MediumInterface(const std::string &insideName,
     graphicsState.currentOutsideMedium = outsideName;
 }
 
-void ParsedScene::TransformBegin(FileLoc loc) {
-    VERIFY_WORLD("TransformBegin");
-    pushedTransforms.push_back(curTransform);
-    pushedActiveTransformBits.push_back(activeTransformBits);
-    pushStack.push_back(std::make_pair('t', loc));
-}
-
-void ParsedScene::TransformEnd(FileLoc loc) {
-    VERIFY_WORLD("TransformEnd");
-    if (pushedTransforms.empty()) {
-        Error(&loc, "Unmatched TransformEnd encountered. Ignoring it.");
-        return;
-    }
-    curTransform = pushedTransforms.back();
-    pushedTransforms.pop_back();
-    activeTransformBits = pushedActiveTransformBits.back();
-    pushedActiveTransformBits.pop_back();
-
-    if (pushStack.back().first == 'a')
-        ErrorExitDeferred(
-            &loc, "Mismatched nesting: open AttributeBegin from %s at TransformEnd",
-            pushStack.back().second);
-    else if (pushStack.back().first == 'o')
-        ErrorExitDeferred(&loc,
-                          "Mismatched nesting: open ObjectBegin from %s at TransformEnd",
-                          pushStack.back().second);
-    else
-        CHECK_EQ(pushStack.back().first, 't');
-    pushStack.pop_back();
-}
-
 void ParsedScene::Texture(const std::string &name, const std::string &type,
                           const std::string &texname, ParsedParameterVector params,
                           FileLoc loc) {
@@ -615,8 +562,9 @@ void ParsedScene::Texture(const std::string &name, const std::string &type,
     ParameterDictionary dict(std::move(params), graphicsState.textureAttributes,
                              graphicsState.colorSpace);
 
-    AnimatedTransform renderFromTexture(RenderFromObject(0), transformStartTime,
-                                        RenderFromObject(1), transformEndTime);
+    AnimatedTransform renderFromTexture(
+        RenderFromObject(0), graphicsState.transformStartTime, RenderFromObject(1),
+        graphicsState.transformEndTime);
 
     if (type != "float" && type != "spectrum") {
         ErrorExitDeferred(
