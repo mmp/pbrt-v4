@@ -223,6 +223,7 @@ struct TransformHash {
 // TransformCache Definition
 class TransformCache {
   public:
+    // TransformCache Public Methods
     TransformCache()
         : bufferResource(Options->useGPU ? gpuMemoryAllocator.resource()
                                          : Allocator().resource()),
@@ -232,7 +233,7 @@ class TransformCache {
     const Transform *Lookup(const Transform &t);
 
   private:
-    // TransformCache Private Data
+    // TransformCache Private Members
     pstd::pmr::monotonic_buffer_resource bufferResource;
     Allocator alloc;
     std::unordered_set<Transform *, TransformHash> hashTable;
@@ -276,8 +277,6 @@ class ParsedScene : public SceneRepresentation {
   public:
     // ParsedScene Public Methods
     ParsedScene();
-    ~ParsedScene();
-
     void Option(const std::string &name, const std::string &value, FileLoc loc);
     void Identity(FileLoc loc);
     void Translate(Float dx, Float dy, Float dz, FileLoc loc);
@@ -329,9 +328,9 @@ class ParsedScene : public SceneRepresentation {
 
     std::string ToString() const;
 
-    SceneTextures CreateTextures(Allocator alloc, bool gpu) const;
+    NamedTextures CreateTextures(Allocator alloc, bool gpu) const;
 
-    void CreateMaterials(/*const*/ SceneTextures &sceneTextures, Allocator alloc,
+    void CreateMaterials(/*const*/ NamedTextures &sceneTextures, Allocator alloc,
                          std::map<std::string, MaterialHandle> *namedMaterials,
                          std::vector<MaterialHandle> *materials) const;
 
@@ -353,30 +352,50 @@ class ParsedScene : public SceneRepresentation {
     std::map<std::string, InstanceDefinitionSceneEntity> instanceDefinitions;
 
   private:
+    // ParsedScene::GraphicsState Definition
+    struct GraphicsState {
+        // GraphicsState Public Methods
+        GraphicsState();
+
+        // GraphicsState Public Members
+        std::string currentInsideMedium, currentOutsideMedium;
+
+        int currentMaterialIndex = 0;
+        std::string currentMaterialName;
+
+        std::string areaLightName;
+        ParameterDictionary areaLightParams;
+        FileLoc areaLightLoc;
+
+        ParsedParameterVector shapeAttributes;
+        ParsedParameterVector lightAttributes;
+        ParsedParameterVector materialAttributes;
+        ParsedParameterVector mediumAttributes;
+        ParsedParameterVector textureAttributes;
+        bool reverseOrientation = false;
+        const RGBColorSpace *colorSpace = RGBColorSpace::sRGB;
+    };
+
     // ParsedScene Private Methods
-    class Transform GetCTM(int index) const {
-        // I believe that this GetMatrix() is related to precision: we get
-        // a more accurate inverse if we re-invert from scratch than to
-        // take the accumulated inverse...
+    class Transform RenderFromObject(int index) const {
         return pbrt::Transform((renderFromWorld * curTransform[index]).GetMatrix());
     }
 
     bool CTMIsAnimated() const { return curTransform.IsAnimated(); }
 
-    struct GraphicsState;
     // ParsedScene Private Members
-    enum class APIState { OptionsBlock, WorldBlock, Uninitialized };
-    APIState currentApiState = APIState::OptionsBlock;
+    GraphicsState graphicsState;
+    enum class BlockState { OptionsBlock, WorldBlock };
+    BlockState currentBlock = BlockState::OptionsBlock;
     TransformSet curTransform;
     uint32_t activeTransformBits = AllTransformsBits;
     static constexpr int StartTransformBits = 1 << 0;
     static constexpr int EndTransformBits = 1 << 1;
     static constexpr int AllTransformsBits = (1 << MaxTransforms) - 1;
     std::map<std::string, TransformSet> namedCoordinateSystems;
+    class Transform renderFromWorld;
     TransformCache transformCache;
     Float transformStartTime = 0, transformEndTime = 1;
-    class Transform renderFromWorld;
-    GraphicsState *graphicsState;
     std::vector<GraphicsState> pushedGraphicsStates;
     std::vector<TransformSet> pushedTransforms;
     std::vector<uint32_t> pushedActiveTransformBits;

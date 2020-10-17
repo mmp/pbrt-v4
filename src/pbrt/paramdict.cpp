@@ -679,7 +679,7 @@ const FileLoc *ParameterDictionary::loc(const std::string &name) const {
 
 // TextureParameterDictionary Method Definitions
 TextureParameterDictionary::TextureParameterDictionary(const ParameterDictionary *dict,
-                                                       const SceneTextures *textures)
+                                                       const NamedTextures *textures)
     : dict(dict), textures(textures) {}
 
 Float TextureParameterDictionary::GetOneFloat(const std::string &name, Float def) const {
@@ -795,8 +795,8 @@ SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTexture(
 SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTextureOrNull(
     const std::string &name, SpectrumType spectrumType, Allocator alloc) const {
     const auto &spectrumTextures = (spectrumType == SpectrumType::General)
-                                       ? textures->spectrumReflectanceTextureMap
-                                       : textures->spectrumGeneralTextureMap;
+                                       ? textures->generalSpectrumTextures
+                                       : textures->illuminantSpectrumTextures;
 
     for (const ParsedParameter *p : dict->params) {
         if (p->name != name)
@@ -872,8 +872,8 @@ FloatTextureHandle TextureParameterDictionary::GetFloatTextureOrNull(
                           name);
 
             p->lookedUp = true;
-            auto iter = textures->floatTextureMap.find(p->strings[0]);
-            if (iter != textures->floatTextureMap.end())
+            auto iter = textures->floatTextures.find(p->strings[0]);
+            if (iter != textures->floatTextures.end())
                 return iter->second;
 
             ErrorExit(&p->loc,

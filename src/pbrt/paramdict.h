@@ -42,11 +42,11 @@ enum class ParameterType {
 // SpectrumType Definition
 enum class SpectrumType { General, Illuminant };
 
-// SceneTextures Definition
-struct SceneTextures {
-    std::map<std::string, FloatTextureHandle> floatTextureMap;
-    std::map<std::string, SpectrumTextureHandle> spectrumReflectanceTextureMap;
-    std::map<std::string, SpectrumTextureHandle> spectrumGeneralTextureMap;
+// NamedTextures Definition
+struct NamedTextures {
+    std::map<std::string, FloatTextureHandle> floatTextures;
+    std::map<std::string, SpectrumTextureHandle> generalSpectrumTextures;
+    std::map<std::string, SpectrumTextureHandle> illuminantSpectrumTextures;
 };
 
 template <ParameterType PT>
@@ -97,6 +97,7 @@ class ParameterDictionary {
     Float GetOneFloat(const std::string &name, Float def) const;
     int GetOneInt(const std::string &name, int def) const;
     bool GetOneBool(const std::string &name, bool def) const;
+
     Point2f GetOnePoint2f(const std::string &name, const Point2f &def) const;
     Vector2f GetOneVector2f(const std::string &name, const Vector2f &def) const;
     Point3f GetOnePoint3f(const std::string &name, const Point3f &def) const;
@@ -110,6 +111,7 @@ class ParameterDictionary {
     std::vector<Float> GetFloatArray(const std::string &name) const;
     std::vector<int> GetIntArray(const std::string &name) const;
     std::vector<uint8_t> GetBoolArray(const std::string &name) const;
+
     std::vector<Point2f> GetPoint2fArray(const std::string &name) const;
     std::vector<Vector2f> GetVector2fArray(const std::string &name) const;
     std::vector<Point3f> GetPoint3fArray(const std::string &name) const;
@@ -157,7 +159,7 @@ class TextureParameterDictionary {
   public:
     // TextureParameterDictionary Public Methods
     TextureParameterDictionary(const ParameterDictionary *dict,
-                               const SceneTextures *textures);
+                               const NamedTextures *textures);
 
     operator const ParameterDictionary &() const { return *dict; }
 
@@ -204,7 +206,7 @@ class TextureParameterDictionary {
   private:
     // TextureParameterDictionary Private Members
     const ParameterDictionary *dict;
-    const SceneTextures *textures;
+    const NamedTextures *textures;
 };
 
 }  // namespace pbrt

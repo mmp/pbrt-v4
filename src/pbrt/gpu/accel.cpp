@@ -878,7 +878,7 @@ GPUAccel::GPUAccel(
     randomHitSBT.missRecordCount = 1;
 
     // Textures
-    SceneTextures textures = scene.CreateTextures(alloc, true);
+    NamedTextures textures = scene.CreateTextures(alloc, true);
 
     // Materials
     std::map<std::string, MaterialHandle> namedMaterials;
@@ -919,16 +919,16 @@ GPUAccel::GPUAccel(
 
     OptixTraversableHandle triangleGASTraversable = createGASForTriangles(
         scene.shapes, hitPGTriangle, anyhitPGShadowTriangle, hitPGRandomHitTriangle,
-        textures.floatTextureMap, namedMaterials, materials, media, shapeIndexToAreaLights, &bounds);
+        textures.floatTextures, namedMaterials, materials, media, shapeIndexToAreaLights, &bounds);
     int bilinearSBTOffset = intersectHGRecords.size();
     OptixTraversableHandle bilinearPatchGASTraversable =
         createGASForBLPs(scene.shapes, hitPGBilinearPatch, anyhitPGShadowBilinearPatch,
-                         hitPGRandomHitBilinearPatch, textures.floatTextureMap, namedMaterials,
+                         hitPGRandomHitBilinearPatch, textures.floatTextures, namedMaterials,
                          materials, media, shapeIndexToAreaLights, &bounds);
     int quadricSBTOffset = intersectHGRecords.size();
     OptixTraversableHandle quadricGASTraversable = createGASForQuadrics(
         scene.shapes, hitPGQuadric, anyhitPGShadowQuadric, hitPGRandomHitQuadric,
-        textures.floatTextureMap, namedMaterials, materials, media, shapeIndexToAreaLights, &bounds);
+        textures.floatTextures, namedMaterials, materials, media, shapeIndexToAreaLights, &bounds);
 
     pstd::vector<OptixInstance> iasInstances(alloc);
 
@@ -971,7 +971,7 @@ GPUAccel::GPUAccel(
         inst.sbtOffset = intersectHGRecords.size();
         inst.handle = createGASForTriangles(
             def.second.shapes, hitPGTriangle, anyhitPGShadowTriangle,
-            hitPGRandomHitTriangle, textures.floatTextureMap, namedMaterials, materials, media, {},
+            hitPGRandomHitTriangle, textures.floatTextures, namedMaterials, materials, media, {},
             &inst.bounds);
         instanceMap[def.first] = inst;
     }

@@ -50,64 +50,13 @@ std::string ParsedScene::ToString() const {
                         instanceDefinitions, lights, shapes, instances);
 }
 
-// ParsedScene::GraphicsState Definition
-struct ParsedScene::GraphicsState {
-    // Graphics State Methods
-    GraphicsState();
-
-    // Graphics State
-    std::string currentInsideMedium, currentOutsideMedium;
-
-    int currentMaterialIndex = 0;
-    std::string currentMaterialName;
-
-    std::string areaLightName;
-    ParameterDictionary areaLightParams;
-    FileLoc areaLightLoc;
-
-    const RGBColorSpace *colorSpace = RGBColorSpace::sRGB;
-
-    bool reverseOrientation = false;
-
-    ParsedParameterVector shapeAttributes;
-    ParsedParameterVector lightAttributes;
-    ParsedParameterVector materialAttributes;
-    ParsedParameterVector mediumAttributes;
-    ParsedParameterVector textureAttributes;
-};
-
 ParsedScene::GraphicsState::GraphicsState() {
     currentMaterialIndex = 0;
 }
 
 // API State Macros
-#define VERIFY_INITIALIZED(func)                             \
-    if (currentApiState == APIState::Uninitialized) {        \
-        Error(&loc,                                          \
-              "pbrtInit() must be before calling \"%s()\". " \
-              "Ignoring.",                                   \
-              func);                                         \
-        return;                                              \
-    } else /* swallow trailing semicolon */
-
-#define FOR_ACTIVE_TRANSFORMS(expr)           \
-    for (int i = 0; i < MaxTransforms; ++i)   \
-        if (activeTransformBits & (1 << i)) { \
-            expr                              \
-        }
-
-#define WARN_IF_ANIMATED_TRANSFORM(func)                                 \
-    do {                                                                 \
-        if (curTransform.IsAnimated())                                   \
-            Warning(&loc,                                                \
-                    "Animated transformations set; ignoring for \"%s\" " \
-                    "and using the start transform only",                \
-                    func);                                               \
-    } while (false) /* swallow trailing semicolon */
-
 #define VERIFY_OPTIONS(func)                                   \
-    VERIFY_INITIALIZED(func);                                  \
-    if (currentApiState == APIState::WorldBlock) {             \
+    if (currentBlock == BlockState::WorldBlock) {              \
         ErrorExit(&loc,                                        \
                   "Options cannot be set inside world block; " \
                   "\"%s\" is not allowed.",                    \
@@ -115,14 +64,19 @@ ParsedScene::GraphicsState::GraphicsState() {
         return;                                                \
     } else /* swallow trailing semicolon */
 #define VERIFY_WORLD(func)                                         \
-    VERIFY_INITIALIZED(func);                                      \
-    if (currentApiState == APIState::OptionsBlock) {               \
+    if (currentBlock == BlockState::OptionsBlock) {                \
         ErrorExit(&loc,                                            \
                   "Scene description must be inside world block; " \
                   "\"%s\" is not allowed.",                        \
                   func);                                           \
         return;                                                    \
     } else /* swallow trailing semicolon */
+
+#define FOR_ACTIVE_TRANSFORMS(expr)           \
+    for (int i = 0; i < MaxTransforms; ++i)   \
+        if (activeTransformBits & (1 << i)) { \
+            expr                              \
+        }
 
 STAT_MEMORY_COUNTER("Memory/TransformCache", transformCacheBytes);
 STAT_PERCENT("Geometry/TransformCache hits", nTransformCacheHits, nTransformCacheLookups);
@@ -158,64 +112,73 @@ STAT_COUNTER("Scene/Object instances used", nObjectInstancesUsed);
 
 // ParsedScene Method Definitions
 ParsedScene::ParsedScene() {
-    // Allocate _graphicsState_
-    graphicsState = new GraphicsState;
-
     // Set scene defaults
+    camera.name = "perspective";
+    sampler.name = "pmj02bn";
+    filter.name = "gaussian";
+    integrator.name = "volpath";
+
     ParameterDictionary dict({}, RGBColorSpace::sRGB);
     materials.push_back(SceneEntity("diffuse", dict, {}));
-
     accelerator.name = "bvh";
-
-    camera.name = "perspective";
-
-    sampler.name = "pmj02bn";
-
-    filter.name = "gaussian";
-
     film.name = "rgb";
     film.parameters = ParameterDictionary({}, RGBColorSpace::sRGB);
+}
 
-    integrator.name = "volpath";
+void ParsedScene::ReverseOrientation(FileLoc loc) {
+    VERIFY_WORLD("ReverseOrientation");
+    graphicsState.reverseOrientation = !graphicsState.reverseOrientation;
+}
+
+void ParsedScene::ColorSpace(const std::string &name, FileLoc loc) {
+    if (const RGBColorSpace *cs = RGBColorSpace::GetNamed(name))
+        graphicsState.colorSpace = cs;
+    else
+        Error(&loc, "%s: color space unknown", name);
 }
 
 void ParsedScene::Identity(FileLoc loc) {
-    VERIFY_INITIALIZED("Identity");
     FOR_ACTIVE_TRANSFORMS(curTransform[i] = pbrt::Transform();)
 }
 
 void ParsedScene::Translate(Float dx, Float dy, Float dz, FileLoc loc) {
-    VERIFY_INITIALIZED("Translate");
     FOR_ACTIVE_TRANSFORMS(curTransform[i] =
                               curTransform[i] * pbrt::Translate(Vector3f(dx, dy, dz));)
 }
 
 void ParsedScene::CoordinateSystem(const std::string &name, FileLoc loc) {
-    VERIFY_INITIALIZED("CoordinateSystem");
     namedCoordinateSystems[name] = curTransform;
 }
 
 void ParsedScene::CoordSysTransform(const std::string &name, FileLoc loc) {
-    VERIFY_INITIALIZED("CoordSysTransform");
     if (namedCoordinateSystems.find(name) != namedCoordinateSystems.end())
         curTransform = namedCoordinateSystems[name];
     else
         Warning(&loc, "Couldn't find named coordinate system \"%s\"", name);
 }
 
-void ParsedScene::WorldBegin(FileLoc loc) {
-    VERIFY_OPTIONS("WorldBegin");
-    currentApiState = APIState::WorldBlock;
-    for (int i = 0; i < MaxTransforms; ++i)
-        curTransform[i] = pbrt::Transform();
-    activeTransformBits = AllTransformsBits;
-    namedCoordinateSystems["world"] = curTransform;
+void ParsedScene::Camera(const std::string &name, ParsedParameterVector params,
+                         FileLoc loc) {
+    ParameterDictionary dict(std::move(params), graphicsState.colorSpace);
+
+    VERIFY_OPTIONS("Camera");
+
+    TransformSet cameraFromWorld = curTransform;
+    TransformSet worldFromCamera = Inverse(curTransform);
+    namedCoordinateSystems["camera"] = Inverse(cameraFromWorld);
+
+    CameraTransform cameraTransform(AnimatedTransform(
+        worldFromCamera[0], transformStartTime, worldFromCamera[1], transformEndTime));
+    renderFromWorld = cameraTransform.RenderFromWorld();
+
+    camera = CameraSceneEntity(name, std::move(dict), loc, cameraTransform,
+                               graphicsState.currentOutsideMedium);
 }
 
 void ParsedScene::AttributeBegin(FileLoc loc) {
     VERIFY_WORLD("AttributeBegin");
 
-    pushedGraphicsStates.push_back(*graphicsState);
+    pushedGraphicsStates.push_back(graphicsState);
 
     pushedTransforms.push_back(curTransform);
     pushedActiveTransformBits.push_back(activeTransformBits);
@@ -231,7 +194,7 @@ void ParsedScene::AttributeEnd(FileLoc loc) {
     }
 
     // NOTE: must keep the following consistent with code in ObjectEnd
-    *graphicsState = std::move(pushedGraphicsStates.back());
+    graphicsState = std::move(pushedGraphicsStates.back());
     pushedGraphicsStates.pop_back();
 
     curTransform = pushedTransforms.back();
@@ -254,19 +217,17 @@ void ParsedScene::AttributeEnd(FileLoc loc) {
 
 void ParsedScene::Attribute(const std::string &target, ParsedParameterVector attrib,
                             FileLoc loc) {
-    VERIFY_INITIALIZED("Attribute");
-
     ParsedParameterVector *currentAttributes = nullptr;
     if (target == "shape") {
-        currentAttributes = &graphicsState->shapeAttributes;
+        currentAttributes = &graphicsState.shapeAttributes;
     } else if (target == "light") {
-        currentAttributes = &graphicsState->lightAttributes;
+        currentAttributes = &graphicsState.lightAttributes;
     } else if (target == "material") {
-        currentAttributes = &graphicsState->materialAttributes;
+        currentAttributes = &graphicsState.materialAttributes;
     } else if (target == "medium") {
-        currentAttributes = &graphicsState->mediumAttributes;
+        currentAttributes = &graphicsState.mediumAttributes;
     } else if (target == "texture") {
-        currentAttributes = &graphicsState->textureAttributes;
+        currentAttributes = &graphicsState.textureAttributes;
     } else {
         ErrorExitDeferred(
             &loc,
@@ -280,78 +241,88 @@ void ParsedScene::Attribute(const std::string &target, ParsedParameterVector att
     // with the parameters...
     for (ParsedParameter *p : attrib) {
         p->mayBeUnused = true;
-        p->colorSpace = graphicsState->colorSpace;
+        p->colorSpace = graphicsState.colorSpace;
         currentAttributes->push_back(p);
     }
+}
+
+void ParsedScene::WorldBegin(FileLoc loc) {
+    VERIFY_OPTIONS("WorldBegin");
+    currentBlock = BlockState::WorldBlock;
+    for (int i = 0; i < MaxTransforms; ++i)
+        curTransform[i] = pbrt::Transform();
+    activeTransformBits = AllTransformsBits;
+    namedCoordinateSystems["world"] = curTransform;
 }
 
 void ParsedScene::LightSource(const std::string &name, ParsedParameterVector params,
                               FileLoc loc) {
     VERIFY_WORLD("LightSource");
-    ParameterDictionary dict(std::move(params), graphicsState->lightAttributes,
-                             graphicsState->colorSpace);
-    AnimatedTransform renderFromLight(GetCTM(0), transformStartTime, GetCTM(1),
-                                      transformEndTime);
+    ParameterDictionary dict(std::move(params), graphicsState.lightAttributes,
+                             graphicsState.colorSpace);
+    AnimatedTransform renderFromLight(RenderFromObject(0), transformStartTime,
+                                      RenderFromObject(1), transformEndTime);
 
     lights.push_back(LightSceneEntity(name, std::move(dict), loc, renderFromLight,
-                                      graphicsState->currentOutsideMedium));
+                                      graphicsState.currentOutsideMedium));
 }
 
 void ParsedScene::Shape(const std::string &name, ParsedParameterVector params,
                         FileLoc loc) {
     VERIFY_WORLD("Shape");
 
-    ParameterDictionary dict(std::move(params), graphicsState->shapeAttributes,
-                             graphicsState->colorSpace);
+    ParameterDictionary dict(std::move(params), graphicsState.shapeAttributes,
+                             graphicsState.colorSpace);
 
     int areaLightIndex = -1;
-    if (!graphicsState->areaLightName.empty()) {
-        areaLights.push_back(SceneEntity(graphicsState->areaLightName,
-                                         graphicsState->areaLightParams,
-                                         graphicsState->areaLightLoc));
+    if (!graphicsState.areaLightName.empty()) {
+        areaLights.push_back(SceneEntity(graphicsState.areaLightName,
+                                         graphicsState.areaLightParams,
+                                         graphicsState.areaLightLoc));
         areaLightIndex = areaLights.size() - 1;
     }
 
     if (CTMIsAnimated()) {
         std::vector<AnimatedShapeSceneEntity> *as = &animatedShapes;
         if (currentInstance != nullptr) {
-            if (!graphicsState->areaLightName.empty())
+            if (!graphicsState.areaLightName.empty())
                 Warning(&loc, "Area lights not supported with object instancing");
             as = &currentInstance->animatedShapes;
         }
 
-        AnimatedTransform renderFromShape(GetCTM(0), transformStartTime, GetCTM(1),
-                                          transformEndTime);
+        AnimatedTransform renderFromShape(RenderFromObject(0), transformStartTime,
+                                          RenderFromObject(1), transformEndTime);
         const class Transform *identity = transformCache.Lookup(pbrt::Transform());
 
         as->push_back(AnimatedShapeSceneEntity(
             {name, std::move(dict), loc, renderFromShape, identity,
-             graphicsState->reverseOrientation, graphicsState->currentMaterialIndex,
-             graphicsState->currentMaterialName, areaLightIndex,
-             graphicsState->currentInsideMedium, graphicsState->currentOutsideMedium}));
+             graphicsState.reverseOrientation, graphicsState.currentMaterialIndex,
+             graphicsState.currentMaterialName, areaLightIndex,
+             graphicsState.currentInsideMedium, graphicsState.currentOutsideMedium}));
     } else {
         std::vector<ShapeSceneEntity> *s = &shapes;
         if (currentInstance != nullptr) {
-            if (!graphicsState->areaLightName.empty())
+            if (!graphicsState.areaLightName.empty())
                 Warning(&loc, "Area lights not supported with object instancing");
             s = &currentInstance->shapes;
         }
 
-        const class Transform *renderFromObject = transformCache.Lookup(GetCTM(0));
+        const class Transform *renderFromObject =
+            transformCache.Lookup(RenderFromObject(0));
         const class Transform *objectFromRender =
             transformCache.Lookup(Inverse(*renderFromObject));
 
         s->push_back(ShapeSceneEntity(
             {name, std::move(dict), loc, renderFromObject, objectFromRender,
-             graphicsState->reverseOrientation, graphicsState->currentMaterialIndex,
-             graphicsState->currentMaterialName, areaLightIndex,
-             graphicsState->currentInsideMedium, graphicsState->currentOutsideMedium}));
+             graphicsState.reverseOrientation, graphicsState.currentMaterialIndex,
+             graphicsState.currentMaterialName, areaLightIndex,
+             graphicsState.currentInsideMedium, graphicsState.currentOutsideMedium}));
     }
 }
 
 void ParsedScene::ObjectBegin(const std::string &name, FileLoc loc) {
     VERIFY_WORLD("ObjectBegin");
-    pushedGraphicsStates.push_back(*graphicsState);
+    pushedGraphicsStates.push_back(graphicsState);
     pushedTransforms.push_back(curTransform);
     pushedActiveTransformBits.push_back(activeTransformBits);
 
@@ -383,7 +354,7 @@ void ParsedScene::ObjectEnd(FileLoc loc) {
     currentInstance = nullptr;
 
     // NOTE: Must keep the following consistent with AttributeEnd
-    *graphicsState = std::move(pushedGraphicsStates.back());
+    graphicsState = std::move(pushedGraphicsStates.back());
     pushedGraphicsStates.pop_back();
 
     curTransform = pushedTransforms.back();
@@ -419,14 +390,14 @@ void ParsedScene::ObjectInstance(const std::string &name, FileLoc loc) {
 
     if (CTMIsAnimated()) {
         AnimatedTransform animatedRenderFromInstance(
-            GetCTM(0) * worldFromRender, transformStartTime, GetCTM(1) * worldFromRender,
-            transformEndTime);
+            RenderFromObject(0) * worldFromRender, transformStartTime,
+            RenderFromObject(1) * worldFromRender, transformEndTime);
 
         instances.push_back(
             InstanceSceneEntity(name, loc, animatedRenderFromInstance, nullptr));
     } else {
         const class Transform *renderFromInstance =
-            transformCache.Lookup(GetCTM(0) * worldFromRender);
+            transformCache.Lookup(RenderFromObject(0) * worldFromRender);
 
         instances.push_back(
             InstanceSceneEntity(name, loc, AnimatedTransform(), renderFromInstance));
@@ -434,7 +405,7 @@ void ParsedScene::ObjectInstance(const std::string &name, FileLoc loc) {
 }
 
 void ParsedScene::EndOfFiles() {
-    if (currentApiState != APIState::WorldBlock)
+    if (currentBlock != BlockState::WorldBlock)
         ErrorExitDeferred("End of files before \"WorldBegin\".");
 
     // Ensure there are no pushed graphics states
@@ -452,14 +423,9 @@ void ParsedScene::EndOfFiles() {
         ErrorExit("Fatal errors during scene construction");
 }
 
-ParsedScene::~ParsedScene() {
-    delete graphicsState;
-}
-
 void ParsedScene::Option(const std::string &name, const std::string &value, FileLoc loc) {
     std::string nName = normalizeArg(name);
 
-    VERIFY_INITIALIZED("Option");
     if (nName == "disablepixeljitter") {
         if (value == "true")
             Options->disablePixelJitter = true;
@@ -507,32 +473,27 @@ void ParsedScene::Option(const std::string &name, const std::string &value, File
 }
 
 void ParsedScene::Transform(Float tr[16], FileLoc loc) {
-    VERIFY_INITIALIZED("Transform");
     FOR_ACTIVE_TRANSFORMS(curTransform[i] = Transpose(
                               pbrt::Transform(SquareMatrix<4>(pstd::MakeSpan(tr, 16))));)
 }
 
 void ParsedScene::ConcatTransform(Float tr[16], FileLoc loc) {
-    VERIFY_INITIALIZED("ConcatTransform");
     FOR_ACTIVE_TRANSFORMS(curTransform[i] =
                               curTransform[i] * Transpose(pbrt::Transform(SquareMatrix<4>(
                                                     pstd::MakeSpan(tr, 16))));)
 }
 
 void ParsedScene::Rotate(Float angle, Float dx, Float dy, Float dz, FileLoc loc) {
-    VERIFY_INITIALIZED("Rotate");
     FOR_ACTIVE_TRANSFORMS(curTransform[i] = curTransform[i] *
                                             pbrt::Rotate(angle, Vector3f(dx, dy, dz));)
 }
 
 void ParsedScene::Scale(Float sx, Float sy, Float sz, FileLoc loc) {
-    VERIFY_INITIALIZED("Scale");
     FOR_ACTIVE_TRANSFORMS(curTransform[i] = curTransform[i] * pbrt::Scale(sx, sy, sz);)
 }
 
 void ParsedScene::LookAt(Float ex, Float ey, Float ez, Float lx, Float ly, Float lz,
                          Float ux, Float uy, Float uz, FileLoc loc) {
-    VERIFY_INITIALIZED("LookAt");
     class Transform lookAt =
         pbrt::LookAt(Point3f(ex, ey, ez), Point3f(lx, ly, lz), Vector3f(ux, uy, uz));
     FOR_ACTIVE_TRANSFORMS(curTransform[i] = curTransform[i] * lookAt;);
@@ -556,31 +517,23 @@ void ParsedScene::TransformTimes(Float start, Float end, FileLoc loc) {
     transformEndTime = end;
 }
 
-void ParsedScene::ColorSpace(const std::string &n, FileLoc loc) {
-    VERIFY_INITIALIZED("RGBColorSpace");
-    if (const RGBColorSpace *cs = RGBColorSpace::GetNamed(n))
-        graphicsState->colorSpace = cs;
-    else
-        Error(&loc, "%s: color space unknown", n);
-}
-
 void ParsedScene::PixelFilter(const std::string &name, ParsedParameterVector params,
                               FileLoc loc) {
-    ParameterDictionary dict(std::move(params), graphicsState->colorSpace);
+    ParameterDictionary dict(std::move(params), graphicsState.colorSpace);
     VERIFY_OPTIONS("PixelFilter");
     filter = SceneEntity(name, std::move(dict), loc);
 }
 
 void ParsedScene::Film(const std::string &type, ParsedParameterVector params,
                        FileLoc loc) {
-    ParameterDictionary dict(std::move(params), graphicsState->colorSpace);
+    ParameterDictionary dict(std::move(params), graphicsState.colorSpace);
     VERIFY_OPTIONS("Film");
     film = SceneEntity(type, std::move(dict), loc);
 }
 
 void ParsedScene::Sampler(const std::string &name, ParsedParameterVector params,
                           FileLoc loc) {
-    ParameterDictionary dict(std::move(params), graphicsState->colorSpace);
+    ParameterDictionary dict(std::move(params), graphicsState.colorSpace);
 
     VERIFY_OPTIONS("Sampler");
     sampler = SceneEntity(name, std::move(dict), loc);
@@ -588,60 +541,39 @@ void ParsedScene::Sampler(const std::string &name, ParsedParameterVector params,
 
 void ParsedScene::Accelerator(const std::string &name, ParsedParameterVector params,
                               FileLoc loc) {
-    ParameterDictionary dict(std::move(params), graphicsState->colorSpace);
+    ParameterDictionary dict(std::move(params), graphicsState.colorSpace);
     VERIFY_OPTIONS("Accelerator");
     accelerator = SceneEntity(name, std::move(dict), loc);
 }
 
 void ParsedScene::Integrator(const std::string &name, ParsedParameterVector params,
                              FileLoc loc) {
-    ParameterDictionary dict(std::move(params), graphicsState->colorSpace);
+    ParameterDictionary dict(std::move(params), graphicsState.colorSpace);
 
     VERIFY_OPTIONS("Integrator");
     integrator = SceneEntity(name, std::move(dict), loc);
 }
 
-void ParsedScene::Camera(const std::string &name, ParsedParameterVector params,
-                         FileLoc loc) {
-    ParameterDictionary dict(std::move(params), graphicsState->colorSpace);
-
-    VERIFY_OPTIONS("Camera");
-
-    TransformSet cameraFromWorld = curTransform;
-    TransformSet worldFromCamera = Inverse(curTransform);
-    namedCoordinateSystems["camera"] = Inverse(cameraFromWorld);
-
-    CameraTransform cameraTransform(AnimatedTransform(
-        worldFromCamera[0], transformStartTime, worldFromCamera[1], transformEndTime));
-    renderFromWorld = cameraTransform.RenderFromWorld();
-
-    camera = CameraSceneEntity(name, std::move(dict), loc, cameraTransform,
-                               graphicsState->currentOutsideMedium);
-}
-
 void ParsedScene::MakeNamedMedium(const std::string &name, ParsedParameterVector params,
                                   FileLoc loc) {
-    VERIFY_INITIALIZED("MakeNamedMedium");
-    WARN_IF_ANIMATED_TRANSFORM("MakeNamedMedium");
-    ParameterDictionary dict(std::move(params), graphicsState->mediumAttributes,
-                             graphicsState->colorSpace);
+    ParameterDictionary dict(std::move(params), graphicsState.mediumAttributes,
+                             graphicsState.colorSpace);
 
     if (media.find(name) != media.end()) {
         ErrorExitDeferred(&loc, "Named medium \"%s\" redefined.", name);
         return;
     }
 
-    AnimatedTransform renderFromMedium(GetCTM(0), transformStartTime, GetCTM(1),
-                                       transformEndTime);
+    AnimatedTransform renderFromMedium(RenderFromObject(0), transformStartTime,
+                                       RenderFromObject(1), transformEndTime);
 
     media[name] = TransformedSceneEntity(name, std::move(dict), loc, renderFromMedium);
 }
 
 void ParsedScene::MediumInterface(const std::string &insideName,
                                   const std::string &outsideName, FileLoc loc) {
-    VERIFY_INITIALIZED("MediumInterface");
-    graphicsState->currentInsideMedium = insideName;
-    graphicsState->currentOutsideMedium = outsideName;
+    graphicsState.currentInsideMedium = insideName;
+    graphicsState.currentOutsideMedium = outsideName;
 }
 
 void ParsedScene::TransformBegin(FileLoc loc) {
@@ -680,11 +612,11 @@ void ParsedScene::Texture(const std::string &name, const std::string &type,
                           FileLoc loc) {
     VERIFY_WORLD("Texture");
 
-    ParameterDictionary dict(std::move(params), graphicsState->textureAttributes,
-                             graphicsState->colorSpace);
+    ParameterDictionary dict(std::move(params), graphicsState.textureAttributes,
+                             graphicsState.colorSpace);
 
-    AnimatedTransform renderFromTexture(GetCTM(0), transformStartTime, GetCTM(1),
-                                        transformEndTime);
+    AnimatedTransform renderFromTexture(RenderFromObject(0), transformStartTime,
+                                        RenderFromObject(1), transformEndTime);
 
     if (type != "float" && type != "spectrum") {
         ErrorExitDeferred(
@@ -708,19 +640,19 @@ void ParsedScene::Texture(const std::string &name, const std::string &type,
 void ParsedScene::Material(const std::string &name, ParsedParameterVector params,
                            FileLoc loc) {
     VERIFY_WORLD("Material");
-    ParameterDictionary dict(std::move(params), graphicsState->materialAttributes,
-                             graphicsState->colorSpace);
+    ParameterDictionary dict(std::move(params), graphicsState.materialAttributes,
+                             graphicsState.colorSpace);
     materials.push_back(SceneEntity(name, std::move(dict), loc));
-    graphicsState->currentMaterialIndex = materials.size() - 1;
-    graphicsState->currentMaterialName.clear();
+    graphicsState.currentMaterialIndex = materials.size() - 1;
+    graphicsState.currentMaterialName.clear();
 }
 
 void ParsedScene::MakeNamedMaterial(const std::string &name, ParsedParameterVector params,
                                     FileLoc loc) {
     VERIFY_WORLD("MakeNamedMaterial");
 
-    ParameterDictionary dict(std::move(params), graphicsState->materialAttributes,
-                             graphicsState->colorSpace);
+    ParameterDictionary dict(std::move(params), graphicsState.materialAttributes,
+                             graphicsState.colorSpace);
 
     // Note: O(n). FIXME?
     for (const auto &nm : namedMaterials)
@@ -734,26 +666,21 @@ void ParsedScene::MakeNamedMaterial(const std::string &name, ParsedParameterVect
 
 void ParsedScene::NamedMaterial(const std::string &name, FileLoc loc) {
     VERIFY_WORLD("NamedMaterial");
-    graphicsState->currentMaterialName = name;
-    graphicsState->currentMaterialIndex = -1;
+    graphicsState.currentMaterialName = name;
+    graphicsState.currentMaterialIndex = -1;
 }
 
 void ParsedScene::AreaLightSource(const std::string &name, ParsedParameterVector params,
                                   FileLoc loc) {
     VERIFY_WORLD("AreaLightSource");
-    graphicsState->areaLightName = name;
-    graphicsState->areaLightParams = ParameterDictionary(
-        std::move(params), graphicsState->lightAttributes, graphicsState->colorSpace);
-    graphicsState->areaLightLoc = loc;
-}
-
-void ParsedScene::ReverseOrientation(FileLoc loc) {
-    VERIFY_WORLD("ReverseOrientation");
-    graphicsState->reverseOrientation = !graphicsState->reverseOrientation;
+    graphicsState.areaLightName = name;
+    graphicsState.areaLightParams = ParameterDictionary(
+        std::move(params), graphicsState.lightAttributes, graphicsState.colorSpace);
+    graphicsState.areaLightLoc = loc;
 }
 
 void ParsedScene::CreateMaterials(
-    /*const*/ SceneTextures &textures, Allocator alloc,
+    /*const*/ NamedTextures &textures, Allocator alloc,
     std::map<std::string, MaterialHandle> *namedMaterialsOut,
     std::vector<MaterialHandle> *materialsOut) const {
     // Named materials
@@ -789,8 +716,8 @@ void ParsedScene::CreateMaterials(
     }
 }
 
-SceneTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
-    SceneTextures textures;
+NamedTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
+    NamedTextures textures;
 
     std::set<std::string> seenFloatTextureFilenames, seenSpectrumTextureFilenames;
     std::vector<size_t> parallelFloatTextures, serialFloatTextures;
@@ -866,7 +793,7 @@ SceneTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
         FloatTextureHandle t = FloatTextureHandle::Create(
             tex.second.texName, renderFromTexture, texDict, &tex.second.loc, alloc, gpu);
         std::lock_guard<std::mutex> lock(mutex);
-        textures.floatTextureMap[tex.first] = t;
+        textures.floatTextures[tex.first] = t;
     });
 
     ParallelFor(0, parallelSpectrumTextures.size(), [&](int64_t i) {
@@ -884,8 +811,8 @@ SceneTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
             &tex.second.loc, alloc, gpu);
 
         std::lock_guard<std::mutex> lock(mutex);
-        textures.spectrumReflectanceTextureMap[tex.first] = reflectanceTex;
-        textures.spectrumGeneralTextureMap[tex.first] = generalTex;
+        textures.generalSpectrumTextures[tex.first] = reflectanceTex;
+        textures.illuminantSpectrumTextures[tex.first] = generalTex;
     });
 
     LOG_VERBOSE("Loading serial textures");
@@ -897,7 +824,7 @@ SceneTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
         TextureParameterDictionary texDict(&tex.second.parameters, &textures);
         FloatTextureHandle t = FloatTextureHandle::Create(
             tex.second.texName, renderFromTexture, texDict, &tex.second.loc, alloc, gpu);
-        textures.floatTextureMap[tex.first] = t;
+        textures.floatTextures[tex.first] = t;
     }
     for (size_t index : serialSpectrumTextures) {
         const auto &tex = spectrumTextures[index];
@@ -914,8 +841,8 @@ SceneTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
         SpectrumTextureHandle generalTex = SpectrumTextureHandle::Create(
             tex.second.texName, renderFromTexture, texDict, SpectrumType::Illuminant,
             &tex.second.loc, alloc, gpu);
-        textures.spectrumReflectanceTextureMap[tex.first] = reflectanceTex;
-        textures.spectrumGeneralTextureMap[tex.first] = generalTex;
+        textures.generalSpectrumTextures[tex.first] = reflectanceTex;
+        textures.illuminantSpectrumTextures[tex.first] = generalTex;
     }
 
     LOG_VERBOSE("Done creating textures");

@@ -49,7 +49,7 @@ using ParsedParameterVector = InlinedVector<ParsedParameter *, 8>;
 // SceneRepresentation Definition
 class SceneRepresentation {
   public:
-    // SceneRepresentation Public Methods
+    // SceneRepresentation Interface
     virtual void Scale(Float sx, Float sy, Float sz, FileLoc loc) = 0;
 
     virtual void Shape(const std::string &name, ParsedParameterVector params,
