@@ -138,7 +138,7 @@ static std::map<std::string, CommandUsage> commandUsage = {
       std::string(R"(
    --crop <x0,x1,y0,y1> Crop images before performing diff.
    --errorfile <name>   Output average error image.
-   --metric <name>      Error metric to use. (Options: "L1", MSE", "MRSE")
+   --metric <name>      Error metric to use. (Options: "MAE", MSE", "MRSE")
    --reference <name>   Reference image filename.
 )")}},
     {"falsecolor", {"falsecolor [options] <filename>", std::string(R"(
@@ -677,8 +677,8 @@ int error(int argc, char *argv[]) {
 
     if (filenameBase.empty())
         usage("error", "Must provide base filename.");
-    if (metric != "MSE" && metric != "MRSE" && metric != "L1")
-        usage("error", "%s: --metric must be \"L1\", \"MSE\" or \"MRSE\".",
+    if (metric != "MSE" && metric != "MRSE" && metric != "MAE")
+        usage("error", "%s: --metric must be \"MAE\", \"MSE\" or \"MRSE\".",
               metric.c_str());
 
     std::vector<std::string> filenames = MatchingFilenames(filenameBase);
@@ -827,8 +827,8 @@ int diff(int argc, char *argv[]) {
     if (referenceFile.empty())
         usage("diff", "must specify --reference image");
 
-    if (metric != "L1" && metric != "MSE" && metric != "MRSE")
-        usage("diff", "%s: --metric must be \"L1\", \"MSE\" or \"MRSE\".",
+    if (metric != "MAE" && metric != "MSE" && metric != "MRSE")
+        usage("diff", "%s: --metric must be \"MAE\", \"MSE\" or \"MRSE\".",
               metric.c_str());
 
     ImageAndMetadata refRead = Image::Read(referenceFile);
