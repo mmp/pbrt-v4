@@ -343,6 +343,7 @@ int assemble(int argc, char *argv[]) {
     std::vector<bool> seenPixel;
     int seenMultiple = 0;
     Bounds2i fullBounds;
+    const RGBColorSpace *colorSpace = nullptr;
     for (const std::string &file : infiles) {
         if (!HasExtension(file, "exr"))
             usage("assemble", "only EXR images include the image bounding boxes that "
@@ -366,7 +367,6 @@ int assemble(int argc, char *argv[]) {
             continue;
         }
 
-        const RGBColorSpace *colorSpace = nullptr;
         if (fullImage.Resolution() == Point2i(0, 0)) {
             // First image read.
             fullImage = Image(image.Format(), *metadata.fullResolution,
@@ -419,7 +419,8 @@ int assemble(int argc, char *argv[]) {
             for (int x = 0; x < image.Resolution().x; ++x) {
                 Point2i fullp{x + metadata.pixelBounds->pMin.x,
                               y + metadata.pixelBounds->pMin.y};
-                size_t fullOffset = fullImage.PixelOffset(fullp);
+                CHECK(InsideExclusive(fullp, fullBounds));
+                size_t fullOffset = fullp.x + fullp.y * fullImage.Resolution().x;
                 if (seenPixel[fullOffset])
                     ++seenMultiple;
                 seenPixel[fullOffset] = true;
