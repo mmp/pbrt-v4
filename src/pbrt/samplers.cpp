@@ -403,7 +403,7 @@ DebugMLTSampler DebugMLTSampler::Create(pstd::span<const std::string> state,
 // SamplerHandle Method Definitions
 SamplerHandle SamplerHandle::Create(const std::string &name,
                                     const ParameterDictionary &parameters,
-                                    const Point2i &fullResolution, const FileLoc *loc,
+                                    Point2i fullResolution, const FileLoc *loc,
                                     Allocator alloc) {
     SamplerHandle sampler = nullptr;
     if (name == "pmj02bn")
@@ -424,7 +424,6 @@ SamplerHandle SamplerHandle::Create(const std::string &name,
 
     if (!sampler)
         ErrorExit(loc, "%s: unable to create sampler.", name);
-
     parameters.ReportUnused();
     return sampler;
 }
