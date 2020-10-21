@@ -6,6 +6,9 @@
 
 #include <pbrt/util/check.h>
 #include <pbrt/util/print.h>
+#ifdef PBRT_BUILD_GPU_RENDERER
+#include <pbrt/gpu/init.h>
+#endif  // PBRT_BUILD_GPU_RENDERER
 
 #include <iterator>
 #include <list>
@@ -109,6 +112,10 @@ ThreadPool::ThreadPool(int nThreads) {
 void ThreadPool::workerFunc(int tIndex) {
     LOG_VERBOSE("Started execution in worker thread %d", tIndex);
     ThreadIndex = tIndex;
+
+#ifdef PBRT_BUILD_GPU_RENDERER
+    GPUThreadInit();
+#endif  // PBRT_BUILD_GPU_RENDERER
 
     std::unique_lock<std::mutex> lock(mutex);
     while (!shutdownThreads)
