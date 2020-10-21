@@ -237,6 +237,7 @@ void ParsedScene::WorldBegin(FileLoc loc) {
     currentBlock = BlockState::WorldBlock;
     for (int i = 0; i < MaxTransforms; ++i)
         graphicsState.ctm[i] = pbrt::Transform();
+    graphicsState.activeTransformBits = AllTransformsBits;
     namedCoordinateSystems["world"] = graphicsState.ctm;
 }
 
