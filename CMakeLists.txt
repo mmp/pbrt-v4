@@ -275,6 +275,10 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   list (APPEND PBRT_CXX_FLAGS "-fp-model ${FP_MODEL}")
 endif ()
 
+if (MSVC AND MSVC_VERSION LESS 1920)
+  message (SEND_ERROR "pbrt-v4 currently requires MSVC 2019 to build on Windows. PRs that get MSVC 2017 working as well would be welcomed. :-)")
+endif ()
+
 if (MSVC AND NOT PBRT_CUDA_ENABLED)
   # FIXME: it would be nice to still pipe these through to MSVC in this case.
   list (APPEND PBRT_CXX_FLAGS /wd4305) # double constant assigned to float
