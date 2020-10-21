@@ -8,6 +8,7 @@
 namespace pbrt {
 
 void GPUInit();
+void GPUThreadInit();
 
 }  // namespace pbrt
 
