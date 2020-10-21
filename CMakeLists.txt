@@ -780,8 +780,8 @@ set_property (TARGET sky_lib PROPERTY FOLDER "ext")
 
 target_compile_definitions (imgtool PRIVATE ${PBRT_DEFINITIONS})
 target_compile_options (imgtool PRIVATE ${PBRT_CXX_FLAGS})
-target_include_directories (imgtool PRIVATE src src/ext)
-target_link_libraries (imgtool PRIVATE ${ALL_PBRT_LIBS} sky_lib)
+target_include_directories (imgtool PRIVATE src src/ext ${FLIP_INCLUDE} )
+target_link_libraries (imgtool PRIVATE ${ALL_PBRT_LIBS} sky_lib flip_lib)
 
 add_sanitizers (imgtool)
 
