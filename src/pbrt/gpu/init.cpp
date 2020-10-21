@@ -87,6 +87,8 @@ void GPUInit() {
 }
 
 void GPUThreadInit() {
+    if (!Options->useGPU)
+        return;
     int device = Options->gpuDevice ? *Options->gpuDevice : 0;
     LOG_VERBOSE("Selecting GPU device %d", device);
     CUDA_CHECK(cudaSetDevice(device));
