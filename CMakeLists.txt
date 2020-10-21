@@ -156,6 +156,8 @@ if (CMAKE_CUDA_COMPILER)
         # Willie hears yeh..
         set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xnvlink -suppress-stack-size-warning")
 
+        set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --forward-unknown-to-host-compiler")
+
         # https://wagonhelm.github.io/articles/2018-03/detecting-cuda-capability-with-cmake
         # Get CUDA compute capability
         set (CHECK_CUDA_OUTPUT_EXE ${CMAKE_BINARY_DIR}/checkcuda)
@@ -246,7 +248,7 @@ INCLUDE(CheckCXXCompilerFlag)
 
 # TODO: how to specify this on windows?
 check_cxx_compiler_flag ("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
-if (COMPILER_SUPPORTS_MARCH_NATIVE AND PBRT_BUILD_NATIVE_EXECUTABLE AND NOT PBRT_CUDA_ENABLED)
+if (COMPILER_SUPPORTS_MARCH_NATIVE AND PBRT_BUILD_NATIVE_EXECUTABLE)
   list (APPEND PBRT_CXX_FLAGS -march=native)
 endif ()
 
