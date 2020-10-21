@@ -277,6 +277,10 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   list (APPEND PBRT_CXX_FLAGS "-fp-model ${FP_MODEL}")
 endif ()
 
+if (CMAKE_COMPILER_IS_GNUCC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8.0)
+  list (APPEND PBRT_CXX_FLAGS -fkeep-inline-functions)
+endif ()
+
 if (MSVC AND MSVC_VERSION LESS 1920)
   message (SEND_ERROR "pbrt-v4 currently requires MSVC 2019 to build on Windows. PRs that get MSVC 2017 working as well would be welcomed. :-)")
 endif ()
