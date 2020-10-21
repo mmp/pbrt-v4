@@ -941,7 +941,7 @@ int diff(int argc, char *argv[]) {
         for (int y = 0; y < image.Resolution().y; ++y)
             for (int x = 0; x < image.Resolution().x; ++x)
                 for (int c = 0; c < image.NChannels(); ++c)
-                    error[c] += errorImage.GetChannel({x, y}, c);
+                    error[c] += errorImage.GetChannel({x, y}, 0);
         for (int c = 0; c < image.NChannels(); ++c)
             error[c] /= image.Resolution().x * image.Resolution().y;
     }
