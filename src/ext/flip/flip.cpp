@@ -44,6 +44,7 @@
 #include <cmath>
 #include <iostream>
 #include <fstream>
+#include <cassert>
 
 namespace flip_detail {
 
