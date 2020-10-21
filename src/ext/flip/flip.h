@@ -46,6 +46,6 @@ struct FLIPOptions {
 };
 
 void ComputeFLIPError(const float *testRGB, const float *referenceRGB,
-                      float *flipRGB, int xRes, int yRes, const FLIPOptions &options);
+                      float *flipError, int xRes, int yRes, const FLIPOptions &options);
 
 #endif // FLIP_FLIP_H
