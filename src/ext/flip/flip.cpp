@@ -37,11 +37,14 @@
 
 // pooling.h
 
+#ifdef WIN32
+#define _USE_MATH_DEFINES
+#endif
+#include <cmath>
 #include <vector>
 #include <string>
 #include <sstream>
 #include <iomanip>
-#include <cmath>
 #include <iostream>
 #include <fstream>
 #include <cassert>
