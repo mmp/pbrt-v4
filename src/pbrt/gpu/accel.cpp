@@ -38,6 +38,14 @@
                       optixGetErrorString(res));                                    \
     } while (false) /* eat semicolon */
 
+#define OPTIX_CHECK_WITH_LOG(EXPR, LOG)                                             \
+    do {                                                                            \
+        OptixResult res = EXPR;                                                     \
+        if (res != OPTIX_SUCCESS)                                                   \
+            LOG_FATAL("OptiX call " #EXPR " failed with code %d: \"%s\"\nLogs: %s", \
+                      int(res), optixGetErrorString(res), LOG);                     \
+    } while (false) /* eat semicolon */
+
 namespace pbrt {
 
 struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) RaygenRecord {
@@ -605,9 +613,11 @@ GPUAccel::GPUAccel(
 
     char log[4096];
     size_t logSize = sizeof(log);
-    OPTIX_CHECK(optixModuleCreateFromPTX(optixContext, &moduleCompileOptions,
-                                         &pipelineCompileOptions, ptxCode.c_str(),
-                                         ptxCode.size(), log, &logSize, &optixModule));
+    OPTIX_CHECK_WITH_LOG(
+        optixModuleCreateFromPTX(optixContext, &moduleCompileOptions,
+                                 &pipelineCompileOptions, ptxCode.c_str(),
+                                 ptxCode.size(), log, &logSize, &optixModule),
+        log);
     LOG_VERBOSE("%s", log);
 
     // Optix program groups...
@@ -618,8 +628,9 @@ GPUAccel::GPUAccel(
         desc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
         desc.raygen.module = optixModule;
         desc.raygen.entryFunctionName = "__raygen__findClosest";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &raygenPGClosest));
+        OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                                     log, &logSize, &raygenPGClosest),
+                             log);
         LOG_VERBOSE("%s", log);
     }
 
@@ -629,8 +640,9 @@ GPUAccel::GPUAccel(
         desc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
         desc.miss.module = optixModule;
         desc.miss.entryFunctionName = "__miss__noop";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &missPGNoOp));
+        OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                                     log, &logSize, &missPGNoOp),
+                             log);
         LOG_VERBOSE("%s", log);
     }
 
@@ -642,8 +654,9 @@ GPUAccel::GPUAccel(
         desc.hitgroup.entryFunctionNameCH = "__closesthit__triangle";
         desc.hitgroup.moduleAH = optixModule;
         desc.hitgroup.entryFunctionNameAH = "__anyhit__triangle";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &hitPGTriangle));
+        OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                                     log, &logSize, &hitPGTriangle),
+                             log);
         LOG_VERBOSE("%s", log);
     }
 
@@ -655,8 +668,9 @@ GPUAccel::GPUAccel(
         desc.hitgroup.entryFunctionNameCH = "__closesthit__bilinearPatch";
         desc.hitgroup.moduleIS = optixModule;
         desc.hitgroup.entryFunctionNameIS = "__intersection__bilinearPatch";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &hitPGBilinearPatch));
+        OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                                     log, &logSize, &hitPGBilinearPatch),
+                             log);
         LOG_VERBOSE("%s", log);
     }
 
@@ -668,8 +682,9 @@ GPUAccel::GPUAccel(
         desc.hitgroup.entryFunctionNameCH = "__closesthit__quadric";
         desc.hitgroup.moduleIS = optixModule;
         desc.hitgroup.entryFunctionNameIS = "__intersection__quadric";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &hitPGQuadric));
+        OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                                     log, &logSize, &hitPGQuadric),
+                             log);
         LOG_VERBOSE("%s", log);
     }
 
@@ -679,8 +694,9 @@ GPUAccel::GPUAccel(
         desc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
         desc.raygen.module = optixModule;
         desc.raygen.entryFunctionName = "__raygen__shadow";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &raygenPGShadow));
+        OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                                     log, &logSize, &raygenPGShadow),
+                             log);
         LOG_VERBOSE("%s", log);
     }
 
@@ -690,8 +706,9 @@ GPUAccel::GPUAccel(
         desc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
         desc.miss.module = optixModule;
         desc.miss.entryFunctionName = "__miss__shadow";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &missPGShadow));
+        OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                                     log, &logSize, &missPGShadow),
+                             log);
         LOG_VERBOSE("%s", log);
     }
 
@@ -701,8 +718,10 @@ GPUAccel::GPUAccel(
         desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
         desc.hitgroup.moduleAH = optixModule;
         desc.hitgroup.entryFunctionNameAH = "__anyhit__shadowTriangle";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &anyhitPGShadowTriangle));
+        OPTIX_CHECK_WITH_LOG(
+            optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log, &logSize,
+                                    &anyhitPGShadowTriangle),
+            log);
         LOG_VERBOSE("%s", log);
     }
 
@@ -712,8 +731,9 @@ GPUAccel::GPUAccel(
         desc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
         desc.raygen.module = optixModule;
         desc.raygen.entryFunctionName = "__raygen__shadow_Tr";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &raygenPGShadowTr));
+        OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                                     log, &logSize, &raygenPGShadowTr),
+                             log);
         LOG_VERBOSE("%s", log);
     }
 
@@ -723,8 +743,9 @@ GPUAccel::GPUAccel(
         desc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
         desc.miss.module = optixModule;
         desc.miss.entryFunctionName = "__miss__shadow_Tr";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &missPGShadowTr));
+        OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                                     log, &logSize, &missPGShadowTr),
+                             log);
         LOG_VERBOSE("%s", log);
     }
 
@@ -736,8 +757,10 @@ GPUAccel::GPUAccel(
         desc.hitgroup.entryFunctionNameIS = "__intersection__bilinearPatch";
         desc.hitgroup.moduleAH = optixModule;
         desc.hitgroup.entryFunctionNameAH = "__anyhit__shadowBilinearPatch";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &anyhitPGShadowBilinearPatch));
+        OPTIX_CHECK_WITH_LOG(
+            optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log, &logSize,
+                                    &anyhitPGShadowBilinearPatch),
+            log);
         LOG_VERBOSE("%s", log);
     }
 
@@ -749,8 +772,10 @@ GPUAccel::GPUAccel(
         desc.hitgroup.entryFunctionNameIS = "__intersection__quadric";
         desc.hitgroup.moduleAH = optixModule;
         desc.hitgroup.entryFunctionNameAH = "__anyhit__shadowQuadric";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &anyhitPGShadowQuadric));
+        OPTIX_CHECK_WITH_LOG(
+            optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log, &logSize,
+                                    &anyhitPGShadowQuadric),
+            log);
         LOG_VERBOSE("%s", log);
     }
 
@@ -760,8 +785,9 @@ GPUAccel::GPUAccel(
         desc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
         desc.raygen.module = optixModule;
         desc.raygen.entryFunctionName = "__raygen__randomHit";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &raygenPGRandomHit));
+        OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                                     log, &logSize, &raygenPGRandomHit),
+                             log);
         LOG_VERBOSE("%s", log);
     }
 
@@ -771,8 +797,10 @@ GPUAccel::GPUAccel(
         desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
         desc.hitgroup.moduleAH = optixModule;
         desc.hitgroup.entryFunctionNameAH = "__anyhit__randomHitTriangle";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &hitPGRandomHitTriangle));
+        OPTIX_CHECK_WITH_LOG(
+            optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log, &logSize,
+                                    &hitPGRandomHitTriangle),
+            log);
         LOG_VERBOSE("%s", log);
     }
 
@@ -784,8 +812,10 @@ GPUAccel::GPUAccel(
         desc.hitgroup.entryFunctionNameIS = "__intersection__bilinearPatch";
         desc.hitgroup.moduleAH = optixModule;
         desc.hitgroup.entryFunctionNameAH = "__anyhit__randomHitBilinearPatch";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &hitPGRandomHitBilinearPatch));
+        OPTIX_CHECK_WITH_LOG(
+            optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log, &logSize,
+                                    &hitPGRandomHitBilinearPatch),
+            log);
         LOG_VERBOSE("%s", log);
     }
 
@@ -797,8 +827,10 @@ GPUAccel::GPUAccel(
         desc.hitgroup.entryFunctionNameIS = "__intersection__quadric";
         desc.hitgroup.moduleAH = optixModule;
         desc.hitgroup.entryFunctionNameAH = "__anyhit__randomHitQuadric";
-        OPTIX_CHECK(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log,
-                                            &logSize, &hitPGRandomHitQuadric));
+        OPTIX_CHECK_WITH_LOG(
+            optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log, &logSize,
+                                    &hitPGRandomHitQuadric),
+            log);
         LOG_VERBOSE("%s", log);
     }
 
@@ -819,9 +851,11 @@ GPUAccel::GPUAccel(
                                   hitPGRandomHitTriangle,
                                   hitPGRandomHitBilinearPatch,
                                   hitPGRandomHitQuadric};
-    OPTIX_CHECK(optixPipelineCreate(
-        optixContext, &pipelineCompileOptions, &pipelineLinkOptions, allPGs,
-        sizeof(allPGs) / sizeof(allPGs[0]), log, &logSize, &optixPipeline));
+    OPTIX_CHECK_WITH_LOG(
+        optixPipelineCreate(optixContext, &pipelineCompileOptions, &pipelineLinkOptions,
+                            allPGs, sizeof(allPGs) / sizeof(allPGs[0]), log, &logSize,
+                            &optixPipeline),
+        log);
     LOG_VERBOSE("%s", log);
 
 #if 0
