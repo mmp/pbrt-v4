@@ -37,11 +37,14 @@
 
 // pooling.h
 
+#ifdef WIN32
+#define _USE_MATH_DEFINES
+#endif
+#include <cmath>
 #include <vector>
 #include <string>
 #include <sstream>
 #include <iomanip>
-#include <cmath>
 #include <iostream>
 #include <fstream>
 #include <cassert>
@@ -459,13 +462,7 @@ public:
 
 // flip.cpp
 
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <vector>
 #include <algorithm>
-#define _USE_MATH_DEFINES
-#include <cmath>
 
 namespace flip_detail {
 
