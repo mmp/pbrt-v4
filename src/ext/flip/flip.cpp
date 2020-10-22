@@ -462,13 +462,7 @@ public:
 
 // flip.cpp
 
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <vector>
 #include <algorithm>
-#define _USE_MATH_DEFINES
-#include <cmath>
 
 namespace flip_detail {
 
