@@ -178,7 +178,7 @@ class PathIntegrator : public RayIntegrator {
     // PathIntegrator Public Methods
     PathIntegrator(int maxDepth, CameraHandle camera, SamplerHandle sampler,
                    PrimitiveHandle aggregate, std::vector<LightHandle> lights,
-                   Float rrThreshold = 1, const std::string &lightSampleStrategy = "bvh",
+                   const std::string &lightSampleStrategy = "bvh",
                    bool regularize = false);
 
     SampledSpectrum Li(RayDifferential ray, SampledWavelengths &lambda,
@@ -198,7 +198,6 @@ class PathIntegrator : public RayIntegrator {
 
     // PathIntegrator Private Members
     int maxDepth;
-    Float rrThreshold;
     LightSamplerHandle lightSampler;
     bool regularize;
 };
@@ -231,12 +230,10 @@ class VolPathIntegrator : public RayIntegrator {
     // VolPathIntegrator Public Methods
     VolPathIntegrator(int maxDepth, CameraHandle camera, SamplerHandle sampler,
                       PrimitiveHandle aggregate, std::vector<LightHandle> lights,
-                      Float rrThreshold = 1,
                       const std::string &lightSampleStrategy = "bvh",
                       bool regularize = false)
         : RayIntegrator(camera, sampler, aggregate, lights),
           maxDepth(maxDepth),
-          rrThreshold(rrThreshold),
           lightSampler(
               LightSamplerHandle::Create(lightSampleStrategy, lights, Allocator())),
           regularize(regularize) {}
@@ -276,8 +273,7 @@ class VolPathIntegrator : public RayIntegrator {
     }
 
     // VolPathIntegrator Private Members
-    const int maxDepth;
-    const Float rrThreshold;
+    int maxDepth;
     LightSamplerHandle lightSampler;
     bool regularize;
 };

@@ -968,6 +968,8 @@ void FormattingScene::Integrator(const std::string &name, ParsedParameterVector 
 
     std::string extra;
     if (upgrade) {
+        dict.RemoveFloat("rrthreshold");
+
         if (name == "sppm") {
             dict.RemoveInt("imagewritefrequency");
 

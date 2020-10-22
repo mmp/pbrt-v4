@@ -170,8 +170,10 @@ class TrowbridgeReitzDistribution {
 
     PBRT_CPU_GPU
     void Regularize() {
-        alpha_x = Clamp(2 * alpha_x, 0.1f, 0.3f);
-        alpha_y = Clamp(2 * alpha_y, 0.1f, 0.3f);
+        if (alpha_x < 0.3f)
+            alpha_x = Clamp(2 * alpha_x, 0.1f, 0.3f);
+        if (alpha_y < 0.3f)
+            alpha_y = Clamp(2 * alpha_y, 0.1f, 0.3f);
     }
 
   private:
