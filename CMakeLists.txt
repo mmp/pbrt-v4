@@ -56,7 +56,7 @@ check_ext ("Ptex" "ptex/src" 82bd326)
 check_ext ("double-conversion" "double-conversion/cmake" 9a8e518)
 check_ext ("filesystem" "filesystem/filesystem" 4efd2628)
 check_ext ("stb" "stb/tools" 1034f5)
-check_ext ("OpenVDB" "openvdb/nanovdb" d5ea9808f)
+check_ext ("OpenVDB" "openvdb/nanovdb" 1c306bcaf7e)
 check_ext ("zlib" "zlib/doc" 54d591e)
 
 if (NOT CMAKE_BUILD_TYPE MATCHES Debug)
