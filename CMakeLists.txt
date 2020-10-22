@@ -158,6 +158,8 @@ if (CMAKE_CUDA_COMPILER)
         # Willie hears yeh..
         set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xnvlink -suppress-stack-size-warning")
 
+        set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --forward-unknown-to-host-compiler")
+
         # https://wagonhelm.github.io/articles/2018-03/detecting-cuda-capability-with-cmake
         # Get CUDA compute capability
         set (CHECK_CUDA_OUTPUT_EXE ${CMAKE_BINARY_DIR}/checkcuda)
@@ -248,7 +250,7 @@ INCLUDE(CheckCXXCompilerFlag)
 
 # TODO: how to specify this on windows?
 check_cxx_compiler_flag ("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
-if (COMPILER_SUPPORTS_MARCH_NATIVE AND PBRT_BUILD_NATIVE_EXECUTABLE AND NOT PBRT_CUDA_ENABLED)
+if (COMPILER_SUPPORTS_MARCH_NATIVE AND PBRT_BUILD_NATIVE_EXECUTABLE)
   list (APPEND PBRT_CXX_FLAGS -march=native)
 endif ()
 
@@ -273,6 +275,14 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   set_property(CACHE FP_MODEL PROPERTY STRINGS "precise" "fast=1" "fast=2")
 
   list (APPEND PBRT_CXX_FLAGS "-fp-model ${FP_MODEL}")
+endif ()
+
+if (CMAKE_COMPILER_IS_GNUCC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8.0)
+  list (APPEND PBRT_CXX_FLAGS -fkeep-inline-functions)
+endif ()
+
+if (MSVC AND MSVC_VERSION LESS 1920)
+  message (SEND_ERROR "pbrt-v4 currently requires MSVC 2019 to build on Windows. PRs that get MSVC 2017 working as well would be welcomed. :-)")
 endif ()
 
 if (MSVC AND NOT PBRT_CUDA_ENABLED)
@@ -782,8 +792,8 @@ set_property (TARGET sky_lib PROPERTY FOLDER "ext")
 
 target_compile_definitions (imgtool PRIVATE ${PBRT_DEFINITIONS})
 target_compile_options (imgtool PRIVATE ${PBRT_CXX_FLAGS})
-target_include_directories (imgtool PRIVATE src src/ext)
-target_link_libraries (imgtool PRIVATE ${ALL_PBRT_LIBS} sky_lib)
+target_include_directories (imgtool PRIVATE src src/ext ${FLIP_INCLUDE} )
+target_link_libraries (imgtool PRIVATE ${ALL_PBRT_LIBS} sky_lib flip_lib)
 
 add_sanitizers (imgtool)
 

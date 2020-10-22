@@ -104,3 +104,10 @@ set_property (TARGET double-conversion cctest PROPERTY FOLDER "ext")
 # nanovdb
 
 set (NANOVDB_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/openvdb/nanovdb PARENT_SCOPE)
+
+###########################################################################
+# FLIP
+
+set (FLIP_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/flip PARENT_SCOPE)
+
+add_library (flip_lib STATIC ${CMAKE_CURRENT_SOURCE_DIR}/flip/flip.cpp)

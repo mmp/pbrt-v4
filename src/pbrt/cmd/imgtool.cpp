@@ -36,6 +36,8 @@ extern "C" {
 #include <map>
 #include <string>
 
+#include <flip.h>
+
 #ifdef PBRT_BUILD_GPU_RENDERER
 
 #include <cuda.h>
@@ -119,7 +121,7 @@ static std::map<std::string, CommandUsage> commandUsage = {
     --crop <x0,x1,y0,y1> Crop images before performing diff.
     --difftol <v>      Acceptable image difference percentage before differences
                        are reported. Default: 0
-    --metric <name>    Error metric to use. (Options: "MAE", "MSE", "MRSE")
+    --metric <name>    Error metric to use. (Options: "MAE", "MSE", "MRSE", "FLIP")
     --outfile <name>   Filename to use for saving an image that encodes the
                        absolute value of per-pixel differences.
     --reference <name> Filename for reference image
@@ -679,7 +681,7 @@ int error(int argc, char *argv[]) {
     if (filenameBase.empty())
         usage("error", "Must provide base filename.");
     if (metric != "MSE" && metric != "MRSE" && metric != "MAE")
-        usage("error", "%s: --metric must be \"MAE\", \"MSE\" or \"MRSE\".",
+        usage("error", "%s: --metric must be \"MAE\", \"MSE\", or \"MRSE\".",
               metric.c_str());
 
     std::vector<std::string> filenames = MatchingFilenames(filenameBase);
@@ -828,8 +830,8 @@ int diff(int argc, char *argv[]) {
     if (referenceFile.empty())
         usage("diff", "must specify --reference image");
 
-    if (metric != "MAE" && metric != "MSE" && metric != "MRSE")
-        usage("diff", "%s: --metric must be \"MAE\", \"MSE\" or \"MRSE\".",
+    if (metric != "MAE" && metric != "MSE" && metric != "MRSE" && metric != "FLIP")
+        usage("diff", "%s: --metric must be \"MAE\", \"MSE\", \"MRSE\", or \"FLIP\".",
               metric.c_str());
 
     ImageAndMetadata refRead = Image::Read(referenceFile);
@@ -907,14 +909,42 @@ int diff(int argc, char *argv[]) {
         fprintf(stderr, "%s: clamped %d infinite pixel values.\n", referenceFile.c_str(),
                 nRefClamped);
 
-    Image diffImage;
+    Image errorImage;
     ImageChannelValues error(refImage.NChannels());
     if (metric == "MAE")
-        error = image.MAE(image.AllChannelsDesc(), refImage, &diffImage);
+        error = image.MAE(image.AllChannelsDesc(), refImage, &errorImage);
     else if (metric == "MSE")
-        error = image.MSE(image.AllChannelsDesc(), refImage, &diffImage);
-    else
-        error = image.MRSE(image.AllChannelsDesc(), refImage, &diffImage);
+        error = image.MSE(image.AllChannelsDesc(), refImage, &errorImage);
+    else if (metric == "MRSE")
+        error = image.MRSE(image.AllChannelsDesc(), refImage, &errorImage);
+    else {
+        // FLIP
+        if (refImage.NChannels() != 3) {
+            fprintf(stderr, "%s: only 3 channel images are currently supported for FLIP.\n",
+                    referenceFile.c_str());
+            return 1;
+        }
+
+        errorImage = Image(PixelFormat::Float, image.Resolution(), {"Error"});
+        FLIPOptions opt; /* use defaults for now */
+        image = image.ConvertToFormat(PixelFormat::Float);
+        refImage = refImage.ConvertToFormat(PixelFormat::Float);
+
+        ComputeFLIPError((float *)image.RawPointer({0, 0}),
+                         (float *)refImage.RawPointer({0, 0}),
+                         (float *)errorImage.RawPointer({0, 0}),
+                         image.Resolution().x, image.Resolution().y,
+                         opt);
+
+        for (int c = 0; c < image.NChannels(); ++c)
+            error[c] = 0;
+        for (int y = 0; y < image.Resolution().y; ++y)
+            for (int x = 0; x < image.Resolution().x; ++x)
+                for (int c = 0; c < image.NChannels(); ++c)
+                    error[c] += errorImage.GetChannel({x, y}, 0);
+        for (int c = 0; c < image.NChannels(); ++c)
+            error[c] /= image.Resolution().x * image.Resolution().y;
+    }
 
     if (error.MaxValue() == 0)
         // Same same.
@@ -934,7 +964,7 @@ int diff(int argc, char *argv[]) {
            referenceFile, imageAverage, refAverage, deltaString, metric, error.Average());
 
     if (!outFile.empty()) {
-        if (!diffImage.Write(outFile))
+        if (!errorImage.Write(outFile))
             return 1;
     }
 
