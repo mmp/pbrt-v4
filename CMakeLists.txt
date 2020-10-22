@@ -34,30 +34,31 @@ function (CHECK_EXT NAME DIR HASH)
   find_package(Git)
   if (GIT_FOUND)
     execute_process(
-      COMMAND ${GIT_EXECUTABLE} branch --contains ${HASH} HEAD
+      COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
       WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/ext/${DIR}"
       RESULT_VARIABLE "git_return"
       ERROR_QUIET
-      OUTPUT_QUIET)
-    if (NOT ${git_return} EQUAL 0)
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      OUTPUT_VARIABLE "git_hash")
+    if (NOT ${git_hash} MATCHES "^${HASH}")
       message (FATAL_ERROR "The ${CMAKE_CURRENT_SOURCE_DIR}/src/ext/${DIR} "
-        "submodule isn't up to date. Please run:\n"
+        "submodule isn't up to date (${git_hash} vs ${HASH}). Please run:\n"
         "  \"git submodule update --recursive\"")
     else()
-      #message(STATUS "${NAME}: includes git commit: ${HASH}")
+      message(STATUS "${NAME} at commit: ${git_hash}")
     endif()
   else(GIT_FOUND)
     message(STATUS "git not found: unable to verify revisions in submodules")
   endif(GIT_FOUND)
 endfunction()
 
-check_ext ("OpenEXR" "openexr/OpenEXR" 023e879e52e7486c4)
-check_ext ("Ptex" "ptex/src" 82bd326)
-check_ext ("double-conversion" "double-conversion/cmake" 9a8e518)
-check_ext ("filesystem" "filesystem/filesystem" 4efd2628)
-check_ext ("stb" "stb/tools" 1034f5)
-check_ext ("OpenVDB" "openvdb/nanovdb" 1c306bcaf7e)
-check_ext ("zlib" "zlib/doc" 54d591e)
+check_ext ("OpenEXR" "openexr/OpenEXR" 5cfb5dab6dfada731586b0281bdb15ee75e26782)
+check_ext ("Ptex" "ptex/src" 4cd8e9a6db2b06e478dfbbd8c26eb6df97f84483)
+check_ext ("double-conversion" "double-conversion/cmake" cc1f75a114aca8d2af69f73a5a959aecbab0e87a)
+check_ext ("filesystem" "filesystem/filesystem" f45da753728cde9b1c380b343e41c8b1ca6498d7)
+check_ext ("stb" "stb/tools" b42009b3b9d4ca35bc703f5310eedc74f584be58)
+check_ext ("OpenVDB" "openvdb/nanovdb" 1c306bcaf7e9f7d52525bab716202bd4f7fff5d1)
+check_ext ("zlib" "zlib/doc" 54d591eabf9fe0e84c725638f8d5d8d202a093fa)
 
 if (NOT CMAKE_BUILD_TYPE MATCHES Debug)
   add_definitions (-D NDEBUG)
