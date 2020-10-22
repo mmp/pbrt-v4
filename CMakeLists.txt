@@ -212,7 +212,24 @@ if (CMAKE_CUDA_COMPILER)
                 # disable "extern declaration... is treated as a static definition" warning
                 -Xcudafe=--display_error_number -Xcudafe=--diag_suppress=3089
                 )
-          target_compile_definitions("${lib_name}" PRIVATE ${PBRT_DEFINITIONS})
+          # CUDA integration in Visual Studio seems broken as even if "Use
+          # Host Preprocessor Definitions" is checked, the host preprocessor
+          # definitions are still not used when compiling device code.
+          # To work around that, define the macros using --define-macro to
+          # avoid CMake identifying those as macros and using the proper (but
+          # broken) way of specifying them.
+          if (${CMAKE_GENERATOR} MATCHES "^Visual Studio")
+            # As NDEBUG is specified globally as a definition, we need to
+            # manually add it due to the bug mentioned earlier and due to it
+            # not being found in PBRT_DEFINITIONS.
+            set (cuda_definitions "--define-macro=NDEBUG")
+            foreach (arg ${PBRT_DEFINITIONS})
+              list (APPEND cuda_definitions "--define-macro=${arg}")
+            endforeach ()
+            target_compile_options("${lib_name}" PRIVATE ${cuda_definitions})
+          else ()
+            target_compile_definitions("${lib_name}" PRIVATE ${PBRT_DEFINITIONS})
+          endif()
           target_include_directories ("${lib_name}" PRIVATE src ${CMAKE_BINARY_DIR})
           target_include_directories ("${lib_name}" SYSTEM PRIVATE ${NANOVDB_INCLUDE})
           add_dependencies ("${lib_name}" pbrt_soa_generated)
