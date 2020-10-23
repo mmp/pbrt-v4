@@ -161,7 +161,8 @@ if (CMAKE_CUDA_COMPILER)
             cuda_build_configuration
             INTERFACE
                 "$<$<COMPILE_LANGUAGE:CUDA>:--std=c++17;--use_fast_math;--expt-relaxed-constexpr;--extended-lambda;--forward-unknown-to-host-compiler>"
-                "$<$<COMPILE_LANGUAGE:CUDA>:$<IF:$<CONFIG:Debug>,-G;-g,-lineinfo;-maxrregcount;128>>"
+                # The "$<NOT:$<BOOL:$<TARGET_PROPERTY:CUDA_PTX_COMPILATION>>>" part is to not add debugging symbols when generating PTX files for OptiX; see https://github.com/mmp/pbrt-v4/issues/69#issuecomment-715499748.
+                "$<$<COMPILE_LANGUAGE:CUDA>:$<IF:$<AND:$<CONFIG:Debug>,$<NOT:$<BOOL:$<TARGET_PROPERTY:CUDA_PTX_COMPILATION>>>>,-G;-g,-lineinfo;-maxrregcount;128>>"
         )
 
         # https://wagonhelm.github.io/articles/2018-03/detecting-cuda-capability-with-cmake
