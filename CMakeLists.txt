@@ -17,7 +17,10 @@ include("${CMAKE_SOURCE_DIR}/cmake/UserConfig.cmake" REQUIRED)
 option (PBRT_FLOAT_AS_DOUBLE "Use 64-bit floats" OFF)
 option (PBRT_BUILD_NATIVE_EXECUTABLE "Build executable optimized for CPU architecture of system pbrt was built on" ON)
 option (PBRT_NVTX "Insert NVTX annotations for NVIDIA Profiling and Debugging Tools" OFF)
-set (PBRT_OPTIX7_PATH "" CACHE PATH "Path to OptiX 7 SDK")
+
+if(NOT PBRT_OPTIX7_PATH)
+  set(PBRT_OPTIX7_PATH "" CACHE PATH "Path to OptiX 7 SDK")
+endif()
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message (STATUS "Setting build type to 'Release' as none was specified.")
