@@ -61,7 +61,6 @@ soa TabulatedBSSRDF {
     Vector3f wo;
     Float time;
     Normal3f ns;
-    Vector3f ss, ts;
     Float eta;
     const BSSRDFTable *table;
     SampledSpectrum sigma_t, rho;

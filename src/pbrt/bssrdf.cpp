@@ -17,9 +17,9 @@
 namespace pbrt {
 
 std::string TabulatedBSSRDF::ToString() const {
-    return StringPrintf("[ TabulatedBSSRDF po: %s eta: %f ns: %s ss: %s ts: %s "
-                        "sigma_t: %s rho: %s table: %s ]",
-                        po, eta, ns, ss, ts, sigma_t, rho, *table);
+    return StringPrintf(
+        "[ TabulatedBSSRDF po: %s eta: %f ns: %s sigma_t: %s rho: %s table: %s ]", po,
+        eta, ns, sigma_t, rho, *table);
 }
 
 // BSSRDF Function Definitions
