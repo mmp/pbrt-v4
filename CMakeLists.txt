@@ -246,7 +246,7 @@ if (CMAKE_CUDA_COMPILER)
               -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/bin2c_wrapper.cmake
             VERBATIM
             DEPENDS "${lib_name}" $<TARGET_OBJECTS:${lib_name}>
-            COMMENT "compiling (and embedding ptx from) ${cuda_file}"
+            COMMENT "Embedding PTX generated from ${cuda_file}"
           )
           set (${output_var} ${embedded_file})
         endmacro ()
