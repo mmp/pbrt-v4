@@ -121,9 +121,10 @@ void ComputeBeamDiffusionBSSRDF(Float g, Float eta, BSSRDFTable *t) {
         }
 
         // Compute effective albedo $\rho_{\roman{eff}}$ and CDF for importance sampling
-        t->rhoEff[i] =
-            IntegrateCatmullRom(t->radiusSamples, {&t->profile[i * nSamples], nSamples},
-                                {&t->profileCDF[i * nSamples], nSamples});
+        t->rhoEff[i] = IntegrateCatmullRom(
+            t->radiusSamples,
+            pstd::span<const Float>(&t->profile[i * nSamples], nSamples),
+            pstd::span<Float>(&t->profileCDF[i * nSamples], nSamples));
     });
 }
 

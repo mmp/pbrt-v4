@@ -223,35 +223,6 @@ bool CatmullRomWeights(pstd::span<const Float> nodes, Float x, int *offset,
     return true;
 }
 
-Float IntegrateCatmullRom(pstd::span<const Float> x, pstd::span<const Float> values,
-                          pstd::span<Float> cdf) {
-    CHECK_EQ(x.size(), values.size());
-    Float sum = 0;
-    cdf[0] = 0;
-    for (int i = 0; i < x.size() - 1; ++i) {
-        // Look up $x_i$ and function values of spline segment _i_
-        Float x0 = x[i], x1 = x[i + 1];
-        Float f0 = values[i], f1 = values[i + 1];
-        Float width = x1 - x0;
-
-        // Approximate derivatives using finite differences
-        Float d0, d1;
-        if (i > 0)
-            d0 = width * (f1 - values[i - 1]) / (x1 - x[i - 1]);
-        else
-            d0 = f1 - f0;
-        if (i + 2 < x.size())
-            d1 = width * (values[i + 2] - f0) / (x[i + 2] - x0);
-        else
-            d1 = f1 - f0;
-
-        // Keep a running sum and build a cumulative distribution function
-        sum += ((d0 - d1) * (1.f / 12.f) + (f0 + f1) * .5f) * width;
-        cdf[i + 1] = sum;
-    }
-    return sum;
-}
-
 Float InvertCatmullRom(pstd::span<const Float> x, pstd::span<const Float> values,
                        Float u) {
     // Stop when _u_ is out of bounds
@@ -294,6 +265,35 @@ Float InvertCatmullRom(pstd::span<const Float> x, pstd::span<const Float> values
     Float t = NewtonBisection(0, 1, eval);
 
     return x0 + t * width;
+}
+
+Float IntegrateCatmullRom(pstd::span<const Float> x, pstd::span<const Float> f,
+                          pstd::span<Float> cdf) {
+    CHECK_EQ(x.size(), f.size());
+    Float sum = 0;
+    cdf[0] = 0;
+    for (int i = 0; i < x.size() - 1; ++i) {
+        // Look up $x_i$ and function values of spline segment _i_
+        Float x0 = x[i], x1 = x[i + 1];
+        Float f0 = f[i], f1 = f[i + 1];
+        Float width = x1 - x0;
+
+        // Approximate derivatives using finite differences
+        Float d0, d1;
+        if (i > 0)
+            d0 = width * (f1 - f[i - 1]) / (x1 - x[i - 1]);
+        else
+            d0 = f1 - f0;
+        if (i + 2 < x.size())
+            d1 = width * (f[i + 2] - f0) / (x[i + 2] - x0);
+        else
+            d1 = f1 - f0;
+
+        // Keep a running sum and build a cumulative distribution function
+        sum += width * ((f0 + f1) / 2 + (d0 - d1) / 12);
+        cdf[i + 1] = sum;
+    }
+    return sum;
 }
 
 // Square--Sphere Mapping Function Definitions
