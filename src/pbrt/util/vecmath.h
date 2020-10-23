@@ -1836,6 +1836,34 @@ class Frame {
     }
 
     PBRT_CPU_GPU
+    static Frame FromX(const Vector3f &x) {
+        Vector3f y, z;
+        CoordinateSystem(x, &y, &z);
+        return Frame(x, y, z);
+    }
+
+    PBRT_CPU_GPU
+    static Frame FromY(const Vector3f &y) {
+        Vector3f x, z;
+        CoordinateSystem(y, &z, &x);
+        return Frame(x, y, z);
+    }
+
+    PBRT_CPU_GPU
+    static Frame FromX(const Normal3f &x) {
+        Vector3f y, z;
+        CoordinateSystem(x, &y, &z);
+        return Frame(Vector3f(x), y, z);
+    }
+
+    PBRT_CPU_GPU
+    static Frame FromY(const Normal3f &y) {
+        Vector3f x, z;
+        CoordinateSystem(y, &z, &x);
+        return Frame(x, Vector3f(y), z);
+    }
+
+    PBRT_CPU_GPU
     static Frame FromZ(const Normal3f &z) { return FromZ(Vector3f(z)); }
 
     PBRT_CPU_GPU

@@ -111,18 +111,10 @@ class TabulatedBSSRDF {
     // TabulatedBSSRDF Public Methods
     TabulatedBSSRDF() = default;
     PBRT_CPU_GPU
-    TabulatedBSSRDF(const Point3f &po, const Vector3f &dpdu, const Normal3f &ns,
-                    const Vector3f &wo, Float time, Float eta,
-                    const SampledSpectrum &sigma_a, const SampledSpectrum &sigma_s,
-                    const BSSRDFTable *table)
-        : po(po),
-          wo(wo),
-          time(time),
-          eta(eta),
-          ns(ns),
-          ss(Normalize(dpdu)),
-          ts(Cross(ns, ss)),
-          table(table) {
+    TabulatedBSSRDF(const Point3f &po, const Normal3f &ns, const Vector3f &wo, Float time,
+                    Float eta, const SampledSpectrum &sigma_a,
+                    const SampledSpectrum &sigma_s, const BSSRDFTable *table)
+        : po(po), wo(wo), time(time), eta(eta), ns(ns), table(table) {
         sigma_t = sigma_a + sigma_s;
         rho = SafeDiv(sigma_s, sigma_t);
     }
@@ -185,27 +177,17 @@ class TabulatedBSSRDF {
     PBRT_CPU_GPU
     pstd::optional<BSSRDFProbeSegment> Sample(Float u1, const Point2f &u2) const {
         // Choose projection axis for BSSRDF sampling
-        Vector3f vx, vy, vz;
+        Frame f;
         switch (SampleDiscrete({0.5, .25, .25}, u1)) {
         case 0:
-            vx = ss;
-            vy = ts;
-            vz = Vector3f(ns);
+            f = Frame::FromZ(ns);
             break;
         case 1:
-            // Prepare for sampling rays with respect to _ss_
-            vx = ts;
-            vy = Vector3f(ns);
-            vz = ss;
+            f = Frame::FromY(ns);
             break;
-
         case 2:
-            // Prepare for sampling rays with respect to _ts_
-            vx = Vector3f(ns);
-            vy = ss;
-            vz = ts;
+            f = Frame::FromX(ns);
             break;
-
         default:
             LOG_FATAL("Unexpected value returned from SampleDiscrete");
         }
@@ -224,8 +206,8 @@ class TabulatedBSSRDF {
 
         // Return BSSRDF sampling ray segment
         Point3f pStart =
-            po + r * (vx * std::cos(phi) + vy * std::sin(phi)) - l * vz * 0.5f;
-        Point3f pTarget = pStart + l * vz;
+            po + r * (f.x * std::cos(phi) + f.y * std::sin(phi)) - l * f.z * 0.5f;
+        Point3f pTarget = pStart + l * f.z;
         return BSSRDFProbeSegment{pStart, pTarget, time};
     }
 
@@ -276,8 +258,9 @@ class TabulatedBSSRDF {
         // Express $\pti-\pto$ and $\bold{n}_i$ with respect to local coordinates at
         // $\pto$
         Vector3f d = pi - po;
-        Vector3f dLocal(Dot(ss, d), Dot(ts, d), Dot(ns, d));
-        Normal3f nLocal(Dot(ss, ni), Dot(ts, ni), Dot(ns, ni));
+        Frame f = Frame::FromZ(ns);
+        Vector3f dLocal = f.ToLocal(d);
+        Normal3f nLocal = f.ToLocal(ni);
 
         // Compute BSSRDF profile radius under projection along each axis
         Float rProj[3] = {std::sqrt(dLocal.y * dLocal.y + dLocal.z * dLocal.z),
@@ -310,7 +293,6 @@ class TabulatedBSSRDF {
     Vector3f wo;
     Float time;
     Normal3f ns;
-    Vector3f ss, ts;
     Float eta;
     const BSSRDFTable *table;
     SampledSpectrum sigma_t, rho;

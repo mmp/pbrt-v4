@@ -774,8 +774,8 @@ class SubsurfaceMaterial {
             SampledSpectrum r = Clamp(texEval(reflectance, ctx, lambda), 0, 1);
             SubsurfaceFromDiffuse(table, r, mfree, &sig_a, &sig_s);
         }
-        *bssrdf = TabulatedBSSRDF(ctx.p, ctx.dpdus, ctx.ns, ctx.wo, 0 /* FIXME: si.time*/,
-                                  eta, sig_a, sig_s, &table);
+        *bssrdf = TabulatedBSSRDF(ctx.p, ctx.ns, ctx.wo, 0 /* FIXME: si.time*/, eta,
+                                  sig_a, sig_s, &table);
     }
 
     PBRT_CPU_GPU
