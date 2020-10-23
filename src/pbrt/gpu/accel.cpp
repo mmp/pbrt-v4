@@ -551,6 +551,13 @@ OptixTraversableHandle GPUAccel::createGASForQuadrics(
     return buildBVH(buildInputs);
 }
 
+static void logCallback(unsigned int level, const char* tag, const char* message, void* cbdata) {
+    if (level <= 2)
+        LOG_ERROR("OptiX: %s: %s", tag, message);
+    else
+        LOG_VERBOSE("OptiX: %s: %s", tag, message);
+}
+
 GPUAccel::GPUAccel(
     const ParsedScene &scene, Allocator alloc, CUstream cudaStream,
     const std::map<int, pstd::vector<LightHandle> *> &shapeIndexToAreaLights,
@@ -578,9 +585,19 @@ GPUAccel::GPUAccel(
 
     // Create OptiX context
     OPTIX_CHECK(optixInit());
-    OPTIX_CHECK(optixDeviceContextCreate(cudaContext, 0, &optixContext));
+    OptixDeviceContextOptions ctxOptions = {};
+#ifndef NDEBUG
+    ctxOptions.logCallbackLevel = 2; // error
+#else
+    ctxOptions.logCallbackLevel = 4; // status/progress
+#endif
+    ctxOptions.logCallbackFunction = logCallback;
+#if (OPTIX_VERSION >= 70200)
+    ctxOptions.validationMode = OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_ALL;
+#endif
+    OPTIX_CHECK(optixDeviceContextCreate(cudaContext, &ctxOptions, &optixContext));
 
-    LOG_VERBOSE("Optix successfully initialized");
+    LOG_VERBOSE("Optix version %d successfully initialized", OPTIX_VERSION);
 
     // OptiX module
     OptixModuleCompileOptions moduleCompileOptions = {};
@@ -607,7 +624,11 @@ GPUAccel::GPUAccel(
 
     OptixPipelineLinkOptions pipelineLinkOptions = {};
     pipelineLinkOptions.maxTraceDepth = 2;
+#ifndef NDEBUG
     pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
+#else
+    pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
+#endif
 
     const std::string ptxCode((const char *)PBRT_EMBEDDED_PTX);
 
