@@ -930,6 +930,14 @@ int diff(int argc, char *argv[]) {
         image = image.ConvertToFormat(PixelFormat::Float);
         refImage = refImage.ConvertToFormat(PixelFormat::Float);
 
+        // Clamp to [0,1]...
+        for (int y = 0; y < image.Resolution().y; ++y)
+            for (int x = 0; x < image.Resolution().x; ++x)
+                for (int c = 0; c < image.NChannels(); ++c) {
+                    image.SetChannel({x, y}, c, Clamp(image.GetChannel({x, y}, c), 0, 1));
+                    refImage.SetChannel({x, y}, c, Clamp(refImage.GetChannel({x, y}, c), 0, 1));
+                }
+
         ComputeFLIPError((float *)image.RawPointer({0, 0}),
                          (float *)refImage.RawPointer({0, 0}),
                          (float *)errorImage.RawPointer({0, 0}),

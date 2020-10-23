@@ -608,7 +608,8 @@ class NanoVDBMediumProvider {
             return SampledSpectrum(0.f);
         nanovdb::Vec3<float> pIndex =
             densityFloatGrid->worldToIndexF(nanovdb::Vec3<float>(p.x, p.y, p.z));
-        Float temp = nanovdb::TrilinearSampler(temperatureFloatGrid->tree())(pIndex);
+        using Sampler = nanovdb::SampleFromVoxels<nanovdb::FloatGrid::TreeType, 1, false>;
+        Float temp = Sampler(temperatureFloatGrid->tree())(pIndex);
         temp = (temp - temperatureCutoff) * temperatureScale;
         if (temp <= 100.f)
             return SampledSpectrum(0.f);
@@ -682,7 +683,8 @@ class NanoVDBMediumProvider {
     SampledSpectrum Density(const Point3f &p, const SampledWavelengths &lambda) const {
         nanovdb::Vec3<float> pIndex =
             densityFloatGrid->worldToIndexF(nanovdb::Vec3<float>(p.x, p.y, p.z));
-        Float density = nanovdb::TrilinearSampler(densityFloatGrid->tree())(pIndex);
+        using Sampler = nanovdb::SampleFromVoxels<nanovdb::FloatGrid::TreeType, 1, false>;
+        Float density = Sampler(densityFloatGrid->tree())(pIndex);
         return SampledSpectrum(density);
     }
 
