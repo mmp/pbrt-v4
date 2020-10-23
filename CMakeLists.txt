@@ -113,6 +113,19 @@ else ()
   message (STATUS "Found -lprofiler: ${PROFILE_LIB}")
 endif ()
 
+add_library (pbrt_warnings INTERFACE)
+target_compile_options (
+    pbrt_warnings
+    INTERFACE
+        "$<$<CXX_COMPILER_ID:MSVC>:$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcompiler >/wd4244>" # int -> float conversion
+        "$<$<CXX_COMPILER_ID:MSVC>:$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcompiler >/wd4267>" # size_t -> int conversion
+        "$<$<CXX_COMPILER_ID:MSVC>:$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcompiler >/wd4305>" # double constant assigned to float
+        "$<$<CXX_COMPILER_ID:MSVC>:$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcompiler >/wd4838>" # double -> int conversion
+        "$<$<CXX_COMPILER_ID:MSVC>:$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcompiler >/wd4843>" # double -> float conversion
+        "$<$<CXX_COMPILER_ID:MSVC>:$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcompiler >/wd26451>" # arithmetic on 4-byte value, then cast to 8-byte
+        "$<$<CXX_COMPILER_ID:MSVC>:$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcompiler >/wd26495>" # uninitialized member variable
+)
+
 #########################################
 ## CUDA / OptiX
 
@@ -148,15 +161,17 @@ if (CMAKE_CUDA_COMPILER)
         include_directories (${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})  # for regular c++ compiles
 
         # http://www.ssl.berkeley.edu/~jimm/grizzly_docs/SSL/opt/intel/cc/9.0/lib/locale/en_US/mcpcom.msg
-        set (PBRT_CUDA_DIAG_FLAGS "")
-        #set (PBRT_CUDA_DIAG_FLAGS "${PBRT_CUDA_DIAG_FLAGS} -Xptxas --warn-on-double-precision-use")
-        set (PBRT_CUDA_DIAG_FLAGS "${PBRT_CUDA_DIAG_FLAGS} -Xcudafe --diag_suppress=partial_override")
-        set (PBRT_CUDA_DIAG_FLAGS "${PBRT_CUDA_DIAG_FLAGS} -Xcudafe --diag_suppress=virtual_function_decl_hidden")
-        set (PBRT_CUDA_DIAG_FLAGS "${PBRT_CUDA_DIAG_FLAGS} -Xcudafe --diag_suppress=integer_sign_change")
-        set (PBRT_CUDA_DIAG_FLAGS "${PBRT_CUDA_DIAG_FLAGS} -Xcudafe --diag_suppress=declared_but_not_referenced")
-        # WAR invalid warnings about this with "if constexpr"
-        set (PBRT_CUDA_DIAG_FLAGS "${PBRT_CUDA_DIAG_FLAGS} -Xcudafe --diag_suppress=implicit_return_from_non_void_function")
-        set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${PBRT_CUDA_DIAG_FLAGS}")
+        target_compile_options (
+            pbrt_warnings
+            INTERFACE
+                #"$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xptxas --warn-on-double-precision-use>"
+                "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcudafe --diag_suppress=partial_override>"
+                "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcudafe --diag_suppress=virtual_function_decl_hidden>"
+                "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcudafe --diag_suppress=integer_sign_change>"
+                "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcudafe --diag_suppress=declared_but_not_referenced>"
+                # WAR invalid warnings about this with "if constexpr"
+                "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcudafe --diag_suppress=implicit_return_from_non_void_function>"
+        )
 
         # Willie hears yeh..
         set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xnvlink -suppress-stack-size-warning")
@@ -236,7 +251,7 @@ if (CMAKE_CUDA_COMPILER)
           endif()
           target_include_directories ("${lib_name}" PRIVATE src ${CMAKE_BINARY_DIR})
           target_include_directories ("${lib_name}" SYSTEM PRIVATE ${NANOVDB_INCLUDE})
-          target_link_libraries ("${lib_name}" PRIVATE cuda_build_configuration)
+          target_link_libraries ("${lib_name}" PRIVATE cuda_build_configuration pbrt_warnings)
           add_dependencies ("${lib_name}" pbrt_soa_generated)
           set (c_var_name ${output_var})
           set (embedded_file ${cuda_file}.ptx_embedded.c)
@@ -295,17 +310,6 @@ endif ()
 
 if (MSVC AND MSVC_VERSION LESS 1920)
   message (SEND_ERROR "pbrt-v4 currently requires MSVC 2019 to build on Windows. PRs that get MSVC 2017 working as well would be welcomed. :-)")
-endif ()
-
-if (MSVC AND NOT PBRT_CUDA_ENABLED)
-  # FIXME: it would be nice to still pipe these through to MSVC in this case.
-  list (APPEND PBRT_CXX_FLAGS /wd4305) # double constant assigned to float
-  list (APPEND PBRT_CXX_FLAGS /wd4244) # int -> float conversion
-  list (APPEND PBRT_CXX_FLAGS /wd4843) # double -> float conversion
-  list (APPEND PBRT_CXX_FLAGS /wd4267) # size_t -> int conversion
-  list (APPEND PBRT_CXX_FLAGS /wd4838) # double -> int conversion
-  list (APPEND PBRT_CXX_FLAGS /wd26495) # uninitialized member variable
-  list (APPEND PBRT_CXX_FLAGS /wd26451) # arithmetic on 4-byte value, then cast to 8-byte
 endif ()
 
 ###########################################################################
@@ -652,6 +656,7 @@ add_executable (pbrt::soac ALIAS soac)
 
 target_compile_definitions (soac PRIVATE ${PBRT_DEFINITIONS})
 target_compile_options (soac PUBLIC ${PBRT_CXX_FLAGS})
+target_link_libraries (soac PRIVATE pbrt_warnings)
 
 set_target_properties (soac PROPERTIES OUTPUT_NAME soac)
 
@@ -718,9 +723,7 @@ endif ()
 
 target_compile_options (pbrt_lib PUBLIC ${PBRT_CXX_FLAGS})
 
-if (PBRT_CUDA_ENABLED)
-    target_link_libraries (pbrt_lib PRIVATE cuda_build_configuration)
-endif ()
+target_link_libraries (pbrt_lib PRIVATE pbrt_warnings $<$<BOOL:PBRT_CUDA_ENABLED>:cuda_build_configuration>)
 
 add_sanitizers (pbrt_lib)
 
@@ -764,7 +767,7 @@ add_executable (pbrt::rgb2spec_opt ALIAS rgb2spec_opt)
 
 target_compile_definitions (rgb2spec_opt PRIVATE ${PBRT_DEFINITIONS})
 target_compile_options (rgb2spec_opt PUBLIC ${PBRT_CXX_FLAGS})
-target_link_libraries (rgb2spec_opt ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries (rgb2spec_opt PRIVATE ${CMAKE_THREAD_LIBS_INIT} pbrt_warnings)
 
 add_custom_command (OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/rgbspectrum_aces.cpp
     COMMAND rgb2spec_opt 64 ${CMAKE_CURRENT_BINARY_DIR}/rgbspectrum_aces.cpp ACES2065_1 
@@ -791,7 +794,7 @@ add_executable (pbrt::pbrt_exe ALIAS pbrt_exe)
 target_compile_definitions (pbrt_exe PRIVATE ${PBRT_DEFINITIONS})
 target_compile_options (pbrt_exe PRIVATE ${PBRT_CXX_FLAGS})
 target_include_directories (pbrt_exe PRIVATE src src/ext)
-target_link_libraries (pbrt_exe PRIVATE ${ALL_PBRT_LIBS})
+target_link_libraries (pbrt_exe PRIVATE ${ALL_PBRT_LIBS} pbrt_warnings)
 
 set_target_properties (pbrt_exe PROPERTIES OUTPUT_NAME pbrt)
 
@@ -809,7 +812,7 @@ set_property (TARGET sky_lib PROPERTY FOLDER "ext")
 target_compile_definitions (imgtool PRIVATE ${PBRT_DEFINITIONS})
 target_compile_options (imgtool PRIVATE ${PBRT_CXX_FLAGS})
 target_include_directories (imgtool PRIVATE src src/ext ${FLIP_INCLUDE} )
-target_link_libraries (imgtool PRIVATE ${ALL_PBRT_LIBS} sky_lib flip_lib)
+target_link_libraries (imgtool PRIVATE ${ALL_PBRT_LIBS} pbrt_warnings sky_lib flip_lib)
 
 add_sanitizers (imgtool)
 
@@ -820,6 +823,7 @@ add_executable (obj2pbrt src/pbrt/cmd/obj2pbrt.cpp)
 
 target_compile_definitions (obj2pbrt PRIVATE ${PBRT_DEFINITIONS})
 target_compile_options (obj2pbrt PRIVATE ${PBRT_CXX_FLAGS})
+target_link_libraries (obj2pbrt PRIVATE pbrt_warnings)
 
 add_sanitizers (obj2pbrt)
 
@@ -830,6 +834,7 @@ add_executable (cyhair2pbrt src/pbrt/cmd/cyhair2pbrt.cpp)
 
 target_compile_definitions (cyhair2pbrt PRIVATE ${PBRT_DEFINITIONS})
 target_compile_options (cyhair2pbrt PRIVATE ${PBRT_CXX_FLAGS})
+target_link_libraries (cyhair2pbrt PRIVATE pbrt_warnings)
 
 add_sanitizers (cyhair2pbrt)
 
@@ -872,7 +877,7 @@ set (PBRT_TEST_SOURCE
 
 add_executable (pbrt_test src/pbrt/cmd/pbrt_test.cpp ${PBRT_TEST_SOURCE})
 
-target_link_libraries (pbrt_test PRIVATE ${ALL_PBRT_LIBS})
+target_link_libraries (pbrt_test PRIVATE ${ALL_PBRT_LIBS} pbrt_warnings)
 target_compile_definitions (pbrt_test PRIVATE ${PBRT_DEFINITIONS})
 target_include_directories (pbrt_test PRIVATE src src/ext ${DOUBLE_CONVERSION_INCLUDE})
 target_compile_options(pbrt_test PUBLIC ${PBRT_CXX_FLAGS})
