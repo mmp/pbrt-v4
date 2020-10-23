@@ -31,6 +31,7 @@ struct BSSRDFSample {
 
 // SubsurfaceInteraction Definition
 struct SubsurfaceInteraction {
+    // SubsurfaceInteraction Public Methods
     SubsurfaceInteraction() = default;
     PBRT_CPU_GPU
     SubsurfaceInteraction(const SurfaceInteraction &si)
@@ -58,11 +59,10 @@ struct SubsurfaceInteraction {
     PBRT_CPU_GPU
     Point3f p() const { return Point3f(pi); }
 
+    // SubsurfaceInteraction Public Members
     Point3fi pi;
-    Normal3f n;
-    Vector3f dpdu, dpdv;
-    Normal3f ns;
-    Vector3f dpdus, dpdvs;
+    Normal3f n, ns;
+    Vector3f dpdu, dpdv, dpdus, dpdvs;
 };
 
 // BSSRDF Function Declarations
@@ -94,15 +94,14 @@ struct BSSRDFTable {
 
 // BSSRDFProbeSegment Definition
 struct BSSRDFProbeSegment {
+    // BSSRDFProbeSegment Public Methods
     BSSRDFProbeSegment() = default;
     PBRT_CPU_GPU
     BSSRDFProbeSegment(const Point3f &p0, const Point3f &p1, Float time)
-        : p0(p0), p1(p1), time(time), valid(true) {}
-    PBRT_CPU_GPU operator bool() const { return valid; }
+        : p0(p0), p1(p1), time(time) {}
 
     Point3f p0, p1;
     Float time;
-    bool valid = false;
 };
 
 // TabulatedBSSRDF Definition
@@ -118,6 +117,7 @@ class TabulatedBSSRDF {
                     const BSSRDFTable *table)
         : po(po),
           wo(wo),
+          time(time),
           eta(eta),
           ns(ns),
           ss(Normalize(dpdu)),
@@ -128,7 +128,7 @@ class TabulatedBSSRDF {
     }
 
     PBRT_CPU_GPU
-    SampledSpectrum S(const Point3f &p, const Vector3f &wi) {
+    SampledSpectrum S(const Point3f &p, const Vector3f &wi) const {
         Float Ft = FrDielectric(CosTheta(wo), eta);
         return (1 - Ft) * Sp(p) * Sw(wi);
     }
@@ -183,7 +183,7 @@ class TabulatedBSSRDF {
     std::string ToString() const;
 
     PBRT_CPU_GPU
-    BSSRDFProbeSegment Sample(Float u1, const Point2f &u2) const {
+    pstd::optional<BSSRDFProbeSegment> Sample(Float u1, const Point2f &u2) const {
         // Choose projection axis for BSSRDF sampling
         Vector3f vx, vy, vz;
         switch (SampleDiscrete({0.5, .25, .25}, u1, nullptr, &u1)) {
@@ -309,7 +309,7 @@ class TabulatedBSSRDF {
 
   private:
     friend class SOA<TabulatedBSSRDF>;
-    // TabulatedBSSRDF Private Data
+    // TabulatedBSSRDF Private Members
     Point3f po;
     Vector3f wo;
     Float time;
@@ -332,12 +332,13 @@ inline void SubsurfaceFromDiffuse(const BSSRDFTable &t, const SampledSpectrum &r
     }
 }
 
-inline SampledSpectrum BSSRDFHandle::S(const Point3f &p, const Vector3f &wi) {
+inline SampledSpectrum BSSRDFHandle::S(const Point3f &p, const Vector3f &wi) const {
     auto s = [&](auto ptr) { return ptr->S(p, wi); };
     return Dispatch(s);
 }
 
-inline BSSRDFProbeSegment BSSRDFHandle::Sample(Float u1, const Point2f &u2) const {
+inline pstd::optional<BSSRDFProbeSegment> BSSRDFHandle::Sample(Float u1,
+                                                               const Point2f &u2) const {
     auto sample = [&](auto ptr) { return ptr->Sample(u1, u2); };
     return Dispatch(sample);
 }

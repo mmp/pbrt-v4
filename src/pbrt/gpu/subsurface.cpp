@@ -34,9 +34,9 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
             Float uc = raySamples.subsurface.uc;
             Point2f u = raySamples.subsurface.u;
 
-            BSSRDFProbeSegment probeSeg = bssrdf.Sample(uc, u);
+            pstd::optional<BSSRDFProbeSegment> probeSeg = bssrdf.Sample(uc, u);
             if (probeSeg)
-                subsurfaceScatterQueue->Push(probeSeg.p0, probeSeg.p1, material, bssrdf,
+                subsurfaceScatterQueue->Push(probeSeg->p0, probeSeg->p1, material, bssrdf,
                                              lambda, be.beta, be.pdfUni, be.mediumInterface,
                                              be.etaScale, be.pixelIndex);
         });

@@ -1198,7 +1198,8 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
         BSSRDFHandle bssrdf = isect.GetBSSRDF(ray, lambda, camera, scratchBuffer);
         if (bssrdf && bs->IsTransmission()) {
             // Sample BSSRDF probe segment to find exit point
-            BSSRDFProbeSegment probeSeg = bssrdf.Sample(sampler.Get1D(), sampler.Get2D());
+            pstd::optional<BSSRDFProbeSegment> probeSeg =
+                bssrdf.Sample(sampler.Get1D(), sampler.Get2D());
             if (!probeSeg)
                 break;
 
@@ -1206,9 +1207,9 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             uint64_t seed = MixBits(FloatToBits(sampler.Get1D()));
             WeightedReservoirSampler<SubsurfaceInteraction> interactionSampler(seed);
             // Intersect BSSRDF sampling ray against the scene geometry
-            Interaction base(probeSeg.p0, probeSeg.time, (MediumHandle) nullptr);
+            Interaction base(probeSeg->p0, probeSeg->time, (MediumHandle) nullptr);
             while (true) {
-                Ray r = base.SpawnRayTo(probeSeg.p1);
+                Ray r = base.SpawnRayTo(probeSeg->p1);
                 if (r.d == Vector3f(0, 0, 0))
                     break;
                 pstd::optional<ShapeIntersection> si = Intersect(r, 1);
