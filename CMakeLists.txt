@@ -18,7 +18,7 @@ option (PBRT_FLOAT_AS_DOUBLE "Use 64-bit floats" OFF)
 option (PBRT_BUILD_NATIVE_EXECUTABLE "Build executable optimized for CPU architecture of system pbrt was built on" ON)
 option (PBRT_NVTX "Insert NVTX annotations for NVIDIA Profiling and Debugging Tools" OFF)
 
-if(NOT PBRT_OPTIX7_PATH)
+if(NOT PBRT_OPTIX7_PATH) # prevent a early definition into UserConfig.cmake
   set(PBRT_OPTIX7_PATH "" CACHE PATH "Path to OptiX 7 SDK")
 endif()
 
