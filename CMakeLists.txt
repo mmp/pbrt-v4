@@ -112,6 +112,8 @@ endif ()
 #########################################
 ## CUDA / OptiX
 
+add_library (cuda_build_configuration INTERFACE)
+
 include (CheckLanguage)
 
 check_language(CUDA)
@@ -150,14 +152,17 @@ if (CMAKE_CUDA_COMPILER)
         set (PBRT_CUDA_DIAG_FLAGS "${PBRT_CUDA_DIAG_FLAGS} -Xcudafe --diag_suppress=declared_but_not_referenced")
         # WAR invalid warnings about this with "if constexpr"
         set (PBRT_CUDA_DIAG_FLAGS "${PBRT_CUDA_DIAG_FLAGS} -Xcudafe --diag_suppress=implicit_return_from_non_void_function")
-        set (PBRT_CUDA_DIAG_FLAGS "${PBRT_CUDA_DIAG_FLAGS} --expt-relaxed-constexpr")
-        set (PBRT_CUDA_DIAG_FLAGS "${PBRT_CUDA_DIAG_FLAGS} --extended-lambda")
         set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${PBRT_CUDA_DIAG_FLAGS}")
 
         # Willie hears yeh..
         set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xnvlink -suppress-stack-size-warning")
 
-        set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --forward-unknown-to-host-compiler")
+        target_compile_options (
+            cuda_build_configuration
+            INTERFACE
+                "$<$<COMPILE_LANGUAGE:CUDA>:--std=c++17;--use_fast_math;--expt-relaxed-constexpr;--extended-lambda;--forward-unknown-to-host-compiler>"
+                "$<$<COMPILE_LANGUAGE:CUDA>:$<IF:$<CONFIG:Debug>,-G;-g,-lineinfo;-maxrregcount;128>>"
+        )
 
         # https://wagonhelm.github.io/articles/2018-03/detecting-cuda-capability-with-cmake
         # Get CUDA compute capability
@@ -171,13 +176,6 @@ if (CMAKE_CUDA_COMPILER)
         execute_process (COMMAND ${CHECK_CUDA_OUTPUT_EXE}
                          RESULT_VARIABLE CUDA_RETURN_CODE
                          OUTPUT_VARIABLE CHECK_CUDA_OUTPUT)
-
-        set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --std=c++17")
-        if (CMAKE_BUILD_TYPE MATCHES Debug)
-          set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --use_fast_math -G -g")
-        else()
-          set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --use_fast_math -lineinfo -maxrregcount 128")
-        endif ()
 
         if (NOT ${CUDA_RETURN_CODE} EQUAL 0)
             message (SEND_ERROR ${CHECK_CUDA_OUTPUT})
@@ -233,6 +231,7 @@ if (CMAKE_CUDA_COMPILER)
           endif()
           target_include_directories ("${lib_name}" PRIVATE src ${CMAKE_BINARY_DIR})
           target_include_directories ("${lib_name}" SYSTEM PRIVATE ${NANOVDB_INCLUDE})
+          target_link_libraries ("${lib_name}" PRIVATE cuda_build_configuration)
           add_dependencies ("${lib_name}" pbrt_soa_generated)
           set (c_var_name ${output_var})
           set (embedded_file ${cuda_file}.ptx_embedded.c)
@@ -724,6 +723,10 @@ if (PBRT_CUDA_ENABLED AND PBRT_OPTIX7_PATH)
 endif ()
 
 target_compile_options (pbrt_lib PUBLIC ${PBRT_CXX_FLAGS})
+
+if (PBRT_CUDA_ENABLED)
+    target_link_libraries (pbrt_lib PRIVATE cuda_build_configuration)
+endif ()
 
 add_sanitizers (pbrt_lib)
 
