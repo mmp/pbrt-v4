@@ -78,6 +78,10 @@ if (MSVC)
   set(PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_IS_MSVC _CRT_SECURE_NO_WARNINGS)
 endif ()
 
+if (PBRT_FLOAT_AS_DOUBLE)
+  set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_FLOAT_AS_DOUBLE)
+endif ()
+
 #######################################
 ## ext
 
@@ -253,10 +257,6 @@ if (CMAKE_CUDA_COMPILER)
     endif ()
 else ()
     message (STATUS "CUDA not found")
-endif ()
-
-if (PBRT_FLOAT_AS_DOUBLE)
-  set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_FLOAT_AS_DOUBLE)
 endif ()
 
 ###########################################################################
