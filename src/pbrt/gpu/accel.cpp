@@ -587,9 +587,9 @@ GPUAccel::GPUAccel(
     OPTIX_CHECK(optixInit());
     OptixDeviceContextOptions ctxOptions = {};
 #ifndef NDEBUG
-    ctxOptions.logCallbackLevel = 2; // error
+    ctxOptions.logCallbackLevel = 4;  // status/progress
 #else
-    ctxOptions.logCallbackLevel = 4; // status/progress
+    ctxOptions.logCallbackLevel = 2;  // error
 #endif
     ctxOptions.logCallbackFunction = logCallback;
 #if (OPTIX_VERSION >= 70200)
