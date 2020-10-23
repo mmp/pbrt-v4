@@ -587,9 +587,9 @@ GPUAccel::GPUAccel(
     OPTIX_CHECK(optixInit());
     OptixDeviceContextOptions ctxOptions = {};
 #ifndef NDEBUG
-    ctxOptions.logCallbackLevel = 2; // error
+    ctxOptions.logCallbackLevel = 4;  // status/progress
 #else
-    ctxOptions.logCallbackLevel = 4; // status/progress
+    ctxOptions.logCallbackLevel = 2;  // error
 #endif
     ctxOptions.logCallbackFunction = logCallback;
 #if (OPTIX_VERSION >= 70200)
@@ -597,7 +597,8 @@ GPUAccel::GPUAccel(
 #endif
     OPTIX_CHECK(optixDeviceContextCreate(cudaContext, &ctxOptions, &optixContext));
 
-    LOG_VERBOSE("Optix version %d successfully initialized", OPTIX_VERSION);
+    LOG_VERBOSE("Optix version %d.%d.%d successfully initialized", OPTIX_VERSION / 10000,
+                (OPTIX_VERSION % 10000) / 100, OPTIX_VERSION % 100);
 
     // OptiX module
     OptixModuleCompileOptions moduleCompileOptions = {};
