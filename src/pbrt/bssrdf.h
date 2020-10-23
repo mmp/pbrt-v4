@@ -186,7 +186,7 @@ class TabulatedBSSRDF {
     pstd::optional<BSSRDFProbeSegment> Sample(Float u1, const Point2f &u2) const {
         // Choose projection axis for BSSRDF sampling
         Vector3f vx, vy, vz;
-        switch (SampleDiscrete({0.5, .25, .25}, u1, nullptr, &u1)) {
+        switch (SampleDiscrete({0.5, .25, .25}, u1)) {
         case 0:
             vx = ss;
             vy = ts;
@@ -210,18 +210,14 @@ class TabulatedBSSRDF {
             LOG_FATAL("Unexpected value returned from SampleDiscrete");
         }
 
-        // Choose spectral channel for BSSRDF sampling
-        int ch = std::min<int>(u1 * NSpectrumSamples, NSpectrumSamples - 1);
-        u1 = std::min(u1 * NSpectrumSamples - ch, OneMinusEpsilon);
-
         // Sample BSSRDF profile in polar coordinates
-        Float r = Sample_Sr(ch, u2[0]);
+        Float r = Sample_Sr(u2[0]);
         if (r < 0)
             return {};
         Float phi = 2 * Pi * u2[1];
 
         // Compute BSSRDF profile bounds and intersection height
-        Float rMax = Sample_Sr(ch, 0.999f);
+        Float rMax = Sample_Sr(0.999f);
         if (r >= rMax)
             return {};
         Float l = 2 * std::sqrt(rMax * rMax - r * r);
@@ -234,12 +230,12 @@ class TabulatedBSSRDF {
     }
 
     PBRT_CPU_GPU
-    Float Sample_Sr(int ch, Float u) const {
-        if (sigma_t[ch] == 0)
+    Float Sample_Sr(Float u) const {
+        if (sigma_t[0] == 0)
             return -1;
         return SampleCatmullRom2D(table->rhoSamples, table->radiusSamples, table->profile,
-                                  table->profileCDF, rho[ch], u) /
-               sigma_t[ch];
+                                  table->profileCDF, rho[0], u) /
+               sigma_t[0];
     }
 
     PBRT_CPU_GPU
