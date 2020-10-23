@@ -48,9 +48,6 @@ from bpy_extras import view3d_utils
 import math
 import gpu
 
-from . import utils
-
-
 
 class Pbrt4RenderEngine(bpy.types.RenderEngine):
     # These three members are used by blender to set up the
