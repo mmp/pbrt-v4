@@ -1,6 +1,6 @@
 #-----------------------------------------------------------------------------#
 #
-#    This file is part of BountyPbrt4, the Pbrt v4 integration for Blender
+#    This file is part of Pbrt4Blender, the Pbrt-v4 integration for Blender
 #
 #    Copyright 2020, Pedro A. "povmaniac"
 #
