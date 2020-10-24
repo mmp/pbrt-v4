@@ -66,15 +66,22 @@ void PrintStackTrace();
 
 #else
 
-#define DCHECK(x)
-#define DCHECK_EQ(a, b)
-#define DCHECK_NE(a, b)
-#define DCHECK_GT(a, b)
-#define DCHECK_GE(a, b)
-#define DCHECK_LT(a, b)
-#define DCHECK_LE(a, b)
+#define EMPTY_CHECK \
+    do {            \
+    } while (false) /* swallow semicolon */
 
-#endif
+// Use an empty check (rather than expanding the macros to nothing) to swallow the
+// semicolon at the end, and avoid empty if-statements.
+#define DCHECK(x) EMPTY_CHECK
+
+#define DCHECK_EQ(a, b) EMPTY_CHECK
+#define DCHECK_NE(a, b) EMPTY_CHECK
+#define DCHECK_GT(a, b) EMPTY_CHECK
+#define DCHECK_GE(a, b) EMPTY_CHECK
+#define DCHECK_LT(a, b) EMPTY_CHECK
+#define DCHECK_LE(a, b) EMPTY_CHECK
+
+#endif  // !defined(NDEBUG)
 
 #define CHECK_RARE_TO_STRING(x) #x
 #define CHECK_RARE_EXPAND_AND_TO_STRING(x) CHECK_RARE_TO_STRING(x)
