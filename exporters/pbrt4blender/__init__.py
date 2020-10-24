@@ -100,10 +100,7 @@ class Pbrt4RenderEngine(bpy.types.RenderEngine):
             # Fill the render result with a flat color. The framebuffer is
             # defined as a list of pixels, each pixel itself being a list of
             # R,G,B,A values.
-            if self.is_preview:
-                color = [0.1, 0.2, 0.1, 1.0]
-            else:
-                color = [0.2, 0.1, 0.1, 1.0]
+            color = [0.2, 0.1, 0.1, 1.0]
 
             pixel_count = self.size_x * self.size_y
             rect = [color] * pixel_count
@@ -151,6 +148,11 @@ def get_panels():
     return panels
 
 def register():
+    #
+    from . import ui, io
+    ui.register()
+    io.register()
+
     # Register the RenderEngine
     bpy.utils.register_class(Pbrt4RenderEngine)
 
@@ -158,6 +160,10 @@ def register():
         panel.COMPAT_ENGINES.add('PBRT4')
 
 def unregister():
+    #
+    ui.unregister()
+    io.unregister()
+
     bpy.utils.unregister_class(Pbrt4RenderEngine)
 
     for panel in get_panels():
