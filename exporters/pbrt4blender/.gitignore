@@ -2,3 +2,4 @@
 __pycache*
 *.exe
 pbrt4.code-workspace
+*.zip
