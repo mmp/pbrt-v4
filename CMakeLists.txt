@@ -8,7 +8,7 @@ set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # For sanitizers
-set (CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
+list (PREPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 # Configuration options
 
@@ -75,11 +75,11 @@ find_package ( Threads )
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 if (MSVC)
-  set(PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_IS_MSVC _CRT_SECURE_NO_WARNINGS)
+  list (APPEND PBRT_DEFINITIONS "PBRT_IS_MSVC" "_CRT_SECURE_NO_WARNINGS")
 endif ()
 
 if (PBRT_FLOAT_AS_DOUBLE)
-  set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_FLOAT_AS_DOUBLE)
+  list (APPEND PBRT_DEFINITIONS "PBRT_FLOAT_AS_DOUBLE")
 endif ()
 
 #######################################
@@ -93,14 +93,14 @@ add_subdirectory (${CMAKE_CURRENT_SOURCE_DIR}/src/ext)
 # os/compiler-specific stuff
 
 if (CMAKE_SYSTEM_NAME STREQUAL Windows)
-  set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_IS_WINDOWS NOMINMAX)
+  list (APPEND PBRT_DEFINITIONS "PBRT_IS_WINDOWS" "NOMINMAX")
 elseif (CMAKE_SYSTEM_NAME STREQUAL Darwin)
-  set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_IS_OSX)
+  list (APPEND PBRT_DEFINITIONS "PBRT_IS_OSX")
 elseif (CMAKE_SYSTEM_NAME STREQUAL Linux)
-  set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_IS_LINUX)
+  list (APPEND PBRT_DEFINITIONS "PBRT_IS_LINUX")
   # -rdynamic so we can get backtrace symbols...
   # --no-as-needed so libprofiler sticks around
-  set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -rdynamic -Wl,--no-as-needed")
+  string (APPEND CMAKE_EXE_LINKER_FLAGS " -rdynamic -Wl,--no-as-needed")
 else ()
   message (SEND_ERROR "Unknown system name: " + CMAKE_SYSTEM_NAME)
 endif()
@@ -154,8 +154,8 @@ if (CMAKE_CUDA_COMPILER)
         message (WARNING "Found CUDA but PBRT_OPTIX7_PATH is not set. Disabling GPU compilation.")
     else ()
         enable_language (CUDA)
-        set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_BUILD_GPU_RENDERER)
-        set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} NVTX)
+        list (APPEND PBRT_DEFINITIONS "PBRT_BUILD_GPU_RENDERER")
+        list (APPEND PBRT_DEFINITIONS "NVTX")
         set (PBRT_CUDA_ENABLED ON)
 
         # FIXME
@@ -175,7 +175,7 @@ if (CMAKE_CUDA_COMPILER)
         )
 
         # Willie hears yeh..
-        set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xnvlink -suppress-stack-size-warning")
+        string (APPEND CMAKE_CUDA_FLAGS " -Xnvlink -suppress-stack-size-warning")
 
         target_compile_options (
             cuda_build_configuration
@@ -203,7 +203,7 @@ if (CMAKE_CUDA_COMPILER)
           else ()
             set(ARCH "${CHECK_CUDA_OUTPUT}")
             message (STATUS "CUDA Architecture: ${ARCH}")
-            set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --gpu-architecture=${ARCH}")
+            string (APPEND CMAKE_CUDA_FLAGS " --gpu-architecture=${ARCH}")
         endif ()
 
         set (PBRT_CUDA_LIB cuda)
@@ -283,11 +283,11 @@ INCLUDE(CheckCXXCompilerFlag)
 # TODO: how to specify this on windows?
 check_cxx_compiler_flag ("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
 if (COMPILER_SUPPORTS_MARCH_NATIVE AND PBRT_BUILD_NATIVE_EXECUTABLE)
-  list (APPEND PBRT_CXX_FLAGS -march=native)
+  list (APPEND PBRT_CXX_FLAGS "-march=native")
 endif ()
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
-  list(APPEND PBRT_CXX_FLAGS -std=c++17)
+  list (APPEND PBRT_CXX_FLAGS "-std=c++17")
 
   FIND_PROGRAM(XIAR xiar)
   IF(XIAR)
@@ -306,7 +306,7 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   set(FP_MODEL "precise" CACHE STRING "The floating point model to compile with.")
   set_property(CACHE FP_MODEL PROPERTY STRINGS "precise" "fast=1" "fast=2")
 
-  list (APPEND PBRT_CXX_FLAGS "-fp-model ${FP_MODEL}")
+  list (APPEND PBRT_CXX_FLAGS "-fp-model" "${FP_MODEL}")
 endif ()
 
 if (MSVC AND MSVC_VERSION LESS 1920)
@@ -335,7 +335,7 @@ int main() {
 " HAVE_MMAP)
 
 if (HAVE_MMAP)
-  set(PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_HAVE_MMAP)
+  list (APPEND PBRT_DEFINITIONS "PBRT_HAVE_MMAP")
 ENDIF ()
 
 include (CheckIncludeFiles)
@@ -349,7 +349,7 @@ int main() {
 } " HAS_INTRIN_H)
 
 if (HAS_INTRIN_H)
-  set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_HAS_INTRIN_H)
+  list (APPEND PBRT_DEFINITIONS "PBRT_HAS_INTRIN_H")
 endif ()
 
 ########################################
@@ -366,11 +366,11 @@ int main() { }"
 HAVE_ATTRIBUTE_NOINLINE)
 
 if (HAVE_ATTRIBUTE_NOINLINE)
-  set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} "PBRT_NOINLINE=__attribute__((noinline))")
+  list (APPEND PBRT_DEFINITIONS "PBRT_NOINLINE=__attribute__((noinline))")
 elseif (HAVE_DECLSPEC_NOINLINE)
-  set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} "PBRT_NOINLINE=__declspec(noinline)")
+  list (APPEND PBRT_DEFINITIONS "PBRT_NOINLINE=__declspec(noinline)")
 else ()
-  set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_NOINLINE)
+  list (APPEND PBRT_DEFINITIONS "PBRT_NOINLINE")
 endif ()
 
 ########################################
@@ -389,9 +389,9 @@ int main() {
 } " HAVE_POSIX_MEMALIGN )
 
 if (HAVE__ALIGNED_MALLOC)
-  set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_HAVE__ALIGNED_MALLOC)
+  list (APPEND PBRT_DEFINITIONS "PBRT_HAVE__ALIGNED_MALLOC")
 elseif (HAVE_POSIX_MEMALIGN)
-  set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_HAVE_POSIX_MEMALIGN)
+  list (APPEND PBRT_DEFINITIONS "PBRT_HAVE_POSIX_MEMALIGN")
 else ()
   message (SEND_ERROR "Unable to find a way to allocate aligned memory")
 endif ()
@@ -407,7 +407,7 @@ int main() { }
 " INT64_IS_OWN_TYPE)
 
 if (INT64_IS_OWN_TYPE)
-  set (PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PBRT_INT64_IS_OWN_TYPE)
+  list (APPEND PBRT_DEFINITIONS "PBRT_INT64_IS_OWN_TYPE")
 
 endif ()
 if (PBRT_NVTX)
@@ -647,7 +647,7 @@ endif ()
 ###########################################################################
 # pbrt libraries and executables
 
-set(PBRT_DEFINITIONS ${PBRT_DEFINITIONS} PTEX_STATIC)
+list (APPEND PBRT_DEFINITIONS "PTEX_STATIC")
 
 ######################
 # soac
@@ -749,15 +749,15 @@ if (PBRT_CUDA_ENABLED)
       ${PBRT_EMBEDDED_PTX}
       )
   add_dependencies (pbrt_embedded_ptx_lib pbrt_soa_generated)
-  set (ALL_PBRT_LIBS ${ALL_PBRT_LIBS} pbrt_embedded_ptx_lib)
+  list (APPEND ALL_PBRT_LIBS pbrt_embedded_ptx_lib)
 endif()
 
 if (WIN32)
-  set (ALL_PBRT_LIBS ${ALL_PBRT_LIBS} dbghelp wsock32 ws2_32)
+  list (APPEND ALL_PBRT_LIBS "dbghelp" "wsock32" "ws2_32")
 endif ()
 
 if (PROFILE_LIB)
-  set(ALL_PBRT_LIBS ${ALL_PBRT_LIBS} ${PROFILE_LIB})
+  list (APPEND ALL_PBRT_LIBS "${PROFILE_LIB}")
 endif ()
 
 ######################
