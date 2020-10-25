@@ -34,7 +34,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
             Float uc = raySamples.subsurface.uc;
             Point2f u = raySamples.subsurface.u;
 
-            pstd::optional<BSSRDFProbeSegment> probeSeg = bssrdf.Sample(uc, u);
+            pstd::optional<BSSRDFProbeSegment> probeSeg = bssrdf.SampleSp(uc, u);
             if (probeSeg)
                 subsurfaceScatterQueue->Push(probeSeg->p0, probeSeg->p1, material, bssrdf,
                                              lambda, be.beta, be.pdfUni, be.mediumInterface,
@@ -57,14 +57,14 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
             SubsurfaceInteraction &intr = s.ssi;
             BSSRDFSample bssrdfSample = bssrdf.ProbeIntersectionToSample(intr, &bxdf);
 
-            if (!bssrdfSample.S || bssrdfSample.pdf == 0)
+            if (!bssrdfSample.Sp || bssrdfSample.pdf == 0)
                 return;
 
-            SampledSpectrum betap = s.beta * bssrdfSample.S * s.weight / bssrdfSample.pdf;
+            SampledSpectrum betap = s.beta * bssrdfSample.Sp * s.weight / bssrdfSample.pdf;
             SampledWavelengths lambda = s.lambda;
             RaySamples raySamples = pixelSampleState.samples[s.pixelIndex];
             Vector3f wo = bssrdfSample.wo;
-            BSDF &bsdf = bssrdfSample.bsdf;
+            BSDF &bsdf = bssrdfSample.Sw;
             Float time = 0;  // TODO: pipe through
 
             // NOTE: the remainder is copied from the Material/BSDF eval method.

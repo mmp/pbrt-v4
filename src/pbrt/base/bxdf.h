@@ -149,7 +149,7 @@ class ThinDielectricBxDF;
 class HairBxDF;
 class MeasuredBxDF;
 class ConductorBxDF;
-class BSSRDFAdapter;
+class NormalizedFresnelBxDF;
 class CoatedDiffuseBxDF;
 class CoatedConductorBxDF;
 
@@ -157,7 +157,7 @@ class CoatedConductorBxDF;
 class BxDFHandle : public TaggedPointer<IdealDiffuseBxDF, DiffuseBxDF, CoatedDiffuseBxDF,
                                         CoatedConductorBxDF, DielectricInterfaceBxDF,
                                         ThinDielectricBxDF, HairBxDF, MeasuredBxDF,
-                                        ConductorBxDF, BSSRDFAdapter> {
+                                        ConductorBxDF, NormalizedFresnelBxDF> {
   public:
     // BxDF Interface
     PBRT_CPU_GPU inline SampledSpectrum f(Vector3f wo, Vector3f wi,

@@ -59,7 +59,6 @@ soa MediumInterface {
 soa TabulatedBSSRDF {
     Point3f po;
     Vector3f wo;
-    Float time;
     Normal3f ns;
     Float eta;
     const BSSRDFTable *table;

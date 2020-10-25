@@ -709,8 +709,10 @@ class CoatedConductorMaterial {
 // SubsurfaceMaterial Definition
 class SubsurfaceMaterial {
   public:
+    // SubsurfaceMaterial Type Definitions
     using BxDF = DielectricInterfaceBxDF;
     using BSSRDF = TabulatedBSSRDF;
+
     // SubsurfaceMaterial Public Methods
     SubsurfaceMaterial(Float scale, SpectrumTextureHandle sigma_a,
                        SpectrumTextureHandle sigma_s, SpectrumTextureHandle reflectance,
@@ -774,15 +776,15 @@ class SubsurfaceMaterial {
             SampledSpectrum r = Clamp(texEval(reflectance, ctx, lambda), 0, 1);
             SubsurfaceFromDiffuse(table, r, mfree, &sig_a, &sig_s);
         }
-        *bssrdf = TabulatedBSSRDF(ctx.p, ctx.ns, ctx.wo, 0 /* FIXME: si.time*/, eta,
-                                  sig_a, sig_s, &table);
+        *bssrdf = TabulatedBSSRDF(ctx.p, ctx.ns, ctx.wo, eta, sig_a, sig_s, &table);
     }
 
     PBRT_CPU_GPU
     FloatTextureHandle GetDisplacement() const { return displacement; }
     PBRT_CPU_GPU bool IsTransparent() const { return false; }
 
-    PBRT_CPU_GPU static constexpr bool HasSubsurfaceScattering() { return true; }
+    PBRT_CPU_GPU
+    static constexpr bool HasSubsurfaceScattering() { return true; }
 
     static SubsurfaceMaterial *Create(const TextureParameterDictionary &parameters,
                                       const FileLoc *loc, Allocator alloc);
@@ -792,10 +794,9 @@ class SubsurfaceMaterial {
   private:
     // SubsurfaceMaterial Private Members
     FloatTextureHandle displacement;
-    Float scale;
     SpectrumTextureHandle sigma_a, sigma_s, reflectance, mfp;
+    Float scale, eta;
     FloatTextureHandle uRoughness, vRoughness;
-    Float eta;
     bool remapRoughness;
     BSSRDFTable table;
 };
