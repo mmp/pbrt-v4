@@ -610,6 +610,32 @@ DiffuseAreaLight::DiffuseAreaLight(const Transform &renderFromLight,
                 "Proceed at your own risk; your image may have errors.");
 }
 
+pstd::optional<LightLiSample> DiffuseAreaLight::SampleLi(LightSampleContext ctx,
+                                                         Point2f u,
+                                                         SampledWavelengths lambda,
+                                                         LightSamplingMode mode) const {
+    // Sample point on shape for _DiffuseAreaLight_
+    ShapeSampleContext shapeCtx(ctx.pi, ctx.n, ctx.ns, 0 /* time */);
+    pstd::optional<ShapeSample> ss = shape.Sample(shapeCtx, u);
+    DCHECK(!IsNaN(ss->pdf));
+    if (!ss || ss->pdf == 0 || LengthSquared(ss->intr.p() - ctx.p()) == 0)
+        return {};
+    ss->intr.mediumInterface = &mediumInterface;
+
+    // Return _LightLiSample_ for sampled point on shape
+    Vector3f wi = Normalize(ss->intr.p() - ctx.p());
+    SampledSpectrum Le = L(ss->intr.p(), ss->intr.n, ss->intr.uv, -wi, lambda);
+    if (!Le)
+        return {};
+    return LightLiSample(Le, wi, ss->pdf, ss->intr);
+}
+
+Float DiffuseAreaLight::PDF_Li(LightSampleContext ctx, Vector3f wi,
+                               LightSamplingMode) const {
+    ShapeSampleContext shapeCtx(ctx.pi, ctx.n, ctx.ns, 0 /* time */);
+    return shape.PDF(shapeCtx, wi);
+}
+
 SampledSpectrum DiffuseAreaLight::Phi(const SampledWavelengths &lambda) const {
     SampledSpectrum phi(0.f);
     if (image) {
