@@ -947,8 +947,8 @@ std::string MeasuredBxDF::ToString() const {
     return StringPrintf("[ MeasuredBxDF brdf: %s ]", *brdf);
 }
 
-std::string BSSRDFAdapter::ToString() const {
-    return StringPrintf("[ BSSRDFAdapter eta: %f ]", eta);
+std::string NormalizedFresnelBxDF::ToString() const {
+    return StringPrintf("[ NormalizedFresnelBxDF eta: %f ]", eta);
 }
 
 // BxDFHandle Method Definitions

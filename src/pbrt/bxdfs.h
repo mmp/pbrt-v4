@@ -938,7 +938,7 @@ beta /= AbsCosTheta(w);
         HGPhaseFunction phase(g);
 
         for (int depth = 0; depth < config.maxDepth; ++depth) {
-            // Follow random walk through layeres to sample layered BSDF
+            // Follow random walk through layers to sample layered BSDF
             // Possibly terminate layered BSDF sampling with Russian Roulette
             Float rrBeta = f.MaxComponentValue() / pdf;
             if (depth > 3 && rrBeta < 0.25) {
@@ -1318,13 +1318,13 @@ class MeasuredBxDF {
     SampledWavelengths lambda;
 };
 
-// BSSRDFAdapter Definition
-class BSSRDFAdapter {
+// NormalizedFresnelBxDF Definition
+class NormalizedFresnelBxDF {
   public:
-    // BSSRDFAdapter Public Methods
-    BSSRDFAdapter() = default;
+    // NormalizedFresnelBxDF Public Methods
+    NormalizedFresnelBxDF() = default;
     PBRT_CPU_GPU
-    BSSRDFAdapter(Float eta) : eta(eta) {}
+    NormalizedFresnelBxDF(Float eta) : eta(eta) {}
 
     PBRT_CPU_GPU
     BSDFSample Sample_f(const Vector3f &wo, Float uc, const Point2f &u,
@@ -1352,7 +1352,7 @@ class BSSRDFAdapter {
     void Regularize() {}
 
     PBRT_CPU_GPU
-    static constexpr const char *Name() { return "BSSRDFAdapter"; }
+    static constexpr const char *Name() { return "NormalizedFresnelBxDF"; }
 
     std::string ToString() const;
 
@@ -1377,8 +1377,7 @@ class BSSRDFAdapter {
     }
 
   private:
-    friend class SOA<BSSRDFAdapter>;
-    // BSSRDFAdapter Private Members
+    friend class SOA<NormalizedFresnelBxDF>;
     Float eta;
 };
 

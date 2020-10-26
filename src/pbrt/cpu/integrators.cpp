@@ -1199,7 +1199,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
         if (bssrdf && bs->IsTransmission()) {
             // Sample BSSRDF probe segment to find exit point
             pstd::optional<BSSRDFProbeSegment> probeSeg =
-                bssrdf.Sample(sampler.Get1D(), sampler.Get2D());
+                bssrdf.SampleSp(sampler.Get1D(), sampler.Get2D());
             if (!probeSeg)
                 break;
 
@@ -1207,7 +1207,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             uint64_t seed = MixBits(FloatToBits(sampler.Get1D()));
             WeightedReservoirSampler<SubsurfaceInteraction> interactionSampler(seed);
             // Intersect BSSRDF sampling ray against the scene geometry
-            Interaction base(probeSeg->p0, probeSeg->time, (MediumHandle) nullptr);
+            Interaction base(probeSeg->p0, ray.time, (MediumHandle) nullptr);
             while (true) {
                 Ray r = base.SpawnRayTo(probeSeg->p1);
                 if (r.d == Vector3f(0, 0, 0))
@@ -1227,38 +1227,35 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             SubsurfaceInteraction ssi = interactionSampler.GetSample();
             BSSRDFSample bssrdfSample =
                 bssrdf.ProbeIntersectionToSample(ssi, scratchBuffer);
-            if (!bssrdfSample.S || bssrdfSample.pdf == 0)
+            if (!bssrdfSample.Sp || bssrdfSample.pdf == 0)
                 break;
-            // Can ignore path pdf here as well since bssrdfSample.pdf
-            // is non-spectral.
-            beta *= bssrdfSample.S * interactionSampler.WeightSum() / bssrdfSample.pdf;
+            beta *= bssrdfSample.Sp * interactionSampler.WeightSum() / bssrdfSample.pdf;
             SurfaceInteraction pi = ssi;
-            BSDF &bsdf = bssrdfSample.bsdf;
+            BSDF &Sw = bssrdfSample.Sw;
             pi.wo = bssrdfSample.wo;
 
             // Possibly regularize subsurface BSDF and update _prevSurfaceIntr_
             anyNonSpecularBounces = true;
             if (regularize) {
                 ++regularizedBSDFs;
-                bsdf.Regularize();
+                Sw.Regularize();
             } else
                 ++totalBSDFs;
             prevSurfaceIntr = pi;
             CHECK(!prevMediumIntr.has_value());
 
             // Account for attenuated direct subsurface scattering
-            L +=
-                SafeDiv(SampleLd(pi, &bsdf, lambda, sampler, beta, pdfUni), lambda.PDF());
+            L += SafeDiv(SampleLd(pi, &Sw, lambda, sampler, beta, pdfUni), lambda.PDF());
 
             // Sample ray for indirect subsurface scattering
             Float u = sampler.Get1D();
-            pstd::optional<BSDFSample> bs = bsdf.Sample_f(pi.wo, u, sampler.Get2D());
+            pstd::optional<BSDFSample> bs = Sw.Sample_f(pi.wo, u, sampler.Get2D());
             if (!bs)
                 break;
             beta *= bs->f * AbsDot(bs->wi, pi.shading.n);
             pdfNEE = pdfUni;
             pdfUni *= bs->pdf;
-            // don't increment depth this time...
+            // Don't increment depth this time...
             DCHECK(!IsInf(beta.y(lambda)));
             specularBounce = bs->IsSpecular();
             ray = RayDifferential(pi.SpawnRay(bs->wi));
