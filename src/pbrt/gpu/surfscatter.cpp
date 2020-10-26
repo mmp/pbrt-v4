@@ -98,7 +98,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                     Point2f u(RadicalInverse(1, i + 1), RadicalInverse(2, i + 1));
 
                     // Estimate one term of $\rho_\roman{hd}$
-                    pstd::optional<BSDFSample> bs = bsdf.Sample_f(me.wo, uc, u);
+                    pstd::optional<BSDFSample> bs = bsdf.Sample_f<BxDF>(me.wo, uc, u);
                     if (bs)
                         rho += bs->f * AbsDot(bs->wi, ns) / bs->pdf;
                 }
@@ -126,7 +126,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 if (bsdfSample->pdfIsProportional) {
                     // The PDFs need to be handled slightly differently for
                     // stochastically-sampled layered materials..
-                    Float pdf = bsdf.PDF(wo, wi);
+                    Float pdf = bsdf.PDF<BxDF>(wo, wi);
                     beta *= pdf / bsdfSample->pdf;
                     pdfUni *= pdf;
                 } else
