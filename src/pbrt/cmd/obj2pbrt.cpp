@@ -1591,7 +1591,7 @@ int main(int argc, char *argv[]) {
                 fprintf(f, "]\n");
             }
             if (!st.empty()) {
-                fprintf(f, "  \"point2 st\" [ \n");
+                fprintf(f, "  \"point2 uv\" [ \n");
                 for (Point2f tex : st)
                     fprintf(f, "\t%.10g %.10g\n", tex.x, tex.y);
                 fprintf(f, "]\n");
