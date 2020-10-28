@@ -107,7 +107,7 @@ std::string ToString(BxDFFlags flags);
 enum class TransportMode { Radiance, Importance };
 
 PBRT_CPU_GPU
-inline TransportMode operator~(TransportMode mode) {
+inline TransportMode operator!(TransportMode mode) {
     return (mode == TransportMode::Radiance) ? TransportMode::Importance
                                              : TransportMode::Radiance;
 }

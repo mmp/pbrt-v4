@@ -2113,9 +2113,9 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
         pdfFwd = bs->pdf;
         anyNonSpecularBounces |= !bs->IsSpecular();
         beta *= bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
-        // TODO: confirm. I believe that ~mode is right. Interestingly,
+        // TODO: confirm. I believe that !mode is right. Interestingly,
         // it makes no difference in the test suite either way.
-        pdfRev = bsdf.PDF(bs->wi, wo, ~mode);
+        pdfRev = bsdf.PDF(bs->wi, wo, !mode);
         if (bs->IsSpecular()) {
             vertex.delta = true;
             pdfRev = pdfFwd = 0;

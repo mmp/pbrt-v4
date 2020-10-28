@@ -438,20 +438,20 @@ class TopOrBottomBxDF {
     }
 
     PBRT_CPU_GPU
-    SampledSpectrum f(const Vector3f &wo, const Vector3f &wi, TransportMode mode) const {
+    SampledSpectrum f(Vector3f wo, Vector3f wi, TransportMode mode) const {
         return top ? top->f(wo, wi, mode) : bottom->f(wo, wi, mode);
     }
 
     PBRT_CPU_GPU
     pstd::optional<BSDFSample> Sample_f(
-        const Vector3f &wo, Float uc, const Point2f &u, TransportMode mode,
+        Vector3f wo, Float uc, Point2f u, TransportMode mode,
         BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
         return top ? top->Sample_f(wo, uc, u, mode, sampleFlags)
                    : bottom->Sample_f(wo, uc, u, mode, sampleFlags);
     }
 
     PBRT_CPU_GPU
-    Float PDF(const Vector3f &wo, const Vector3f &wi, TransportMode mode,
+    Float PDF(Vector3f wo, Vector3f wi, TransportMode mode,
               BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
         return top ? top->PDF(wo, wi, mode, sampleFlags)
                    : bottom->PDF(wo, wi, mode, sampleFlags);
@@ -513,21 +513,23 @@ class LayeredBxDF {
     PBRT_CPU_GPU
     SampledSpectrum f(Vector3f wo, Vector3f wi, TransportMode mode) const {
         SampledSpectrum f(0.);
+        // Estimate _LayeredBxDF_ value _f_ using random sampling
         // Set _wi_ and _wi_ for layered BSDF evaluation
         if (config.twoSided && wo.z < 0) {
-            // BIG WIN
             wo = -wo;
             wi = -wi;
         }
 
-        // Determine entrance and exit interfaces for layered BSDF
+        // Determine entrance interface for layered BSDF
+        TopOrBottomBxDF<TopBxDF, BottomBxDF> enterInterface;
         bool enteredTop = wo.z > 0;
-        TopOrBottomBxDF<TopBxDF, BottomBxDF> enterInterface, exitInterface;
-        TopOrBottomBxDF<TopBxDF, BottomBxDF> nonExitInterface;
         if (enteredTop)
             enterInterface = &top;
         else
             enterInterface = &bottom;
+
+        // Determine exit interface and exit $z$ for layered BSDF
+        TopOrBottomBxDF<TopBxDF, BottomBxDF> exitInterface, nonExitInterface;
         if (SameHemisphere(wo, wi) ^ enteredTop) {
             exitInterface = &bottom;
             nonExitInterface = &top;
@@ -551,26 +553,23 @@ class LayeredBxDF {
             // Sample random walk through layers to estimate BSDF value
             // Sample transmission direction through entrance interface
             Float uc = r();
-            Point2f u(r(), r());
             pstd::optional<BSDFSample> wos = enterInterface.Sample_f(
-                wo, uc, u, mode, BxDFReflTransFlags::Transmission);
+                wo, uc, Point2f(r(), r()), mode, BxDFReflTransFlags::Transmission);
             if (!wos || !wos->f || wos->pdf == 0 || wos->wi.z == 0)
-                continue;
-
-            // Sample BSDF for NEE in _wi_'s direction
-            uc = r();
-            u = Point2f(r(), r());
-            pstd::optional<BSDFSample> wis = exitInterface.Sample_f(
-                wi, uc, u, ~mode, BxDFReflTransFlags::Transmission);
-            if (!wis || !wis->f || wis->pdf == 0 || wis->wi.z == 0)
                 continue;
 
             // Declare state for random walk through BSDF layers
             SampledSpectrum beta = wos->f * AbsCosTheta(wos->wi) / wos->pdf;
-            SampledSpectrum betaExit = wis->f / wis->pdf;
             Vector3f w = wos->wi;
             Float z = enteredTop ? thickness : 0;
             HGPhaseFunction phase(g);
+
+            // Sample BSDF for NEE in _wi_'s direction
+            uc = r();
+            pstd::optional<BSDFSample> wis = exitInterface.Sample_f(
+                wi, uc, Point2f(r(), r()), !mode, BxDFReflTransFlags::Transmission);
+            if (!wis || !wis->f || wis->pdf == 0 || wis->wi.z == 0)
+                continue;
 
             for (int depth = 0; depth < config.maxDepth; ++depth) {
                 // Sample next event for layered BSDF evaluation random walk
@@ -578,7 +577,7 @@ class LayeredBxDF {
                          beta[1], beta[2], beta[3], w.x, w.y, w.z, f[0], f[1], f[2],
                          f[3]);
                 // Possibly terminate layered BSDF random walk with Russian Roulette
-                if (depth > 3 && beta.MaxComponentValue() < .25) {
+                if (depth > 3 && beta.MaxComponentValue() < 0.25f) {
                     Float q = std::max<Float>(0, 1 - beta.MaxComponentValue());
                     if (r() < q)
                         break;
@@ -587,32 +586,28 @@ class LayeredBxDF {
                              beta[1], beta[2], beta[3]);
                 }
 
-                if (albedo) {
+                // Account for media between layers and possibly scatter
+                if (!albedo) {
+                    // Advance to next layer boundary and update _beta_ for transmittance
+                    z = (z == thickness) ? 0 : thickness;
+                    beta *= Tr(thickness, w);
+
+                } else {
                     // Sample medium scattering for layered BSDF evaluation
                     Float sigma_t = 1;
-                    Float dz = SampleExponential(r(), sigma_t / AbsCosTheta(w));
+                    Float dz = SampleExponential(r(), sigma_t / std::abs(w.z));
                     Float zp = w.z > 0 ? (z + dz) : (z - dz);
                     CHECK_RARE(1e-5, z == zp);
                     if (z == zp)
                         continue;
                     if (0 < zp && zp < thickness) {
                         // Handle scattering event in layered BSDF medium
-#if 0
-// TODO: cancel out and simplify: should be
-// f *= AbsCosTheta(w) / sigma_t (!!!) -- that in turn makes the tricky cosine stuff
-// more reasonable / palatible...
-//beta *= Tr(dz, w) / ExponentialPDF(dz, sigma_t / AbsCosTheta(w));
-beta *= AbsCosTheta(w) / sigma_t;
-// Tricky cosines. Always divide here since we always
-// include it when we leave a surface.
-beta /= AbsCosTheta(w);
-#endif
                         // Account for scattering through _exitInterface_ using _wis_
                         Float wt = 1;
                         if (!IsSpecular(exitInterface.Flags()))
                             wt = PowerHeuristic(1, wis->pdf, 1, phase.PDF(-w, -wis->wi));
-                        Float te = Tr(zp - exitZ, wis->wi);
-                        f += beta * albedo * phase.p(-w, -wis->wi) * wt * te * betaExit;
+                        f += beta * albedo * phase.p(-w, -wis->wi) * wt *
+                             Tr(zp - exitZ, wis->wi) * wis->f / wis->pdf;
 
                         // Sample phase function and update layered path state
                         pstd::optional<PhaseFunctionSample> ps =
@@ -637,18 +632,14 @@ beta /= AbsCosTheta(w);
                         continue;
                     }
                     z = Clamp(zp, 0, thickness);
-
-                } else {
-                    // Advance to next layer boundary and update _beta_ for transmittance
-                    z = (z == thickness) ? 0 : thickness;
-                    beta *= Tr(thickness, w);
                 }
+
+                // Account for scattering at appropriate interface
                 if (z == exitZ) {
                     // Account for reflection at _exitInterface_
                     Float uc = r();
-                    Point2f u(r(), r());
                     pstd::optional<BSDFSample> bs = exitInterface.Sample_f(
-                        -w, uc, u, mode, BxDFReflTransFlags::Reflection);
+                        -w, uc, Point2f(r(), r()), mode, BxDFReflTransFlags::Reflection);
                     if (!bs || !bs->f || bs->pdf == 0 || bs->wi.z == 0)
                         break;
                     beta *= bs->f * AbsCosTheta(bs->wi) / bs->pdf;
@@ -663,8 +654,8 @@ beta /= AbsCosTheta(w);
                             wt = PowerHeuristic(1, wis->pdf, 1,
                                                 nonExitInterface.PDF(-w, -wis->wi, mode));
                         f += beta * nonExitInterface.f(-w, -wis->wi, mode) *
-                             AbsCosTheta(wis->wi) * wt * Tr(thickness, wis->wi) *
-                             betaExit;
+                             AbsCosTheta(wis->wi) * wt * Tr(thickness, wis->wi) * wis->f /
+                             wis->pdf;
                     }
                     // Sample new direction using BSDF at _nonExitInterface_
                     Float uc = r();
@@ -692,6 +683,7 @@ beta /= AbsCosTheta(w);
                 }
             }
         }
+
         return f / config.nSamples;
     }
 
@@ -736,7 +728,7 @@ beta /= AbsCosTheta(w);
             // Follow random walk through layers to sample layered BSDF
             // Possibly terminate layered BSDF sampling with Russian Roulette
             Float rrBeta = f.MaxComponentValue() / pdf;
-            if (depth > 3 && rrBeta < 0.25) {
+            if (depth > 3 && rrBeta < 0.25f) {
                 Float q = std::max<Float>(0, 1 - rrBeta);
                 if (r() < q)
                     return {};
@@ -755,16 +747,6 @@ beta /= AbsCosTheta(w);
                     return {};
                 if (0 < zp && zp < thickness) {
                     // Update path state for valid scattering event between interfaces
-#if 0
-// TODO: cancel out and simplify: should be
-// f *= AbsCosTheta(w) / sigma_t (!!!) -- that in turn makes the tricky cosine stuff
-// more reasonable / palatible...
-//f *= Tr(dz, w) / ExponentialPDF(dz, sigma_t / AbsCosTheta(w));
-f *= AbsCosTheta(w) / sigma_t;
-// Tricky cosines. Always divide here since we always
-// include it when we leave a surface.
-f /= AbsCosTheta(w);
-#endif
                     pstd::optional<PhaseFunctionSample> ps =
                         phase.Sample_p(-w, Point2f(r(), r()));
                     if (!ps || ps->pdf == 0 || ps->wi.z == 0)
@@ -784,7 +766,6 @@ f /= AbsCosTheta(w);
 
             } else {
                 // Advance to the other layer interface
-                // Bounce back and forth between the top and bottom
                 z = (z == thickness) ? 0 : thickness;
                 f *= Tr(thickness, w);
             }
@@ -824,9 +805,9 @@ f /= AbsCosTheta(w);
     Float PDF(Vector3f wo, Vector3f wi, TransportMode mode,
               BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
         CHECK(sampleFlags == BxDFReflTransFlags::All);  // for now
+        // Return approximate PDF for layered BSDF
         // Set _wi_ and _wi_ for layered BSDF evaluation
         if (config.twoSided && wo.z < 0) {
-            // BIG WIN
             wo = -wo;
             wi = -wi;
         }
@@ -837,16 +818,13 @@ f /= AbsCosTheta(w);
             return std::min<Float>(rng.Uniform<Float>(), OneMinusEpsilon);
         };
 
+        // Update _pdfSum_ for reflection at the entrance layer
         bool enteredTop = wo.z > 0;
         Float pdfSum = 0;
-        // Update _pdfSum_ for reflection at the entrance layer
         if (SameHemisphere(wo, wi)) {
-            if (enteredTop)
-                pdfSum += config.nSamples *
-                          top.PDF(wo, wi, mode, BxDFReflTransFlags::Reflection);
-            else
-                pdfSum += config.nSamples *
-                          bottom.PDF(wo, wi, mode, BxDFReflTransFlags::Reflection);
+            auto reflFlag = BxDFReflTransFlags::Reflection;
+            pdfSum += enteredTop ? config.nSamples * top.PDF(wo, wi, mode, reflFlag)
+                                 : config.nSamples * bottom.PDF(wo, wi, mode, reflFlag);
         }
 
         for (int s = 0; s < config.nSamples; ++s) {
@@ -868,13 +846,13 @@ f /= AbsCosTheta(w);
 
                 // Update _pdfSum_ accounting for TRT scattering events
                 if (!wos || !wos->f || wos->pdf == 0 || wos->wi.z == 0 ||
-                    wos->IsReflection()) {
+                    wos->IsReflection())
                     pdfSum += tInterface.PDF(wo, wi, mode);
-                } else {
+                else {
                     uc = r();
                     u = Point2f(r(), r());
                     pstd::optional<BSDFSample> wis =
-                        tInterface.Sample_f(wi, uc, u, ~mode);
+                        tInterface.Sample_f(wi, uc, u, !mode);
                     if (!wis || !wis->f || wis->pdf == 0 || wis->wi.z == 0 ||
                         wis->IsReflection())
                         continue;
@@ -902,7 +880,7 @@ f /= AbsCosTheta(w);
 
                 uc = r();
                 u = Point2f(r(), r());
-                pstd::optional<BSDFSample> wis = tiInterface.Sample_f(wi, uc, u, ~mode);
+                pstd::optional<BSDFSample> wis = tiInterface.Sample_f(wi, uc, u, !mode);
                 if (!wis || !wos->f || wos->pdf == 0 || wos->wi.z == 0 ||
                     wis->IsReflection())
                     continue;
@@ -918,7 +896,7 @@ f /= AbsCosTheta(w);
             }
         }
         // Return mixture of PDF estimate and constant PDF
-        return Lerp(.9, 1 / (4 * Pi), pdfSum / config.nSamples);
+        return Lerp(0.9f, 1 / (4 * Pi), pdfSum / config.nSamples);
     }
 
   protected:
@@ -927,7 +905,7 @@ f /= AbsCosTheta(w);
     static Float Tr(Float dz, const Vector3f &w) {
         if (std::abs(dz) <= std::numeric_limits<Float>::min())
             return 1;
-        return std::exp(-std::abs(dz) / AbsCosTheta(w));
+        return std::exp(-std::abs(dz / w.z));
     }
 
     // LayeredBxDF Protected Members
