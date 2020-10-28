@@ -458,6 +458,12 @@ class TopOrBottomBxDF {
     }
 
     PBRT_CPU_GPU
+    bool IsNonSpecular() const {
+        BxDFFlags flags = top ? top->Flags() : bottom->Flags();
+        return (flags & (BxDFFlags::Diffuse | BxDFFlags::Glossy));
+    }
+
+    PBRT_CPU_GPU
     BxDFFlags Flags() const { return top ? top->Flags() : bottom->Flags(); }
 
   private:
@@ -840,24 +846,36 @@ class LayeredBxDF {
                     tInterface = &bottom;
                 }
                 // Sample _tInterface_ to get direction into the layers
-                Float uc = r();
-                Point2f u(r(), r());
-                pstd::optional<BSDFSample> wos = tInterface.Sample_f(wo, uc, u, mode);
+                auto trans = BxDFReflTransFlags::Transmission;
+                pstd::optional<BSDFSample> wos =
+                    tInterface.Sample_f(wo, r(), {r(), r()}, mode, trans);
+                pstd::optional<BSDFSample> wis =
+                    tInterface.Sample_f(wi, r(), {r(), r()}, !mode, trans);
 
                 // Update _pdfSum_ accounting for TRT scattering events
-                if (!wos || !wos->f || wos->pdf == 0 || wos->wi.z == 0 ||
-                    wos->IsReflection())
-                    pdfSum += tInterface.PDF(wo, wi, mode);
-                else {
-                    uc = r();
-                    u = Point2f(r(), r());
-                    pstd::optional<BSDFSample> wis =
-                        tInterface.Sample_f(wi, uc, u, !mode);
-                    if (!wis || !wis->f || wis->pdf == 0 || wis->wi.z == 0 ||
-                        wis->IsReflection())
-                        continue;
-                    // if (IsSpecular(tInterface.Flags()))
-                    pdfSum += rInterface.PDF(-wos->wi, -wis->wi, mode);
+                if (wos && wos->f && wos->pdf > 0 && wis && wis->f && wis->pdf > 0) {
+                    if (!tInterface.IsNonSpecular())
+                        pdfSum += rInterface.PDF(-wos->wi, -wis->wi, mode);
+                    else {
+                        // Use multiple importance sampling to estimate PDF product
+                        pstd::optional<BSDFSample> rs =
+                            rInterface.Sample_f(-wos->wi, r(), {r(), r()}, mode);
+                        if (!rs || !rs->f || rs->pdf == 0)
+                            ;
+                        else if (!rInterface.IsNonSpecular())
+                            pdfSum += tInterface.PDF(-rs->wi, wi, mode);
+                        else {
+                            // Actual MIS here
+                            // first, sample r -> r cancels
+                            Float tPDF = tInterface.PDF(-rs->wi, wi, mode);
+                            Float wt = PowerHeuristic(1, rs->pdf, 1, tPDF);
+                            pdfSum += wt * tPDF;
+
+                            Float rPDF = rInterface.PDF(-wos->wi, -wis->wi, mode);
+                            wt = PowerHeuristic(1, wis->pdf, 1, rPDF);
+                            pdfSum += wt * rPDF;
+                        }
+                    }
                 }
 
             } else {
