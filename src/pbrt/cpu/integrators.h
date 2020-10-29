@@ -220,8 +220,8 @@ class SimpleVolPathIntegrator : public RayIntegrator {
     std::string ToString() const;
 
   private:
+    // SimpleVolPathIntegrator Private Members
     int maxDepth;
-    bool sampleLights, samplePhase;
 };
 
 // VolPathIntegrator Definition

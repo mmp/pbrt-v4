@@ -847,10 +847,9 @@ class LayeredBxDF {
                 }
                 // Sample _tInterface_ to get direction into the layers
                 auto trans = BxDFReflTransFlags::Transmission;
-                pstd::optional<BSDFSample> wos =
-                    tInterface.Sample_f(wo, r(), {r(), r()}, mode, trans);
-                pstd::optional<BSDFSample> wis =
-                    tInterface.Sample_f(wi, r(), {r(), r()}, !mode, trans);
+                pstd::optional<BSDFSample> wos, wis;
+                wos = tInterface.Sample_f(wo, r(), {r(), r()}, mode, trans);
+                wis = tInterface.Sample_f(wi, r(), {r(), r()}, !mode, trans);
 
                 // Update _pdfSum_ accounting for TRT scattering events
                 if (wos && wos->f && wos->pdf > 0 && wis && wis->f && wis->pdf > 0) {

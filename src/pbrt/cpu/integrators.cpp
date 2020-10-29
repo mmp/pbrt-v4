@@ -878,12 +878,13 @@ SimpleVolPathIntegrator::SimpleVolPathIntegrator(int maxDepth, CameraHandle came
 
 SampledSpectrum SimpleVolPathIntegrator::Li(RayDifferential ray,
                                             SampledWavelengths &lambda,
-                                            SamplerHandle sampler,
-                                            ScratchBuffer &scratchBuffer,
+                                            SamplerHandle sampler, ScratchBuffer &buf,
                                             VisibleSurface *) const {
     SampledSpectrum L(0.f), beta(1.f);
     int numScatters = 0;
+    // Terminate secondary wavelengths before starting random walk
     lambda.TerminateSecondary();
+
     while (true) {
         // Estimate radiance for ray path using delta tracking
         pstd::optional<ShapeIntersection> si = Intersect(ray);
@@ -908,30 +909,38 @@ SampledSpectrum SimpleVolPathIntegrator::Li(RayDifferential ray,
                 int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, u);
                 if (mode == 0) {
                     // Handle absorption event for delta-tracking
-                    // absorbed; done
-                    L += SafeDiv(intr.Le, lambda.PDF());
+                    L += SafeDiv(beta * intr.Le, lambda.PDF());
                     terminated = true;
                     return false;
 
                 } else if (mode == 1) {
                     // Handle scattering event for delta-tracking
+                    // Stop path sampling if maximum depth has been reached
                     if (numScatters++ >= maxDepth) {
                         terminated = true;
                         return false;
                     }
-                    Vector3f wi = SampleUniformSphere(sampler.Get2D());
-                    beta *= intr.phase.p(-ray.d, wi) / UniformSpherePDF();
-                    ray = intr.SpawnRay(wi);
+
+                    // Sample phase function and udpate path throughput
+                    pstd::optional<PhaseFunctionSample> ps =
+                        intr.phase.Sample_p(-ray.d, sampler.Get2D());
+                    if (!ps) {
+                        terminated = true;
+                        return false;
+                    }
+                    beta *= ps->p / ps->pdf;
+                    ray = intr.SpawnRay(ps->wi);
+
                     scattered = true;
                     return false;
 
                 } else {
                     // Handle null scattering event for delta-tracking
-                    // null -- keep going...
                     return true;
                 }
             });
         }
+        // Handle terminated and unscattered rays after medium sampling
         if (terminated)
             break;
         if (!scattered) {
@@ -941,13 +950,12 @@ SampledSpectrum SimpleVolPathIntegrator::Li(RayDifferential ray,
                     L += SafeDiv(beta * light.Le(ray, lambda), lambda.PDF());
                 return L;
             }
-            SurfaceInteraction &isect = si->intr;
-            L += SafeDiv(beta * isect.Le(-ray.d, lambda), lambda.PDF());
+            L += SafeDiv(beta * si->intr.Le(-ray.d, lambda), lambda.PDF());
 
             // Handle surface intersection for _SimpleVolPathIntegrator_
-            BSDF bsdf = isect.GetBSDF(ray, lambda, camera, scratchBuffer, sampler);
+            BSDF bsdf = si->intr.GetBSDF(ray, lambda, camera, buf, sampler);
             if (!bsdf)
-                isect.SkipIntersection(&ray, si->tHit);
+                si->intr.SkipIntersection(&ray, si->tHit);
             else if (bsdf.Sample_f(-ray.d, sampler.Get1D(), sampler.Get2D()))
                 ErrorExit(
                     "SimpleVolPathIntegrator doesn't support scattering from surfaces");
