@@ -979,14 +979,12 @@ STAT_COUNTER("Integrator/Surface interactions", surfaceInteractions);
 // VolPathIntegrator Method Definitions
 SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &lambda,
                                       SamplerHandle sampler, ScratchBuffer &scratchBuffer,
-                                      VisibleSurface *visibleSurface) const {
+                                      VisibleSurface *) const {
     // Declare state variables for volumetric path
-    // NOTE: beta means something different here...
     SampledSpectrum L(0.f), beta(1.f), pdfUni(1.f), pdfNEE(1.f);
     bool specularBounce = false, anyNonSpecularBounces = false;
     Float etaScale = 1;
-    pstd::optional<SurfaceInteraction> prevSurfaceIntr;
-    pstd::optional<MediumInteraction> prevMediumIntr;
+    LightSampleContext prevIntrContext;
     int depth = 0;
 
     while (true) {
@@ -1059,8 +1057,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                         beta *= ps->p;
                         pdfNEE = pdfUni;
                         pdfUni *= ps->pdf;
-                        prevMediumIntr = intr;
-                        prevSurfaceIntr.reset();
+                        prevIntrContext = LightSampleContext(intr);
                         scattered = true;
                         ray = intr.SpawnRay(ps->wi);
                         specularBounce = false;
@@ -1089,8 +1086,6 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             continue;
         // Handle scattering at point on surface for volumetric path tracer
         ++surfaceInteractions;
-        if (depth > 0)
-            CHECK(prevSurfaceIntr.has_value() ^ prevMediumIntr.has_value());
         // Add emitted light at volume path vertex or from the environment
         if (!si) {
             // Accumulate contributions from infinite light sources
@@ -1101,11 +1096,6 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                         L += SafeDiv(beta * Le, pdfUni.Average() * lambda.PDF());
                     else {
                         // Add infinite light contribution using both PDFs with MIS
-                        LightSampleContext prevIntrContext;
-                        if (prevSurfaceIntr)
-                            prevIntrContext = LightSampleContext(*prevSurfaceIntr);
-                        else
-                            prevIntrContext = LightSampleContext(*prevMediumIntr);
                         Float lightPDF = lightSampler.PDF(prevIntrContext, light) *
                                          light.PDF_Li(prevIntrContext, ray.d,
                                                       LightSamplingMode::WithMIS);
@@ -1127,11 +1117,6 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             else {
                 // Add surface light contribution using both PDFs with MIS
                 LightHandle areaLight(isect.areaLight);
-                LightSampleContext prevIntrContext;
-                if (prevSurfaceIntr)
-                    prevIntrContext = LightSampleContext(*prevSurfaceIntr);
-                else
-                    prevIntrContext = LightSampleContext(*prevMediumIntr);
                 Float lightPDF =
                     lightSampler.PDF(prevIntrContext, areaLight) *
                     areaLight.PDF_Li(prevIntrContext, ray.d, LightSamplingMode::WithMIS);
@@ -1147,8 +1132,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             continue;
         }
 
-        prevSurfaceIntr = isect;
-        prevMediumIntr.reset();
+        prevIntrContext = LightSampleContext(isect);
         // Terminate path if maximum depth reached
         if (depth++ >= maxDepth)
             return L;
@@ -1234,15 +1218,14 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             BSDF &Sw = bssrdfSample.Sw;
             pi.wo = bssrdfSample.wo;
 
-            // Possibly regularize subsurface BSDF and update _prevSurfaceIntr_
+            // Possibly regularize subsurface BSDF and update _prevIntrContext_
             anyNonSpecularBounces = true;
             if (regularize) {
                 ++regularizedBSDFs;
                 Sw.Regularize();
             } else
                 ++totalBSDFs;
-            prevSurfaceIntr = pi;
-            CHECK(!prevMediumIntr.has_value());
+            prevIntrContext = LightSampleContext(pi);
 
             // Account for attenuated direct subsurface scattering
             L += SafeDiv(SampleLd(pi, &Sw, lambda, sampler, beta, pdfUni), lambda.PDF());
