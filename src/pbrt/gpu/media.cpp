@@ -61,23 +61,11 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
             // Sample the medium according to T_maj, the homogeneous
             // transmission function based on the majorant.
             bool scattered = false;
-            ray.medium.SampleTmaj(
+            SampledSpectrum Tmaj = ray.medium.SampleTmaj(
                 ray, tMax, rng, lambda, [&](const MediumSample &mediumSample) {
                     rescale(beta, pdfUni, pdfNEE);
 
-                    if (!mediumSample.intr) {
-                        // No interaction was sampled, but update the path
-                        // throughput and unidirectional PDF to the end of
-                        // the ray segment.
-                        beta *= mediumSample.Tmaj;
-                        pdfUni *= mediumSample.Tmaj;
-                        PBRT_DBG("No intr: beta %f %f %f %f pdfUni %f %f %f %f\n", beta[0],
-                            beta[1], beta[2], beta[3], pdfUni[0], pdfUni[1], pdfUni[2],
-                            pdfUni[3]);
-                        return false;
-                    }
-
-                    const MediumInteraction &intr = *mediumSample.intr;
+                    const MediumInteraction &intr = mediumSample.intr;
                     const SampledSpectrum &sigma_a = intr.sigma_a;
                     const SampledSpectrum &sigma_s = intr.sigma_s;
                     const SampledSpectrum &Tmaj = mediumSample.Tmaj;
@@ -140,6 +128,11 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                         return true;
                     }
                 });
+            if (!scattered && beta) {
+                beta *= Tmaj;
+                pdfUni *= Tmaj;
+                pdfNEE *= Tmaj;
+            }
 
             PBRT_DBG("Post ray medium sample L %f %f %f %f beta %f %f %f %f\n", L[0], L[1],
                 L[2], L[3], beta[0], beta[1], beta[2], beta[3]);

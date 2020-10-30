@@ -437,12 +437,8 @@ extern "C" __global__ void __raygen__shadow_Tr() {
                 missed ? tMax : (Distance(ray.o, Point3f(ctx.piHit)) / Length(ray.d));
             ray.medium.SampleTmaj(ray, tEnd, rng, lambda,
                                   [&](const MediumSample &mediumSample) {
-                                      if (!mediumSample.intr)
-                                          // FIXME: include last Tmaj?
-                                          return false;
-
                                       const SampledSpectrum &Tmaj = mediumSample.Tmaj;
-                                      const MediumInteraction &intr = *mediumSample.intr;
+                                      const MediumInteraction &intr = mediumSample.intr;
                                       SampledSpectrum sigma_n = intr.sigma_n();
 
                                       // ratio-tracking: only evaluate null scattering

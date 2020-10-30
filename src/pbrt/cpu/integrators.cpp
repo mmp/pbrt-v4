@@ -399,12 +399,7 @@ SampledSpectrum Integrator::Tr(const Interaction &p0, const Interaction &p1,
                                   [&](const MediumSample &ms) -> bool {
                                       const SampledSpectrum &Tmaj = ms.Tmaj;
 
-                                      if (!ms.intr) {
-                                          Tr *= Tmaj;
-                                          return false;
-                                      }
-
-                                      const MediumInteraction &intr = *ms.intr;
+                                      const MediumInteraction &intr = ms.intr;
                                       SampledSpectrum sigma_n = intr.sigma_n();
 
                                       // ratio-tracking: only evaluate null scattering
@@ -890,78 +885,78 @@ SampledSpectrum SimpleVolPathIntegrator::Li(RayDifferential ray,
         pstd::optional<ShapeIntersection> si = Intersect(ray);
         bool scattered = false, terminated = false;
         if (ray.medium) {
-            // Sample medium scattering for _SimpleVolPathIntegrator_
-            Float tMax = si ? si->tHit : Infinity;
+            // Sample medium scattering using delta tracking
             RNG rng(Hash(sampler.Get1D()), Hash(sampler.Get1D()));
-            ray.medium.SampleTmaj(ray, tMax, rng, lambda, [&](const MediumSample &ms) {
-                // Update delta-tracking estimator for path sample
-                if (!ms.intr)
-                    return false;
-                const MediumInteraction &intr = *ms.intr;
-                const SampledSpectrum &sigma_a = intr.sigma_a, &sigma_s = intr.sigma_s;
-                // Compute medium event probabilities for interaction
-                Float pAbsorb = sigma_a[0] / intr.sigma_maj[0];
-                Float pScatter = sigma_s[0] / intr.sigma_maj[0];
-                Float pNull = std::max<Float>(0, 1 - pAbsorb - pScatter);
+            Float tMax = si ? si->tHit : Infinity;
+            SampledSpectrum Tmaj = ray.medium.SampleTmaj(
+                ray, tMax, rng, lambda, [&](const MediumSample &ms) {
+                    const MediumInteraction &intr = ms.intr;
+                    // Compute medium event probabilities for interaction
+                    Float pAbsorb = intr.sigma_a[0] / intr.sigma_maj[0];
+                    Float pScatter = intr.sigma_s[0] / intr.sigma_maj[0];
+                    Float pNull = std::max<Float>(0, 1 - pAbsorb - pScatter);
 
-                // Randomly sample medium scattering event for delta-tracking
-                Float u = sampler.Get1D();
-                int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, u);
-                if (mode == 0) {
-                    // Handle absorption event for delta-tracking
-                    L += SafeDiv(beta * intr.Le, lambda.PDF());
-                    terminated = true;
-                    return false;
-
-                } else if (mode == 1) {
-                    // Handle scattering event for delta-tracking
-                    // Stop path sampling if maximum depth has been reached
-                    if (numScatters++ >= maxDepth) {
+                    // Randomly sample medium scattering event for delta tracking
+                    int mode =
+                        SampleDiscrete({pAbsorb, pScatter, pNull}, sampler.Get1D());
+                    if (mode == 0) {
+                        // Handle absorption event for delta tracking
+                        L += SafeDiv(beta * intr.Le, lambda.PDF());
                         terminated = true;
                         return false;
-                    }
 
-                    // Sample phase function and udpate path throughput
-                    pstd::optional<PhaseFunctionSample> ps =
-                        intr.phase.Sample_p(-ray.d, sampler.Get2D());
-                    if (!ps) {
-                        terminated = true;
+                    } else if (mode == 1) {
+                        // Handle scattering event for delta tracking
+                        // Stop path sampling if maximum depth has been reached
+                        if (numScatters++ >= maxDepth) {
+                            terminated = true;
+                            return false;
+                        }
+
+                        // Sample phase function for delta tracking scattering event
+                        pstd::optional<PhaseFunctionSample> ps =
+                            intr.phase.Sample_p(-ray.d, sampler.Get2D());
+                        if (!ps) {
+                            terminated = true;
+                            return false;
+                        }
+
+                        // Update state for recursive $L_\roman{i}$ evaluation
+                        beta *= ps->p / ps->pdf;
+                        ray = intr.SpawnRay(ps->wi);
+                        scattered = true;
                         return false;
+
+                    } else {
+                        // Handle null scattering event for delta tracking
+                        return true;
                     }
-                    beta *= ps->p / ps->pdf;
-                    ray = intr.SpawnRay(ps->wi);
-
-                    scattered = true;
-                    return false;
-
-                } else {
-                    // Handle null scattering event for delta-tracking
-                    return true;
-                }
-            });
+                });
+            if (!scattered)
+                beta *= Tmaj / Tmaj[0];
         }
         // Handle terminated and unscattered rays after medium sampling
         if (terminated)
-            break;
-        if (!scattered) {
-            // Add emission to un-scattered ray
-            if (!si) {
-                for (const auto &light : infiniteLights)
-                    L += SafeDiv(beta * light.Le(ray, lambda), lambda.PDF());
-                return L;
-            }
+            return L;
+        if (scattered)
+            continue;
+        // Add emission to un-scattered ray
+        if (si)
             L += SafeDiv(beta * si->intr.Le(-ray.d, lambda), lambda.PDF());
-
-            // Handle surface intersection for _SimpleVolPathIntegrator_
-            BSDF bsdf = si->intr.GetBSDF(ray, lambda, camera, buf, sampler);
-            if (!bsdf)
-                si->intr.SkipIntersection(&ray, si->tHit);
-            else if (bsdf.Sample_f(-ray.d, sampler.Get1D(), sampler.Get2D()))
-                ErrorExit(
-                    "SimpleVolPathIntegrator doesn't support scattering from surfaces");
-            else
-                break;
+        else {
+            for (const auto &light : infiniteLights)
+                L += SafeDiv(beta * light.Le(ray, lambda), lambda.PDF());
+            return L;
         }
+
+        // Handle surface intersection along delta tracking path
+        BSDF bsdf = si->intr.GetBSDF(ray, lambda, camera, buf, sampler);
+        if (!bsdf)
+            si->intr.SkipIntersection(&ray, si->tHit);
+        else if (bsdf.Sample_f(-ray.d, sampler.Get1D(), sampler.Get2D()))
+            ErrorExit("SimpleVolPathIntegrator doesn't support scattering from surfaces");
+        else
+            break;
     }
     return L;
 }
@@ -1005,7 +1000,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             // Sample the participating medium
             Float tMax = si ? si->tHit : Infinity;
             RNG rng(Hash(sampler.Get1D()), Hash(sampler.Get1D()));
-            ray.medium.SampleTmaj(
+            SampledSpectrum Tmaj = ray.medium.SampleTmaj(
                 ray, tMax, rng, lambda, [&](const MediumSample &mediumSample) {
                     // Handle medium scattering event for ray
                     if (!beta) {
@@ -1013,15 +1008,8 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                         return false;
                     }
                     rescale(beta, pdfUni, pdfNEE);
-                    if (!mediumSample.intr) {
-                        // Update _beta_ and _pdfUni_ for ray that escaped the medium
-                        // FIXME: review this, esp the pdf...
-                        beta *= mediumSample.Tmaj;
-                        pdfUni *= mediumSample.Tmaj;
-                        return false;
-                    }
                     ++volumeInteractions;
-                    const MediumInteraction &intr = *mediumSample.intr;
+                    const MediumInteraction &intr = mediumSample.intr;
                     const SampledSpectrum &sigma_a = intr.sigma_a,
                                           &sigma_s = intr.sigma_s;
                     const SampledSpectrum &Tmaj = mediumSample.Tmaj;
@@ -1032,8 +1020,8 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                             (intr.sigma_maj[0] * pdfUni.Average()) * lambda.PDF());
 
                     // Compute medium event probabilities for interaction
-                    Float pAbsorb = sigma_a[0] / intr.sigma_maj[0];
-                    Float pScatter = sigma_s[0] / intr.sigma_maj[0];
+                    Float pAbsorb = intr.sigma_a[0] / intr.sigma_maj[0];
+                    Float pScatter = intr.sigma_s[0] / intr.sigma_maj[0];
                     Float pNull = std::max<Float>(0, 1 - pAbsorb - pScatter);
 
                     CHECK_GE(1 - pAbsorb - pScatter, -1e-6);
@@ -1090,6 +1078,10 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                         return true;
                     }
                 });
+            if (!scattered && !terminated) {
+                beta *= Tmaj;
+                pdfUni *= Tmaj;
+            }
         }
         if (terminated)
             return L;
@@ -1359,11 +1351,7 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
                 lightRay, tMax, rng, lambda, [&](const MediumSample &mediumSample) {
                     // Account for medium scattering event along shadow ray
                     const SampledSpectrum &Tmaj = mediumSample.Tmaj;
-                    if (!mediumSample.intr) {
-                        // CO                        betaLight *= Tmaj;
-                        return false;
-                    }
-                    const MediumInteraction &intr = *mediumSample.intr;
+                    const MediumInteraction &intr = mediumSample.intr;
                     // Update _throughput_ and PDFs using ratio-tracking estimator
                     SampledSpectrum sigma_n = intr.sigma_n();
                     // ratio-tracking: only evaluate null scattering
@@ -2018,12 +2006,7 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
             ray.medium.SampleTmaj(
                 ray, tMax, rng, lambda, [&](const MediumSample &mediumSample) {
                     const SampledSpectrum &Tmaj = mediumSample.Tmaj;
-                    if (!mediumSample.intr) {
-                        beta *= Tmaj / Tmaj.Average();
-                        return false;  // onward to the surface path...
-                    }
-
-                    const MediumInteraction &intr = *mediumSample.intr;
+                    const MediumInteraction &intr = mediumSample.intr;
                     const SampledSpectrum &sigma_a = intr.sigma_a;
                     const SampledSpectrum &sigma_s = intr.sigma_s;
 
