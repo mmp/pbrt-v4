@@ -255,18 +255,21 @@ class VolPathIntegrator : public RayIntegrator {
                              const SampledSpectrum &beta,
                              const SampledSpectrum &pathPDF) const;
 
-    static void Rescale(SampledSpectrum &beta, SampledSpectrum &pdfUni,
+    static void Rescale(SampledSpectrum &T_hat, SampledSpectrum &pdfUni,
                         SampledSpectrum &pdfLight) {
-        if (beta.MaxComponentValue() > 0x1p24f ||
+        if (T_hat.MaxComponentValue() > 0x1p24f ||
             pdfLight.MaxComponentValue() > 0x1p24f ||
             pdfUni.MaxComponentValue() > 0x1p24f) {
-            beta *= 1.f / 0x1p24f;
+            // Downscale _T_hat_, _pdfLight_, and _pdfUni_
+            T_hat *= 1.f / 0x1p24f;
             pdfLight *= 1.f / 0x1p24f;
             pdfUni *= 1.f / 0x1p24f;
-        } else if (beta.MaxComponentValue() < 0x1p-24f ||
-                   pdfLight.MaxComponentValue() < 0x1p-24f ||
-                   pdfUni.MaxComponentValue() < 0x1p-24f) {
-            beta *= 0x1p24f;
+        }
+        // Upscale _T_hat_, _pdfLight_, and _pdfUni_ if necessary
+        if (T_hat.MaxComponentValue() < 0x1p-24f ||
+            pdfLight.MaxComponentValue() < 0x1p-24f ||
+            pdfUni.MaxComponentValue() < 0x1p-24f) {
+            T_hat *= 0x1p24f;
             pdfLight *= 0x1p24f;
             pdfUni *= 0x1p24f;
         }
