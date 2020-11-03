@@ -1014,10 +1014,16 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                     Rescale(T_hat, pdfUni, pdfLight);
 
                     // Add emission from medium scattering event
-                    if (depth < maxDepth)
-                        L += SafeDiv(
-                            T_hat * intr.Le * sigma_a,
-                            (intr.sigma_maj[0] * pdfUni.Average()) * lambda.PDF());
+                    if (depth < maxDepth && intr.Le) {
+                        // Compute $\hat{P}$ at new path vertex
+                        SampledSpectrum P_hat = T_hat * Tmaj * sigma_a * intr.Le;
+
+                        // Compute PDF for absorption event at path vertex
+                        SampledSpectrum emitPDF = pdfUni * intr.sigma_maj * Tmaj;
+
+                        // Update _L_ for medium emission
+                        L += SafeDiv(P_hat, emitPDF.Average() * lambda.PDF());
+                    }
 
                     // Compute medium event probabilities for interaction
                     Float pAbsorb = intr.sigma_a[0] / intr.sigma_maj[0];
@@ -1046,9 +1052,10 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                             SampleLd(intr, nullptr, lambda, sampler, T_hat, pdfUni),
                             lambda.PDF());
 
-                        // Sample indirect lighting at volume scattering event
+                        // Sample new direction at real scattering event
+                        Point2f u = sampler.Get2D();
                         pstd::optional<PhaseFunctionSample> ps =
-                            intr.phase.Sample_p(-ray.d, sampler.Get2D());
+                            intr.phase.Sample_p(-ray.d, u);
                         if (!ps || ps->pdf == 0) {
                             terminated = true;
                             return false;
