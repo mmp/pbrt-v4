@@ -435,7 +435,8 @@ extern "C" __global__ void __raygen__shadow_Tr() {
 
             Float tEnd =
                 missed ? tMax : (Distance(ray.o, Point3f(ctx.piHit)) / Length(ray.d));
-            ray.medium.SampleTmaj(ray, tEnd, rng, lambda,
+            SampledSpectrum Tmaj =
+                ray.medium.SampleTmaj(ray, tEnd, rng, lambda,
                                   [&](const MediumSample &mediumSample) {
                                       const SampledSpectrum &Tmaj = mediumSample.Tmaj;
                                       const MediumInteraction &intr = mediumSample.intr;
@@ -479,6 +480,9 @@ extern "C" __global__ void __raygen__shadow_Tr() {
 
                                       return true;
                                   });
+            throughput *= Tmaj;
+            pdfNEE *= Tmaj;
+            pdfUni *= Tmaj;
         }
 
         if (missed || !throughput)
@@ -507,6 +511,8 @@ extern "C" __global__ void __raygen__shadow_Tr() {
     if (!throughput)
         Ld = SampledSpectrum(0.f);
     else
+        // FIXME/reconcile: this takes pdfNEE as input while
+        // e.g. VolPathIntegrator::SampleLd() does not...
         Ld *= throughput / (sr.pdfUni * pdfUni + sr.pdfNEE * pdfNEE).Average();
 
     PBRT_DBG("Setting final Ld for shadow ray index %d pixel index %d = as %f %f %f %f\n",

@@ -1335,7 +1335,7 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
         // Update transmittance for current ray segment
         if (lightRay.medium != nullptr) {
             Float tMax = si ? si->tHit : (1 - ShadowEpsilon);
-            lightRay.medium.SampleTmaj(
+            SampledSpectrum Tmaj = lightRay.medium.SampleTmaj(
                 lightRay, tMax, rng, lambda, [&](const MediumSample &mediumSample) {
                     // Update ray transmittance estimate at sampled point
                     // Update _T_ray_ and PDFs using ratio-tracking estimator
@@ -1362,6 +1362,10 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
                     Rescale(T_ray, lightPathPDF, uniPathPDF);
                     return true;
                 });
+            // Update transmittance estimate for final unsampled segment
+            T_ray *= Tmaj;
+            lightPathPDF *= Tmaj;
+            uniPathPDF *= Tmaj;
         }
 
         // Generate next ray segment or return final transmittance
