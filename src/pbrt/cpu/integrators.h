@@ -255,23 +255,23 @@ class VolPathIntegrator : public RayIntegrator {
                              const SampledSpectrum &beta,
                              const SampledSpectrum &pathPDF) const;
 
-    static void Rescale(SampledSpectrum &T_hat, SampledSpectrum &pdfUni,
-                        SampledSpectrum &pdfLight) {
+    static void Rescale(SampledSpectrum &T_hat, SampledSpectrum &uniPathPDF,
+                        SampledSpectrum &lightPathPDF) {
         if (T_hat.MaxComponentValue() > 0x1p24f ||
-            pdfLight.MaxComponentValue() > 0x1p24f ||
-            pdfUni.MaxComponentValue() > 0x1p24f) {
-            // Downscale _T_hat_, _pdfLight_, and _pdfUni_
+            lightPathPDF.MaxComponentValue() > 0x1p24f ||
+            uniPathPDF.MaxComponentValue() > 0x1p24f) {
+            // Downscale _T_hat_, _lightPathPDF_, and _uniPathPDF_
             T_hat *= 1.f / 0x1p24f;
-            pdfLight *= 1.f / 0x1p24f;
-            pdfUni *= 1.f / 0x1p24f;
+            lightPathPDF *= 1.f / 0x1p24f;
+            uniPathPDF *= 1.f / 0x1p24f;
         }
-        // Upscale _T_hat_, _pdfLight_, and _pdfUni_ if necessary
+        // Upscale _T_hat_, _lightPathPDF_, and _uniPathPDF_ if necessary
         if (T_hat.MaxComponentValue() < 0x1p-24f ||
-            pdfLight.MaxComponentValue() < 0x1p-24f ||
-            pdfUni.MaxComponentValue() < 0x1p-24f) {
+            lightPathPDF.MaxComponentValue() < 0x1p-24f ||
+            uniPathPDF.MaxComponentValue() < 0x1p-24f) {
             T_hat *= 0x1p24f;
-            pdfLight *= 0x1p24f;
-            pdfUni *= 0x1p24f;
+            lightPathPDF *= 0x1p24f;
+            uniPathPDF *= 0x1p24f;
         }
     }
 
