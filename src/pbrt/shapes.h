@@ -1269,47 +1269,60 @@ struct BilinearIntersection {
 PBRT_CPU_GPU inline pstd::optional<BilinearIntersection> IntersectBilinearPatch(
     const Ray &ray, Float tMax, const Point3f &p00, const Point3f &p10,
     const Point3f &p01, const Point3f &p11) {
-    // Find quadratic coefficients for distance from ray to $u$ line
-    Vector3f qn = Cross(p10 - p00, p01 - p11);
-    Vector3f e11 = p11 - p10, e00 = p01 - p00;
-    Vector3f q00 = p00 - ray.o, q10 = p10 - ray.o;
-    Float a = Dot(qn, ray.d);
-    Float c = Dot(Cross(q00, ray.d), e00);
-    Float b = Dot(Cross(q10, ray.d), e11) - (a + c);
+    // Find quadratic coefficients for distance from ray to $u$ iso-lines
+    Float a = Dot(Cross(p10 - p00, p01 - p11), ray.d);
+    Float c = Dot(Cross(p00 - ray.o, ray.d), p01 - p00);
+    Float b = Dot(Cross(p10 - ray.o, ray.d), p11 - p10) - (a + c);
 
-    // Solve quadratic for bilinear patch intersection
+    // Solve quadratic for bilinear patch $u$ intersection
     Float u1, u2;
     if (!Quadratic(a, b, c, &u1, &u2))
         return {};
 
     Float t = tMax, u, v;
-    // Compute $(u,v)$ and ray $t$ corresponding to first quadratic root
+    // Compute $v$ and $t$ for to first $u$ intersection
     if (0 <= u1 && u1 <= 1) {
-        Vector3f pa = Lerp(u1, q00, q10), pb = Lerp(u1, e00, e11);
-        Vector3f n = Cross(ray.d, pb);
-        Float det = Dot(n, n);
-        n = Cross(n, pa);
-        Float t1 = Dot(n, pb), v1 = Dot(n, ray.d);
+        // Precompute common terms for $v$ and $t$ computation
+        Point3f uo = Lerp(u1, p00, p10);
+        Vector3f ud = Lerp(u1, p01, p11) - uo;
+        Vector3f deltao = uo - ray.o;
+        Vector3f perp = Cross(ray.d, ud);
+        Float p2 = LengthSquared(perp);
+
+        // Compute matrix determinants for $v$ and $t$ numerators
+        Float v1 = SquareMatrix<3>(deltao.x, ray.d.x, perp.x, deltao.y, ray.d.y, perp.y,
+                                   deltao.z, ray.d.z, perp.z)
+                       .Determinant();
+        Float t1 = SquareMatrix<3>(deltao.x, ud.x, perp.x, deltao.y, ud.y, perp.y,
+                                   deltao.z, ud.z, perp.z)
+                       .Determinant();
+
         // Set _u_, _v_, and _t_ if intersection is valid
-        if (t1 > 0 && 0 <= v1 && v1 <= det) {
+        if (t1 > 0 && 0 <= v1 && v1 <= p2) {
             u = u1;
-            v = v1 / det;
-            t = t1 / det;
+            v = v1 / p2;
+            t = t1 / p2;
         }
     }
 
-    // Compute $(u,v)$ and ray $t$ corresponding to second quadratic root
+    // Compute $v$ and $t$ for to second $u$ intersection
     if (0 <= u2 && u2 <= 1 && u2 != u1) {
-        Vector3f pa = Lerp(u2, q00, q10), pb = Lerp(u2, e00, e11);
-        Vector3f n = Cross(ray.d, pb);
-        Float det = Dot(n, n);
-        n = Cross(n, pa);
-        Float t2 = Dot(n, pb) / det;
-        Float v2 = Dot(n, ray.d);
-        if (0 <= v2 && v2 <= det && t > t2 && t2 > 0) {
+        Point3f uo = Lerp(u2, p00, p10);
+        Vector3f ud = Lerp(u2, p01, p11) - uo;
+        Vector3f deltao = uo - ray.o;
+        Vector3f perp = Cross(ray.d, ud);
+        Float p2 = LengthSquared(perp);
+        Float v2 = SquareMatrix<3>(deltao.x, ray.d.x, perp.x, deltao.y, ray.d.y, perp.y,
+                                   deltao.z, ray.d.z, perp.z)
+                       .Determinant();
+        Float t2 = SquareMatrix<3>(deltao.x, ud.x, perp.x, deltao.y, ud.y, perp.y,
+                                   deltao.z, ud.z, perp.z)
+                       .Determinant();
+        t2 /= p2;
+        if (0 <= v2 && v2 <= p2 && t > t2 && t2 > 0) {
             t = t2;
             u = u2;
-            v = v2 / det;
+            v = v2 / p2;
         }
     }
 
