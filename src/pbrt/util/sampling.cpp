@@ -390,29 +390,23 @@ Vector3f SampleHenyeyGreenstein(Vector3f wo, Float g, Point2f u, Float *pdf) {
     return wi;
 }
 
-Float SampleCatmullRom(pstd::span<const Float> x, pstd::span<const Float> f,
+Float SampleCatmullRom(pstd::span<const Float> nodes, pstd::span<const Float> f,
                        pstd::span<const Float> F, Float u, Float *fval, Float *pdf) {
-    CHECK_EQ(x.size(), f.size());
+    CHECK_EQ(nodes.size(), f.size());
     CHECK_EQ(f.size(), F.size());
     // Map _u_ to a spline interval by inverting _F_
     u *= F.back();
     int i = FindInterval(F.size(), [&](int i) { return F[i] <= u; });
 
     // Look up $x_i$ and function values of spline segment _i_
-    Float x0 = x[i], x1 = x[i + 1];
+    Float x0 = nodes[i], x1 = nodes[i + 1];
     Float f0 = f[i], f1 = f[i + 1];
     Float width = x1 - x0;
 
     // Approximate derivatives using finite differences
-    Float d0, d1;
-    if (i > 0)
-        d0 = width * (f1 - f[i - 1]) / (x1 - x[i - 1]);
-    else
-        d0 = f1 - f0;
-    if (i + 2 < x.size())
-        d1 = width * (f[i + 2] - f0) / (x[i + 2] - x0);
-    else
-        d1 = f1 - f0;
+    Float d0 = (i > 0) ? width * (f1 - f[i - 1]) / (x1 - nodes[i - 1]) : (f1 - f0);
+    Float d1 = (i + 2 < nodes.size()) ? width * (f[i + 2] - f0) / (nodes[i + 2] - x0)
+                                      : (f1 - f0);
 
     // Re-scale _u_ for continous spline sampling step
     u = (u - F[i]) / width;
@@ -420,9 +414,9 @@ Float SampleCatmullRom(pstd::span<const Float> x, pstd::span<const Float> f,
     // Invert definite integral over spline segment
     Float Fhat, fhat;
     auto eval = [&](Float t) -> std::pair<Float, Float> {
-        Fhat =
-            EvaluatePolynomial(t, 0, f0, .5f * d0, (1.f / 3.f) * (-2 * d0 - d1) + f1 - f0,
-                               .25f * (d0 + d1) + .5f * (f0 - f1));
+        Fhat = EvaluatePolynomial(t, 0, f0, 0.5f * d0,
+                                  (1.f / 3.f) * (-2 * d0 - d1) + f1 - f0,
+                                  0.25f * (d0 + d1) + 0.5f * (f0 - f1));
         fhat = EvaluatePolynomial(t, f0, d0, -2 * d0 - d1 + 3 * (f1 - f0),
                                   d0 + d1 + 2 * (f0 - f1));
         return {Fhat - u, fhat};
@@ -447,11 +441,11 @@ Float SampleCatmullRom2D(pstd::span<const Float> nodes1, pstd::span<const Float>
 
     // Define a lambda function to interpolate table entries
     auto interpolate = [&](pstd::span<const Float> array, int idx) {
-        Float value = 0;
+        Float v = 0;
         for (int i = 0; i < 4; ++i)
             if (weights[i] != 0)
-                value += array[(offset + i) * nodes2.size() + idx] * weights[i];
-        return value;
+                v += array[(offset + i) * nodes2.size() + idx] * weights[i];
+        return v;
     };
 
     // Map _u_ to a spline interval by inverting the interpolated _cdf_
@@ -482,9 +476,9 @@ Float SampleCatmullRom2D(pstd::span<const Float> nodes1, pstd::span<const Float>
     // Invert definite integral over spline segment
     Float Fhat, fhat;
     auto eval = [&](Float t) -> std::pair<Float, Float> {
-        Fhat =
-            EvaluatePolynomial(t, 0, f0, .5f * d0, (1.f / 3.f) * (-2 * d0 - d1) + f1 - f0,
-                               .25f * (d0 + d1) + .5f * (f0 - f1));
+        Fhat = EvaluatePolynomial(t, 0, f0, 0.5f * d0,
+                                  (1.f / 3.f) * (-2 * d0 - d1) + f1 - f0,
+                                  0.25f * (d0 + d1) + 0.5f * (f0 - f1));
         fhat = EvaluatePolynomial(t, f0, d0, -2 * d0 - d1 + 3 * (f1 - f0),
                                   d0 + d1 + 2 * (f0 - f1));
         return {Fhat - u, fhat};
