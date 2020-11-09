@@ -507,7 +507,7 @@ PBRT_CPU_GPU inline Vector3f SampleTrowbridgeReitzVisibleArea(Vector3f w, Float 
     // Reproject to hemisphere and transform normal to ellipsoid configuration
     Vector3f nh =
         t1 * T1 + t2 * T2 + std::sqrt(std::max<Float>(0, 1 - t1 * t1 - t2 * t2)) * wh;
-    CHECK_RARE(1e-6, nh.z == 0);
+    CHECK_RARE(1e-5f, nh.z == 0);
     return Normalize(
         Vector3f(alpha_x * nh.x, alpha_y * nh.y, std::max<Float>(1e-6f, nh.z)));
 }

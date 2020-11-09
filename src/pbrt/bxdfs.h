@@ -364,7 +364,7 @@ class ConductorBxDF {
             return {};
         Vector3f wh = mfDistrib.Sample_wm(wo, u);
         Vector3f wi = Reflect(wo, wh);
-        CHECK_RARE(1e-6, Dot(wo, wh) <= 0);
+        CHECK_RARE(1e-5f, Dot(wo, wh) <= 0);
         if (!SameHemisphere(wo, wi) || Dot(wo, wh) <= 0)
             return {};
 
@@ -394,8 +394,8 @@ class ConductorBxDF {
             return 0;
         // Return PDF for sampling Torrance--Sparrow conductor BRDF
         Vector3f wh = wo + wi;
-        CHECK_RARE(1e-6, LengthSquared(wh) == 0);
-        CHECK_RARE(1e-6, Dot(wo, wh) < 0);
+        CHECK_RARE(1e-5f, LengthSquared(wh) == 0);
+        CHECK_RARE(1e-5f, Dot(wo, wh) < 0);
         if (LengthSquared(wh) == 0 || Dot(wo, wh) <= 0)
             return 0;
         wh = Normalize(wh);
