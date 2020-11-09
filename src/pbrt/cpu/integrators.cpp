@@ -2284,7 +2284,7 @@ SampledSpectrum BDPTIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
                      StringPrintf("Connect bdpt s: %d, t: %d, Lpath: %s, misWeight: %f\n",
                                   s, t, Lpath, misWeight)
                          .c_str());
-            if (visualizeStrategies || visualizeWeights) {
+            if (pFilmNew && (visualizeStrategies || visualizeWeights)) {
                 SampledSpectrum value;
                 if (visualizeStrategies)
                     value = misWeight == 0 ? SampledSpectrum(0.) : Lpath / misWeight;
