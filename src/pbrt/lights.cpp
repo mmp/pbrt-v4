@@ -88,8 +88,9 @@ LightBounds PointLight::Bounds() const {
                        false);
 }
 
-LightLeSample PointLight::SampleLe(const Point2f &u1, const Point2f &u2,
-                                   SampledWavelengths &lambda, Float time) const {
+pstd::optional<LightLeSample> PointLight::SampleLe(Point2f u1, Point2f u2,
+                                                   SampledWavelengths &lambda,
+                                                   Float time) const {
     Point3f p = renderFromLight(Point3f(0, 0, 0));
     Ray ray(p, SampleUniformSphere(u1), time, mediumInterface.outside);
     return LightLeSample(scale * I.Sample(lambda), ray, 1, UniformSpherePDF());
@@ -132,8 +133,9 @@ SampledSpectrum DistantLight::Phi(const SampledWavelengths &lambda) const {
     return scale * Lemit.Sample(lambda) * Pi * sceneRadius * sceneRadius;
 }
 
-LightLeSample DistantLight::SampleLe(const Point2f &u1, const Point2f &u2,
-                                     SampledWavelengths &lambda, Float time) const {
+pstd::optional<LightLeSample> DistantLight::SampleLe(Point2f u1, Point2f u2,
+                                                     SampledWavelengths &lambda,
+                                                     Float time) const {
     // Choose point on disk oriented toward infinite light direction
     Vector3f w = Normalize(renderFromLight(Vector3f(0, 0, 1)));
     Frame wFrame = Frame::FromZ(w);
@@ -143,8 +145,8 @@ LightLeSample DistantLight::SampleLe(const Point2f &u1, const Point2f &u2,
     // Compute _DistantLight_ light ray
     Ray ray(pDisk + sceneRadius * w, -w, time);
 
-    return LightLeSample(scale * Lemit.Sample(lambda), ray,
-                         1 / (Pi * sceneRadius * sceneRadius), 1);
+    return LightLeSample(scale * Lemit.Sample(lambda), ray, 1 / (Pi * Sqr(sceneRadius)),
+                         1);
 }
 
 void DistantLight::PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const {
@@ -225,8 +227,7 @@ ProjectionLight::ProjectionLight(Transform renderFromLight,
     CHECK(channelDesc.IsIdentity());
     auto dwdA = [&](const Point2f &p) {
         Vector3f w = Vector3f(lightFromScreen(Point3f(p.x, p.y, 0)));
-        w = Normalize(w);
-        return Pow<3>(w.z);
+        return Pow<3>(CosTheta(Normalize(w)));
     };
     Array2D<Float> d = image.GetSamplingDistribution(dwdA, screenBounds);
     distrib = PiecewiseConstant2D(d, screenBounds);
@@ -351,46 +352,52 @@ LightBounds ProjectionLight::Bounds() const {
     return LightBounds(p, w, phi, 0.f, std::acos(cosTotalWidth), false);
 }
 
-LightLeSample ProjectionLight::SampleLe(const Point2f &u1, const Point2f &u2,
-                                        SampledWavelengths &lambda, Float time) const {
+pstd::optional<LightLeSample> ProjectionLight::SampleLe(Point2f u1, Point2f u2,
+                                                        SampledWavelengths &lambda,
+                                                        Float time) const {
+    // Sample light space ray direction for projection light
     Float pdf;
     Point2f ps = distrib.Sample(u1, &pdf);
     if (pdf == 0)
         return {};
-
     Vector3f w = Vector3f(lightFromScreen(Point3f(ps.x, ps.y, 0)));
 
-    Ray ray = renderFromLight(
-        Ray(Point3f(0, 0, 0), Normalize(w), time, mediumInterface.outside));
+    // Compute PDF for sampled projection light direction
     Float cosTheta = CosTheta(Normalize(w));
     CHECK_GT(cosTheta, 0);
     Float pdfDir = pdf * screenBounds.Area() / (A * Pow<3>(cosTheta));
 
+    // Compute radiance for sampled projection light direction
     Point2f p = Point2f(screenBounds.Offset(ps));
     RGB rgb;
     for (int c = 0; c < 3; ++c)
         rgb[c] = image.LookupNearestChannel(p, c);
-
     SampledSpectrum L =
         scale * RGBIlluminantSpectrum(*imageColorSpace, rgb).Sample(lambda);
 
+    Ray ray = renderFromLight(
+        Ray(Point3f(0, 0, 0), Normalize(w), time, mediumInterface.outside));
     return LightLeSample(L, ray, 1, pdfDir);
 }
 
 void ProjectionLight::PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
     *pdfPos = 0;
-
+    // Transform ray direction to light space and reject invalid ones
     Vector3f w = Normalize(renderFromLight.ApplyInverse(ray.d));
     if (w.z < hither) {
         *pdfDir = 0;
         return;
     }
+
+    // Compute screen space coordinates for direction and test against bounds
     Point3f ps = screenFromLight(Point3f(w));
     if (!Inside(Point2f(ps.x, ps.y), screenBounds)) {
         *pdfDir = 0;
         return;
     }
-    *pdfDir = distrib.PDF(Point2f(ps.x, ps.y)) * screenBounds.Area() / (A * Pow<3>(w.z));
+
+    *pdfDir = distrib.PDF(Point2f(ps.x, ps.y)) * screenBounds.Area() /
+              (A * Pow<3>(CosTheta(w)));
 }
 
 ProjectionLight *ProjectionLight::Create(const Transform &renderFromLight,
@@ -479,20 +486,21 @@ LightBounds GoniometricLight::Bounds() const {
     return LightBounds(p, Vector3f(0, 0, 1), phi, Pi, Pi / 2, false);
 }
 
-LightLeSample GoniometricLight::SampleLe(const Point2f &u1, const Point2f &u2,
-                                         SampledWavelengths &lambda, Float time) const {
+pstd::optional<LightLeSample> GoniometricLight::SampleLe(Point2f u1, Point2f u2,
+                                                         SampledWavelengths &lambda,
+                                                         Float time) const {
+    // Sample direction and PDF for ray leaving goniometric light
     Float pdf;
     Point2f uv = distrib.Sample(u1, &pdf);
     Vector3f wl = EqualAreaSquareToSphere(uv);
     Float pdfDir = pdf / (4 * Pi);
 
-    Ray ray = renderFromLight(Ray(Point3f(0, 0, 0), wl, time, mediumInterface.inside));
+    Ray ray = renderFromLight(Ray(Point3f(0, 0, 0), wl, time, mediumInterface.outside));
     return LightLeSample(I(wl, lambda), ray, 1, pdfDir);
 }
 
 void GoniometricLight::PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
     *pdfPos = 0.f;
-
     Vector3f wl = Normalize(renderFromLight.ApplyInverse(ray.d));
     Point2f uv = EqualAreaSphereToSquare(wl);
     *pdfDir = distrib.PDF(uv) / (4 * Pi);
@@ -676,10 +684,10 @@ LightBounds DiffuseAreaLight::Bounds() const {
                        twoSided);
 }
 
-LightLeSample DiffuseAreaLight::SampleLe(const Point2f &u1, const Point2f &u2,
-                                         SampledWavelengths &lambda, Float time) const {
+pstd::optional<LightLeSample> DiffuseAreaLight::SampleLe(Point2f u1, Point2f u2,
+                                                         SampledWavelengths &lambda,
+                                                         Float time) const {
     // Sample a point on the area light's _Shape_
-    Float pdfDir;
     pstd::optional<ShapeSample> ss = shape.Sample(u1);
     if (!ss)
         return {};
@@ -688,32 +696,32 @@ LightLeSample DiffuseAreaLight::SampleLe(const Point2f &u1, const Point2f &u2,
 
     // Sample a cosine-weighted outgoing direction _w_ for area light
     Vector3f w;
+    Float pdfDir;
     if (twoSided) {
-        Point2f u = u2;
-        // Choose a side to sample and then remap u[0] to [0,1] before
-        // applying cosine-weighted hemisphere sampling for the chosen side.
-        if (u[0] < .5) {
-            u[0] = std::min(u[0] * 2, OneMinusEpsilon);
-            w = SampleCosineHemisphere(u);
+        // Choose side of surface and sample cosine-weighted outgoing direction
+        if (u2[0] < 0.5f) {
+            u2[0] = std::min(u2[0] * 2, OneMinusEpsilon);
+            w = SampleCosineHemisphere(u2);
         } else {
-            u[0] = std::min((u[0] - .5f) * 2, OneMinusEpsilon);
-            w = SampleCosineHemisphere(u);
+            u2[0] = std::min((u2[0] - 0.5f) * 2, OneMinusEpsilon);
+            w = SampleCosineHemisphere(u2);
             w.z *= -1;
         }
         pdfDir = 0.5f * CosineHemispherePDF(std::abs(w.z));
+
     } else {
         w = SampleCosineHemisphere(u2);
         pdfDir = CosineHemispherePDF(w.z);
     }
-
     if (pdfDir == 0)
         return {};
 
     // Return _LightLeSample_ for ray leaving area light
-    Frame nFrame = Frame::FromZ(ss->intr.n);
+    const Interaction &intr = ss->intr;
+    Frame nFrame = Frame::FromZ(intr.n);
     w = nFrame.FromLocal(w);
-    return LightLeSample(L(ss->intr.p(), ss->intr.n, ss->intr.uv, w, lambda),
-                         ss->intr.SpawnRay(w), ss->intr, ss->pdf, pdfDir);
+    return LightLeSample(L(intr.p(), intr.n, intr.uv, w, lambda), intr.SpawnRay(w), intr,
+                         ss->pdf, pdfDir);
 }
 
 void DiffuseAreaLight::PDF_Le(const Interaction &intr, Vector3f &w, Float *pdfPos,
@@ -836,10 +844,12 @@ SampledSpectrum UniformInfiniteLight::Phi(const SampledWavelengths &lambda) cons
     return 4 * Pi * Pi * Sqr(sceneRadius) * scale * Lemit.Sample(lambda);
 }
 
-LightLeSample UniformInfiniteLight::SampleLe(const Point2f &u1, const Point2f &u2,
-                                             SampledWavelengths &lambda,
-                                             Float time) const {
+pstd::optional<LightLeSample> UniformInfiniteLight::SampleLe(Point2f u1, Point2f u2,
+                                                             SampledWavelengths &lambda,
+                                                             Float time) const {
+    // Sample direction for uniform infinite light ray
     Vector3f w = SampleUniformSphere(u1);
+
     // Compute infinite light sample ray
     Frame wFrame = Frame::FromZ(-w);
     Point2f cd = SampleUniformDiskConcentric(u2);
@@ -923,8 +933,9 @@ SampledSpectrum ImageInfiniteLight::Phi(const SampledWavelengths &lambda) const 
     return 4 * Pi * Pi * Sqr(sceneRadius) * scale * sumL / (width * height);
 }
 
-LightLeSample ImageInfiniteLight::SampleLe(const Point2f &u1, const Point2f &u2,
-                                           SampledWavelengths &lambda, Float time) const {
+pstd::optional<LightLeSample> ImageInfiniteLight::SampleLe(Point2f u1, Point2f u2,
+                                                           SampledWavelengths &lambda,
+                                                           Float time) const {
     // Sample infinite light image and compute ray direction _w_
     Float mapPDF;
     Point2f uv = distribution.Sample(u1, &mapPDF);
@@ -1120,9 +1131,8 @@ Float PortalImageInfiniteLight::PDF_Li(LightSampleContext ctx, Vector3f w,
     return pdf / duv_dw;
 }
 
-LightLeSample PortalImageInfiniteLight::SampleLe(const Point2f &u1, const Point2f &u2,
-                                                 SampledWavelengths &lambda,
-                                                 Float time) const {
+pstd::optional<LightLeSample> PortalImageInfiniteLight::SampleLe(
+    Point2f u1, Point2f u2, SampledWavelengths &lambda, Float time) const {
     Float mapPDF;
     Bounds2f b(Point2f(0, 0), Point2f(1, 1));
     Point2f uv = distribution.Sample(u1, b, &mapPDF);
@@ -1243,46 +1253,46 @@ LightBounds SpotLight::Bounds() const {
     return LightBounds(p, w, phi, 0.f, std::acos(cosFalloffEnd), false);
 }
 
-LightLeSample SpotLight::SampleLe(const Point2f &u1, const Point2f &u2,
-                                  SampledWavelengths &lambda, Float time) const {
-    // Unnormalized probabilities of sampling each part.
+pstd::optional<LightLeSample> SpotLight::SampleLe(Point2f u1, Point2f u2,
+                                                  SampledWavelengths &lambda,
+                                                  Float time) const {
+    // Choose whether to sample spotlight center cone or falloff region
     Float p[2] = {1 - cosFalloffStart, (cosFalloffStart - cosFalloffEnd) / 2};
     Float sectionPDF;
-    Vector3f wl;
     int section = SampleDiscrete(p, u2[0], &sectionPDF);
+
+    Vector3f wl;
     Float pdfDir;
     if (section == 0) {
-        // Sample center cone
+        // Sample spotlight center cone
         wl = SampleUniformCone(u1, cosFalloffStart);
-        pdfDir = sectionPDF * UniformConePDF(cosFalloffStart);
-    } else {
-        DCHECK_EQ(1, section);
+        pdfDir = UniformConePDF(cosFalloffStart) * sectionPDF;
 
+    } else {
+        // Sample spotlight falloff region
         Float cosTheta = SampleSmoothStep(u1[0], cosFalloffEnd, cosFalloffStart);
-        CHECK(cosTheta >= cosFalloffEnd && cosTheta <= cosFalloffStart);
+        DCHECK(cosTheta >= cosFalloffEnd && cosTheta <= cosFalloffStart);
         Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
         Float phi = u1[1] * 2 * Pi;
         wl = SphericalDirection(sinTheta, cosTheta, phi);
-        pdfDir = sectionPDF * SmoothStepPDF(cosTheta, cosFalloffEnd, cosFalloffStart) /
+        pdfDir = SmoothStepPDF(cosTheta, cosFalloffEnd, cosFalloffStart) * sectionPDF /
                  (2 * Pi);
     }
-
+    // Return sampled spotlight ray
     Ray ray = renderFromLight(Ray(Point3f(0, 0, 0), wl, time, mediumInterface.outside));
     return LightLeSample(I(wl, lambda), ray, 1, pdfDir);
 }
 
 void SpotLight::PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
-    *pdfPos = 0;
-
-    // Unnormalized probabilities of sampling each part.
     Float p[2] = {1 - cosFalloffStart, (cosFalloffStart - cosFalloffEnd) / 2};
-
+    *pdfPos = 0;
+    // Find spotlight directional PDF based on $\cos \theta$
     Float cosTheta = CosTheta(renderFromLight.ApplyInverse(ray.d));
     if (cosTheta >= cosFalloffStart)
         *pdfDir = UniformConePDF(cosFalloffStart) * p[0] / (p[0] + p[1]);
     else
-        *pdfDir = SmoothStepPDF(cosTheta, cosFalloffEnd, cosFalloffStart) / (2 * Pi) *
-                  (p[1] / (p[0] + p[1]));
+        *pdfDir = SmoothStepPDF(cosTheta, cosFalloffEnd, cosFalloffStart) * p[1] /
+                  ((p[0] + p[1]) * (2 * Pi));
 }
 
 std::string SpotLight::ToString() const {
@@ -1334,8 +1344,9 @@ void LightHandle::Preprocess(const Bounds3f &sceneBounds) {
     return DispatchCPU(preprocess);
 }
 
-LightLeSample LightHandle::SampleLe(const Point2f &u1, const Point2f &u2,
-                                    SampledWavelengths &lambda, Float time) const {
+pstd::optional<LightLeSample> LightHandle::SampleLe(Point2f u1, Point2f u2,
+                                                    SampledWavelengths &lambda,
+                                                    Float time) const {
     auto sample = [&](auto ptr) { return ptr->SampleLe(u1, u2, lambda, time); };
     return Dispatch(sample);
 }

@@ -94,7 +94,7 @@ class CameraTransform {
 
 // CameraWiSample Definition
 struct CameraWiSample {
-  public:
+    // CameraWiSample Public Methods
     CameraWiSample() = default;
     PBRT_CPU_GPU
     CameraWiSample(const SampledSpectrum &Wi, const Vector3f &wi, Float pdf,
@@ -289,7 +289,7 @@ class OrthographicCamera : public ProjectiveCamera {
     }
 
     PBRT_CPU_GPU
-    pstd::optional<CameraWiSample> SampleWi(const Interaction &ref, const Point2f &sample,
+    pstd::optional<CameraWiSample> SampleWi(const Interaction &ref, Point2f u,
                                             SampledWavelengths &lambda) const {
         LOG_FATAL("SampleWi() unimplemented for OrthographicCamera");
         return {};
@@ -323,7 +323,7 @@ class PerspectiveCamera : public ProjectiveCamera {
         cosTotalWidth = wCornerCamera.z;
         DCHECK_LT(.9999 * cosTotalWidth, std::cos(Radians(fov / 2)));
 
-        // Compute image plane bounds at $z=1$ for _PerspectiveCamera_
+        // Compute image plane area at $z=1$ for _PerspectiveCamera_
         Point2i res = film.FullResolution();
         Point3f pMin = cameraFromRaster(Point3f(0, 0, 0));
         Point3f pMax = cameraFromRaster(Point3f(res.x, res.y, 0));
@@ -356,7 +356,7 @@ class PerspectiveCamera : public ProjectiveCamera {
     PBRT_CPU_GPU
     void PDF_We(const Ray &ray, Float *pdfPos, Float *pdfDir) const;
     PBRT_CPU_GPU
-    pstd::optional<CameraWiSample> SampleWi(const Interaction &ref, const Point2f &sample,
+    pstd::optional<CameraWiSample> SampleWi(const Interaction &ref, Point2f u,
                                             SampledWavelengths &lambda) const;
 
     std::string ToString() const;
@@ -409,7 +409,7 @@ class SphericalCamera : public CameraBase {
     }
 
     PBRT_CPU_GPU
-    pstd::optional<CameraWiSample> SampleWi(const Interaction &ref, const Point2f &sample,
+    pstd::optional<CameraWiSample> SampleWi(const Interaction &ref, Point2f u,
                                             SampledWavelengths &lambda) const {
         LOG_FATAL("SampleWi() unimplemented for SphericalCamera");
         return {};
@@ -458,7 +458,7 @@ class RealisticCamera : public CameraBase {
     }
 
     PBRT_CPU_GPU
-    pstd::optional<CameraWiSample> SampleWi(const Interaction &ref, const Point2f &sample,
+    pstd::optional<CameraWiSample> SampleWi(const Interaction &ref, Point2f u,
                                             SampledWavelengths &lambda) const {
         LOG_FATAL("SampleWi() unimplemented for RealisticCamera");
         return {};

@@ -558,7 +558,7 @@ LightPathIntegrator::LightPathIntegrator(int maxDepth, CameraHandle camera,
 void LightPathIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleIndex,
                                               SamplerHandle sampler,
                                               ScratchBuffer &scratchBuffer) {
-    // Eat the first two samples since they're "special"...
+    // Consume first two dimensions from sampler
     (void)sampler.Get2D();
 
     // Sample wavelengths for the ray
@@ -569,33 +569,32 @@ void LightPathIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleI
         lu = 0.5;
     SampledWavelengths lambda = camera.GetFilm().SampleWavelengths(lu);
 
-    // Sample a light
+    // Sample light to start light path
     pstd::optional<SampledLight> sampledLight = lightSampler->Sample(sampler.Get1D());
     if (!sampledLight)
         return;
-
     LightHandle light = sampledLight->light;
     Float lightPDF = sampledLight->pdf;
 
+    // Sample point on light source for light path
     Float time = camera.SampleTime(sampler.Get1D());
-    LightLeSample les = light.SampleLe(sampler.Get2D(), sampler.Get2D(), lambda, time);
-    if (!les || les.pdfPos == 0 || les.pdfDir == 0 || !les.L)
+    pstd::optional<LightLeSample> les =
+        light.SampleLe(sampler.Get2D(), sampler.Get2D(), lambda, time);
+    if (!les || les->pdfPos == 0 || les->pdfDir == 0 || !les->L)
         return;
-    RayDifferential ray(les.ray);
-    SampledSpectrum beta =
-        les.L * les.AbsCosTheta(ray.d) / (lightPDF * les.pdfPos * les.pdfDir);
 
-    // Is the light sample directly visible?
-    if (les.intr) {
+    // Add contribution of directly-visible light source
+    if (les->intr) {
         pstd::optional<CameraWiSample> cs =
-            camera.SampleWi(*les.intr, sampler.Get2D(), lambda);
+            camera.SampleWi(*les->intr, sampler.Get2D(), lambda);
         if (cs && cs->pdf != 0) {
-            Float pdf = light.PDF_Li(cs->pLens, cs->wi);
-            if (pdf > 0) {
+            if (Float pdf = light.PDF_Li(cs->pLens, cs->wi); pdf > 0) {
+                // Add light's emitted radiance if non-zero and light is visible
                 SampledSpectrum Le =
-                    light.L(les.intr->p(), les.intr->n, les.intr->uv, cs->wi, lambda);
+                    light.L(les->intr->p(), les->intr->n, les->intr->uv, cs->wi, lambda);
                 if (Le && Unoccluded(cs->pRef, cs->pLens)) {
-                    SampledSpectrum L = Le * les.AbsCosTheta(cs->wi) * cs->Wi /
+                    // Compute visible light's path contribution and add to film
+                    SampledSpectrum L = Le * les->AbsCosTheta(cs->wi) * cs->Wi /
                                         (lightPDF * pdf * cs->pdf);
                     L = SafeDiv(L, lambda.PDF());
                     camera.GetFilm().AddSplat(cs->pRaster, L, lambda);
@@ -604,23 +603,33 @@ void LightPathIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleI
         }
     }
 
-    for (int depth = 0; depth < maxDepth && beta; ++depth) {
+    // Follow light path and accumulate contributions to image
+    int depth = 0;
+    // Initialize light path ray and weighted path throughput _beta_
+    RayDifferential ray(les->ray);
+    SampledSpectrum beta =
+        les->L * les->AbsCosTheta(ray.d) / (lightPDF * les->pdfPos * les->pdfDir);
+
+    while (true) {
+        // Intersect light path ray with scene
         pstd::optional<ShapeIntersection> si = Intersect(ray);
         if (!si)
             break;
-
-        // Compute scattering functions for _mode_ and skip over medium
-        // boundaries
         SurfaceInteraction &isect = si->intr;
+
+        // Get BSDF and skip over medium boundaries
         BSDF bsdf = isect.GetBSDF(ray, lambda, camera, scratchBuffer, sampler);
         if (!bsdf) {
             isect.SkipIntersection(&ray, si->tHit);
-            --depth;
             continue;
         }
-        Vector3f wo = isect.wo;
 
-        // Try to splat into the film
+        // End path if maximum depth reached
+        if (depth++ == maxDepth)
+            break;
+
+        // Splat contribution into film if intersection point is visible to camera
+        Vector3f wo = isect.wo;
         pstd::optional<CameraWiSample> cs =
             camera.SampleWi(isect, sampler.Get2D(), lambda);
         if (cs && cs->pdf != 0) {
@@ -631,13 +640,12 @@ void LightPathIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleI
                 camera.GetFilm().AddSplat(cs->pRaster, L, lambda);
         }
 
-        // Sample the BSDF...
+        // Sample BSDF and update light path state
         Float u = sampler.Get1D();
         pstd::optional<BSDFSample> bs =
             bsdf.Sample_f(wo, u, sampler.Get2D(), TransportMode::Importance);
         if (!bs)
             break;
-
         beta *= bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
         ray = isect.SpawnRay(ray, bsdf, bs->wi, bs->flags);
     }
@@ -1932,30 +1940,31 @@ int GenerateLightSubpath(const Integrator &integrator, SampledWavelengths &lambd
         return 0;
     LightHandle light = sampledLight->light;
     Float lightPDF = sampledLight->pdf;
-    LightLeSample les = light.SampleLe(sampler.Get2D(), sampler.Get2D(), lambda, time);
-    if (!les || les.pdfPos == 0 || les.pdfDir == 0 || !les.L)
+    pstd::optional<LightLeSample> les =
+        light.SampleLe(sampler.Get2D(), sampler.Get2D(), lambda, time);
+    if (!les || les->pdfPos == 0 || les->pdfDir == 0 || !les->L)
         return 0;
-    RayDifferential ray(les.ray);
+    RayDifferential ray(les->ray);
 
     // Generate first vertex on light subpath and start random walk
-    path[0] = les.intr ? Vertex::CreateLight(light, ray, *les.intr, les.L,
-                                             les.pdfPos * lightPDF)
-                       : Vertex::CreateLight(light, ray, les.L, les.pdfPos * lightPDF);
+    path[0] = les->intr ? Vertex::CreateLight(light, ray, *les->intr, les->L,
+                                              les->pdfPos * lightPDF)
+                        : Vertex::CreateLight(light, ray, les->L, les->pdfPos * lightPDF);
     SampledSpectrum beta =
-        les.L * les.AbsCosTheta(ray.d) / (lightPDF * les.pdfPos * les.pdfDir);
+        les->L * les->AbsCosTheta(ray.d) / (lightPDF * les->pdfPos * les->pdfDir);
     PBRT_DBG("%s\n",
              StringPrintf(
                  "Starting light subpath. Ray: %s, Le %s, beta %s, pdfPos %f, pdfDir %f",
-                 ray, les.L, beta, les.pdfPos, les.pdfDir)
+                 ray, les->L, beta, les->pdfPos, les->pdfDir)
                  .c_str());
     int nVertices = RandomWalk(integrator, lambda, ray, sampler, camera, scratchBuffer,
-                               beta, les.pdfDir, maxDepth - 1, TransportMode::Importance,
+                               beta, les->pdfDir, maxDepth - 1, TransportMode::Importance,
                                path + 1, regularize);
     // Correct subpath sampling densities for infinite area lights
     if (path[0].IsInfiniteLight()) {
         // Set spatial density of _path[1]_ for infinite area light
         if (nVertices > 0) {
-            path[1].pdfFwd = les.pdfPos;
+            path[1].pdfFwd = les->pdfPos;
             if (path[1].IsOnSurface())
                 path[1].pdfFwd *= AbsDot(ray.d, path[1].ng());
         }
@@ -3007,12 +3016,13 @@ void SPPMIntegrator::Render() {
                 Float uLightTime = camera.SampleTime(Sample1D());
 
                 // Generate _photonRay_ from light source and initialize _beta_
-                LightLeSample les = light.SampleLe(uLight0, uLight1, lambda, uLightTime);
-                if (!les || les.pdfPos == 0 || les.pdfDir == 0 || !les.L)
+                pstd::optional<LightLeSample> les =
+                    light.SampleLe(uLight0, uLight1, lambda, uLightTime);
+                if (!les || les->pdfPos == 0 || les->pdfDir == 0 || !les->L)
                     continue;
-                RayDifferential photonRay = RayDifferential(les.ray);
-                SampledSpectrum beta = (les.AbsCosTheta(photonRay.d) * les.L) /
-                                       (lightPDF * les.pdfPos * les.pdfDir);
+                RayDifferential photonRay = RayDifferential(les->ray);
+                SampledSpectrum beta = (les->AbsCosTheta(photonRay.d) * les->L) /
+                                       (lightPDF * les->pdfPos * les->pdfDir);
                 if (!beta)
                     continue;
 

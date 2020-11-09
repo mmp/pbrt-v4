@@ -83,8 +83,7 @@ void CameraHandle::PDF_We(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
     return Dispatch(pdf);
 }
 
-pstd::optional<CameraWiSample> CameraHandle::SampleWi(const Interaction &ref,
-                                                      const Point2f &u,
+pstd::optional<CameraWiSample> CameraHandle::SampleWi(const Interaction &ref, Point2f u,
                                                       SampledWavelengths &lambda) const {
     auto sample = [&](auto ptr) { return ptr->SampleWi(ref, u, lambda); };
     return Dispatch(sample);
@@ -608,7 +607,7 @@ void PerspectiveCamera::PDF_We(const Ray &ray, Float *pdfPos, Float *pdfDir) con
 }
 
 pstd::optional<CameraWiSample> PerspectiveCamera::SampleWi(
-    const Interaction &ref, const Point2f &u, SampledWavelengths &lambda) const {
+    const Interaction &ref, Point2f u, SampledWavelengths &lambda) const {
     // Uniformly sample a lens interaction _lensIntr_
     Point2f pLens = lensRadius * SampleUniformDiskConcentric(u);
     Point3f pLensRender = RenderFromCamera(Point3f(pLens.x, pLens.y, 0), ref.time);

@@ -324,7 +324,7 @@ class LightPathIntegrator : public ImageTileIntegrator {
     std::string ToString() const;
 
   private:
-    // LightPathIntegrator Private Data
+    // LightPathIntegrator Private Members
     int maxDepth;
     std::unique_ptr<PowerLightSampler> lightSampler;
 };

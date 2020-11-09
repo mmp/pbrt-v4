@@ -88,10 +88,9 @@ class LightHandle : public TaggedPointer<  // Light Source Types
     LightBounds Bounds() const;
 
     PBRT_CPU_GPU
-    LightLeSample SampleLe(const Point2f &u1, const Point2f &u2,
-                           SampledWavelengths &lambda, Float time) const;
+    pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
+                                           SampledWavelengths &lambda, Float time) const;
 
-    // Note shouldn't be called for area lights..
     PBRT_CPU_GPU
     void PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const;
 

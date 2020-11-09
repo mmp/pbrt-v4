@@ -51,7 +51,7 @@ struct LightLiSample {
 
 // LightLeSample Definition
 struct LightLeSample {
-  public:
+    // LightLeSample Public Methods
     LightLeSample() = default;
     PBRT_CPU_GPU
     LightLeSample(const SampledSpectrum &L, const Ray &ray, Float pdfPos, Float pdfDir)
@@ -66,10 +66,7 @@ struct LightLeSample {
     PBRT_CPU_GPU
     Float AbsCosTheta(const Vector3f &w) const { return intr ? AbsDot(w, intr->n) : 1; }
 
-    PBRT_CPU_GPU
-    // FIXME: should this be || or && ?. Review usage...
-    operator bool() const { return pdfPos > 0 || pdfDir > 0; }
-
+    // LightLeSample Public Members
     SampledSpectrum L;
     Ray ray;
     pstd::optional<Interaction> intr;
@@ -266,8 +263,8 @@ class PointLight : public LightBase {
     void Preprocess(const Bounds3f &sceneBounds) {}
 
     PBRT_CPU_GPU
-    LightLeSample SampleLe(const Point2f &u1, const Point2f &u2,
-                           SampledWavelengths &lambda, Float time) const;
+    pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
+                                           SampledWavelengths &lambda, Float time) const;
     PBRT_CPU_GPU
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
@@ -320,8 +317,8 @@ class DistantLight : public LightBase {
     Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const { return 0; }
 
     PBRT_CPU_GPU
-    LightLeSample SampleLe(const Point2f &u1, const Point2f &u2,
-                           SampledWavelengths &lambda, Float time) const;
+    pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
+                                           SampledWavelengths &lambda, Float time) const;
     PBRT_CPU_GPU
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
@@ -383,8 +380,8 @@ class ProjectionLight : public LightBase {
     Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
 
     PBRT_CPU_GPU
-    LightLeSample SampleLe(const Point2f &u1, const Point2f &u2,
-                           SampledWavelengths &lambda, Float time) const;
+    pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
+                                           SampledWavelengths &lambda, Float time) const;
     PBRT_CPU_GPU
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
@@ -435,8 +432,8 @@ class GoniometricLight : public LightBase {
     Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
 
     PBRT_CPU_GPU
-    LightLeSample SampleLe(const Point2f &u1, const Point2f &u2,
-                           SampledWavelengths &lambda, Float time) const;
+    pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
+                                           SampledWavelengths &lambda, Float time) const;
     PBRT_CPU_GPU
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
@@ -483,8 +480,8 @@ class DiffuseAreaLight : public LightBase {
     SampledSpectrum Phi(const SampledWavelengths &lambda) const;
 
     PBRT_CPU_GPU
-    LightLeSample SampleLe(const Point2f &u1, const Point2f &u2,
-                           SampledWavelengths &lambda, Float time) const;
+    pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
+                                           SampledWavelengths &lambda, Float time) const;
     PBRT_CPU_GPU
     void PDF_Le(const Interaction &, Vector3f &w, Float *pdfPos, Float *pdfDir) const;
 
@@ -558,8 +555,8 @@ class UniformInfiniteLight : public LightBase {
     Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
 
     PBRT_CPU_GPU
-    LightLeSample SampleLe(const Point2f &u1, const Point2f &u2,
-                           SampledWavelengths &lambda, Float time) const;
+    pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
+                                           SampledWavelengths &lambda, Float time) const;
     PBRT_CPU_GPU
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
@@ -598,8 +595,8 @@ class ImageInfiniteLight : public LightBase {
     Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
 
     PBRT_CPU_GPU
-    LightLeSample SampleLe(const Point2f &u1, const Point2f &u2,
-                           SampledWavelengths &lambda, Float time) const;
+    pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
+                                           SampledWavelengths &lambda, Float time) const;
     PBRT_CPU_GPU
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
@@ -692,8 +689,8 @@ class PortalImageInfiniteLight : public LightBase {
     Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
 
     PBRT_CPU_GPU
-    LightLeSample SampleLe(const Point2f &u1, const Point2f &u2,
-                           SampledWavelengths &lambda, Float time) const;
+    pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
+                                           SampledWavelengths &lambda, Float time) const;
     PBRT_CPU_GPU
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
@@ -788,8 +785,8 @@ class SpotLight : public LightBase {
     Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
 
     PBRT_CPU_GPU
-    LightLeSample SampleLe(const Point2f &u1, const Point2f &u2,
-                           SampledWavelengths &lambda, Float time) const;
+    pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
+                                           SampledWavelengths &lambda, Float time) const;
     PBRT_CPU_GPU
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
