@@ -2582,6 +2582,9 @@ void MLTIntegrator::Render() {
         });
         progress.Done();
     }
+    if (std::accumulate(bootstrapWeights.begin(), bootstrapWeights.end(), 0.) == 0.)
+        ErrorExit("No light carrying paths found during bootstrap sampling! "
+                  "Are you trying to render a black image?");
     AliasTable bootstrapTable(bootstrapWeights);
     Float b = std::accumulate(bootstrapWeights.begin(), bootstrapWeights.end(), 0.) /
               bootstrapWeights.size() * (maxDepth + 1);

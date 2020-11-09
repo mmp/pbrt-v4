@@ -572,6 +572,7 @@ AliasTable::AliasTable(pstd::span<const Float> weights, Allocator alloc)
     : bins(weights.size(), alloc) {
     // Normalize _weights_ to compute alias table PDF
     Float sum = std::accumulate(weights.begin(), weights.end(), 0.);
+    CHECK_GT(sum, 0);
     for (size_t i = 0; i < weights.size(); ++i)
         bins[i].pdf = weights[i] / sum;
 
