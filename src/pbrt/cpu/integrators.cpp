@@ -2729,12 +2729,18 @@ struct SPPMPixel {
         // VisiblePoint Public Methods
         VisiblePoint() = default;
         VisiblePoint(const Point3f &p, const Vector3f &wo, const BSDF &bsdf,
-                     const SampledSpectrum &beta)
-            : p(p), wo(wo), bsdf(bsdf), beta(beta) {}
+                     const SampledSpectrum &beta, bool secondaryLambdaTerminated)
+            : p(p),
+              wo(wo),
+              bsdf(bsdf),
+              beta(beta),
+              secondaryLambdaTerminated(secondaryLambdaTerminated) {}
+
         Point3f p;
         Vector3f wo;
         BSDF bsdf;
         SampledSpectrum beta;
+        bool secondaryLambdaTerminated;
     } vp;
     AtomicFloat Phi[NSpectrumSamples];
     std::atomic<int> M{0};
@@ -2802,7 +2808,7 @@ void SPPMIntegrator::Render() {
     for (int iter = 0; iter < nIterations; ++iter) {
         // Generate SPPM visible points
         // Sample wavelengths for SPPM pass
-        SampledWavelengths lambda =
+        const SampledWavelengths passLambda =
             Options->disableWavelengthJitter
                 ? camera.GetFilm().SampleWavelengths(0.5)
                 : camera.GetFilm().SampleWavelengths(RadicalInverse(1, iter));
@@ -2817,6 +2823,7 @@ void SPPMIntegrator::Render() {
                     tileSampler.StartPixelSample(pPixel, iter);
 
                     // Generate camera ray for pixel for SPPM
+                    SampledWavelengths lambda = passLambda;
                     FilterHandle filter = camera.GetFilm().GetFilter();
                     CameraSample cameraSample =
                         GetCameraSample(tileSampler, pPixel, filter);
@@ -2881,7 +2888,8 @@ void SPPMIntegrator::Render() {
                         // Possibly create visible point and end camera path
                         if (bsdf.IsDiffuse() ||
                             (bsdf.IsGlossy() && depth == maxDepth - 1)) {
-                            pixel.vp = {isect.p(), wo, bsdf, beta};
+                            pixel.vp = {isect.p(), wo, bsdf, beta,
+                                        lambda.SecondaryTerminated()};
                             break;
                         }
 
@@ -3016,6 +3024,7 @@ void SPPMIntegrator::Render() {
                 Float uLightTime = camera.SampleTime(Sample1D());
 
                 // Generate _photonRay_ from light source and initialize _beta_
+                SampledWavelengths lambda = passLambda;
                 pstd::optional<LightLeSample> les =
                     light.SampleLe(uLight0, uLight1, lambda, uLightTime);
                 if (!les || les->pdfPos == 0 || les->pdfDir == 0 || !les->L)
@@ -3053,8 +3062,17 @@ void SPPMIntegrator::Render() {
                                 Vector3f wi = -photonRay.d;
                                 SampledSpectrum Phi =
                                     beta * pixel.vp.bsdf.f(pixel.vp.wo, wi);
-                                for (int i = 0; i < NSpectrumSamples; ++i)
-                                    pixel.Phi[i].Add(Phi[i]);
+                                if (lambda.SecondaryTerminated())
+                                    pixel.Phi[0].Add(Phi[0] / lambda.PDF()[0]);
+                                else if (pixel.vp.secondaryLambdaTerminated) {
+                                    SampledWavelengths phiLambda = lambda;
+                                    phiLambda.TerminateSecondary();
+                                    pixel.Phi[0].Add(Phi[0] / phiLambda.PDF()[0]);
+                                } else {
+                                    Phi = SafeDiv(Phi, lambda.PDF());
+                                    for (int i = 0; i < NSpectrumSamples; ++i)
+                                        pixel.Phi[i].Add(Phi[i]);
+                                }
                                 ++pixel.M;
                             }
                         }
@@ -3112,8 +3130,7 @@ void SPPMIntegrator::Render() {
                 SampledSpectrum Phi;
                 for (int j = 0; j < NSpectrumSamples; ++j)
                     Phi[j] = p.Phi[j];
-                RGB rgb =
-                    film.ToOutputRGB(SafeDiv(p.vp.beta * Phi, lambda.PDF()), lambda);
+                RGB rgb = film.ToOutputRGB(p.vp.beta * Phi, passLambda);
                 p.tau = (p.tau + rgb) * (Rnew * Rnew) / (p.radius * p.radius);
                 p.N = Nnew;
                 p.radius = Rnew;
