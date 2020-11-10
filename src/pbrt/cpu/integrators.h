@@ -427,28 +427,24 @@ class MLTIntegrator : public Integrator {
 class SPPMIntegrator : public Integrator {
   public:
     // SPPMIntegrator Public Methods
-    SPPMIntegrator(CameraHandle camera, PrimitiveHandle aggregate,
-                   std::vector<LightHandle> lights, int nIterations,
-                   int photonsPerIteration, int maxDepth, Float initialSearchRadius,
-                   bool regularize, int seed, const RGBColorSpace *colorSpace)
+    SPPMIntegrator(CameraHandle camera, SamplerHandle sampler, PrimitiveHandle aggregate,
+                   std::vector<LightHandle> lights, int photonsPerIteration, int maxDepth,
+                   Float initialSearchRadius, int seed, const RGBColorSpace *colorSpace)
         : Integrator(aggregate, lights),
           camera(camera),
+          samplerPrototype(sampler),
           initialSearchRadius(initialSearchRadius),
-          nIterations(nIterations),
           maxDepth(maxDepth),
           photonsPerIteration(photonsPerIteration > 0
                                   ? photonsPerIteration
                                   : camera.GetFilm().PixelBounds().Area()),
-          regularize(regularize),
           colorSpace(colorSpace),
           digitPermutationsSeed(seed) {}
 
-    static std::unique_ptr<SPPMIntegrator> Create(const ParameterDictionary &parameters,
-                                                  const RGBColorSpace *colorSpace,
-                                                  CameraHandle camera,
-                                                  PrimitiveHandle aggregate,
-                                                  std::vector<LightHandle> lights,
-                                                  const FileLoc *loc);
+    static std::unique_ptr<SPPMIntegrator> Create(
+        const ParameterDictionary &parameters, const RGBColorSpace *colorSpace,
+        CameraHandle camera, SamplerHandle sampler, PrimitiveHandle aggregate,
+        std::vector<LightHandle> lights, const FileLoc *loc);
 
     std::string ToString() const;
 
@@ -463,9 +459,8 @@ class SPPMIntegrator : public Integrator {
     // SPPMIntegrator Private Members
     CameraHandle camera;
     Float initialSearchRadius;
+    SamplerHandle samplerPrototype;
     int digitPermutationsSeed;
-    int nIterations;
-    bool regularize;
     int maxDepth;
     int photonsPerIteration;
     const RGBColorSpace *colorSpace;

@@ -976,8 +976,10 @@ void FormattingScene::Integrator(const std::string &name, ParsedParameterVector 
             std::vector<int> iterations = dict.GetIntArray("numiterations");
             if (!iterations.empty()) {
                 dict.RemoveInt("numiterations");
-                extra += indent(1) +
-                         StringPrintf("\"integer iterations\" [ %d ]\n", iterations[0]);
+                Warning(
+                    &loc,
+                    "The SPPM integrator no longer takes a \"numiterations\" parameter. "
+                    "This value is now set via the Sampler's number of pixel samples.");
             }
         }
         std::string lss = dict.GetOneString("lightsamplestrategy", "");

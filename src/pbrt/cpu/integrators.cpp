@@ -2780,149 +2780,138 @@ void SPPMIntegrator::Render() {
     if (Options->recordPixelStatistics)
         StatsEnablePixelStats(camera.GetFilm().PixelBounds(),
                               RemoveExtension(camera.GetFilm().GetFilename()));
-    // Allocate samplers for SPPM rendering
-    std::unique_ptr<pstd::vector<DigitPermutation>> digitPermutations(
-        ComputeRadicalInversePermutations(digitPermutationsSeed));
-    HaltonSampler sampler(nIterations, camera.GetFilm().FullResolution(), Options->seed);
-    std::vector<SamplerHandle> tileSamplers =
-        sampler.Clone(MaxThreadIndex(), Allocator());
-
-    // Initialize _pixelBounds_ and _pixels_ array for SPPM
-    Bounds2i pixelBounds = camera.GetFilm().PixelBounds();
-    CHECK(!pixelBounds.IsEmpty());
+    // Define variables for commonly-used values in SPPM rendering
+    int nIterations = samplerPrototype.SamplesPerPixel();
+    ProgressReporter progress(2 * nIterations, "Rendering", Options->quiet);
+    const Float invSqrtSPP = 1.f / std::sqrt(nIterations);
+    FilmHandle film = camera.GetFilm();
+    Bounds2i pixelBounds = film.PixelBounds();
     int nPixels = pixelBounds.Area();
+
+    // Initialize _pixels_ array for SPPM
+    CHECK(!pixelBounds.IsEmpty());
     Array2D<SPPMPixel> pixels(pixelBounds);
     for (SPPMPixel &p : pixels)
         p.radius = initialSearchRadius;
-
-    const Float invSqrtSPP = 1.f / std::sqrt(nIterations);
     pixelMemoryBytes += pixels.size() * sizeof(SPPMPixel);
+
     // Create light samplers for SPPM rendering
     BVHLightSampler directLightSampler(lights, Allocator());
     PowerLightSampler shootLightSampler(lights, Allocator());
 
-    ProgressReporter progress(2 * nIterations, "Rendering", Options->quiet);
-    std::vector<ScratchBuffer> perThreadScratchBuffers;
+    // Allocate per-thread _ScratchBuffer_s for SPPM rendering
+    std::vector<ScratchBuffer> threadScratchBuffers;
     for (int i = 0; i < MaxThreadIndex(); ++i)
         // TODO: size this
-        perThreadScratchBuffers.push_back(ScratchBuffer(nPixels * 1024));
-    FilmHandle film = camera.GetFilm();
+        threadScratchBuffers.push_back(ScratchBuffer(nPixels * 1024));
+
+    // Allocate samplers for SPPM rendering
+    std::vector<SamplerHandle> threadSamplers =
+        samplerPrototype.Clone(MaxThreadIndex(), Allocator());
+    pstd::vector<DigitPermutation> *digitPermutations(
+        ComputeRadicalInversePermutations(digitPermutationsSeed));
 
     for (int iter = 0; iter < nIterations; ++iter) {
         // Generate SPPM visible points
         // Sample wavelengths for SPPM pass
         const SampledWavelengths passLambda =
             Options->disableWavelengthJitter
-                ? camera.GetFilm().SampleWavelengths(0.5)
-                : camera.GetFilm().SampleWavelengths(RadicalInverse(1, iter));
+                ? film.SampleWavelengths(0.5)
+                : film.SampleWavelengths(RadicalInverse(1, iter));
 
-        {
-            ParallelFor2D(pixelBounds, [&](Bounds2i tileBounds) {
-                ScratchBuffer &scratchBuffer = perThreadScratchBuffers[ThreadIndex];
-                SamplerHandle &tileSampler = tileSamplers[ThreadIndex];
-                // Follow camera paths for _tile_ in image for SPPM
-                for (Point2i pPixel : tileBounds) {
-                    // Prepare _tileSampler_ for _pPixel_
-                    tileSampler.StartPixelSample(pPixel, iter);
+        ParallelFor2D(pixelBounds, [&](Bounds2i tileBounds) {
+            // Follow camera paths for _tileBounds_ in image for SPPM
+            ScratchBuffer &scratchBuffer = threadScratchBuffers[ThreadIndex];
+            SamplerHandle sampler = threadSamplers[ThreadIndex];
+            for (Point2i pPixel : tileBounds) {
+                sampler.StartPixelSample(pPixel, iter);
+                // Generate camera ray for pixel for SPPM
+                SampledWavelengths lambda = passLambda;
+                CameraSample cs = GetCameraSample(sampler, pPixel, film.GetFilter());
+                pstd::optional<CameraRayDifferential> crd =
+                    camera.GenerateRayDifferential(cs, lambda);
+                if (!crd || !crd->weight)
+                    continue;
+                SampledSpectrum beta = crd->weight;
+                RayDifferential &ray = crd->ray;
+                if (!Options->disablePixelJitter)
+                    ray.ScaleDifferentials(invSqrtSPP);
 
-                    // Generate camera ray for pixel for SPPM
-                    SampledWavelengths lambda = passLambda;
-                    FilterHandle filter = camera.GetFilm().GetFilter();
-                    CameraSample cameraSample =
-                        GetCameraSample(tileSampler, pPixel, filter);
-                    pstd::optional<CameraRayDifferential> crd =
-                        camera.GenerateRayDifferential(cameraSample, lambda);
-                    if (!crd || !crd->weight)
+                // Follow camera ray path until a visible point is created
+                SPPMPixel &pixel = pixels[pPixel];
+                Float etaScale = 1;
+                bool specularBounce = false, anyNonSpecularBounces = false;
+                for (int depth = 0; depth < maxDepth; ++depth) {
+                    ++totalPhotonSurfaceInteractions;
+                    pstd::optional<ShapeIntersection> si = Intersect(ray);
+                    if (!si) {
+                        // Accumulate light contributions for ray with no intersection
+                        if (depth == 0) {
+                            for (const auto &light : infiniteLights) {
+                                SampledSpectrum L = beta * light.Le(ray, lambda);
+                                L = SafeDiv(L, lambda.PDF());
+                                pixel.Ld += film.ToOutputRGB(L, lambda);
+                            }
+                        }
+
+                        break;
+                    }
+                    // Process SPPM camera ray intersection
+                    // Compute BSDF at SPPM camera ray intersection
+                    SurfaceInteraction &isect = si->intr;
+                    BSDF bsdf =
+                        isect.GetBSDF(ray, lambda, camera, scratchBuffer, sampler);
+                    if (!bsdf) {
+                        isect.SkipIntersection(&ray, si->tHit);
+                        --depth;
                         continue;
-                    SampledSpectrum beta = crd->weight;
-                    RayDifferential &ray = crd->ray;
-                    if (!Options->disablePixelJitter)
-                        ray.ScaleDifferentials(invSqrtSPP);
+                    }
 
-                    // Follow camera ray path until a visible point is created
-                    SPPMPixel &pixel = pixels[pPixel];
-                    Float etaScale = 1;
-                    bool specularBounce = false, anyNonSpecularBounces = false;
-                    for (int depth = 0; depth < maxDepth; ++depth) {
-                        ++totalPhotonSurfaceInteractions;
-                        pstd::optional<ShapeIntersection> si = Intersect(ray);
-                        if (!si) {
-                            // Accumulate light contributions for ray with no intersection
-                            if (depth == 0) {
-                                for (const auto &light : infiniteLights) {
-                                    SampledSpectrum L = beta * light.Le(ray, lambda);
-                                    L = SafeDiv(L, lambda.PDF());
-                                    pixel.Ld += film.ToOutputRGB(L, lambda);
-                                }
-                            }
+                    ++totalBSDFs;
+                    // Accumulate direct illumination at SPPM camera ray intersection
+                    Vector3f wo = -ray.d;
+                    if (depth == 0 || specularBounce) {
+                        SampledSpectrum L = beta * isect.Le(wo, lambda);
+                        L = SafeDiv(L, lambda.PDF());
+                        pixel.Ld += film.ToOutputRGB(L, lambda);
+                    }
+                    SampledSpectrum Ld =
+                        SampleLd(isect, &bsdf, lambda, sampler, &directLightSampler);
+                    pixel.Ld += film.ToOutputRGB(beta * Ld, lambda);
 
+                    // Possibly create visible point and end camera path
+                    if (bsdf.IsDiffuse() || (bsdf.IsGlossy() && depth == maxDepth - 1)) {
+                        pixel.vp = {isect.p(), wo, bsdf, beta,
+                                    lambda.SecondaryTerminated()};
+                        break;
+                    }
+
+                    // Spawn ray from SPPM camera path vertex
+                    if (depth < maxDepth - 1) {
+                        Float u = sampler.Get1D();
+                        pstd::optional<BSDFSample> bs =
+                            bsdf.Sample_f(wo, u, sampler.Get2D());
+                        if (!bs)
                             break;
-                        }
-                        // Process SPPM camera ray intersection
-                        // Compute BSDF at SPPM camera ray intersection
-                        SurfaceInteraction &isect = si->intr;
-                        BSDF bsdf =
-                            isect.GetBSDF(ray, lambda, camera, scratchBuffer, &sampler);
-                        if (!bsdf) {
-                            isect.SkipIntersection(&ray, si->tHit);
-                            --depth;
-                            continue;
-                        }
+                        specularBounce = bs->IsSpecular();
+                        anyNonSpecularBounces |= !bs->IsSpecular();
+                        if (bs->IsTransmission())
+                            etaScale *= Sqr(bsdf.eta);
 
-                        // Possibly regularize the BSDF
-                        if (regularize && anyNonSpecularBounces) {
-                            ++regularizedBSDFs;
-                            bsdf.Regularize();
-                        }
-
-                        ++totalBSDFs;
-                        // Accumulate direct illumination at SPPM camera ray intersection
-                        Vector3f wo = -ray.d;
-                        if (depth == 0 || specularBounce) {
-                            SampledSpectrum L = beta * isect.Le(wo, lambda);
-                            L = SafeDiv(L, lambda.PDF());
-                            pixel.Ld += film.ToOutputRGB(L, lambda);
-                        }
-                        SampledSpectrum Ld = SampleLd(isect, &bsdf, lambda, tileSampler,
-                                                      &directLightSampler);
-                        pixel.Ld +=
-                            film.ToOutputRGB(SafeDiv(beta * Ld, lambda.PDF()), lambda);
-
-                        // Possibly create visible point and end camera path
-                        if (bsdf.IsDiffuse() ||
-                            (bsdf.IsGlossy() && depth == maxDepth - 1)) {
-                            pixel.vp = {isect.p(), wo, bsdf, beta,
-                                        lambda.SecondaryTerminated()};
-                            break;
-                        }
-
-                        // Spawn ray from SPPM camera path vertex
-                        if (depth < maxDepth - 1) {
-                            Float u = tileSampler.Get1D();
-                            pstd::optional<BSDFSample> bs =
-                                bsdf.Sample_f(wo, u, tileSampler.Get2D());
-                            if (!bs)
+                        beta *= bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
+                        SampledSpectrum rrBeta = beta * etaScale;
+                        if (rrBeta.MaxComponentValue() < 1) {
+                            Float q =
+                                std::max<Float>(.05f, 1 - rrBeta.MaxComponentValue());
+                            if (sampler.Get1D() < q)
                                 break;
-                            specularBounce = bs->IsSpecular();
-                            anyNonSpecularBounces |= !bs->IsSpecular();
-                            if (bs->IsTransmission())
-                                etaScale *= Sqr(bsdf.eta);
-
-                            beta *= bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
-                            SampledSpectrum rrBeta = beta * etaScale;
-                            if (rrBeta.MaxComponentValue() < 1) {
-                                Float q =
-                                    std::max<Float>(.05f, 1 - rrBeta.MaxComponentValue());
-                                if (tileSampler.Get1D() < q)
-                                    break;
-                                beta /= 1 - q;
-                            }
-                            ray = isect.SpawnRay(ray, bsdf, bs->wi, bs->flags);
+                            beta /= 1 - q;
                         }
+                        ray = isect.SpawnRay(ray, bsdf, bs->wi, bs->flags);
                     }
                 }
-            });
-        }
+            }
+        });
         progress.Update();
         // Create grid of all SPPM visible points
         // Allocate grid for SPPM visible points
@@ -2950,7 +2939,7 @@ void SPPMIntegrator::Render() {
 
         // Add visible points to SPPM grid
         ParallelFor2D(pixelBounds, [&](Bounds2i tileBounds) {
-            ScratchBuffer &scratchBuffer = perThreadScratchBuffers[ThreadIndex];
+            ScratchBuffer &scratchBuffer = threadScratchBuffers[ThreadIndex];
             for (Point2i pPixel : tileBounds) {
                 SPPMPixel &pixel = pixels[pPixel];
                 if (pixel.vp.beta) {
@@ -2991,6 +2980,7 @@ void SPPMIntegrator::Render() {
 
         ParallelFor(0, photonsPerIteration, [&](int64_t start, int64_t end) {
             ScratchBuffer &scratchBuffer = photonShootScratchBuffers[ThreadIndex];
+            SamplerHandle sampler = threadSamplers[ThreadIndex];
             for (int64_t photonIndex = start; photonIndex < end; ++photonIndex) {
                 // Follow photon path for _photonIndex_
                 // Define sampling lambda functions for photon shooting
@@ -3003,6 +2993,7 @@ void SPPMIntegrator::Render() {
                     ++haltonDim;
                     return u;
                 };
+
                 auto Sample2D = [&]() {
                     Point2f u(
                         ScrambledRadicalInverse(haltonDim, haltonIndex,
@@ -3083,7 +3074,7 @@ void SPPMIntegrator::Render() {
                     // Sample new photon ray direction
                     // Compute BSDF at photon intersection point
                     BSDF photonBSDF =
-                        isect.GetBSDF(photonRay, lambda, camera, scratchBuffer, &sampler);
+                        isect.GetBSDF(photonRay, lambda, camera, scratchBuffer, sampler);
                     if (!photonBSDF) {
                         isect.SkipIntersection(&photonRay, si->tHit);
                         --depth;
@@ -3092,10 +3083,8 @@ void SPPMIntegrator::Render() {
 
                     // Sample BSDF _fr_ and direction _wi_ for reflected photon
                     Vector3f wo = -photonRay.d;
-                    Float bsdfSample = Sample1D();
-                    Point2f bsdfSample2 = Sample2D();
                     pstd::optional<BSDFSample> bs = photonBSDF.Sample_f(
-                        wo, bsdfSample, bsdfSample2, TransportMode::Importance);
+                        wo, Sample1D(), Sample2D(), TransportMode::Importance);
                     if (!bs)
                         break;
                     SampledSpectrum bnew =
@@ -3115,7 +3104,7 @@ void SPPMIntegrator::Render() {
             }
         });
         // CAN CUT THIS??
-        for (ScratchBuffer &scratchBuffer : perThreadScratchBuffers)
+        for (ScratchBuffer &scratchBuffer : threadScratchBuffers)
             scratchBuffer.Reset();
 
         progress.Update();
@@ -3211,7 +3200,6 @@ SampledSpectrum SPPMIntegrator::SampleLd(const SurfaceInteraction &intr, const B
                                          SampledWavelengths &lambda,
                                          SamplerHandle sampler,
                                          LightSamplerHandle lightSampler) const {
-    // NOTE: share fragments from PathIntegrator::SampleLd here...
     pstd::optional<SampledLight> sampledLight =
         lightSampler.Sample(intr, sampler.Get1D());
 
@@ -3258,7 +3246,7 @@ SampledSpectrum SPPMIntegrator::SampleLd(const SurfaceInteraction &intr, const B
     Float uScattering = sampler.Get1D();
     pstd::optional<BSDFSample> bs = bsdf->Sample_f(intr.wo, uScattering, sampler.Get2D());
     if (!bs)
-        return Ld;
+        return SafeDiv(Ld, lambda.PDF());
 
     Vector3f wi = bs->wi;
     SampledSpectrum f = bs->f * AbsDot(wi, intr.shading.n);
@@ -3295,32 +3283,28 @@ SampledSpectrum SPPMIntegrator::SampleLd(const SurfaceInteraction &intr, const B
             }
         }
     }
-    return Ld;
+    return SafeDiv(Ld, lambda.PDF());
 }
 
 std::string SPPMIntegrator::ToString() const {
     return StringPrintf("[ SPPMIntegrator camera: %s initialSearchRadius: %f "
-                        "nIterations: %d maxDepth: %d photonsPerIteration: %d "
-                        "regularize: %s colorSpace: %s digitPermutations:(elided) ]",
-                        camera, initialSearchRadius, nIterations, maxDepth,
-                        photonsPerIteration, regularize, *colorSpace);
+                        "maxDepth: %d photonsPerIteration: %d "
+                        "colorSpace: %s digitPermutations: (elided) ]",
+                        camera, initialSearchRadius, maxDepth, photonsPerIteration,
+                        *colorSpace);
 }
 
 std::unique_ptr<SPPMIntegrator> SPPMIntegrator::Create(
     const ParameterDictionary &parameters, const RGBColorSpace *colorSpace,
-    CameraHandle camera, PrimitiveHandle aggregate, std::vector<LightHandle> lights,
-    const FileLoc *loc) {
-    int nIterations = parameters.GetOneInt("iterations", 64);
+    CameraHandle camera, SamplerHandle sampler, PrimitiveHandle aggregate,
+    std::vector<LightHandle> lights, const FileLoc *loc) {
     int maxDepth = parameters.GetOneInt("maxdepth", 5);
     int photonsPerIter = parameters.GetOneInt("photonsperiteration", -1);
     Float radius = parameters.GetOneFloat("radius", 1.f);
-    if (Options->quickRender)
-        nIterations = std::max(1, nIterations / 16);
-    bool regularize = parameters.GetOneBool("regularize", false);
-    int seed = parameters.GetOneInt("seed", 0);
-    return std::make_unique<SPPMIntegrator>(camera, aggregate, lights, nIterations,
-                                            photonsPerIter, maxDepth, radius, regularize,
-                                            seed, colorSpace);
+    int seed = parameters.GetOneInt("seed", 6502);
+    return std::make_unique<SPPMIntegrator>(camera, sampler, aggregate, lights,
+                                            photonsPerIter, maxDepth, radius, seed,
+                                            colorSpace);
 }
 
 std::unique_ptr<Integrator> Integrator::Create(
@@ -3355,8 +3339,8 @@ std::unique_ptr<Integrator> Integrator::Create(
         integrator = RandomWalkIntegrator::Create(parameters, camera, sampler, aggregate,
                                                   lights, loc);
     else if (name == "sppm")
-        integrator = SPPMIntegrator::Create(parameters, colorSpace, camera, aggregate,
-                                            lights, loc);
+        integrator = SPPMIntegrator::Create(parameters, colorSpace, camera, sampler,
+                                            aggregate, lights, loc);
     else
         ErrorExit(loc, "%s: integrator type unknown.", name);
 
