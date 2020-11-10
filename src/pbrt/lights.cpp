@@ -625,9 +625,9 @@ pstd::optional<LightLiSample> DiffuseAreaLight::SampleLi(LightSampleContext ctx,
     // Sample point on shape for _DiffuseAreaLight_
     ShapeSampleContext shapeCtx(ctx.pi, ctx.n, ctx.ns, 0 /* time */);
     pstd::optional<ShapeSample> ss = shape.Sample(shapeCtx, u);
-    DCHECK(!IsNaN(ss->pdf));
     if (!ss || ss->pdf == 0 || LengthSquared(ss->intr.p() - ctx.p()) == 0)
         return {};
+    DCHECK(!IsNaN(ss->pdf));
     ss->intr.mediumInterface = &mediumInterface;
 
     // Return _LightLiSample_ for sampled point on shape
