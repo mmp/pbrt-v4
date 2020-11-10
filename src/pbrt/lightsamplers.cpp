@@ -74,6 +74,8 @@ PowerLightSampler::PowerLightSampler(pstd::span<const LightHandle> lights,
     SampledWavelengths lambda = SampledWavelengths::SampleUniform(0.5);
     for (const auto &light : lights)
         lightPower.push_back(light.Phi(lambda).Average());
+    if (std::accumulate(lightPower.begin(), lightPower.end(), 0.f) == 0.f)
+        std::fill(lightPower.begin(), lightPower.end(), 1.f);
     aliasTable = AliasTable(lightPower, alloc);
 }
 
