@@ -447,20 +447,16 @@ extern "C" __global__ void __raygen__shadow_Tr() {
                                       lightPathPDF *= Tmaj * intr.sigma_maj;
                                       uniPathPDF *= Tmaj * sigma_n;
 
-                                      Float pSurvive = T_ray.MaxComponentValue() /
-                                          (lightPathPDF + uniPathPDF).Average();
-
-                                      PBRT_DBG("T_ray %f %f %f %f lightPathPDF %f %f %f %f uniPathPDF %f %f %f %f "
-                                               "pSurvive %f\n",
-                                               T_ray[0], T_ray[1], T_ray[2], T_ray[3],
-                                               lightPathPDF[0], lightPathPDF[1], lightPathPDF[2], lightPathPDF[3],
-                                               uniPathPDF[0], uniPathPDF[1], uniPathPDF[2], uniPathPDF[3], pSurvive);
-
-                                      if (pSurvive < .25f) {
-                                          if (rng.Uniform<Float>() > pSurvive)
+                                      // Possibly terminate transmittance computation using Russian roulette
+                                      SampledSpectrum Tr = T_ray / (lightPathPDF + uniPathPDF).Average();
+                                      if (Tr.MaxComponentValue() < 0.05f) {
+                                          Float q = 0.75f;
+                                          if (rng.Uniform<Float>() < q)
                                               T_ray = SampledSpectrum(0.);
-                                          else
-                                              T_ray /= pSurvive;
+                                          else {
+                                              lightPathPDF *= 1 - q;
+                                              uniPathPDF *= 1 - q;
+                                          }
                                       }
 
                                       PBRT_DBG("Tmaj %f %f %f %f sigma_n %f %f %f %f sigma_maj %f %f %f %f\n",
