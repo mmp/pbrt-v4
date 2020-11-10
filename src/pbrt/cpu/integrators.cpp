@@ -2739,11 +2739,13 @@ struct SPPMPixel {
               beta(beta),
               secondaryLambdaTerminated(secondaryLambdaTerminated) {}
 
+        // VisiblePoint Public Members
         Point3f p;
         Vector3f wo;
         BSDF bsdf;
         SampledSpectrum beta;
         bool secondaryLambdaTerminated;
+
     } vp;
     AtomicFloat Phi[NSpectrumSamples];
     std::atomic<int> M{0};
@@ -2796,7 +2798,7 @@ void SPPMIntegrator::Render() {
     pixelMemoryBytes += pixels.size() * sizeof(SPPMPixel);
 
     // Create light samplers for SPPM rendering
-    BVHLightSampler directLightSampler(lights, Allocator());
+    BVHLightSampler lightSampler(lights, Allocator());
     PowerLightSampler shootLightSampler(lights, Allocator());
 
     // Allocate per-thread _ScratchBuffer_s for SPPM rendering
@@ -2839,20 +2841,33 @@ void SPPMIntegrator::Render() {
 
                 // Follow camera ray path until a visible point is created
                 SPPMPixel &pixel = pixels[pPixel];
-                Float etaScale = 1;
-                bool specularBounce = false, anyNonSpecularBounces = false;
-                for (int depth = 0; depth < maxDepth; ++depth) {
+                Float etaScale = 1, bsdfPDF;
+                bool specularBounce = true, haveSetVisiblePoint = false;
+                LightSampleContext prevIntrCtx;
+                int depth = 0;
+                while (true) {
                     ++totalPhotonSurfaceInteractions;
                     pstd::optional<ShapeIntersection> si = Intersect(ray);
                     if (!si) {
                         // Accumulate light contributions for ray with no intersection
-                        if (depth == 0) {
-                            for (const auto &light : infiniteLights) {
-                                SampledSpectrum L = beta * light.Le(ray, lambda);
-                                L = SafeDiv(L, lambda.PDF());
-                                pixel.Ld += film.ToOutputRGB(L, lambda);
+                        SampledSpectrum L(0.f);
+                        // Incorporate emission from infinite lights for escaped ray
+                        for (const auto &light : infiniteLights) {
+                            SampledSpectrum Le = light.Le(ray, lambda);
+                            if (depth == 0 || specularBounce)
+                                L += SafeDiv(beta * Le, lambda.PDF());
+                            else {
+                                // Compute MIS weight for infinite light
+                                Float lightPDF = lightSampler.PDF(prevIntrCtx, light) *
+                                                 light.PDF_Li(prevIntrCtx, ray.d,
+                                                              LightSamplingMode::WithMIS);
+                                Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
+
+                                L += SafeDiv(beta * weight * Le, lambda.PDF());
                             }
                         }
+
+                        pixel.Ld += film.ToOutputRGB(L, lambda);
 
                         break;
                     }
@@ -2863,52 +2878,70 @@ void SPPMIntegrator::Render() {
                         isect.GetBSDF(ray, lambda, camera, scratchBuffer, sampler);
                     if (!bsdf) {
                         isect.SkipIntersection(&ray, si->tHit);
-                        --depth;
                         continue;
                     }
 
                     ++totalBSDFs;
-                    // Accumulate direct illumination at SPPM camera ray intersection
+                    // Add emission from directly visible emissive surfaces to _pixel.Ld_
                     Vector3f wo = -ray.d;
-                    if (depth == 0 || specularBounce) {
-                        SampledSpectrum L = beta * isect.Le(wo, lambda);
-                        L = SafeDiv(L, lambda.PDF());
-                        pixel.Ld += film.ToOutputRGB(L, lambda);
+                    SampledSpectrum L(0.f);
+                    // Incorporate emission from emissive surface hit by ray
+                    SampledSpectrum Le = si->intr.Le(-ray.d, lambda);
+                    if (Le) {
+                        if (depth == 0 || specularBounce)
+                            L += SafeDiv(beta * Le, lambda.PDF());
+                        else {
+                            // Compute MIS weight for area light
+                            LightHandle areaLight(si->intr.areaLight);
+                            Float lightPDF = lightSampler.PDF(prevIntrCtx, areaLight) *
+                                             areaLight.PDF_Li(prevIntrCtx, ray.d,
+                                                              LightSamplingMode::WithMIS);
+                            Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
+
+                            L += SafeDiv(beta * weight * Le, lambda.PDF());
+                        }
                     }
+
+                    pixel.Ld += film.ToOutputRGB(L, lambda);
+
+                    // Terminate path at maximum depth or if visible point has been set
+                    if (depth++ == maxDepth || haveSetVisiblePoint)
+                        break;
+
+                    // Accumulate direct illumination at SPPM camera ray intersection
                     SampledSpectrum Ld =
-                        SampleLd(isect, &bsdf, lambda, sampler, &directLightSampler);
-                    pixel.Ld += film.ToOutputRGB(beta * Ld, lambda);
+                        SampleLd(isect, &bsdf, lambda, sampler, &lightSampler);
+                    pixel.Ld +=
+                        film.ToOutputRGB(SafeDiv(beta * Ld, lambda.PDF()), lambda);
 
                     // Possibly create visible point and end camera path
-                    if (bsdf.IsDiffuse() || (bsdf.IsGlossy() && depth == maxDepth - 1)) {
+                    if (bsdf.IsDiffuse() || (bsdf.IsGlossy() && depth == maxDepth)) {
                         pixel.vp = {isect.p(), wo, bsdf, beta,
                                     lambda.SecondaryTerminated()};
-                        break;
+                        haveSetVisiblePoint = true;
                     }
 
                     // Spawn ray from SPPM camera path vertex
-                    if (depth < maxDepth - 1) {
-                        Float u = sampler.Get1D();
-                        pstd::optional<BSDFSample> bs =
-                            bsdf.Sample_f(wo, u, sampler.Get2D());
-                        if (!bs)
-                            break;
-                        specularBounce = bs->IsSpecular();
-                        anyNonSpecularBounces |= !bs->IsSpecular();
-                        if (bs->IsTransmission())
-                            etaScale *= Sqr(bsdf.eta);
+                    Float u = sampler.Get1D();
+                    pstd::optional<BSDFSample> bs = bsdf.Sample_f(wo, u, sampler.Get2D());
+                    if (!bs)
+                        break;
+                    specularBounce = bs->IsSpecular();
+                    if (bs->IsTransmission())
+                        etaScale *= Sqr(bsdf.eta);
 
-                        beta *= bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
-                        SampledSpectrum rrBeta = beta * etaScale;
-                        if (rrBeta.MaxComponentValue() < 1) {
-                            Float q =
-                                std::max<Float>(.05f, 1 - rrBeta.MaxComponentValue());
-                            if (sampler.Get1D() < q)
-                                break;
-                            beta /= 1 - q;
-                        }
-                        ray = isect.SpawnRay(ray, bsdf, bs->wi, bs->flags);
+                    beta *= bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
+                    bsdfPDF = bs->pdfIsProportional ? bsdf.PDF(wo, bs->wi) : bs->pdf;
+
+                    SampledSpectrum rrBeta = beta * etaScale;
+                    if (rrBeta.MaxComponentValue() < 1) {
+                        Float q = std::max<Float>(.05f, 1 - rrBeta.MaxComponentValue());
+                        if (sampler.Get1D() < q)
+                            break;
+                        beta /= 1 - q;
                     }
+                    ray = isect.SpawnRay(ray, bsdf, bs->wi, bs->flags);
+                    prevIntrCtx = LightSampleContext(isect);
                 }
             }
         });
@@ -3200,90 +3233,43 @@ SampledSpectrum SPPMIntegrator::SampleLd(const SurfaceInteraction &intr, const B
                                          SampledWavelengths &lambda,
                                          SamplerHandle sampler,
                                          LightSamplerHandle lightSampler) const {
-    pstd::optional<SampledLight> sampledLight =
-        lightSampler.Sample(intr, sampler.Get1D());
+    // Initialize _LightSampleContext_ for light sampling
+    LightSampleContext ctx(intr);
+    // Try to nudge the light sampling position to correct side of the surface
+    if (bsdf->HasReflection() && !bsdf->HasTransmission())
+        ctx.pi = intr.OffsetRayOrigin(intr.wo);
+    else if (bsdf->HasTransmission() && !bsdf->HasReflection())
+        ctx.pi = intr.OffsetRayOrigin(-intr.wo);
 
+    // Choose a light source for the direct lighting calculation
+    pstd::optional<SampledLight> sampledLight = lightSampler.Sample(ctx, sampler.Get1D());
     Point2f uLight = sampler.Get2D();
+    if (!sampledLight)
+        return {};
 
-    SampledSpectrum Ld(0.f);
+    // Sample a point on the light source for direct lighting
+    LightHandle light = sampledLight->light;
+    DCHECK(light != nullptr && sampledLight->pdf > 0);
+    pstd::optional<LightLiSample> ls =
+        light.SampleLi(ctx, uLight, lambda, LightSamplingMode::WithMIS);
+    if (!ls || !ls->L || ls->pdf == 0)
+        return {};
 
-    if (sampledLight) {
-        LightHandle light = sampledLight->light;
-        DCHECK(light != nullptr && sampledLight->pdf > 0);
+    // Evaluate BSDF for light sample and check light visibility
+    Vector3f wo = intr.wo, wi = ls->wi;
+    SampledSpectrum f = bsdf->f(wo, wi) * AbsDot(wi, intr.shading.n);
+    if (!f || !Unoccluded(intr, ls->pLight))
+        return {};
 
-        // Sample light source with multiple importance sampling
-        // Initialize _LightSampleContext_ for light sampling
-        LightSampleContext ctx(intr);
-        // Try to nudge the light sampling position to correct side of the surface
-        if (bsdf->HasReflection() && !bsdf->HasTransmission())
-            ctx.pi = intr.OffsetRayOrigin(intr.wo);
-        else if (bsdf->HasTransmission() && !bsdf->HasReflection())
-            ctx.pi = intr.OffsetRayOrigin(-intr.wo);
-
-        pstd::optional<LightLiSample> ls =
-            light.SampleLi(ctx, uLight, lambda, LightSamplingMode::WithMIS);
-        if (ls && ls->L && ls->pdf > 0) {
-            // Evaluate BSDF for light sampling strategy
-            Vector3f wo = intr.wo, wi = ls->wi;
-            SampledSpectrum f = bsdf->f(wo, wi) * AbsDot(wi, intr.shading.n);
-            if (f) {
-                SampledSpectrum Li = ls->L;
-                if (Unoccluded(intr, ls->pLight)) {
-                    // Add light's contribution to reflected radiance
-                    Float lightPDF = sampledLight->pdf * ls->pdf;
-                    if (IsDeltaLight(light.Type()))
-                        Ld = f * Li / lightPDF;
-                    else {
-                        Float bsdfPDF = bsdf->PDF(wo, wi);
-                        Float weight = PowerHeuristic(1, lightPDF, 1, bsdfPDF);
-                        Ld = f * Li * weight / lightPDF;
-                    }
-                }
-            }
-        }
+    // Return light's contribution to reflected radiance
+    Float lightPDF = sampledLight->pdf * ls->pdf;
+    if (IsDeltaLight(light.Type()))
+        return f * ls->L / lightPDF;
+    else {
+        Float bsdfPDF = bsdf->PDF(wo, wi);
+        Float weight = PowerHeuristic(1, lightPDF, 1, bsdfPDF);
+        return f * ls->L * weight / lightPDF;
     }
-
-    Float uScattering = sampler.Get1D();
-    pstd::optional<BSDFSample> bs = bsdf->Sample_f(intr.wo, uScattering, sampler.Get2D());
-    if (!bs)
-        return SafeDiv(Ld, lambda.PDF());
-
-    Vector3f wi = bs->wi;
-    SampledSpectrum f = bs->f * AbsDot(wi, intr.shading.n);
-
-    Ray ray = intr.SpawnRay(wi);
-    pstd::optional<ShapeIntersection> si = Intersect(ray);
-    if (si) {
-        SampledSpectrum Le = si->intr.Le(-ray.d, lambda);
-        if (Le) {
-            if (bs->IsSpecular())
-                Ld += f * Le / bs->pdf;
-            else {
-                // Compute MIS pdf...
-                LightHandle areaLight(si->intr.areaLight);
-                Float lightPDF = lightSampler.PDF(intr, areaLight) *
-                                 areaLight.PDF_Li(intr, wi, LightSamplingMode::WithMIS);
-                Float bsdfPDF = bs->pdfIsProportional ? bsdf->PDF(intr.wo, wi) : bs->pdf;
-                Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
-                Ld += f * Le * weight / bs->pdf;
-            }
-        }
-    } else {
-        for (const auto &light : infiniteLights) {
-            SampledSpectrum Le = light.Le(ray, lambda);
-            if (bs->IsSpecular())
-                Ld += f * Le / bs->pdf;
-            else {
-                // Compute MIS pdf...
-                Float lightPDF = lightSampler.PDF(intr, light) *
-                                 light.PDF_Li(intr, wi, LightSamplingMode::WithMIS);
-                Float bsdfPDF = bs->pdfIsProportional ? bsdf->PDF(intr.wo, wi) : bs->pdf;
-                Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
-                Ld += f * Le * weight / bs->pdf;
-            }
-        }
-    }
-    return SafeDiv(Ld, lambda.PDF());
 }
 
 std::string SPPMIntegrator::ToString() const {
