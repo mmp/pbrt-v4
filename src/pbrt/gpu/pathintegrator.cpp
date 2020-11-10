@@ -488,11 +488,11 @@ void GPUPathIntegrator::HandleEscapedRays(int depth) {
                          L[0], L[1], L[2], L[3], er.beta[0], er.beta[1], er.beta[2],
                          er.beta[3], Le[0], Le[1], Le[2], Le[3]);
                      PBRT_DBG("pdf uni %f %f %f %f pdf nee %f %f %f %f",
-                         er.pdfUni[0], er.pdfUni[1], er.pdfUni[2], er.pdfUni[3],
-                         er.pdfNEE[0], er.pdfNEE[1], er.pdfNEE[2], er.pdfNEE[3]);
+                         er.uniPathPDF[0], er.uniPathPDF[1], er.uniPathPDF[2], er.uniPathPDF[3],
+                         er.lightPathPDF[0], er.lightPathPDF[1], er.lightPathPDF[2], er.lightPathPDF[3]);
 
                      if (depth == 0 || er.specularBounce) {
-                         L = er.beta * Le / er.pdfUni.Average();
+                         L = er.beta * Le / er.uniPathPDF.Average();
                      } else {
                          Float time = 0;  // FIXME
                          LightSampleContext ctx(er.piPrev, er.nPrev, er.nsPrev);
@@ -502,10 +502,10 @@ void GPUPathIntegrator::HandleEscapedRays(int depth) {
                              lightChoicePDF *
                              envLight.PDF_Li(ctx, ray.d, LightSamplingMode::WithMIS);
 
-                         SampledSpectrum pdfUni = er.pdfUni;
-                         SampledSpectrum pdfNEE = er.pdfNEE * lightPDF;
+                         SampledSpectrum uniPathPDF = er.uniPathPDF;
+                         SampledSpectrum lightPathPDF = er.lightPathPDF * lightPDF;
 
-                         L = er.beta * Le / (pdfUni + pdfNEE).Average();
+                         L = er.beta * Le / (uniPathPDF + lightPathPDF).Average();
                      }
                      L = SafeDiv(L, er.lambda.PDF());
 
@@ -533,7 +533,7 @@ void GPUPathIntegrator::HandleRayFoundEmission(int depth) {
             SampledSpectrum L(0.f);
 
             if (depth == 0 || he.isSpecularBounce) {
-                L = he.beta * Le / he.pdfUni.Average();
+                L = he.beta * Le / he.uniPathPDF.Average();
             } else {
                 Vector3f wi = he.rayd;
 
@@ -543,10 +543,10 @@ void GPUPathIntegrator::HandleRayFoundEmission(int depth) {
                 Float lightPDF = lightChoicePDF *
                                  areaLight.PDF_Li(ctx, wi, LightSamplingMode::WithMIS);
 
-                SampledSpectrum pdfUni = he.pdfUni;
-                SampledSpectrum pdfNEE = he.pdfNEE * lightPDF;
+                SampledSpectrum uniPathPDF = he.uniPathPDF;
+                SampledSpectrum lightPathPDF = he.lightPathPDF * lightPDF;
 
-                L = he.beta * Le / (pdfUni + pdfNEE).Average();
+                L = he.beta * Le / (uniPathPDF + lightPathPDF).Average();
             }
             L = SafeDiv(L, he.lambda.PDF());
 
