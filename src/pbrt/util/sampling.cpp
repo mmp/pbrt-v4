@@ -643,7 +643,7 @@ int AliasTable::Sample(Float u, Float *pdfOut, Float *uRemapped) const {
         // Return sample for alias table at _alias[offset]_
         int alias = bins[offset].alias;
         DCHECK_GE(alias, 0);
-        DCHECK_GT(bins[offset].pdf, 0);
+        DCHECK_GT(bins[alias].pdf, 0);
         if (pdfOut)
             *pdfOut = bins[alias].pdf;
         if (uRemapped)
