@@ -262,6 +262,7 @@ void ImageTileIntegrator::Render() {
     if (mseOutFile)
         fclose(mseOutFile);
     progress.Done();
+    DisconnectFromDisplayServer();
     LOG_VERBOSE("Rendering finished");
 }
 
@@ -3245,6 +3246,7 @@ void SPPMIntegrator::Render() {
                                                        });
 #endif
     progress.Done();
+    DisconnectFromDisplayServer();
 }
 
 SampledSpectrum SPPMIntegrator::SampleLd(const SurfaceInteraction &intr, const BSDF *bsdf,
