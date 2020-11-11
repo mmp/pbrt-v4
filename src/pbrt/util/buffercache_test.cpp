@@ -14,6 +14,8 @@ using namespace pbrt;
 TEST(BufferCache, Basics) {
     ASSERT_FALSE(intBufferCache == nullptr);
 
+    FreeBufferCaches();
+
     std::vector<int> v{1,2,3,4,5};
 
     EXPECT_EQ(0, intBufferCache->BytesUsed());
