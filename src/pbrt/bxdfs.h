@@ -985,7 +985,7 @@ class HairBxDF {
     BxDFFlags Flags() const { return BxDFFlags::GlossyReflection; }
 
     PBRT_CPU_GPU
-    static RGBSpectrum SigmaAFromConcentration(Float ce, Float cp);
+    static RGBUnboundedSpectrum SigmaAFromConcentration(Float ce, Float cp);
     PBRT_CPU_GPU
     static SampledSpectrum SigmaAFromReflectance(const SampledSpectrum &c, Float beta_n,
                                                  const SampledWavelengths &lambda);

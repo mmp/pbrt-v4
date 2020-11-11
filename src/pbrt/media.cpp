@@ -118,9 +118,10 @@ bool GetMediumScatteringProperties(const std::string &name, SpectrumHandle *sigm
 
     for (MeasuredSS &mss : SubsurfaceParameterTable) {
         if (name == mss.name) {
-            *sigma_a = alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB, mss.sigma_a);
-            *sigma_s =
-                alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB, mss.sigma_prime_s);
+            *sigma_a =
+                alloc.new_object<RGBUnboundedSpectrum>(*RGBColorSpace::sRGB, mss.sigma_a);
+            *sigma_s = alloc.new_object<RGBUnboundedSpectrum>(*RGBColorSpace::sRGB,
+                                                              mss.sigma_prime_s);
             return true;
         }
     }
@@ -151,13 +152,13 @@ HomogeneousMedium *HomogeneousMedium::Create(const ParameterDictionary &paramete
     }
     if (sig_a == nullptr) {
         sig_a =
-            parameters.GetOneSpectrum("sigma_a", nullptr, SpectrumType::General, alloc);
+            parameters.GetOneSpectrum("sigma_a", nullptr, SpectrumType::Unbounded, alloc);
         if (sig_a == nullptr)
             sig_a = alloc.new_object<ConstantSpectrum>(1.f);
     }
     if (sig_s == nullptr) {
         sig_s =
-            parameters.GetOneSpectrum("sigma_s", nullptr, SpectrumType::General, alloc);
+            parameters.GetOneSpectrum("sigma_s", nullptr, SpectrumType::Unbounded, alloc);
         if (sig_s == nullptr)
             sig_s = alloc.new_object<ConstantSpectrum>(1.f);
     }

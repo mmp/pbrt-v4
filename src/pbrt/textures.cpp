@@ -349,8 +349,10 @@ SampledSpectrum SpectrumImageTexture::Evaluate(TextureEvalContext ctx,
 
     // Return _SampledSpectrum_ for RGB image texture value
     if (const RGBColorSpace *cs = mipmap->GetRGBColorSpace(); cs != nullptr) {
-        if (spectrumType == SpectrumType::General)
-            return RGBSpectrum(*cs, rgb).Sample(lambda);
+        if (spectrumType == SpectrumType::Unbounded)
+            return RGBUnboundedSpectrum(*cs, rgb).Sample(lambda);
+        else if (spectrumType == SpectrumType::Albedo)
+            return RGBAlbedoSpectrum(*cs, Clamp(rgb, 0, 1)).Sample(lambda);
         else
             return RGBIlluminantSpectrum(*cs, rgb).Sample(lambda);
     }
@@ -466,9 +468,9 @@ SampledSpectrum MarbleTexture::Evaluate(TextureEvalContext ctx,
     RGB rgb = 1.5f * EvaluateCubicBezier(pstd::span(c + first, 4), t);
 
 #ifdef PBRT_IS_GPU_CODE
-    return RGBSpectrum(*RGBColorSpace_sRGB, rgb).Sample(lambda);
+    return RGBAlbedoSpectrum(*RGBColorSpace_sRGB, rgb).Sample(lambda);
 #else
-    return RGBSpectrum(*RGBColorSpace::sRGB, rgb).Sample(lambda);
+    return RGBAlbedoSpectrum(*RGBColorSpace::sRGB, rgb).Sample(lambda);
 #endif
 }
 
@@ -652,8 +654,10 @@ SampledSpectrum SpectrumPtexTexture::Evaluate(TextureEvalContext ctx,
         return SampledSpectrum(result[0]);
     DCHECK_EQ(3, nc);
     RGB rgb(result[0], result[1], result[2]);
-    if (spectrumType == SpectrumType::General)
-        return RGBSpectrum(*RGBColorSpace::sRGB, rgb).Sample(lambda);
+    if (spectrumType == SpectrumType::Unbounded)
+        return RGBUnboundedSpectrum(*RGBColorSpace::sRGB, rgb).Sample(lambda);
+    else if (spectrumType == SpectrumType::Albedo)
+        return RGBAlbedoSpectrum(*RGBColorSpace::sRGB, Clamp(rgb, 0, 1)).Sample(lambda);
     else
         return RGBIlluminantSpectrum(*RGBColorSpace::sRGB, rgb).Sample(lambda);
 #endif

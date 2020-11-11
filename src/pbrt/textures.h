@@ -651,9 +651,11 @@ class GPUSpectrumImageTexture {
             float4 tex = tex2D<float4>(texObj, st[0], 1 - st[1]);
             rgb = scale * RGB(tex.x, tex.y, tex.z);
         }
-        if (spectrumType == SpectrumType::General) {
+        if (spectrumType == SpectrumType::Unbounded)
+            return RGBUnboundedSpectrum(*colorSpace, rgb).Sample(lambda);
+        else if (spectrumType == SpectrumType::Albedo) {
             rgb = Clamp(rgb, 0, 1);
-            return RGBSpectrum(*colorSpace, rgb).Sample(lambda);
+            return RGBAlbedoSpectrum(*colorSpace, rgb).Sample(lambda);
         } else
             return RGBIlluminantSpectrum(*colorSpace, rgb).Sample(lambda);
 #endif

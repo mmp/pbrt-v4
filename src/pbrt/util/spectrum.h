@@ -40,13 +40,14 @@ class BlackbodySpectrum;
 class ConstantSpectrum;
 class PiecewiseLinearSpectrum;
 class DenselySampledSpectrum;
-class RGBSpectrum;
+class RGBAlbedoSpectrum;
+class RGBUnboundedSpectrum;
 class RGBIlluminantSpectrum;
 
-class SpectrumHandle
-    : public TaggedPointer<ConstantSpectrum, DenselySampledSpectrum,
-                           PiecewiseLinearSpectrum, RGBIlluminantSpectrum, RGBSpectrum,
-                           BlackbodySpectrum> {
+class SpectrumHandle : public TaggedPointer<ConstantSpectrum, DenselySampledSpectrum,
+                                            PiecewiseLinearSpectrum, RGBAlbedoSpectrum,
+                                            RGBUnboundedSpectrum, RGBIlluminantSpectrum,
+                                            BlackbodySpectrum> {
   public:
     // SpectrumHandle Public Methods
     using TaggedPointer::TaggedPointer;
@@ -508,16 +509,42 @@ class BlackbodySpectrum {
     Float normalizationFactor;
 };
 
-class RGBSpectrum {
+class RGBAlbedoSpectrum {
   public:
-    // RGBSpectrum Public Methods
+    // RGBAlbedoSpectrum Public Methods
+    PBRT_CPU_GPU
+    Float operator()(Float lambda) const { return rsp(lambda); }
+    PBRT_CPU_GPU
+    Float MaxValue() const { return rsp.MaxValue(); }
+
+    PBRT_CPU_GPU
+    RGBAlbedoSpectrum(const RGBColorSpace &cs, const RGB &rgb);
+
+    PBRT_CPU_GPU
+    SampledSpectrum Sample(const SampledWavelengths &lambda) const {
+        SampledSpectrum s;
+        for (int i = 0; i < NSpectrumSamples; ++i)
+            s[i] = rsp(lambda[i]);
+        return s;
+    }
+
+    std::string ToString() const;
+
+  private:
+    // RGBAlbedoSpectrum Private Members
+    RGBSigmoidPolynomial rsp;
+};
+
+class RGBUnboundedSpectrum {
+  public:
+    // RGBUnboundedSpectrum Public Methods
     PBRT_CPU_GPU
     Float operator()(Float lambda) const { return scale * rsp(lambda); }
     PBRT_CPU_GPU
     Float MaxValue() const { return scale * rsp.MaxValue(); }
 
     PBRT_CPU_GPU
-    RGBSpectrum(const RGBColorSpace &cs, const RGB &rgb);
+    RGBUnboundedSpectrum(const RGBColorSpace &cs, const RGB &rgb);
 
     PBRT_CPU_GPU
     SampledSpectrum Sample(const SampledWavelengths &lambda) const {
@@ -530,7 +557,7 @@ class RGBSpectrum {
     std::string ToString() const;
 
   private:
-    // RGBSpectrum Private Members
+    // RGBUnboundedSpectrum Private Members
     Float scale = 1;
     RGBSigmoidPolynomial rsp;
 };

@@ -378,13 +378,18 @@ std::vector<SpectrumHandle> ParameterDictionary::extractSpectrumArray(
                 RGB rgb(v[0], v[1], v[2]);
                 const RGBColorSpace &cs =
                     param.colorSpace ? *param.colorSpace : *colorSpace;
-                if (spectrumType == SpectrumType::General)
-                    return alloc.new_object<RGBSpectrum>(cs, rgb);
-                else {
+                if (rgb.r < 0 || rgb.g < 0 || rgb.b < 0)
+                    ErrorExit(loc, "RGB parameter \"%s\" has negative component.",
+                              param.name);
+                if (spectrumType == SpectrumType::Albedo) {
+                    if (rgb.r > 1 || rgb.g > 1 || rgb.b > 1)
+                        ErrorExit(loc, "RGB parameter \"%s\" has > 1 component.",
+                                  param.name);
+                    return alloc.new_object<RGBAlbedoSpectrum>(cs, rgb);
+                } else if (spectrumType == SpectrumType::Unbounded) {
+                    return alloc.new_object<RGBUnboundedSpectrum>(cs, rgb);
+                } else {
                     CHECK(spectrumType == SpectrumType::Illuminant);
-                    if (std::min({v[0], v[1], v[2]}) < 0)
-                        ErrorExit(&param.loc,
-                                  "RGB parameter \"%s\" has negative component value.");
                     return alloc.new_object<RGBIlluminantSpectrum>(cs, rgb);
                 }
             });
@@ -794,9 +799,11 @@ SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTexture(
 
 SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTextureOrNull(
     const std::string &name, SpectrumType spectrumType, Allocator alloc) const {
-    const auto &spectrumTextures = (spectrumType == SpectrumType::General)
-                                       ? textures->generalSpectrumTextures
-                                       : textures->illuminantSpectrumTextures;
+    const auto &spectrumTextures = (spectrumType == SpectrumType::Unbounded)
+                                       ? textures->unboundedSpectrumTextures
+                                       : ((spectrumType == SpectrumType::Albedo)
+                                              ? textures->albedoSpectrumTextures
+                                              : textures->illuminantSpectrumTextures);
 
     for (const ParsedParameter *p : dict->params) {
         if (p->name != name)
@@ -828,15 +835,20 @@ SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTextureOrNull(
 
             RGB rgb(p->numbers[0], p->numbers[1], p->numbers[2]);
             if (rgb.r < 0 || rgb.g < 0 || rgb.b < 0)
-                ErrorExit(&p->loc,
-                          "Negative value provided for \"rgb\" parameter \"%s\".",
+                ErrorExit(&p->loc, "Negative value provided for RGB parameter \"%s\".",
                           p->name);
             SpectrumHandle s;
             if (spectrumType == SpectrumType::Illuminant)
                 s = alloc.new_object<RGBIlluminantSpectrum>(*dict->ColorSpace(), rgb);
+            else if (spectrumType == SpectrumType::Unbounded)
+                s = alloc.new_object<RGBUnboundedSpectrum>(*dict->ColorSpace(), rgb);
             else {
-                CHECK(spectrumType == SpectrumType::General);
-                s = alloc.new_object<RGBSpectrum>(*dict->ColorSpace(), rgb);
+                CHECK(spectrumType == SpectrumType::Albedo);
+                if (rgb.r > 1 || rgb.g > 1 || rgb.b > 1)
+                    ErrorExit(&p->loc,
+                              "RGB parameter \"%s\" used as an albedo has > 1 component.",
+                              p->name);
+                s = alloc.new_object<RGBAlbedoSpectrum>(*dict->ColorSpace(), rgb);
             }
             return alloc.new_object<SpectrumConstantTexture>(s);
         } else if (p->type == "spectrum" || p->type == "blackbody") {
