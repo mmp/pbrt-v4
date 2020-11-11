@@ -2592,20 +2592,26 @@ void MLTIntegrator::Render() {
               bootstrapWeights.size() * (maxDepth + 1);
 
     // Set up connection to display server, if enabled
+    std::atomic<int> finishedChains(0);
     if (!Options->displayServer.empty()) {
-        FilmHandle film = camera.GetFilm();
-        Bounds2i pixelBounds = film.PixelBounds();
-        DisplayDynamic(film.GetFilename(), Point2i(pixelBounds.Diagonal()),
-                       {"R", "G", "B"},
-                       [=](Bounds2i b, pstd::span<pstd::span<Float>> displayValue) {
-                           int index = 0;
-                           for (Point2i p : b) {
-                               RGB rgb = film.GetPixelRGB(pixelBounds.pMin + p);
-                               for (int c = 0; c < 3; ++c)
-                                   displayValue[c][index] = rgb[c];
-                               ++index;
-                           }
-                       });
+        DisplayDynamic(
+            camera.GetFilm().GetFilename(),
+            Point2i(camera.GetFilm().PixelBounds().Diagonal()), {"R", "G", "B"},
+            [&](Bounds2i bounds, pstd::span<pstd::span<Float>> displayValue) {
+                FilmHandle film = camera.GetFilm();
+                Bounds2i pixelBounds = film.PixelBounds();
+                int index = 0;
+                for (Point2i p : bounds) {
+                    Float finishedPixelMutations =
+                        Float(finishedChains.load(std::memory_order_relaxed)) /
+                        Float(nChains) * mutationsPerPixel;
+                    Float scale = b / std::max<Float>(1, finishedPixelMutations);
+                    RGB rgb = film.GetPixelRGB(pixelBounds.pMin + p, scale);
+                    for (int c = 0; c < 3; ++c)
+                        displayValue[c][index] = rgb[c];
+                    ++index;
+                }
+            });
     }
 
     // Run _nChains_ Markov chains in parallel
@@ -2676,6 +2682,7 @@ void MLTIntegrator::Render() {
                 StatsReportPixelEnd(Point2i(pCurrent));
             }
 
+            ++finishedChains;
             progress.Update(1);
         });
         progress.Done();
@@ -2686,6 +2693,7 @@ void MLTIntegrator::Render() {
     metadata.renderTimeSeconds = timer.ElapsedSeconds();
     camera.InitMetadata(&metadata);
     camera.GetFilm().WriteImage(metadata, b / mutationsPerPixel);
+    DisconnectFromDisplayServer();
 }
 
 std::string MLTIntegrator::ToString() const {
