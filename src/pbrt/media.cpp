@@ -13,7 +13,6 @@
 #include <pbrt/util/error.h>
 #include <pbrt/util/file.h>
 #include <pbrt/util/memory.h>
-#include <pbrt/util/print.h>
 #include <pbrt/util/sampling.h>
 #include <pbrt/util/scattering.h>
 #include <pbrt/util/stats.h>

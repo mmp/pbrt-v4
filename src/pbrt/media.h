@@ -15,6 +15,7 @@
 #include <pbrt/util/error.h>
 #include <pbrt/util/memory.h>
 #include <pbrt/util/parallel.h>
+#include <pbrt/util/print.h>
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/scattering.h>
 #include <pbrt/util/spectrum.h>

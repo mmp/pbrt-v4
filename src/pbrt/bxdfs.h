@@ -416,6 +416,7 @@ struct LayeredBxDFConfig {
     uint8_t maxDepth = 10;
     uint8_t nSamples = 1;
     uint8_t twoSided = true;
+    std::string ToString() const;
 };
 
 // TopOrBottomBxDF Definition

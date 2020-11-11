@@ -593,6 +593,11 @@ std::string HairBxDF::ToString() const {
                         h, gamma_o, eta, beta_m, beta_n, v[0], s, sigma_a);
 }
 
+std::string LayeredBxDFConfig::ToString() const {
+    return StringPrintf("[ LayeredBxDFConfig maxDepth: %d nSamples: %d twoSided: %d",
+                        maxDepth, nSamples, twoSided);
+}
+
 // *****************************************************************************
 // Tensor file I/O
 // *****************************************************************************

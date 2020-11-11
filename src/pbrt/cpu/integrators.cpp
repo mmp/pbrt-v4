@@ -2750,9 +2750,9 @@ struct SPPMPixel {
 
     } vp;
     AtomicFloat Phi[NSpectrumSamples];
-    std::atomic<int> M{0};
+    std::atomic<int> m{0};
     RGB tau;
-    Float N = 0;
+    Float n = 0;
 };
 
 // SPPMPixelListNode Definition
@@ -2818,11 +2818,11 @@ void SPPMIntegrator::Render() {
                 film.GetFilename(), Point2i(pixelBounds.Diagonal()), {"R", "G", "B"},
                 [&](Bounds2i b, pstd::span<pstd::span<Float>> displayValue) {
                     int index = 0;
-                    uint64_t Np = (uint64_t)(iter + 1) * (uint64_t)photonsPerIteration;
+                    uint64_t np = (uint64_t)(iter + 1) * (uint64_t)photonsPerIteration;
                     for (Point2i pPixel : b) {
                         const SPPMPixel &pixel = pixels[pPixel];
                         RGB rgb = pixel.Ld / (iter + 1) +
-                                  pixel.tau / (Np * Pi * Sqr(pixel.radius));
+                                  pixel.tau / (np * Pi * Sqr(pixel.radius));
                         for (int c = 0; c < 3; ++c)
                             displayValue[c][index] = rgb[c];
                         ++index;
@@ -3105,7 +3105,7 @@ void SPPMIntegrator::Render() {
                                 if (DistanceSquared(pixel.vp.p, isect.p()) >
                                     Sqr(pixel.radius))
                                     continue;
-                                // Update _pixel_ $\Phi$ and $M$ for nearby photon
+                                // Update _pixel_ $\Phi$ and $m$ for nearby photon
                                 Vector3f wi = -photonRay.d;
                                 SampledSpectrum Phi =
                                     beta * pixel.vp.bsdf.f(pixel.vp.wo, wi);
@@ -3117,7 +3117,7 @@ void SPPMIntegrator::Render() {
                                 Phi = SafeDiv(Phi, phiLambda.PDF());
                                 for (int i = 0; i < NSpectrumSamples; ++i)
                                     pixel.Phi[i].Add(Phi[i]);
-                                ++pixel.M;
+                                ++pixel.m;
                             }
                         }
                     }
@@ -3163,23 +3163,23 @@ void SPPMIntegrator::Render() {
         // Update pixel values from this pass's photons
         ParallelFor2D(pixelBounds, [&](Point2i pPixel) {
             SPPMPixel &p = pixels[pPixel];
-            if (int M = p.M.load(); M > 0) {
+            if (int m = p.m.load(); m > 0) {
                 // Compute new photon count and search radius given photons
                 Float gamma = (Float)2 / (Float)3;
-                Float Nnew = p.N + gamma * M;
-                Float Rnew = p.radius * std::sqrt(Nnew / (p.N + M));
+                Float nNew = p.n + gamma * m;
+                Float rNew = p.radius * std::sqrt(nNew / (p.n + m));
 
                 // Update $\tau$ for pixel
                 SampledSpectrum Phi;
                 for (int i = 0; i < NSpectrumSamples; ++i)
                     Phi[i] = p.Phi[i];
                 RGB rgb = film.ToOutputRGB(p.vp.beta * Phi, passLambda);
-                p.tau = (p.tau + rgb) * Sqr(Rnew) / Sqr(p.radius);
+                p.tau = (p.tau + rgb) * Sqr(rNew) / Sqr(p.radius);
 
                 // Set remaining pixel values for next photon pass
-                p.N = Nnew;
-                p.radius = Rnew;
-                p.M = 0;
+                p.n = nNew;
+                p.radius = rNew;
+                p.m = 0;
                 for (int i = 0; i < NSpectrumSamples; ++i)
                     p.Phi[i] = (Float)0;
             }
@@ -3191,14 +3191,14 @@ void SPPMIntegrator::Render() {
         // Periodically write SPPM image to disk
         if (iter + 1 == nIterations || (iter + 1 <= 64 && IsPowerOf2(iter + 1)) ||
             ((iter + 1) % 64 == 0)) {
-            uint64_t Np = (uint64_t)(iter + 1) * (uint64_t)photonsPerIteration;
+            uint64_t np = (uint64_t)(iter + 1) * (uint64_t)photonsPerIteration;
             Image rgbImage(PixelFormat::Float, Point2i(pixelBounds.Diagonal()),
                            {"R", "G", "B"});
 
             ParallelFor2D(pixelBounds, [&](Point2i pPixel) {
                 // Compute radiance _L_ for SPPM pixel _pPixel_
                 const SPPMPixel &pixel = pixels[pPixel];
-                RGB L = pixel.Ld / (iter + 1) + pixel.tau / (Np * Pi * Sqr(pixel.radius));
+                RGB L = pixel.Ld / (iter + 1) + pixel.tau / (np * Pi * Sqr(pixel.radius));
 
                 Point2i pImage = Point2i(pPixel - pixelBounds.pMin);
                 rgbImage.SetChannels(pImage, {L.r, L.g, L.b});

@@ -268,7 +268,14 @@ CoatedDiffuseMaterial *CoatedDiffuseMaterial::Create(
 }
 
 std::string CoatedConductorMaterial::ToString() const {
-    return StringPrintf("[ CoatedConductorMaterial TODO ]");
+    return StringPrintf("[ CoatedConductorMaterial displacement: %f interfaceURoughness: "
+                        "%f interfaceVRoughness: %f thickness: %f "
+                        "interfaceEta: %f g: %s albedo: %s conductorURoughness: %s "
+                        "conductorVRoughness: %s "
+                        "conductorEta: %s k: %s remapRoughness: %s config: %s",
+                        displacement, interfaceURoughness, interfaceVRoughness, thickness,
+                        interfaceEta, g, albedo, conductorURoughness, conductorVRoughness,
+                        conductorEta, k, remapRoughness, config);
 }
 
 CoatedConductorMaterial *CoatedConductorMaterial::Create(
