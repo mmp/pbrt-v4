@@ -369,7 +369,6 @@ class Sphere {
             // Intersect sample ray with shape geometry
             Ray ray = ctx.SpawnRay(wi);
             pstd::optional<ShapeIntersection> isect = Intersect(ray);
-            CHECK_RARE(1e-6, !isect.has_value());
             if (!isect)
                 return 0;
 
@@ -545,7 +544,6 @@ class Disk {
         // Intersect sample ray with shape geometry
         Ray ray = ctx.SpawnRay(wi);
         pstd::optional<ShapeIntersection> isect = Intersect(ray);
-        CHECK_RARE(1e-6, !isect.has_value());
         if (!isect)
             return 0;
 
@@ -778,7 +776,6 @@ class Cylinder {
         // Intersect sample ray with shape geometry
         Ray ray = ctx.SpawnRay(wi);
         pstd::optional<ShapeIntersection> isect = Intersect(ray);
-        CHECK_RARE(1e-6, !isect.has_value());
         if (!isect)
             return 0;
 
@@ -1125,7 +1122,6 @@ class Triangle {
             // Intersect sample ray with shape geometry
             Ray ray = ctx.SpawnRay(wi);
             pstd::optional<ShapeIntersection> isect = Intersect(ray);
-            CHECK_RARE(1e-6, !isect.has_value());
             if (!isect)
                 return 0;
 

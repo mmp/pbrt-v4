@@ -1277,7 +1277,6 @@ Float BilinearPatch::PDF(const ShapeSampleContext &ctx, const Vector3f &wi) cons
     // Intersect sample ray with shape geometry
     Ray ray = ctx.SpawnRay(wi);
     pstd::optional<ShapeIntersection> isect = Intersect(ray);
-    CHECK_RARE(1e-6, !isect.has_value());
     if (!isect)
         return 0;
 
