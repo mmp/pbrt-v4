@@ -2811,6 +2811,24 @@ void SPPMIntegrator::Render() {
         ComputeRadicalInversePermutations(digitPermutationsSeed));
 
     for (int iter = 0; iter < nIterations; ++iter) {
+        // Connect to display server for SPPM if requested
+        if (iter == 0 && !Options->displayServer.empty()) {
+            DisplayDynamic(
+                film.GetFilename(), Point2i(pixelBounds.Diagonal()), {"R", "G", "B"},
+                [&](Bounds2i b, pstd::span<pstd::span<Float>> displayValue) {
+                    int index = 0;
+                    uint64_t Np = (uint64_t)(iter + 1) * (uint64_t)photonsPerIteration;
+                    for (Point2i pPixel : b) {
+                        const SPPMPixel &pixel = pixels[pPixel];
+                        RGB rgb = pixel.Ld / (iter + 1) +
+                                  pixel.tau / (Np * Pi * Sqr(pixel.radius));
+                        for (int c = 0; c < 3; ++c)
+                            displayValue[c][index] = rgb[c];
+                        ++index;
+                    }
+                });
+        }
+
         // Generate SPPM visible points
         // Sample wavelengths for SPPM pass
         const SampledWavelengths passLambda =
