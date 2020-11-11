@@ -195,10 +195,11 @@ void ImageTileIntegrator::Render() {
         FilmHandle film = camera.GetFilm();
         DisplayDynamic(film.GetFilename(), Point2i(pixelBounds.Diagonal()),
                        {"R", "G", "B"},
-                       [=](Bounds2i b, pstd::span<pstd::span<Float>> displayValue) {
+                       [&](Bounds2i b, pstd::span<pstd::span<Float>> displayValue) {
                            int index = 0;
                            for (Point2i p : b) {
-                               RGB rgb = film.GetPixelRGB(pixelBounds.pMin + p);
+                               RGB rgb = film.GetPixelRGB(pixelBounds.pMin + p,
+                                                          2.f / (waveStart + waveEnd));
                                for (int c = 0; c < 3; ++c)
                                    displayValue[c][index] = rgb[c];
                                ++index;
