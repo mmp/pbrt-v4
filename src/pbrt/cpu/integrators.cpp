@@ -2703,6 +2703,8 @@ std::unique_ptr<MLTIntegrator> MLTIntegrator::Create(
     int nBootstrap = parameters.GetOneInt("bootstrapsamples", 100000);
     int64_t nChains = parameters.GetOneInt("chains", 1000);
     int mutationsPerPixel = parameters.GetOneInt("mutationsperpixel", 100);
+    if (Options->pixelSamples)
+        mutationsPerPixel = *Options->pixelSamples;
     Float largeStepProbability = parameters.GetOneFloat("largestepprobability", 0.3f);
     Float sigma = parameters.GetOneFloat("sigma", .01f);
     if (Options->quickRender) {
