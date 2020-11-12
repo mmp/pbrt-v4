@@ -337,15 +337,13 @@ class BDPTIntegrator : public RayIntegrator {
     BDPTIntegrator(CameraHandle camera, SamplerHandle sampler, PrimitiveHandle aggregate,
                    std::vector<LightHandle> lights, int maxDepth,
                    bool visualizeStrategies, bool visualizeWeights,
-                   const std::string &lightSampleStrategy = "power",
                    bool regularize = false)
         : RayIntegrator(camera, sampler, aggregate, lights),
           maxDepth(maxDepth),
-          visualizeStrategies(visualizeStrategies),
-          visualizeWeights(visualizeWeights),
-          lightSampleStrategy(lightSampleStrategy),
+          regularize(regularize),
           lightSampler(new PowerLightSampler(lights, Allocator())),
-          regularize(regularize) {}
+          visualizeStrategies(visualizeStrategies),
+          visualizeWeights(visualizeWeights) {}
 
     SampledSpectrum Li(RayDifferential ray, SampledWavelengths &lambda,
                        SamplerHandle sampler, ScratchBuffer &scratchBuffer,
@@ -362,11 +360,9 @@ class BDPTIntegrator : public RayIntegrator {
   private:
     // BDPTIntegrator Private Members
     int maxDepth;
-    bool visualizeStrategies;
-    bool visualizeWeights;
-    std::string lightSampleStrategy;
     bool regularize;
     LightSamplerHandle lightSampler;
+    bool visualizeStrategies, visualizeWeights;
     mutable std::vector<FilmHandle> weightFilms;
 };
 

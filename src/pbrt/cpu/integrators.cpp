@@ -1550,13 +1550,10 @@ struct EndpointInteraction : Interaction {
                       "Expect both union members have same size");
     }
 
-    EndpointInteraction(LightHandle light, const Ray &r, const Interaction &intr)
+    EndpointInteraction(LightHandle light, const Interaction &intr)
         : Interaction(intr), light(light) {}
     EndpointInteraction(LightHandle light, const Ray &r)
         : Interaction(r.o, r.time, r.medium), light(light) {}
-
-    EndpointInteraction(const Interaction &it, LightHandle light)
-        : Interaction(it), light(light) {}
     EndpointInteraction(const Ray &ray)
         : Interaction(ray(1), Normal3f(-ray.d), ray.time, ray.medium), light(nullptr) {}
 };
@@ -1596,13 +1593,14 @@ struct Vertex {
                                       const SampledSpectrum &beta);
     static inline Vertex CreateCamera(CameraHandle camera, const Interaction &it,
                                       const SampledSpectrum &beta);
+
     static inline Vertex CreateLight(LightHandle light, const Ray &ray,
                                      const SampledSpectrum &Le, Float pdf);
-    static inline Vertex CreateLight(LightHandle light, const Ray &ray,
-                                     const Interaction &intr, const SampledSpectrum &Le,
-                                     Float pdf);
+    static inline Vertex CreateLight(LightHandle light, const Interaction &intr,
+                                     const SampledSpectrum &Le, Float pdf);
     static inline Vertex CreateLight(const EndpointInteraction &ei,
                                      const SampledSpectrum &beta, Float pdf);
+
     static inline Vertex CreateMedium(const MediumInteraction &mi,
                                       const SampledSpectrum &beta, Float pdf,
                                       const Vertex &prev);
@@ -1697,10 +1695,10 @@ struct Vertex {
                 Le += light.Le(Ray(p(), -w), lambda);
             return Le;
 
-        } else {
-            return si.areaLight ? si.areaLight.L(si.p(), si.n, si.uv, w, lambda)
-                                : SampledSpectrum(0.);
-        }
+        } else if (si.areaLight)
+            return si.areaLight.L(si.p(), si.n, si.uv, w, lambda);
+        else
+            return SampledSpectrum(0.f);
     }
 
     std::string ToString() const {
@@ -1756,7 +1754,7 @@ struct Vertex {
     Float PDF(const Integrator &integrator, const Vertex *prev,
               const Vertex &next) const {
         if (type == VertexType::Light)
-            return PdfLight(integrator, next);
+            return PDFLight(integrator, next);
         // Compute directions to preceding and next vertex
         Vector3f wn = next.p() - p();
         if (LengthSquared(wn) == 0)
@@ -1786,10 +1784,11 @@ struct Vertex {
         return ConvertDensity(pdf, next);
     }
 
-    Float PdfLight(const Integrator &integrator, const Vertex &v) const {
+    Float PDFLight(const Integrator &integrator, const Vertex &v) const {
         Vector3f w = v.p() - p();
         Float invDist2 = 1 / LengthSquared(w);
         w *= std::sqrt(invDist2);
+        // Compute sampling density _pdf_ for light type
         Float pdf;
         if (IsInfiniteLight()) {
             // Compute planar sampling density for infinite light sources
@@ -1809,22 +1808,20 @@ struct Vertex {
             pdf = pdfDir * invDist2;
 
         } else {
-            // Get pointer _light_ to the light source at the vertex
+            // Compute sampling density for non-infinite light sources
             CHECK(type == VertexType::Light);
             CHECK(ei.light != nullptr);
-            LightHandle light = ei.light;
-
-            // Compute sampling density for non-infinite light sources
             Float pdfPos, pdfDir;
-            light.PDF_Le(Ray(p(), w, time()), &pdfPos, &pdfDir);
+            ei.light.PDF_Le(Ray(p(), w, time()), &pdfPos, &pdfDir);
             pdf = pdfDir * invDist2;
         }
+
         if (v.IsOnSurface())
             pdf *= AbsDot(v.ng(), w);
         return pdf;
     }
 
-    Float PdfLightOrigin(const std::vector<LightHandle> &infiniteLights, const Vertex &v,
+    Float PDFLightOrigin(const std::vector<LightHandle> &infiniteLights, const Vertex &v,
                          LightSamplerHandle lightSampler) {
         Vector3f w = v.p() - p();
         if (LengthSquared(w) == 0)
@@ -1834,25 +1831,14 @@ struct Vertex {
             // Return solid angle density for infinite light sources
             return InfiniteLightDensity(infiniteLights, lightSampler, w);
 
-        } else if (IsOnSurface()) {
-            // Return probability for emissive surface
-            if (type == VertexType::Light)
-                CHECK(ei.light.Is<DiffuseAreaLight>());  // since that's all we've
-                                                         // got currently...
-            LightHandle light = (type == VertexType::Light) ? ei.light : si.areaLight;
-            Float pdfChoice = lightSampler.PDF(light);
-            Float pdfPos, pdfDir;
-            light.PDF_Le(ei, w, &pdfPos, &pdfDir);
-            return pdfPos * pdfChoice;
-
         } else {
-            // Return solid angle density for non-infinite light sources
-            Float pdfPos, pdfDir;
-            CHECK(IsLight());
-            LightHandle light = type == VertexType::Light ? ei.light : si.areaLight;
-            CHECK(light != nullptr);
-            Float pdfChoice = lightSampler.PDF(light);
-            light.PDF_Le(Ray(p(), w, time()), &pdfPos, &pdfDir);
+            // Return solid angle density for non-infinite light source
+            LightHandle light = (type == VertexType::Light) ? ei.light : si.areaLight;
+            Float pdfPos, pdfDir, pdfChoice = lightSampler.PDF(light);
+            if (IsOnSurface())
+                light.PDF_Le(ei, w, &pdfPos, &pdfDir);
+            else
+                light.PDF_Le(Ray(p(), w, time()), &pdfPos, &pdfDir);
             return pdfPos * pdfChoice;
         }
     }
@@ -1876,10 +1862,9 @@ inline Vertex Vertex::CreateLight(LightHandle light, const Ray &ray,
     return v;
 }
 
-inline Vertex Vertex::CreateLight(LightHandle light, const Ray &ray,
-                                  const Interaction &intr, const SampledSpectrum &Le,
-                                  Float pdf) {
-    Vertex v(VertexType::Light, EndpointInteraction(light, ray, intr), Le);
+inline Vertex Vertex::CreateLight(LightHandle light, const Interaction &intr,
+                                  const SampledSpectrum &Le, Float pdf) {
+    Vertex v(VertexType::Light, EndpointInteraction(light, intr), Le);
     v.pdfFwd = pdf;
     return v;
 }
@@ -1934,26 +1919,30 @@ int GenerateLightSubpath(const Integrator &integrator, SampledWavelengths &lambd
                          SamplerHandle sampler, CameraHandle camera,
                          ScratchBuffer &scratchBuffer, int maxDepth, Float time,
                          LightSamplerHandle lightSampler, Vertex *path, bool regularize) {
+    // Generate light subpath and initialize _path_ vertices
     if (maxDepth == 0)
         return 0;
-    // Sample initial ray for light subpath
+    // Sample light for BDPT light subpath
     pstd::optional<SampledLight> sampledLight = lightSampler.Sample(sampler.Get1D());
     if (!sampledLight)
         return 0;
     LightHandle light = sampledLight->light;
-    Float lightPDF = sampledLight->pdf;
+    Float lightSamplePDF = sampledLight->pdf;
+
+    // Sample initial ray for light subpath
     pstd::optional<LightLeSample> les =
         light.SampleLe(sampler.Get2D(), sampler.Get2D(), lambda, time);
     if (!les || les->pdfPos == 0 || les->pdfDir == 0 || !les->L)
         return 0;
     RayDifferential ray(les->ray);
 
-    // Generate first vertex on light subpath and start random walk
-    path[0] = les->intr ? Vertex::CreateLight(light, ray, *les->intr, les->L,
-                                              les->pdfPos * lightPDF)
-                        : Vertex::CreateLight(light, ray, les->L, les->pdfPos * lightPDF);
-    SampledSpectrum beta =
-        les->L * les->AbsCosTheta(ray.d) / (lightPDF * les->pdfPos * les->pdfDir);
+    // Generate first vertex of light subpath
+    Float lightPDF = lightSamplePDF * les->pdfPos;
+    path[0] = les->intr ? Vertex::CreateLight(light, *les->intr, les->L, lightPDF)
+                        : Vertex::CreateLight(light, ray, les->L, lightPDF);
+
+    // Follow light subpath start random walk
+    SampledSpectrum beta = les->L * les->AbsCosTheta(ray.d) / (lightPDF * les->pdfDir);
     PBRT_DBG("%s\n",
              StringPrintf(
                  "Starting light subpath. Ray: %s, Le %s, beta %s, pdfPos %f, pdfDir %f",
@@ -2171,14 +2160,14 @@ Float MISWeight(const Integrator &integrator, Vertex *lightVertices,
     ScopedAssignment<Float> a4;
     if (pt)
         a4 = {&pt->pdfRev, s > 0 ? qs->PDF(integrator, qsMinus, *pt)
-                                 : pt->PdfLightOrigin(integrator.infiniteLights, *ptMinus,
+                                 : pt->PDFLightOrigin(integrator.infiniteLights, *ptMinus,
                                                       lightSampler)};
 
     // Update reverse density of vertex $\pt{}_{t-2}$
     ScopedAssignment<Float> a5;
     if (ptMinus)
         a5 = {&ptMinus->pdfRev, s > 0 ? pt->PDF(integrator, qs, *ptMinus)
-                                      : pt->PdfLight(integrator, *ptMinus)};
+                                      : pt->PDFLight(integrator, *ptMinus)};
 
     // Update reverse density of vertices $\pq{}_{s-1}$ and $\pq{}_{s-2}$
     ScopedAssignment<Float> a6;
@@ -2259,7 +2248,7 @@ void BDPTIntegrator::Render() {
 
 SampledSpectrum BDPTIntegrator::Li(RayDifferential ray, SampledWavelengths &lambda,
                                    SamplerHandle sampler, ScratchBuffer &scratchBuffer,
-                                   VisibleSurface *visibleSurface) const {
+                                   VisibleSurface *) const {
     // Trace the camera and light subpaths
     Vertex *cameraVertices = scratchBuffer.Alloc<Vertex[]>(maxDepth + 2);
     int nCamera = GenerateCameraSubpath(*this, ray, lambda, sampler, scratchBuffer,
@@ -2368,10 +2357,10 @@ SampledSpectrum ConnectBDPT(const Integrator &integrator, SampledWavelengths &la
                 pstd::optional<LightLiSample> lightWeight =
                     light.SampleLi(ctx, sampler.Get2D(), lambda);
                 if (lightWeight) {
-                    EndpointInteraction ei(lightWeight->pLight, light);
+                    EndpointInteraction ei(light, lightWeight->pLight);
                     sampled = Vertex::CreateLight(
                         ei, lightWeight->L / (lightWeight->pdf * lightPDF), 0);
-                    sampled.pdfFwd = sampled.PdfLightOrigin(integrator.infiniteLights, pt,
+                    sampled.pdfFwd = sampled.PDFLightOrigin(integrator.infiniteLights, pt,
                                                             lightSampler);
                     L = pt.beta * pt.f(sampled, TransportMode::Radiance) * sampled.beta;
                     if (pt.IsOnSurface())
@@ -2425,10 +2414,9 @@ SampledSpectrum ConnectBDPT(const Integrator &integrator, SampledWavelengths &la
 
 std::string BDPTIntegrator::ToString() const {
     return StringPrintf("[ BDPTIntegrator maxDepth: %d visualizeStrategies: %s "
-                        "visualizeWeights: %s lightSampleStrategy: %s regularize: %s "
-                        "lightSampler: %s ]",
-                        maxDepth, visualizeStrategies, visualizeWeights,
-                        lightSampleStrategy, regularize, lightSampler);
+                        "visualizeWeights: %s regularize: %s lightSampler: %s ]",
+                        maxDepth, visualizeStrategies, visualizeWeights, regularize,
+                        lightSampler);
 }
 
 std::unique_ptr<BDPTIntegrator> BDPTIntegrator::Create(
@@ -2444,11 +2432,10 @@ std::unique_ptr<BDPTIntegrator> BDPTIntegrator::Create(
         maxDepth = 5;
     }
 
-    std::string lightStrategy = parameters.GetOneString("lightsampler", "power");
     bool regularize = parameters.GetOneBool("regularize", false);
     return std::make_unique<BDPTIntegrator>(camera, sampler, aggregate, lights, maxDepth,
                                             visualizeStrategies, visualizeWeights,
-                                            lightStrategy, regularize);
+                                            regularize);
 }
 
 STAT_PERCENT("Integrator/Acceptance rate", acceptedMutations, totalMutations);

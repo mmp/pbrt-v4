@@ -374,7 +374,7 @@ class UniformGridMediumProvider {
 
     pstd::vector<Float> GetMaxDensityGrid(Allocator alloc, Point3i *res) const {
         // Set _gridResolution_ and allocate _maxGrid_
-        *res = Point3i(4, 4, 4);
+        *res = Point3i(16, 16, 16);
         pstd::vector<Float> maxGrid(alloc);
         maxGrid.resize(res->x * res->y * res->z);
 
