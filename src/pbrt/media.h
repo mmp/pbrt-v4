@@ -258,6 +258,7 @@ class CuboidMedium {
                         SampledSpectrum Tmaj = FastExp(-sigma_maj * (t - t0));
                         Point3f p = ray(t);
                         SampledSpectrum d = provider->Density(p, lambda);
+                        d = Clamp(d, 0, maxDensity);
                         SampledSpectrum Le = provider->Le(p, lambda);
                         SampledSpectrum sigmap_a = sigma_a * d, sigmap_s = sigma_s * d;
 
