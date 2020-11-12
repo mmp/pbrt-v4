@@ -78,6 +78,35 @@ TEST(RGBColorSpace, StdIllumWhiteACES2065_1) {
     EXPECT_LE(rgb.b, 1.01);
 }
 
+#if 0
+TEST(RGBUnboundedSpectrum, SmallValues) {
+    RGB rgb(0.00010678071, 0, 0.000010491596);
+    RGBUnboundedSpectrum rs(*RGBColorSpace::sRGB, rgb);
+
+    for (int lambda = 360; lambda < 840; ++lambda)
+        EXPECT_LT(rs(lambda), 0.05f) << ", lambda = " << lambda;
+}
+#endif
+
+TEST(RGBUnboundedSpectrum, MaxValue) {
+    RNG rng;
+    for (const auto &cs :
+         {*RGBColorSpace::sRGB, *RGBColorSpace::Rec2020, *RGBColorSpace::ACES2065_1}) {
+        for (int i = 0; i < 100; ++i) {
+            RGB rgb(rng.Uniform<Float>(), rng.Uniform<Float>(), rng.Uniform<Float>());
+            rgb *= 10.f;
+            RGBUnboundedSpectrum rs(cs, rgb);
+
+            Float m = rs.MaxValue();
+            Float sm = 0;
+            for (Float lambda = 360; lambda <= 830; lambda += 1. / 16.)
+                sm = std::max(sm, rs(lambda));
+            EXPECT_LT(std::abs((sm - m) / sm), 1e-4)
+                << "sampled " << sm << " MaxValue " << m << " for " << rs;
+        }
+    }
+}
+
 TEST(RGBAlbedoSpectrum, MaxValue) {
     RNG rng;
     for (const auto &cs :
