@@ -174,7 +174,7 @@ void RGBToSpectrumTable::Init(Allocator alloc) {
             ACES2065_1ToSpectrumTableDataPtr);
         return;
     }
-#else
+#endif
     sRGB = alloc.new_object<RGBToSpectrumTable>(
         sRGBToSpectrumTable_Res, sRGBToSpectrumTable_Scale, sRGBToSpectrumTable_Data);
     DCI_P3 = alloc.new_object<RGBToSpectrumTable>(DCI_P3ToSpectrumTable_Res,
@@ -186,7 +186,6 @@ void RGBToSpectrumTable::Init(Allocator alloc) {
     ACES2065_1 = alloc.new_object<RGBToSpectrumTable>(ACES2065_1ToSpectrumTable_Res,
                                                       ACES2065_1ToSpectrumTable_Scale,
                                                       ACES2065_1ToSpectrumTable_Data);
-#endif
 }
 
 std::string RGBToSpectrumTable::ToString() const {
