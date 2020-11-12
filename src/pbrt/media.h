@@ -231,7 +231,7 @@ class CuboidMedium {
                        ((nextCrossingT[1] < nextCrossingT[2]));
             const int cmpToAxis[8] = {2, 1, 2, 1, 2, 2, 0, 0};
             int stepAxis = cmpToAxis[bits];
-            Float t1 = nextCrossingT[stepAxis];
+            Float t1 = std::min(tMax, nextCrossingT[stepAxis]);
 
             // Sample volume scattering in current voxel
             // Get _maxDensity_ for current voxel and compute _sigma_maj_
@@ -240,7 +240,9 @@ class CuboidMedium {
             Float maxDensity = maxDensityGrid[offset];
             SampledSpectrum sigma_maj(sigma_t * maxDensity);
 
-            if (sigma_maj[0] > 0) {
+            if (sigma_maj[0] == 0)
+                TmajAccum *= FastExp(-sigma_maj * (t1 - t0));
+            else {
                 while (true) {
                     // Sample medium in current voxel
                     // Sample _t_ for scattering event and check validity
@@ -258,6 +260,9 @@ class CuboidMedium {
                         SampledSpectrum d = provider->Density(p, lambda);
                         SampledSpectrum Le = provider->Le(p, lambda);
                         SampledSpectrum sigmap_a = sigma_a * d, sigmap_s = sigma_s * d;
+
+                        Tmaj *= TmajAccum;
+                        TmajAccum = SampledSpectrum(1.f);
 
                         // Report scattering event in grid to callback function
                         Point3f pRender = renderFromMedium(p);
