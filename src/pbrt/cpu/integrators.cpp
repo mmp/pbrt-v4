@@ -1977,15 +1977,12 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
     // Follow random walk to initialize BDPT path vertices
     int bounces = 0;
     bool anyNonSpecularBounces = false;
-    // Declare variables for forward and reverse probability densities
-    Float pdfFwd = pdf, pdfRev = 0;
-
+    Float pdfFwd = pdf;
     while (true) {
         // Attempt to create the next subpath vertex in _path_
-        PBRT_DBG("%s\n",
-                 StringPrintf("Random walk. Bounces %d, beta %s, pdfFwd %f, pdfRef %f",
-                              bounces, beta, pdfFwd, pdfRev)
-                     .c_str());
+        PBRT_DBG("%s\n", StringPrintf("Random walk. Bounces %d, beta %s, pdfFwd %f",
+                                      bounces, beta, pdfFwd)
+                             .c_str());
         if (!beta)
             break;
         bool scattered = false, terminated = false;
@@ -1996,28 +1993,25 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
             // Sample participating medium for _RandomWalk()_ ray
             Float tMax = si ? si->tHit : Infinity;
             RNG rng(Hash(ray.d.x), Hash(ray.d.y));
-            ray.medium.SampleTmaj(
-                ray, tMax, rng, lambda, [&](const MediumSample &mediumSample) {
-                    const SampledSpectrum &Tmaj = mediumSample.Tmaj;
-                    const MediumInteraction &intr = mediumSample.intr;
-                    const SampledSpectrum &sigma_a = intr.sigma_a;
-                    const SampledSpectrum &sigma_s = intr.sigma_s;
-
-                    Float pAbsorb = sigma_a[0] / intr.sigma_maj[0];
-                    Float pScatter = sigma_s[0] / intr.sigma_maj[0];
+            SampledSpectrum Tmaj = ray.medium.SampleTmaj(
+                ray, tMax, rng, lambda, [&](const MediumSample &ms) {
+                    const MediumInteraction &intr = ms.intr;
+                    // Compute medium event probabilities for interaction
+                    Float pAbsorb = intr.sigma_a[0] / intr.sigma_maj[0];
+                    Float pScatter = intr.sigma_s[0] / intr.sigma_maj[0];
                     Float pNull = std::max<Float>(0, 1 - pAbsorb - pScatter);
-                    DCHECK_GE(1 - pAbsorb - pScatter, -1e-6);
 
+                    // Randomly sample medium event for _RandomRalk()_ ray
                     Float um = sampler.Get1D();
                     int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, um);
                     if (mode == 0) {
                         // Handle absorption for _RandomWalk()_ ray
                         terminated = true;
                         return false;
-                        beta *= Tmaj * sigma_s / (Tmaj * sigma_s).Average();
 
                     } else if (mode == 1) {
                         // Handle scattering for _RandomWalk()_ ray
+                        beta *= ms.Tmaj * intr.sigma_s / (ms.Tmaj[0] * intr.sigma_s[0]);
                         // Record medium interaction in _path_ and compute forward density
                         vertex = Vertex::CreateMedium(intr, beta, pdfFwd, prev);
                         if (++bounces >= maxDepth) {
@@ -2033,24 +2027,27 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
                             terminated = true;
                             return false;
                         }
-                        pdfFwd = pdfRev = ps->pdf;
-                        beta *= ps->p / pdfFwd;
+                        // Update path state and previous path verex after medium
+                        // scattering
+                        pdfFwd = ps->pdf;
+                        beta *= ps->p / ps->pdf;
                         ray = intr.SpawnRay(ps->wi);
                         anyNonSpecularBounces = true;
-
-                        // Compute reverse area density at preceding vertex
-                        prev.pdfRev = vertex.ConvertDensity(pdfRev, prev);
+                        prev.pdfRev = vertex.ConvertDensity(ps->pdf, prev);
 
                         scattered = true;
                         return false;
+
                     } else {
                         // Handle null scattering for _RandomWalk()_ ray
                         SampledSpectrum sigma_n = intr.sigma_n();
-
-                        beta *= Tmaj * sigma_n / (Tmaj * sigma_n).Average();
+                        beta *= ms.Tmaj * sigma_n / (ms.Tmaj[0] * sigma_n[0]);
                         return true;
                     }
                 });
+            // Update _beta_ for medium transmittance
+            if (!scattered)
+                beta *= Tmaj / Tmaj[0];
         }
 
         if (terminated)
@@ -2098,9 +2095,12 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
         pdfFwd = bs->pdf;
         anyNonSpecularBounces |= !bs->IsSpecular();
         beta *= bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
+        ray = isect.SpawnRay(ray, bsdf, bs->wi, bs->flags);
+
+        // Compute path probabilities at surface vertex
         // TODO: confirm. I believe that !mode is right. Interestingly,
         // it makes no difference in the test suite either way.
-        pdfRev = bsdf.PDF(bs->wi, wo, !mode);
+        Float pdfRev = bsdf.PDF(bs->wi, wo, !mode);
         if (bs->IsSpecular()) {
             vertex.delta = true;
             pdfRev = pdfFwd = 0;
@@ -2108,9 +2108,6 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
         PBRT_DBG("%s\n",
                  StringPrintf("Random walk beta after shading normal correction %s", beta)
                      .c_str());
-        ray = isect.SpawnRay(ray, bsdf, bs->wi, bs->flags);
-
-        // Compute reverse area density at preceding vertex
         prev.pdfRev = vertex.ConvertDensity(pdfRev, prev);
     }
     return bounces;
@@ -2351,9 +2348,16 @@ SampledSpectrum ConnectBDPT(const Integrator &integrator, SampledWavelengths &la
                 Float lightPDF = sampledLight->pdf;
 
                 LightSampleContext ctx;
-                if (pt.IsOnSurface())
-                    ctx = LightSampleContext(pt.GetInteraction().AsSurface());
-                else
+                if (pt.IsOnSurface()) {
+                    const SurfaceInteraction &si = pt.GetInteraction().AsSurface();
+                    ctx = LightSampleContext(si);
+                    // Try to nudge the light sampling position to correct side of the
+                    // surface
+                    if (pt.bsdf.HasReflection() && !pt.bsdf.HasTransmission())
+                        ctx.pi = si.OffsetRayOrigin(si.wo);
+                    else if (pt.bsdf.HasTransmission() && !pt.bsdf.HasReflection())
+                        ctx.pi = si.OffsetRayOrigin(-si.wo);
+                } else
                     ctx = LightSampleContext(pt.GetInteraction());
                 pstd::optional<LightLiSample> lightWeight =
                     light.SampleLi(ctx, sampler.Get2D(), lambda);
