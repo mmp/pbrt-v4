@@ -186,8 +186,9 @@ STAT_MEMORY_COUNTER("Memory/Volume grids", volumeGridBytes);
 // UniformGridMediumProvider Method Definitions
 UniformGridMediumProvider::UniformGridMediumProvider(
     const Bounds3f &bounds, pstd::optional<SampledGrid<Float>> dgrid,
-    pstd::optional<SampledGrid<RGB>> rgbgrid, const RGBColorSpace *colorSpace,
-    SpectrumHandle Le, SampledGrid<Float> Legrid, Allocator alloc)
+    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbgrid,
+    const RGBColorSpace *colorSpace, SpectrumHandle Le, SampledGrid<Float> Legrid,
+    Allocator alloc)
     : bounds(bounds),
       densityGrid(std::move(dgrid)),
       rgbDensityGrid(std::move(rgbgrid)),
@@ -220,11 +221,16 @@ UniformGridMediumProvider *UniformGridMediumProvider::Create(
     const RGBColorSpace *colorSpace = parameters.ColorSpace();
 
     pstd::optional<SampledGrid<Float>> densityGrid;
-    pstd::optional<SampledGrid<RGB>> rgbDensityGrid;
+    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbDensityGrid;
     if (density.size())
         densityGrid = SampledGrid<Float>(density, nx, ny, nz, alloc);
-    else
-        rgbDensityGrid = SampledGrid<RGB>(rgbDensity, nx, ny, nz, alloc);
+    else {
+        std::vector<RGBUnboundedSpectrum> rgbSpectrumDensity;
+        for (RGB rgb : rgbDensity)
+            rgbSpectrumDensity.push_back(RGBUnboundedSpectrum(*colorSpace, rgb));
+        rgbDensityGrid =
+            SampledGrid<RGBUnboundedSpectrum>(rgbSpectrumDensity, nx, ny, nz, alloc);
+    }
 
     SpectrumHandle Le =
         parameters.GetOneSpectrum("Le", nullptr, SpectrumType::Illuminant, alloc);
