@@ -547,6 +547,9 @@ class RGBUnboundedSpectrum {
     RGBUnboundedSpectrum(const RGBColorSpace &cs, const RGB &rgb);
 
     PBRT_CPU_GPU
+    RGBUnboundedSpectrum() : rsp(0, 0, 0), scale(0) {}
+
+    PBRT_CPU_GPU
     SampledSpectrum Sample(const SampledWavelengths &lambda) const {
         SampledSpectrum s;
         for (int i = 0; i < NSpectrumSamples; ++i)

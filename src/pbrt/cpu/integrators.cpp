@@ -359,17 +359,6 @@ bool Integrator::IntersectP(const Ray &ray, Float tMax) const {
         return false;
 }
 
-std::string Integrator::ToString() const {
-    std::string s = StringPrintf("[ Scene aggregate: %s sceneBounds: %s lights[%d]: [ ",
-                                 aggregate, sceneBounds, lights.size());
-    for (const auto &l : lights)
-        s += StringPrintf("%s, ", l.ToString());
-    s += StringPrintf("] infiniteLights[%d]: [ ", infiniteLights.size());
-    for (const auto &l : infiniteLights)
-        s += StringPrintf("%s, ", l.ToString());
-    return s + " ]";
-}
-
 SampledSpectrum Integrator::Tr(const Interaction &p0, const Interaction &p1,
                                const SampledWavelengths &lambda, RNG &rng) const {
     auto rescale = [](SampledSpectrum &Tr, SampledSpectrum &pdf) {
@@ -423,6 +412,17 @@ SampledSpectrum Integrator::Tr(const Interaction &p0, const Interaction &p1,
     }
     PBRT_DBG("%s\n", StringPrintf("Tr from %s to %s = %s", p0.pi, p1.pi, Tr).c_str());
     return Tr / pdf.Average();
+}
+
+std::string Integrator::ToString() const {
+    std::string s = StringPrintf("[ Scene aggregate: %s sceneBounds: %s lights[%d]: [ ",
+                                 aggregate, sceneBounds, lights.size());
+    for (const auto &l : lights)
+        s += StringPrintf("%s, ", l.ToString());
+    s += StringPrintf("] infiniteLights[%d]: [ ", infiniteLights.size());
+    for (const auto &l : infiniteLights)
+        s += StringPrintf("%s, ", l.ToString());
+    return s + " ]";
 }
 
 // SimplePathIntegrator Method Definitions
@@ -1795,7 +1795,7 @@ struct Vertex {
             Point3f worldCenter;
             Float worldRadius;
             integrator.SceneBounds().BoundingSphere(&worldCenter, &worldRadius);
-            pdf = 1 / (Pi * worldRadius * worldRadius);
+            pdf = 1 / (Pi * Sqr(worldRadius));
 
         } else if (IsOnSurface()) {
             // Compute sampling density at emissive surface
@@ -1922,6 +1922,7 @@ int GenerateLightSubpath(const Integrator &integrator, SampledWavelengths &lambd
     // Generate light subpath and initialize _path_ vertices
     if (maxDepth == 0)
         return 0;
+    // Sample initial ray for light subpath
     // Sample light for BDPT light subpath
     pstd::optional<SampledLight> sampledLight = lightSampler.Sample(sampler.Get1D());
     if (!sampledLight)
@@ -1929,7 +1930,6 @@ int GenerateLightSubpath(const Integrator &integrator, SampledWavelengths &lambd
     LightHandle light = sampledLight->light;
     Float lightSamplePDF = sampledLight->pdf;
 
-    // Sample initial ray for light subpath
     pstd::optional<LightLeSample> les =
         light.SampleLe(sampler.Get2D(), sampler.Get2D(), lambda, time);
     if (!les || les->pdfPos == 0 || les->pdfDir == 0 || !les->L)
@@ -1941,7 +1941,7 @@ int GenerateLightSubpath(const Integrator &integrator, SampledWavelengths &lambd
     path[0] = les->intr ? Vertex::CreateLight(light, *les->intr, les->L, lightPDF)
                         : Vertex::CreateLight(light, ray, les->L, lightPDF);
 
-    // Follow light subpath start random walk
+    // Follow light subpath random walk
     SampledSpectrum beta = les->L * les->AbsCosTheta(ray.d) / (lightPDF * les->pdfDir);
     PBRT_DBG("%s\n",
              StringPrintf(
@@ -1974,6 +1974,7 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
                int maxDepth, TransportMode mode, Vertex *path, bool regularize) {
     if (maxDepth == 0)
         return 0;
+    // Follow random walk to initialize BDPT path vertices
     int bounces = 0;
     bool anyNonSpecularBounces = false;
     // Declare variables for forward and reverse probability densities
@@ -1987,11 +1988,12 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
                      .c_str());
         if (!beta)
             break;
+        bool scattered = false, terminated = false;
         // Trace a ray and sample the medium, if any
         Vertex &vertex = path[bounces], &prev = path[bounces - 1];
         pstd::optional<ShapeIntersection> si = integrator.Intersect(ray);
-        bool scattered = false, terminated = false;
         if (ray.medium) {
+            // Sample participating medium for _RandomWalk()_ ray
             Float tMax = si ? si->tHit : Infinity;
             RNG rng(Hash(ray.d.x), Hash(ray.d.y));
             ray.medium.SampleTmaj(
@@ -2008,15 +2010,14 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
 
                     Float um = sampler.Get1D();
                     int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, um);
-
                     if (mode == 0) {
-                        // absorption; done
+                        // Handle absorption for _RandomWalk()_ ray
                         terminated = true;
                         return false;
-                    } else if (mode == 1) {
-                        // scatter
                         beta *= Tmaj * sigma_s / (Tmaj * sigma_s).Average();
 
+                    } else if (mode == 1) {
+                        // Handle scattering for _RandomWalk()_ ray
                         // Record medium interaction in _path_ and compute forward density
                         vertex = Vertex::CreateMedium(intr, beta, pdfFwd, prev);
                         if (++bounces >= maxDepth) {
@@ -2043,7 +2044,7 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
                         scattered = true;
                         return false;
                     } else {
-                        // null scatter
+                        // Handle null scattering for _RandomWalk()_ ray
                         SampledSpectrum sigma_n = intr.sigma_n();
 
                         beta *= Tmaj * sigma_n / (Tmaj * sigma_n).Average();
@@ -2056,7 +2057,7 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
             return bounces;
         if (scattered)
             continue;
-        // Handle surface interaction for path generation
+        // Handle escaped rays after no medium scattering event
         if (!si) {
             // Capture escaped rays when tracing from the camera
             if (mode == TransportMode::Radiance) {
@@ -2066,6 +2067,8 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
 
             break;
         }
+
+        // Handle surface interaction for path generation
         SurfaceInteraction &isect = si->intr;
         // Get BSDF and skip over medium boundaries
         BSDF bsdf = isect.GetBSDF(ray, lambda, camera, scratchBuffer, sampler);
@@ -2086,7 +2089,7 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
 
         if (++bounces >= maxDepth)
             break;
-        // Sample BSDF at current vertex and compute reverse probability
+        // Sample BSDF at current vertex
         Vector3f wo = isect.wo;
         Float u = sampler.Get1D();
         pstd::optional<BSDFSample> bs = bsdf.Sample_f(wo, u, sampler.Get2D(), mode);
@@ -2329,8 +2332,6 @@ SampledSpectrum ConnectBDPT(const Integrator &integrator, SampledWavelengths &la
                 if (qs.IsOnSurface())
                     L *= AbsDot(cs->wi, qs.ns());
                 DCHECK(!L.HasNaNs());
-                // Only check visibility after we know that the path would
-                // make a non-zero contribution.
                 if (L) {
                     RNG rng(Hash(cs->pRaster), Hash(cs->pLens));
                     L *= integrator.Tr(cs->pRef, cs->pLens, lambda, rng);
@@ -2356,7 +2357,7 @@ SampledSpectrum ConnectBDPT(const Integrator &integrator, SampledWavelengths &la
                     ctx = LightSampleContext(pt.GetInteraction());
                 pstd::optional<LightLiSample> lightWeight =
                     light.SampleLi(ctx, sampler.Get2D(), lambda);
-                if (lightWeight) {
+                if (lightWeight && lightWeight->L && lightWeight->pdf > 0) {
                     EndpointInteraction ei(light, lightWeight->pLight);
                     sampled = Vertex::CreateLight(
                         ei, lightWeight->L / (lightWeight->pdf * lightPDF), 0);
@@ -2558,12 +2559,10 @@ void MLTIntegrator::Render() {
                                        largeStepProbability, nSampleStreams);
                     threadSampler = &sampler;
                     threadDepth = depth;
-
                     Point2f pRaster;
                     SampledWavelengths lambda;
                     bootstrapWeights[rngIndex] =
                         L(scratchBuffer, sampler, depth, &pRaster, &lambda).Average();
-
                     scratchBuffer.Reset();
                 }
             }
