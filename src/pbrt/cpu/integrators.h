@@ -408,10 +408,14 @@ class MLTIntegrator : public Integrator {
     SampledSpectrum L(ScratchBuffer &scratchBuffer, MLTSampler &sampler, int k,
                       Point2f *pRaster, SampledWavelengths *lambda);
 
+    static Float C(const SampledSpectrum &L, const SampledWavelengths &lambda) {
+        return L.y(lambda);
+    }
+
     // MLTIntegrator Private Members
-    LightSamplerHandle lightSampler;
-    bool regularize;
     CameraHandle camera;
+    bool regularize;
+    LightSamplerHandle lightSampler;
     int maxDepth;
     int nBootstrap;
     int mutationsPerPixel;

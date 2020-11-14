@@ -350,13 +350,10 @@ void MLTSampler::EnsureReady(int index) {
         Xi.value = rng.Uniform<Float>();
     } else {
         int64_t nSmall = currentIteration - Xi.lastModificationIteration;
-        // Apply _nSmall_ small step mutations
-        // Sample the standard normal distribution $N(0, 1)$
-        Float normalSample = SampleNormal(rng.Uniform<Float>());
-
-        // Compute the effective standard deviation and apply perturbation to $\VEC{X}_i$
+        // Apply _nSmall_ small step mutations to $\VEC{X}_i$
         Float effSigma = sigma * std::sqrt((Float)nSmall);
-        Xi.value += normalSample * effSigma;
+        Float delta = SampleNormal(rng.Uniform<Float>(), 0, effSigma);
+        Xi.value += delta;
         Xi.value -= std::floor(Xi.value);
     }
     Xi.lastModificationIteration = currentIteration;

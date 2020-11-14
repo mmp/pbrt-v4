@@ -487,7 +487,7 @@ class MLTSampler {
     MLTSampler(int mutationsPerPixel, int rngSequenceIndex, Float sigma,
                Float largeStepProbability, int streamCount)
         : mutationsPerPixel(mutationsPerPixel),
-          rng(rngSequenceIndex),
+          rng(MixBits(rngSequenceIndex)),
           sigma(sigma),
           largeStepProbability(largeStepProbability),
           streamCount(streamCount) {}
