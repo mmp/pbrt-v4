@@ -269,7 +269,7 @@ void GPUPathIntegrator::TraceShadowRays(int depth) {
           });
 }
 
-void GPUPathIntegrator::Render(ImageMetadata *metadata) {
+void GPUPathIntegrator::Render() {
     Vector2i resolution = film.PixelBounds().Diagonal();
     int spp = sampler.SamplesPerPixel();
 
@@ -469,9 +469,6 @@ void GPUPathIntegrator::Render(ImageMetadata *metadata) {
     // Another synchronization to make sure no kernels are running on the
     // GPU so that we can safely access unified memory from the CPU.
     CUDA_CHECK(cudaDeviceSynchronize());
-
-    metadata->samplesPerPixel = sampler.SamplesPerPixel();
-    camera.InitMetadata(metadata);
 }
 
 void GPUPathIntegrator::HandleEscapedRays(int depth) {
@@ -612,8 +609,7 @@ void GPURender(ParsedScene &scene) {
     ///////////////////////////////////////////////////////////////////////////
     // Render!
     Timer timer;
-    ImageMetadata metadata;
-    integrator->Render(&metadata);
+    integrator->Render();
 
     LOG_VERBOSE("Total rendering time: %.3f s", timer.ElapsedSeconds());
 
@@ -626,13 +622,15 @@ void GPURender(ParsedScene &scene) {
         Printf("%s\n", integrator->stats->Print());
     }
 
-    metadata.renderTimeSeconds = timer.ElapsedSeconds();
-    metadata.samplesPerPixel = integrator->sampler.SamplesPerPixel();
-
     std::vector<GPULogItem> logs = ReadGPULogs();
     for (const auto &item : logs)
         Log(item.level, item.file, item.line, item.message);
 
+    ImageMetadata metadata;
+    metadata.samplesPerPixel = integrator->sampler.SamplesPerPixel();
+    integrator->camera.InitMetadata(&metadata);
+    metadata.renderTimeSeconds = timer.ElapsedSeconds();
+    metadata.samplesPerPixel = integrator->sampler.SamplesPerPixel();
     integrator->film.WriteImage(metadata);
 }
 

@@ -30,7 +30,7 @@ class GPUPathIntegrator {
   public:
     GPUPathIntegrator(Allocator alloc, const ParsedScene &scene);
 
-    void Render(ImageMetadata *metadata);
+    void Render();
 
     void GenerateCameraRays(int y0, int sampleIndex);
     template <typename Sampler>
