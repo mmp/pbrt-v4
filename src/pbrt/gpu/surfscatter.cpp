@@ -50,7 +50,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
     RayQueue *nextRayQueue = NextRayQueue(depth);
 
     ForAllQueued(
-        name.c_str(), evalQueue->Get<Material>(), maxQueueSize,
+        name.c_str(), evalQueue->Get<MaterialEvalWorkItem<Material>>(), maxQueueSize,
         PBRT_GPU_LAMBDA(const MaterialEvalWorkItem<Material> me, int index) {
             const Material *material = me.material;
 

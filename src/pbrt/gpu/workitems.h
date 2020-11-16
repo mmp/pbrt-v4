@@ -439,10 +439,10 @@ class MediumSampleQueue : public WorkQueue<MediumSampleWorkItem> {
 using MediumScatterQueue = WorkQueue<MediumScatterWorkItem>;
 
 using MaterialEvalQueue =
-    MultiWorkQueue<MaterialEvalWorkItem, CoatedDiffuseMaterial, CoatedConductorMaterial,
-                   ConductorMaterial, DielectricMaterial, DiffuseMaterial,
-                   DiffuseTransmissionMaterial, HairMaterial, MeasuredMaterial,
-                   SubsurfaceMaterial, ThinDielectricMaterial, MixMaterial>;
+    MultiWorkQueue<MaterialEvalWorkItem<CoatedDiffuseMaterial>, MaterialEvalWorkItem<CoatedConductorMaterial>,
+                   MaterialEvalWorkItem<ConductorMaterial>, MaterialEvalWorkItem<DielectricMaterial>, MaterialEvalWorkItem<DiffuseMaterial>,
+                   MaterialEvalWorkItem<DiffuseTransmissionMaterial>, MaterialEvalWorkItem<HairMaterial>, MaterialEvalWorkItem<MeasuredMaterial>,
+                   MaterialEvalWorkItem<SubsurfaceMaterial>, MaterialEvalWorkItem<ThinDielectricMaterial>, MaterialEvalWorkItem<MixMaterial>>;
 
 }  // namespace pbrt
 

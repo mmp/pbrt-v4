@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <cstddef>
 
+// GPU Macro Definitions
 #if defined(__CUDA_ARCH__)
 #define PBRT_IS_GPU_CODE
 #endif
@@ -27,6 +28,12 @@
 #define PBRT_CONST const
 #define PBRT_CPU_GPU
 #define PBRT_GPU
+#endif
+
+#ifdef PBRT_IS_WINDOWS
+#define PBRT_GPU_LAMBDA(...) [ =, *this ] PBRT_GPU(__VA_ARGS__) mutable
+#else
+#define PBRT_GPU_LAMBDA(...) [=] PBRT_GPU(__VA_ARGS__)
 #endif
 
 #ifdef PBRT_BUILD_GPU_RENDERER
