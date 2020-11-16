@@ -213,7 +213,7 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
         // TODO: intr.wo == -ray.d?
         params.hitAreaLightQueue->Push(HitAreaLightWorkItem{
             intr.areaLight, r.lambda, r.beta, r.uniPathPDF, r.lightPathPDF, intr.p(), intr.n,
-            intr.uv, intr.wo, r.piPrev, ray.d, ray.time, r.nPrev, r.nsPrev,
+            intr.uv, intr.wo, r.piPrev, ray.d, r.nPrev, r.nsPrev,
             (int)r.isSpecularBounce, r.pixelIndex});
     }
 

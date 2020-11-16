@@ -125,4 +125,8 @@ void ReportKernelStats() {
     Printf("\n");
 }
 
+void GPUWait() {
+    CUDA_CHECK(cudaDeviceSynchronize());
+}
+
 }  // namespace pbrt

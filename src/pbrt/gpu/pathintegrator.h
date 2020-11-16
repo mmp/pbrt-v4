@@ -26,10 +26,10 @@ class GPUAccel;
 void GPUInit();
 void GPURender(ParsedScene &scene);
 
+// GPUPathIntegrator Definition
 class GPUPathIntegrator {
   public:
-    GPUPathIntegrator(Allocator alloc, const ParsedScene &scene);
-
+    // GPUPathIntegrator Public Methods
     void Render();
 
     void GenerateCameraRays(int y0, int sampleIndex);
@@ -65,20 +65,12 @@ class GPUPathIntegrator {
 
     void UpdateFilm();
 
+    GPUPathIntegrator(Allocator alloc, const ParsedScene &scene);
+
     RayQueue *CurrentRayQueue(int depth) { return rayQueues[depth & 1]; }
     RayQueue *NextRayQueue(int depth) { return rayQueues[(depth + 1) & 1]; }
 
-    FilterHandle filter;
-    FilmHandle film;
-    SamplerHandle sampler;
-    CameraHandle camera;
-    LightHandle envLight;
-    LightSamplerHandle lightSampler;
-
-    int maxDepth;
-    bool regularize;
-    int maxQueueSize, scanlinesPerPass;
-
+    // GPUPathIntegrator Member Variables
     // Various properties of the scene
     bool initializeVisibleSurface;
     bool haveSubsurface;
@@ -87,25 +79,6 @@ class GPUPathIntegrator {
     pstd::array<bool, MaterialHandle::NumTags()> haveUniversalEvalMaterial;
 
     GPUAccel *accel = nullptr;
-
-    SOA<PixelSampleState> pixelSampleState;
-
-    RayQueue *rayQueues[2] = {nullptr, nullptr};
-
-    ShadowRayQueue *shadowRayQueue = nullptr;
-
-    EscapedRayQueue *escapedRayQueue = nullptr;
-    HitAreaLightQueue *hitAreaLightQueue = nullptr;
-
-    MaterialEvalQueue *basicEvalMaterialQueue = nullptr;
-    MaterialEvalQueue *universalEvalMaterialQueue = nullptr;
-
-    GetBSSRDFAndProbeRayQueue *bssrdfEvalQueue = nullptr;
-    SubsurfaceScatterQueue *subsurfaceScatterQueue = nullptr;
-
-    MediumTransitionQueue *mediumTransitionQueue = nullptr;
-    MediumSampleQueue *mediumSampleQueue = nullptr;
-    MediumScatterQueue *mediumScatterQueue = nullptr;
 
     struct Stats {
         Stats(int maxDepth, Allocator alloc);
@@ -117,6 +90,38 @@ class GPUPathIntegrator {
         pstd::vector<uint64_t> indirectRays, shadowRays;
     };
     Stats *stats;
+
+    int scanlinesPerPass, maxQueueSize;
+
+    FilterHandle filter;
+    FilmHandle film;
+    SamplerHandle sampler;
+    CameraHandle camera;
+    LightHandle envLight;
+    LightSamplerHandle lightSampler;
+
+    RayQueue *rayQueues[2] = {nullptr, nullptr};
+
+    SOA<PixelSampleState> pixelSampleState;
+
+    MediumTransitionQueue *mediumTransitionQueue = nullptr;
+    MediumSampleQueue *mediumSampleQueue = nullptr;
+    MediumScatterQueue *mediumScatterQueue = nullptr;
+
+    int maxDepth;
+    bool regularize;
+
+    EscapedRayQueue *escapedRayQueue = nullptr;
+
+    HitAreaLightQueue *hitAreaLightQueue = nullptr;
+
+    MaterialEvalQueue *basicEvalMaterialQueue = nullptr;
+    MaterialEvalQueue *universalEvalMaterialQueue = nullptr;
+
+    ShadowRayQueue *shadowRayQueue = nullptr;
+
+    GetBSSRDFAndProbeRayQueue *bssrdfEvalQueue = nullptr;
+    SubsurfaceScatterQueue *subsurfaceScatterQueue = nullptr;
 };
 
 }  // namespace pbrt

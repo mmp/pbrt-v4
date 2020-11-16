@@ -19,7 +19,7 @@ namespace pbrt {
 STAT_RATIO("Geometry/Triangles per mesh", nTris, nTriMeshes);
 STAT_MEMORY_COUNTER("Memory/Triangles", triangleBytes);
 
-// TriangleMesh Method Implementations
+// TriangleMesh Method Definitions
 TriangleMesh::TriangleMesh(const Transform &renderFromObject, bool reverseOrientation,
                            std::vector<int> indices, std::vector<Point3f> p,
                            std::vector<Vector3f> s, std::vector<Normal3f> n,

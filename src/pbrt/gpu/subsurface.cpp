@@ -16,6 +16,7 @@
 
 namespace pbrt {
 
+// GPUPathIntegrator Subsurface Scattering Methods
 void GPUPathIntegrator::SampleSubsurface(int depth) {
     RayQueue *rayQueue = CurrentRayQueue(depth);
     RayQueue *nextRayQueue = NextRayQueue(depth);
@@ -36,9 +37,9 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
 
             pstd::optional<BSSRDFProbeSegment> probeSeg = bssrdf.SampleSp(uc, u);
             if (probeSeg)
-                subsurfaceScatterQueue->Push(probeSeg->p0, probeSeg->p1, material, bssrdf,
-                                             lambda, be.beta, be.uniPathPDF, be.mediumInterface,
-                                             be.etaScale, be.pixelIndex);
+                subsurfaceScatterQueue->Push(
+                    probeSeg->p0, probeSeg->p1, material, bssrdf, lambda, be.beta,
+                    be.uniPathPDF, be.mediumInterface, be.etaScale, be.pixelIndex);
         });
 
     accel->IntersectOneRandom(maxQueueSize, subsurfaceScatterQueue);
@@ -60,7 +61,8 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
             if (!bssrdfSample.Sp || bssrdfSample.pdf == 0)
                 return;
 
-            SampledSpectrum betap = s.beta * bssrdfSample.Sp * s.weight / bssrdfSample.pdf;
+            SampledSpectrum betap =
+                s.beta * bssrdfSample.Sp * s.weight / bssrdfSample.pdf;
             SampledWavelengths lambda = s.lambda;
             RaySamples raySamples = pixelSampleState.samples[s.pixelIndex];
             Vector3f wo = bssrdfSample.wo;
@@ -81,9 +83,10 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                     SampledSpectrum beta = betap * bsdfSample->f * AbsDot(wi, intr.ns);
                     SampledSpectrum uniPathPDF = s.uniPathPDF, lightPathPDF = uniPathPDF;
 
-                    PBRT_DBG("%s f*cos[0] %f bsdfSample->pdf %f f*cos/pdf %f\n", BxDF::Name(),
-                        bsdfSample->f[0] * AbsDot(wi, intr.ns), bsdfSample->pdf,
-                        bsdfSample->f[0] * AbsDot(wi, intr.ns) / bsdfSample->pdf);
+                    PBRT_DBG("%s f*cos[0] %f bsdfSample->pdf %f f*cos/pdf %f\n",
+                             BxDF::Name(), bsdfSample->f[0] * AbsDot(wi, intr.ns),
+                             bsdfSample->pdf,
+                             bsdfSample->f[0] * AbsDot(wi, intr.ns) / bsdfSample->pdf);
 
                     if (bsdfSample->pdfIsProportional) {
                         Float pdf = bsdf.PDF(wo, wi);
@@ -121,19 +124,22 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                         // possible...
                         bool anyNonSpecularBounces = true;
 
-                        nextRayQueue->PushIndirect(
-                            ray, intr.pi, intr.n, intr.ns, beta, uniPathPDF, lightPathPDF, lambda,
-                            etaScale, bsdfSample->IsSpecular(), anyNonSpecularBounces,
-                            s.pixelIndex);
+                        nextRayQueue->PushIndirect(ray, intr.pi, intr.n, intr.ns, beta,
+                                                   uniPathPDF, lightPathPDF, lambda,
+                                                   etaScale, bsdfSample->IsSpecular(),
+                                                   anyNonSpecularBounces, s.pixelIndex);
 
-                        PBRT_DBG("Spawned indirect ray at depth %d. "
-                            "Specular %d Beta %f %f %f %f uniPathPDF %f %f %f %f lightPathPDF %f "
+                        PBRT_DBG(
+                            "Spawned indirect ray at depth %d. "
+                            "Specular %d Beta %f %f %f %f uniPathPDF %f %f %f %f "
+                            "lightPathPDF %f "
                             "%f %f %f "
                             "beta/uniPathPDF %f %f %f %f\n",
-                            depth + 1, int(bsdfSample->IsSpecular()),
-                            beta[0], beta[1], beta[2], beta[3], uniPathPDF[0], uniPathPDF[1],
-                            uniPathPDF[2], uniPathPDF[3], lightPathPDF[0], lightPathPDF[1], lightPathPDF[2],
-                            lightPathPDF[3], SafeDiv(beta, uniPathPDF)[0], SafeDiv(beta, uniPathPDF)[1],
+                            depth + 1, int(bsdfSample->IsSpecular()), beta[0], beta[1],
+                            beta[2], beta[3], uniPathPDF[0], uniPathPDF[1], uniPathPDF[2],
+                            uniPathPDF[3], lightPathPDF[0], lightPathPDF[1],
+                            lightPathPDF[2], lightPathPDF[3],
+                            SafeDiv(beta, uniPathPDF)[0], SafeDiv(beta, uniPathPDF)[1],
                             SafeDiv(beta, uniPathPDF)[2], SafeDiv(beta, uniPathPDF)[3]);
                     }
                 }
@@ -148,8 +154,8 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                     return;
                 LightHandle light = sampledLight->light;
 
-                pstd::optional<LightLiSample> ls = light.SampleLi(ctx, raySamples.direct.u, lambda,
-                                                  LightSamplingMode::WithMIS);
+                pstd::optional<LightLiSample> ls = light.SampleLi(
+                    ctx, raySamples.direct.u, lambda, LightSamplingMode::WithMIS);
                 if (!ls || !ls->L || ls->pdf == 0)
                     return;
 
@@ -160,7 +166,8 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
 
                 SampledSpectrum beta = betap * f * AbsDot(wi, intr.ns);
 
-                PBRT_DBG("depth %d beta %f %f %f %f f %f %f %f %f ls.L %f %f %f %f ls.pdf "
+                PBRT_DBG(
+                    "depth %d beta %f %f %f %f f %f %f %f %f ls.L %f %f %f %f ls.pdf "
                     "%f\n",
                     depth, beta[0], beta[1], beta[2], beta[3], f[0], f[1], f[2], f[3],
                     ls->L[0], ls->L[1], ls->L[2], ls->L[3], ls->pdf);
@@ -175,12 +182,13 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                 SampledSpectrum Ld = SafeDiv(beta * ls->L, lambda.PDF());
 
                 PBRT_DBG("depth %d Ld %f %f %f %f "
-                    "new beta %f %f %f %f beta/uni %f %f %f %f Ld/uni %f %f %f %f\n",
-                    depth, Ld[0], Ld[1], Ld[2], Ld[3], beta[0], beta[1], beta[2], beta[3],
-                    SafeDiv(beta, uniPathPDF)[0], SafeDiv(beta, uniPathPDF)[1],
-                    SafeDiv(beta, uniPathPDF)[2], SafeDiv(beta, uniPathPDF)[3],
-                    SafeDiv(Ld, uniPathPDF)[0], SafeDiv(Ld, uniPathPDF)[1],
-                    SafeDiv(Ld, uniPathPDF)[2], SafeDiv(Ld, uniPathPDF)[3]);
+                         "new beta %f %f %f %f beta/uni %f %f %f %f Ld/uni %f %f %f %f\n",
+                         depth, Ld[0], Ld[1], Ld[2], Ld[3], beta[0], beta[1], beta[2],
+                         beta[3], SafeDiv(beta, uniPathPDF)[0],
+                         SafeDiv(beta, uniPathPDF)[1], SafeDiv(beta, uniPathPDF)[2],
+                         SafeDiv(beta, uniPathPDF)[3], SafeDiv(Ld, uniPathPDF)[0],
+                         SafeDiv(Ld, uniPathPDF)[1], SafeDiv(Ld, uniPathPDF)[2],
+                         SafeDiv(Ld, uniPathPDF)[3]);
 
                 Ray ray = SpawnRayTo(intr.pi, intr.n, time, ls->pLight.pi, ls->pLight.n);
                 if (haveMedia)
@@ -188,8 +196,8 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                     ray.medium = Dot(ray.d, intr.n) > 0 ? s.mediumInterface.outside
                                                         : s.mediumInterface.inside;
 
-                shadowRayQueue->Push(ray, 1 - ShadowEpsilon, lambda, Ld, uniPathPDF, lightPathPDF,
-                                     s.pixelIndex);
+                shadowRayQueue->Push(ray, 1 - ShadowEpsilon, lambda, Ld, uniPathPDF,
+                                     lightPathPDF, s.pixelIndex);
             }
         });
 

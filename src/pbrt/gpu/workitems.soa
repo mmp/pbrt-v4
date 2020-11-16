@@ -70,7 +70,6 @@ soa HitAreaLightWorkItem {
     Vector3f wo;
     Point3fi piPrev;
     Vector3f rayd;
-    Float time;
     Normal3f nPrev, nsPrev;
     int isSpecularBounce;
     int pixelIndex;

@@ -40,6 +40,7 @@ static inline void rescale(SampledSpectrum &beta, SampledSpectrum &lightPathPDF,
     }
 }
 
+// GPUPathIntegrator Surface Scattering Methods
 template <typename Material, typename TextureEvaluator>
 void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                                                 MaterialEvalQueue *evalQueue, int depth) {
@@ -120,8 +121,8 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 SampledSpectrum uniPathPDF = me.uniPathPDF, lightPathPDF = uniPathPDF;
 
                 PBRT_DBG("%s f*cos[0] %f bsdfSample->pdf %f f*cos/pdf %f\n", BxDF::Name(),
-                    bsdfSample->f[0] * AbsDot(wi, ns), bsdfSample->pdf,
-                    bsdfSample->f[0] * AbsDot(wi, ns) / bsdfSample->pdf);
+                         bsdfSample->f[0] * AbsDot(wi, ns), bsdfSample->pdf,
+                         bsdfSample->f[0] * AbsDot(wi, ns) / bsdfSample->pdf);
 
                 if (bsdfSample->pdfIsProportional) {
                     // The PDFs need to be handled slightly differently for
@@ -157,9 +158,9 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                         // subsurface scattering rather than tracing the
                         // ray.
                         bssrdfEvalQueue->Push(material, lambda, beta, uniPathPDF,
-                                              Point3f(me.pi), wo, me.n, ns,
-                                              dpdus, me.uv, me.mediumInterface,
-                                              etaScale, me.pixelIndex);
+                                              Point3f(me.pi), wo, me.n, ns, dpdus, me.uv,
+                                              me.mediumInterface, etaScale,
+                                              me.pixelIndex);
                     } else {
                         Ray ray = SpawnRay(me.pi, me.n, me.time, wi);
                         if (haveMedia)
@@ -172,18 +173,21 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                             !bsdfSample->IsSpecular() || me.anyNonSpecularBounces;
 
                         // Spawn indriect ray.
-                        nextRayQueue->PushIndirect(
-                            ray, me.pi, me.n, ns, beta, uniPathPDF, lightPathPDF, lambda, etaScale,
-                            bsdfSample->IsSpecular(), anyNonSpecularBounces,
-                            me.pixelIndex);
+                        nextRayQueue->PushIndirect(ray, me.pi, me.n, ns, beta, uniPathPDF,
+                                                   lightPathPDF, lambda, etaScale,
+                                                   bsdfSample->IsSpecular(),
+                                                   anyNonSpecularBounces, me.pixelIndex);
 
-                        PBRT_DBG("Spawned indirect ray at depth %d from me.index %d. "
-                            "Specular %d Beta %f %f %f %f uniPathPDF %f %f %f %f lightPathPDF %f "
+                        PBRT_DBG(
+                            "Spawned indirect ray at depth %d from me.index %d. "
+                            "Specular %d Beta %f %f %f %f uniPathPDF %f %f %f %f "
+                            "lightPathPDF %f "
                             "%f %f %f beta/uniPathPDF %f %f %f %f\n",
-                            depth + 1, index, int(bsdfSample->IsSpecular()),
-                            beta[0], beta[1], beta[2], beta[3], uniPathPDF[0], uniPathPDF[1],
-                            uniPathPDF[2], uniPathPDF[3], lightPathPDF[0], lightPathPDF[1], lightPathPDF[2],
-                            lightPathPDF[3], SafeDiv(beta, uniPathPDF)[0], SafeDiv(beta, uniPathPDF)[1],
+                            depth + 1, index, int(bsdfSample->IsSpecular()), beta[0],
+                            beta[1], beta[2], beta[3], uniPathPDF[0], uniPathPDF[1],
+                            uniPathPDF[2], uniPathPDF[3], lightPathPDF[0],
+                            lightPathPDF[1], lightPathPDF[2], lightPathPDF[3],
+                            SafeDiv(beta, uniPathPDF)[0], SafeDiv(beta, uniPathPDF)[1],
                             SafeDiv(beta, uniPathPDF)[2], SafeDiv(beta, uniPathPDF)[3]);
                     }
                 }
@@ -208,8 +212,8 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 __syncthreads();
 
                 // And now sample the light source itself.
-                pstd::optional<LightLiSample> ls = light.SampleLi(ctx, raySamples.direct.u, lambda,
-                                                  LightSamplingMode::WithMIS);
+                pstd::optional<LightLiSample> ls = light.SampleLi(
+                    ctx, raySamples.direct.u, lambda, LightSamplingMode::WithMIS);
                 if (!ls || !ls->L || ls->pdf == 0)
                     return;
 
@@ -219,14 +223,15 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                     return;
 
                 SampledSpectrum beta = me.beta * f * AbsDot(wi, ns);
-                PBRT_DBG("me.beta %f %f %f %f f %f %f %f %f dot %f\n",
-                    me.beta[0], me.beta[1], me.beta[2], me.beta[3],
-                    f[0], f[1], f[2], f[3], AbsDot(wi, ns));
+                PBRT_DBG("me.beta %f %f %f %f f %f %f %f %f dot %f\n", me.beta[0],
+                         me.beta[1], me.beta[2], me.beta[3], f[0], f[1], f[2], f[3],
+                         AbsDot(wi, ns));
 
-                PBRT_DBG("me index %d depth %d beta %f %f %f %f f %f %f %f %f ls.L %f %f %f "
+                PBRT_DBG(
+                    "me index %d depth %d beta %f %f %f %f f %f %f %f %f ls.L %f %f %f "
                     "%f ls.pdf %f\n",
-                    index, depth, beta[0], beta[1], beta[2], beta[3], f[0], f[1],
-                    f[2], f[3], ls->L[0], ls->L[1], ls->L[2], ls->L[3], ls->pdf);
+                    index, depth, beta[0], beta[1], beta[2], beta[3], f[0], f[1], f[2],
+                    f[3], ls->L[0], ls->L[1], ls->L[2], ls->L[3], ls->pdf);
 
                 // Compute light and BSDF PDFs for MIS.
                 Float lightPDF = ls->pdf * sampledLight->pdf;
@@ -243,16 +248,17 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                     ray.medium = Dot(ray.d, me.n) > 0 ? me.mediumInterface.outside
                                                       : me.mediumInterface.inside;
 
-                shadowRayQueue->Push(ray, 1 - ShadowEpsilon, lambda, Ld,
-                                     uniPathPDF, lightPathPDF, me.pixelIndex);
+                shadowRayQueue->Push(ray, 1 - ShadowEpsilon, lambda, Ld, uniPathPDF,
+                                     lightPathPDF, me.pixelIndex);
 
                 PBRT_DBG("me.index %d spawned shadow ray depth %d Ld %f %f %f %f "
-                    "new beta %f %f %f %f beta/uni %f %f %f %f Ld/uni %f %f %f %f\n",
-                    index, depth, Ld[0], Ld[1], Ld[2], Ld[3], beta[0], beta[1],
-                    beta[2], beta[3], SafeDiv(beta, uniPathPDF)[0], SafeDiv(beta, uniPathPDF)[1],
-                    SafeDiv(beta, uniPathPDF)[2], SafeDiv(beta, uniPathPDF)[3],
-                    SafeDiv(Ld, uniPathPDF)[0], SafeDiv(Ld, uniPathPDF)[1],
-                    SafeDiv(Ld, uniPathPDF)[2], SafeDiv(Ld, uniPathPDF)[3]);
+                         "new beta %f %f %f %f beta/uni %f %f %f %f Ld/uni %f %f %f %f\n",
+                         index, depth, Ld[0], Ld[1], Ld[2], Ld[3], beta[0], beta[1],
+                         beta[2], beta[3], SafeDiv(beta, uniPathPDF)[0],
+                         SafeDiv(beta, uniPathPDF)[1], SafeDiv(beta, uniPathPDF)[2],
+                         SafeDiv(beta, uniPathPDF)[3], SafeDiv(Ld, uniPathPDF)[0],
+                         SafeDiv(Ld, uniPathPDF)[1], SafeDiv(Ld, uniPathPDF)[2],
+                         SafeDiv(Ld, uniPathPDF)[3]);
             }
         });
 }

@@ -15,61 +15,7 @@
 
 namespace pbrt {
 
-template <typename Sampler>
-void GPUPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
-    RayQueue *rayQueue = CurrentRayQueue(0);
-
-    GPUParallelFor("Generate Camera rays", maxQueueSize,
-    PBRT_GPU_LAMBDA(int pixelIndex) {
-        Vector2i resolution = film.PixelBounds().Diagonal();
-        Bounds2i pixelBounds = film.PixelBounds();
-
-        Point2i pPixel(pixelBounds.pMin.x + int(pixelIndex) % resolution.x,
-                       pixelBounds.pMin.y + y0 + int(pixelIndex) / resolution.x);
-        pixelSampleState.pPixel[pixelIndex] = pPixel;
-
-        // If we've split the image into multiple spans of scanlines,
-        // then in the final pass, we may have a few more threads
-        // launched than there are remaining pixels. Bail out without
-        // enqueuing a ray if so.
-        if (!InsideExclusive(pPixel, pixelBounds))
-            return;
-
-        // Initialize the Sampler for the current pixel and sample.
-        Sampler pixelSampler = *sampler.Cast<Sampler>();
-        pixelSampler.StartPixelSample(pPixel, sampleIndex, 0);
-
-        // Sample wavelengths for the ray path for the pixel sample.
-        // Use a blue noise pattern rather than the Sampler.
-        Float lu = RadicalInverse(1, sampleIndex) + BlueNoise(47, pPixel);
-        if (lu >= 1)
-            lu -= 1;
-        if (GetOptions().disableWavelengthJitter)
-            lu = 0.5f;
-        SampledWavelengths lambda = film.SampleWavelengths(lu);
-
-        // Generate samples for the camera ray and the ray itself.
-        CameraSample cameraSample = GetCameraSample(pixelSampler, pPixel, filter);
-        pstd::optional<CameraRay> cameraRay = camera.GenerateRay(cameraSample, lambda);
-
-        // Initialize the rest of the pixel sample's state.
-        pixelSampleState.L[pixelIndex] = SampledSpectrum(0.f);
-        pixelSampleState.lambda[pixelIndex] = lambda;
-        pixelSampleState.filterWeight[pixelIndex] = cameraSample.weight;
-        if (initializeVisibleSurface)
-            pixelSampleState.visibleSurface[pixelIndex] = VisibleSurface();
-
-        if (cameraRay) {
-            // Enqueue the camera ray if the camera gave us one with
-            // non-zero weight. (RealisticCamera doesn't always return
-            // a ray, e.g. in the case of vignetting...)
-            rayQueue->PushCameraRay(cameraRay->ray, lambda, pixelIndex);
-            pixelSampleState.cameraRayWeight[pixelIndex] = cameraRay->weight;
-        } else
-            pixelSampleState.cameraRayWeight[pixelIndex] = SampledSpectrum(0);
-    });
-}
-
+// GPUPathIntegrator Camera Ray Methods
 void GPUPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
     auto generateRays = [=](auto sampler) {
         using Sampler = std::remove_reference_t<decltype(*sampler)>;
@@ -86,6 +32,63 @@ void GPUPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
     // specializing on the Camera since its state is read-only and shared
     // among all of the threads, so caches well in practice.
     sampler.DispatchCPU(generateRays);
+}
+
+template <typename Sampler>
+void GPUPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
+    RayQueue *rayQueue = CurrentRayQueue(0);
+    GPUParallelFor(
+        "Generate Camera rays", maxQueueSize, PBRT_GPU_LAMBDA(int pixelIndex) {
+            // Initialize _pPixel_ and test against pixel bounds
+            Vector2i resolution = film.PixelBounds().Diagonal();
+            Bounds2i pixelBounds = film.PixelBounds();
+
+            Point2i pPixel(pixelBounds.pMin.x + int(pixelIndex) % resolution.x,
+                           pixelBounds.pMin.y + y0 + int(pixelIndex) / resolution.x);
+            pixelSampleState.pPixel[pixelIndex] = pPixel;
+
+            // If we've split the image into multiple spans of scanlines,
+            // then in the final pass, we may have a few more threads
+            // launched than there are remaining pixels. Bail out without
+            // enqueuing a ray if so.
+            if (!InsideExclusive(pPixel, pixelBounds))
+                return;
+
+            // Initialize _Sampler_ for current pixel and sample
+            Sampler pixelSampler = *sampler.Cast<Sampler>();
+            pixelSampler.StartPixelSample(pPixel, sampleIndex, 0);
+
+            // Sample wavelengths for ray path
+            Float lu = RadicalInverse(1, sampleIndex) + BlueNoise(47, pPixel);
+            if (lu >= 1)
+                lu -= 1;
+            if (GetOptions().disableWavelengthJitter)
+                lu = 0.5f;
+            SampledWavelengths lambda = film.SampleWavelengths(lu);
+
+            // Compute _CameraSample_ and generate ray
+            CameraSample cameraSample = GetCameraSample(pixelSampler, pPixel, filter);
+            pstd::optional<CameraRay> cameraRay =
+                camera.GenerateRay(cameraSample, lambda);
+
+            // Initialize remainder of _PixelSampleState_ for ray
+            // Initialize the rest of the pixel sample's state.
+            pixelSampleState.L[pixelIndex] = SampledSpectrum(0.f);
+            pixelSampleState.lambda[pixelIndex] = lambda;
+            pixelSampleState.filterWeight[pixelIndex] = cameraSample.weight;
+            if (initializeVisibleSurface)
+                pixelSampleState.visibleSurface[pixelIndex] = VisibleSurface();
+
+            // Enqueue camera ray for intersection tests
+            if (cameraRay) {
+                // Enqueue the camera ray if the camera gave us one with
+                // non-zero weight. (RealisticCamera doesn't always return
+                // a ray, e.g. in the case of vignetting...)
+                rayQueue->PushCameraRay(cameraRay->ray, lambda, pixelIndex);
+                pixelSampleState.cameraRayWeight[pixelIndex] = cameraRay->weight;
+            } else
+                pixelSampleState.cameraRayWeight[pixelIndex] = SampledSpectrum(0);
+        });
 }
 
 }  // namespace pbrt

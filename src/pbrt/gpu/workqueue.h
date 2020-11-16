@@ -102,6 +102,12 @@ void ForAllQueued(const char *desc, WorkQueue<WorkItem> *q, int maxQueued, F fun
 template <typename... Ts>
 class MultiWorkQueue;
 
+template <>
+class MultiWorkQueue<> {
+  public:
+    MultiWorkQueue(int n, Allocator alloc, pstd::span<const bool> haveType) {}
+};
+
 template <typename T, typename... Ts>
 class MultiWorkQueue<T, Ts...> : public MultiWorkQueue<Ts...> {
   public:
@@ -133,23 +139,17 @@ class MultiWorkQueue<T, Ts...> : public MultiWorkQueue<Ts...> {
             return MultiWorkQueue<Ts...>::template Get<Tg>();
     }
 
-    template <typename Tq, typename... Args>
-    PBRT_CPU_GPU int Push(Args &&... args) {
+    template <typename Tq>
+    PBRT_CPU_GPU int Push(Tq item) {
         if constexpr (std::is_same_v<Tq, T>)
-            return q.Push(std::forward<Args>(args)...);
+            return q.Push(item);
         else
-            return MultiWorkQueue<Ts...>::template Push<Tq>(std::forward<Args>(args)...);
+            return MultiWorkQueue<Ts...>::template Push<Tq>(item);
     }
 
   private:
     // MultiWorkQueue Private Members
     WorkQueue<T> q;
-};
-
-template <>
-class MultiWorkQueue<> {
-  public:
-    MultiWorkQueue(int n, Allocator alloc, pstd::span<const bool> haveType) {}
 };
 
 }  // namespace pbrt
