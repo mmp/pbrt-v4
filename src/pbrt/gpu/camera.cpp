@@ -17,20 +17,14 @@ namespace pbrt {
 
 // GPUPathIntegrator Camera Ray Methods
 void GPUPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
+    // Define _generateRays_ lambda function
     auto generateRays = [=](auto sampler) {
         using Sampler = std::remove_reference_t<decltype(*sampler)>;
         if constexpr (!std::is_same_v<Sampler, MLTSampler> &&
                       !std::is_same_v<Sampler, DebugMLTSampler>)
             GenerateCameraRays<Sampler>(y0, sampleIndex);
     };
-    // Somewhat surprisingly, GenerateCameraRays() is specialized on the
-    // type of the Sampler being used and not on, say, the Camera.  By
-    // specializing on the sampler type, the particular Sampler used can be
-    // stack allocated (rather than living in global memory), which in turn
-    // allows its state to be stored in registers in the
-    // GenerateCameraRays() kernel. There's little benefit from
-    // specializing on the Camera since its state is read-only and shared
-    // among all of the threads, so caches well in practice.
+
     sampler.DispatchCPU(generateRays);
 }
 
@@ -39,18 +33,15 @@ void GPUPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
     RayQueue *rayQueue = CurrentRayQueue(0);
     GPUParallelFor(
         "Generate Camera rays", maxQueueSize, PBRT_GPU_LAMBDA(int pixelIndex) {
-            // Initialize _pPixel_ and test against pixel bounds
-            Vector2i resolution = film.PixelBounds().Diagonal();
+            // Enqueue camera ray and set pixel state for sample
+            // Compute pixel coordinates for _pixelIndex_
             Bounds2i pixelBounds = film.PixelBounds();
-
-            Point2i pPixel(pixelBounds.pMin.x + int(pixelIndex) % resolution.x,
-                           pixelBounds.pMin.y + y0 + int(pixelIndex) / resolution.x);
+            int xResolution = pixelBounds.pMax.x - pixelBounds.pMin.x;
+            Point2i pPixel(pixelBounds.pMin.x + pixelIndex % xResolution,
+                           y0 + pixelIndex / xResolution);
             pixelSampleState.pPixel[pixelIndex] = pPixel;
 
-            // If we've split the image into multiple spans of scanlines,
-            // then in the final pass, we may have a few more threads
-            // launched than there are remaining pixels. Bail out without
-            // enqueuing a ray if so.
+            // Test pixel coordinates against pixel bounds
             if (!InsideExclusive(pPixel, pixelBounds))
                 return;
 
@@ -72,7 +63,6 @@ void GPUPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
                 camera.GenerateRay(cameraSample, lambda);
 
             // Initialize remainder of _PixelSampleState_ for ray
-            // Initialize the rest of the pixel sample's state.
             pixelSampleState.L[pixelIndex] = SampledSpectrum(0.f);
             pixelSampleState.lambda[pixelIndex] = lambda;
             pixelSampleState.filterWeight[pixelIndex] = cameraSample.weight;

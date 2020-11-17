@@ -330,7 +330,9 @@ void GPUPathIntegrator::Render() {
          ++sampleIndex) {
         // Render image for sample _sampleIndex_
         LOG_VERBOSE("Starting to submit work for sample %d", sampleIndex);
-        for (int y0 = 0; y0 < resolution.y; y0 += scanlinesPerPass) {
+        Bounds2i pixelBounds = film.PixelBounds();
+        for (int y0 = pixelBounds.pMin.y; y0 < pixelBounds.pMax.y;
+             y0 += scanlinesPerPass) {
             // Generate camera rays for current scanline range
             RayQueue *cameraRayQueue = CurrentRayQueue(0);
             GPUDo(
@@ -344,19 +346,19 @@ void GPUPathIntegrator::Render() {
                 "Update camera ray stats",
                 PBRT_GPU_LAMBDA() { stats->cameraRays += cameraRayQueue->Size(); });
 
+            // Trace rays and estimate radiance up to maximum ray depth
             for (int depth = 0; true; ++depth) {
                 // Reset ray queues before tracing rays
-                RayQueue *resetQueue = NextRayQueue(depth);
+                RayQueue *nextQueue = NextRayQueue(depth);
                 GPUDo(
                     "Reset queues before tracing rays", PBRT_GPU_LAMBDA() {
+                        nextQueue->Reset();
                         // Reset queues before tracing next batch of rays
                         mediumTransitionQueue->Reset();
                         if (mediumSampleQueue)
                             mediumSampleQueue->Reset();
                         if (mediumScatterQueue)
                             mediumScatterQueue->Reset();
-
-                        resetQueue->Reset();
 
                         if (escapedRayQueue)
                             escapedRayQueue->Reset();
@@ -402,6 +404,7 @@ void GPUPathIntegrator::Render() {
                 if (haveSubsurface)
                     SampleSubsurface(depth);
             }
+
             UpdateFilm();
             // Copy updated film pixels to buffer for display
             if (!Options->displayServer.empty())
@@ -457,7 +460,7 @@ void GPUPathIntegrator::HandleEscapedRays(int depth) {
             if (depth == 0 || er.specularBounce) {
                 L = er.beta * Le / er.uniPathPDF.Average();
             } else {
-                LightSampleContext ctx(er.piPrev, er.nPrev, er.nsPrev);
+                LightSampleContext ctx = er.prevIntrCtx;
 
                 Float lightChoicePDF = lightSampler.PDF(ctx, envLight);
                 Float lightPDF = lightChoicePDF *
@@ -495,9 +498,9 @@ void GPUPathIntegrator::HandleRayFoundEmission(int depth) {
             if (depth == 0 || he.isSpecularBounce) {
                 L = he.beta * Le / he.uniPathPDF.Average();
             } else {
-                Vector3f wi = he.rayd;
+                Vector3f wi = -he.wo;
 
-                LightSampleContext ctx(he.piPrev, he.nPrev, he.nsPrev);
+                LightSampleContext ctx = he.prevIntrCtx;
 
                 Float lightChoicePDF = lightSampler.PDF(ctx, areaLight);
                 Float lightPDF = lightChoicePDF *

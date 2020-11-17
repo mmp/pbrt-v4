@@ -124,9 +124,10 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                         // possible...
                         bool anyNonSpecularBounces = true;
 
-                        nextRayQueue->PushIndirect(ray, intr.pi, intr.n, intr.ns, beta,
-                                                   uniPathPDF, lightPathPDF, lambda,
-                                                   etaScale, bsdfSample->IsSpecular(),
+                        LightSampleContext ctx(intr.pi, intr.n, intr.ns);
+                        nextRayQueue->PushIndirect(ray, ctx, beta, uniPathPDF,
+                                                   lightPathPDF, lambda, etaScale,
+                                                   bsdfSample->IsSpecular(),
                                                    anyNonSpecularBounces, s.pixelIndex);
 
                         PBRT_DBG(

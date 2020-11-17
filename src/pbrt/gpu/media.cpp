@@ -167,8 +167,8 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                     PBRT_DBG("Adding ray to escapedRayQueue pixel index %d depth %d\n",
                              ms.pixelIndex, depth);
                     escapedRayQueue->Push(EscapedRayWorkItem{
-                        beta, uniPathPDF, lightPathPDF, lambda, ray.o, ray.d, ms.piPrev,
-                        ms.nPrev, ms.nsPrev, (int)ms.isSpecularBounce, ms.pixelIndex});
+                        beta, uniPathPDF, lightPathPDF, lambda, ray.o, ray.d,
+                        ms.prevIntrCtx, (int)ms.isSpecularBounce, ms.pixelIndex});
                 }
             }
 
@@ -178,12 +178,12 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                 intr.mediumInterface = &ms.mediumInterface;
                 Ray newRay = intr.SpawnRay(ray.d);
                 mediumTransitionQueue->Push(MediumTransitionWorkItem{
-                    newRay, lambda, beta, uniPathPDF, lightPathPDF, ms.piPrev, ms.nPrev,
-                    ms.nsPrev, ms.isSpecularBounce, ms.anyNonSpecularBounces, ms.etaScale,
+                    newRay, lambda, beta, uniPathPDF, lightPathPDF, ms.prevIntrCtx,
+                    ms.isSpecularBounce, ms.anyNonSpecularBounces, ms.etaScale,
                     ms.pixelIndex});
 #if 0
                 // WHY NOT THIS?
-                rayQueues[(depth + 1) & 1]->PushIndirect(newRay, ms.piPrev, ms.nPrev, ms.nsPrev,
+                rayQueues[(depth + 1) & 1]->PushIndirect(newRay, ms.prevIntrCtx,
                                                          beta, uniPathPDF, lightPathPDF, lambda, ms.etaScale,
                                                          ms.isSpecularBounce, ms.anyNonSpecularBounces,
                                                          ms.pixelIndex);
@@ -196,11 +196,10 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                     "Ray hit an area light: adding to hitAreaLightQueue pixel index %d "
                     "depth %d\n",
                     ms.pixelIndex, depth);
-                // TODO: intr.wo == -ray.d?
                 hitAreaLightQueue->Push(HitAreaLightWorkItem{
                     ms.areaLight, lambda, beta, uniPathPDF, lightPathPDF, Point3f(ms.pi),
-                    ms.n, ms.uv, -ray.d, ms.piPrev, ray.d, ms.nPrev, ms.nsPrev,
-                    ms.isSpecularBounce, ms.pixelIndex});
+                    ms.n, ms.uv, -ray.d, ms.prevIntrCtx, ms.isSpecularBounce,
+                    ms.pixelIndex});
             }
 
             FloatTextureHandle displacement = material.GetDisplacement();
@@ -312,8 +311,7 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
             bool anyNonSpecularBounces = true;
 
             // Spawn indirect ray.
-            nextRayQueue->PushIndirect(ray, Point3fi(ms.p), Normal3f(0, 0, 0),
-                                       Normal3f(0, 0, 0), beta, uniPathPDF, lightPathPDF,
+            nextRayQueue->PushIndirect(ray, ctx, beta, uniPathPDF, lightPathPDF,
                                        ms.lambda, ms.etaScale, isSpecularBounce,
                                        anyNonSpecularBounces, ms.pixelIndex);
             PBRT_DBG("Enqueuing indirect medium ray at depth %d pixel index %d\n",
@@ -332,8 +330,8 @@ void GPUPathIntegrator::HandleMediumTransitions(int depth) {
             // Why not? Basically boils down to current indirect enqueue (and other
             // places?))
             // TODO: figure this out...
-            rayQueue->PushIndirect(mt.ray, mt.piPrev, mt.nPrev, mt.nsPrev, mt.beta,
-                                   mt.uniPathPDF, mt.lightPathPDF, mt.lambda, mt.etaScale,
+            rayQueue->PushIndirect(mt.ray, mt.prevIntrCtx, mt.beta, mt.uniPathPDF,
+                                   mt.lightPathPDF, mt.lambda, mt.etaScale,
                                    mt.isSpecularBounce, mt.anyNonSpecularBounces,
                                    mt.pixelIndex);
             PBRT_DBG("Enqueuied ray after medium transition at depth %d pixel index %d",

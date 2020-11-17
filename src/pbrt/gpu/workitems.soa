@@ -11,6 +11,7 @@ flat MediumHandle;
 flat int;
 
 soa BSDF;
+soa LightSampleContext;
 soa MediumInterface;
 soa Normal3f;
 soa Point2f;
@@ -41,9 +42,7 @@ soa RayWorkItem {
     int pixelIndex;
     SampledWavelengths lambda;
     SampledSpectrum beta, uniPathPDF, lightPathPDF;
-    Point3fi piPrev;
-    Normal3f nPrev;
-    Normal3f nsPrev;
+    LightSampleContext prevIntrCtx;
     Float etaScale;
     int isSpecularBounce;
     int anyNonSpecularBounces;
@@ -54,8 +53,7 @@ soa EscapedRayWorkItem {
     SampledWavelengths lambda;
     Point3f rayo;
     Vector3f rayd;
-    Point3fi piPrev;
-    Normal3f nPrev, nsPrev;
+    LightSampleContext prevIntrCtx;
     int specularBounce;
     int pixelIndex;
 };
@@ -68,9 +66,7 @@ soa HitAreaLightWorkItem {
     Normal3f n;
     Point2f uv;
     Vector3f wo;
-    Point3fi piPrev;
-    Vector3f rayd;
-    Normal3f nPrev, nsPrev;
+    LightSampleContext prevIntrCtx;
     int isSpecularBounce;
     int pixelIndex;
 };
@@ -118,8 +114,7 @@ soa MediumTransitionWorkItem {
     Ray ray;
     SampledWavelengths lambda;
     SampledSpectrum beta, uniPathPDF, lightPathPDF;
-    Point3fi piPrev;
-    Normal3f nPrev, nsPrev;
+    LightSampleContext prevIntrCtx;
     int isSpecularBounce;
     int anyNonSpecularBounces;
     Float etaScale;
@@ -139,9 +134,7 @@ soa MediumSampleWorkItem {
     Normal3f n;
     Vector3f wo;
     Point2f uv;
-    Point3fi piPrev;
-    Normal3f nPrev;
-    Normal3f nsPrev;
+    LightSampleContext prevIntrCtx;
     int isSpecularBounce;
     MaterialHandle material;
     Normal3f ns;

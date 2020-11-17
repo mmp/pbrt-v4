@@ -64,3 +64,8 @@ soa TabulatedBSSRDF {
     const BSSRDFTable *table;
     SampledSpectrum sigma_t, rho;
 };
+
+soa LightSampleContext {
+    Point3fi pi;
+    Normal3f n, ns;
+};

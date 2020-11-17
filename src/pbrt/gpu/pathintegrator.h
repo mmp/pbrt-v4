@@ -71,7 +71,6 @@ class GPUPathIntegrator {
     RayQueue *NextRayQueue(int depth) { return rayQueues[(depth + 1) & 1]; }
 
     // GPUPathIntegrator Member Variables
-    // Various properties of the scene
     bool initializeVisibleSurface;
     bool haveSubsurface;
     bool haveMedia;
@@ -91,8 +90,6 @@ class GPUPathIntegrator {
     };
     Stats *stats;
 
-    int scanlinesPerPass, maxQueueSize;
-
     FilterHandle filter;
     FilmHandle film;
     SamplerHandle sampler;
@@ -100,9 +97,11 @@ class GPUPathIntegrator {
     LightHandle envLight;
     LightSamplerHandle lightSampler;
 
-    RayQueue *rayQueues[2] = {nullptr, nullptr};
+    int scanlinesPerPass, maxQueueSize;
 
     SOA<PixelSampleState> pixelSampleState;
+
+    RayQueue *rayQueues[2];
 
     MediumTransitionQueue *mediumTransitionQueue = nullptr;
     MediumSampleQueue *mediumSampleQueue = nullptr;

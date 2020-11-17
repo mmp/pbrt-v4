@@ -173,7 +173,10 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                             !bsdfSample->IsSpecular() || me.anyNonSpecularBounces;
 
                         // Spawn indriect ray.
-                        nextRayQueue->PushIndirect(ray, me.pi, me.n, ns, beta, uniPathPDF,
+                        LightSampleContext ctx(
+                            me.pi, me.n,
+                            ns);  // Note: slightly different than context below. Problem?
+                        nextRayQueue->PushIndirect(ray, ctx, beta, uniPathPDF,
                                                    lightPathPDF, lambda, etaScale,
                                                    bsdfSample->IsSpecular(),
                                                    anyNonSpecularBounces, me.pixelIndex);

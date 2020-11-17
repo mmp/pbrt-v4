@@ -117,15 +117,15 @@ extern "C" __global__ void __raygen__findClosest() {
                 r.ray.o.x, r.ray.o.y, r.ray.o.z, r.ray.d.x, r.ray.d.y, r.ray.d.z,
                 r.beta[0], r.beta[1], r.beta[2], r.beta[3]);
             params.mediumSampleQueue->Push(r.ray, Infinity, r.lambda, r.beta, r.uniPathPDF,
-                                           r.lightPathPDF, r.pixelIndex, r.piPrev,
-                                           r.nPrev, r.nsPrev, r.isSpecularBounce,
+                                           r.lightPathPDF, r.pixelIndex, r.prevIntrCtx,
+                                           r.isSpecularBounce,
                                            r.anyNonSpecularBounces, r.etaScale);
         } else if (params.escapedRayQueue) {
             PBRT_DBG("Adding ray to escapedRayQueue ray index %d pixel index %d\n", rayIndex,
                      r.pixelIndex);
             params.escapedRayQueue->Push(EscapedRayWorkItem{
-                r.beta, r.uniPathPDF, r.lightPathPDF, r.lambda, ray.o, ray.d, r.piPrev, r.nPrev,
-                r.nsPrev, (int)r.isSpecularBounce, r.pixelIndex});
+                r.beta, r.uniPathPDF, r.lightPathPDF, r.lambda, ray.o, ray.d, r.prevIntrCtx,
+                (int)r.isSpecularBounce, r.pixelIndex});
         }
     }
 }
@@ -166,9 +166,7 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
                                  r.uniPathPDF,
                                  r.lightPathPDF,
                                  r.pixelIndex,
-                                 r.piPrev,
-                                 r.nPrev,
-                                 r.nsPrev,
+                                 r.prevIntrCtx,
                                  r.isSpecularBounce,
                                  r.anyNonSpecularBounces,
                                  r.etaScale,
@@ -201,7 +199,7 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
                  rayIndex, r.pixelIndex);
         Ray newRay = intr.SpawnRay(r.ray.d);
         params.mediumTransitionQueue->Push(MediumTransitionWorkItem{
-            newRay, r.lambda, r.beta, r.uniPathPDF, r.lightPathPDF, r.piPrev, r.nPrev, r.nsPrev,
+            newRay, r.lambda, r.beta, r.uniPathPDF, r.lightPathPDF, r.prevIntrCtx,
             r.isSpecularBounce, r.anyNonSpecularBounces, r.etaScale, r.pixelIndex});
         return;
     }
@@ -213,8 +211,7 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
         // TODO: intr.wo == -ray.d?
         params.hitAreaLightQueue->Push(HitAreaLightWorkItem{
             intr.areaLight, r.lambda, r.beta, r.uniPathPDF, r.lightPathPDF, intr.p(), intr.n,
-            intr.uv, intr.wo, r.piPrev, ray.d, r.nPrev, r.nsPrev,
-            (int)r.isSpecularBounce, r.pixelIndex});
+            intr.uv, intr.wo, r.prevIntrCtx, (int)r.isSpecularBounce, r.pixelIndex});
     }
 
     FloatTextureHandle displacement = material.GetDisplacement();

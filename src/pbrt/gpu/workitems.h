@@ -20,6 +20,7 @@ namespace pbrt {
 
 // RaySamples Definition
 struct RaySamples {
+    // RaySamples Public Members
     struct {
         Point2f u;
         Float uc;
@@ -28,7 +29,6 @@ struct RaySamples {
         Float uc, rr;
         Point2f u;
     } indirect;
-
     bool haveSubsurface;
     struct {
         Float uc;
@@ -99,11 +99,11 @@ struct SOA<RaySamples> {
 
 // PixelSampleState Definition
 struct PixelSampleState {
-    Float filterWeight;
+    // PixelSampleState Public Members
     Point2i pPixel;
+    Float filterWeight;
     SampledWavelengths lambda;
-    SampledSpectrum L;
-    SampledSpectrum cameraRayWeight;
+    SampledSpectrum L, cameraRayWeight;
     VisibleSurface visibleSurface;
     RaySamples samples;
 };
@@ -114,9 +114,7 @@ struct RayWorkItem {
     int pixelIndex;
     SampledWavelengths lambda;
     SampledSpectrum beta, uniPathPDF, lightPathPDF;
-    Point3fi piPrev;
-    Normal3f nPrev;
-    Normal3f nsPrev;
+    LightSampleContext prevIntrCtx;
     Float etaScale;
     int isSpecularBounce;
     int anyNonSpecularBounces;
@@ -128,8 +126,7 @@ struct EscapedRayWorkItem {
     SampledWavelengths lambda;
     Point3f rayo;
     Vector3f rayd;
-    Point3fi piPrev;
-    Normal3f nPrev, nsPrev;
+    LightSampleContext prevIntrCtx;
     int specularBounce;
     int pixelIndex;
 };
@@ -146,9 +143,7 @@ struct HitAreaLightWorkItem {
     Normal3f n;
     Point2f uv;
     Vector3f wo;
-    Point3fi piPrev;
-    Vector3f rayd;
-    Normal3f nPrev, nsPrev;
+    LightSampleContext prevIntrCtx;
     int isSpecularBounce;
     int pixelIndex;
 };
@@ -256,8 +251,7 @@ struct MediumTransitionWorkItem {
     Ray ray;
     SampledWavelengths lambda;
     SampledSpectrum beta, uniPathPDF, lightPathPDF;
-    Point3fi piPrev;
-    Normal3f nPrev, nsPrev;
+    LightSampleContext prevIntrCtx;
     int isSpecularBounce;
     int anyNonSpecularBounces;
     Float etaScale;
@@ -277,9 +271,7 @@ struct MediumSampleWorkItem {
     SampledSpectrum uniPathPDF;
     SampledSpectrum lightPathPDF;
     int pixelIndex;
-    Point3fi piPrev;
-    Normal3f nPrev;
-    Normal3f nsPrev;
+    LightSampleContext prevIntrCtx;
     int isSpecularBounce;
     int anyNonSpecularBounces;
     Float etaScale;
@@ -335,9 +327,8 @@ class RayQueue : public WorkQueue<RayWorkItem> {
     }
 
     PBRT_CPU_GPU
-    int PushIndirect(const Ray &ray, const Point3fi &piPrev, const Normal3f &nPrev,
-                     const Normal3f &nsPrev, const SampledSpectrum &beta,
-                     const SampledSpectrum &uniPathPDF,
+    int PushIndirect(const Ray &ray, const LightSampleContext &prevIntrCtx,
+                     const SampledSpectrum &beta, const SampledSpectrum &uniPathPDF,
                      const SampledSpectrum &lightPathPDF,
                      const SampledWavelengths &lambda, Float etaScale,
                      bool isSpecularBounce, bool anyNonSpecularBounces, int pixelIndex) {
@@ -345,9 +336,7 @@ class RayQueue : public WorkQueue<RayWorkItem> {
         DCHECK(!ray.HasNaN());
         this->ray[index] = ray;
         this->pixelIndex[index] = pixelIndex;
-        this->piPrev[index] = piPrev;
-        this->nPrev[index] = nPrev;
-        this->nsPrev[index] = nsPrev;
+        this->prevIntrCtx[index] = prevIntrCtx;
         this->beta[index] = beta;
         this->uniPathPDF[index] = uniPathPDF;
         this->lightPathPDF[index] = lightPathPDF;
@@ -434,7 +423,7 @@ class MediumSampleQueue : public WorkQueue<MediumSampleWorkItem> {
     PBRT_CPU_GPU
     int Push(Ray ray, Float tMax, SampledWavelengths lambda, SampledSpectrum beta,
              SampledSpectrum uniPathPDF, SampledSpectrum lightPathPDF, int pixelIndex,
-             Point3fi piPrev, Normal3f nPrev, Normal3f nsPrev, int isSpecularBounce,
+             LightSampleContext prevIntrCtx, int isSpecularBounce,
              int anyNonSpecularBounces, Float etaScale) {
         int index = AllocateEntry();
         this->ray[index] = ray;
@@ -444,9 +433,7 @@ class MediumSampleQueue : public WorkQueue<MediumSampleWorkItem> {
         this->uniPathPDF[index] = uniPathPDF;
         this->lightPathPDF[index] = lightPathPDF;
         this->pixelIndex[index] = pixelIndex;
-        this->piPrev[index] = piPrev;
-        this->nPrev[index] = nPrev;
-        this->nsPrev[index] = nsPrev;
+        this->prevIntrCtx[index] = prevIntrCtx;
         this->isSpecularBounce[index] = isSpecularBounce;
         this->anyNonSpecularBounces[index] = anyNonSpecularBounces;
         this->etaScale[index] = etaScale;
