@@ -373,7 +373,7 @@ class SobolSampler {
     Point2f Get2D() {
         if (dimension + 1 >= NSobolDimensions)
             dimension = 2;
-        Point2f u(SampleDimension(dimension), SampleDimension(dimension + 1));
+        Point2f u{SampleDimension(dimension), SampleDimension(dimension + 1)};
         if (dimension == 0) {
             // Remap Sobol$'$ dimensions used for pixel samples
             for (int dim = 0; dim < 2; ++dim) {

@@ -310,7 +310,7 @@ Float MLTSampler::Get1D() {
 }
 
 Point2f MLTSampler::Get2D() {
-    return Point2f(Get1D(), Get1D());
+    return {Get1D(), Get1D()};
 }
 
 std::vector<SamplerHandle> MLTSampler::Clone(int n, Allocator alloc) {
