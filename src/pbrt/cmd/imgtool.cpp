@@ -2174,8 +2174,29 @@ int denoise_optix(int argc, char *argv[]) {
     ImageAndMetadata im = Image::Read(inFilename);
     Image &image = im.image;
 
+    int nLayers = 3;
+    ImageChannelDesc desc[3] = {
+        image.GetChannelDesc({"R", "G", "B"}),
+        image.GetChannelDesc({"Albedo.R", "Albedo.G", "Albedo.B"}),
+        image.GetChannelDesc({"Nsx", "Nsy", "Nsz"})};
+    if (!desc[0]) {
+        fprintf(stderr, "%s: image doesn't have R, G, B channels.", inFilename.c_str());
+        return 1;
+    }
+    if (!desc[1]) {
+        fprintf(stderr, "Warning: %s: image doesn't have Albedo.{R,G,B} channels. "
+                "Denoising quality may suffer.\n", inFilename.c_str());
+        nLayers = 1;
+    }
+    if (!desc[2]) {
+        fprintf(stderr, "Warning: %s: image doesn't have Nsx, Nsy, Nsz channels. "
+                "Denoising quality may suffer.\n", inFilename.c_str());
+        nLayers = 1;
+    }
+
     OptixDenoiserOptions options = {};
-    options.inputKind = OPTIX_DENOISER_INPUT_RGB_ALBEDO_NORMAL;
+    options.inputKind = (nLayers = 3) ? OPTIX_DENOISER_INPUT_RGB_ALBEDO_NORMAL :
+        OPTIX_DENOISER_INPUT_RGB;
 
     OptixDenoiser denoiserHandle;
     OPTIX_CHECK(optixDenoiserCreate(optixContext, &options, &denoiserHandle));
@@ -2200,27 +2221,8 @@ int denoise_optix(int argc, char *argv[]) {
     CUDAMemoryResource cudaMemoryResource;
     Allocator alloc(&cudaMemoryResource);
 
-    ImageChannelDesc desc[3] = {
-        image.GetChannelDesc({"R", "G", "B"}),
-        image.GetChannelDesc({"Albedo.R", "Albedo.G", "Albedo.B"}),
-        image.GetChannelDesc({"Nsx", "Nsy", "Nsz"})};
-    if (!desc[0]) {
-        fprintf(stderr, "%s: image doesn't have R, G, B channels.", inFilename.c_str());
-        return 1;
-    }
-    if (!desc[1]) {
-        fprintf(stderr, "%s: image doesn't have Albedo.{R,G,B} channels.",
-                inFilename.c_str());
-        return 1;
-    }
-    if (!desc[2]) {
-        fprintf(stderr, "%s: image doesn't have Nsx, Nsy, Nsz channels.",
-                inFilename.c_str());
-        return 1;
-    }
-
-    OptixImage2D *inputLayers = alloc.allocate_object<OptixImage2D>(3);
-    for (int i = 0; i < 3; ++i) {
+    OptixImage2D *inputLayers = alloc.allocate_object<OptixImage2D>(nLayers);
+    for (int i = 0; i < nLayers; ++i) {
         inputLayers[i].width = image.Resolution().x;
         inputLayers[i].height = image.Resolution().y;
         inputLayers[i].rowStrideInBytes = image.Resolution().x * 3 * sizeof(float);
@@ -2265,7 +2267,7 @@ int denoise_optix(int argc, char *argv[]) {
 
     OPTIX_CHECK(optixDenoiserInvoke(
         denoiserHandle, 0 /* stream */, &params, CUdeviceptr(denoiserState),
-        memorySizes.stateSizeInBytes, inputLayers, 3, 0 /* offset x */, 0 /* offset y */,
+        memorySizes.stateSizeInBytes, inputLayers, nLayers, 0 /* offset x */, 0 /* offset y */,
         outputImage, CUdeviceptr(scratchBuffer),
         memorySizes.withoutOverlapScratchSizeInBytes));
 
