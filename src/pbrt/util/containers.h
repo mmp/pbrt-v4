@@ -101,6 +101,18 @@ struct TakeFirstN<1, TypePack<T, Ts...>> {
     using type = TypePack<T>;
 };
 
+template <template <typename> class M, typename... Ts>
+struct MapType;
+template <template <typename> class M, typename T>
+struct MapType<M, TypePack<T>> {
+    using type = TypePack<M<T>>;
+};
+
+template <template <typename> class M, typename T, typename... Ts>
+struct MapType<M, TypePack<T, Ts...>> {
+    using type = typename Prepend<M<T>, typename MapType<M, TypePack<Ts...>>::type>::type;
+};
+
 template <typename F, typename... Ts>
 void ForEachType(F func, TypePack<Ts...>);
 template <typename F, typename T, typename... Ts>
