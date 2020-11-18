@@ -362,7 +362,6 @@ void GPUPathIntegrator::Render() {
 
                         if (escapedRayQueue)
                             escapedRayQueue->Reset();
-
                         hitAreaLightQueue->Reset();
 
                         basicEvalMaterialQueue->Reset();
@@ -440,51 +439,49 @@ void GPUPathIntegrator::Render() {
 void GPUPathIntegrator::HandleEscapedRays(int depth) {
     ForAllQueued(
         "Handle escaped rays", escapedRayQueue, maxQueueSize,
-        PBRT_GPU_LAMBDA(const EscapedRayWorkItem er, int index) {
+        PBRT_GPU_LAMBDA(const EscapedRayWorkItem w, int index) {
             // Update pixel radiance for escaped ray
-            SampledSpectrum Le = envLight.Le(Ray(er.rayo, er.rayd), er.lambda);
+            SampledSpectrum Le = envLight.Le(Ray(w.rayo, w.rayd), w.lambda);
             if (!Le)
                 return;
             // Compute path radiance contribution from infinite light
             SampledSpectrum L(0.f);
 
             PBRT_DBG("L %f %f %f %f T_hat %f %f %f %f Le %f %f %f %f", L[0], L[1], L[2],
-                     L[3], er.T_hat[0], er.T_hat[1], er.T_hat[2], er.T_hat[3], Le[0],
-                     Le[1], Le[2], Le[3]);
-            PBRT_DBG("pdf uni %f %f %f %f pdf nee %f %f %f %f", er.uniPathPDF[0],
-                     er.uniPathPDF[1], er.uniPathPDF[2], er.uniPathPDF[3],
-                     er.lightPathPDF[0], er.lightPathPDF[1], er.lightPathPDF[2],
-                     er.lightPathPDF[3]);
+                     L[3], w.T_hat[0], w.T_hat[1], w.T_hat[2], w.T_hat[3], Le[0], Le[1],
+                     Le[2], Le[3]);
+            PBRT_DBG("pdf uni %f %f %f %f pdf nee %f %f %f %f", w.uniPathPDF[0],
+                     w.uniPathPDF[1], w.uniPathPDF[2], w.uniPathPDF[3], w.lightPathPDF[0],
+                     w.lightPathPDF[1], w.lightPathPDF[2], w.lightPathPDF[3]);
 
-            if (depth == 0 || er.specularBounce) {
-                L = er.T_hat * Le / er.uniPathPDF.Average();
+            if (depth == 0 || w.specularBounce) {
+                L = w.T_hat * Le / w.uniPathPDF.Average();
             } else {
                 // Compute MIS-weighted radiance contribution from infinite light
-                LightSampleContext ctx = er.prevIntrCtx;
+                LightSampleContext ctx = w.prevIntrCtx;
                 Float lightChoicePDF = lightSampler.PDF(ctx, envLight);
-                SampledSpectrum uniPathPDF = er.uniPathPDF;
                 SampledSpectrum lightPathPDF =
-                    er.lightPathPDF * lightChoicePDF *
-                    envLight.PDF_Li(ctx, er.rayd, LightSamplingMode::WithMIS);
-                L = er.T_hat * Le / (uniPathPDF + lightPathPDF).Average();
+                    w.lightPathPDF * lightChoicePDF *
+                    envLight.PDF_Li(ctx, w.rayd, LightSamplingMode::WithMIS);
+                L = w.T_hat * Le / (w.uniPathPDF + lightPathPDF).Average();
             }
-            L = SafeDiv(L, er.lambda.PDF());
+            L = SafeDiv(L, w.lambda.PDF());
 
             PBRT_DBG("Added L %f %f %f %f for escaped ray pixel index %d\n", L[0], L[1],
-                     L[2], L[3], er.pixelIndex);
+                     L[2], L[3], w.pixelIndex);
 
-            L += pixelSampleState.L[er.pixelIndex];
-            pixelSampleState.L[er.pixelIndex] = L;
+            L += pixelSampleState.L[w.pixelIndex];
+            pixelSampleState.L[w.pixelIndex] = L;
         });
 }
 
 void GPUPathIntegrator::HandleRayFoundEmission(int depth) {
     ForAllQueued(
         "Handle emitters hit by indirect rays", hitAreaLightQueue, maxQueueSize,
-        PBRT_GPU_LAMBDA(const HitAreaLightWorkItem he, int index) {
+        PBRT_GPU_LAMBDA(const HitAreaLightWorkItem w, int index) {
             // Find emitted radiance from surface that ray hit
-            LightHandle areaLight = he.areaLight;
-            SampledSpectrum Le = areaLight.L(he.p, he.n, he.uv, he.wo, he.lambda);
+            LightHandle areaLight = w.areaLight;
+            SampledSpectrum Le = areaLight.L(w.p, w.n, w.uv, w.wo, w.lambda);
             if (!Le)
                 return;
             PBRT_DBG("Got Le %f %f %f %f from hit area light at depth %d\n", Le[0], Le[1],
@@ -492,31 +489,31 @@ void GPUPathIntegrator::HandleRayFoundEmission(int depth) {
 
             // Compute area light's weighted radiance contribution to the path
             SampledSpectrum L(0.f);
-            if (depth == 0 || he.isSpecularBounce) {
-                L = he.T_hat * Le / he.uniPathPDF.Average();
+            if (depth == 0 || w.isSpecularBounce) {
+                L = w.T_hat * Le / w.uniPathPDF.Average();
             } else {
                 // Compute MIS-weighted radiance contribution from area light
-                Vector3f wi = -he.wo;
+                Vector3f wi = -w.wo;
 
-                LightSampleContext ctx = he.prevIntrCtx;
+                LightSampleContext ctx = w.prevIntrCtx;
 
                 Float lightChoicePDF = lightSampler.PDF(ctx, areaLight);
                 Float lightPDF = lightChoicePDF *
                                  areaLight.PDF_Li(ctx, wi, LightSamplingMode::WithMIS);
 
-                SampledSpectrum uniPathPDF = he.uniPathPDF;
-                SampledSpectrum lightPathPDF = he.lightPathPDF * lightPDF;
+                SampledSpectrum uniPathPDF = w.uniPathPDF;
+                SampledSpectrum lightPathPDF = w.lightPathPDF * lightPDF;
 
-                L = he.T_hat * Le / (uniPathPDF + lightPathPDF).Average();
+                L = w.T_hat * Le / (uniPathPDF + lightPathPDF).Average();
             }
-            L = SafeDiv(L, he.lambda.PDF());
+            L = SafeDiv(L, w.lambda.PDF());
 
             PBRT_DBG("Added L %f %f %f %f for pixel index %d\n", L[0], L[1], L[2], L[3],
-                     he.pixelIndex);
+                     w.pixelIndex);
 
             // Update _L_ in _PixelSampleState_ for area light's radiance
-            L += pixelSampleState.L[he.pixelIndex];
-            pixelSampleState.L[he.pixelIndex] = L;
+            L += pixelSampleState.L[w.pixelIndex];
+            pixelSampleState.L[w.pixelIndex] = L;
         });
 }
 

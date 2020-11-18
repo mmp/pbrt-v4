@@ -19,8 +19,6 @@ void GPUPathIntegrator::GenerateRaySamples(int depth, int sampleIndex) {
                       !std::is_same_v<Sampler, DebugMLTSampler>)
             GenerateRaySamples<Sampler>(depth, sampleIndex);
     };
-    // Call the appropriate GenerateRaySamples specialization based on the
-    // Sampler's actual type.
     sampler.DispatchCPU(generateSamples);
 }
 
