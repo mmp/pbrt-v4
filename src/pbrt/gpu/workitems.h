@@ -13,6 +13,7 @@
 #include <pbrt/lightsamplers.h>
 #include <pbrt/materials.h>
 #include <pbrt/ray.h>
+#include <pbrt/util/containers.h>
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/soa.h>
 
@@ -437,13 +438,7 @@ using MediumScatterQueue = WorkQueue<MediumScatterWorkItem>;
 
 // MaterialEvalQueue Definition
 using MaterialEvalQueue = MultiWorkQueue<
-    MaterialEvalWorkItem<CoatedDiffuseMaterial>,
-    MaterialEvalWorkItem<CoatedConductorMaterial>,
-    MaterialEvalWorkItem<ConductorMaterial>, MaterialEvalWorkItem<DielectricMaterial>,
-    MaterialEvalWorkItem<DiffuseMaterial>,
-    MaterialEvalWorkItem<DiffuseTransmissionMaterial>, MaterialEvalWorkItem<HairMaterial>,
-    MaterialEvalWorkItem<MeasuredMaterial>, MaterialEvalWorkItem<SubsurfaceMaterial>,
-    MaterialEvalWorkItem<ThinDielectricMaterial>, MaterialEvalWorkItem<MixMaterial>>;
+    typename MapType<MaterialEvalWorkItem, typename MaterialHandle::Types>::type>;
 
 }  // namespace pbrt
 

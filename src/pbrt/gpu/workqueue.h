@@ -99,21 +99,21 @@ void ForAllQueued(const char *desc, WorkQueue<WorkItem> *q, int maxQueued, F fun
 }
 
 // MultiWorkQueue Definition
-template <typename... Ts>
+template <typename T>
 class MultiWorkQueue;
 
 template <>
-class MultiWorkQueue<> {
+class MultiWorkQueue<TypePack<>> {
   public:
     MultiWorkQueue(int n, Allocator alloc, pstd::span<const bool> haveType) {}
 };
 
 template <typename T, typename... Ts>
-class MultiWorkQueue<T, Ts...> : public MultiWorkQueue<Ts...> {
+class MultiWorkQueue<TypePack<T, Ts...>> : public MultiWorkQueue<TypePack<Ts...>> {
   public:
     // MultiWorkQueue Public Methods
     MultiWorkQueue(int n, Allocator alloc, pstd::span<const bool> haveType)
-        : MultiWorkQueue<Ts...>(n, alloc, haveType.subspan(1, haveType.size())),
+        : MultiWorkQueue<TypePack<Ts...>>(n, alloc, haveType.subspan(1, haveType.size())),
           q(haveType.front() ? n : 1, alloc) {}
 
     template <typename Tsz>
@@ -121,14 +121,14 @@ class MultiWorkQueue<T, Ts...> : public MultiWorkQueue<Ts...> {
         if constexpr (std::is_same_v<Tsz, T>)
             return q.Size();
         else
-            return MultiWorkQueue<Ts...>::template Size<Tsz>();
+            return MultiWorkQueue<TypePack<Ts...>>::template Size<Tsz>();
     }
 
     PBRT_CPU_GPU
     void Reset() {
         q.Reset();
         if constexpr (sizeof...(Ts) > 0)
-            MultiWorkQueue<Ts...>::Reset();
+            MultiWorkQueue<TypePack<Ts...>>::Reset();
     }
 
     template <typename Tg>
@@ -136,7 +136,7 @@ class MultiWorkQueue<T, Ts...> : public MultiWorkQueue<Ts...> {
         if constexpr (std::is_same_v<Tg, T>)
             return &q;
         else
-            return MultiWorkQueue<Ts...>::template Get<Tg>();
+            return MultiWorkQueue<TypePack<Ts...>>::template Get<Tg>();
     }
 
     template <typename Tq>
@@ -144,7 +144,7 @@ class MultiWorkQueue<T, Ts...> : public MultiWorkQueue<Ts...> {
         if constexpr (std::is_same_v<Tq, T>)
             return q.Push(item);
         else
-            return MultiWorkQueue<Ts...>::template Push<Tq>(item);
+            return MultiWorkQueue<TypePack<Ts...>>::template Push<Tq>(item);
     }
 
   private:
