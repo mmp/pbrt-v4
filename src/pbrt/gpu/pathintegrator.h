@@ -42,7 +42,6 @@ class GPUPathIntegrator {
 
     void TraceShadowRays(int depth);
     void SampleMediumInteraction(int depth);
-    void HandleMediumTransitions(int depth);
     void SampleSubsurface(int depth);
 
     void HandleEscapedRays(int depth);
@@ -103,7 +102,6 @@ class GPUPathIntegrator {
 
     RayQueue *rayQueues[2];
 
-    MediumTransitionQueue *mediumTransitionQueue = nullptr;
     MediumSampleQueue *mediumSampleQueue = nullptr;
     MediumScatterQueue *mediumScatterQueue = nullptr;
 

@@ -228,8 +228,6 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
         pstd::MakeConstSpan(&haveUniversalEvalMaterial[1],
                             haveUniversalEvalMaterial.size() - 1));
 
-    // Always allocate this, even if no media
-    mediumTransitionQueue = alloc.new_object<MediumTransitionQueue>(maxQueueSize, alloc);
     if (haveMedia) {
         mediumSampleQueue = alloc.new_object<MediumSampleQueue>(maxQueueSize, alloc);
         mediumScatterQueue = alloc.new_object<MediumScatterQueue>(maxQueueSize, alloc);
@@ -354,7 +352,6 @@ void GPUPathIntegrator::Render() {
                     "Reset queues before tracing rays", PBRT_GPU_LAMBDA() {
                         nextQueue->Reset();
                         // Reset queues before tracing next batch of rays
-                        mediumTransitionQueue->Reset();
                         if (mediumSampleQueue)
                             mediumSampleQueue->Reset();
                         if (mediumScatterQueue)
@@ -378,8 +375,8 @@ void GPUPathIntegrator::Render() {
                 // Find closest intersections along active rays
                 accel->IntersectClosest(maxQueueSize, escapedRayQueue, hitAreaLightQueue,
                                         basicEvalMaterialQueue,
-                                        universalEvalMaterialQueue, mediumTransitionQueue,
-                                        mediumSampleQueue, CurrentRayQueue(depth));
+                                        universalEvalMaterialQueue, mediumSampleQueue,
+                                        CurrentRayQueue(depth), NextRayQueue(depth));
 
                 if (depth > 0) {
                     // As above, with the indexing...
@@ -399,7 +396,6 @@ void GPUPathIntegrator::Render() {
                 EvaluateMaterialsAndBSDFs(depth);
                 // Do immediately so that we have space for shadow rays for subsurface..
                 TraceShadowRays(depth);
-                HandleMediumTransitions(depth);
                 if (haveSubsurface)
                     SampleSubsurface(depth);
             }

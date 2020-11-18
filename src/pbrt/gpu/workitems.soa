@@ -110,17 +110,6 @@ soa SubsurfaceScatterWorkItem {
     SubsurfaceInteraction ssi;
 };
 
-soa MediumTransitionWorkItem {
-    Ray ray;
-    SampledWavelengths lambda;
-    SampledSpectrum T_hat, uniPathPDF, lightPathPDF;
-    LightSampleContext prevIntrCtx;
-    int isSpecularBounce;
-    int anyNonSpecularBounces;
-    Float etaScale;
-    int pixelIndex;
-};
-
 soa MediumSampleWorkItem {
     Ray ray;
     Float tMax;

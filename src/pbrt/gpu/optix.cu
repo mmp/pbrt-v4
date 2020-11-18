@@ -198,9 +198,9 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
         PBRT_DBG("Enqueuing into medium transition queue: ray index %d pixel index %d \n",
                  rayIndex, r.pixelIndex);
         Ray newRay = intr.SpawnRay(r.ray.d);
-        params.mediumTransitionQueue->Push(MediumTransitionWorkItem{
-            newRay, r.lambda, r.T_hat, r.uniPathPDF, r.lightPathPDF, r.prevIntrCtx,
-            r.isSpecularBounce, r.anyNonSpecularBounces, r.etaScale, r.pixelIndex});
+        params.nextRayQueue->PushIndirect(
+            newRay, r.prevIntrCtx, r.T_hat, r.uniPathPDF, r.lightPathPDF, r.lambda,
+            r.etaScale, r.isSpecularBounce, r.anyNonSpecularBounces, r.pixelIndex);
         return;
     }
 

@@ -248,21 +248,6 @@ struct SubsurfaceScatterWorkItem {
     int pixelIndex;
 };
 
-// MediumTransitionWorkItem Definition
-struct MediumTransitionWorkItem {
-    Ray ray;
-    SampledWavelengths lambda;
-    SampledSpectrum T_hat, uniPathPDF, lightPathPDF;
-    LightSampleContext prevIntrCtx;
-    int isSpecularBounce;
-    int anyNonSpecularBounces;
-    Float etaScale;
-    int pixelIndex;
-};
-
-// MediumTransitionQueue Definition
-using MediumTransitionQueue = WorkQueue<MediumTransitionWorkItem>;
-
 // MediumSampleWorkItem Definition
 struct MediumSampleWorkItem {
     // Both enqueue types (have mtl and no hit)

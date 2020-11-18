@@ -36,6 +36,7 @@ static inline void rescale(SampledSpectrum &T_hat, SampledSpectrum &lightPathPDF
 
 // GPUPathIntegrator Participating Media Methods
 void GPUPathIntegrator::SampleMediumInteraction(int depth) {
+    RayQueue *nextRayQueue = NextRayQueue(depth);
     ForAllQueued(
         "Sample medium interaction", mediumSampleQueue, maxQueueSize,
         PBRT_GPU_LAMBDA(MediumSampleWorkItem w, int index) {
@@ -177,17 +178,10 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                 Interaction intr(w.pi, w.n);
                 intr.mediumInterface = &w.mediumInterface;
                 Ray newRay = intr.SpawnRay(ray.d);
-                mediumTransitionQueue->Push(MediumTransitionWorkItem{
-                    newRay, lambda, T_hat, uniPathPDF, lightPathPDF, w.prevIntrCtx,
-                    w.isSpecularBounce, w.anyNonSpecularBounces, w.etaScale,
-                    w.pixelIndex});
-#if 0
-                // WHY NOT THIS?
-                rayQueues[(depth + 1) & 1]->PushIndirect(newRay, w.prevIntrCtx,
-                                                         T_hat, uniPathPDF, lightPathPDF, lambda, w.etaScale,
-                                                         w.isSpecularBounce, w.anyNonSpecularBounces,
-                                                         w.pixelIndex);
-#endif
+                nextRayQueue->PushIndirect(newRay, w.prevIntrCtx, T_hat, uniPathPDF,
+                                           lightPathPDF, lambda, w.etaScale,
+                                           w.isSpecularBounce, w.anyNonSpecularBounces,
+                                           w.pixelIndex);
                 return;
             }
 
@@ -226,7 +220,6 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
         return;
 
     RayQueue *currentRayQueue = CurrentRayQueue(depth);
-    RayQueue *nextRayQueue = NextRayQueue(depth);
 
     using PhaseFunction = HGPhaseFunction;
     std::string desc = std::string("Sample direct/indirect - Henyey Greenstein");
@@ -315,26 +308,6 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                                        anyNonSpecularBounces, w.pixelIndex);
             PBRT_DBG("Enqueuing indirect medium ray at depth %d pixel index %d\n",
                      depth + 1, w.pixelIndex);
-        });
-}
-
-void GPUPathIntegrator::HandleMediumTransitions(int depth) {
-    RayQueue *rayQueue = NextRayQueue(depth);
-
-    ForAllQueued(
-        "Handle medium transitions", mediumTransitionQueue, maxQueueSize,
-        PBRT_GPU_LAMBDA(MediumTransitionWorkItem mt, int index) {
-            // Have to do this here, later, since we can't be writing into
-            // the other ray queue in optix closest hit.  (Wait--really?
-            // Why not? Basically boils down to current indirect enqueue (and other
-            // places?))
-            // TODO: figure this out...
-            rayQueue->PushIndirect(mt.ray, mt.prevIntrCtx, mt.T_hat, mt.uniPathPDF,
-                                   mt.lightPathPDF, mt.lambda, mt.etaScale,
-                                   mt.isSpecularBounce, mt.anyNonSpecularBounces,
-                                   mt.pixelIndex);
-            PBRT_DBG("Enqueuied ray after medium transition at depth %d pixel index %d",
-                     depth + 1, mt.pixelIndex);
         });
 }
 

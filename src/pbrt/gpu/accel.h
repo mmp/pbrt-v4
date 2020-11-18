@@ -41,8 +41,7 @@ class GPUAccel {
         int maxRays, EscapedRayQueue *escapedRayQueue,
         HitAreaLightQueue *hitAreaLightQueue, MaterialEvalQueue *basicEvalMaterialQueue,
         MaterialEvalQueue *universalEvalMaterialQueue,
-        MediumTransitionQueue *mediumTransitionQueue,
-        MediumSampleQueue *mediumSampleQueue, RayQueue *rayQueue) const;
+        MediumSampleQueue *mediumSampleQueue, RayQueue *rayQueue, RayQueue *nextRayQueue) const;
 
     void IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue) const;
 

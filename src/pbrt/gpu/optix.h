@@ -53,10 +53,10 @@ struct RayIntersectParameters {
     RayQueue *rayQueue;
 
     // closest hit
+    RayQueue *nextRayQueue;
     EscapedRayQueue *escapedRayQueue;
     HitAreaLightQueue *hitAreaLightQueue;
     MaterialEvalQueue *basicEvalMaterialQueue, *universalEvalMaterialQueue;
-    MediumTransitionQueue *mediumTransitionQueue;
     MediumSampleQueue *mediumSampleQueue;
 
     // shadow rays
