@@ -41,7 +41,7 @@ soa RayWorkItem {
     Ray ray;
     int pixelIndex;
     SampledWavelengths lambda;
-    SampledSpectrum beta, uniPathPDF, lightPathPDF;
+    SampledSpectrum T_hat, uniPathPDF, lightPathPDF;
     LightSampleContext prevIntrCtx;
     Float etaScale;
     int isSpecularBounce;
@@ -49,7 +49,7 @@ soa RayWorkItem {
 };
 
 soa EscapedRayWorkItem {
-    SampledSpectrum beta, uniPathPDF, lightPathPDF;
+    SampledSpectrum T_hat, uniPathPDF, lightPathPDF;
     SampledWavelengths lambda;
     Point3f rayo;
     Vector3f rayd;
@@ -61,7 +61,7 @@ soa EscapedRayWorkItem {
 soa HitAreaLightWorkItem {
     LightHandle areaLight;
     SampledWavelengths lambda;
-    SampledSpectrum beta, uniPathPDF, lightPathPDF;
+    SampledSpectrum T_hat, uniPathPDF, lightPathPDF;
     Point3f p;
     Normal3f n;
     Point2f uv;
@@ -82,7 +82,7 @@ soa ShadowRayWorkItem {
 soa GetBSSRDFAndProbeRayWorkItem {
     MaterialHandle material;
     SampledWavelengths lambda;
-    SampledSpectrum beta, uniPathPDF;
+    SampledSpectrum T_hat, uniPathPDF;
     Point3f p;
     Vector3f wo;
     Normal3f n, ns;
@@ -99,7 +99,7 @@ soa SubsurfaceScatterWorkItem {
     MaterialHandle material;
     TabulatedBSSRDF bssrdf;
     SampledWavelengths lambda;
-    SampledSpectrum beta, uniPathPDF;
+    SampledSpectrum T_hat, uniPathPDF;
     MediumInterface mediumInterface;
     Float etaScale;
     int pixelIndex;
@@ -113,7 +113,7 @@ soa SubsurfaceScatterWorkItem {
 soa MediumTransitionWorkItem {
     Ray ray;
     SampledWavelengths lambda;
-    SampledSpectrum beta, uniPathPDF, lightPathPDF;
+    SampledSpectrum T_hat, uniPathPDF, lightPathPDF;
     LightSampleContext prevIntrCtx;
     int isSpecularBounce;
     int anyNonSpecularBounces;
@@ -125,7 +125,7 @@ soa MediumSampleWorkItem {
     Ray ray;
     Float tMax;
     SampledWavelengths lambda;
-    SampledSpectrum beta;
+    SampledSpectrum T_hat;
     SampledSpectrum uniPathPDF;
     SampledSpectrum lightPathPDF;
     int pixelIndex;
@@ -150,7 +150,7 @@ soa MediumSampleWorkItem {
 soa MediumScatterWorkItem {
     Point3f p;
     SampledWavelengths lambda;
-    SampledSpectrum beta, uniPathPDF;
+    SampledSpectrum T_hat, uniPathPDF;
     HGPhaseFunction phase;
     Vector3f wo;
     Float etaScale;
@@ -161,7 +161,7 @@ soa MediumScatterWorkItem {
 soa MaterialEvalWorkItem<Material> {
     const Material *material;
     SampledWavelengths lambda;
-    SampledSpectrum beta, uniPathPDF;
+    SampledSpectrum T_hat, uniPathPDF;
     Point3fi pi;
     Normal3f n, ns;
     Vector3f dpdus, dpdvs;

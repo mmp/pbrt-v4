@@ -113,10 +113,10 @@ extern "C" __global__ void __raygen__findClosest() {
     if (missed) {
         if (ray.medium) {
             PBRT_DBG("Adding miss ray to mediumSampleQueue. "
-                "ray %f %f %f d %f %f %f beta %f %f %f %f\n",
+                "ray %f %f %f d %f %f %f T_hat %f %f %f %f\n",
                 r.ray.o.x, r.ray.o.y, r.ray.o.z, r.ray.d.x, r.ray.d.y, r.ray.d.z,
-                r.beta[0], r.beta[1], r.beta[2], r.beta[3]);
-            params.mediumSampleQueue->Push(r.ray, Infinity, r.lambda, r.beta, r.uniPathPDF,
+                r.T_hat[0], r.T_hat[1], r.T_hat[2], r.T_hat[3]);
+            params.mediumSampleQueue->Push(r.ray, Infinity, r.lambda, r.T_hat, r.uniPathPDF,
                                            r.lightPathPDF, r.pixelIndex, r.prevIntrCtx,
                                            r.isSpecularBounce,
                                            r.anyNonSpecularBounces, r.etaScale);
@@ -124,7 +124,7 @@ extern "C" __global__ void __raygen__findClosest() {
             PBRT_DBG("Adding ray to escapedRayQueue ray index %d pixel index %d\n", rayIndex,
                      r.pixelIndex);
             params.escapedRayQueue->Push(EscapedRayWorkItem{
-                r.beta, r.uniPathPDF, r.lightPathPDF, r.lambda, ray.o, ray.d, r.prevIntrCtx,
+                r.T_hat, r.uniPathPDF, r.lightPathPDF, r.lambda, ray.o, ray.d, r.prevIntrCtx,
                 (int)r.isSpecularBounce, r.pixelIndex});
         }
     }
@@ -162,7 +162,7 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
             MediumSampleWorkItem{r.ray,
                                  optixGetRayTmax(),
                                  r.lambda,
-                                 r.beta,
+                                 r.T_hat,
                                  r.uniPathPDF,
                                  r.lightPathPDF,
                                  r.pixelIndex,
@@ -199,7 +199,7 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
                  rayIndex, r.pixelIndex);
         Ray newRay = intr.SpawnRay(r.ray.d);
         params.mediumTransitionQueue->Push(MediumTransitionWorkItem{
-            newRay, r.lambda, r.beta, r.uniPathPDF, r.lightPathPDF, r.prevIntrCtx,
+            newRay, r.lambda, r.T_hat, r.uniPathPDF, r.lightPathPDF, r.prevIntrCtx,
             r.isSpecularBounce, r.anyNonSpecularBounces, r.etaScale, r.pixelIndex});
         return;
     }
@@ -210,7 +210,7 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
         Ray ray = r.ray;
         // TODO: intr.wo == -ray.d?
         params.hitAreaLightQueue->Push(HitAreaLightWorkItem{
-            intr.areaLight, r.lambda, r.beta, r.uniPathPDF, r.lightPathPDF, intr.p(), intr.n,
+            intr.areaLight, r.lambda, r.T_hat, r.uniPathPDF, r.lightPathPDF, intr.p(), intr.n,
             intr.uv, intr.wo, r.prevIntrCtx, (int)r.isSpecularBounce, r.pixelIndex});
     }
 
@@ -227,7 +227,7 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
     auto enqueue = [=](auto ptr) {
         using Material = typename std::remove_reference_t<decltype(*ptr)>;
         q->Push<MaterialEvalWorkItem<Material>>(MaterialEvalWorkItem<Material>{
-            ptr, r.lambda, r.beta, r.uniPathPDF, intr.pi, intr.n, intr.shading.n,
+            ptr, r.lambda, r.T_hat, r.uniPathPDF, intr.pi, intr.n, intr.shading.n,
             intr.shading.dpdu, intr.shading.dpdv, intr.shading.dndu, intr.shading.dndv,
             intr.wo, intr.uv, intr.time, r.anyNonSpecularBounces, r.etaScale,
             getPayload<ClosestHitContext>()->mediumInterface, r.pixelIndex});
@@ -368,18 +368,18 @@ extern "C" __global__ void __miss__shadow() {
 }
 
 __device__
-inline void rescale(SampledSpectrum &beta, SampledSpectrum &lightPathPDF,
+inline void rescale(SampledSpectrum &T_hat, SampledSpectrum &lightPathPDF,
                     SampledSpectrum &uniPathPDF) {
-    if (beta.MaxComponentValue() > 0x1p24f ||
+    if (T_hat.MaxComponentValue() > 0x1p24f ||
         lightPathPDF.MaxComponentValue() > 0x1p24f ||
         uniPathPDF.MaxComponentValue() > 0x1p24f) {
-        beta *= 1.f / 0x1p24f;
+        T_hat *= 1.f / 0x1p24f;
         lightPathPDF *= 1.f / 0x1p24f;
         uniPathPDF *= 1.f / 0x1p24f;
-    } else if (beta.MaxComponentValue() < 0x1p-24f ||
+    } else if (T_hat.MaxComponentValue() < 0x1p-24f ||
                lightPathPDF.MaxComponentValue() < 0x1p-24f ||
                uniPathPDF.MaxComponentValue() < 0x1p-24f) {
-        beta *= 0x1p24f;
+        T_hat *= 0x1p24f;
         lightPathPDF *= 0x1p24f;
         uniPathPDF *= 0x1p24f;
     }

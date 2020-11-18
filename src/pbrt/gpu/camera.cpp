@@ -71,9 +71,6 @@ void GPUPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
 
             // Enqueue camera ray for intersection tests
             if (cameraRay) {
-                // Enqueue the camera ray if the camera gave us one with
-                // non-zero weight. (RealisticCamera doesn't always return
-                // a ray, e.g. in the case of vignetting...)
                 rayQueue->PushCameraRay(cameraRay->ray, lambda, pixelIndex);
                 pixelSampleState.cameraRayWeight[pixelIndex] = cameraRay->weight;
             } else

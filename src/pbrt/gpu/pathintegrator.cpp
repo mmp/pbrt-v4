@@ -442,34 +442,31 @@ void GPUPathIntegrator::HandleEscapedRays(int depth) {
         "Handle escaped rays", escapedRayQueue, maxQueueSize,
         PBRT_GPU_LAMBDA(const EscapedRayWorkItem er, int index) {
             // Update pixel radiance for escaped ray
-            Ray ray(er.rayo, er.rayd);
-            SampledSpectrum Le = envLight.Le(ray, er.lambda);
+            SampledSpectrum Le = envLight.Le(Ray(er.rayo, er.rayd), er.lambda);
             if (!Le)
                 return;
-
+            // Compute path radiance contribution from infinite light
             SampledSpectrum L(0.f);
 
-            PBRT_DBG("L %f %f %f %f beta %f %f %f %f Le %f %f %f %f", L[0], L[1], L[2],
-                     L[3], er.beta[0], er.beta[1], er.beta[2], er.beta[3], Le[0], Le[1],
-                     Le[2], Le[3]);
+            PBRT_DBG("L %f %f %f %f T_hat %f %f %f %f Le %f %f %f %f", L[0], L[1], L[2],
+                     L[3], er.T_hat[0], er.T_hat[1], er.T_hat[2], er.T_hat[3], Le[0],
+                     Le[1], Le[2], Le[3]);
             PBRT_DBG("pdf uni %f %f %f %f pdf nee %f %f %f %f", er.uniPathPDF[0],
                      er.uniPathPDF[1], er.uniPathPDF[2], er.uniPathPDF[3],
                      er.lightPathPDF[0], er.lightPathPDF[1], er.lightPathPDF[2],
                      er.lightPathPDF[3]);
 
             if (depth == 0 || er.specularBounce) {
-                L = er.beta * Le / er.uniPathPDF.Average();
+                L = er.T_hat * Le / er.uniPathPDF.Average();
             } else {
+                // Compute MIS-weighted radiance contribution from infinite light
                 LightSampleContext ctx = er.prevIntrCtx;
-
                 Float lightChoicePDF = lightSampler.PDF(ctx, envLight);
-                Float lightPDF = lightChoicePDF *
-                                 envLight.PDF_Li(ctx, ray.d, LightSamplingMode::WithMIS);
-
                 SampledSpectrum uniPathPDF = er.uniPathPDF;
-                SampledSpectrum lightPathPDF = er.lightPathPDF * lightPDF;
-
-                L = er.beta * Le / (uniPathPDF + lightPathPDF).Average();
+                SampledSpectrum lightPathPDF =
+                    er.lightPathPDF * lightChoicePDF *
+                    envLight.PDF_Li(ctx, er.rayd, LightSamplingMode::WithMIS);
+                L = er.T_hat * Le / (uniPathPDF + lightPathPDF).Average();
             }
             L = SafeDiv(L, er.lambda.PDF());
 
@@ -485,19 +482,20 @@ void GPUPathIntegrator::HandleRayFoundEmission(int depth) {
     ForAllQueued(
         "Handle emitters hit by indirect rays", hitAreaLightQueue, maxQueueSize,
         PBRT_GPU_LAMBDA(const HitAreaLightWorkItem he, int index) {
+            // Find emitted radiance from surface that ray hit
             LightHandle areaLight = he.areaLight;
             SampledSpectrum Le = areaLight.L(he.p, he.n, he.uv, he.wo, he.lambda);
             if (!Le)
                 return;
-
             PBRT_DBG("Got Le %f %f %f %f from hit area light at depth %d\n", Le[0], Le[1],
                      Le[2], Le[3], depth);
 
+            // Compute area light's weighted radiance contribution to the path
             SampledSpectrum L(0.f);
-
             if (depth == 0 || he.isSpecularBounce) {
-                L = he.beta * Le / he.uniPathPDF.Average();
+                L = he.T_hat * Le / he.uniPathPDF.Average();
             } else {
+                // Compute MIS-weighted radiance contribution from area light
                 Vector3f wi = -he.wo;
 
                 LightSampleContext ctx = he.prevIntrCtx;
@@ -509,15 +507,15 @@ void GPUPathIntegrator::HandleRayFoundEmission(int depth) {
                 SampledSpectrum uniPathPDF = he.uniPathPDF;
                 SampledSpectrum lightPathPDF = he.lightPathPDF * lightPDF;
 
-                L = he.beta * Le / (uniPathPDF + lightPathPDF).Average();
+                L = he.T_hat * Le / (uniPathPDF + lightPathPDF).Average();
             }
             L = SafeDiv(L, he.lambda.PDF());
 
             PBRT_DBG("Added L %f %f %f %f for pixel index %d\n", L[0], L[1], L[2], L[3],
                      he.pixelIndex);
 
+            // Update _L_ in _PixelSampleState_ for area light's radiance
             L += pixelSampleState.L[he.pixelIndex];
-
             pixelSampleState.L[he.pixelIndex] = L;
         });
 }

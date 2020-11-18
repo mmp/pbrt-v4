@@ -1020,20 +1020,20 @@ class UniversalTextureEvaluator {
                                SampledWavelengths lambda);
 };
 
+// BasicTextureEvaluator Definition
 class BasicTextureEvaluator {
   public:
+    // BasicTextureEvaluator Public Methods
     PBRT_CPU_GPU
     bool CanEvaluate(std::initializer_list<FloatTextureHandle> ftex,
                      std::initializer_list<SpectrumTextureHandle> stex) const {
         for (auto f : ftex)
-            if (f && (!f.Is<FloatConstantTexture>() && !f.Is<GPUFloatImageTexture>())) {
+            if (f && (!f.Is<FloatConstantTexture>() && !f.Is<GPUFloatImageTexture>()))
                 return false;
-            }
         for (auto s : stex)
             if (s &&
-                (!s.Is<SpectrumConstantTexture>() && !s.Is<GPUSpectrumImageTexture>())) {
+                (!s.Is<SpectrumConstantTexture>() && !s.Is<GPUSpectrumImageTexture>()))
                 return false;
-            }
         return true;
     }
 
