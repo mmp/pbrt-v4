@@ -88,6 +88,10 @@ template <typename T, typename... Ts>
 struct Prepend<T, TypePack<Ts...>> {
     using type = TypePack<T, Ts...>;
 };
+template <typename... Ts>
+struct Prepend<void, TypePack<Ts...>> {
+    using type = TypePack<Ts...>;
+};
 
 template <int index, typename T, typename... Ts>
 struct TakeFirstN;
@@ -111,6 +115,38 @@ struct MapType<M, TypePack<T>> {
 template <template <typename> class M, typename T, typename... Ts>
 struct MapType<M, TypePack<T, Ts...>> {
     using type = typename Prepend<M<T>, typename MapType<M, TypePack<Ts...>>::type>::type;
+};
+
+template <template <typename> class Pred, typename... Ts>
+struct FilterTypes;
+
+namespace internal {
+
+template <typename T, bool>
+struct FilterTypesHelper;
+
+template <typename T>
+struct FilterTypesHelper<T, true> {
+    using type = T;
+};
+template <typename T>
+struct FilterTypesHelper<T, false> {
+    using type = void;
+};
+
+};  // namespace internal
+
+template <template <typename> class Pred, typename T>
+struct FilterTypes<Pred, TypePack<T>> {
+    using type = typename TypePack<
+        typename internal::FilterTypesHelper<T, Pred<T>::value>::type>::type;
+};
+
+template <template <typename> class Pred, typename T, typename... Ts>
+struct FilterTypes<Pred, TypePack<T, Ts...>> {
+    using type =
+        typename Prepend<typename internal::FilterTypesHelper<T, Pred<T>::value>::type,
+                         TypePack<Ts...>>::type;
 };
 
 template <typename F, typename... Ts>
