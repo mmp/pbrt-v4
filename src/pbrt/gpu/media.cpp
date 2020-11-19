@@ -209,8 +209,8 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
             auto enqueue = [=](auto ptr) {
                 using Material = typename std::remove_reference_t<decltype(*ptr)>;
                 q->Push<MaterialEvalWorkItem<Material>>(MaterialEvalWorkItem<Material>{
-                    ptr, lambda, T_hat, uniPathPDF, w.pi, w.n, w.ns, w.dpdus, w.dpdvs,
-                    w.dndus, w.dndvs, -ray.d, w.uv, ray.time, w.anyNonSpecularBounces,
+                    ptr, w.pi, w.n, w.ns, w.dpdus, w.dpdvs, w.dndus, w.dndvs, w.uv,
+                    lambda, w.anyNonSpecularBounces, T_hat, uniPathPDF, -ray.d, ray.time,
                     w.etaScale, w.mediumInterface, w.pixelIndex});
             };
             material.Dispatch(enqueue);

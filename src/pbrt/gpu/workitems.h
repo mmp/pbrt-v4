@@ -163,50 +163,6 @@ struct ShadowRayWorkItem {
     int pixelIndex;
 };
 
-// MaterialEvalWorkItem Definition
-template <typename Material>
-struct MaterialEvalWorkItem {
-    PBRT_CPU_GPU
-    BumpEvalContext GetBumpEvalContext() const {
-        BumpEvalContext ctx;
-        ctx.p = Point3f(pi);
-        ctx.uv = uv;
-        ctx.shading.n = ns;
-        ctx.shading.dpdu = dpdus;
-        ctx.shading.dpdv = dpdvs;
-        ctx.shading.dndu = dndus;
-        ctx.shading.dndv = dndvs;
-        return ctx;
-    }
-
-    PBRT_CPU_GPU
-    MaterialEvalContext GetMaterialEvalContext(Normal3f ns, Vector3f dpdus) const {
-        MaterialEvalContext ctx;
-        ctx.wo = wo;
-        ctx.n = n;
-        ctx.ns = ns;
-        ctx.dpdus = dpdus;
-        ctx.p = Point3f(pi);
-        ctx.uv = uv;
-        return ctx;
-    }
-
-    const Material *material;
-    SampledWavelengths lambda;
-    SampledSpectrum T_hat, uniPathPDF;
-    Point3fi pi;
-    Normal3f n, ns;
-    Vector3f dpdus, dpdvs;
-    Normal3f dndus, dndvs;
-    Vector3f wo;
-    Point2f uv;
-    Float time;
-    int anyNonSpecularBounces;
-    Float etaScale;
-    MediumInterface mediumInterface;
-    int pixelIndex;
-};
-
 // GetBSSRDFAndProbeRayWorkItem Definition
 struct GetBSSRDFAndProbeRayWorkItem {
     PBRT_CPU_GPU
@@ -288,6 +244,52 @@ struct MediumScatterWorkItem {
     Vector3f wo;
     Float etaScale;
     MediumHandle medium;
+    int pixelIndex;
+};
+
+// MaterialEvalWorkItem Definition
+template <typename Material>
+struct MaterialEvalWorkItem {
+    // MaterialEvalWorkItem Public Methods
+    PBRT_CPU_GPU
+    BumpEvalContext GetBumpEvalContext() const {
+        BumpEvalContext ctx;
+        ctx.p = Point3f(pi);
+        ctx.uv = uv;
+        ctx.shading.n = ns;
+        ctx.shading.dpdu = dpdus;
+        ctx.shading.dpdv = dpdvs;
+        ctx.shading.dndu = dndus;
+        ctx.shading.dndv = dndvs;
+        return ctx;
+    }
+
+    PBRT_CPU_GPU
+    MaterialEvalContext GetMaterialEvalContext(Normal3f ns, Vector3f dpdus) const {
+        MaterialEvalContext ctx;
+        ctx.wo = wo;
+        ctx.n = n;
+        ctx.ns = ns;
+        ctx.dpdus = dpdus;
+        ctx.p = Point3f(pi);
+        ctx.uv = uv;
+        return ctx;
+    }
+
+    // MaterialEvalWorkItem Public Members
+    const Material *material;
+    Point3fi pi;
+    Normal3f n, ns;
+    Vector3f dpdus, dpdvs;
+    Normal3f dndus, dndvs;
+    Point2f uv;
+    SampledWavelengths lambda;
+    int anyNonSpecularBounces;
+    SampledSpectrum T_hat, uniPathPDF;
+    Vector3f wo;
+    Float time;
+    Float etaScale;
+    MediumInterface mediumInterface;
     int pixelIndex;
 };
 

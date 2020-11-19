@@ -226,10 +226,11 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
 
     auto enqueue = [=](auto ptr) {
         using Material = typename std::remove_reference_t<decltype(*ptr)>;
-        q->Push<MaterialEvalWorkItem<Material>>(MaterialEvalWorkItem<Material>{
-            ptr, r.lambda, r.T_hat, r.uniPathPDF, intr.pi, intr.n, intr.shading.n,
+        q->Push(MaterialEvalWorkItem<Material>{
+            ptr, intr.pi, intr.n, intr.shading.n,
             intr.shading.dpdu, intr.shading.dpdv, intr.shading.dndu, intr.shading.dndv,
-            intr.wo, intr.uv, intr.time, r.anyNonSpecularBounces, r.etaScale,
+            intr.uv, r.lambda, r.anyNonSpecularBounces,
+            r.T_hat, r.uniPathPDF, intr.wo, intr.time, r.etaScale,
             getPayload<ClosestHitContext>()->mediumInterface, r.pixelIndex});
     };
     material.Dispatch(enqueue);
