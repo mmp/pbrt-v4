@@ -985,7 +985,7 @@ STAT_COUNTER("Integrator/Surface interactions", surfaceInteractions);
 // VolPathIntegrator Method Definitions
 SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &lambda,
                                       SamplerHandle sampler, ScratchBuffer &scratchBuffer,
-                                      VisibleSurface *) const {
+                                      VisibleSurface *visibleSurf) const {
     // Declare state variables for volumetric path
     SampledSpectrum L(0.f), T_hat(1.f), uniPathPDF(1.f), lightPathPDF(1.f);
     bool specularBounce = false, anyNonSpecularBounces = false;
@@ -1144,6 +1144,27 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
         if (!bsdf) {
             isect.SkipIntersection(&ray, si->tHit);
             continue;
+        }
+
+        // Initialize _visibleSurf_ at first intersection
+        if (depth == 0 && visibleSurf != nullptr) {
+            // Estimate BSDF's albedo
+            constexpr int nRhoSamples = 16;
+            SampledSpectrum rho(0.f);
+            for (int i = 0; i < nRhoSamples; ++i) {
+                // Generate sample for hemispherical-directional reflectance
+                Float uc = RadicalInverse(0, i + 1);
+                Point2f u(RadicalInverse(1, i + 1), RadicalInverse(2, i + 1));
+
+                // Estimate one term of $\rho_\roman{hd}$
+                pstd::optional<BSDFSample> bs = bsdf.Sample_f(si->intr.wo, uc, u);
+                if (bs)
+                    rho += bs->f * AbsDot(bs->wi, si->intr.shading.n) / bs->pdf;
+            }
+            SampledSpectrum albedo = rho / nRhoSamples;
+
+            *visibleSurf =
+                VisibleSurface(si->intr, camera.GetCameraTransform(), albedo, lambda);
         }
 
         // Terminate path if maximum depth reached

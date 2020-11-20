@@ -341,9 +341,10 @@ void CPURender(ParsedScene &parsedScene) {
         parsedScene.integrator.name != "aov")
         Warning("No light sources defined in scene; rendering a black image.");
 
-    if (parsedScene.film.name == "gbuffer" && parsedScene.integrator.name != "path")
+    if (parsedScene.film.name == "gbuffer" && !(parsedScene.integrator.name == "path" ||
+                                                parsedScene.integrator.name == "volpath"))
         Warning(&parsedScene.film.loc,
-                "GBufferFilm is not supported by %s. The channels "
+                "GBufferFilm is not supported by the \"%s\" integrator. The channels "
                 "other than R, G, B will be zero.",
                 parsedScene.integrator.name);
 
