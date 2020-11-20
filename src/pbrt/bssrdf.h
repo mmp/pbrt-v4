@@ -257,7 +257,7 @@ class TabulatedBSSRDF {
                                            NormalizedFresnelBxDF *bxdf) const {
         *bxdf = NormalizedFresnelBxDF(eta);
         Vector3f wo = Vector3f(si.ns);
-        BSDF bsdf(wo, si.n, si.ns, si.dpdus, bxdf, eta);
+        BSDF bsdf(wo, si.n, si.ns, si.dpdus, bxdf);
         return BSSRDFSample{Sp(si.p()), PDF_Sp(si.p(), si.n), bsdf, wo};
     }
 

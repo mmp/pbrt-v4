@@ -22,9 +22,8 @@ class BSDF {
     BSDF() = default;
     PBRT_CPU_GPU
     BSDF(const Vector3f &wo, const Normal3f &n, const Normal3f &ns, const Vector3f &dpdus,
-         BxDFHandle bxdf, Float eta = 1)
-        : eta(Dot(wo, n) < 0 ? 1 / eta : eta),
-          bxdf(bxdf),
+         BxDFHandle bxdf)
+        : bxdf(bxdf),
           ng(n),
           shadingFrame(Frame::FromXZ(Normalize(dpdus), Vector3f(ns))) {}
 
@@ -163,9 +162,6 @@ class BSDF {
 
     PBRT_CPU_GPU
     void Regularize() { bxdf.Regularize(); }
-
-    // BSDF Public Members
-    Float eta;
 
   private:
     // BSDF Private Members

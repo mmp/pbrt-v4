@@ -98,7 +98,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
 
                     Float etaScale = s.etaScale;
                     if (bsdfSample->IsTransmission())
-                        etaScale *= Sqr(bsdf.eta);
+                        etaScale *= Sqr(bsdfSample->eta);
 
                     // Russian roulette
                     SampledSpectrum rrBeta = T_hat * etaScale / uniPathPDF.Average();

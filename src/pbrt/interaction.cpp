@@ -89,8 +89,8 @@ void SurfaceInteraction::SkipIntersection(RayDifferential *ray, Float t) const {
 }
 
 RayDifferential SurfaceInteraction::SpawnRay(const RayDifferential &rayi,
-                                             const BSDF &bsdf, Vector3f wi,
-                                             int flags) const {
+                                             const BSDF &bsdf, Vector3f wi, int flags,
+                                             Float eta) const {
     RayDifferential rd(SpawnRay(wi));
     if (rayi.hasDifferentials) {
         // Compute ray differentials for specular reflection or transmission
@@ -122,7 +122,7 @@ RayDifferential SurfaceInteraction::SpawnRay(const RayDifferential &rayi,
 
             // Compute differential transmitted directions
             // Find _eta_ and oriented surface normal for transmission
-            Float eta = 1 / bsdf.eta;
+            eta = 1 / eta;
             if (Dot(wo, ns) < 0) {
                 ns = -ns;
                 dndx = -dndx;
@@ -179,7 +179,7 @@ BSDF SurfaceInteraction::GetBSDF(const RayDifferential &ray, SampledWavelengths 
         // Override _bsdf_ with diffuse equivalent
         SampledSpectrum r = bsdf.rho(wo, {sampler.Get1D()}, {sampler.Get2D()});
         bsdf = BSDF(wo, n, shading.n, shading.dpdu,
-                    scratchBuffer.Alloc<IdealDiffuseBxDF>(r), bsdf.eta);
+                    scratchBuffer.Alloc<IdealDiffuseBxDF>(r));
     }
     return bsdf;
 }

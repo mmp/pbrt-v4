@@ -119,9 +119,14 @@ struct BSDFSample {
     // BSDFSample Public Methods
     BSDFSample() = default;
     PBRT_CPU_GPU
-    BSDFSample(SampledSpectrum f, Vector3f wi, Float pdf, BxDFFlags flags,
+    BSDFSample(SampledSpectrum f, Vector3f wi, Float pdf, BxDFFlags flags, Float eta = 1,
                bool pdfIsProportional = false)
-        : f(f), wi(wi), pdf(pdf), flags(flags), pdfIsProportional(pdfIsProportional) {}
+        : f(f),
+          wi(wi),
+          pdf(pdf),
+          flags(flags),
+          eta(eta),
+          pdfIsProportional(pdfIsProportional) {}
 
     PBRT_CPU_GPU
     bool IsReflection() const { return pbrt::IsReflective(flags); }
@@ -139,6 +144,7 @@ struct BSDFSample {
     Vector3f wi;
     Float pdf = 0;
     BxDFFlags flags;
+    Float eta = 1;
     bool pdfIsProportional;
 };
 

@@ -158,7 +158,8 @@ pstd::optional<BSDFSample> DielectricInterfaceBxDF::Sample_f(
             if (mode == TransportMode::Radiance)
                 ft /= Sqr(etap);
 
-            return BSDFSample(ft, wi, pt / (pr + pt), BxDFFlags::SpecularTransmission);
+            return BSDFSample(ft, wi, pt / (pr + pt), BxDFFlags::SpecularTransmission,
+                              etap);
         }
 
     } else {
@@ -224,7 +225,7 @@ pstd::optional<BSDFSample> DielectricInterfaceBxDF::Sample_f(
             Float pdf = mfDistrib.PDF(wo, wh) * dwh_dwi * pt / (pr + pt);
             CHECK(!IsNaN(pdf));
 
-            return BSDFSample(f, wi, pdf, BxDFFlags::GlossyTransmission);
+            return BSDFSample(f, wi, pdf, BxDFFlags::GlossyTransmission, etap);
         }
     }
 }

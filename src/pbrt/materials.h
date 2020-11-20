@@ -178,7 +178,7 @@ class DielectricMaterial {
 
         // Return BSDF for dielectric material
         *bxdf = DielectricInterfaceBxDF(eta, distrib);
-        return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf, eta);
+        return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf);
     }
 
   private:
@@ -215,7 +215,7 @@ class ThinDielectricMaterial {
 
         // Return BSDF for _ThinDielectricMaterial_
         *bxdf = ThinDielectricBxDF(eta);
-        return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf, eta);
+        return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf);
     }
 
     PBRT_CPU_GPU
@@ -387,7 +387,7 @@ class HairMaterial {
         // Offset along width
         Float h = -1 + 2 * ctx.uv[1];
         *bxdf = HairBxDF(h, e, sig_a, bm, bn, a);
-        return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf, e);
+        return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf);
     }
 
     static HairMaterial *Create(const TextureParameterDictionary &parameters,
@@ -756,7 +756,7 @@ class SubsurfaceMaterial {
 
         // Initialize _bsdf_ for smooth or rough dielectric
         *bxdf = DielectricInterfaceBxDF(eta, distrib);
-        return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf, eta);
+        return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf);
     }
 
     template <typename TextureEvaluator>

@@ -159,7 +159,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 // Update _etaScale_ accounting for BSDF scattering
                 Float etaScale = w.etaScale;
                 if (bsdfSample->IsTransmission())
-                    etaScale *= Sqr(bsdf.eta);
+                    etaScale *= Sqr(bsdfSample->eta);
 
                 // Apply Russian roulette to indirect ray based on weighted path
                 // throughput

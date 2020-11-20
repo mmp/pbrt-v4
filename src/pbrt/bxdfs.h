@@ -799,7 +799,7 @@ class LayeredBxDF {
                                                         : BxDFFlags::GlossyTransmission;
                 if (flipWi)
                     w = -w;
-                return BSDFSample(f, w, pdf, flags, true);
+                return BSDFSample(f, w, pdf, flags, 1.f, true);
             }
 
             // Scale _f_ by cosine term after scattering at the interface
