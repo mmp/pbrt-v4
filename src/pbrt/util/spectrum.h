@@ -72,7 +72,7 @@ PBRT_CPU_GPU inline Float Blackbody(Float lambda, Float T) {
     const Float kb = 1.3806488e-23;
     // Return emitted radiance for blackbody at wavelength _lambda[i]_
     Float l = lambda * 1e-9f;
-    Float Le = (2 * h * c * c) / (Pow<5>(l) * (std::exp((h * c) / (l * kb * T)) - 1));
+    Float Le = (2 * h * c * c) / (Pow<5>(l) * (FastExp((h * c) / (l * kb * T)) - 1));
     CHECK(!IsNaN(Le));
     return Le;
 }

@@ -923,7 +923,7 @@ class LayeredBxDF {
     static Float Tr(Float dz, const Vector3f &w) {
         if (std::abs(dz) <= std::numeric_limits<Float>::min())
             return 1;
-        return std::exp(-std::abs(dz / w.z));
+        return FastExp(-std::abs(dz / w.z));
     }
 
     // LayeredBxDF Protected Members
@@ -1000,9 +1000,9 @@ class HairBxDF {
                     Float sinTheta_o, Float v) {
         Float a = cosTheta_i * cosTheta_o / v;
         Float b = sinTheta_i * sinTheta_o / v;
-        Float mp =
-            (v <= .1) ? (std::exp(LogI0(a) - b - 1 / v + 0.6931f + std::log(1 / (2 * v))))
-                      : (std::exp(-b) * I0(a)) / (std::sinh(1 / v) * 2 * v);
+        Float mp = (v <= .1)
+                       ? (FastExp(LogI0(a) - b - 1 / v + 0.6931f + std::log(1 / (2 * v))))
+                       : (FastExp(-b) * I0(a)) / (std::sinh(1 / v) * 2 * v);
         CHECK(!IsInf(mp) && !IsNaN(mp));
         return mp;
     }

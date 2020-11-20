@@ -41,7 +41,7 @@ TEST(Spectrum, Blackbody) {
     // consistent with this.
     for (Float T : {2700, 3000, 4500, 5600, 6000}) {
         Float lambdaMax = 2.8977721e-3 / T * 1e9;
-        Float lambda[3] = {Float(.999 * lambdaMax), lambdaMax, Float(1.001 * lambdaMax)};
+        Float lambda[3] = {Float(.99 * lambdaMax), lambdaMax, Float(1.01 * lambdaMax)};
         EXPECT_LT(Blackbody(lambda[0], T), Blackbody(lambda[1], T));
         EXPECT_GT(Blackbody(lambda[1], T), Blackbody(lambda[2], T));
     }

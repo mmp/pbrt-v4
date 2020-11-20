@@ -455,7 +455,7 @@ pstd::optional<BSDFSample> HairBxDF::Sample_f(Vector3f wo, Float uc, Point2f u,
 
     // Sample $M_p$ to compute $\thetai$
     Float cosTheta = 1 + v[p] * std::log(std::max<Float>(u[0], 1e-5) +
-                                         (1 - u[0]) * std::exp(-2 / v[p]));
+                                         (1 - u[0]) * FastExp(-2 / v[p]));
     Float sinTheta = SafeSqrt(1 - Sqr(cosTheta));
     Float cosPhi = std::cos(2 * Pi * u[1]);
     Float sinTheta_i = -cosTheta * sinThetap_o + sinTheta * cosPhi * cosThetap_o;
