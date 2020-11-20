@@ -751,7 +751,7 @@ DiffuseAreaLight *DiffuseAreaLight::Create(const Transform &renderFromLight,
     bool twoSided = parameters.GetOneBool("twosided", false);
 
     std::string filename = ResolveFilename(parameters.GetOneString("filename", ""));
-    Image image;
+    Image image(alloc);
     const RGBColorSpace *imageColorSpace = nullptr;
     if (!filename.empty()) {
         if (L != nullptr)
