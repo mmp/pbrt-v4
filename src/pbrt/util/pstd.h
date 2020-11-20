@@ -531,10 +531,6 @@ class monotonic_buffer_resource : public memory_resource {
             upstreamResource->deallocate(block.ptr, block.size);
         usedBlocks.clear();
 
-        for (const auto &block : availableBlocks)
-            upstreamResource->deallocate(block.ptr, block.size);
-        availableBlocks.clear();
-
         upstreamResource->deallocate(currentBlock.ptr, currentBlock.size);
         currentBlock = MemoryBlock();
     }
@@ -562,17 +558,6 @@ class monotonic_buffer_resource : public memory_resource {
                 currentBlock = {};
             }
 
-            // Get new block of memory for _ScratchBuffer_
-
-            // Try to get memory block from _availableBlocks_
-            for (auto iter = availableBlocks.begin(); iter != availableBlocks.end();
-                 ++iter) {
-                if (bytes <= iter->size) {
-                    currentBlock = std::move(*iter);
-                    availableBlocks.erase(iter);
-                    goto success;
-                }
-            }
             currentBlock = {
                 upstreamResource->allocate(blockSize, alignof(std::max_align_t)),
                 blockSize};
@@ -604,7 +589,7 @@ class monotonic_buffer_resource : public memory_resource {
     MemoryBlock currentBlock;
     size_t currentBlockPos = 0;
     // TODO: should use the memory_resource for this list's allocations...
-    std::list<MemoryBlock> usedBlocks, availableBlocks;
+    std::list<MemoryBlock> usedBlocks;
 };
 
 template <class Tp = std::byte>
