@@ -411,7 +411,7 @@ inline float FastExp(float x) {
     int i = (int)fxp;
 
     // Evaluate polynomial approximation of $2^f$
-    float twoToF = EvaluatePolynomial(f, 0.999813f, 0.696834f, 0.224131f, 0.0790209f);
+    float twoToF = EvaluatePolynomial(f, 1.f, 0.695556856f, 0.226173572f, 0.0781455737f);
 
     // Scale $2^f$ by $2^i$ and return final result
     int exponent = Exponent(twoToF) + i;
