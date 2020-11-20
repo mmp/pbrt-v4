@@ -1373,7 +1373,7 @@ RealisticCamera *RealisticCamera::Create(const ParameterDictionary &parameters,
     };
 
     std::string apertureName = ResolveFilename(parameters.GetOneString("aperture", ""));
-    Image apertureImage;
+    Image apertureImage(alloc);
     if (!apertureName.empty()) {
         // built-in diaphragm shapes
         if (apertureName == "gaussian") {
