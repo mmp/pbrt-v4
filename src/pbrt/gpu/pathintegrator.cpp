@@ -476,7 +476,7 @@ void GPUPathIntegrator::HandleRayFoundEmission(int depth) {
         "Handle emitters hit by indirect rays", hitAreaLightQueue, maxQueueSize,
         PBRT_GPU_LAMBDA(const HitAreaLightWorkItem w, int index) {
             // Find emitted radiance from surface that ray hit
-            SampledSpectrum Le = areaLight.L(w.p, w.n, w.uv, w.wo, w.lambda);
+            SampledSpectrum Le = w.areaLight.L(w.p, w.n, w.uv, w.wo, w.lambda);
             if (!Le)
                 return;
             PBRT_DBG("Got Le %f %f %f %f from hit area light at depth %d\n", Le[0], Le[1],

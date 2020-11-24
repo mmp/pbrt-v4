@@ -291,7 +291,6 @@ struct MaterialEvalWorkItem {
     int pixelIndex;
     SampledSpectrum T_hat, uniPathPDF;
     MediumInterface mediumInterface;
-    Float time;
     Float etaScale;
     Float time;
 };

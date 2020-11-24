@@ -168,8 +168,8 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                     PBRT_DBG("Adding ray to escapedRayQueue pixel index %d depth %d\n",
                              w.pixelIndex, depth);
                     escapedRayQueue->Push(EscapedRayWorkItem{
-                        T_hat, uniPathPDF, lightPathPDF, lambda, ray.o, ray.d,
-                        w.prevIntrCtx, (int)w.isSpecularBounce, w.pixelIndex});
+                        ray.o, ray.d, lambda, w.pixelIndex, (int)w.isSpecularBounce,
+                        T_hat, uniPathPDF, lightPathPDF, w.prevIntrCtx});
                 }
             }
 
@@ -191,8 +191,9 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                     "depth %d\n",
                     w.pixelIndex, depth);
                 hitAreaLightQueue->Push(HitAreaLightWorkItem{
-                    w.areaLight, lambda, T_hat, uniPathPDF, lightPathPDF, Point3f(w.pi),
-                    w.n, w.uv, -ray.d, w.prevIntrCtx, w.isSpecularBounce, w.pixelIndex});
+                    w.areaLight, Point3f(w.pi), w.n, w.uv, -ray.d, lambda, T_hat,
+                    uniPathPDF, lightPathPDF, w.prevIntrCtx, w.isSpecularBounce,
+                    w.pixelIndex});
             }
 
             FloatTextureHandle displacement = material.GetDisplacement();
@@ -210,8 +211,8 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                 using Material = typename std::remove_reference_t<decltype(*ptr)>;
                 q->Push<MaterialEvalWorkItem<Material>>(MaterialEvalWorkItem<Material>{
                     ptr, w.pi, w.n, w.ns, w.dpdus, w.dpdvs, w.dndus, w.dndvs, w.uv,
-                    lambda, w.anyNonSpecularBounces, T_hat, uniPathPDF, -ray.d, ray.time,
-                    w.etaScale, w.mediumInterface, w.pixelIndex});
+                    lambda, w.anyNonSpecularBounces, -ray.d, w.pixelIndex, T_hat,
+                    uniPathPDF, w.mediumInterface, w.etaScale, ray.time});
             };
             material.Dispatch(enqueue);
         });

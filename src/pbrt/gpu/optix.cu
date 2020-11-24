@@ -124,8 +124,8 @@ extern "C" __global__ void __raygen__findClosest() {
             PBRT_DBG("Adding ray to escapedRayQueue ray index %d pixel index %d\n", rayIndex,
                      r.pixelIndex);
             params.escapedRayQueue->Push(EscapedRayWorkItem{
-                r.T_hat, r.uniPathPDF, r.lightPathPDF, r.lambda, ray.o, ray.d, r.prevIntrCtx,
-                (int)r.isSpecularBounce, r.pixelIndex});
+                ray.o, ray.d, r.lambda, r.pixelIndex, (int)r.isSpecularBounce,
+                r.T_hat, r.uniPathPDF, r.lightPathPDF, r.prevIntrCtx});
         }
     }
 }
@@ -198,7 +198,7 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
         PBRT_DBG("Enqueuing into medium transition queue: ray index %d pixel index %d \n",
                  rayIndex, r.pixelIndex);
         Ray newRay = intr.SpawnRay(r.ray.d);
-        params.nextRayQueue->PushIndirect(
+        params.nextRayQueue->PushIndirectRay(
             newRay, r.prevIntrCtx, r.T_hat, r.uniPathPDF, r.lightPathPDF, r.lambda,
             r.etaScale, r.isSpecularBounce, r.anyNonSpecularBounces, r.pixelIndex);
         return;
@@ -210,8 +210,9 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
         Ray ray = r.ray;
         // TODO: intr.wo == -ray.d?
         params.hitAreaLightQueue->Push(HitAreaLightWorkItem{
-            intr.areaLight, r.lambda, r.T_hat, r.uniPathPDF, r.lightPathPDF, intr.p(), intr.n,
-            intr.uv, intr.wo, r.prevIntrCtx, (int)r.isSpecularBounce, r.pixelIndex});
+            intr.areaLight, intr.p(), intr.n, intr.uv, intr.wo, r.lambda,
+            r.T_hat, r.uniPathPDF, r.lightPathPDF, r.prevIntrCtx,
+            (int)r.isSpecularBounce, r.pixelIndex});
     }
 
     FloatTextureHandle displacement = material.GetDisplacement();
@@ -229,9 +230,9 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
         q->Push(MaterialEvalWorkItem<Material>{
             ptr, intr.pi, intr.n, intr.shading.n,
             intr.shading.dpdu, intr.shading.dpdv, intr.shading.dndu, intr.shading.dndv,
-            intr.uv, r.lambda, r.anyNonSpecularBounces,
-            r.T_hat, r.uniPathPDF, intr.wo, intr.time, r.etaScale,
-            getPayload<ClosestHitContext>()->mediumInterface, r.pixelIndex});
+                intr.uv, r.lambda, r.anyNonSpecularBounces, intr.wo, r.pixelIndex,
+                r.T_hat, r.uniPathPDF, getPayload<ClosestHitContext>()->mediumInterface,
+                r.etaScale, intr.time});
     };
     material.Dispatch(enqueue);
 
