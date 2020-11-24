@@ -29,8 +29,7 @@ void GPUPathIntegrator::GenerateRaySamples(int depth, int sampleIndex) {
 
     RayQueue *rayQueue = CurrentRayQueue(depth);
     ForAllQueued(
-        desc.c_str(), rayQueue, maxQueueSize,
-        PBRT_GPU_LAMBDA(const RayWorkItem w, int index) {
+        desc.c_str(), rayQueue, maxQueueSize, PBRT_GPU_LAMBDA(const RayWorkItem w) {
             // Generate samples for ray segment at current sample index
             // Find first sample dimension
             int dimension = 5 + 7 * depth;

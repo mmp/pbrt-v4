@@ -39,7 +39,7 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
     RayQueue *nextRayQueue = NextRayQueue(depth);
     ForAllQueued(
         "Sample medium interaction", mediumSampleQueue, maxQueueSize,
-        PBRT_GPU_LAMBDA(MediumSampleWorkItem w, int index) {
+        PBRT_GPU_LAMBDA(MediumSampleWorkItem w) {
             Ray ray = w.ray;
             Float tMax = w.tMax;
 
@@ -212,7 +212,7 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                 q->Push<MaterialEvalWorkItem<Material>>(MaterialEvalWorkItem<Material>{
                     ptr, w.pi, w.n, w.ns, w.dpdus, w.dpdvs, w.dndus, w.dndvs, w.uv,
                     lambda, w.anyNonSpecularBounces, -ray.d, w.pixelIndex, T_hat,
-                    uniPathPDF, w.mediumInterface, w.etaScale, ray.time});
+                    uniPathPDF, w.etaScale, w.mediumInterface, ray.time});
             };
             material.Dispatch(enqueue);
         });
@@ -226,7 +226,7 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
     std::string desc = std::string("Sample direct/indirect - Henyey Greenstein");
     ForAllQueued(
         desc.c_str(), mediumScatterQueue, maxQueueSize,
-        PBRT_GPU_LAMBDA(MediumScatterWorkItem w, int index) {
+        PBRT_GPU_LAMBDA(MediumScatterWorkItem w) {
             RaySamples raySamples = pixelSampleState.samples[w.pixelIndex];
             Float time = 0;  // TODO: FIXME
             Vector3f wo = w.wo;

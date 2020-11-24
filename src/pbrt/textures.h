@@ -1039,10 +1039,10 @@ class BasicTextureEvaluator {
 
     PBRT_CPU_GPU
     Float operator()(FloatTextureHandle tex, TextureEvalContext ctx) {
-        if (FloatConstantTexture *fc = tex.CastOrNullptr<FloatConstantTexture>())
-            return fc->Evaluate(ctx);
-        else if (GPUFloatImageTexture *fg = tex.CastOrNullptr<GPUFloatImageTexture>())
-            return fg->Evaluate(ctx);
+        if (FloatConstantTexture *fcTex = tex.CastOrNullptr<FloatConstantTexture>())
+            return fcTex->Evaluate(ctx);
+        else if (GPUFloatImageTexture *fiTex = tex.CastOrNullptr<GPUFloatImageTexture>())
+            return fiTex->Evaluate(ctx);
         else
             return 0.f;
     }

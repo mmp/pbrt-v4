@@ -231,8 +231,8 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
             ptr, intr.pi, intr.n, intr.shading.n,
             intr.shading.dpdu, intr.shading.dpdv, intr.shading.dndu, intr.shading.dndv,
                 intr.uv, r.lambda, r.anyNonSpecularBounces, intr.wo, r.pixelIndex,
-                r.T_hat, r.uniPathPDF, getPayload<ClosestHitContext>()->mediumInterface,
-                r.etaScale, intr.time});
+                r.T_hat, r.uniPathPDF, r.etaScale,
+                getPayload<ClosestHitContext>()->mediumInterface, intr.time});
     };
     material.Dispatch(enqueue);
 

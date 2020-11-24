@@ -23,48 +23,48 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
 
     ForAllQueued(
         "Get BSSRDF and enqueue probe ray", bssrdfEvalQueue, maxQueueSize,
-        PBRT_GPU_LAMBDA(const GetBSSRDFAndProbeRayWorkItem be, int index) {
+        PBRT_GPU_LAMBDA(const GetBSSRDFAndProbeRayWorkItem w) {
             using BSSRDF = typename SubsurfaceMaterial::BSSRDF;
             BSSRDF bssrdf;
-            const SubsurfaceMaterial *material = be.material.Cast<SubsurfaceMaterial>();
-            MaterialEvalContext ctx = be.GetMaterialEvalContext();
-            SampledWavelengths lambda = be.lambda;
+            const SubsurfaceMaterial *material = w.material.Cast<SubsurfaceMaterial>();
+            MaterialEvalContext ctx = w.GetMaterialEvalContext();
+            SampledWavelengths lambda = w.lambda;
             material->GetBSSRDF(BasicTextureEvaluator(), ctx, lambda, &bssrdf);
 
-            RaySamples raySamples = pixelSampleState.samples[be.pixelIndex];
+            RaySamples raySamples = pixelSampleState.samples[w.pixelIndex];
             Float uc = raySamples.subsurface.uc;
             Point2f u = raySamples.subsurface.u;
 
             pstd::optional<BSSRDFProbeSegment> probeSeg = bssrdf.SampleSp(uc, u);
             if (probeSeg)
-                subsurfaceScatterQueue->Push(
-                    probeSeg->p0, probeSeg->p1, material, bssrdf, lambda, be.T_hat,
-                    be.uniPathPDF, be.mediumInterface, be.etaScale, be.pixelIndex);
+                subsurfaceScatterQueue->Push(probeSeg->p0, probeSeg->p1, material, bssrdf,
+                                             lambda, w.T_hat, w.uniPathPDF,
+                                             w.mediumInterface, w.etaScale, w.pixelIndex);
         });
 
     accel->IntersectOneRandom(maxQueueSize, subsurfaceScatterQueue);
 
     ForAllQueued(
         "Handle out-scattering after SSS", subsurfaceScatterQueue, maxQueueSize,
-        PBRT_GPU_LAMBDA(SubsurfaceScatterWorkItem s, int index) {
-            if (s.weight == 0)
+        PBRT_GPU_LAMBDA(SubsurfaceScatterWorkItem w) {
+            if (w.weight == 0)
                 return;
 
             using BSSRDF = TabulatedBSSRDF;
-            BSSRDF bssrdf = s.bssrdf;
+            BSSRDF bssrdf = w.bssrdf;
             using BxDF = typename BSSRDF::BxDF;
             BxDF bxdf;
 
-            SubsurfaceInteraction &intr = s.ssi;
+            SubsurfaceInteraction &intr = w.ssi;
             BSSRDFSample bssrdfSample = bssrdf.ProbeIntersectionToSample(intr, &bxdf);
 
             if (!bssrdfSample.Sp || bssrdfSample.pdf == 0)
                 return;
 
             SampledSpectrum T_hatp =
-                s.T_hat * bssrdfSample.Sp * s.weight / bssrdfSample.pdf;
-            SampledWavelengths lambda = s.lambda;
-            RaySamples raySamples = pixelSampleState.samples[s.pixelIndex];
+                w.T_hat * bssrdfSample.Sp * w.weight / bssrdfSample.pdf;
+            SampledWavelengths lambda = w.lambda;
+            RaySamples raySamples = pixelSampleState.samples[w.pixelIndex];
             Vector3f wo = bssrdfSample.wo;
             BSDF &bsdf = bssrdfSample.Sw;
             Float time = 0;  // TODO: pipe through
@@ -81,7 +81,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                 if (bsdfSample) {
                     Vector3f wi = bsdfSample->wi;
                     SampledSpectrum T_hat = T_hatp * bsdfSample->f * AbsDot(wi, intr.ns);
-                    SampledSpectrum uniPathPDF = s.uniPathPDF, lightPathPDF = uniPathPDF;
+                    SampledSpectrum uniPathPDF = w.uniPathPDF, lightPathPDF = uniPathPDF;
 
                     PBRT_DBG("%s f*cos[0] %f bsdfSample->pdf %f f*cos/pdf %f\n",
                              BxDF::Name(), bsdfSample->f[0] * AbsDot(wi, intr.ns),
@@ -96,7 +96,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                     } else
                         uniPathPDF *= bsdfSample->pdf;
 
-                    Float etaScale = s.etaScale;
+                    Float etaScale = w.etaScale;
                     if (bsdfSample->IsTransmission())
                         etaScale *= Sqr(bsdfSample->eta);
 
@@ -117,8 +117,8 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                         if (haveMedia)
                             // TODO: should always just take outside in this case?
                             ray.medium = Dot(ray.d, intr.n) > 0
-                                             ? s.mediumInterface.outside
-                                             : s.mediumInterface.inside;
+                                             ? w.mediumInterface.outside
+                                             : w.mediumInterface.inside;
 
                         // || rather than | is intentional, to avoid the read if
                         // possible...
@@ -128,7 +128,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                         nextRayQueue->PushIndirectRay(
                             ray, ctx, T_hat, uniPathPDF, lightPathPDF, lambda, etaScale,
                             bsdfSample->IsSpecular(), anyNonSpecularBounces,
-                            s.pixelIndex);
+                            w.pixelIndex);
 
                         PBRT_DBG(
                             "Spawned indirect ray at depth %d. "
@@ -177,8 +177,8 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                 // This causes uniPathPDF to be zero for the shadow ray, so that
                 // part of MIS just becomes a no-op.
                 Float bsdfPDF = IsDeltaLight(light.Type()) ? 0.f : bsdf.PDF<BxDF>(wo, wi);
-                SampledSpectrum uniPathPDF = s.uniPathPDF * bsdfPDF;
-                SampledSpectrum lightPathPDF = s.uniPathPDF * lightPDF;
+                SampledSpectrum uniPathPDF = w.uniPathPDF * bsdfPDF;
+                SampledSpectrum lightPathPDF = w.uniPathPDF * lightPDF;
 
                 SampledSpectrum Ld = SafeDiv(T_hat * ls->L, lambda.PDF());
 
@@ -195,11 +195,11 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                 Ray ray = SpawnRayTo(intr.pi, intr.n, time, ls->pLight.pi, ls->pLight.n);
                 if (haveMedia)
                     // TODO: as above, always take outside here?
-                    ray.medium = Dot(ray.d, intr.n) > 0 ? s.mediumInterface.outside
-                                                        : s.mediumInterface.inside;
+                    ray.medium = Dot(ray.d, intr.n) > 0 ? w.mediumInterface.outside
+                                                        : w.mediumInterface.inside;
 
                 shadowRayQueue->Push(ray, 1 - ShadowEpsilon, lambda, Ld, uniPathPDF,
-                                     lightPathPDF, s.pixelIndex);
+                                     lightPathPDF, w.pixelIndex);
             }
         });
 

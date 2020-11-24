@@ -94,7 +94,7 @@ void ForAllQueued(const char *desc, WorkQueue<WorkItem> *q, int maxQueued, F fun
     GPUParallelFor(desc, maxQueued, [=] PBRT_GPU(int index) mutable {
         if (index >= q->Size())
             return;
-        func((*q)[index], index);
+        func((*q)[index]);
     });
 }
 
