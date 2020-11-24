@@ -43,9 +43,11 @@ class GPUAccel {
         MaterialEvalQueue *universalEvalMaterialQueue,
         MediumSampleQueue *mediumSampleQueue, RayQueue *rayQueue, RayQueue *nextRayQueue) const;
 
-    void IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue) const;
+    void IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue,
+                         SOA<PixelSampleState> *pixelSampleState) const;
 
-    void IntersectShadowTr(int maxRays, ShadowRayQueue *shadowRayQueue) const;
+    void IntersectShadowTr(int maxRays, ShadowRayQueue *shadowRayQueue,
+                           SOA<PixelSampleState> *pixelSampleState) const;
 
     void IntersectOneRandom(int maxRays, SubsurfaceScatterQueue *subsurfaceScatterQueue) const;
 

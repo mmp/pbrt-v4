@@ -357,12 +357,12 @@ extern "C" __global__ void __raygen__shadow() {
                  sr.Ld[0], sr.Ld[1], sr.Ld[2], sr.Ld[3],
                  sr.uniPathPDF[0], sr.uniPathPDF[1], sr.uniPathPDF[2], sr.uniPathPDF[3],
                  sr.lightPathPDF[0], sr.lightPathPDF[1], sr.lightPathPDF[2], sr.lightPathPDF[3]);
+
+        SampledSpectrum Lpixel = params.pixelSampleState->L[sr.pixelIndex];
+        params.pixelSampleState->L[sr.pixelIndex] = Lpixel + Ld;
     } else {
         PBRT_DBG("Shadow ray was occluded\n");
-        Ld = SampledSpectrum(0.);
     }
-
-    params.shadowRayQueue->Ld[index] = Ld;
 }
 
 extern "C" __global__ void __miss__shadow() {
@@ -503,17 +503,17 @@ extern "C" __global__ void __raygen__shadow_Tr() {
              T_ray[2] / (sr.uniPathPDF * uniPathPDF + sr.lightPathPDF * lightPathPDF).Average(),
              T_ray[3] / (sr.uniPathPDF * uniPathPDF + sr.lightPathPDF * lightPathPDF).Average());
 
-    if (!T_ray)
-        Ld = SampledSpectrum(0.f);
-    else
+    if (T_ray) {
         // FIXME/reconcile: this takes lightPathPDF as input while
         // e.g. VolPathIntegrator::SampleLd() does not...
         Ld *= T_ray / (sr.uniPathPDF * uniPathPDF + sr.lightPathPDF * lightPathPDF).Average();
 
-    PBRT_DBG("Setting final Ld for shadow ray index %d pixel index %d = as %f %f %f %f\n",
-             index, sr.pixelIndex, Ld[0], Ld[1], Ld[2], Ld[3]);
+        PBRT_DBG("Setting final Ld for shadow ray index %d pixel index %d = as %f %f %f %f\n",
+                 index, sr.pixelIndex, Ld[0], Ld[1], Ld[2], Ld[3]);
 
-    params.shadowRayQueue->Ld[index] = Ld;
+        SampledSpectrum Lpixel = params.pixelSampleState->L[sr.pixelIndex];
+        params.pixelSampleState->L[sr.pixelIndex] = Lpixel + Ld;
+    }
 }
 
 extern "C" __global__ void __miss__shadow_Tr() {

@@ -523,22 +523,9 @@ void GPUPathIntegrator::HandleRayFoundEmission(int depth) {
 
 void GPUPathIntegrator::TraceShadowRays(int depth) {
     if (haveMedia)
-        accel->IntersectShadowTr(maxQueueSize, shadowRayQueue);
+        accel->IntersectShadowTr(maxQueueSize, shadowRayQueue, &pixelSampleState);
     else
-        accel->IntersectShadow(maxQueueSize, shadowRayQueue);
-    // Add shadow ray radiance contributions to pixels
-    ForAllQueued(
-        "Incorporate shadow ray contribution", shadowRayQueue, maxQueueSize,
-        PBRT_GPU_LAMBDA(const ShadowRayWorkItem sr) {
-            if (!sr.Ld)
-                return;
-            SampledSpectrum Lpixel = pixelSampleState.L[sr.pixelIndex];
-
-            PBRT_DBG("Adding shadow ray Ld %f %f %f %f at pixel index %d \n", sr.Ld[0],
-                     sr.Ld[1], sr.Ld[2], sr.Ld[3], sr.pixelIndex);
-
-            pixelSampleState.L[sr.pixelIndex] = Lpixel + sr.Ld;
-        });
+        accel->IntersectShadow(maxQueueSize, shadowRayQueue, &pixelSampleState);
 
     // Reset shadow ray queue
     GPUDo(
