@@ -178,10 +178,10 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                 Interaction intr(w.pi, w.n);
                 intr.mediumInterface = &w.mediumInterface;
                 Ray newRay = intr.SpawnRay(ray.d);
-                nextRayQueue->PushIndirect(newRay, w.prevIntrCtx, T_hat, uniPathPDF,
-                                           lightPathPDF, lambda, w.etaScale,
-                                           w.isSpecularBounce, w.anyNonSpecularBounces,
-                                           w.pixelIndex);
+                nextRayQueue->PushIndirectRay(newRay, w.prevIntrCtx, T_hat, uniPathPDF,
+                                              lightPathPDF, lambda, w.etaScale,
+                                              w.isSpecularBounce, w.anyNonSpecularBounces,
+                                              w.pixelIndex);
                 return;
             }
 
@@ -303,9 +303,9 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
             bool anyNonSpecularBounces = true;
 
             // Spawn indirect ray.
-            nextRayQueue->PushIndirect(ray, ctx, T_hat, uniPathPDF, lightPathPDF,
-                                       w.lambda, w.etaScale, isSpecularBounce,
-                                       anyNonSpecularBounces, w.pixelIndex);
+            nextRayQueue->PushIndirectRay(ray, ctx, T_hat, uniPathPDF, lightPathPDF,
+                                          w.lambda, w.etaScale, isSpecularBounce,
+                                          anyNonSpecularBounces, w.pixelIndex);
             PBRT_DBG("Enqueuing indirect medium ray at depth %d pixel index %d\n",
                      depth + 1, w.pixelIndex);
         });

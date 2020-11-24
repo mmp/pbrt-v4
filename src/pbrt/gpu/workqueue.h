@@ -105,7 +105,7 @@ class MultiWorkQueue;
 template <>
 class MultiWorkQueue<TypePack<>> {
   public:
-    MultiWorkQueue(int n, Allocator alloc, pstd::span<const bool> haveType) {}
+    MultiWorkQueue(int, Allocator, pstd::span<const bool>) {}
 };
 
 template <typename T, typename... Ts>
@@ -139,12 +139,12 @@ class MultiWorkQueue<TypePack<T, Ts...>> : public MultiWorkQueue<TypePack<Ts...>
             return MultiWorkQueue<TypePack<Ts...>>::template Get<Tg>();
     }
 
-    template <typename Tq>
-    PBRT_CPU_GPU int Push(Tq item) {
-        if constexpr (std::is_same_v<Tq, T>)
+    template <typename Tp>
+    PBRT_CPU_GPU int Push(Tp item) {
+        if constexpr (std::is_same_v<Tp, T>)
             return q.Push(item);
         else
-            return MultiWorkQueue<TypePack<Ts...>>::template Push<Tq>(item);
+            return MultiWorkQueue<TypePack<Ts...>>::template Push(item);
     }
 
   private:

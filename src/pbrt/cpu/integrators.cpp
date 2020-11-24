@@ -580,10 +580,9 @@ void LightPathIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleI
 
     // Sample point on light source for light path
     Float time = camera.SampleTime(sampler.Get1D());
-    const Point2f uv0Light(sampler.Get2D());
-    const Point2f uv1Light(sampler.Get2D());
-    pstd::optional<LightLeSample> les =
-        light.SampleLe(uv0Light, uv1Light, lambda, time);
+    Point2f ul0 = sampler.Get2D();
+    Point2f ul1 = sampler.Get2D();
+    pstd::optional<LightLeSample> les = light.SampleLe(ul0, ul1, lambda, time);
     if (!les || les->pdfPos == 0 || les->pdfDir == 0 || !les->L)
         return;
 
@@ -898,9 +897,9 @@ SampledSpectrum SimpleVolPathIntegrator::Li(RayDifferential ray,
         bool scattered = false, terminated = false;
         if (ray.medium) {
             // Sample medium scattering using delta tracking
-            const Float h0 = Hash(sampler.Get1D());
-            const Float h1 = Hash(sampler.Get1D());
-            RNG rng(h0, h1);
+            uint64_t hash0 = Hash(sampler.Get1D());
+            uint64_t hash1 = Hash(sampler.Get1D());
+            RNG rng(hash0, hash1);
             Float tMax = si ? si->tHit : Infinity;
             ray.medium.SampleTmaj(ray, tMax, rng, lambda, [&](const MediumSample &ms) {
                 const MediumInteraction &intr = ms.intr;
@@ -964,9 +963,9 @@ SampledSpectrum SimpleVolPathIntegrator::Li(RayDifferential ray,
         if (!bsdf)
             si->intr.SkipIntersection(&ray, si->tHit);
         else {
-            const Float uBSDF = sampler.Get1D();
-            const Point2f vwBSDF = sampler.Get2D();
-            if (bsdf.Sample_f(-ray.d, uBSDF, vwBSDF))
+            Float uc = sampler.Get1D();
+            Point2f u = sampler.Get2D();
+            if (bsdf.Sample_f(-ray.d, uc, u))
                 ErrorExit("SimpleVolPathIntegrator doesn't support surface scattering.");
             else
                 break;
@@ -1014,9 +1013,9 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             // Sample the participating medium
             bool scattered = false, terminated = false;
             Float tMax = si ? si->tHit : Infinity;
-            const Float h0 = Hash(sampler.Get1D());
-            const Float h1 = Hash(sampler.Get1D());
-            RNG rng(h0, h1);
+            uint64_t hash0 = Hash(sampler.Get1D());
+            uint64_t hash1 = Hash(sampler.Get1D());
+            RNG rng(hash0, hash1);
             SampledSpectrum Tmaj = ray.medium.SampleTmaj(
                 ray, tMax, rng, lambda, [&](const MediumSample &mediumSample) {
                     // Handle medium scattering event for ray
@@ -1227,10 +1226,9 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
         BSSRDFHandle bssrdf = isect.GetBSSRDF(ray, lambda, camera, scratchBuffer);
         if (bssrdf && bs->IsTransmission()) {
             // Sample BSSRDF probe segment to find exit point
-            const Float uBSSRDF = sampler.Get1D();
-            const Point2f vwBSSRDF = sampler.Get2D();
-            pstd::optional<BSSRDFProbeSegment> probeSeg =
-                bssrdf.SampleSp(sampler.Get1D(), sampler.Get2D());
+            Float uc = sampler.Get1D();
+            Point2f up = sampler.Get2D();
+            pstd::optional<BSSRDFProbeSegment> probeSeg = bssrdf.SampleSp(uc, up);
             if (!probeSeg)
                 break;
 
@@ -1963,10 +1961,9 @@ int GenerateLightSubpath(const Integrator &integrator, SampledWavelengths &lambd
     LightHandle light = sampledLight->light;
     Float lightSamplePDF = sampledLight->pdf;
 
-    const Point2f uv0Light(sampler.Get2D());
-    const Point2f uv1Light(sampler.Get2D());
-    pstd::optional<LightLeSample> les =
-        light.SampleLe(uv0Light, uv1Light, lambda, time);
+    Point2f ul0 = sampler.Get2D();
+    Point2f ul1 = sampler.Get2D();
+    pstd::optional<LightLeSample> les = light.SampleLe(ul0, ul1, lambda, time);
     if (!les || les->pdfPos == 0 || les->pdfDir == 0 || !les->L)
         return 0;
     RayDifferential ray(les->ray);

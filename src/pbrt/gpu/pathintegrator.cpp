@@ -346,7 +346,7 @@ void GPUPathIntegrator::Render() {
 
             // Trace rays and estimate radiance up to maximum ray depth
             for (int depth = 0; true; ++depth) {
-                // Reset ray queues before tracing rays
+                // Reset queues before tracing rays
                 RayQueue *nextQueue = NextRayQueue(depth);
                 GPUDo(
                     "Reset queues before tracing rays", PBRT_GPU_LAMBDA() {
@@ -476,7 +476,6 @@ void GPUPathIntegrator::HandleRayFoundEmission(int depth) {
         "Handle emitters hit by indirect rays", hitAreaLightQueue, maxQueueSize,
         PBRT_GPU_LAMBDA(const HitAreaLightWorkItem w, int index) {
             // Find emitted radiance from surface that ray hit
-            LightHandle areaLight = w.areaLight;
             SampledSpectrum Le = areaLight.L(w.p, w.n, w.uv, w.wo, w.lambda);
             if (!Le)
                 return;
@@ -490,16 +489,13 @@ void GPUPathIntegrator::HandleRayFoundEmission(int depth) {
             } else {
                 // Compute MIS-weighted radiance contribution from area light
                 Vector3f wi = -w.wo;
-
                 LightSampleContext ctx = w.prevIntrCtx;
-
-                Float lightChoicePDF = lightSampler.PDF(ctx, areaLight);
+                Float lightChoicePDF = lightSampler.PDF(ctx, w.areaLight);
                 Float lightPDF = lightChoicePDF *
-                                 areaLight.PDF_Li(ctx, wi, LightSamplingMode::WithMIS);
+                                 w.areaLight.PDF_Li(ctx, wi, LightSamplingMode::WithMIS);
 
                 SampledSpectrum uniPathPDF = w.uniPathPDF;
                 SampledSpectrum lightPathPDF = w.lightPathPDF * lightPDF;
-
                 L = w.T_hat * Le / (uniPathPDF + lightPathPDF).Average();
             }
             L = SafeDiv(L, w.lambda.PDF());
@@ -518,14 +514,12 @@ void GPUPathIntegrator::TraceShadowRays(int depth) {
         accel->IntersectShadowTr(maxQueueSize, shadowRayQueue);
     else
         accel->IntersectShadow(maxQueueSize, shadowRayQueue);
-
-    // Add contribution if light was visible
+    // Add shadow ray radiance contributions to pixels
     ForAllQueued(
         "Incorporate shadow ray contribution", shadowRayQueue, maxQueueSize,
         PBRT_GPU_LAMBDA(const ShadowRayWorkItem sr, int index) {
             if (!sr.Ld)
                 return;
-
             SampledSpectrum Lpixel = pixelSampleState.L[sr.pixelIndex];
 
             PBRT_DBG("Adding shadow ray Ld %f %f %f %f at pixel index %d \n", sr.Ld[0],
@@ -534,6 +528,7 @@ void GPUPathIntegrator::TraceShadowRays(int depth) {
             pixelSampleState.L[sr.pixelIndex] = Lpixel + sr.Ld;
         });
 
+    // Reset shadow ray queue
     GPUDo(
         "Reset shadowRayQueue", PBRT_GPU_LAMBDA() {
             stats->shadowRays[depth] += shadowRayQueue->Size();

@@ -125,10 +125,10 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                         bool anyNonSpecularBounces = true;
 
                         LightSampleContext ctx(intr.pi, intr.n, intr.ns);
-                        nextRayQueue->PushIndirect(ray, ctx, T_hat, uniPathPDF,
-                                                   lightPathPDF, lambda, etaScale,
-                                                   bsdfSample->IsSpecular(),
-                                                   anyNonSpecularBounces, s.pixelIndex);
+                        nextRayQueue->PushIndirectRay(
+                            ray, ctx, T_hat, uniPathPDF, lightPathPDF, lambda, etaScale,
+                            bsdfSample->IsSpecular(), anyNonSpecularBounces,
+                            s.pixelIndex);
 
                         PBRT_DBG(
                             "Spawned indirect ray at depth %d. "

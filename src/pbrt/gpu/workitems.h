@@ -102,9 +102,9 @@ struct SOA<RaySamples> {
 struct PixelSampleState {
     // PixelSampleState Public Members
     Point2i pPixel;
-    Float filterWeight;
-    SampledWavelengths lambda;
     SampledSpectrum L;
+    SampledWavelengths lambda;
+    Float filterWeight;
     VisibleSurface visibleSurface;
     SampledSpectrum cameraRayWeight;
     RaySamples samples;
@@ -125,13 +125,14 @@ struct RayWorkItem {
 
 // EscapedRayWorkItem Definition
 struct EscapedRayWorkItem {
-    SampledSpectrum T_hat, uniPathPDF, lightPathPDF;
-    SampledWavelengths lambda;
+    // EscapedRayWorkItem Public Members
     Point3f rayo;
     Vector3f rayd;
-    LightSampleContext prevIntrCtx;
-    int specularBounce;
+    SampledWavelengths lambda;
     int pixelIndex;
+    int specularBounce;
+    SampledSpectrum T_hat, uniPathPDF, lightPathPDF;
+    LightSampleContext prevIntrCtx;
 };
 
 // EscapedRayQueue Definition
@@ -139,13 +140,14 @@ using EscapedRayQueue = WorkQueue<EscapedRayWorkItem>;
 
 // HitAreaLightWorkItem Definition
 struct HitAreaLightWorkItem {
+    // HitAreaLightWorkItem Public Members
     LightHandle areaLight;
-    SampledWavelengths lambda;
-    SampledSpectrum T_hat, uniPathPDF, lightPathPDF;
     Point3f p;
     Normal3f n;
     Point2f uv;
     Vector3f wo;
+    SampledWavelengths lambda;
+    SampledSpectrum T_hat, uniPathPDF, lightPathPDF;
     LightSampleContext prevIntrCtx;
     int isSpecularBounce;
     int pixelIndex;
@@ -285,12 +287,13 @@ struct MaterialEvalWorkItem {
     Point2f uv;
     SampledWavelengths lambda;
     int anyNonSpecularBounces;
-    SampledSpectrum T_hat, uniPathPDF;
     Vector3f wo;
+    int pixelIndex;
+    SampledSpectrum T_hat, uniPathPDF;
+    MediumInterface mediumInterface;
     Float time;
     Float etaScale;
-    MediumInterface mediumInterface;
-    int pixelIndex;
+    Float time;
 };
 
 #include "gpu_workitems_soa.h"
@@ -304,25 +307,12 @@ class RayQueue : public WorkQueue<RayWorkItem> {
     int PushCameraRay(const Ray &ray, const SampledWavelengths &lambda, int pixelIndex);
 
     PBRT_CPU_GPU
-    int PushIndirect(const Ray &ray, const LightSampleContext &prevIntrCtx,
-                     const SampledSpectrum &T_hat, const SampledSpectrum &uniPathPDF,
-                     const SampledSpectrum &lightPathPDF,
-                     const SampledWavelengths &lambda, Float etaScale,
-                     bool isSpecularBounce, bool anyNonSpecularBounces, int pixelIndex) {
-        int index = AllocateEntry();
-        DCHECK(!ray.HasNaN());
-        this->ray[index] = ray;
-        this->pixelIndex[index] = pixelIndex;
-        this->prevIntrCtx[index] = prevIntrCtx;
-        this->T_hat[index] = T_hat;
-        this->uniPathPDF[index] = uniPathPDF;
-        this->lightPathPDF[index] = lightPathPDF;
-        this->lambda[index] = lambda;
-        this->anyNonSpecularBounces[index] = anyNonSpecularBounces;
-        this->isSpecularBounce[index] = isSpecularBounce;
-        this->etaScale[index] = etaScale;
-        return index;
-    }
+    int PushIndirectRay(const Ray &ray, const LightSampleContext &prevIntrCtx,
+                        const SampledSpectrum &T_hat, const SampledSpectrum &uniPathPDF,
+                        const SampledSpectrum &lightPathPDF,
+                        const SampledWavelengths &lambda, Float etaScale,
+                        bool isSpecularBounce, bool anyNonSpecularBounces,
+                        int pixelIndex);
 };
 
 // RayQueue Inline Methods
@@ -342,11 +332,32 @@ inline int RayQueue::PushCameraRay(const Ray &ray, const SampledWavelengths &lam
     return index;
 }
 
+PBRT_CPU_GPU
+inline int RayQueue::PushIndirectRay(
+    const Ray &ray, const LightSampleContext &prevIntrCtx, const SampledSpectrum &T_hat,
+    const SampledSpectrum &uniPathPDF, const SampledSpectrum &lightPathPDF,
+    const SampledWavelengths &lambda, Float etaScale, bool isSpecularBounce,
+    bool anyNonSpecularBounces, int pixelIndex) {
+    int index = AllocateEntry();
+    DCHECK(!ray.HasNaN());
+    this->ray[index] = ray;
+    this->pixelIndex[index] = pixelIndex;
+    this->prevIntrCtx[index] = prevIntrCtx;
+    this->T_hat[index] = T_hat;
+    this->uniPathPDF[index] = uniPathPDF;
+    this->lightPathPDF[index] = lightPathPDF;
+    this->lambda[index] = lambda;
+    this->anyNonSpecularBounces[index] = anyNonSpecularBounces;
+    this->isSpecularBounce[index] = isSpecularBounce;
+    this->etaScale[index] = etaScale;
+    return index;
+}
+
 // ShadowRayQueue Definition
 class ShadowRayQueue : public WorkQueue<ShadowRayWorkItem> {
   public:
     using WorkQueue::WorkQueue;
-
+    // ShadowRayQueue Public Methods
     PBRT_CPU_GPU
     void Push(const Ray &ray, Float tMax, SampledWavelengths lambda, SampledSpectrum Ld,
               SampledSpectrum uniPathPDF, SampledSpectrum lightPathPDF, int pixelIndex) {

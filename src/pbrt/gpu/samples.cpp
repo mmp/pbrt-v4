@@ -24,7 +24,9 @@ void GPUPathIntegrator::GenerateRaySamples(int depth, int sampleIndex) {
 
 template <typename Sampler>
 void GPUPathIntegrator::GenerateRaySamples(int depth, int sampleIndex) {
+    // Generate description string _desc_ for ray sample generation
     std::string desc = std::string("Generate ray samples - ") + Sampler::Name();
+
     RayQueue *rayQueue = CurrentRayQueue(depth);
     ForAllQueued(
         desc.c_str(), rayQueue, maxQueueSize,

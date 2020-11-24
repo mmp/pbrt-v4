@@ -192,10 +192,10 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                         LightSampleContext ctx(
                             w.pi, w.n,
                             ns);  // Note: slightly different than context below. Problem?
-                        nextRayQueue->PushIndirect(ray, ctx, T_hat, uniPathPDF,
-                                                   lightPathPDF, lambda, etaScale,
-                                                   bsdfSample->IsSpecular(),
-                                                   anyNonSpecularBounces, w.pixelIndex);
+                        nextRayQueue->PushIndirectRay(
+                            ray, ctx, T_hat, uniPathPDF, lightPathPDF, lambda, etaScale,
+                            bsdfSample->IsSpecular(), anyNonSpecularBounces,
+                            w.pixelIndex);
 
                         PBRT_DBG(
                             "Spawned indirect ray at depth %d from w.index %d. "
@@ -214,7 +214,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
 
             // Sample light and enqueue shadow ray at intersection point
             if (bsdf.IsNonSpecular()) {
-                // Choose a light source using the LightSampler.
+                // Choose a light source using the _LightSampler_
                 LightSampleContext ctx(w.pi, w.n, ns);
                 if (bsdf.HasReflection() && !bsdf.HasTransmission())
                     ctx.pi = OffsetRayOrigin(ctx.pi, w.n, wo);
@@ -229,18 +229,17 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 // Remarkably, this substantially improves L1 cache hits with
                 // CoatedDiffuseBxDF and gives about a 60% perf. benefit.
                 __syncthreads();
-
-                // And now sample the light source itself.
+                // Sample light source and evaluate BSDF for direct lighting
                 pstd::optional<LightLiSample> ls = light.SampleLi(
                     ctx, raySamples.direct.u, lambda, LightSamplingMode::WithMIS);
                 if (!ls || !ls->L || ls->pdf == 0)
                     return;
-
                 Vector3f wi = ls->wi;
                 SampledSpectrum f = bsdf.f<BxDF>(wo, wi);
                 if (!f)
                     return;
 
+                // Compute path throughput and path PDFs for light sample
                 SampledSpectrum T_hat = w.T_hat * f * AbsDot(wi, ns);
                 PBRT_DBG("w.T_hat %f %f %f %f f %f %f %f %f dot %f\n", w.T_hat[0],
                          w.T_hat[1], w.T_hat[2], w.T_hat[3], f[0], f[1], f[2], f[3],
@@ -252,7 +251,6 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                     index, depth, T_hat[0], T_hat[1], T_hat[2], T_hat[3], f[0], f[1],
                     f[2], f[3], ls->L[0], ls->L[1], ls->L[2], ls->L[3], ls->pdf);
 
-                // Compute light and BSDF PDFs for MIS.
                 Float lightPDF = ls->pdf * sampledLight->pdf;
                 // This causes uniPathPDF to be zero for the shadow ray, so that
                 // part of MIS just becomes a no-op.
@@ -260,13 +258,12 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 SampledSpectrum uniPathPDF = w.uniPathPDF * bsdfPDF;
                 SampledSpectrum lightPathPDF = w.uniPathPDF * lightPDF;
 
+                // Enqueue shadow ray with tentative radiance contribution
                 SampledSpectrum Ld = SafeDiv(T_hat * ls->L, lambda.PDF());
-
                 Ray ray = SpawnRayTo(w.pi, w.n, w.time, ls->pLight.pi, ls->pLight.n);
                 if (haveMedia)
                     ray.medium = Dot(ray.d, w.n) > 0 ? w.mediumInterface.outside
                                                      : w.mediumInterface.inside;
-
                 shadowRayQueue->Push(ray, 1 - ShadowEpsilon, lambda, Ld, uniPathPDF,
                                      lightPathPDF, w.pixelIndex);
 

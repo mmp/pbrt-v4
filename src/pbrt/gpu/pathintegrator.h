@@ -96,6 +96,9 @@ class GPUPathIntegrator {
     LightHandle envLight;
     LightSamplerHandle lightSampler;
 
+    int maxDepth;
+    bool regularize;
+
     int scanlinesPerPass, maxQueueSize;
 
     SOA<PixelSampleState> pixelSampleState;
@@ -104,9 +107,6 @@ class GPUPathIntegrator {
 
     MediumSampleQueue *mediumSampleQueue = nullptr;
     MediumScatterQueue *mediumScatterQueue = nullptr;
-
-    int maxDepth;
-    bool regularize;
 
     EscapedRayQueue *escapedRayQueue = nullptr;
 
