@@ -33,11 +33,11 @@ TEST(BVHLightSampling, OneSpot) {
     RNG rng;
     for (int i = 0; i < 100; ++i) {
         // Random point in [-5, 5]
-        Point3f p(Lerp(rng.Uniform<Float>(), -5, 5), Lerp(rng.Uniform<Float>(), -5, 5),
-                  Lerp(rng.Uniform<Float>(), -5, 5));
+        Point3f p{Lerp(rng.Uniform<Float>(), -5, 5), Lerp(rng.Uniform<Float>(), -5, 5),
+                  Lerp(rng.Uniform<Float>(), -5, 5)};
 
         Interaction in(p, 0., (MediumHandle) nullptr);
-        Point2f u(rng.Uniform<Float>(), rng.Uniform<Float>());
+        Point2f u{rng.Uniform<Float>(), rng.Uniform<Float>()};
         SampledWavelengths lambda = SampledWavelengths::SampleUniform(0.5);
         pstd::optional<LightLiSample> ls = lights[0].SampleLi(in, u, lambda);
 
@@ -65,8 +65,8 @@ TEST(BVHLightSampling, Point) {
     ConstantSpectrum one(1.f);
     for (int i = 0; i < 33; ++i) {
         // Random point in [-5, 5]
-        Vector3f p(Lerp(rng.Uniform<Float>(), -5, 5), Lerp(rng.Uniform<Float>(), -5, 5),
-                   Lerp(rng.Uniform<Float>(), -5, 5));
+        Vector3f p{Lerp(rng.Uniform<Float>(), -5, 5), Lerp(rng.Uniform<Float>(), -5, 5),
+                   Lerp(rng.Uniform<Float>(), -5, 5)};
         lights.push_back(
             new PointLight(Translate(p), MediumInterface(), &one, 1.f, Allocator()));
         lightToIndex[lights.back()] = i;
@@ -79,7 +79,7 @@ TEST(BVHLightSampling, Point) {
             return rng.Uniform<Float>() < .5 ? Lerp(rng.Uniform<Float>(), -15, -7)
                                              : Lerp(rng.Uniform<Float>(), 7, 16);
         };
-        Point3f p(r(), r(), r());
+        Point3f p{r(), r(), r()};
 
         std::vector<Float> sumWt(lights.size(), 0.f);
         const int nSamples = 10000;
@@ -113,8 +113,8 @@ TEST(BVHLightSampling, PointVaryPower) {
     std::unordered_map<LightHandle, int, LightHandleHash> lightToIndex;
     for (int i = 0; i < 82; ++i) {
         // Random point in [-5, 5]
-        Vector3f p(Lerp(rng.Uniform<Float>(), -5, 5), Lerp(rng.Uniform<Float>(), -5, 5),
-                   Lerp(rng.Uniform<Float>(), -5, 5));
+        Vector3f p{Lerp(rng.Uniform<Float>(), -5, 5), Lerp(rng.Uniform<Float>(), -5, 5),
+                   Lerp(rng.Uniform<Float>(), -5, 5)};
         lightPower.push_back(rng.Uniform<Float>());
         lightSpectra.push_back(std::make_unique<ConstantSpectrum>(lightPower.back()));
         sumPower += lightPower.back();
@@ -130,7 +130,7 @@ TEST(BVHLightSampling, PointVaryPower) {
             return rng.Uniform<Float>() < .5 ? Lerp(rng.Uniform<Float>(), -15, -7)
                                              : Lerp(rng.Uniform<Float>(), 7, 16);
         };
-        Point3f p(r(), r(), r());
+        Point3f p{r(), r(), r()};
 
         std::vector<Float> sumWt(lights.size(), 0.f);
         const int nSamples = 100000;
@@ -163,7 +163,7 @@ TEST(BVHLightSampling, PointVaryPower) {
             return rng.Uniform<Float>() < .5 ? Lerp(rng.Uniform<Float>(), -15, -7)
                                              : Lerp(rng.Uniform<Float>(), 7, 16);
         };
-        Point3f p(10000 * r(), 10000 * r(), 10000 * r());
+        Point3f p{10000 * r(), 10000 * r(), 10000 * r()};
         Interaction intr(Point3fi(p), Normal3f(0, 0, 0), Point2f(0, 0));
 
         std::vector<int> counts(lights.size(), 0);
@@ -207,11 +207,11 @@ TEST(BVHLightSampling, OneTri) {
 
     for (int i = 0; i < 10; ++i) {
         // Random point in [-5, 5]
-        Point3f p(Lerp(rng.Uniform<Float>(), -5, 5), Lerp(rng.Uniform<Float>(), -5, 5),
-                  Lerp(rng.Uniform<Float>(), -5, 5));
+        Point3f p{Lerp(rng.Uniform<Float>(), -5, 5), Lerp(rng.Uniform<Float>(), -5, 5),
+                  Lerp(rng.Uniform<Float>(), -5, 5)};
 
         Interaction in(p, 0., (MediumHandle) nullptr);
-        Point2f u(rng.Uniform<Float>(), rng.Uniform<Float>());
+        Point2f u{rng.Uniform<Float>(), rng.Uniform<Float>()};
         SampledWavelengths lambda = SampledWavelengths::SampleUniform(0.5);
         pstd::optional<LightLiSample> ls = lights[0].SampleLi(in, u, lambda);
 
@@ -239,8 +239,8 @@ static std::tuple<std::vector<LightHandle>, std::vector<ShapeHandle>> randomLigh
         // Triangle
         {
             std::vector<int> indices{0, 1, 2};
-            std::vector<Point3f> p{Point3f(r(), r(), r()), Point3f(r(), r(), r()),
-                                   Point3f(r(), r(), r())};
+            std::vector<Point3f> p{Point3f{r(), r(), r()}, Point3f{r(), r(), r()},
+                                   Point3f{r(), r(), r()}};
             // leaks...
             TriangleMesh *mesh = new TriangleMesh(id, false /* rev orientation */,
                                                   indices, p, {}, {}, {}, {});
@@ -256,9 +256,9 @@ static std::tuple<std::vector<LightHandle>, std::vector<ShapeHandle>> randomLigh
 
         // Random point light
         {
-            Vector3f p(Lerp(rng.Uniform<Float>(), -5, 5),
+            Vector3f p{Lerp(rng.Uniform<Float>(), -5, 5),
                        Lerp(rng.Uniform<Float>(), -5, 5),
-                       Lerp(rng.Uniform<Float>(), -5, 5));
+                       Lerp(rng.Uniform<Float>(), -5, 5)};
             lights.push_back(new PointLight(Translate(p), MediumInterface(),
                                             alloc.new_object<ConstantSpectrum>(r()),
                                             1.f, Allocator()));
@@ -278,7 +278,7 @@ TEST(BVHLightSampling, PdfMethod) {
 
     BVHLightSampler distrib(lights, Allocator());
     for (int i = 0; i < 100; ++i) {
-        Point3f p(-1 + 3 * r(), -1 + 3 * r(), -1 + 3 * r());
+        Point3f p{-1 + 3 * r(), -1 + 3 * r(), -1 + 3 * r()};
         Float u = rng.Uniform<Float>();
         Interaction intr(Point3fi(p), Normal3f(0, 0, 0), Point2f(0, 0));
         pstd::optional<SampledLight> sampledLight = distrib.Sample(intr, u);
@@ -300,7 +300,7 @@ TEST(ExhaustiveLightSampling, PdfMethod) {
 
     ExhaustiveLightSampler distrib(lights, Allocator());
     for (int i = 0; i < 100; ++i) {
-        Point3f p(-1 + 3 * r(), -1 + 3 * r(), -1 + 3 * r());
+        Point3f p{-1 + 3 * r(), -1 + 3 * r(), -1 + 3 * r()};
         Interaction intr(Point3fi(p), Normal3f(0, 0, 0), Point2f(0, 0));
         pstd::optional<SampledLight> sampledLight =
             distrib.Sample(intr, rng.Uniform<Float>());
@@ -319,7 +319,7 @@ TEST(UniformLightSampling, PdfMethod) {
 
     UniformLightSampler distrib(lights, Allocator());
     for (int i = 0; i < 100; ++i) {
-        Point3f p(-1 + 3 * r(), -1 + 3 * r(), -1 + 3 * r());
+        Point3f p{-1 + 3 * r(), -1 + 3 * r(), -1 + 3 * r()};
         Interaction intr(Point3fi(p), Normal3f(0, 0, 0), Point2f(0, 0));
         pstd::optional<SampledLight> sampledLight =
             distrib.Sample(intr, rng.Uniform<Float>());
@@ -338,7 +338,7 @@ TEST(PowerLightSampling, PdfMethod) {
 
     PowerLightSampler distrib(lights, Allocator());
     for (int i = 0; i < 100; ++i) {
-        Point3f p(-1 + 3 * r(), -1 + 3 * r(), -1 + 3 * r());
+        Point3f p{-1 + 3 * r(), -1 + 3 * r(), -1 + 3 * r()};
         Interaction intr(Point3fi(p), Normal3f(0, 0, 0), Point2f(0, 0));
         pstd::optional<SampledLight> sampledLight =
             distrib.Sample(intr, rng.Uniform<Float>());

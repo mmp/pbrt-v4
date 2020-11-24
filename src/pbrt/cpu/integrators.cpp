@@ -580,8 +580,10 @@ void LightPathIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleI
 
     // Sample point on light source for light path
     Float time = camera.SampleTime(sampler.Get1D());
+    const Point2f uv0Light(sampler.Get2D());
+    const Point2f uv1Light(sampler.Get2D());
     pstd::optional<LightLeSample> les =
-        light.SampleLe(sampler.Get2D(), sampler.Get2D(), lambda, time);
+        light.SampleLe(uv0Light, uv1Light, lambda, time);
     if (!les || les->pdfPos == 0 || les->pdfDir == 0 || !les->L)
         return;
 
@@ -896,7 +898,9 @@ SampledSpectrum SimpleVolPathIntegrator::Li(RayDifferential ray,
         bool scattered = false, terminated = false;
         if (ray.medium) {
             // Sample medium scattering using delta tracking
-            RNG rng(Hash(sampler.Get1D()), Hash(sampler.Get1D()));
+            const Float h0 = Hash(sampler.Get1D());
+            const Float h1 = Hash(sampler.Get1D());
+            RNG rng(h0, h1);
             Float tMax = si ? si->tHit : Infinity;
             ray.medium.SampleTmaj(ray, tMax, rng, lambda, [&](const MediumSample &ms) {
                 const MediumInteraction &intr = ms.intr;
@@ -959,10 +963,14 @@ SampledSpectrum SimpleVolPathIntegrator::Li(RayDifferential ray,
         BSDF bsdf = si->intr.GetBSDF(ray, lambda, camera, buf, sampler);
         if (!bsdf)
             si->intr.SkipIntersection(&ray, si->tHit);
-        else if (bsdf.Sample_f(-ray.d, sampler.Get1D(), sampler.Get2D()))
-            ErrorExit("SimpleVolPathIntegrator doesn't support surface scattering.");
-        else
-            break;
+        else {
+            const Float uBSDF = sampler.Get1D();
+            const Point2f vwBSDF = sampler.Get2D();
+            if (bsdf.Sample_f(-ray.d, uBSDF, vwBSDF))
+                ErrorExit("SimpleVolPathIntegrator doesn't support surface scattering.");
+            else
+                break;
+        }
     }
     return L;
 }
@@ -1006,7 +1014,9 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             // Sample the participating medium
             bool scattered = false, terminated = false;
             Float tMax = si ? si->tHit : Infinity;
-            RNG rng(Hash(sampler.Get1D()), Hash(sampler.Get1D()));
+            const Float h0 = Hash(sampler.Get1D());
+            const Float h1 = Hash(sampler.Get1D());
+            RNG rng(h0, h1);
             SampledSpectrum Tmaj = ray.medium.SampleTmaj(
                 ray, tMax, rng, lambda, [&](const MediumSample &mediumSample) {
                     // Handle medium scattering event for ray
@@ -1217,6 +1227,8 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
         BSSRDFHandle bssrdf = isect.GetBSSRDF(ray, lambda, camera, scratchBuffer);
         if (bssrdf && bs->IsTransmission()) {
             // Sample BSSRDF probe segment to find exit point
+            const Float uBSSRDF = sampler.Get1D();
+            const Point2f vwBSSRDF = sampler.Get2D();
             pstd::optional<BSSRDFProbeSegment> probeSeg =
                 bssrdf.SampleSp(sampler.Get1D(), sampler.Get2D());
             if (!probeSeg)
@@ -1951,8 +1963,10 @@ int GenerateLightSubpath(const Integrator &integrator, SampledWavelengths &lambd
     LightHandle light = sampledLight->light;
     Float lightSamplePDF = sampledLight->pdf;
 
+    const Point2f uv0Light(sampler.Get2D());
+    const Point2f uv1Light(sampler.Get2D());
     pstd::optional<LightLeSample> les =
-        light.SampleLe(sampler.Get2D(), sampler.Get2D(), lambda, time);
+        light.SampleLe(uv0Light, uv1Light, lambda, time);
     if (!les || les->pdfPos == 0 || les->pdfDir == 0 || !les->L)
         return 0;
     RayDifferential ray(les->ray);
@@ -3078,11 +3092,11 @@ void SPPMIntegrator::Render() {
                 };
 
                 auto Sample2D = [&]() {
-                    Point2f u(
+                    Point2f u{
                         ScrambledRadicalInverse(haltonDim, haltonIndex,
                                                 (*digitPermutations)[haltonDim]),
                         ScrambledRadicalInverse(haltonDim + 1, haltonIndex,
-                                                (*digitPermutations)[haltonDim + 1]));
+                                                (*digitPermutations)[haltonDim + 1])};
                     haltonDim += 2;
                     return u;
                 };

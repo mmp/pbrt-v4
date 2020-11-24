@@ -321,9 +321,10 @@ static Transform randomTransform(RNG &rng) {
     };
 
     for (int i = 0; i < 1; ++i) {
-        t = t * Scale(pExp(rng, 4), pExp(rng, 4), pExp(rng, 4));
-        t = t * Translate(Vector3f(rt(), rt(), rt()));
-        Point2f u(rng.Uniform<Float>(), rng.Uniform<Float>());
+        const Float s[3] = {pExp(rng, 4), pExp(rng, 4), pExp(rng, 4)};
+        t = t * Scale(s[0], s[1], s[2]);
+        t = t * Translate(Vector3f{rt(), rt(), rt()});
+        Point2f u{rng.Uniform<Float>(), rng.Uniform<Float>()};
         t = t * Rotate(rr() * 20., SampleUniformSphere(u));
     }
     return t;
