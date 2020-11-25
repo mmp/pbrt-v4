@@ -265,8 +265,15 @@ endif ()
 INCLUDE(CheckCXXCompilerFlag)
 
 # TODO: how to specify this on windows?
+
+# TODO: the following works given --forward-unknown-to-host-compiler
+# starting with CUDA 11.1, but is broken in 11.0.  Unfortunately cmake
+# still reports 0 for CUDA_VERSION_MINOR with 11.1, so it's not clear how
+# to detect that vs CUDA 11.0...
+
 check_cxx_compiler_flag ("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
-if (COMPILER_SUPPORTS_MARCH_NATIVE AND PBRT_BUILD_NATIVE_EXECUTABLE)
+if (COMPILER_SUPPORTS_MARCH_NATIVE AND PBRT_BUILD_NATIVE_EXECUTABLE AND
+    NOT PBRT_CUDA_ENABLED)
   list (APPEND PBRT_CXX_FLAGS -march=native)
 endif ()
 
