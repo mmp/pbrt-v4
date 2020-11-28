@@ -906,62 +906,51 @@ class SummedAreaTable {
     // SummedAreaTable Public Methods
     SummedAreaTable(Allocator alloc) : sum(alloc) {}
     SummedAreaTable(const Array2D<Float> &values, Allocator alloc = {})
-        : sum(integrate(values, alloc)) {}
+        : sum(values.xSize(), values.ySize(), alloc) {
+        sum(0, 0) = values(0, 0);
+        // Compute sums along first scanline and column
+        for (int x = 1; x < sum.xSize(); ++x)
+            sum(x, 0) = values(x, 0) + sum(x - 1, 0);
+        for (int y = 1; y < sum.ySize(); ++y)
+            sum(0, y) = values(0, y) + sum(0, y - 1);
 
-    PBRT_CPU_GPU
-    Float Sum(const Bounds2f &extent) const {
-        double s = ((lookup(extent.pMax.x, extent.pMax.y) -
-                     lookup(extent.pMin.x, extent.pMax.y)) +
-                    (lookup(extent.pMin.x, extent.pMin.y) -
-                     lookup(extent.pMax.x, extent.pMin.y)));
-        return std::max<Float>(s, 0);
+        // Compute sums for the remainder of the entries
+        for (int y = 1; y < sum.ySize(); ++y)
+            for (int x = 1; x < sum.xSize(); ++x)
+                sum(x, y) =
+                    (values(x, y) + sum(x - 1, y) + sum(x, y - 1) - sum(x - 1, y - 1));
     }
 
     PBRT_CPU_GPU
-    Float Average(const Bounds2f &extent) const { return Sum(extent) / extent.Area(); }
+    Float Integral(const Bounds2f &extent) const {
+        double s = (((double)Lookup(extent.pMax.x, extent.pMax.y) -
+                     (double)Lookup(extent.pMin.x, extent.pMax.y)) +
+                    ((double)Lookup(extent.pMin.x, extent.pMin.y) -
+                     (double)Lookup(extent.pMax.x, extent.pMin.y)));
+        return std::max<Float>(s / (sum.xSize() * sum.ySize()), 0);
+    }
 
     std::string ToString() const;
 
   private:
     // SummedAreaTable Private Methods
-    Array2D<double> integrate(const Array2D<Float> &values, Allocator alloc) {
-        auto f = [&values](int x, int y) {
-            return values(x, y) / (values.xSize() * values.ySize());
-        };
-        Array2D<double> result(values.xSize(), values.ySize(), alloc);
-        result(0, 0) = f(0, 0);
-        // Compute sums along first scanline and column
-        for (int x = 1; x < result.xSize(); ++x)
-            result(x, 0) = f(x, 0) + result(x - 1, 0);
-        for (int y = 1; y < result.ySize(); ++y)
-            result(0, y) = f(0, y) + result(0, y - 1);
-
-        // Compute sums for the remainder of the entries
-        for (int y = 1; y < result.ySize(); ++y)
-            for (int x = 1; x < result.xSize(); ++x)
-                result(x, y) = (f(x, y) + result(x - 1, y) + result(x, y - 1) -
-                                result(x - 1, y - 1));
-
-        return result;
-    }
-
     PBRT_CPU_GPU
-    double lookup(Float x, Float y) const {
+    Float Lookup(Float x, Float y) const {
         // Rescale $(x,y)$ to table resolution and compute integer coordinates
         x *= sum.xSize();
         y *= sum.ySize();
         int x0 = (int)x, y0 = (int)y;
 
         // Bilinearly interpolate between surrounding table values
-        Float v00 = lookup(x0, y0), v10 = lookup(x0 + 1, y0);
-        Float v01 = lookup(x0, y0 + 1), v11 = lookup(x0 + 1, y0 + 1);
+        Float v00 = LookupInt(x0, y0), v10 = LookupInt(x0 + 1, y0);
+        Float v01 = LookupInt(x0, y0 + 1), v11 = LookupInt(x0 + 1, y0 + 1);
         Float dx = x - int(x), dy = y - int(y);
         return (1 - dx) * (1 - dy) * v00 + (1 - dx) * dy * v01 + dx * (1 - dy) * v10 +
                dx * dy * v11;
     }
 
     PBRT_CPU_GPU
-    double lookup(int x, int y) const {
+    Float LookupInt(int x, int y) const {
         // Return zero at lower boundaries
         if (x == 0 || y == 0)
             return 0;
@@ -987,78 +976,82 @@ class WindowedPiecewiseConstant2D {
     PBRT_CPU_GPU
     Point2f Sample(const Point2f &u, const Bounds2f &b, Float *pdf) const {
         // Handle zero-valued function for windowed sampling
-        if (sat.Sum(b) == 0) {
+        if (sat.Integral(b) == 0) {
             *pdf = 0;
             return {};
         }
 
-        // Sample marginal windowed function in the first dimension
-        Float sumb = sat.Sum(b);
+        // Define lambda function _Px_ for marginal cumulative distribution
+        Float bInt = sat.Integral(b);
         auto Px = [&, this](Float x) -> Float {
             Bounds2f bx = b;
             bx.pMax.x = x;
-            return sat.Sum(bx) / sumb;
+            return sat.Integral(bx) / bInt;
         };
-        Point2f p;
-        int nx = func.xSize();
-        p.x = sample(Px, u[0], b.pMin.x, b.pMax.x, nx);
 
-        // Sample conditional windowed function in the second dimension
-        Bounds2f by(Point2f(std::floor(p.x * nx) / nx, b.pMin.y),
-                    Point2f(std::ceil(p.x * nx) / nx, b.pMax.y));
-        if (by.pMin.x == by.pMax.x)
-            by.pMax.x += 1.f / nx;
-        if (sat.Sum(by) == 0) {
-            // This can happen when we're provided a really narrow initial
-            // bounding box
+        // Sample marginal windowed function in $x$
+        Point2f p;
+        p.x = SampleBisection(Px, u[0], b.pMin.x, b.pMax.x, func.xSize());
+
+        // Sample conditional windowed function in $y$
+        // Compute 2D bounds _bCond_ for conditional sampling
+        int nx = func.xSize();
+        Bounds2f bCond(Point2f(std::floor(p.x * nx) / nx, b.pMin.y),
+                       Point2f(std::ceil(p.x * nx) / nx, b.pMax.y));
+        if (bCond.pMin.x == bCond.pMax.x)
+            bCond.pMax.x += 1.f / nx;
+        if (sat.Integral(bCond) == 0) {
             *pdf = 0;
             return {};
         }
-        Float sumby = sat.Sum(by);
+
+        // Define lambda function for conditional distribution and sample $y$
+        Float condIntegral = sat.Integral(bCond);
         auto Py = [&, this](Float y) -> Float {
-            Bounds2f byy = by;
-            byy.pMax.y = y;
-            return sat.Sum(byy) / sumby;
+            Bounds2f by = bCond;
+            by.pMax.y = y;
+            return sat.Integral(by) / condIntegral;
         };
-        p.y = sample(Py, u[1], b.pMin.y, b.pMax.y, func.ySize());
+        p.y = SampleBisection(Py, u[1], b.pMin.y, b.pMax.y, func.ySize());
 
         // Compute PDF and return point sampled from windowed function
-        *pdf = PDF(p, b);
+        *pdf = Eval(p) / bInt;
         return p;
     }
 
     PBRT_CPU_GPU
     Float PDF(const Point2f &p, const Bounds2f &b) const {
-        if (sat.Sum(b) == 0)
+        if (sat.Integral(b) == 0)
             return 0;
-        return Eval(p) / sat.Sum(b);
+        return Eval(p) / sat.Integral(b);
     }
 
   private:
     // WindowedPiecewiseConstant2D Private Methods
-    PBRT_CPU_GPU
-    Float Eval(const Point2f &p) const {
-        Point2i pi(std::min<int>(p[0] * func.xSize(), func.xSize() - 1),
-                   std::min<int>(p[1] * func.ySize(), func.ySize() - 1));
-        return func[pi];
-    }
-
-    template <typename F>
-    PBRT_CPU_GPU static Float sample(F func, Float u, Float min, Float max, int n) {
+    template <typename CDF>
+    PBRT_CPU_GPU static Float SampleBisection(CDF P, Float u, Float min, Float max,
+                                              int n) {
         // Apply bisection to bracket _u_
         while (std::ceil(n * max) - std::floor(n * min) > 1) {
-            DCHECK_LE(func(min), u);
-            DCHECK_GE(func(max), u);
+            DCHECK_LE(P(min), u);
+            DCHECK_GE(P(max), u);
             Float mid = (min + max) / 2;
-            if (func(mid) > u)
+            if (P(mid) > u)
                 max = mid;
             else
                 min = mid;
         }
 
         // Find sample by interpolating between _min_ and _max_
-        Float t = (u - func(min)) / (func(max) - func(min));
+        Float t = (u - P(min)) / (P(max) - P(min));
         return Clamp(Lerp(t, min, max), min, max);
+    }
+
+    PBRT_CPU_GPU
+    Float Eval(const Point2f &p) const {
+        Point2i pi(std::min<int>(p[0] * func.xSize(), func.xSize() - 1),
+                   std::min<int>(p[1] * func.ySize(), func.ySize() - 1));
+        return func[pi];
     }
 
     // WindowedPiecewiseConstant2D Private Members

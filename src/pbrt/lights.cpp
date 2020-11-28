@@ -968,7 +968,7 @@ std::string ImageInfiniteLight::ToString() const {
 
 // PortalImageInfiniteLight Method Definitions
 PortalImageInfiniteLight::PortalImageInfiniteLight(
-    const Transform &renderFromLight, Image equiAreaImage,
+    const Transform &renderFromLight, Image equalAreaImage,
     const RGBColorSpace *imageColorSpace, Float scale, const std::string &filename,
     std::vector<Point3f> p, Allocator alloc)
     : LightBase(LightType::Infinite, renderFromLight, MediumInterface()),
@@ -977,8 +977,7 @@ PortalImageInfiniteLight::PortalImageInfiniteLight(
       scale(scale),
       filename(filename),
       distribution(alloc) {
-    // Initialize sampling PDFs for infinite area light
-    ImageChannelDesc channelDesc = equiAreaImage.GetChannelDesc({"R", "G", "B"});
+    ImageChannelDesc channelDesc = equalAreaImage.GetChannelDesc({"R", "G", "B"});
     if (!channelDesc)
         ErrorExit("%s: image used for PortalImageInfiniteLight doesn't have R, "
                   "G, B channels.",
@@ -986,17 +985,17 @@ PortalImageInfiniteLight::PortalImageInfiniteLight(
     CHECK_EQ(3, channelDesc.size());
     CHECK(channelDesc.IsIdentity());
 
-    if (equiAreaImage.Resolution().x != equiAreaImage.Resolution().y)
+    if (equalAreaImage.Resolution().x != equalAreaImage.Resolution().y)
         ErrorExit("%s: image resolution (%d, %d) is non-square. It's unlikely "
-                  "this is an "
-                  "equirect environment map.",
-                  filename, equiAreaImage.Resolution().x, equiAreaImage.Resolution().y);
+                  "this is an equal area environment map.",
+                  filename, equalAreaImage.Resolution().x, equalAreaImage.Resolution().y);
 
     if (p.size() != 4)
         ErrorExit("Expected 4 vertices for infinite light portal but given %d", p.size());
     for (int i = 0; i < 4; ++i)
         portal[i] = p[i];
 
+    // PortalImageInfiniteLight constructor conclusion
     // Compute frame for portal coordinate system
     Vector3f p01 = Normalize(portal[1] - portal[0]);
     Vector3f p12 = Normalize(portal[2] - portal[1]);
@@ -1009,37 +1008,36 @@ PortalImageInfiniteLight::PortalImageInfiniteLight(
     if (std::abs(Dot(p01, p12)) > .001 || std::abs(Dot(p12, p32)) > .001 ||
         std::abs(Dot(p32, p03)) > .001 || std::abs(Dot(p03, p01)) > .001)
         Error("Infinite light portal isn't a planar quadrilateral");
-    portalFrame = Frame::FromXY(p01, p03);
+    portalFrame = Frame::FromXY(p03, p01);
 
-    // Resample environment map into rectified coordinates
-    // Resample the latlong map into rectified coordinates
-    image = Image(PixelFormat::Float, equiAreaImage.Resolution(), {"R", "G", "B"},
-                  equiAreaImage.Encoding(), alloc);
+    // Resample environment map into rectified image
+    image = Image(PixelFormat::Float, equalAreaImage.Resolution(), {"R", "G", "B"},
+                  equalAreaImage.Encoding(), alloc);
     ParallelFor(0, image.Resolution().y, [&](int y) {
         for (int x = 0; x < image.Resolution().x; ++x) {
-            // [0,1]^2 image coordinates
-            Point2f st((x + 0.5f) / image.Resolution().x,
+            // Resample _equalAreaImage_ to compute rectified image pixel $(x,y)$
+            // Find $(u,v)$ coordinates in equal-area image for pixel
+            Point2f uv((x + 0.5f) / image.Resolution().x,
                        (y + 0.5f) / image.Resolution().y);
-
-            Vector3f w = RenderFromImage(st);
-
+            Vector3f w = RenderFromImage(uv);
             w = Normalize(renderFromLight.ApplyInverse(w));
+            Point2f uvEqui = EqualAreaSphereToSquare(w);
 
-            Point2f stEqui = EqualAreaSphereToSquare(w);
-            for (int c = 0; c < 3; ++c)
-                image.SetChannel(
-                    {x, y}, c,
-                    equiAreaImage.BilerpChannel(stEqui, c, WrapMode::OctahedralSphere));
+            for (int c = 0; c < 3; ++c) {
+                Float v =
+                    equalAreaImage.BilerpChannel(uvEqui, c, WrapMode::OctahedralSphere);
+                image.SetChannel({x, y}, c, v);
+            }
         }
     });
 
-    // Initialize sampling PDFs for infinite area light
-    auto duvdw = [&](const Point2f &p) {
+    // Initialize sampling distribution for portal image infinite light
+    auto duv_dw = [&](const Point2f &p) {
         Float duv_dw;
         (void)RenderFromImage(p, &duv_dw);
         return duv_dw;
     };
-    Array2D<Float> d = image.GetSamplingDistribution(duvdw);
+    Array2D<Float> d = image.GetSamplingDistribution(duv_dw);
     distribution = WindowedPiecewiseConstant2D(d, alloc);
 }
 
@@ -1070,64 +1068,61 @@ SampledSpectrum PortalImageInfiniteLight::Phi(const SampledWavelengths &lambda) 
 
 SampledSpectrum PortalImageInfiniteLight::Le(const Ray &ray,
                                              const SampledWavelengths &lambda) const {
-    // Ignore world to light...
-    Vector3f w = Normalize(ray.d);
-    Point2f st = ImageFromRender(w);
-
-    if (!Inside(st, ImageBounds(ray.o)))
+    pstd::optional<Point2f> uv = ImageFromRender(Normalize(ray.d));
+    pstd::optional<Bounds2f> b = ImageBounds(ray.o);
+    if (!uv || !b || !Inside(*uv, *b))
         return SampledSpectrum(0.f);
-
-    return ImageLookup(st, lambda);
+    return ImageLookup(*uv, lambda);
 }
 
 SampledSpectrum PortalImageInfiniteLight::ImageLookup(
-    const Point2f &st, const SampledWavelengths &lambda) const {
+    Point2f uv, const SampledWavelengths &lambda) const {
     RGB rgb;
     for (int c = 0; c < 3; ++c)
-        rgb[c] = image.LookupNearestChannel(st, c);
-    return scale * RGBIlluminantSpectrum(*imageColorSpace, ClampZero(rgb)).Sample(lambda);
+        rgb[c] = image.LookupNearestChannel(uv, c);
+    RGBIlluminantSpectrum spec(*imageColorSpace, ClampZero(rgb));
+    return scale * spec.Sample(lambda);
 }
 
 pstd::optional<LightLiSample> PortalImageInfiniteLight::SampleLi(
     LightSampleContext ctx, Point2f u, SampledWavelengths lambda,
     LightSamplingMode mode) const {
-    Bounds2f b = ImageBounds(ctx.p());
-
-    // Find $(u,v)$ sample coordinates in infinite light texture
+    // Sample $(u,v)$ in potentially-visible region of light image
+    pstd::optional<Bounds2f> b = ImageBounds(ctx.p());
+    if (!b)
+        return {};
     Float mapPDF;
-    Point2f uv = distribution.Sample(u, b, &mapPDF);
+    Point2f uv = distribution.Sample(u, *b, &mapPDF);
     if (mapPDF == 0)
         return {};
 
-    // Convert infinite light sample point to direction
-    // Note: ignore WorldToLight since we already folded it in when we
-    // resampled...
+    // Convert portal image sample point to direction and compute PDF
     Float duv_dw;
     Vector3f wi = RenderFromImage(uv, &duv_dw);
     if (duv_dw == 0)
         return {};
-
-    // Compute PDF for sampled infinite light direction
     Float pdf = mapPDF / duv_dw;
     CHECK(!IsInf(pdf));
 
+    // Compute radiance for portal light sample and return _LightLiSample_
     SampledSpectrum L = ImageLookup(uv, lambda);
-
-    return LightLiSample(L, wi, pdf,
-                         Interaction(ctx.p() + wi * (2 * sceneRadius), &mediumInterface));
+    Point3f pl = ctx.p() + 2 * sceneRadius * wi;
+    return LightLiSample(L, wi, pdf, Interaction(pl, &mediumInterface));
 }
 
 Float PortalImageInfiniteLight::PDF_Li(LightSampleContext ctx, Vector3f w,
                                        LightSamplingMode mode) const {
-    // Note: ignore WorldToLight since we already folded it in when we
-    // resampled...
+    // Find image $(u,v)$ coordinates corresponding to direction _w_
     Float duv_dw;
-    Point2f st = ImageFromRender(w, &duv_dw);
-    if (duv_dw == 0)
+    pstd::optional<Point2f> uv = ImageFromRender(w, &duv_dw);
+    if (!uv || duv_dw == 0)
         return 0;
 
-    Bounds2f b = ImageBounds(ctx.p());
-    Float pdf = distribution.PDF(st, b);
+    // Return PDF for sampling $(u,v)$ from reference point
+    pstd::optional<Bounds2f> b = ImageBounds(ctx.p());
+    if (!b)
+        return {};
+    Float pdf = distribution.PDF(*uv, *b);
     return pdf / duv_dw;
 }
 
@@ -1181,15 +1176,15 @@ void PortalImageInfiniteLight::PDF_Le(const Ray &ray, Float *pdfPos,
     // TODO: negate here or???
     Vector3f w = -Normalize(ray.d);
     Float duv_dw;
-    Point2f st = ImageFromRender(w, &duv_dw);
+    pstd::optional<Point2f> uv = ImageFromRender(w, &duv_dw);
 
-    if (duv_dw == 0) {
+    if (!uv || duv_dw == 0) {
         *pdfPos = *pdfDir = 0;
         return;
     }
 
     Bounds2f b(Point2f(0, 0), Point2f(1, 1));
-    Float pdf = distribution.PDF(st, b);
+    Float pdf = distribution.PDF(*uv, b);
 
 #if 0
     Normal3f n = Normal3f(portalFrame.z);

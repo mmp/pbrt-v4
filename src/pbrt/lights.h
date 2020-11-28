@@ -706,42 +706,46 @@ class PortalImageInfiniteLight : public LightBase {
   private:
     // PortalImageInfiniteLight Private Methods
     PBRT_CPU_GPU
-    SampledSpectrum ImageLookup(const Point2f &st,
-                                const SampledWavelengths &lambda) const;
+    SampledSpectrum ImageLookup(Point2f uv, const SampledWavelengths &lambda) const;
 
     PBRT_CPU_GPU
-    Vector3f RenderFromImage(const Point2f &st, Float *duv_dw = nullptr) const {
-        Float alpha = -Pi / 2 + st.x * Pi, beta = -Pi / 2 + st.y * Pi;
-        Float x = std::tan(alpha), y = std::tan(beta);
-        DCHECK(!IsInf(x) && !IsInf(y));
-        Vector3f w = Normalize(Vector3f(x, y, -1));
-
-        if (w.z == 0)
-            w.z = 1e-5;
-        if (duv_dw)
-            *duv_dw = Pi * Pi * std::abs((1 - w.y * w.y) * (1 - w.x * w.x) / w.z);
-        return portalFrame.FromLocal(w);
-    }
-
-    PBRT_CPU_GPU
-    Point2f ImageFromRender(const Vector3f &wRender, Float *duv_dw = nullptr) const {
+    pstd::optional<Point2f> ImageFromRender(Vector3f wRender,
+                                            Float *duv_dw = nullptr) const {
         Vector3f w = portalFrame.ToLocal(wRender);
-        if (w.z == 0)
-            w.z = 1e-5;
+        if (w.z <= 0)
+            return {};
+        // Compute Jacobian determinant of mapping $\roman{d}(u,v)/\roman{d}\omega$ if
+        // needed
         if (duv_dw)
-            *duv_dw = Pi * Pi * std::abs((1 - w.y * w.y) * (1 - w.x * w.x) / w.z);
+            *duv_dw = Sqr(Pi) * (1 - Sqr(w.x)) * (1 - Sqr(w.y)) / w.z;
 
-        Float alpha = std::atan(w.x / -w.z), beta = std::atan(w.y / -w.z);
+        Float alpha = std::atan2(w.x, w.z), beta = std::atan2(w.y, w.z);
         DCHECK(!IsNaN(alpha + beta));
         return Point2f(Clamp((alpha + Pi / 2) / Pi, 0, 1),
                        Clamp((beta + Pi / 2) / Pi, 0, 1));
     }
 
     PBRT_CPU_GPU
-    Bounds2f ImageBounds(const Point3f &p) const {
-        Point2f p0 = ImageFromRender(Normalize(portal[0] - p));
-        Point2f p1 = ImageFromRender(Normalize(portal[2] - p));
-        return Bounds2f(p0, p1);
+    Vector3f RenderFromImage(Point2f uv, Float *duv_dw = nullptr) const {
+        Float alpha = -Pi / 2 + uv[0] * Pi, beta = -Pi / 2 + uv[1] * Pi;
+        Float x = std::tan(alpha), y = std::tan(beta);
+        DCHECK(!IsInf(x) && !IsInf(y));
+        Vector3f w = Normalize(Vector3f(x, y, 1));
+        // Compute Jacobian determinant of mapping $\roman{d}(u,v)/\roman{d}\omega$ if
+        // needed
+        if (duv_dw)
+            *duv_dw = Sqr(Pi) * (1 - Sqr(w.x)) * (1 - Sqr(w.y)) / w.z;
+
+        return portalFrame.FromLocal(w);
+    }
+
+    PBRT_CPU_GPU
+    pstd::optional<Bounds2f> ImageBounds(const Point3f &p) const {
+        pstd::optional<Point2f> p0 = ImageFromRender(Normalize(portal[0] - p));
+        pstd::optional<Point2f> p1 = ImageFromRender(Normalize(portal[2] - p));
+        if (!p0 || !p1)
+            return {};
+        return Bounds2f(*p0, *p1);
     }
 
     PBRT_CPU_GPU
@@ -750,15 +754,15 @@ class PortalImageInfiniteLight : public LightBase {
     }
 
     // PortalImageInfiniteLight Private Members
-    std::string filename;
+    pstd::array<Point3f, 4> portal;
+    Frame portalFrame;
     Image image;
+    WindowedPiecewiseConstant2D distribution;
     const RGBColorSpace *imageColorSpace;
     Float scale;
-    Frame portalFrame;
-    pstd::array<Point3f, 4> portal;
-    WindowedPiecewiseConstant2D distribution;
-    Point3f sceneCenter;
     Float sceneRadius;
+    std::string filename;
+    Point3f sceneCenter;
 };
 
 // SpotLight Definition

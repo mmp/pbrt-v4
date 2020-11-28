@@ -526,7 +526,6 @@ void GPUPathIntegrator::TraceShadowRays(int depth) {
         accel->IntersectShadowTr(maxQueueSize, shadowRayQueue, &pixelSampleState);
     else
         accel->IntersectShadow(maxQueueSize, shadowRayQueue, &pixelSampleState);
-
     // Reset shadow ray queue
     GPUDo(
         "Reset shadowRayQueue", PBRT_GPU_LAMBDA() {
