@@ -506,11 +506,11 @@ class Vector3 : public Tuple3<Vector3, T> {
     PBRT_CPU_GPU explicit Vector3(const Normal3<U> &n);
 };
 
-// Vector2* definitions
+// Vector2* Definitions
 using Vector2f = Vector2<Float>;
 using Vector2i = Vector2<int>;
 
-// Vector3* definitions
+// Vector3* Definitions
 using Vector3f = Vector3<Float>;
 using Vector3i = Vector3<int>;
 
@@ -1733,6 +1733,51 @@ PBRT_CPU_GPU
 inline bool SameHemisphere(const Vector3f &w, const Normal3f &wp) {
     return w.z * wp.z > 0;
 }
+
+// OctahedralVector Definition
+class OctahedralVector {
+  public:
+    // OctahedralVector Public Methods
+    OctahedralVector() = default;
+    PBRT_CPU_GPU
+    OctahedralVector(const Vector3f &v) {
+        Float invL1Norm = 1 / (std::abs(v.x) + std::abs(v.y) + std::abs(v.z));
+        if (v.z < 0.0f) {
+            x = Encode((1 - std::abs(v.y * invL1Norm)) * SignNotZero(v.x));
+            y = Encode((1 - std::abs(v.x * invL1Norm)) * SignNotZero(v.y));
+        } else {
+            x = Encode(v.x * invL1Norm);
+            y = Encode(v.y * invL1Norm);
+        }
+    }
+
+    PBRT_CPU_GPU
+    explicit operator Vector3f() const {
+        Vector3f v;
+        v.x = -1 + 2 * (x / 65535.f);
+        v.y = -1 + 2 * (y / 65535.f);
+        v.z = 1 - (std::abs(v.x) + std::abs(v.y));
+        if (v.z < 0) {
+            Float xo = v.x;
+            v.x = (1 - std::abs(v.y)) * SignNotZero(xo);
+            v.y = (1 - std::abs(xo)) * SignNotZero(v.y);
+        }
+        return Normalize(v);
+    }
+
+  private:
+    // OctahedralVector Private Methods
+    PBRT_CPU_GPU
+    static Float SignNotZero(Float v) { return (v < 0) ? -1 : 1; }
+
+    PBRT_CPU_GPU
+    static uint16_t Encode(Float f) {
+        return std::round(Clamp((f + 1) / 2, 0, 1) * 65535.f);
+    }
+
+    // OctahedralVector Private Members
+    uint16_t x, y;
+};
 
 // DirectionCone Definition
 class DirectionCone {
