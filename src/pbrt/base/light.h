@@ -34,6 +34,7 @@ class SpotLight;
 
 class LightSampleContext;
 struct LightBounds;
+struct CompactLightBounds;
 struct LightLiSample;
 struct LightLeSample;
 

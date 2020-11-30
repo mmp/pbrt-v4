@@ -119,16 +119,94 @@ struct LightBounds {
           twoSided(twoSided) {}
 
     PBRT_CPU_GPU
-    Float Importance(Point3f p, Normal3f n) const {
+    Point3f Centroid() const { return (b.pMin + b.pMax) / 2; }
+
+    Float Importance(Point3f p, Normal3f n) const;
+
+    std::string ToString() const;
+
+    // LightBounds Public Members
+    Bounds3f b;  // TODO: rename to |bounds|?
+    Vector3f w;
+    Float phi = 0;
+    Float cosTheta_o, cosTheta_e;
+    bool twoSided;
+};
+
+LightBounds Union(const LightBounds &a, const LightBounds &b);
+
+// CompactLightBounds Definition
+struct CompactLightBounds {
+  public:
+    // CompactLightBounds Public Methods
+    CompactLightBounds() = default;
+    PBRT_CPU_GPU
+    CompactLightBounds(const LightBounds &lb, const Bounds3f &allLightBounds) {
+        for (int c = 0; c < 3; ++c) {
+            qb[0][c] = std::floor(RescaleBounds(lb.b[0][c], allLightBounds.pMin[c],
+                                                allLightBounds.pMax[c]));
+            qb[1][c] = std::ceil(RescaleBounds(lb.b[1][c], allLightBounds.pMin[c],
+                                               allLightBounds.pMax[c]));
+        }
+        w = Normalize(lb.w);
+        phi = lb.phi;
+        qCosTheta_o = QuantizeCos(lb.cosTheta_o);
+        qCosTheta_e = QuantizeCos(lb.cosTheta_e);
+        twoSided = lb.twoSided;
+    }
+    PBRT_CPU_GPU
+    CompactLightBounds(const uint16_t b[2][3], const Vector3f &w, Float phi,
+                       Float cosTheta_o, Float cosTheta_e, bool twoSided)
+        : w(Normalize(w)),
+          phi(phi),
+          qCosTheta_o(QuantizeCos(cosTheta_o)),
+          qCosTheta_e(QuantizeCos(cosTheta_e)),
+          twoSided(twoSided) {
+        for (int i = 0; i < 2; ++i)
+            for (int j = 0; j < 3; ++j)
+                qb[i][j] = b[i][j];
+    }
+
+    std::string ToString() const;
+    std::string ToString(const Bounds3f &allBounds) const;
+
+    PBRT_CPU_GPU
+    bool TwoSided() const { return twoSided; }
+    PBRT_CPU_GPU
+    Float CosTheta_o() const { return 2 * (qCosTheta_o / 32767.f) - 1; }
+    PBRT_CPU_GPU
+    Float CosTheta_e() const { return 2 * (qCosTheta_e / 32767.f) - 1; }
+
+    PBRT_CPU_GPU
+    Point3f Centroid(const Bounds3f &b) const {
+        Bounds3f bbox = Bounds(b);
+        return (bbox.pMin + bbox.pMax) / 2;
+    }
+
+    PBRT_CPU_GPU
+    Bounds3f Bounds(const Bounds3f &allLightBounds) const {
+        return Bounds3f(
+            Point3f(Lerp(qb[0][0] / 65535.f, allLightBounds[0][0], allLightBounds[1][0]),
+                    Lerp(qb[0][1] / 65535.f, allLightBounds[0][1], allLightBounds[1][1]),
+                    Lerp(qb[0][2] / 65535.f, allLightBounds[0][2], allLightBounds[1][2])),
+            Point3f(
+                Lerp(qb[1][0] / 65535.f, allLightBounds[0][0], allLightBounds[1][0]),
+                Lerp(qb[1][1] / 65535.f, allLightBounds[0][1], allLightBounds[1][1]),
+                Lerp(qb[1][2] / 65535.f, allLightBounds[0][2], allLightBounds[1][2])));
+    }
+
+    PBRT_CPU_GPU
+    Float Importance(Point3f p, Normal3f n, const Bounds3f &allLightBounds) const {
         // Compute clamped squared distance to _intr_
-        Point3f pc = Centroid();
+        Point3f pc = Centroid(allLightBounds);
         Float d2 = DistanceSquared(p, pc);
         // Don't let d2 get too small if p is inside the bounds.
+        Bounds3f b = Bounds(allLightBounds);
         d2 = std::max(d2, Length(b.Diagonal()) / 2);
 
         Vector3f wi = Normalize(p - pc);
 
-        Float cosTheta = Dot(w, wi);
+        Float cosTheta = Dot(Vector3f(w), wi);
         if (twoSided)
             cosTheta = std::abs(cosTheta);
 #if 0
@@ -172,12 +250,12 @@ struct LightBounds {
         // Compute $\cos \theta_\roman{p}$ for _intr_ and test against $\cos
         // \theta_\roman{e}$
         // cos(theta_p). Compute in two steps
-        Float cosTheta_x = cosSubClamped(
-            sinTheta, cosTheta, SafeSqrt(1 - cosTheta_o * cosTheta_o), cosTheta_o);
-        Float sinTheta_x = sinSubClamped(
-            sinTheta, cosTheta, SafeSqrt(1 - cosTheta_o * cosTheta_o), cosTheta_o);
+        Float cosTheta_x = cosSubClamped(sinTheta, cosTheta,
+                                         SafeSqrt(1 - Sqr(CosTheta_o())), CosTheta_o());
+        Float sinTheta_x = sinSubClamped(sinTheta, cosTheta,
+                                         SafeSqrt(1 - Sqr(CosTheta_o())), CosTheta_o());
         Float cosTheta_p = cosSubClamped(sinTheta_x, cosTheta_x, sinTheta_u, cosTheta_u);
-        if (cosTheta_p <= cosTheta_e)
+        if (cosTheta_p <= CosTheta_e())
             return 0;
 
         Float imp = phi * cosTheta_p / d2;
@@ -197,20 +275,38 @@ struct LightBounds {
         return std::max<Float>(imp, 0);
     }
 
+  private:
+    // CompactLightBounds Private Methods
     PBRT_CPU_GPU
-    Point3f Centroid() const { return (b.pMin + b.pMax) / 2; }
+    static unsigned int QuantizeCos(Float c) {
+        CHECK(c >= -1 && c <= 1);
+        Float qc = 32767.f * ((c + 1) / 2);
+        int q = std::floor(qc);
+        CHECK(q >= 0 && q <= 32767);
+        return q;
+    }
 
-    std::string ToString() const;
+    PBRT_CPU_GPU
+    static Float RescaleBounds(Float p, Float min, Float max) {
+        CHECK(p >= min && p <= max);
+        if (min == max)
+            return 0;
+        Float pp = Clamp((p - min) / (max - min), 0, 1);
+        Float qp = 65535.f * pp;
+        CHECK(qp >= 0 && qp <= 65535);
+        return qp;
+    }
 
-    // LightBounds Public Members
-    Bounds3f b;  // TODO: rename to |bounds|?
-    Vector3f w;
+    // CompactLightBounds Private Members
+    uint16_t qb[2][3];
+    OctahedralVector w;
     Float phi = 0;
-    Float cosTheta_o = 1, cosTheta_e = 1;
-    bool twoSided = false;
+    struct {
+        unsigned int qCosTheta_o : 15;
+        unsigned int qCosTheta_e : 15;
+        unsigned int twoSided : 1;
+    };
 };
-
-LightBounds Union(const LightBounds &a, const LightBounds &b);
 
 // LightBase Definition
 class LightBase {

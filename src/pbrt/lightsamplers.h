@@ -108,18 +108,19 @@ class PowerLightSampler {
 };
 
 // LightBVHNode Definition
-class LightBVHNode {
-  public:
+struct alignas(32) LightBVHNode {
+    // LightBVHNode Public Methods
     LightBVHNode() = default;
+
     PBRT_CPU_GPU
-    LightBVHNode(int lightIndex, const LightBounds &lightBounds)
+    LightBVHNode(int lightIndex, const CompactLightBounds &lightBounds)
         : childOrLightIndex(lightIndex), lightBounds(lightBounds) {
         isLeaf = true;
         parentIndex = (1u << 30) - 1;
     }
 
     PBRT_CPU_GPU
-    LightBVHNode(int child0Index, int child1Index, const LightBounds &lightBounds)
+    LightBVHNode(int child0Index, int child1Index, const CompactLightBounds &lightBounds)
         : lightBounds(lightBounds), childOrLightIndex(child1Index) {
         isLeaf = false;
         parentIndex = (1u << 30) - 1;
@@ -130,8 +131,8 @@ class LightBVHNode {
 
     std::string ToString() const;
 
-    LightBounds lightBounds;
     // LightBVHNode Public Members
+    CompactLightBounds lightBounds;
     int childOrLightIndex;
     struct {
         unsigned int parentIndex : 31;
@@ -169,10 +170,13 @@ class BVHLightSampler {
             int nodeIndex = 0;
             Float pdf = (1 - pInfinite);
             while (true) {
-                const LightBVHNode node = nodes[nodeIndex];
+                LightBVHNode node = nodes[nodeIndex];
                 // Process light BVH node _node_ for light sampling
                 if (node.isLeaf) {
-                    if (node.lightBounds.Importance(p, n) > 0)
+                    if (nodeIndex > 0)
+                        DCHECK_GT(node.lightBounds.Importance(p, n, allLightBounds), 0);
+                    if (nodeIndex > 0 ||
+                        node.lightBounds.Importance(p, n, allLightBounds) > 0)
                         return SampledLight{lights[node.childOrLightIndex], pdf};
                     return {};
                 } else {
@@ -180,8 +184,8 @@ class BVHLightSampler {
                     const LightBVHNode *children[2] = {&nodes[nodeIndex + 1],
                                                        &nodes[node.childOrLightIndex]};
                     pstd::array<Float, 2> ci = {
-                        children[0]->lightBounds.Importance(p, n),
-                        children[1]->lightBounds.Importance(p, n)};
+                        children[0]->lightBounds.Importance(p, n, allLightBounds),
+                        children[1]->lightBounds.Importance(p, n, allLightBounds)};
                     if (ci[0] == 0 && ci[1] == 0)
                         return {};
                     Float nodePDF;
@@ -203,7 +207,7 @@ class BVHLightSampler {
         int nodeIndex = lightToNodeIndex[light];
         Point3f p = ctx.p();
         Normal3f n = ctx.ns;
-        if (nodes[nodeIndex].lightBounds.Importance(p, n) == 0)
+        if (nodes[nodeIndex].lightBounds.Importance(p, n, allLightBounds) == 0)
             return 0;
 
         // Compute light's PDF by walking up tree nodes to the root
@@ -212,8 +216,9 @@ class BVHLightSampler {
             const LightBVHNode *node = &nodes[nodeIndex];
             const LightBVHNode *parent = &nodes[node->parentIndex];
             Float ci[2] = {
-                nodes[node->parentIndex + 1].lightBounds.Importance(p, n),
-                nodes[parent->childOrLightIndex].lightBounds.Importance(p, n)};
+                nodes[node->parentIndex + 1].lightBounds.Importance(p, n, allLightBounds),
+                nodes[parent->childOrLightIndex].lightBounds.Importance(p, n,
+                                                                        allLightBounds)};
             int childIndex = int(nodeIndex == parent->childOrLightIndex);
             DCHECK_GT(ci[childIndex], 0);
             pdf *= ci[childIndex] / (ci[0] + ci[1]);
@@ -244,12 +249,14 @@ class BVHLightSampler {
 
   private:
     // BVHLightSampler Private Methods
-    int buildBVH(std::vector<std::pair<int, LightBounds>> &bvhLights, int start, int end,
-                 Allocator alloc);
+    std::pair<int, LightBounds> buildBVH(
+        std::vector<std::pair<int, LightBounds>> &bvhLights, int start, int end,
+        Allocator alloc);
 
     // BVHLightSampler Private Members
     pstd::vector<LightHandle> lights, infiniteLights;
     pstd::vector<LightBVHNode> nodes;
+    Bounds3f allLightBounds;
     HashMap<LightHandle, int, LightHandleHash> lightToNodeIndex;
 };
 
