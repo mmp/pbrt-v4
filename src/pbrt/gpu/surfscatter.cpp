@@ -227,9 +227,6 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                     return;
                 LightHandle light = sampledLight->light;
 
-                // Remarkably, this substantially improves L1 cache hits with
-                // CoatedDiffuseBxDF and gives about a 60% perf. benefit.
-                __syncthreads();
                 // Sample light source and evaluate BSDF for direct lighting
                 pstd::optional<LightLiSample> ls = light.SampleLi(
                     ctx, raySamples.direct.u, lambda, LightSamplingMode::WithMIS);
