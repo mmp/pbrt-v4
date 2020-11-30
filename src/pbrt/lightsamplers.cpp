@@ -99,12 +99,12 @@ BVHLightSampler::BVHLightSampler(pstd::span<const LightHandle> lights, Allocator
     // Partition lights into _infiniteLights_ and _bvhLights_
     for (size_t i = 0; i < lights.size(); ++i) {
         LightHandle light = lights[i];
-        LightBounds lightBounds = light.Bounds();
+        pstd::optional<LightBounds> lightBounds = light.Bounds();
         if (!lightBounds)
             infiniteLights.push_back(light);
-        else if (lightBounds.phi > 0) {
-            bvhLights.push_back(std::make_pair(i, lightBounds));
-            allLightBounds = Union(allLightBounds, lightBounds.b);
+        else if (lightBounds->phi > 0) {
+            bvhLights.push_back(std::make_pair(i, *lightBounds));
+            allLightBounds = Union(allLightBounds, lightBounds->bounds);
         }
     }
 
@@ -112,6 +112,7 @@ BVHLightSampler::BVHLightSampler(pstd::span<const LightHandle> lights, Allocator
         return;
     buildBVH(bvhLights, 0, bvhLights.size(), alloc);
     lightBVHBytes += nodes.size() * sizeof(LightBVHNode);
+    LOG_VERBOSE("Node size %d", sizeof(LightBVHNode));
 }
 
 std::pair<int, LightBounds> BVHLightSampler::buildBVH(
@@ -135,7 +136,7 @@ std::pair<int, LightBounds> BVHLightSampler::buildBVH(
     Bounds3f bounds, centroidBounds;
     for (int i = start; i < end; ++i) {
         const LightBounds &lb = bvhLights[i].second;
-        bounds = Union(bounds, lb.b);
+        bounds = Union(bounds, lb.bounds);
         centroidBounds = Union(centroidBounds, lb.Centroid());
     }
 
@@ -168,6 +169,7 @@ std::pair<int, LightBounds> BVHLightSampler::buildBVH(
             for (int j = i + 1; j < nBuckets; ++j)
                 b1 = Union(b1, bucketLightBounds[j]);
 
+            // TODO: why is this not a light bounds method?
             auto Momega = [](const LightBounds &b) {
                 Float theta_o = SafeACos(b.cosTheta_o), theta_e = SafeACos(b.cosTheta_e);
                 Float theta_w = std::min(theta_o + theta_e, Pi);
@@ -179,8 +181,8 @@ std::pair<int, LightBounds> BVHLightSampler::buildBVH(
             };
             // Compute final light split cost for bucket
             Float Kr = MaxComponentValue(bounds.Diagonal()) / bounds.Diagonal()[dim];
-            cost[i] = Kr * (b0.phi * Momega(b0) * b0.b.SurfaceArea() +
-                            b1.phi * Momega(b1) * b1.b.SurfaceArea());
+            cost[i] = Kr * (b0.phi * Momega(b0) * b0.bounds.SurfaceArea() +
+                            b1.phi * Momega(b1) * b1.bounds.SurfaceArea());
         }
 
         // Find light split that minimizes SAH metric
@@ -247,9 +249,9 @@ ExhaustiveLightSampler::ExhaustiveLightSampler(pstd::span<const LightHandle> lig
       lightBounds(alloc),
       lightToBoundedIndex(alloc) {
     for (const auto &light : lights) {
-        if (LightBounds lb = light.Bounds(); lb) {
+        if (pstd::optional<LightBounds> lb = light.Bounds(); lb) {
             lightToBoundedIndex.Insert(light, boundedLights.size());
-            lightBounds.push_back(lb);
+            lightBounds.push_back(*lb);
             boundedLights.push_back(light);
         } else
             infiniteLights.push_back(light);

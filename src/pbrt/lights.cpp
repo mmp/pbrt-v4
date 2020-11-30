@@ -59,9 +59,9 @@ std::string LightBase::BaseToString() const {
 }
 
 std::string LightBounds::ToString() const {
-    return StringPrintf("[ LightBounds b: %s w: %s phi: %f "
+    return StringPrintf("[ LightBounds bounds: %s w: %s phi: %f "
                         "cosTheta_o: %f cosTheta_e: %f twoSided: %s ]",
-                        b, w, phi, cosTheta_o, cosTheta_e, twoSided);
+                        bounds, w, phi, cosTheta_o, cosTheta_e, twoSided);
 }
 
 std::string CompactLightBounds::ToString() const {
@@ -81,23 +81,78 @@ std::string CompactLightBounds::ToString(const Bounds3f &allBounds) const {
 }
 
 // LightBounds Method Definitions
-Float LightBounds::Importance(Point3f p, Normal3f n) const {
-    CompactLightBounds cb(*this, b);
-    return cb.Importance(p, n, b);
-}
-
 LightBounds Union(const LightBounds &a, const LightBounds &b) {
+    // If one _LightBounds_ has zero power, return the other
     if (a.phi == 0)
         return b;
     if (b.phi == 0)
         return a;
-    DirectionCone c =
+
+    // Find average direction and updated angles for _LightBounds_
+    DirectionCone cone =
         Union(DirectionCone(a.w, a.cosTheta_o), DirectionCone(b.w, b.cosTheta_o));
-    Float cosTheta_o = c.cosTheta;
-    // min of cos since want max of angles...
+    Float cosTheta_o = cone.cosTheta;
     Float cosTheta_e = std::min(a.cosTheta_e, b.cosTheta_e);
-    return LightBounds(Union(a.b, b.b), c.w, a.phi + b.phi, cosTheta_o, cosTheta_e,
-                       a.twoSided | b.twoSided);
+
+    // Return final _LightBounds_ union
+    return LightBounds(Union(a.bounds, b.bounds), cone.w, a.phi + b.phi, cosTheta_o,
+                       cosTheta_e, a.twoSided | b.twoSided);
+}
+
+Float LightBounds::Importance(Point3f p, Normal3f n) const {
+    // Return importance for light bounds at reference point
+    // Compute clamped squared distance to reference point
+    Point3f pc = (bounds.pMin + bounds.pMax) / 2;
+    Float d2 = DistanceSquared(p, pc);
+    d2 = std::max(d2, Length(bounds.Diagonal()) / 2);
+
+    // Compute sine and cosine of angle to vector _w_
+    Vector3f wi = Normalize(p - pc);
+    Float cosTheta = Dot(Vector3f(w), wi);
+    if (twoSided)
+        cosTheta = std::abs(cosTheta);
+    Float sinTheta = SafeSqrt(1 - Sqr(cosTheta));
+
+    // Define cosine and sine clamped subtraction lambdas
+    auto cosSubClamped = [](Float sinTheta_a, Float cosTheta_a, Float sinTheta_b,
+                            Float cosTheta_b) -> Float {
+        if (cosTheta_a > cosTheta_b)
+            return 1;
+        return cosTheta_a * cosTheta_b + sinTheta_a * sinTheta_b;
+    };
+
+    auto sinSubClamped = [](Float sinTheta_a, Float cosTheta_a, Float sinTheta_b,
+                            Float cosTheta_b) -> Float {
+        if (cosTheta_a > cosTheta_b)
+            return 0;
+        return sinTheta_a * cosTheta_b - cosTheta_a * sinTheta_b;
+    };
+
+    // Compute $\cos \theta_\roman{u}$ for reference point
+    Float cosTheta_u = BoundSubtendedDirections(bounds, p).cosTheta;
+    Float sinTheta_u = SafeSqrt(1 - Sqr(cosTheta_u));
+
+    // Compute $\cos \theta_\roman{p}$ and test against $\cos \theta_\roman{e}$
+    Float sinTheta_o = SafeSqrt(1 - Sqr(cosTheta_o));
+    Float cosTheta_x = cosSubClamped(sinTheta, cosTheta, sinTheta_o, cosTheta_o);
+    Float sinTheta_x = sinSubClamped(sinTheta, cosTheta, sinTheta_o, cosTheta_o);
+    Float cosTheta_p = cosSubClamped(sinTheta_x, cosTheta_x, sinTheta_u, cosTheta_u);
+    if (cosTheta_p <= cosTheta_e)
+        return 0;
+
+    // Return final importance at reference point
+    Float importance = phi * cosTheta_p / d2;
+    DCHECK_GE(importance, -1e-3);
+    // Account for $\cos \theta_\roman{i}$ in importance at surfaces
+    if (n != Normal3f(0, 0, 0)) {
+        Float cosTheta_i = AbsDot(wi, n);
+        Float sinTheta_i = SafeSqrt(1 - Sqr(cosTheta_i));
+        Float cosThetap_i = cosSubClamped(sinTheta_i, cosTheta_i, sinTheta_u, cosTheta_u);
+        importance *= cosThetap_i;
+    }
+
+    importance = std::max<Float>(importance, 0);
+    return importance;
 }
 
 // PointLight Method Definitions
@@ -105,9 +160,10 @@ SampledSpectrum PointLight::Phi(const SampledWavelengths &lambda) const {
     return 4 * Pi * scale * I.Sample(lambda);
 }
 
-LightBounds PointLight::Bounds() const {
+pstd::optional<LightBounds> PointLight::Bounds() const {
     Point3f p = renderFromLight(Point3f(0, 0, 0));
-    return LightBounds(p, Vector3f(0, 0, 1), 4 * Pi * scale * I.MaxValue(), std::cos(Pi),
+    Float phi = 4 * Pi * scale * I.MaxValue();
+    return LightBounds(Bounds3f(p, p), Vector3f(0, 0, 1), phi, std::cos(Pi),
                        std::cos(Pi / 2), false);
 }
 
@@ -343,36 +399,21 @@ SampledSpectrum ProjectionLight::Phi(const SampledWavelengths &lambda) const {
     return scale * A * sum / (image.Resolution().x * image.Resolution().y);
 }
 
-LightBounds ProjectionLight::Bounds() const {
-#if 0
-    // Along the lines of Phi()
-    Float sum = 0;
-    for (int v = 0; v < image.Resolution().y; ++v)
-        for (int u = 0; u < image.Resolution().x; ++u) {
-            Point2f ps = screenBounds.Lerp({(u + .5f) / image.Resolution().x,
-                                            (v + .5f) / image.Resolution().y});
-            Vector3f w = Vector3f(lightFromScreen(Point3f(ps.x, ps.y, 0)));
-            w = Normalize(w);
-            Float dwdA = Pow<3>(w.z);
-            sum += image.GetChannels({u, v}, rgbChannelDesc).MaxValue() * dwdA;
-        }
-    Float phi = scale * A * sum / (image.Resolution().x * image.Resolution().y);
-#else
-    // See comment in SpotLight::Bounds()
+pstd::optional<LightBounds> ProjectionLight::Bounds() const {
     Float sum = 0;
     for (int v = 0; v < image.Resolution().y; ++v)
         for (int u = 0; u < image.Resolution().x; ++u)
             sum += std::max({image.GetChannel({u, v}, 0), image.GetChannel({u, v}, 1),
                              image.GetChannel({u, v}, 2)});
     Float phi = scale * sum / (image.Resolution().x * image.Resolution().y);
-#endif
+
     Point3f pCorner(screenBounds.pMax.x, screenBounds.pMax.y, 0);
     Vector3f wCorner = Normalize(Vector3f(lightFromScreen(pCorner)));
     Float cosTotalWidth = CosTheta(wCorner);
 
     Point3f p = renderFromLight(Point3f(0, 0, 0));
     Vector3f w = Normalize(renderFromLight(Vector3f(0, 0, 1)));
-    return LightBounds(p, w, phi, std::cos(0.f), cosTotalWidth, false);
+    return LightBounds(Bounds3f(p, p), w, phi, std::cos(0.f), cosTotalWidth, false);
 }
 
 pstd::optional<LightLeSample> ProjectionLight::SampleLe(Point2f u1, Point2f u2,
@@ -496,7 +537,7 @@ SampledSpectrum GoniometricLight::Phi(const SampledWavelengths &lambda) const {
            (image.Resolution().x * image.Resolution().y);
 }
 
-LightBounds GoniometricLight::Bounds() const {
+pstd::optional<LightBounds> GoniometricLight::Bounds() const {
     Float sumY = 0;
     for (int y = 0; y < image.Resolution().y; ++y)
         for (int x = 0; x < image.Resolution().x; ++x)
@@ -506,7 +547,8 @@ LightBounds GoniometricLight::Bounds() const {
 
     Point3f p = renderFromLight(Point3f(0, 0, 0));
     // Bound it as an isotropic point light.
-    return LightBounds(p, Vector3f(0, 0, 1), phi, std::cos(Pi), std::cos(Pi / 2), false);
+    return LightBounds(Bounds3f(p, p), Vector3f(0, 0, 1), phi, std::cos(Pi),
+                       std::cos(Pi / 2), false);
 }
 
 pstd::optional<LightLeSample> GoniometricLight::SampleLe(Point2f u1, Point2f u2,
@@ -686,22 +728,22 @@ SampledSpectrum DiffuseAreaLight::Phi(const SampledWavelengths &lambda) const {
     return phi * (twoSided ? 2 : 1) * scale * area * Pi;
 }
 
-LightBounds DiffuseAreaLight::Bounds() const {
+pstd::optional<LightBounds> DiffuseAreaLight::Bounds() const {
+    // Compute _phi_ for diffuse area light bounds
     Float phi = 0;
     if (image) {
+        // Compute average _DiffuseAreaLight_ image channel value
         // Assume no distortion in the mapping, FWIW...
         for (int y = 0; y < image.Resolution().y; ++y)
             for (int x = 0; x < image.Resolution().x; ++x)
                 for (int c = 0; c < 3; ++c)
                     phi += image.GetChannel({x, y}, c);
         phi /= 3 * image.Resolution().x * image.Resolution().y;
+
     } else
         phi = Lemit.MaxValue();
-
     phi *= scale * (twoSided ? 2 : 1) * area * Pi;
 
-    // TODO: for animated shapes, we probably need to worry about
-    // renderFromLight as in SampleLi().
     DirectionCone nb = shape.NormalBounds();
     return LightBounds(shape.Bounds(), nb.w, phi, nb.cosTheta, std::cos(Pi / 2),
                        twoSided);
@@ -1251,24 +1293,14 @@ SampledSpectrum SpotLight::Phi(const SampledWavelengths &lambda) const {
            ((1 - cosFalloffStart) + (cosFalloffStart - cosFalloffEnd) / 2);
 }
 
-LightBounds SpotLight::Bounds() const {
+pstd::optional<LightBounds> SpotLight::Bounds() const {
     Point3f p = renderFromLight(Point3f(0, 0, 0));
     Vector3f w = Normalize(renderFromLight(Vector3f(0, 0, 1)));
-    // As in Phi()
-#if 0
-    Float phi = scale * I.MaxValue() * 2 * Pi * ((1 - cosFalloffStart) +
-                                          (cosFalloffStart - cosFalloffEnd) / 2);
-#else
-    // cf. room-subsurf-from-kd.pbrt test: we sorta kinda actually want to
-    // compute power as if it was an isotropic light source; the
-    // LightBounds geometric terms give zero importance outside the spot
-    // light's cone, so inside the cone, it doesn't matter if the overall
-    // power is low; it's more accurate to effectively treat it as a point
-    // light source.
     Float phi = scale * Iemit.MaxValue() * 4 * Pi;
-#endif
-
-    return LightBounds(p, w, phi, std::cos(0.f), cosFalloffEnd, false);
+    Float cosTheta_e = std::cos(std::acos(cosFalloffEnd) - std::acos(cosFalloffStart));
+    if (cosTheta_e == 1 && cosFalloffEnd != cosFalloffStart)
+        cosTheta_e = 0.999f;
+    return LightBounds(Bounds3f(p, p), w, phi, cosFalloffStart, cosTheta_e, false);
 }
 
 pstd::optional<LightLeSample> SpotLight::SampleLe(Point2f u1, Point2f u2,
@@ -1374,7 +1406,7 @@ void LightHandle::PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
     return Dispatch(pdf);
 }
 
-LightBounds LightHandle::Bounds() const {
+pstd::optional<LightBounds> LightHandle::Bounds() const {
     auto bounds = [](auto ptr) { return ptr->Bounds(); };
     return DispatchCPU(bounds);
 }

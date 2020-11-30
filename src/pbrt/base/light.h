@@ -86,7 +86,7 @@ class LightHandle : public TaggedPointer<  // Light Source Types
 
     void Preprocess(const Bounds3f &sceneBounds);
 
-    LightBounds Bounds() const;
+    pstd::optional<LightBounds> Bounds() const;
 
     PBRT_CPU_GPU
     pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
