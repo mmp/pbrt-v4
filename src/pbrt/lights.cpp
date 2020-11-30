@@ -59,9 +59,9 @@ std::string LightBase::BaseToString() const {
 }
 
 std::string LightBounds::ToString() const {
-    return StringPrintf("[ LightBounds b: %s w: %s phi: %f theta_o: %f theta_e: %f "
+    return StringPrintf("[ LightBounds b: %s w: %s phi: %f "
                         "cosTheta_o: %f cosTheta_e: %f twoSided: %s ]",
-                        b, w, phi, theta_o, theta_e, cosTheta_o, cosTheta_e, twoSided);
+                        b, w, phi, cosTheta_o, cosTheta_e, twoSided);
 }
 
 // LightBounds Method Definitions
@@ -72,9 +72,11 @@ LightBounds Union(const LightBounds &a, const LightBounds &b) {
         return a;
     DirectionCone c =
         Union(DirectionCone(a.w, a.cosTheta_o), DirectionCone(b.w, b.cosTheta_o));
-    Float theta_o = SafeACos(c.cosTheta);
-    return LightBounds(Union(a.b, b.b), c.w, a.phi + b.phi, theta_o,
-                       std::max(a.theta_e, b.theta_e), a.twoSided | b.twoSided);
+    Float cosTheta_o = c.cosTheta;
+    // min of cos since want max of angles...
+    Float cosTheta_e = std::min(a.cosTheta_e, b.cosTheta_e);
+    return LightBounds(Union(a.b, b.b), c.w, a.phi + b.phi, cosTheta_o, cosTheta_e,
+                       a.twoSided | b.twoSided);
 }
 
 // PointLight Method Definitions
@@ -84,8 +86,8 @@ SampledSpectrum PointLight::Phi(const SampledWavelengths &lambda) const {
 
 LightBounds PointLight::Bounds() const {
     Point3f p = renderFromLight(Point3f(0, 0, 0));
-    return LightBounds(p, Vector3f(0, 0, 1), 4 * Pi * scale * I.MaxValue(), Pi, Pi / 2,
-                       false);
+    return LightBounds(p, Vector3f(0, 0, 1), 4 * Pi * scale * I.MaxValue(), std::cos(Pi),
+                       std::cos(Pi / 2), false);
 }
 
 pstd::optional<LightLeSample> PointLight::SampleLe(Point2f u1, Point2f u2,
@@ -349,7 +351,7 @@ LightBounds ProjectionLight::Bounds() const {
 
     Point3f p = renderFromLight(Point3f(0, 0, 0));
     Vector3f w = Normalize(renderFromLight(Vector3f(0, 0, 1)));
-    return LightBounds(p, w, phi, 0.f, std::acos(cosTotalWidth), false);
+    return LightBounds(p, w, phi, std::cos(0.f), cosTotalWidth, false);
 }
 
 pstd::optional<LightLeSample> ProjectionLight::SampleLe(Point2f u1, Point2f u2,
@@ -483,7 +485,7 @@ LightBounds GoniometricLight::Bounds() const {
 
     Point3f p = renderFromLight(Point3f(0, 0, 0));
     // Bound it as an isotropic point light.
-    return LightBounds(p, Vector3f(0, 0, 1), phi, Pi, Pi / 2, false);
+    return LightBounds(p, Vector3f(0, 0, 1), phi, std::cos(Pi), std::cos(Pi / 2), false);
 }
 
 pstd::optional<LightLeSample> GoniometricLight::SampleLe(Point2f u1, Point2f u2,
@@ -680,7 +682,7 @@ LightBounds DiffuseAreaLight::Bounds() const {
     // TODO: for animated shapes, we probably need to worry about
     // renderFromLight as in SampleLi().
     DirectionCone nb = shape.NormalBounds();
-    return LightBounds(shape.Bounds(), nb.w, phi, SafeACos(nb.cosTheta), Pi / 2,
+    return LightBounds(shape.Bounds(), nb.w, phi, nb.cosTheta, std::cos(Pi / 2),
                        twoSided);
 }
 
@@ -1245,7 +1247,7 @@ LightBounds SpotLight::Bounds() const {
     Float phi = scale * Iemit.MaxValue() * 4 * Pi;
 #endif
 
-    return LightBounds(p, w, phi, 0.f, std::acos(cosFalloffEnd), false);
+    return LightBounds(p, w, phi, std::cos(0.f), cosFalloffEnd, false);
 }
 
 pstd::optional<LightLeSample> SpotLight::SampleLe(Point2f u1, Point2f u2,

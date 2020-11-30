@@ -167,12 +167,13 @@ LightBVHNode *BVHLightSampler::buildBVH(
                 b1 = Union(b1, bucketLightBounds[j]);
 
             auto Momega = [](const LightBounds &b) {
-                Float theta_w = std::min(b.theta_o + b.theta_e, Pi);
-                return 2 * Pi * (1 - std::cos(b.theta_o)) +
+                Float theta_o = SafeACos(b.cosTheta_o), theta_e = SafeACos(b.cosTheta_e);
+                Float theta_w = std::min(theta_o + theta_e, Pi);
+                Float sinTheta_o = SafeSqrt(1 - Sqr(b.cosTheta_o));
+                return 2 * Pi * (1 - b.cosTheta_o) +
                        Pi / 2 *
-                           (2 * theta_w * std::sin(b.theta_o) -
-                            std::cos(b.theta_o - 2 * theta_w) -
-                            2 * b.theta_o * std::sin(b.theta_o) + std::cos(b.theta_o));
+                           (2 * theta_w * sinTheta_o - std::cos(theta_o - 2 * theta_w) -
+                            2 * theta_o * sinTheta_o + b.cosTheta_o);
             };
 
             // Can simplify since we always split

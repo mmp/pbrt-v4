@@ -101,25 +101,21 @@ struct LightBounds {
     operator bool() const { return !b.IsDegenerate(); }
 
     LightBounds() = default;
-    LightBounds(const Bounds3f &b, const Vector3f &w, Float phi, Float theta_o,
-                Float theta_e, bool twoSided)
+    LightBounds(const Bounds3f &b, const Vector3f &w, Float phi, Float cosTheta_o,
+                Float cosTheta_e, bool twoSided)
         : b(b),
           w(Normalize(w)),
           phi(phi),
-          theta_o(theta_o),
-          theta_e(theta_e),
-          cosTheta_o(std::cos(theta_o)),
-          cosTheta_e(std::cos(theta_e)),
+          cosTheta_o(cosTheta_o),
+          cosTheta_e(cosTheta_e),
           twoSided(twoSided) {}
-    LightBounds(const Point3f &p, const Vector3f &w, Float phi, Float theta_o,
-                Float theta_e, bool twoSided)
+    LightBounds(const Point3f &p, const Vector3f &w, Float phi, Float cosTheta_o,
+                Float cosTheta_e, bool twoSided)
         : b(p, p),
           w(Normalize(w)),
           phi(phi),
-          theta_o(theta_o),
-          theta_e(theta_e),
-          cosTheta_o(std::cos(theta_o)),
-          cosTheta_e(std::cos(theta_e)),
+          cosTheta_o(cosTheta_o),
+          cosTheta_e(cosTheta_e),
           twoSided(twoSided) {}
 
     PBRT_CPU_GPU
@@ -210,7 +206,6 @@ struct LightBounds {
     Bounds3f b;  // TODO: rename to |bounds|?
     Vector3f w;
     Float phi = 0;
-    Float theta_o = 0, theta_e = 0;
     Float cosTheta_o = 1, cosTheta_e = 1;
     bool twoSided = false;
 };
