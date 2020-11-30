@@ -1765,6 +1765,10 @@ class OctahedralVector {
         return Normalize(v);
     }
 
+    std::string ToString() const {
+        return StringPrintf("[ OctahedralVector x: %d y: %d ]", x, y);
+    }
+
   private:
     // OctahedralVector Private Methods
     PBRT_CPU_GPU
