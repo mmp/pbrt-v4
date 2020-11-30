@@ -110,15 +110,19 @@ class PowerLightSampler {
 // LightBVHNode Definition
 class LightBVHNode {
   public:
-    LightBVHNode(LightHandle light, const LightBounds &lightBounds)
-        : light(light), lightBounds(lightBounds) {
+    LightBVHNode() = default;
+    PBRT_CPU_GPU
+    LightBVHNode(int lightIndex, const LightBounds &lightBounds)
+        : childOrLightIndex(lightIndex), lightBounds(lightBounds) {
         isLeaf = true;
+        parentIndex = (1u << 30) - 1;
     }
-    LightBVHNode(LightBVHNode *c0, LightBVHNode *c1)
-        : lightBounds(Union(c0->lightBounds, c1->lightBounds)) {
+
+    PBRT_CPU_GPU
+    LightBVHNode(int child0Index, int child1Index, const LightBounds &lightBounds)
+        : lightBounds(lightBounds), childOrLightIndex(child1Index) {
         isLeaf = false;
-        children[0] = c0;
-        children[1] = c1;
+        parentIndex = (1u << 30) - 1;
     }
 
     PBRT_CPU_GPU
@@ -127,12 +131,12 @@ class LightBVHNode {
     std::string ToString() const;
 
     LightBounds lightBounds;
-    bool isLeaf;
-    union {
-        LightHandle light;
-        LightBVHNode *children[2];
+    // LightBVHNode Public Members
+    int childOrLightIndex;
+    struct {
+        unsigned int parentIndex : 31;
+        unsigned int isLeaf : 1;
     };
-    LightBVHNode *parent = nullptr;
 };
 
 // BVHLightSampler Definition
@@ -143,45 +147,47 @@ class BVHLightSampler {
 
     PBRT_CPU_GPU
     pstd::optional<SampledLight> Sample(const LightSampleContext &ctx, Float u) const {
-        Point3f p = ctx.p();
-        Normal3f n = ctx.ns;
-        // FIXME: handle no lights at all w/o a NaN...
+        // Compute infinite light sampling probability _pInfinite_
         Float pInfinite = Float(infiniteLights.size()) /
-                          Float(infiniteLights.size() + (root != nullptr ? 1 : 0));
+                          Float(infiniteLights.size() + (!nodes.empty() ? 1 : 0));
 
         if (u < pInfinite) {
+            // Sample infinite lights with uniform probability
             u = std::min<Float>(u * pInfinite, OneMinusEpsilon);
             int index =
                 std::min<int>(u * infiniteLights.size(), infiniteLights.size() - 1);
             Float pdf = pInfinite * 1.f / infiniteLights.size();
             return SampledLight{infiniteLights[index], pdf};
-        } else {
-            if (root == nullptr)
-                return {};
 
+        } else {
+            // Traverse light BVH to sample light
+            if (nodes.empty())
+                return {};
+            Point3f p = ctx.p();
+            Normal3f n = ctx.ns;
             u = std::min<Float>((u - pInfinite) / (1 - pInfinite), OneMinusEpsilon);
-            const LightBVHNode *node = root;
+            int nodeIndex = 0;
             Float pdf = (1 - pInfinite);
             while (true) {
-                if (node->isLeaf) {
-                    if (node->lightBounds.Importance(p, n) > 0)
-                        return SampledLight{node->light, pdf};
+                const LightBVHNode node = nodes[nodeIndex];
+                // Process light BVH node _node_ for light sampling
+                if (node.isLeaf) {
+                    if (node.lightBounds.Importance(p, n) > 0)
+                        return SampledLight{lights[node.childOrLightIndex], pdf};
                     return {};
                 } else {
+                    // Compute child node importances and randomly sample child node
+                    const LightBVHNode *children[2] = {&nodes[nodeIndex + 1],
+                                                       &nodes[node.childOrLightIndex]};
                     pstd::array<Float, 2> ci = {
-                        node->children[0]->lightBounds.Importance(p, n),
-                        node->children[1]->lightBounds.Importance(p, n)};
+                        children[0]->lightBounds.Importance(p, n),
+                        children[1]->lightBounds.Importance(p, n)};
                     if (ci[0] == 0 && ci[1] == 0)
-                        // It may happen that we follow a path down the tree and later
-                        // find that there aren't any lights that illuminate our point;
-                        // a natural consequence of the bounds tightening up on the way
-                        // down.
                         return {};
-
                     Float nodePDF;
                     int child = SampleDiscrete(ci, u, &nodePDF, &u);
                     pdf *= nodePDF;
-                    node = node->children[child];
+                    nodeIndex = (child == 0) ? (nodeIndex + 1) : node.childOrLightIndex;
                 }
             }
         }
@@ -189,28 +195,34 @@ class BVHLightSampler {
 
     PBRT_CPU_GPU
     Float PDF(const LightSampleContext &ctx, LightHandle light) const {
-        if (!lightToNode.HasKey(light))
-            return 1.f / (infiniteLights.size() + (root != nullptr ? 1 : 0));
+        // Handle infinite _light_ PDF computation
+        if (!lightToNodeIndex.HasKey(light))
+            return 1.f / (infiniteLights.size() + (!nodes.empty() ? 1 : 0));
 
-        LightBVHNode *node = lightToNode[light];
-        Float pdf = 1;
-
+        // Get leaf _LightBVHNode_ for light and test importance
+        int nodeIndex = lightToNodeIndex[light];
         Point3f p = ctx.p();
         Normal3f n = ctx.ns;
-        if (node->lightBounds.Importance(p, n) == 0)
+        if (nodes[nodeIndex].lightBounds.Importance(p, n) == 0)
             return 0;
 
-        for (; node->parent != nullptr; node = node->parent) {
-            pstd::array<Float, 2> ci = {
-                node->parent->children[0]->lightBounds.Importance(p, n),
-                node->parent->children[1]->lightBounds.Importance(p, n)};
-            int childIndex = static_cast<int>(node == node->parent->children[1]);
+        // Compute light's PDF by walking up tree nodes to the root
+        Float pdf = 1;
+        while (nodeIndex != 0) {
+            const LightBVHNode *node = &nodes[nodeIndex];
+            const LightBVHNode *parent = &nodes[node->parentIndex];
+            Float ci[2] = {
+                nodes[node->parentIndex + 1].lightBounds.Importance(p, n),
+                nodes[parent->childOrLightIndex].lightBounds.Importance(p, n)};
+            int childIndex = int(nodeIndex == parent->childOrLightIndex);
             DCHECK_GT(ci[childIndex], 0);
             pdf *= ci[childIndex] / (ci[0] + ci[1]);
+            nodeIndex = node->parentIndex;
         }
 
+        // Return final PDF accounting for infinite light sampling probability
         Float pInfinite = Float(infiniteLights.size()) / Float(infiniteLights.size() + 1);
-        return pdf * (1.f - pInfinite);
+        return pdf * (1 - pInfinite);
     }
 
     PBRT_CPU_GPU
@@ -232,13 +244,13 @@ class BVHLightSampler {
 
   private:
     // BVHLightSampler Private Methods
-    LightBVHNode *buildBVH(std::vector<std::pair<LightHandle, LightBounds>> &lights,
-                           int start, int end, Allocator alloc, int *nNodes);
+    int buildBVH(std::vector<std::pair<int, LightBounds>> &bvhLights, int start, int end,
+                 Allocator alloc);
 
     // BVHLightSampler Private Members
-    LightBVHNode *root = nullptr;
     pstd::vector<LightHandle> lights, infiniteLights;
-    HashMap<LightHandle, LightBVHNode *, LightHandleHash> lightToNode;
+    pstd::vector<LightBVHNode> nodes;
+    HashMap<LightHandle, int, LightHandleHash> lightToNodeIndex;
 };
 
 // ExhaustiveLightSampler Definition

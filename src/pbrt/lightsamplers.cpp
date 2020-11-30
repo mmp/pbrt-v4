@@ -93,74 +93,73 @@ STAT_INT_DISTRIBUTION("Integrator/Lights sampled per lookup", nLightsSampled);
 BVHLightSampler::BVHLightSampler(pstd::span<const LightHandle> lights, Allocator alloc)
     : lights(lights.begin(), lights.end(), alloc),
       infiniteLights(alloc),
-      lightToNode(alloc) {
-    std::vector<std::pair<LightHandle, LightBounds>> bvhLights;
+      nodes(alloc),
+      lightToNodeIndex(alloc) {
+    std::vector<std::pair<int, LightBounds>> bvhLights;
     // Partition lights into _infiniteLights_ and _bvhLights_
-    for (const auto &light : lights) {
+    for (size_t i = 0; i < lights.size(); ++i) {
+        LightHandle light = lights[i];
         LightBounds lightBounds = light.Bounds();
         if (!lightBounds)
             infiniteLights.push_back(light);
-        else if (lightBounds.phi > 0)
-            bvhLights.push_back(std::make_pair(light, lightBounds));
+        else if (lightBounds.phi > 0) {
+            bvhLights.push_back(std::make_pair(i, lightBounds));
+        }
     }
 
     if (bvhLights.empty())
         return;
-    int nNodes = 0;
-    root = buildBVH(bvhLights, 0, bvhLights.size(), alloc, &nNodes);
-    lightBVHBytes += nNodes * sizeof(LightBVHNode);
+    buildBVH(bvhLights, 0, bvhLights.size(), alloc);
+    lightBVHBytes += nodes.size() * sizeof(LightBVHNode);
 }
 
-LightBVHNode *BVHLightSampler::buildBVH(
-    std::vector<std::pair<LightHandle, LightBounds>> &lights, int start, int end,
-    Allocator alloc, int *nNodes) {
+int BVHLightSampler::buildBVH(std::vector<std::pair<int, LightBounds>> &bvhLights,
+                              int start, int end, Allocator alloc) {
     CHECK_LT(start, end);
-    (*nNodes)++;
     int nLights = end - start;
+    // Initialize leaf node if only a single light remains
     if (nLights == 1) {
-        LightBVHNode *node =
-            alloc.new_object<LightBVHNode>(lights[start].first, lights[start].second);
-        lightToNode.Insert(lights[start].first, node);
-        return node;
+        int nodeIndex = nodes.size();
+        nodes.push_back(
+            LightBVHNode(bvhLights[start].first, bvhLights[start].second));
+        LightHandle light = lights[bvhLights[start].first];
+        lightToNodeIndex.Insert(light, nodeIndex);
+        return nodeIndex;
     }
 
+    // Choose split dimension and position using modified SAH
+    // Compute bounds and centroid bounds for lights
     Bounds3f bounds, centroidBounds;
     for (int i = start; i < end; ++i) {
-        const LightBounds &lb = lights[i].second;
+        const LightBounds &lb = bvhLights[i].second;
         bounds = Union(bounds, lb.b);
         centroidBounds = Union(centroidBounds, lb.Centroid());
     }
 
-    // Modified SAH
-    // Replace # of primitives with emitter power
-    // TODO: use the more efficient bounds/cost sweep calculation from v4
-
     Float minCost = Infinity;
     int minCostSplitBucket = -1, minCostSplitDim = -1;
     constexpr int nBuckets = 12;
-
     for (int dim = 0; dim < 3; ++dim) {
-        if (centroidBounds.pMax[dim] == centroidBounds.pMin[dim]) {
+        // Compute minimum cost bucket for splitting along dimension _dim_
+        if (centroidBounds.pMax[dim] == centroidBounds.pMin[dim])
             continue;
-        }
-
+        // Compute _LightBounds_ for each bucket
         LightBounds bucketLightBounds[nBuckets];
-
         for (int i = start; i < end; ++i) {
-            Point3f pc = lights[i].second.Centroid();
+            Point3f pc = bvhLights[i].second.Centroid();
             int b = nBuckets * centroidBounds.Offset(pc)[dim];
             if (b == nBuckets)
                 b = nBuckets - 1;
             CHECK_GE(b, 0);
             CHECK_LT(b, nBuckets);
-            bucketLightBounds[b] = Union(bucketLightBounds[b], lights[i].second);
+            bucketLightBounds[b] = Union(bucketLightBounds[b], bvhLights[i].second);
         }
 
-        // Compute costs for splitting after each bucket
+        // Compute costs for splitting lights after each bucket
         Float cost[nBuckets - 1];
         for (int i = 0; i < nBuckets - 1; ++i) {
+            // Find _LightBounds_ for lights below and above bucket split
             LightBounds b0, b1;
-
             for (int j = 0; j <= i; ++j)
                 b0 = Union(b0, bucketLightBounds[j]);
             for (int j = i + 1; j < nBuckets; ++j)
@@ -175,14 +174,13 @@ LightBVHNode *BVHLightSampler::buildBVH(
                            (2 * theta_w * sinTheta_o - std::cos(theta_o - 2 * theta_w) -
                             2 * theta_o * sinTheta_o + b.cosTheta_o);
             };
-
-            // Can simplify since we always split
+            // Compute final light split cost for bucket
             Float Kr = MaxComponentValue(bounds.Diagonal()) / bounds.Diagonal()[dim];
             cost[i] = Kr * (b0.phi * Momega(b0) * b0.b.SurfaceArea() +
                             b1.phi * Momega(b1) * b1.b.SurfaceArea());
         }
 
-        // Find bucket to split at that minimizes SAH metric
+        // Find light split that minimizes SAH metric
         for (int i = 1; i < nBuckets - 1; ++i) {
             if (cost[i] > 0 && cost[i] < minCost) {
                 minCost = cost[i];
@@ -192,13 +190,14 @@ LightBVHNode *BVHLightSampler::buildBVH(
         }
     }
 
+    // Partition lights according to chosen split
     int mid;
     if (minCostSplitDim == -1) {
         mid = (start + end) / 2;
     } else {
         const auto *pmid = std::partition(
-            &lights[start], &lights[end - 1] + 1,
-            [=](const std::pair<LightHandle, LightBounds> &l) {
+            &bvhLights[start], &bvhLights[end - 1] + 1,
+            [=](const std::pair<int, LightBounds> &l) {
                 int b = nBuckets *
                         centroidBounds.Offset(l.second.Centroid())[minCostSplitDim];
                 if (b == nBuckets)
@@ -207,35 +206,33 @@ LightBVHNode *BVHLightSampler::buildBVH(
                 CHECK_LT(b, nBuckets);
                 return b <= minCostSplitBucket;
             });
-        mid = pmid - &lights[0];
-
-        if (mid == start || mid == end) {
+        mid = pmid - &bvhLights[0];
+        if (mid == start || mid == end)
             mid = (start + end) / 2;
-        }
         CHECK(mid > start && mid < end);
     }
 
-    LightBVHNode *node =
-        alloc.new_object<LightBVHNode>(buildBVH(lights, start, mid, alloc, nNodes),
-                                       buildBVH(lights, mid, end, alloc, nNodes));
-    node->children[0]->parent = node->children[1]->parent = node;
-
-    return node;
+    // Allocate interior _LightBVHNode_ and recursively initialize children
+    int nodeIndex = nodes.size();
+    nodes.push_back(LightBVHNode());
+    int child0Index = buildBVH(bvhLights, start, mid, alloc);
+    CHECK_EQ(nodeIndex + 1, child0Index);
+    int child1Index = buildBVH(bvhLights, mid, end, alloc);
+    LightBounds lb =
+        Union(nodes[child0Index].lightBounds, nodes[child1Index].lightBounds);
+    nodes[nodeIndex] = LightBVHNode(child0Index, child1Index, lb);
+    nodes[child0Index].parentIndex = nodes[child1Index].parentIndex = nodeIndex;
+    return nodeIndex;
 }
 
 std::string BVHLightSampler::ToString() const {
-    return StringPrintf("[ BVHLightSampler root: %s ]",
-                        root ? root->ToString() : std::string("(nullptr)"));
+    return StringPrintf("[ BVHLightSampler nodes: %s ]", nodes);
 }
 
 std::string LightBVHNode::ToString() const {
-    std::string s =
-        StringPrintf("[ LightBVHNode lightBounds: %s isLeaf: %s ", lightBounds, isLeaf);
-    if (isLeaf)
-        s += StringPrintf("light: %s ", light);
-    else
-        s += StringPrintf("children[0]: %s children[1]: %s", *children[0], *children[1]);
-    return s + "]";
+    return StringPrintf("[ LightBVHNode lightBounds: %s parentIndex: %d "
+                        "childOrLightIndex: %d isLeaf: %d ]",
+                        lightBounds, parentIndex, childOrLightIndex, isLeaf);
 }
 
 // ExhaustiveLightSampler Method Definitions
@@ -297,7 +294,6 @@ Float ExhaustiveLightSampler::PDF(const LightSampleContext &ctx,
         if (light == boundedLights[i])
             lightImportance = importance;
     }
-
     Float pInfinite = Float(infiniteLights.size()) /
                       Float(infiniteLights.size() + (!lightBounds.empty() ? 1 : 0));
     Float pdf = lightImportance / importanceSum * (1. - pInfinite);
