@@ -112,7 +112,7 @@ BVHLightSampler::BVHLightSampler(pstd::span<const LightHandle> lights, Allocator
     : lights(lights.begin(), lights.end(), alloc),
       infiniteLights(alloc),
       nodes(alloc),
-      lightToNodeIndex(alloc) {
+      lightToBitTrail(alloc) {
     std::vector<std::pair<int, LightBounds>> bvhLights;
     // Partition lights into _infiniteLights_ and _bvhLights_
     for (size_t i = 0; i < lights.size(); ++i) {
@@ -128,21 +128,21 @@ BVHLightSampler::BVHLightSampler(pstd::span<const LightHandle> lights, Allocator
 
     if (bvhLights.empty())
         return;
-    buildBVH(bvhLights, 0, bvhLights.size(), alloc);
+    buildBVH(bvhLights, 0, bvhLights.size(), 0, 0, alloc);
     lightBVHBytes += nodes.size() * sizeof(LightBVHNode);
 }
 
 std::pair<int, LightBounds> BVHLightSampler::buildBVH(
     std::vector<std::pair<int, LightBounds>> &bvhLights, int start, int end,
-    Allocator alloc) {
+    uint32_t bitTrail, int depth, Allocator alloc) {
     CHECK_LT(start, end);
-    int nLights = end - start;
     // Initialize leaf node if only a single light remains
-    if (nLights == 1) {
+    if (end - start == 1) {
         int nodeIndex = nodes.size();
         CompactLightBounds cb(bvhLights[start].second, allLightBounds);
-        nodes.push_back(LightBVHNode(bvhLights[start].first, cb));
-        lightToNodeIndex.Insert(lights[bvhLights[start].first], nodeIndex);
+        int lightIndex = bvhLights[start].first;
+        nodes.push_back(LightBVHNode(lightIndex, cb));
+        lightToBitTrail.Insert(lights[lightIndex], bitTrail);
         return {nodeIndex, bvhLights[start].second};
     }
 
@@ -223,13 +223,15 @@ std::pair<int, LightBounds> BVHLightSampler::buildBVH(
     // Allocate interior _LightBVHNode_ and recursively initialize children
     int nodeIndex = nodes.size();
     nodes.push_back(LightBVHNode());
-    std::pair<int, LightBounds> child0 = buildBVH(bvhLights, start, mid, alloc);
+    CHECK_LT(depth, 32);
+    std::pair<int, LightBounds> child0 =
+        buildBVH(bvhLights, start, mid, bitTrail, depth + 1, alloc);
     CHECK_EQ(nodeIndex + 1, child0.first);
-    std::pair<int, LightBounds> child1 = buildBVH(bvhLights, mid, end, alloc);
+    std::pair<int, LightBounds> child1 =
+        buildBVH(bvhLights, mid, end, bitTrail | (1u << depth), depth + 1, alloc);
     LightBounds lb = Union(child0.second, child1.second);
     nodes[nodeIndex] =
         LightBVHNode(child0.first, child1.first, CompactLightBounds(lb, allLightBounds));
-    nodes[child0.first].parentIndex = nodes[child1.first].parentIndex = nodeIndex;
     return {nodeIndex, lb};
 }
 
@@ -238,9 +240,9 @@ std::string BVHLightSampler::ToString() const {
 }
 
 std::string LightBVHNode::ToString() const {
-    return StringPrintf("[ LightBVHNode lightBounds: %s parentIndex: %d "
-                        "childOrLightIndex: %d isLeaf: %d ]",
-                        lightBounds, parentIndex, childOrLightIndex, isLeaf);
+    return StringPrintf(
+        "[ LightBVHNode lightBounds: %s childOrLightIndex: %d isLeaf: %d ]", lightBounds,
+        childOrLightIndex, isLeaf);
 }
 
 // ExhaustiveLightSampler Method Definitions
