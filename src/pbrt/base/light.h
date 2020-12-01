@@ -33,8 +33,8 @@ class PortalImageInfiniteLight;
 class SpotLight;
 
 class LightSampleContext;
-struct LightBounds;
-struct CompactLightBounds;
+class LightBounds;
+class CompactLightBounds;
 struct LightLiSample;
 struct LightLeSample;
 

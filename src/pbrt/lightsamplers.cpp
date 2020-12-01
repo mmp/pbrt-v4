@@ -87,9 +87,11 @@ PowerLightSampler::PowerLightSampler(pstd::span<const LightHandle> lights,
 
     // Compute lights' power and initialize alias table
     std::vector<Float> lightPower;
-    SampledWavelengths lambda = SampledWavelengths::SampleUniform(0.5);
-    for (const auto &light : lights)
-        lightPower.push_back(light.Phi(lambda).Average());
+    SampledWavelengths lambda = SampledWavelengths::SampleXYZ(0.5);
+    for (const auto &light : lights) {
+        SampledSpectrum phi = SafeDiv(light.Phi(lambda), lambda.PDF());
+        lightPower.push_back(phi.Average());
+    }
     if (std::accumulate(lightPower.begin(), lightPower.end(), 0.f) == 0.f)
         std::fill(lightPower.begin(), lightPower.end(), 1.f);
     aliasTable = AliasTable(lightPower, alloc);
@@ -128,7 +130,6 @@ BVHLightSampler::BVHLightSampler(pstd::span<const LightHandle> lights, Allocator
         return;
     buildBVH(bvhLights, 0, bvhLights.size(), alloc);
     lightBVHBytes += nodes.size() * sizeof(LightBVHNode);
-    LOG_VERBOSE("Node size %d", sizeof(LightBVHNode));
 }
 
 std::pair<int, LightBounds> BVHLightSampler::buildBVH(
@@ -139,11 +140,9 @@ std::pair<int, LightBounds> BVHLightSampler::buildBVH(
     // Initialize leaf node if only a single light remains
     if (nLights == 1) {
         int nodeIndex = nodes.size();
-        nodes.push_back(
-            LightBVHNode(bvhLights[start].first,
-                         CompactLightBounds(bvhLights[start].second, allLightBounds)));
-        LightHandle light = lights[bvhLights[start].first];
-        lightToNodeIndex.Insert(light, nodeIndex);
+        CompactLightBounds cb(bvhLights[start].second, allLightBounds);
+        nodes.push_back(LightBVHNode(bvhLights[start].first, cb));
+        lightToNodeIndex.Insert(lights[bvhLights[start].first], nodeIndex);
         return {nodeIndex, bvhLights[start].second};
     }
 
@@ -185,20 +184,8 @@ std::pair<int, LightBounds> BVHLightSampler::buildBVH(
             for (int j = i + 1; j < nBuckets; ++j)
                 b1 = Union(b1, bucketLightBounds[j]);
 
-            // TODO: why is this not a light bounds method?
-            auto Momega = [](const LightBounds &b) {
-                Float theta_o = SafeACos(b.cosTheta_o), theta_e = SafeACos(b.cosTheta_e);
-                Float theta_w = std::min(theta_o + theta_e, Pi);
-                Float sinTheta_o = SafeSqrt(1 - Sqr(b.cosTheta_o));
-                return 2 * Pi * (1 - b.cosTheta_o) +
-                       Pi / 2 *
-                           (2 * theta_w * sinTheta_o - std::cos(theta_o - 2 * theta_w) -
-                            2 * theta_o * sinTheta_o + b.cosTheta_o);
-            };
             // Compute final light split cost for bucket
-            Float Kr = MaxComponentValue(bounds.Diagonal()) / bounds.Diagonal()[dim];
-            cost[i] = Kr * (b0.phi * Momega(b0) * b0.bounds.SurfaceArea() +
-                            b1.phi * Momega(b1) * b1.bounds.SurfaceArea());
+            cost[i] = EvaluateCost(b0, bounds, dim) + EvaluateCost(b1, bounds, dim);
         }
 
         // Find light split that minimizes SAH metric

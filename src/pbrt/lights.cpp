@@ -1282,6 +1282,8 @@ pstd::optional<LightBounds> SpotLight::Bounds() const {
     Vector3f w = Normalize(renderFromLight(Vector3f(0, 0, 1)));
     Float phi = scale * Iemit.MaxValue() * 4 * Pi;
     Float cosTheta_e = std::cos(std::acos(cosFalloffEnd) - std::acos(cosFalloffStart));
+    // Allow a little slop here to deal with fp round-off error in the computation of
+    // cosTheta_p in the importance function.
     if (cosTheta_e == 1 && cosFalloffEnd != cosFalloffStart)
         cosTheta_e = 0.999f;
     return LightBounds(Bounds3f(p, p), w, phi, cosFalloffStart, cosTheta_e, false);

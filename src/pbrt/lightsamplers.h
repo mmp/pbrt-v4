@@ -108,7 +108,7 @@ class PowerLightSampler {
 };
 
 // CompactLightBounds Definition
-struct CompactLightBounds {
+class CompactLightBounds {
   public:
     // CompactLightBounds Public Methods
     CompactLightBounds() = default;
@@ -123,23 +123,10 @@ struct CompactLightBounds {
         // Quantize bounding box into _qb_
         for (int c = 0; c < 3; ++c) {
             qb[0][c] =
-                std::floor(RescaleBounds(lb.bounds[0][c], allb.pMin[c], allb.pMax[c]));
+                std::floor(QuantizeBounds(lb.bounds[0][c], allb.pMin[c], allb.pMax[c]));
             qb[1][c] =
-                std::ceil(RescaleBounds(lb.bounds[1][c], allb.pMin[c], allb.pMax[c]));
+                std::ceil(QuantizeBounds(lb.bounds[1][c], allb.pMin[c], allb.pMax[c]));
         }
-    }
-
-    PBRT_CPU_GPU
-    CompactLightBounds(const uint16_t b[2][3], const Vector3f &w, Float phi,
-                       Float cosTheta_o, Float cosTheta_e, bool twoSided)
-        : w(Normalize(w)),
-          phi(phi),
-          qCosTheta_o(QuantizeCos(cosTheta_o)),
-          qCosTheta_e(QuantizeCos(cosTheta_e)),
-          twoSided(twoSided) {
-        for (int i = 0; i < 2; ++i)
-            for (int j = 0; j < 3; ++j)
-                qb[i][j] = b[i][j];
     }
 
     std::string ToString() const;
@@ -153,12 +140,6 @@ struct CompactLightBounds {
     Float CosTheta_e() const { return 2 * (qCosTheta_e / 32767.f) - 1; }
 
     PBRT_CPU_GPU
-    Point3f Centroid(const Bounds3f &b) const {
-        Bounds3f bbox = Bounds(b);
-        return (bbox.pMin + bbox.pMax) / 2;
-    }
-
-    PBRT_CPU_GPU
     Bounds3f Bounds(const Bounds3f &allb) const {
         return {Point3f(Lerp(qb[0][0] / 65535.f, allb.pMin.x, allb.pMax.x),
                         Lerp(qb[0][1] / 65535.f, allb.pMin.y, allb.pMax.y),
@@ -169,8 +150,8 @@ struct CompactLightBounds {
     }
 
     PBRT_CPU_GPU
-    Float Importance(Point3f p, Normal3f n, const Bounds3f &allLightBounds) const {
-        Bounds3f bounds = Bounds(allLightBounds);
+    Float Importance(Point3f p, Normal3f n, const Bounds3f &allb) const {
+        Bounds3f bounds = Bounds(allb);
         Float cosTheta_o = CosTheta_o(), cosTheta_e = CosTheta_e();
         // Return importance for light bounds at reference point
         // Compute clamped squared distance to reference point
@@ -233,21 +214,15 @@ struct CompactLightBounds {
     PBRT_CPU_GPU
     static unsigned int QuantizeCos(Float c) {
         CHECK(c >= -1 && c <= 1);
-        Float qc = 32767.f * ((c + 1) / 2);
-        int q = std::floor(qc);
-        CHECK(q >= 0 && q <= 32767);
-        return q;
+        return std::floor(32767.f * ((c + 1) / 2));
     }
 
     PBRT_CPU_GPU
-    static Float RescaleBounds(Float p, Float min, Float max) {
-        CHECK(p >= min && p <= max);
+    static Float QuantizeBounds(Float c, Float min, Float max) {
+        CHECK(c >= min && c <= max);
         if (min == max)
             return 0;
-        Float pp = Clamp((p - min) / (max - min), 0, 1);
-        Float qp = 65535.f * pp;
-        CHECK(qp >= 0 && qp <= 65535);
-        return qp;
+        return 65535.f * Clamp((c - min) / (max - min), 0, 1);
     }
 
     // CompactLightBounds Private Members
@@ -318,34 +293,40 @@ class BVHLightSampler {
             // Traverse light BVH to sample light
             if (nodes.empty())
                 return {};
+            // Declare common variables for light BVH traversal
             Point3f p = ctx.p();
             Normal3f n = ctx.ns;
             u = std::min<Float>((u - pInfinite) / (1 - pInfinite), OneMinusEpsilon);
             int nodeIndex = 0;
             Float pdf = (1 - pInfinite);
+
             while (true) {
+                // Process light BVH node for light sampling
                 LightBVHNode node = nodes[nodeIndex];
-                // Process light BVH node _node_ for light sampling
-                if (node.isLeaf) {
+                if (!node.isLeaf) {
+                    // Compute light BVH child node importances
+                    const LightBVHNode *children[2] = {&nodes[nodeIndex + 1],
+                                                       &nodes[node.childOrLightIndex]};
+                    Float ci[2] = {
+                        children[0]->lightBounds.Importance(p, n, allLightBounds),
+                        children[1]->lightBounds.Importance(p, n, allLightBounds)};
+                    if (ci[0] == 0 && ci[1] == 0)
+                        return {};
+
+                    // Randomly sample light BVH child node
+                    Float nodePDF;
+                    int child = SampleDiscrete(ci, u, &nodePDF, &u);
+                    pdf *= nodePDF;
+                    nodeIndex = (child == 0) ? (nodeIndex + 1) : node.childOrLightIndex;
+
+                } else {
+                    // Confirm light has non-zero importance before returning light sample
                     if (nodeIndex > 0)
                         DCHECK_GT(node.lightBounds.Importance(p, n, allLightBounds), 0);
                     if (nodeIndex > 0 ||
                         node.lightBounds.Importance(p, n, allLightBounds) > 0)
                         return SampledLight{lights[node.childOrLightIndex], pdf};
                     return {};
-                } else {
-                    // Compute child node importances and randomly sample child node
-                    const LightBVHNode *children[2] = {&nodes[nodeIndex + 1],
-                                                       &nodes[node.childOrLightIndex]};
-                    pstd::array<Float, 2> ci = {
-                        children[0]->lightBounds.Importance(p, n, allLightBounds),
-                        children[1]->lightBounds.Importance(p, n, allLightBounds)};
-                    if (ci[0] == 0 && ci[1] == 0)
-                        return {};
-                    Float nodePDF;
-                    int child = SampleDiscrete(ci, u, &nodePDF, &u);
-                    pdf *= nodePDF;
-                    nodeIndex = (child == 0) ? (nodeIndex + 1) : node.childOrLightIndex;
                 }
             }
         }
@@ -367,20 +348,27 @@ class BVHLightSampler {
         // Compute light's PDF by walking up tree nodes to the root
         Float pdf = 1;
         while (nodeIndex != 0) {
+            // Get pointers to current node, parent, and parent's children
             const LightBVHNode *node = &nodes[nodeIndex];
             const LightBVHNode *parent = &nodes[node->parentIndex];
-            Float ci[2] = {
-                nodes[node->parentIndex + 1].lightBounds.Importance(p, n, allLightBounds),
-                nodes[parent->childOrLightIndex].lightBounds.Importance(p, n,
-                                                                        allLightBounds)};
+            const LightBVHNode *child0 = &nodes[node->parentIndex + 1];
+            const LightBVHNode *child1 = &nodes[parent->childOrLightIndex];
+
+            // Compute child importances and update PDF for current node
+            Float ci[2] = {child0->lightBounds.Importance(p, n, allLightBounds),
+                           child1->lightBounds.Importance(p, n, allLightBounds)};
             int childIndex = int(nodeIndex == parent->childOrLightIndex);
             DCHECK_GT(ci[childIndex], 0);
             pdf *= ci[childIndex] / (ci[0] + ci[1]);
+
             nodeIndex = node->parentIndex;
         }
 
         // Return final PDF accounting for infinite light sampling probability
-        Float pInfinite = Float(infiniteLights.size()) / Float(infiniteLights.size() + 1);
+        // Compute infinite light sampling probability _pInfinite_
+        Float pInfinite = Float(infiniteLights.size()) /
+                          Float(infiniteLights.size() + (!nodes.empty() ? 1 : 0));
+
         return pdf * (1 - pInfinite);
     }
 
@@ -406,6 +394,21 @@ class BVHLightSampler {
     std::pair<int, LightBounds> buildBVH(
         std::vector<std::pair<int, LightBounds>> &bvhLights, int start, int end,
         Allocator alloc);
+
+    Float EvaluateCost(const LightBounds &b, const Bounds3f &bounds, int dim) const {
+        auto Momega = [](const LightBounds &b) {
+            Float theta_o = SafeACos(b.cosTheta_o), theta_e = SafeACos(b.cosTheta_e);
+            Float theta_w = std::min(theta_o + theta_e, Pi);
+            Float sinTheta_o = SafeSqrt(1 - Sqr(b.cosTheta_o));
+            return 2 * Pi * (1 - b.cosTheta_o) +
+                   Pi / 2 *
+                       (2 * theta_w * sinTheta_o - std::cos(theta_o - 2 * theta_w) -
+                        2 * theta_o * sinTheta_o + b.cosTheta_o);
+        };
+
+        Float Kr = MaxComponentValue(bounds.Diagonal()) / bounds.Diagonal()[dim];
+        return Kr * b.phi * Momega(b) * b.bounds.SurfaceArea();
+    }
 
     // BVHLightSampler Private Members
     pstd::vector<LightHandle> lights, infiniteLights;

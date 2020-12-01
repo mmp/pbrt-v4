@@ -95,7 +95,8 @@ class LightSampleContext {
 };
 
 // LightBounds Definition
-struct LightBounds {
+class LightBounds {
+  public:
     // LightBounds Public Methods
     LightBounds() = default;
     LightBounds(const Bounds3f &b, const Vector3f &w, Float phi, Float cosTheta_o,
