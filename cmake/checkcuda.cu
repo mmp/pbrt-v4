@@ -13,9 +13,10 @@ int main(int argc, char **argv){
         printf("CUDA error: %s\n", cudaGetErrorString(error));
         return rc; /* Failure */
     }
-    if((dP.major+(dP.minor/10)) < min_cc) {
-        printf("Minimum Compute Capability of %2.1f required: %d.%d found. Not Building CUDA Code.\n",
-               min_cc, dP.major, dP.minor);
+    float cc = dP.major + (dP.minor / 10.0);
+    if(cc < min_cc) {
+        printf("Minimum Compute Capability of %2.1f required: %2.1f found. Not Building CUDA Code.\n",
+               min_cc, cc);
         return 1; /* Failure */
     } else {
         printf("sm_%d%d", dP.major, dP.minor);
