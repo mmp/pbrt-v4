@@ -1366,7 +1366,7 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
     SampledSpectrum T_ray(1.f), lightPathPDF(1.f), uniPathPDF(1.f);
     RNG rng(Hash(lightRay.o), Hash(lightRay.d));
 
-    while (true) {
+    while (lightRay.d != Vector3f(0, 0, 0)) {
         // Trace ray through media to estimate transmittance
         pstd::optional<ShapeIntersection> si = Intersect(lightRay, 1 - ShadowEpsilon);
         // Handle opaque surface along ray's path

@@ -408,7 +408,7 @@ extern "C" __global__ void __raygen__shadow_Tr() {
     SampledSpectrum T_ray(1.f);
     SampledSpectrum uniPathPDF(1.f), lightPathPDF(1.f);
 
-    while (true) {
+    while (ray.d != Vector3f(0, 0, 0)) {
         ClosestHitContext ctx(ray.medium, true);
         uint32_t p0 = packPointer0(&ctx), p1 = packPointer1(&ctx);
 
@@ -485,9 +485,6 @@ extern "C" __global__ void __raygen__shadow_Tr() {
             break;
 
         ray = ctx.SpawnRayTo(pLight);
-
-        if (ray.d == Vector3f(0, 0, 0))
-            break;
     }
 
     PBRT_DBG("Final T_ray %.9g %.9g %.9g %.9g sr.uniPathPDF %.9g %.9g %.9g %.9g uniPathPDF %.9g %.9g %.9g %.9g\n",
