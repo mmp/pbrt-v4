@@ -817,6 +817,19 @@ target_link_libraries (imgtool PRIVATE ${ALL_PBRT_LIBS} sky_lib flip_lib)
 add_sanitizers (imgtool)
 
 ######################
+# pspec
+
+add_executable (pspec src/pbrt/cmd/pspec.cpp)
+add_executable (pbrt::pspec ALIAS pspec)
+
+target_compile_definitions (pspec PRIVATE ${PBRT_DEFINITIONS})
+target_compile_options (pspec PRIVATE ${PBRT_CXX_FLAGS})
+target_include_directories (pspec PRIVATE src src/ext)
+target_link_libraries (pspec PRIVATE ${ALL_PBRT_LIBS})
+
+add_sanitizers (pspec)
+
+######################
 # obj2pbrt
 
 add_executable (obj2pbrt src/pbrt/cmd/obj2pbrt.cpp)
@@ -890,6 +903,7 @@ add_test (pbrt_unit_test pbrt_test)
 install (TARGETS
   pbrt_exe
   imgtool
+  pspec
   obj2pbrt
   cyhair2pbrt
   DESTINATION
