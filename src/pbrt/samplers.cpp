@@ -119,13 +119,15 @@ PaddedSobolSampler *PaddedSobolSampler::Create(const ParameterDictionary &parame
 
     RandomizeStrategy randomizer;
     std::string s = parameters.GetOneString("randomization",
-                                            nsamp <= 2 ? "cranleypatterson" : "owen");
+                                            nsamp <= 2 ? "cranleypatterson" : "fastowen");
     if (s == "none")
         randomizer = RandomizeStrategy::None;
     else if (s == "cranleypatterson")
         randomizer = RandomizeStrategy::CranleyPatterson;
     else if (s == "xor")
         randomizer = RandomizeStrategy::XOR;
+    else if (s == "fastowen")
+        randomizer = RandomizeStrategy::FastOwen;
     else if (s == "owen")
         randomizer = RandomizeStrategy::Owen;
     else
@@ -244,13 +246,15 @@ SobolSampler *SobolSampler::Create(const ParameterDictionary &parameters,
         nsamp = 1;
 
     RandomizeStrategy randomizer;
-    std::string s = parameters.GetOneString("randomization", "owen");
+    std::string s = parameters.GetOneString("randomization", "fastowen");
     if (s == "none")
         randomizer = RandomizeStrategy::None;
     else if (s == "cranleypatterson")
         randomizer = RandomizeStrategy::CranleyPatterson;
     else if (s == "xor")
         randomizer = RandomizeStrategy::XOR;
+    else if (s == "fastowen")
+        randomizer = RandomizeStrategy::FastOwen;
     else if (s == "owen")
         randomizer = RandomizeStrategy::Owen;
     else

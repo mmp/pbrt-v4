@@ -137,7 +137,7 @@ PBRT_CPU_GPU inline uint32_t MultiplyGenerator(pstd::span<const uint32_t> C, uin
 }
 
 // Laine et al., Stratified Sampling for Stochastic Transparency, Sec 3.1...
-PBRT_CPU_GPU inline uint32_t OwenScramble(uint32_t v, uint32_t hash) {
+PBRT_CPU_GPU inline uint32_t FastOwenBinaryScramble(uint32_t v, uint32_t hash) {
     v = ReverseBits32(v);
     v += hash;
     v ^= v * 0x6c50b47cu;
@@ -145,6 +145,19 @@ PBRT_CPU_GPU inline uint32_t OwenScramble(uint32_t v, uint32_t hash) {
     v ^= v * 0xc7afe638u;
     v ^= v * 0x8d22f6e6u;
     return ReverseBits32(v);
+}
+
+PBRT_CPU_GPU inline uint32_t OwenScrambleBinaryFull(uint32_t v, uint32_t hash) {
+    if (hash & 1)
+        v ^= 1u << 31;
+
+    for (int b = 1; b < 32; ++b) {
+        uint32_t mask = (~0u) << (32 - b);
+        if (MixBits((v & mask) ^ hash) & (1u << b))
+            v ^= 1u << (31 - b);
+    }
+
+    return v;
 }
 
 template <typename R>
@@ -189,17 +202,26 @@ struct XORScrambler {
     uint32_t permutation;
 };
 
+// FastOwenScrambler Definition
+struct FastOwenScrambler {
+    PBRT_CPU_GPU
+    FastOwenScrambler(uint32_t seed) : seed(seed) {}
+    PBRT_CPU_GPU
+    uint32_t operator()(uint32_t v) const { return FastOwenBinaryScramble(v, seed); }
+    uint32_t seed;
+};
+
 // OwenScrambler Definition
 struct OwenScrambler {
     PBRT_CPU_GPU
     OwenScrambler(uint32_t seed) : seed(seed) {}
     PBRT_CPU_GPU
-    uint32_t operator()(uint32_t v) const { return OwenScramble(v, seed); }
+    uint32_t operator()(uint32_t v) const { return OwenScrambleBinaryFull(v, seed); }
     uint32_t seed;
 };
 
 // RandomizeStrategy Definition
-enum class RandomizeStrategy { None, CranleyPatterson, XOR, Owen };
+enum class RandomizeStrategy { None, CranleyPatterson, XOR, FastOwen, Owen };
 
 std::string ToString(RandomizeStrategy r);
 

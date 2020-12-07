@@ -202,6 +202,8 @@ class PaddedSobolSampler {
             return SobolSample(a, dimension, NoRandomizer());
         case RandomizeStrategy::XOR:
             return SobolSample(a, dimension, XORScrambler(hash));
+        case RandomizeStrategy::FastOwen:
+            return SobolSample(a, dimension, FastOwenScrambler(hash));
         case RandomizeStrategy::Owen:
             return SobolSample(a, dimension, OwenScrambler(hash));
         default:
@@ -403,6 +405,8 @@ class SobolSampler {
             return SobolSample(sobolIndex, dimension, CranleyPattersonRotator(hash));
         else if (randomizeStrategy == RandomizeStrategy::XOR)
             return SobolSample(sobolIndex, dimension, XORScrambler(hash));
+        else if (randomizeStrategy == RandomizeStrategy::FastOwen)
+            return SobolSample(sobolIndex, dimension, FastOwenScrambler(hash));
         else
             return SobolSample(sobolIndex, dimension, OwenScrambler(hash));
     }
