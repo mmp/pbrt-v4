@@ -83,10 +83,12 @@ inline double ProgressReporter::ElapsedSeconds() const {
 inline void ProgressReporter::Update(int64_t num) {
 #ifdef PBRT_BUILD_GPU_RENDERER
     if (gpuEvents.size() > 0) {
-        CHECK_LE(gpuEventsLaunchedOffset + num, gpuEvents.size());
-        while (num-- > 0) {
-            CHECK_EQ(cudaEventRecord(gpuEvents[gpuEventsLaunchedOffset]), cudaSuccess);
-            ++gpuEventsLaunchedOffset;
+        if (gpuEventsLaunchedOffset + num <= gpuEvents.size()) {
+            while (num-- > 0) {
+                CHECK_EQ(cudaEventRecord(gpuEvents[gpuEventsLaunchedOffset]),
+                         cudaSuccess);
+                ++gpuEventsLaunchedOffset;
+            }
         }
         return;
     }
