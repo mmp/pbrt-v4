@@ -72,10 +72,6 @@ pstd::vector<DigitPermutation> *ComputeRadicalInversePermutations(uint32_t seed,
                                                                   Allocator alloc = {});
 PBRT_CPU_GPU
 Float ScrambledRadicalInverse(int baseIndex, uint64_t a, const DigitPermutation &perm);
-#if 0
-PBRT_CPU_GPU
-Float ScrambledRadicalInverse(int baseIndex, uint64_t a, uint32_t seed);
-#endif
 
 // NoRandomizer Definition
 struct NoRandomizer {
@@ -121,6 +117,25 @@ PBRT_CPU_GPU inline Float ScrambledRadicalInverse(int baseIndex, uint64_t a,
         uint64_t next = a / base;
         int digitValue = a - next * base;
         reversedDigits = reversedDigits * base + perm.Permute(digitIndex, digitValue);
+        invBaseN *= invBase;
+        ++digitIndex;
+        a = next;
+    }
+    return std::min(invBaseN * reversedDigits, OneMinusEpsilon);
+}
+
+PBRT_CPU_GPU inline Float OwenScrambledRadicalInverse(int baseIndex, uint64_t a,
+                                                      uint32_t hash) {
+    int base = Primes[baseIndex];
+    Float invBase = (Float)1 / (Float)base, invBaseN = 1;
+    uint64_t reversedDigits = 0;
+    int digitIndex = 0;
+    while (1 - invBaseN < 1) {
+        uint64_t next = a / base;
+        int digitValue = a - next * base;
+        uint32_t digitHash = MixBits(hash ^ reversedDigits);
+        digitValue = PermutationElement(digitValue, base, digitHash);
+        reversedDigits = reversedDigits * base + digitValue;
         invBaseN *= invBase;
         ++digitIndex;
         a = next;
