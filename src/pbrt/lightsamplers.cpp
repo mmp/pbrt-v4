@@ -113,9 +113,10 @@ BVHLightSampler::BVHLightSampler(pstd::span<const LightHandle> lights, Allocator
       infiniteLights(alloc),
       nodes(alloc),
       lightToBitTrail(alloc) {
+    // Initialize _infiniteLights_ array and light BVH
     std::vector<std::pair<int, LightBounds>> bvhLights;
-    // Partition lights into _infiniteLights_ and _bvhLights_
     for (size_t i = 0; i < lights.size(); ++i) {
+        // Partition $i$th light into _infiniteLights_ or _bvhLights_
         LightHandle light = lights[i];
         pstd::optional<LightBounds> lightBounds = light.Bounds();
         if (!lightBounds)
@@ -125,10 +126,8 @@ BVHLightSampler::BVHLightSampler(pstd::span<const LightHandle> lights, Allocator
             allLightBounds = Union(allLightBounds, lightBounds->bounds);
         }
     }
-
-    if (bvhLights.empty())
-        return;
-    buildBVH(bvhLights, 0, bvhLights.size(), 0, 0, alloc);
+    if (!bvhLights.empty())
+        buildBVH(bvhLights, 0, bvhLights.size(), 0, 0, alloc);
     lightBVHBytes += nodes.size() * sizeof(LightBVHNode);
 }
 
@@ -141,7 +140,7 @@ std::pair<int, LightBounds> BVHLightSampler::buildBVH(
         int nodeIndex = nodes.size();
         CompactLightBounds cb(bvhLights[start].second, allLightBounds);
         int lightIndex = bvhLights[start].first;
-        nodes.push_back(LightBVHNode(lightIndex, cb));
+        nodes.push_back(LightBVHNode::MakeLeaf(lightIndex, cb));
         lightToBitTrail.Insert(lights[lightIndex], bitTrail);
         return {nodeIndex, bvhLights[start].second};
     }
@@ -229,9 +228,11 @@ std::pair<int, LightBounds> BVHLightSampler::buildBVH(
     CHECK_EQ(nodeIndex + 1, child0.first);
     std::pair<int, LightBounds> child1 =
         buildBVH(bvhLights, mid, end, bitTrail | (1u << depth), depth + 1, alloc);
+
+    // Initialize interior node and return node index and bounds
     LightBounds lb = Union(child0.second, child1.second);
-    nodes[nodeIndex] =
-        LightBVHNode(child0.first, child1.first, CompactLightBounds(lb, allLightBounds));
+    CompactLightBounds cb(lb, allLightBounds);
+    nodes[nodeIndex] = LightBVHNode::MakeInterior(child1.first, cb);
     return {nodeIndex, lb};
 }
 

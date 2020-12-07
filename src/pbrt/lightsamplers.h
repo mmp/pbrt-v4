@@ -159,13 +159,6 @@ class CompactLightBounds {
         Float d2 = DistanceSquared(p, pc);
         d2 = std::max(d2, Length(bounds.Diagonal()) / 2);
 
-        // Compute sine and cosine of angle to vector _w_
-        Vector3f wi = Normalize(p - pc);
-        Float cosTheta = Dot(Vector3f(w), wi);
-        if (twoSided)
-            cosTheta = std::abs(cosTheta);
-        Float sinTheta = SafeSqrt(1 - Sqr(cosTheta));
-
         // Define cosine and sine clamped subtraction lambdas
         auto cosSubClamped = [](Float sinTheta_a, Float cosTheta_a, Float sinTheta_b,
                                 Float cosTheta_b) -> Float {
@@ -181,27 +174,34 @@ class CompactLightBounds {
             return sinTheta_a * cosTheta_b - cosTheta_a * sinTheta_b;
         };
 
-        // Compute $\cos \theta_\roman{u}$ for reference point
-        Float cosTheta_u = BoundSubtendedDirections(bounds, p).cosTheta;
-        Float sinTheta_u = SafeSqrt(1 - Sqr(cosTheta_u));
+        // Compute sine and cosine of angle to vector _w_, $\theta_\roman{w}$
+        Vector3f wi = Normalize(p - pc);
+        Float cosTheta_w = Dot(Vector3f(w), wi);
+        if (twoSided)
+            cosTheta_w = std::abs(cosTheta_w);
+        Float sinTheta_w = SafeSqrt(1 - Sqr(cosTheta_w));
 
-        // Compute $\cos \theta_\roman{p}$ and test against $\cos \theta_\roman{e}$
+        // Compute $\cos \theta_\roman{b}$ for reference point
+        Float cosTheta_b = BoundSubtendedDirections(bounds, p).cosTheta;
+        Float sinTheta_b = SafeSqrt(1 - Sqr(cosTheta_b));
+
+        // Compute $\cos \theta'$ and test against $\cos \theta_\roman{e}$
         Float sinTheta_o = SafeSqrt(1 - Sqr(cosTheta_o));
-        Float cosTheta_x = cosSubClamped(sinTheta, cosTheta, sinTheta_o, cosTheta_o);
-        Float sinTheta_x = sinSubClamped(sinTheta, cosTheta, sinTheta_o, cosTheta_o);
-        Float cosTheta_p = cosSubClamped(sinTheta_x, cosTheta_x, sinTheta_u, cosTheta_u);
-        if (cosTheta_p <= cosTheta_e)
+        Float cosTheta_x = cosSubClamped(sinTheta_w, cosTheta_w, sinTheta_o, cosTheta_o);
+        Float sinTheta_x = sinSubClamped(sinTheta_w, cosTheta_w, sinTheta_o, cosTheta_o);
+        Float cosThetap = cosSubClamped(sinTheta_x, cosTheta_x, sinTheta_b, cosTheta_b);
+        if (cosThetap <= cosTheta_e)
             return 0;
 
         // Return final importance at reference point
-        Float importance = phi * cosTheta_p / d2;
+        Float importance = phi * cosThetap / d2;
         DCHECK_GE(importance, -1e-3);
         // Account for $\cos \theta_\roman{i}$ in importance at surfaces
         if (n != Normal3f(0, 0, 0)) {
             Float cosTheta_i = AbsDot(wi, n);
             Float sinTheta_i = SafeSqrt(1 - Sqr(cosTheta_i));
             Float cosThetap_i =
-                cosSubClamped(sinTheta_i, cosTheta_i, sinTheta_u, cosTheta_u);
+                cosSubClamped(sinTheta_i, cosTheta_i, sinTheta_b, cosTheta_b);
             importance *= cosThetap_i;
         }
 
@@ -242,15 +242,14 @@ struct alignas(32) LightBVHNode {
     LightBVHNode() = default;
 
     PBRT_CPU_GPU
-    LightBVHNode(int lightIndex, const CompactLightBounds &lightBounds)
-        : childOrLightIndex(lightIndex), lightBounds(lightBounds) {
-        isLeaf = true;
+    static LightBVHNode MakeLeaf(unsigned int lightIndex, const CompactLightBounds &cb) {
+        return LightBVHNode{cb, lightIndex, 1};
     }
 
     PBRT_CPU_GPU
-    LightBVHNode(int child0Index, int child1Index, const CompactLightBounds &lightBounds)
-        : lightBounds(lightBounds), childOrLightIndex(child1Index) {
-        isLeaf = false;
+    static LightBVHNode MakeInterior(unsigned int child1Index,
+                                     const CompactLightBounds &cb) {
+        return LightBVHNode{cb, child1Index, 0};
     }
 
     PBRT_CPU_GPU
@@ -335,28 +334,29 @@ class BVHLightSampler {
         if (!lightToBitTrail.HasKey(light))
             return 1.f / (infiniteLights.size() + (!nodes.empty() ? 1 : 0));
 
-        // Get leaf _LightBVHNode_ for light and test importance
+        // Initialize local variables for BVH traversal for PDF computation
         uint32_t bitTrail = lightToBitTrail[light];
         Point3f p = ctx.p();
         Normal3f n = ctx.ns;
-
-        // Compute light's PDF by walking up tree nodes to the root
         Float pdf = 1;
         int nodeIndex = 0;
+
+        // Compute light's PDF by walking down tree nodes to the light
         while (true) {
             const LightBVHNode *node = &nodes[nodeIndex];
             if (node->isLeaf) {
-                CHECK_EQ(light, lights[node->childOrLightIndex]);
+                DCHECK_EQ(light, lights[node->childOrLightIndex]);
                 break;
             }
+            // Compute child importances and update PDF for current node
             const LightBVHNode *child0 = &nodes[nodeIndex + 1];
             const LightBVHNode *child1 = &nodes[node->childOrLightIndex];
-            // Compute child importances and update PDF for current node
             Float ci[2] = {child0->lightBounds.Importance(p, n, allLightBounds),
                            child1->lightBounds.Importance(p, n, allLightBounds)};
             DCHECK_GT(ci[bitTrail & 1], 0);
             pdf *= ci[bitTrail & 1] / (ci[0] + ci[1]);
 
+            // Use _bitTrail_ to find next node index and update its value
             nodeIndex = (bitTrail & 1) ? node->childOrLightIndex : (nodeIndex + 1);
             bitTrail >>= 1;
         }
@@ -393,7 +393,8 @@ class BVHLightSampler {
         uint32_t bitTrail, int depth, Allocator alloc);
 
     Float EvaluateCost(const LightBounds &b, const Bounds3f &bounds, int dim) const {
-        Float theta_o = SafeACos(b.cosTheta_o), theta_e = SafeACos(b.cosTheta_e);
+        // Evaluate direction bounds measure for _LightBounds_
+        Float theta_o = std::acos(b.cosTheta_o), theta_e = std::acos(b.cosTheta_e);
         Float theta_w = std::min(theta_o + theta_e, Pi);
         Float sinTheta_o = SafeSqrt(1 - Sqr(b.cosTheta_o));
         Float Momega = 2 * Pi * (1 - b.cosTheta_o) +
@@ -401,14 +402,16 @@ class BVHLightSampler {
                            (2 * theta_w * sinTheta_o - std::cos(theta_o - 2 * theta_w) -
                             2 * theta_o * sinTheta_o + b.cosTheta_o);
 
+        // Return complete cost estimate for _LightBounds_
         Float Kr = MaxComponentValue(bounds.Diagonal()) / bounds.Diagonal()[dim];
-        return Kr * b.phi * Momega * b.bounds.SurfaceArea();
+        return b.phi * Momega * Kr * b.bounds.SurfaceArea();
     }
 
     // BVHLightSampler Private Members
-    pstd::vector<LightHandle> lights, infiniteLights;
-    pstd::vector<LightBVHNode> nodes;
+    pstd::vector<LightHandle> lights;
+    pstd::vector<LightHandle> infiniteLights;
     Bounds3f allLightBounds;
+    pstd::vector<LightBVHNode> nodes;
     HashMap<LightHandle, uint32_t, LightHandleHash> lightToBitTrail;
 };
 

@@ -90,13 +90,6 @@ Float LightBounds::Importance(Point3f p, Normal3f n) const {
     Float d2 = DistanceSquared(p, pc);
     d2 = std::max(d2, Length(bounds.Diagonal()) / 2);
 
-    // Compute sine and cosine of angle to vector _w_
-    Vector3f wi = Normalize(p - pc);
-    Float cosTheta = Dot(Vector3f(w), wi);
-    if (twoSided)
-        cosTheta = std::abs(cosTheta);
-    Float sinTheta = SafeSqrt(1 - Sqr(cosTheta));
-
     // Define cosine and sine clamped subtraction lambdas
     auto cosSubClamped = [](Float sinTheta_a, Float cosTheta_a, Float sinTheta_b,
                             Float cosTheta_b) -> Float {
@@ -112,26 +105,33 @@ Float LightBounds::Importance(Point3f p, Normal3f n) const {
         return sinTheta_a * cosTheta_b - cosTheta_a * sinTheta_b;
     };
 
-    // Compute $\cos \theta_\roman{u}$ for reference point
-    Float cosTheta_u = BoundSubtendedDirections(bounds, p).cosTheta;
-    Float sinTheta_u = SafeSqrt(1 - Sqr(cosTheta_u));
+    // Compute sine and cosine of angle to vector _w_, $\theta_\roman{w}$
+    Vector3f wi = Normalize(p - pc);
+    Float cosTheta_w = Dot(Vector3f(w), wi);
+    if (twoSided)
+        cosTheta_w = std::abs(cosTheta_w);
+    Float sinTheta_w = SafeSqrt(1 - Sqr(cosTheta_w));
 
-    // Compute $\cos \theta_\roman{p}$ and test against $\cos \theta_\roman{e}$
+    // Compute $\cos \theta_\roman{b}$ for reference point
+    Float cosTheta_b = BoundSubtendedDirections(bounds, p).cosTheta;
+    Float sinTheta_b = SafeSqrt(1 - Sqr(cosTheta_b));
+
+    // Compute $\cos \theta'$ and test against $\cos \theta_\roman{e}$
     Float sinTheta_o = SafeSqrt(1 - Sqr(cosTheta_o));
-    Float cosTheta_x = cosSubClamped(sinTheta, cosTheta, sinTheta_o, cosTheta_o);
-    Float sinTheta_x = sinSubClamped(sinTheta, cosTheta, sinTheta_o, cosTheta_o);
-    Float cosTheta_p = cosSubClamped(sinTheta_x, cosTheta_x, sinTheta_u, cosTheta_u);
-    if (cosTheta_p <= cosTheta_e)
+    Float cosTheta_x = cosSubClamped(sinTheta_w, cosTheta_w, sinTheta_o, cosTheta_o);
+    Float sinTheta_x = sinSubClamped(sinTheta_w, cosTheta_w, sinTheta_o, cosTheta_o);
+    Float cosThetap = cosSubClamped(sinTheta_x, cosTheta_x, sinTheta_b, cosTheta_b);
+    if (cosThetap <= cosTheta_e)
         return 0;
 
     // Return final importance at reference point
-    Float importance = phi * cosTheta_p / d2;
+    Float importance = phi * cosThetap / d2;
     DCHECK_GE(importance, -1e-3);
     // Account for $\cos \theta_\roman{i}$ in importance at surfaces
     if (n != Normal3f(0, 0, 0)) {
         Float cosTheta_i = AbsDot(wi, n);
         Float sinTheta_i = SafeSqrt(1 - Sqr(cosTheta_i));
-        Float cosThetap_i = cosSubClamped(sinTheta_i, cosTheta_i, sinTheta_u, cosTheta_u);
+        Float cosThetap_i = cosSubClamped(sinTheta_i, cosTheta_i, sinTheta_b, cosTheta_b);
         importance *= cosThetap_i;
     }
 
