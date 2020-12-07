@@ -47,6 +47,7 @@ inline int GetBlockSize(const char *description, F kernel) {
     return blockSize;
 }
 
+#ifdef __CUDACC__
 template <typename F>
 __global__ void Kernel(F func, int nItems) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -55,6 +56,7 @@ __global__ void Kernel(F func, int nItems) {
 
     func(tid);
 }
+#endif  // __CUDACC__
 
 // GPU Launch Function Declarations
 template <typename F>
@@ -67,6 +69,7 @@ void GPUDo(const char *description, F func) {
 
 void GPUWait();
 
+#ifdef __CUDACC__
 template <typename F>
 void GPUParallelFor(const char *description, int nItems, F func) {
 #ifdef NVTX
@@ -93,6 +96,7 @@ void GPUParallelFor(const char *description, int nItems, F func) {
     nvtxRangePop();
 #endif
 }
+#endif  // __CUDACC__
 
 void ReportKernelStats();
 
