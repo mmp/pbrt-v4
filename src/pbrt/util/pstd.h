@@ -464,9 +464,13 @@ class memory_resource {
   public:
     virtual ~memory_resource();
     void *allocate(size_t bytes, size_t alignment = max_align) {
+        if (bytes == 0)
+            return nullptr;
         return do_allocate(bytes, alignment);
     }
     void deallocate(void *p, size_t bytes, size_t alignment = max_align) {
+        if (!p)
+            return;
         return do_deallocate(p, bytes, alignment);
     }
     bool is_equal(const memory_resource &other) const noexcept {
@@ -561,7 +565,6 @@ class monotonic_buffer_resource : public memory_resource {
             currentBlock = {
                 upstreamResource->allocate(blockSize, alignof(std::max_align_t)),
                 blockSize};
-        success:
             currentBlockPos = 0;
         }
 
