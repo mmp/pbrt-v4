@@ -445,6 +445,8 @@ set (PBRT_SOURCE
   src/pbrt/cpu/integrators.cpp
   src/pbrt/cpu/primitive.cpp
   src/pbrt/cpu/render.cpp
+
+  src/pbrt/cmd/pspec_gpu.cpp
   )
 
 set (PBRT_SOURCE_HEADERS
@@ -630,6 +632,8 @@ if (PBRT_CUDA_ENABLED)
    src/pbrt/util/vecmath.cpp
 
     ${PBRT_GPU_SOURCE}
+
+    src/pbrt/cmd/pspec_gpu.cpp
 
     PROPERTIES LANGUAGE CUDA
   )
