@@ -29,10 +29,12 @@ std::string SamplerHandle::ToString() const {
 }
 
 // HaltonSampler Method Definitions
-HaltonSampler::HaltonSampler(int samplesPerPixel, const Point2i &fullRes, int seed,
+HaltonSampler::HaltonSampler(int samplesPerPixel, const Point2i &fullRes,
+                             RandomizeStrategy randomizeStrategy, int seed,
                              Allocator alloc)
-    : samplesPerPixel(samplesPerPixel) {
-    digitPermutations = ComputeRadicalInversePermutations(seed, alloc);
+    : samplesPerPixel(samplesPerPixel), randomizeStrategy(randomizeStrategy) {
+    if (randomizeStrategy == RandomizeStrategy::PermuteDigits)
+        digitPermutations = ComputeRadicalInversePermutations(seed, alloc);
     // Find radical inverse base scales and exponents that cover sampling area
     for (int i = 0; i < 2; ++i) {
         int base = (i == 0) ? 2 : 3;
@@ -61,11 +63,12 @@ std::vector<SamplerHandle> HaltonSampler::Clone(int n, Allocator alloc) {
 }
 
 std::string HaltonSampler::ToString() const {
-    return StringPrintf("[ HaltonSampler digitPermutations: %p "
+    return StringPrintf("[ HaltonSampler randomizeStrategy: %s digitPermutations: %p "
                         "haltonIndex: %d dimension: %d samplesPerPixel: %d "
                         "baseScales: %s baseExponents: %s multInverse: [ %d %d ] ]",
-                        digitPermutations, haltonIndex, dimension, samplesPerPixel,
-                        baseScales, baseExponents, multInverse[0], multInverse[1]);
+                        randomizeStrategy, digitPermutations, haltonIndex, dimension,
+                        samplesPerPixel, baseScales, baseExponents, multInverse[0],
+                        multInverse[1]);
 }
 
 HaltonSampler *HaltonSampler::Create(const ParameterDictionary &parameters,
@@ -78,7 +81,24 @@ HaltonSampler *HaltonSampler::Create(const ParameterDictionary &parameters,
     if (Options->quickRender)
         nsamp = 1;
 
-    return alloc.new_object<HaltonSampler>(nsamp, fullResolution, seed, alloc);
+    RandomizeStrategy randomizer;
+    std::string s = parameters.GetOneString("randomization", "permutedigits");
+    if (s == "none")
+        randomizer = RandomizeStrategy::None;
+    else if (s == "cranleypatterson")
+        randomizer = RandomizeStrategy::CranleyPatterson;
+    else if (s == "permutedigits")
+        randomizer = RandomizeStrategy::PermuteDigits;
+    else if (s == "fastowen")
+        ErrorExit("%s: \"fastowen\" randomization not supported by Halton sampler.");
+    else if (s == "owen")
+        randomizer = RandomizeStrategy::Owen;
+    else
+        ErrorExit(loc, "%s: unknown randomization strategy given to PaddedSobolSampler",
+                  s);
+
+    return alloc.new_object<HaltonSampler>(nsamp, fullResolution, randomizer, seed,
+                                           alloc);
 }
 
 std::vector<SamplerHandle> SobolSampler::Clone(int n, Allocator alloc) {
