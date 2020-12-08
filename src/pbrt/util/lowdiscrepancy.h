@@ -208,10 +208,10 @@ struct CranleyPattersonRotator {
     uint32_t delta;
 };
 
-// XORScrambler Definition
-struct XORScrambler {
+// BinaryPermuteScrambler Definition
+struct BinaryPermuteScrambler {
     PBRT_CPU_GPU
-    XORScrambler(uint32_t permutation) : permutation(permutation) {}
+    BinaryPermuteScrambler(uint32_t permutation) : permutation(permutation) {}
     PBRT_CPU_GPU
     uint32_t operator()(uint32_t v) const { return permutation ^ v; }
     uint32_t permutation;
@@ -236,7 +236,7 @@ struct OwenScrambler {
 };
 
 // RandomizeStrategy Definition
-enum class RandomizeStrategy { None, CranleyPatterson, XOR, FastOwen, Owen };
+enum class RandomizeStrategy { None, CranleyPatterson, PermuteDigits, FastOwen, Owen };
 
 std::string ToString(RandomizeStrategy r);
 

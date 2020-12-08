@@ -32,7 +32,7 @@ static void usage(const std::string &msg = {}) {
             R"(usage: pspec <sampler> [<options...>]
 
 Where <sampler> is one of: stdin, halton, random, stratified, pmj02bn, sobol,
-                           sobol.xor, sobol.owen, sobol.realowen
+                           sobol.permutedigits, sobol.owen, sobol.realowen
 
 Options:
   --npoints <n>        Number of sample points to generate in each set.
@@ -102,8 +102,8 @@ static std::vector<Point2f> GenerateSamples(std::string samplerName, int nPoints
                 return new PMJ02BNSampler(nPoints, Options->seed);
             } else if (samplerName == "sobol") {
                 return new PaddedSobolSampler(nPoints, RandomizeStrategy::None);
-            } else if (samplerName == "sobol.xor") {
-                return new PaddedSobolSampler(nPoints, RandomizeStrategy::XOR);
+            } else if (samplerName == "sobol.permutedigits") {
+                return new PaddedSobolSampler(nPoints, RandomizeStrategy::PermuteDigits);
             } else if (samplerName == "sobol.owen") {
                 return new PaddedSobolSampler(nPoints, RandomizeStrategy::Owen);
             } else

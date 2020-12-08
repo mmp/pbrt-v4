@@ -200,8 +200,8 @@ class PaddedSobolSampler {
         switch (randomizeStrategy) {
         case RandomizeStrategy::None:
             return SobolSample(a, dimension, NoRandomizer());
-        case RandomizeStrategy::XOR:
-            return SobolSample(a, dimension, XORScrambler(hash));
+        case RandomizeStrategy::PermuteDigits:
+            return SobolSample(a, dimension, BinaryPermuteScrambler(hash));
         case RandomizeStrategy::FastOwen:
             return SobolSample(a, dimension, FastOwenScrambler(hash));
         case RandomizeStrategy::Owen:
@@ -403,8 +403,8 @@ class SobolSampler {
         uint32_t hash = MixBits((uint64_t(dimension) << 32) ^ GetOptions().seed);
         if (randomizeStrategy == RandomizeStrategy::CranleyPatterson)
             return SobolSample(sobolIndex, dimension, CranleyPattersonRotator(hash));
-        else if (randomizeStrategy == RandomizeStrategy::XOR)
-            return SobolSample(sobolIndex, dimension, XORScrambler(hash));
+        else if (randomizeStrategy == RandomizeStrategy::PermuteDigits)
+            return SobolSample(sobolIndex, dimension, BinaryPermuteScrambler(hash));
         else if (randomizeStrategy == RandomizeStrategy::FastOwen)
             return SobolSample(sobolIndex, dimension, FastOwenScrambler(hash));
         else

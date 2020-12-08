@@ -124,8 +124,8 @@ PaddedSobolSampler *PaddedSobolSampler::Create(const ParameterDictionary &parame
         randomizer = RandomizeStrategy::None;
     else if (s == "cranleypatterson")
         randomizer = RandomizeStrategy::CranleyPatterson;
-    else if (s == "xor")
-        randomizer = RandomizeStrategy::XOR;
+    else if (s == "permutedigits")
+        randomizer = RandomizeStrategy::PermuteDigits;
     else if (s == "fastowen")
         randomizer = RandomizeStrategy::FastOwen;
     else if (s == "owen")
@@ -251,8 +251,8 @@ SobolSampler *SobolSampler::Create(const ParameterDictionary &parameters,
         randomizer = RandomizeStrategy::None;
     else if (s == "cranleypatterson")
         randomizer = RandomizeStrategy::CranleyPatterson;
-    else if (s == "xor")
-        randomizer = RandomizeStrategy::XOR;
+    else if (s == "permutedigits")
+        randomizer = RandomizeStrategy::PermuteDigits;
     else if (s == "fastowen")
         randomizer = RandomizeStrategy::FastOwen;
     else if (s == "owen")

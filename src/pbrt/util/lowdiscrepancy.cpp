@@ -35,8 +35,8 @@ std::string ToString(RandomizeStrategy r) {
         return "None";
     case RandomizeStrategy::CranleyPatterson:
         return "CranleyPatterson";
-    case RandomizeStrategy::XOR:
-        return "XOR";
+    case RandomizeStrategy::PermuteDigits:
+        return "PermuteDigits";
     case RandomizeStrategy::FastOwen:
         return "FastOwen";
     case RandomizeStrategy::Owen:

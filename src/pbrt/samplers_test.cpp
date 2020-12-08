@@ -22,14 +22,14 @@ TEST(Sampler, ConsistentValues) {
     samplers.push_back(new RandomSampler(spp));
     samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::None));
     samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::CranleyPatterson));
-    samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::XOR));
+    samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::PermuteDigits));
     samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::Owen));
     samplers.push_back(new PMJ02BNSampler(spp));
     samplers.push_back(new StratifiedSampler(rootSpp, rootSpp, true));
     samplers.push_back(new SobolSampler(spp, resolution, RandomizeStrategy::None));
     samplers.push_back(
         new SobolSampler(spp, resolution, RandomizeStrategy::CranleyPatterson));
-    samplers.push_back(new SobolSampler(spp, resolution, RandomizeStrategy::XOR));
+    samplers.push_back(new SobolSampler(spp, resolution, RandomizeStrategy::PermuteDigits));
     samplers.push_back(new SobolSampler(spp, resolution, RandomizeStrategy::Owen));
 
     for (auto &sampler : samplers) {
@@ -109,7 +109,7 @@ static void checkElementarySampler(const char *name, SamplerHandle sampler,
 
 TEST(PaddedSobolSampler, ElementaryIntervals) {
     for (auto rand :
-         {RandomizeStrategy::None, RandomizeStrategy::Owen, RandomizeStrategy::XOR})
+         {RandomizeStrategy::None, RandomizeStrategy::Owen, RandomizeStrategy::PermuteDigits})
         for (int logSamples = 2; logSamples <= 10; ++logSamples)
             checkElementarySampler("PaddedSobolSampler",
                                    new PaddedSobolSampler(1 << logSamples, rand),
@@ -128,7 +128,7 @@ TEST(SobolXORScrambledSampler, ElementaryIntervals) {
     for (int logSamples = 2; logSamples <= 10; ++logSamples)
         checkElementarySampler(
             "Sobol XOR Scrambled",
-            new SobolSampler(1 << logSamples, Point2i(1, 1), RandomizeStrategy::XOR),
+            new SobolSampler(1 << logSamples, Point2i(1, 1), RandomizeStrategy::PermuteDigits),
             logSamples);
 }
 
