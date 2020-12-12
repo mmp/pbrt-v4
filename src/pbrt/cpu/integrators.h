@@ -22,6 +22,7 @@
 #include <pbrt/util/rng.h>
 #include <pbrt/util/sampling.h>
 
+#include <functional>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -464,6 +465,28 @@ class SPPMIntegrator : public Integrator {
     int maxDepth;
     int photonsPerIteration;
     const RGBColorSpace *colorSpace;
+};
+
+// FunctionIntegrator Definition
+class FunctionIntegrator : public Integrator {
+  public:
+    FunctionIntegrator(std::function<Float(Point2f)> func,
+                       const std::string &outputFilename, CameraHandle camera,
+                       SamplerHandle sampler);
+
+    static std::unique_ptr<FunctionIntegrator> Create(
+        const ParameterDictionary &parameters, CameraHandle camera, SamplerHandle sampler,
+        const FileLoc *loc);
+
+    void Render();
+
+    std::string ToString() const;
+
+  private:
+    std::function<Float(Point2f)> func;
+    std::string outputFilename;
+    CameraHandle camera;
+    SamplerHandle baseSampler;
 };
 
 }  // namespace pbrt

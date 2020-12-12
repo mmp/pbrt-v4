@@ -45,6 +45,9 @@ class HaltonSampler {
     int SamplesPerPixel() const { return samplesPerPixel; }
 
     PBRT_CPU_GPU
+    RandomizeStrategy GetRandomizeStrategy() const { return randomizeStrategy; }
+
+    PBRT_CPU_GPU
     void StartPixelSample(const Point2i &p, int sampleIndex, int dim) {
         haltonIndex = 0;
         int sampleStride = baseScales[0] * baseScales[1];
