@@ -66,8 +66,13 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
             // Sample the medium according to T_maj, the homogeneous
             // transmission function based on the majorant.
             bool scattered = false;
+
+            RaySamples raySamples = pixelSampleState.samples[w.pixelIndex];
+            Float uDist = raySamples.media.uDist;
+            Float uMode = raySamples.media.uMode;
+
             SampledSpectrum Tmaj = ray.medium.SampleTmaj(
-                ray, tMax, rng, lambda, [&](const MediumSample &mediumSample) {
+                ray, tMax, uDist, rng, lambda, [&](const MediumSample &mediumSample) {
                     rescale(T_hat, uniPathPDF, lightPathPDF);
 
                     const MediumInteraction &intr = mediumSample.intr;
@@ -97,8 +102,7 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                              pScatter, pNull);
 
                     // And randomly choose one.
-                    Float um = rng.Uniform<Float>();
-                    int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, um);
+                    int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, uMode);
 
                     if (mode == 0) {
                         // Absorption--done.
@@ -130,6 +134,8 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                         T_hat *= Tmaj * sigma_n;
                         uniPathPDF *= Tmaj * sigma_n;
                         lightPathPDF *= Tmaj * intr.sigma_maj;
+
+                        uMode = rng.Uniform<Float>();
 
                         return true;
                     }

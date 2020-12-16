@@ -69,7 +69,7 @@ class MediumHandle : public TaggedPointer<HomogeneousMedium, UniformGridMedium,
     bool IsEmissive() const;
 
     template <typename F>
-    PBRT_CPU_GPU SampledSpectrum SampleTmaj(Ray ray, Float tMax, RNG &rng,
+    PBRT_CPU_GPU SampledSpectrum SampleTmaj(Ray ray, Float tMax, Float u, RNG &rng,
                                             const SampledWavelengths &lambda,
                                             F callback) const;
 };

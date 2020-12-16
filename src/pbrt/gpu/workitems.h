@@ -35,6 +35,10 @@ struct RaySamples {
         Float uc;
         Point2f u;
     } subsurface;
+    bool haveMedia;
+    struct {
+        Float uDist, uMode;
+    } media;
 };
 
 template <>
@@ -46,6 +50,8 @@ struct SOA<RaySamples> {
         direct = alloc.allocate_object<Float4>(size);
         indirect = alloc.allocate_object<Float4>(size);
         subsurface = alloc.allocate_object<Float4>(size);
+        mediaDist = alloc.allocate_object<Float>(size);
+        mediaMode = alloc.allocate_object<Float>(size);
     }
 
     PBRT_CPU_GPU
@@ -55,16 +61,23 @@ struct SOA<RaySamples> {
         rs.direct.u = Point2f(dir.v[0], dir.v[1]);
         rs.direct.uc = dir.v[2];
 
+        rs.haveSubsurface = int(dir.v[3]) & 1;
+        rs.haveMedia = int(dir.v[3]) & 2;
+
         Float4 ind = Load4(indirect + i);
         rs.indirect.uc = ind.v[0];
         rs.indirect.rr = ind.v[1];
         rs.indirect.u = Point2f(ind.v[2], ind.v[3]);
 
-        rs.haveSubsurface = dir.v[3] != 0;
         if (rs.haveSubsurface) {
             Float4 ss = Load4(subsurface + i);
             rs.subsurface.uc = ss.v[0];
             rs.subsurface.u = Point2f(ss.v[1], ss.v[2]);
+        }
+
+        if (rs.haveMedia) {
+            rs.media.uDist = mediaDist[i];
+            rs.media.uMode = mediaMode[i];
         }
 
         return rs;
@@ -76,13 +89,18 @@ struct SOA<RaySamples> {
 
         PBRT_CPU_GPU
         void operator=(RaySamples rs) {
-            soa->direct[index] = Float4{rs.direct.u[0], rs.direct.u[1], rs.direct.uc,
-                                        Float(rs.haveSubsurface)};
+            int flags = (rs.haveSubsurface ? 1 : 0) | (rs.haveMedia ? 2 : 0);
+            soa->direct[index] =
+                Float4{rs.direct.u[0], rs.direct.u[1], rs.direct.uc, Float(flags)};
             soa->indirect[index] = Float4{rs.indirect.uc, rs.indirect.rr,
                                           rs.indirect.u[0], rs.indirect.u[1]};
             if (rs.haveSubsurface)
                 soa->subsurface[index] =
                     Float4{rs.subsurface.uc, rs.subsurface.u.x, rs.subsurface.u.y, 0.f};
+            if (rs.haveMedia) {
+                soa->mediaDist[index] = rs.media.uDist;
+                soa->mediaMode[index] = rs.media.uMode;
+            }
         }
 
         SOA *soa;
@@ -96,6 +114,7 @@ struct SOA<RaySamples> {
     Float4 *__restrict__ direct;
     Float4 *__restrict__ indirect;
     Float4 *__restrict__ subsurface;
+    Float *__restrict__ mediaDist, *__restrict__ mediaMode;
 };
 
 // PixelSampleState Definition

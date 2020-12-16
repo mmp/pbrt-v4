@@ -387,7 +387,7 @@ SampledSpectrum Integrator::Tr(const Interaction &p0, const Interaction &p1,
             Point3f pExit = ray(si ? si->tHit : (1 - ShadowEpsilon));
             ray.d = pExit - ray.o;
 
-            ray.medium.SampleTmaj(ray, 1.f, rng, lambda,
+            ray.medium.SampleTmaj(ray, 1.f, rng.Uniform<Float>(), rng, lambda,
                                   [&](const MediumSample &ms) -> bool {
                                       const SampledSpectrum &Tmaj = ms.Tmaj;
 
@@ -902,7 +902,9 @@ SampledSpectrum SimpleVolPathIntegrator::Li(RayDifferential ray,
             uint64_t hash1 = Hash(sampler.Get1D());
             RNG rng(hash0, hash1);
             Float tMax = si ? si->tHit : Infinity;
-            ray.medium.SampleTmaj(ray, tMax, rng, lambda, [&](const MediumSample &ms) {
+            Float u = sampler.Get1D();
+            Float uMode = sampler.Get1D();
+            ray.medium.SampleTmaj(ray, tMax, u, rng, lambda, [&](const MediumSample &ms) {
                 const MediumInteraction &intr = ms.intr;
                 // Compute medium event probabilities for interaction
                 Float pAbsorb = intr.sigma_a[0] / intr.sigma_maj[0];
@@ -910,7 +912,7 @@ SampledSpectrum SimpleVolPathIntegrator::Li(RayDifferential ray,
                 Float pNull = std::max<Float>(0, 1 - pAbsorb - pScatter);
 
                 // Randomly sample medium scattering event for delta tracking
-                int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, sampler.Get1D());
+                int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, uMode);
                 if (mode == 0) {
                     // Handle absorption event for delta tracking
                     L += SafeDiv(beta * intr.Le, lambda.PDF());
@@ -941,6 +943,7 @@ SampledSpectrum SimpleVolPathIntegrator::Li(RayDifferential ray,
 
                 } else {
                     // Handle null scattering event for delta tracking
+                    uMode = rng.Uniform<Float>();
                     return true;
                 }
             });
@@ -1018,7 +1021,8 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             uint64_t hash1 = Hash(sampler.Get1D());
             RNG rng(hash0, hash1);
             SampledSpectrum Tmaj = ray.medium.SampleTmaj(
-                ray, tMax, rng, lambda, [&](const MediumSample &mediumSample) {
+                ray, tMax, sampler.Get1D(), rng, lambda,
+                [&](const MediumSample &mediumSample) {
                     // Handle medium scattering event for ray
                     if (!T_hat) {
                         terminated = true;
@@ -1378,7 +1382,8 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
         if (lightRay.medium != nullptr) {
             Float tMax = si ? si->tHit : (1 - ShadowEpsilon);
             SampledSpectrum Tmaj = lightRay.medium.SampleTmaj(
-                lightRay, tMax, rng, lambda, [&](const MediumSample &mediumSample) {
+                lightRay, tMax, rng.Uniform<Float>(), rng, lambda,
+                [&](const MediumSample &mediumSample) {
                     // Update ray transmittance estimate at sampled point
                     // Update _T_ray_ and PDFs using ratio-tracking estimator
                     const MediumInteraction &intr = mediumSample.intr;
@@ -2026,8 +2031,9 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
             // Sample participating medium for _RandomWalk()_ ray
             Float tMax = si ? si->tHit : Infinity;
             RNG rng(Hash(ray.d.x), Hash(ray.d.y));
+            Float u = sampler.Get1D();
             SampledSpectrum Tmaj = ray.medium.SampleTmaj(
-                ray, tMax, rng, lambda, [&](const MediumSample &ms) {
+                ray, tMax, u, rng, lambda, [&](const MediumSample &ms) {
                     const MediumInteraction &intr = ms.intr;
                     // Compute medium event probabilities for interaction
                     Float pAbsorb = intr.sigma_a[0] / intr.sigma_maj[0];

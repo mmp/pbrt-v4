@@ -435,7 +435,7 @@ extern "C" __global__ void __raygen__shadow_Tr() {
             Float tEnd =
                 missed ? tMax : (Distance(ray.o, Point3f(ctx.piHit)) / Length(ray.d));
             SampledSpectrum Tmaj =
-                ray.medium.SampleTmaj(ray, tEnd, rng, lambda,
+                ray.medium.SampleTmaj(ray, tEnd, rng.Uniform<Float>(), rng, lambda,
                                   [&](const MediumSample &mediumSample) {
                                       const SampledSpectrum &Tmaj = mediumSample.Tmaj;
                                       const MediumInteraction &intr = mediumSample.intr;

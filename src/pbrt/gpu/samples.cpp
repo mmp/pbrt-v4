@@ -35,6 +35,8 @@ void GPUPathIntegrator::GenerateRaySamples(int depth, int sampleIndex) {
             int dimension = 5 + 7 * depth;
             if (haveSubsurface)
                 dimension += 3 * depth;
+            if (haveMedia)
+                dimension += 2 * depth;
 
             // Initialize _Sampler_ for pixel, sample index, and dimension
             Sampler pixelSampler = *sampler.Cast<Sampler>();
@@ -53,6 +55,11 @@ void GPUPathIntegrator::GenerateRaySamples(int depth, int sampleIndex) {
             if (haveSubsurface) {
                 rs.subsurface.uc = pixelSampler.Get1D();
                 rs.subsurface.u = pixelSampler.Get2D();
+            }
+            rs.haveMedia = haveMedia;
+            if (haveMedia) {
+                rs.media.uDist = pixelSampler.Get1D();
+                rs.media.uMode = pixelSampler.Get1D();
             }
 
             // Store _RaySamples_ in pixel sample state
