@@ -18,7 +18,9 @@ static constexpr int NumBlueNoiseTextures = 48;
 extern PBRT_CONST uint16_t
     BlueNoiseTextures[NumBlueNoiseTextures][BlueNoiseResolution][BlueNoiseResolution];
 
-// Returns a sample in [0,1].
+// Blue noise lookup functions
+PBRT_CPU_GPU inline float BlueNoise(int tableIndex, Point2i p);
+
 PBRT_CPU_GPU
 inline float BlueNoise(int textureIndex, Point2i p) {
     CHECK(textureIndex >= 0 && p.x >= 0 && p.y >= 0);

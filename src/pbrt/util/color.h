@@ -18,6 +18,11 @@
 #include <memory>
 #include <string>
 
+// A special present from windgi.h on Windows...
+#ifdef RGB
+#undef RGB
+#endif  // RGB
+
 namespace pbrt {
 
 // RGB Definition
