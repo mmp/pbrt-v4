@@ -21,6 +21,11 @@
 
 #include <vector>
 
+// Another present from windgi.h on Windows...
+#ifdef RGB
+#undef RGB
+#endif // RGB
+
 namespace pbrt {
 
 struct Buffer {
