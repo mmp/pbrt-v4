@@ -44,6 +44,9 @@ set (ZLIB_LIBRARIES ${ZLIB_LIBARIES} PARENT_SCOPE)
 
 ###########################################################################
 # OpenEXR
+if (POLICY CMP0077)
+  cmake_policy(SET CMP0077 NEW)
+endif()
 
 set (ILMBASE_NAMESPACE_VERSIONING OFF CACHE BOOL " " FORCE)
 set (OPENEXR_NAMESPACE_VERSIONING OFF CACHE BOOL " " FORCE)
