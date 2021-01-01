@@ -959,7 +959,7 @@ class CoatedConductorBxDF : public LayeredBxDF<DielectricInterfaceBxDF, Conducto
 // HairBxDF Definition
 class HairBxDF {
   public:
-    // HairBSDF Public Methods
+    // HairBxDF Public Methods
     HairBxDF() = default;
     PBRT_CPU_GPU
     HairBxDF(Float h, Float eta, const SampledSpectrum &sigma_a, Float beta_m,
@@ -991,10 +991,10 @@ class HairBxDF {
                                                  const SampledWavelengths &lambda);
 
   private:
-    // HairBSDF Constants
+    // HairBxDF Constants
     static constexpr int pMax = 3;
 
-    // HairBSDF Private Methods
+    // HairBxDF Private Methods
     PBRT_CPU_GPU
     static Float Mp(Float cosTheta_i, Float cosTheta_o, Float sinTheta_i,
                     Float sinTheta_o, Float v) {
@@ -1051,7 +1051,7 @@ class HairBxDF {
     PBRT_CPU_GPU
     pstd::array<Float, pMax + 1> ComputeApPDF(Float cosThetaO) const;
 
-    // HairBSDF Private Members
+    // HairBxDF Private Members
     Float h, gamma_o, eta;
     SampledSpectrum sigma_a;
     Float beta_m, beta_n;

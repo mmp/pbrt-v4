@@ -681,7 +681,7 @@ SpectrumPtexTexture *SpectrumPtexTexture::Create(
     return alloc.new_object<SpectrumPtexTexture>(filename, encoding, spectrumType);
 }
 
-// ScaleTexture Method Definitions
+// ScaledTexture Method Definitions
 std::string FloatScaledTexture::ToString() const {
     return StringPrintf("[ FloatScaledTexture tex: %s scale: %s ]", tex, scale);
 }

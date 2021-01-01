@@ -379,9 +379,9 @@ class UniformGridMediumProvider {
         // Define _getMaxDensity_ lambda
         auto getMaxDensity = [&](const Bounds3f &bounds) -> Float {
             if (densityGrid)
-                return densityGrid->MaximumValue(bounds);
+                return densityGrid->MaxValue(bounds);
             else
-                return rgbDensityGrid->MaximumValue(
+                return rgbDensityGrid->MaxValue(
                     bounds,
                     [] PBRT_CPU_GPU(RGBUnboundedSpectrum s) { return s.MaxValue(); });
         };

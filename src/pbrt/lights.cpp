@@ -1459,10 +1459,10 @@ LightHandle LightHandle::Create(const std::string &name,
         } else if (!L.empty()) {
             if (!filename.empty())
                 ErrorExit(loc, "Can't specify both emission \"L\" and "
-                               "\"filename\" with InfiniteAreaLight");
+                               "\"filename\" with ImageInfiniteLight");
 
             if (!portal.empty())
-                ErrorExit(loc, "Portals are not supported for InfiniteAreaLights "
+                ErrorExit(loc, "Portals are not supported for infinite lights "
                                "without \"filename\".");
 
             // Scale the light spectrum to be equivalent to 1 nit

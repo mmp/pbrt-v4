@@ -838,7 +838,7 @@ class SampledGrid {
     }
 
     template <typename F>
-    Float MaximumValue(const Bounds3f &bounds, F convert) const {
+    Float MaxValue(const Bounds3f &bounds, F convert) const {
         Point3f ps[2] = {Point3f(bounds.pMin.x * nx - .5f, bounds.pMin.y * ny - .5f,
                                  bounds.pMin.z * nz - .5f),
                          Point3f(bounds.pMax.x * nx - .5f, bounds.pMax.y * ny - .5f,
@@ -856,8 +856,8 @@ class SampledGrid {
         return maxValue;
     }
 
-    T MaximumValue(const Bounds3f &bounds) const {
-        return MaximumValue(bounds, [](T value) { return value; });
+    T MaxValue(const Bounds3f &bounds) const {
+        return MaxValue(bounds, [](T value) { return value; });
     }
 
     std::string ToString() const {

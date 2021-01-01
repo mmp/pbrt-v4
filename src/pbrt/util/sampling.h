@@ -482,7 +482,7 @@ PBRT_CPU_GPU inline Vector3f SampleTrowbridgeReitz(Float alpha_x, Float alpha_y,
         Float tanTheta2 = alpha2 * u[0] / (1 - u[0]);
         cosTheta = 1 / std::sqrt(1 + tanTheta2);
     }
-    Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
+    Float sinTheta = SafeSqrt(1 - Sqr(cosTheta));
     return SphericalDirection(sinTheta, cosTheta, phi);
 }
 

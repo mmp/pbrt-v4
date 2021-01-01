@@ -45,11 +45,17 @@ class HomogeneousMedium;
 template <typename Provider>
 class CuboidMedium;
 class UniformGridMediumProvider;
+// UniformGridMedium Definition
 using UniformGridMedium = CuboidMedium<UniformGridMediumProvider>;
+
 class CloudMediumProvider;
+// CloudMedium Definition
 using CloudMedium = CuboidMedium<CloudMediumProvider>;
+
 class NanoVDBMediumProvider;
+// NanoVDBMedium Definition
 using NanoVDBMedium = CuboidMedium<NanoVDBMediumProvider>;
+
 struct MediumSample;
 
 // MediumHandle Definition

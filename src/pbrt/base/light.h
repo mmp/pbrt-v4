@@ -80,7 +80,7 @@ class LightHandle : public TaggedPointer<  // Light Source Types
     PBRT_CPU_GPU inline SampledSpectrum L(Point3f p, Normal3f n, Point2f uv, Vector3f w,
                                           const SampledWavelengths &lambda) const;
 
-    // InfiniteAreaLights only
+    // InfiniteLights only
     PBRT_CPU_GPU inline SampledSpectrum Le(const Ray &ray,
                                            const SampledWavelengths &lambda) const;
 
