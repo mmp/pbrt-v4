@@ -77,7 +77,7 @@ class Tuple2 {
     Tuple2(T x, T y) : x(x), y(y) { DCHECK(!HasNaN()); }
     PBRT_CPU_GPU
     bool HasNaN() const { return IsNaN(x) || IsNaN(y); }
-#ifndef NDEBUG
+#ifdef PBRT_DEBUG_BUILD
     // The default versions of these are fine for release builds; for debug
     // we define them so that we can add the Assert checks.
     PBRT_CPU_GPU
@@ -93,7 +93,7 @@ class Tuple2 {
         y = c.y;
         return static_cast<Child<T> &>(*this);
     }
-#endif  // !NDEBUG
+#endif
 
     template <typename U>
     PBRT_CPU_GPU auto operator+(const Child<U> &c) const -> Child<decltype(T{} + U{})> {
@@ -298,7 +298,7 @@ class Tuple3 {
 
     static const int nDimensions = 3;
 
-#ifndef NDEBUG
+#ifdef PBRT_DEBUG_BUILD
     // The default versions of these are fine for release builds; for debug
     // we define them so that we can add the Assert checks.
     PBRT_CPU_GPU
@@ -317,7 +317,7 @@ class Tuple3 {
         z = c.z;
         return static_cast<Child<T> &>(*this);
     }
-#endif  // !NDEBUG
+#endif
 
     template <typename U>
     PBRT_CPU_GPU Child<T> &operator+=(const Child<U> &c) {

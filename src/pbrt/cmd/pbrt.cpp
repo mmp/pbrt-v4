@@ -192,10 +192,10 @@ int main(int argc, char *argv[]) {
     // Print welcome banner
     if (!options.quiet && !format && !toPly && !options.upgrade) {
         printf("pbrt version 4 (built %s at %s)\n", __DATE__, __TIME__);
-#ifndef NDEBUG
+#ifdef PBRT_DEBUG_BUILD
         LOG_VERBOSE("Running debug build");
         printf("*** DEBUG BUILD ***\n");
-#endif  // !NDEBUG
+#endif
         printf("Copyright (c)1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.\n");
         printf("The source code to pbrt (but *not* the book contents) is covered "
                "by the Apache 2.0 License.\n");

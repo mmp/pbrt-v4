@@ -80,7 +80,7 @@ void GPUParallelFor(const char *description, int nItems, F func) {
     int blockSize = GetBlockSize(description, kernel);
     std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(description);
 
-#ifndef NDEBUG
+#ifdef PBRT_DEBUG_BUILD
     LOG_VERBOSE("Launching %s", description);
 #endif
     cudaEventRecord(events.first);
@@ -88,7 +88,7 @@ void GPUParallelFor(const char *description, int nItems, F func) {
     kernel<<<gridSize, blockSize>>>(func, nItems);
     cudaEventRecord(events.second);
 
-#ifndef NDEBUG
+#ifdef PBRT_DEBUG_BUILD
     CUDA_CHECK(cudaDeviceSynchronize());
     LOG_VERBOSE("Post-sync %s", description);
 #endif

@@ -109,9 +109,9 @@ Transform LookAt(const Point3f &pos, const Point3f &look, const Vector3f &up) {
     cameraToWorld[3][2] = 0.;
 
     pstd::optional<SquareMatrix<4>> worldToCamera = Inverse(cameraToWorld);
-#ifndef NDEBUG
+#ifdef PBRT_DEBUG_BUILD
     DCHECK(worldToCamera);
-#endif  // !NDEBUG
+#endif
     return Transform(*worldToCamera, cameraToWorld);
 }
 

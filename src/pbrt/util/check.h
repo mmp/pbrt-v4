@@ -54,7 +54,7 @@ void PrintStackTrace();
 
 #endif  // PBRT_IS_GPU_CODE
 
-#ifndef NDEBUG
+#ifdef PBRT_DEBUG_BUILD
 
 #define DCHECK(x) (CHECK(x))
 #define DCHECK_EQ(a, b) CHECK_EQ(a, b)
@@ -104,10 +104,10 @@ void PrintStackTrace();
             ++numTrue;                                                                  \
     } while (0)
 
-#ifdef NDEBUG
-#define DCHECK_RARE(freq, condition)
-#else
+#ifdef PBRT_DEBUG_BUILD
 #define DCHECK_RARE(freq, condition) CHECK_RARE(freq, condition)
+#else
+#define DCHECK_RARE(freq, condition)
 #endif  // NDEBUG
 
 #endif  // PBRT_IS_GPU_CODE

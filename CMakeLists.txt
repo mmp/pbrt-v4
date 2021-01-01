@@ -60,8 +60,8 @@ check_ext ("stb" "stb/tools" b42009b3b9d4ca35bc703f5310eedc74f584be58)
 check_ext ("OpenVDB" "openvdb/nanovdb" 1c306bcaf7e9f7d52525bab716202bd4f7fff5d1)
 check_ext ("zlib" "zlib/doc" 54d591eabf9fe0e84c725638f8d5d8d202a093fa)
 
-if (NOT CMAKE_BUILD_TYPE MATCHES Debug)
-  add_definitions (-D NDEBUG)
+if (CMAKE_BUILD_TYPE MATCHES Debug)
+  add_definitions (-D PBRT_DEBUG_BUILD)
 endif ()
 # To build a release build with CHECKs enabled, comment-out the above
 # 3 lines and un-comment out this one:
@@ -220,10 +220,12 @@ if (CMAKE_CUDA_COMPILER)
           # avoid CMake identifying those as macros and using the proper (but
           # broken) way of specifying them.
           if (${CMAKE_GENERATOR} MATCHES "^Visual Studio")
-            # As NDEBUG is specified globally as a definition, we need to
+            # As PBRT_DEBUG_BUILD is specified globally as a definition, we need to
             # manually add it due to the bug mentioned earlier and due to it
             # not being found in PBRT_DEFINITIONS.
-            set (cuda_definitions "--define-macro=NDEBUG")
+            if (CMAKE_BUILD_TYPE MATCHES Debug)
+                set (cuda_definitions "--define-macro=PBRT_DEBUG_BUILD")
+            endif ()
             foreach (arg ${PBRT_DEFINITIONS})
               list (APPEND cuda_definitions "--define-macro=${arg}")
             endforeach ()
