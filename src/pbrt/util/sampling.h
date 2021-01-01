@@ -1605,8 +1605,8 @@ class PiecewiseLinear2D {
                                       param_weight),
               v11 = lookup<Dimension>(m_data.data() + m_size.x + 1, offset, slice_size,
                                       param_weight),
-              c0 = std::fma((1.f - sample.y), v00, sample.y * v01),
-              c1 = std::fma((1.f - sample.y), v10, sample.y * v11);
+              c0 = FMA((1.f - sample.y), v00, sample.y * v01),
+              c1 = FMA((1.f - sample.y), v10, sample.y * v11);
 
         is_const = std::abs(c0 - c1) < 1e-4f * (c0 + c1);
         sample.x = is_const ? (2.f * sample.x)
@@ -1665,8 +1665,8 @@ class PiecewiseLinear2D {
 
         Vector2f w1 = sample, w0 = Vector2f(1, 1) - w1;
 
-        float c0 = std::fma(w0.y, v00, w1.y * v01), c1 = std::fma(w0.y, v10, w1.y * v11),
-              pdf = std::fma(w0.x, c0, w1.x * c1);
+        float c0 = FMA(w0.y, v00, w1.y * v01), c1 = FMA(w0.y, v10, w1.y * v11),
+              pdf = FMA(w0.x, c0, w1.x * c1);
 
         sample.x *= c0 + .5f * sample.x * (c1 - c0);
 
@@ -1751,8 +1751,7 @@ class PiecewiseLinear2D {
               v11 = lookup<Dimension>(m_data.data() + m_size.x + 1, index, size,
                                       param_weight);
 
-        return std::fma(w0.y, std::fma(w0.x, v00, w1.x * v10),
-                        w1.y * std::fma(w0.x, v01, w1.x * v11)) *
+        return FMA(w0.y, FMA(w0.x, v00, w1.x * v10), w1.y * FMA(w0.x, v01, w1.x * v11)) *
                HProd(m_inv_patch_size);
     }
 
@@ -1775,7 +1774,7 @@ class PiecewiseLinear2D {
               v0 = lookup<Dim - 1>(data, i0, size, param_weight),
               v1 = lookup<Dim - 1>(data, i1, size, param_weight);
 
-        return std::fma(v0, w0, v1 * w1);
+        return FMA(v0, w0, v1 * w1);
     }
 
     template <size_t Dim, std::enable_if_t<Dim == 0, int> = 0>
