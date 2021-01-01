@@ -829,27 +829,6 @@ Image Image::JointBilateralFilter(const ImageChannelDesc &toFilterDesc, int half
     return result;
 }
 
-Array2D<Float> Image::GetSamplingDistribution(std::function<Float(Point2f)> dxdA,
-                                              const Bounds2f &domain, Allocator alloc) {
-    Array2D<Float> dist(resolution[0], resolution[1], alloc);
-    ParallelFor(0, resolution[1], [&](int64_t y0, int64_t y1) {
-        for (int y = y0; y < y1; ++y) {
-            for (int x = 0; x < resolution[0]; ++x) {
-                // This is noticably better than MaxValue: discuss / show
-                // example..
-                Float value = GetChannels({x, y}).Average();
-
-                // Assume jacobian term is basically constant over the
-                // region.
-                Point2f p = domain.Lerp(
-                    Point2f((x + .5f) / resolution[0], (y + .5f) / resolution[1]));
-                dist(x, y) = value * dxdA(p);
-            }
-        }
-    });
-    return dist;
-}
-
 // ImageIO Local Declarations
 static ImageAndMetadata ReadEXR(const std::string &name, Allocator alloc);
 static ImageAndMetadata ReadPNG(const std::string &name, Allocator alloc,
