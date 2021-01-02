@@ -160,7 +160,7 @@ void ImageTileIntegrator::Render() {
     if (Options->recordPixelStatistics)
         StatsEnablePixelStats(pixelBounds,
                               RemoveExtension(camera.GetFilm().GetFilename()));
-    // Handle MSE referene image, if provided
+    // Handle MSE reference image, if provided
     pstd::optional<Image> referenceImage;
     FILE *mseOutFile = nullptr;
     if (!Options->mseReferenceImage.empty()) {
@@ -242,22 +242,27 @@ void ImageTileIntegrator::Render() {
         if (!referenceImage)
             nextWaveSize = std::min(2 * nextWaveSize, 64);
 
-        // Write current image to disk
-        LOG_VERBOSE("Writing image with spp = %d", waveStart);
-        ImageMetadata metadata;
-        metadata.renderTimeSeconds = progress.ElapsedSeconds();
-        metadata.samplesPerPixel = waveStart;
-        if (referenceImage) {
-            ImageMetadata filmMetadata;
-            Image filmImage = camera.GetFilm().GetImage(&filmMetadata, 1.f / waveStart);
-            ImageChannelValues mse =
-                filmImage.MSE(filmImage.AllChannelsDesc(), *referenceImage);
-            fprintf(mseOutFile, "%d, %.9g\n", waveStart, mse.Average());
-            metadata.MSE = mse.Average();
-            fflush(mseOutFile);
+        // Optionally write current image to disk
+        if (Options->writePartialImages || referenceImage) {
+            LOG_VERBOSE("Writing image with spp = %d", waveStart);
+            ImageMetadata metadata;
+            metadata.renderTimeSeconds = progress.ElapsedSeconds();
+            metadata.samplesPerPixel = waveStart;
+            if (referenceImage) {
+                ImageMetadata filmMetadata;
+                Image filmImage =
+                    camera.GetFilm().GetImage(&filmMetadata, 1.f / waveStart);
+                ImageChannelValues mse =
+                    filmImage.MSE(filmImage.AllChannelsDesc(), *referenceImage);
+                fprintf(mseOutFile, "%d, %.9g\n", waveStart, mse.Average());
+                metadata.MSE = mse.Average();
+                fflush(mseOutFile);
+            }
+            if (Options->writePartialImages) {
+                camera.InitMetadata(&metadata);
+                camera.GetFilm().WriteImage(metadata, 1.0f / waveStart);
+            }
         }
-        camera.InitMetadata(&metadata);
-        camera.GetFilm().WriteImage(metadata, 1.0f / waveStart);
     }
 
     if (mseOutFile)
@@ -268,7 +273,7 @@ void ImageTileIntegrator::Render() {
 }
 
 // RayIntegrator Method Definitions
-void RayIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleIndex,
+void RayIntegrator::EvaluatePixelSample(Point2i pPixel, int sampleIndex,
                                         SamplerHandle sampler,
                                         ScratchBuffer &scratchBuffer) {
     // Initialize _CameraSample_ for current sample
@@ -287,10 +292,9 @@ void RayIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleIndex,
     pstd::optional<CameraRayDifferential> cameraRay =
         camera.GenerateRayDifferential(cameraSample, lambda);
 
+    // Trace _cameraRay_ if valid
     SampledSpectrum L(0.);
     VisibleSurface visibleSurface;
-    bool initializeVisibleSurface = camera.GetFilm().UsesVisibleSurface();
-    // Trace _cameraRay_ if valid
     if (cameraRay) {
         // Double check that the ray's direction is normalized.
         DCHECK_GT(Length(cameraRay->ray.d), .999f);
@@ -303,6 +307,7 @@ void RayIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleIndex,
 
         ++nCameraRays;
         // Evaluate radiance along camera ray
+        bool initializeVisibleSurface = camera.GetFilm().UsesVisibleSurface();
         L = cameraRay->weight * Li(cameraRay->ray, lambda, sampler, scratchBuffer,
                                    initializeVisibleSurface ? &visibleSurface : nullptr);
 
@@ -558,7 +563,7 @@ LightPathIntegrator::LightPathIntegrator(int maxDepth, CameraHandle camera,
     lightSampler = std::make_unique<PowerLightSampler>(lights, Allocator());
 }
 
-void LightPathIntegrator::EvaluatePixelSample(const Point2i &pPixel, int sampleIndex,
+void LightPathIntegrator::EvaluatePixelSample(Point2i pPixel, int sampleIndex,
                                               SamplerHandle sampler,
                                               ScratchBuffer &scratchBuffer) {
     // Consume first two dimensions from sampler

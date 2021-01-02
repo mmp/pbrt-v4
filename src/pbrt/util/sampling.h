@@ -263,8 +263,7 @@ inline Point2f InvertUniformSphereSample(const Vector3f &v) {
     return Point2f((1 - v.z) / 2, phi / (2 * Pi));
 }
 
-PBRT_CPU_GPU
-inline Point2f SampleUniformDiskPolar(const Point2f &u) {
+PBRT_CPU_GPU inline Point2f SampleUniformDiskPolar(const Point2f &u) {
     Float r = std::sqrt(u[0]);
     Float theta = 2 * Pi * u[1];
     return {r * std::cos(theta), r * std::sin(theta)};

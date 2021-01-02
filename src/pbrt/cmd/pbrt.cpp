@@ -81,6 +81,8 @@ Rendering options:
   --seed <n>                   Set random number generator seed. Default: 0.
   --spp <n>                    Override number of pixel samples specified in scene
                                description file.
+  --write-partial-images       Periodically write the current image to disk, rather
+                               than waiting for the end of rendering. Default: disabled.
 
 Logging options:
   --log-level <level>          Log messages at or above this level, where <level>
@@ -177,6 +179,8 @@ int main(int argc, char *argv[]) {
             ParseArg(&argv, "seed", &options.seed, onError) ||
             ParseArg(&argv, "spp", &options.pixelSamples, onError) ||
             ParseArg(&argv, "toply", &toPly, onError) ||
+            ParseArg(&argv, "write-partial-images", &options.writePartialImages,
+                     onError) ||
             ParseArg(&argv, "upgrade", &options.upgrade, onError)) {
             // success
         } else if ((strcmp(*argv, "--help") == 0) || (strcmp(*argv, "-help") == 0) ||
