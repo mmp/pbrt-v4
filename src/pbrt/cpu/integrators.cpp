@@ -421,8 +421,8 @@ SampledSpectrum Integrator::Tr(const Interaction &p0, const Interaction &p1,
 }
 
 std::string Integrator::ToString() const {
-    std::string s = StringPrintf("[ Scene aggregate: %s sceneBounds: %s lights[%d]: [ ",
-                                 aggregate, sceneBounds, lights.size());
+    std::string s = StringPrintf("[ Integrator aggregate: %s lights[%d]: [ ", aggregate,
+                                 lights.size());
     for (const auto &l : lights)
         s += StringPrintf("%s, ", l.ToString());
     s += StringPrintf("] infiniteLights[%d]: [ ", infiniteLights.size());
@@ -1834,9 +1834,10 @@ struct Vertex {
         Float pdf;
         if (IsInfiniteLight()) {
             // Compute planar sampling density for infinite light sources
+            Bounds3f sceneBounds = integrator.aggregate.Bounds();
             Point3f worldCenter;
             Float worldRadius;
-            integrator.SceneBounds().BoundingSphere(&worldCenter, &worldRadius);
+            sceneBounds.BoundingSphere(&worldCenter, &worldRadius);
             pdf = 1 / (Pi * Sqr(worldRadius));
 
         } else if (IsOnSurface()) {

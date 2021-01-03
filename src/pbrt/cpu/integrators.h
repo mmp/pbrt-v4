@@ -46,8 +46,6 @@ class Integrator {
 
     virtual std::string ToString() const = 0;
 
-    const Bounds3f &SceneBounds() const { return sceneBounds; }
-
     virtual void Render() = 0;
 
     pstd::optional<ShapeIntersection> Intersect(const Ray &ray,
@@ -71,18 +69,13 @@ class Integrator {
     Integrator(PrimitiveHandle aggregate, std::vector<LightHandle> lights)
         : aggregate(aggregate), lights(lights) {
         // Integrator constructor implementation
-        if (aggregate)
-            sceneBounds = aggregate.Bounds();
-
+        Bounds3f sceneBounds = aggregate.Bounds();
         for (auto &light : lights) {
             light.Preprocess(sceneBounds);
             if (light.Type() == LightType::Infinite)
                 infiniteLights.push_back(light);
         }
     }
-
-    // Integrator Private Members
-    Bounds3f sceneBounds;
 };
 
 // ImageTileIntegrator Definition
