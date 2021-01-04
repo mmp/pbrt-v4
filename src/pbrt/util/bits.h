@@ -43,7 +43,7 @@ inline uint64_t ReverseBits64(uint64_t n) {
 #endif
 }
 
-// https://fgiesen.wordpress.com/2009/12/13/decoding-morton-codes/,
+// https://fgiesen.wordpress.com/2009/12/13/decoding-morton-codes/
 // updated to 64 bits.
 PBRT_CPU_GPU
 inline uint64_t LeftShift2(uint64_t x) {

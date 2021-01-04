@@ -678,28 +678,6 @@ int NextPrime(int x);
 // Permutation Inline Function Declarations
 PBRT_CPU_GPU inline int PermutationElement(uint32_t i, uint32_t n, uint32_t seed);
 
-// Permutation Inline Functions
-PBRT_CPU_GPU inline
-int RandomPermute4(int v, int p) {
-    DCHECK(v >= 0 && v < 4);
-    DCHECK(p >= 0 && p < 24);
-
-    int perm[4] = { 0, 1, 2, 3 };
-    for (int i = 0; i <= 3; ++i) {
-        int n = 4 - i;
-        int other = i + (p % n);
-#ifdef PBRT_IS_GPU_CODE
-        Float tmp = perm[i];
-        perm[i] = perm[other];
-        perm[other] = tmp;
-#else
-        std::swap(perm[i], perm[other]);
-#endif
-        p /= n;
-    }
-    return perm[v];
-}
-
 PBRT_CPU_GPU
 inline int PermutationElement(uint32_t i, uint32_t l, uint32_t p) {
     uint32_t w = l - 1;

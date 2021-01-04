@@ -77,22 +77,19 @@ class HaltonSampler {
     }
 
     PBRT_CPU_GPU
+    Point2f GetPixel2D() {
+        return {RadicalInverse(0, haltonIndex >> baseExponents[0]),
+                RadicalInverse(1, haltonIndex / baseScales[1])};
+    }
+
+    PBRT_CPU_GPU
     Point2f Get2D() {
-        // Return non-pixel 2D Halton sample
         if (dimension + 1 >= PrimeTableSize)
             dimension = 2;
         int dim = dimension;
         dimension += 2;
         return {SampleDimension(dim), SampleDimension(dim + 1)};
     }
-
-    PBRT_CPU_GPU
-    Point2f GetPixel2D() {
-        // Return Halton pixel sample
-        return {RadicalInverse(0, haltonIndex >> baseExponents[0]),
-                RadicalInverse(1, haltonIndex / baseScales[1])};
-    }
-
 
     std::vector<SamplerHandle> Clone(int n, Allocator alloc);
     std::string ToString() const;
@@ -249,6 +246,7 @@ class PaddedSobolSampler {
     int sampleIndex, dimension;
 };
 
+// ZSobolSampler Definition
 class ZSobolSampler {
   public:
     ZSobolSampler(int samplesPerPixel, Point2i fullResolution,
@@ -256,7 +254,8 @@ class ZSobolSampler {
                   int seed = 0)
         : randomizeStrategy(randomizeStrategy), seed(seed) {
         if (!IsPowerOf2(samplesPerPixel)) {
-            Warning("Rounding %d up to the next power of two for \"zsobol\" sampler samples per pixel.",
+            Warning("Rounding %d up to the next power of two for \"zsobol\" sampler "
+                    "samples per pixel.",
                     samplesPerPixel);
             samplesPerPixel = RoundUpPow2(samplesPerPixel);
         }
@@ -270,8 +269,9 @@ class ZSobolSampler {
     PBRT_CPU_GPU
     static constexpr const char *Name() { return "ZSobolSampler"; }
 
-    static ZSobolSampler *Create(const ParameterDictionary &parameters, Point2i fullResolution,
-                                 const FileLoc *loc, Allocator alloc);
+    static ZSobolSampler *Create(const ParameterDictionary &parameters,
+                                 Point2i fullResolution, const FileLoc *loc,
+                                 Allocator alloc);
 
     PBRT_CPU_GPU
     int SamplesPerPixel() const { return 1 << log2SamplesPerPixel; }
@@ -305,7 +305,7 @@ class ZSobolSampler {
     Point2f Get2D() {
         uint64_t sampleIndex = GetSampleIndex();
         uint64_t bits = MixBits(dimension ^ seed);
-        uint32_t sampleHash[2] = { uint32_t(bits), uint32_t(bits >> 32) };
+        uint32_t sampleHash[2] = {uint32_t(bits), uint32_t(bits >> 32)};
 
         dimension += 2;
 
@@ -336,10 +336,11 @@ class ZSobolSampler {
     PBRT_CPU_GPU
     uint64_t GetSampleIndex() const {
         static const uint8_t permutations[24][4] = {
-             {0, 1, 2, 3}, {0, 1, 3, 2}, {0, 2, 1, 3}, {0, 2, 3, 1}, {0, 3, 2, 1}, {0, 3, 1, 2},
-             {1, 0, 2, 3}, {1, 0, 3, 2}, {1, 2, 0, 3}, {1, 2, 3, 0}, {1, 3, 2, 0}, {1, 3, 0, 2},
-             {2, 1, 0, 3}, {2, 1, 3, 0}, {2, 0, 1, 3}, {2, 0, 3, 1}, {2, 3, 0, 1}, {2, 3, 1, 0},
-             {3, 1, 2, 0}, {3, 1, 0, 2}, {3, 2, 1, 0}, {3, 2, 0, 1}, {3, 0, 2, 1}, {3, 0, 1, 2} };
+            {0, 1, 2, 3}, {0, 1, 3, 2}, {0, 2, 1, 3}, {0, 2, 3, 1}, {0, 3, 2, 1},
+            {0, 3, 1, 2}, {1, 0, 2, 3}, {1, 0, 3, 2}, {1, 2, 0, 3}, {1, 2, 3, 0},
+            {1, 3, 2, 0}, {1, 3, 0, 2}, {2, 1, 0, 3}, {2, 1, 3, 0}, {2, 0, 1, 3},
+            {2, 0, 3, 1}, {2, 3, 0, 1}, {2, 3, 1, 0}, {3, 1, 2, 0}, {3, 1, 0, 2},
+            {3, 2, 1, 0}, {3, 2, 0, 1}, {3, 0, 2, 1}, {3, 0, 1, 2}};
 
         uint64_t sampleIndex = 0;
         bool pow2Samples = log2SamplesPerPixel & 1;
@@ -400,6 +401,13 @@ class PMJ02BNSampler {
     }
 
     PBRT_CPU_GPU
+    Point2f GetPixel2D() {
+        int px = pixel.x % pixelTileSize, py = pixel.y % pixelTileSize;
+        int offset = (px + py * pixelTileSize) * samplesPerPixel;
+        return (*pixelSamples)[offset + sampleIndex];
+    }
+
+    PBRT_CPU_GPU
     Point2f Get2D() {
         // Compute index for 2D pmj02bn sample
         int index = sampleIndex;
@@ -423,14 +431,6 @@ class PMJ02BNSampler {
 
         dimension += 2;
         return {std::min(u.x, OneMinusEpsilon), std::min(u.y, OneMinusEpsilon)};
-    }
-
-    PBRT_CPU_GPU
-    Point2f GetPixel2D() {
-        // Return pmj02bn pixel sample
-        int px = pixel.x % pixelTileSize, py = pixel.y % pixelTileSize;
-        int offset = (px + py * pixelTileSize) * samplesPerPixel;
-        return (*pixelSamples)[offset + sampleIndex];
     }
 
     std::vector<SamplerHandle> Clone(int n, Allocator alloc);
@@ -471,7 +471,7 @@ class RandomSampler {
     PBRT_CPU_GPU
     Point2f Get2D() { return {rng.Uniform<Float>(), rng.Uniform<Float>()}; }
     PBRT_CPU_GPU
-    Point2f GetPixel2D() { return {rng.Uniform<Float>(), rng.Uniform<Float>()}; }
+    Point2f GetPixel2D() { return Get2D(); }
 
     std::vector<SamplerHandle> Clone(int n, Allocator alloc);
     std::string ToString() const;
@@ -520,15 +520,6 @@ class SobolSampler {
     }
 
     PBRT_CPU_GPU
-    Point2f Get2D() {
-        if (dimension + 1 >= NSobolDimensions)
-            dimension = 2;
-        Point2f u(SampleDimension(dimension), SampleDimension(dimension + 1));
-        dimension += 2;
-        return u;
-    }
-
-    PBRT_CPU_GPU
     Point2f GetPixel2D() {
         Point2f u(SampleDimension(0), SampleDimension(1));
         // Remap Sobol$'$ dimensions used for pixel samples
@@ -537,6 +528,16 @@ class SobolSampler {
             CHECK_RARE(1e-7, u[dim] * scale - pixel[dim] > 1);
             u[dim] = Clamp(u[dim] * scale - pixel[dim], 0, OneMinusEpsilon);
         }
+
+        return u;
+    }
+
+    PBRT_CPU_GPU
+    Point2f Get2D() {
+        if (dimension + 1 >= NSobolDimensions)
+            dimension = 2;
+        Point2f u(SampleDimension(dimension), SampleDimension(dimension + 1));
+        dimension += 2;
         return u;
     }
 
@@ -679,7 +680,7 @@ class MLTSampler {
     Point2f Get2D();
 
     PBRT_CPU_GPU
-    Point2f GetPixel2D() { return Get2D(); }
+    Point2f GetPixel2D();
 
     std::vector<SamplerHandle> Clone(int n, Allocator alloc);
 

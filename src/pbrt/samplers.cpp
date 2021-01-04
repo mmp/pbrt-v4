@@ -160,8 +160,7 @@ PaddedSobolSampler *PaddedSobolSampler::Create(const ParameterDictionary &parame
 // ZSobolSampler Method Definitions
 std::vector<SamplerHandle> ZSobolSampler::Clone(int n, Allocator alloc) {
     std::vector<SamplerHandle> samplers(n);
-    ZSobolSampler *samplerMem =
-        (ZSobolSampler *)alloc.allocate_object<ZSobolSampler>(n);
+    ZSobolSampler *samplerMem = (ZSobolSampler *)alloc.allocate_object<ZSobolSampler>(n);
     for (int i = 0; i < n; ++i) {
         alloc.construct(&samplerMem[i], *this);
         samplers[i] = &samplerMem[i];
@@ -177,7 +176,8 @@ std::string ZSobolSampler::ToString() const {
 }
 
 ZSobolSampler *ZSobolSampler::Create(const ParameterDictionary &parameters,
-                                     Point2i fullResolution, const FileLoc *loc, Allocator alloc) {
+                                     Point2i fullResolution, const FileLoc *loc,
+                                     Allocator alloc) {
     int nsamp = parameters.GetOneInt("pixelsamples", 16);
     if (Options->pixelSamples)
         nsamp = *Options->pixelSamples;
@@ -381,6 +381,10 @@ Float MLTSampler::Get1D() {
 
 Point2f MLTSampler::Get2D() {
     return {Get1D(), Get1D()};
+}
+
+Point2f MLTSampler::GetPixel2D() {
+    return Get2D();
 }
 
 std::vector<SamplerHandle> MLTSampler::Clone(int n, Allocator alloc) {

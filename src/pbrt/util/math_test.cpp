@@ -4,7 +4,6 @@
 
 #include <gtest/gtest.h>
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <cstdint>
 
@@ -961,40 +960,5 @@ TEST(PermutationElement, UniformDelta) {
                                  count[offset], i, j, n, numIters / n);
             }
         }
-    }
-}
-
-TEST(Permute4, Uniform) {
-    // Make sure all are valid permutations.
-    for (int p = 0; p < 24; ++p) {
-        int count[4] = { 0 };
-        for (int v = 0; v < 4; ++v)
-            ++count[RandomPermute4(v, p)];
-        for (int v = 0; v < 4; ++v)
-            EXPECT_EQ(1, count[v]);
-    }
-
-    // Explicitly generate each permutation and make sure each of the
-    // expected ones is generated exactly once.
-    std::set<std::array<int, 4>> expectedPermutations(
-        {std::array<int, 4>{0, 1, 2, 3}, std::array<int, 4>{0, 1, 3, 2},
-         std::array<int, 4>{0, 2, 1, 3}, std::array<int, 4>{0, 2, 3, 1},
-         std::array<int, 4>{0, 3, 2, 1}, std::array<int, 4>{0, 3, 1, 2},
-         std::array<int, 4>{1, 0, 2, 3}, std::array<int, 4>{1, 0, 3, 2},
-         std::array<int, 4>{1, 2, 0, 3}, std::array<int, 4>{1, 2, 3, 0},
-         std::array<int, 4>{1, 3, 2, 0}, std::array<int, 4>{1, 3, 0, 2},
-         std::array<int, 4>{2, 1, 0, 3}, std::array<int, 4>{2, 1, 3, 0},
-         std::array<int, 4>{2, 0, 1, 3}, std::array<int, 4>{2, 0, 3, 1},
-         std::array<int, 4>{2, 3, 0, 1}, std::array<int, 4>{2, 3, 1, 0},
-         std::array<int, 4>{3, 1, 2, 0}, std::array<int, 4>{3, 1, 0, 2},
-         std::array<int, 4>{3, 2, 1, 0}, std::array<int, 4>{3, 2, 0, 1},
-         std::array<int, 4>{3, 0, 2, 1}, std::array<int, 4>{3, 0, 1, 2}});
-
-    for (int p = 0; p < 24; ++p) {
-        std::array<int, 4> perm{RandomPermute4(0, p), RandomPermute4(1, p),
-                                RandomPermute4(2, p), RandomPermute4(3, p)};
-        auto iter = expectedPermutations.find(perm);
-        EXPECT_TRUE(iter != expectedPermutations.end());
-        expectedPermutations.erase(iter);
     }
 }
