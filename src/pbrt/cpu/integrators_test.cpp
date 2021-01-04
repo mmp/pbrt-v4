@@ -247,6 +247,8 @@ std::vector<std::pair<SamplerHandle, std::string>> GetSamplers(
     samplers.push_back(std::make_pair(new HaltonSampler(256, resolution), "Halton 256"));
     samplers.push_back(std::make_pair(new PaddedSobolSampler(256, RandomizeStrategy::PermuteDigits),
                                       "Padded Sobol 256"));
+    samplers.push_back(std::make_pair(new ZSobolSampler(256, Point2i(16, 16), RandomizeStrategy::PermuteDigits),
+                                      "Z Sobol 256"));
     samplers.push_back(
         std::make_pair(new SobolSampler(256, resolution, RandomizeStrategy::None),
                        "Sobol 256 Not Randomized"));

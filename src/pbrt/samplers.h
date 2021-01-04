@@ -284,6 +284,8 @@ class ZSobolSampler {
         int sampleIndex = GetSampleIndex();
         uint32_t sampleHash = MixBits(dimension ^ seed);
 
+        ++dimension;
+
         if (randomizeStrategy == RandomizeStrategy::None)
             return SobolSample(sampleIndex, 0, NoRandomizer());
         else if (randomizeStrategy == RandomizeStrategy::CranleyPatterson)
@@ -301,6 +303,8 @@ class ZSobolSampler {
         int sampleIndex = GetSampleIndex();
         uint64_t bits = MixBits(dimension ^ seed);
         uint32_t sampleHash[2] = { uint32_t(bits), uint32_t(bits >> 32) };
+
+        dimension += 2;
 
         if (randomizeStrategy == RandomizeStrategy::None)
             return {SobolSample(sampleIndex, 0, NoRandomizer()),
