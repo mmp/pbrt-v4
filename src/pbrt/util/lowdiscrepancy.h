@@ -187,6 +187,7 @@ PBRT_CPU_GPU inline Float SobolSample(int64_t index, int dimension, R randomizer
 template <typename R>
 PBRT_CPU_GPU inline float SobolSampleFloat(int64_t a, int dimension, R randomizer) {
     DCHECK_LT(dimension, NSobolDimensions);
+    DCHECK(a >= 0 && a < (1ull << SobolMatrixSize));
     // Compute initial Sobol sample _v_ using generator matrices
     uint32_t v = 0;
     for (int i = dimension * SobolMatrixSize; a != 0; a >>= 1, i++)
@@ -266,6 +267,7 @@ inline uint64_t SobolIntervalToIndex(uint32_t m, uint64_t frame, const Point2i &
 PBRT_CPU_GPU
 inline uint64_t SobolSampleBits64(int64_t a, int dimension) {
     CHECK_LT(dimension, NSobolDimensions);
+    DCHECK(a >= 0 && a < (1ull << SobolMatrixSize));
     uint64_t v = 0;
     for (int i = dimension * SobolMatrixSize; a != 0; a >>= 1, i++)
         if (a & 1)

@@ -281,7 +281,7 @@ class ZSobolSampler {
 
     PBRT_CPU_GPU
     Float Get1D() {
-        int sampleIndex = GetSampleIndex();
+        uint64_t sampleIndex = GetSampleIndex();
         uint32_t sampleHash = MixBits(dimension ^ seed);
 
         ++dimension;
@@ -300,7 +300,7 @@ class ZSobolSampler {
 
     PBRT_CPU_GPU
     Point2f Get2D() {
-        int sampleIndex = GetSampleIndex();
+        uint64_t sampleIndex = GetSampleIndex();
         uint64_t bits = MixBits(dimension ^ seed);
         uint32_t sampleHash[2] = { uint32_t(bits), uint32_t(bits >> 32) };
 
@@ -328,15 +328,21 @@ class ZSobolSampler {
 
   private:
     PBRT_CPU_GPU
-    int GetSampleIndex() const {
-        int sampleIndex = 0;
+    uint64_t GetSampleIndex() const {
+        static const uint8_t permutations[24][4] = {
+             {0, 1, 2, 3}, {0, 1, 3, 2}, {0, 2, 1, 3}, {0, 2, 3, 1}, {0, 3, 2, 1}, {0, 3, 1, 2},
+             {1, 0, 2, 3}, {1, 0, 3, 2}, {1, 2, 0, 3}, {1, 2, 3, 0}, {1, 3, 2, 0}, {1, 3, 0, 2},
+             {2, 1, 0, 3}, {2, 1, 3, 0}, {2, 0, 1, 3}, {2, 0, 3, 1}, {2, 3, 0, 1}, {2, 3, 1, 0},
+             {3, 1, 2, 0}, {3, 1, 0, 2}, {3, 2, 1, 0}, {3, 2, 0, 1}, {3, 0, 2, 1}, {3, 0, 1, 2} };
+
+        uint64_t sampleIndex = 0;
         bool pow2Samples = log2SamplesPerPixel & 1;
         for (int i = nBase4Digits - 1; i >= 0; --i) {
             int digitShift = 2 * i + int(pow2Samples);
             int digit = (mortonIndex >> digitShift) & 3;
             int p = HashPerm(mortonIndex >> (digitShift + 2));
-            digit = RandomPermute4(digit, p);
-            sampleIndex |= digit << digitShift;
+            digit = permutations[p][digit];
+            sampleIndex |= uint64_t(digit) << digitShift;
         }
         if (pow2Samples && (mortonIndex & 1))
             sampleIndex |= 1;
@@ -344,13 +350,13 @@ class ZSobolSampler {
     }
 
     PBRT_CPU_GPU
-    int HashPerm(int index) const {
+    int HashPerm(uint64_t index) const {
         return uint32_t(MixBits(index ^ (0x55555555 * dimension)) >> 24) % 24;
     }
 
     RandomizeStrategy randomizeStrategy;
     int log2SamplesPerPixel, seed, nBase4Digits;
-    uint32_t mortonIndex;
+    uint64_t mortonIndex;
     int dimension;
 };
 
