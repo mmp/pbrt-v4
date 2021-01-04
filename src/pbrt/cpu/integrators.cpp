@@ -243,7 +243,7 @@ void ImageTileIntegrator::Render() {
             nextWaveSize = std::min(2 * nextWaveSize, 64);
 
         // Optionally write current image to disk
-        if (Options->writePartialImages || referenceImage) {
+        if (waveStart == spp || Options->writePartialImages || referenceImage) {
             LOG_VERBOSE("Writing image with spp = %d", waveStart);
             ImageMetadata metadata;
             metadata.renderTimeSeconds = progress.ElapsedSeconds();
@@ -258,7 +258,7 @@ void ImageTileIntegrator::Render() {
                 metadata.MSE = mse.Average();
                 fflush(mseOutFile);
             }
-            if (Options->writePartialImages) {
+            if (waveStart == spp || Options->writePartialImages) {
                 camera.InitMetadata(&metadata);
                 camera.GetFilm().WriteImage(metadata, 1.0f / waveStart);
             }
