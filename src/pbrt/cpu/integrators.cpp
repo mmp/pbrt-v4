@@ -276,17 +276,15 @@ void ImageTileIntegrator::Render() {
 void RayIntegrator::EvaluatePixelSample(Point2i pPixel, int sampleIndex,
                                         SamplerHandle sampler,
                                         ScratchBuffer &scratchBuffer) {
-    // Initialize _CameraSample_ for current sample
-    FilterHandle filter = camera.GetFilm().GetFilter();
-    CameraSample cameraSample = GetCameraSample(sampler, pPixel, filter);
-
     // Sample wavelengths for the ray
-    Float lu = RadicalInverse(1, sampleIndex) + BlueNoise(47, pPixel);
-    if (lu >= 1)
-        lu -= 1;
+    Float lu = sampler.Get1D();
     if (Options->disableWavelengthJitter)
         lu = 0.5;
     SampledWavelengths lambda = camera.GetFilm().SampleWavelengths(lu);
+
+    // Initialize _CameraSample_ for current sample
+    FilterHandle filter = camera.GetFilm().GetFilter();
+    CameraSample cameraSample = GetCameraSample(sampler, pPixel, filter);
 
     // Generate camera ray for current sample
     pstd::optional<CameraRayDifferential> cameraRay =
@@ -567,9 +565,7 @@ void LightPathIntegrator::EvaluatePixelSample(Point2i pPixel, int sampleIndex,
                                               SamplerHandle sampler,
                                               ScratchBuffer &scratchBuffer) {
     // Sample wavelengths for the ray
-    Float lu = RadicalInverse(1, sampleIndex) + BlueNoise(47, pPixel);
-    if (lu >= 1)
-        lu -= 1;
+    Float lu = sampler.Get1D();
     if (Options->disableWavelengthJitter)
         lu = 0.5;
     SampledWavelengths lambda = camera.GetFilm().SampleWavelengths(lu);

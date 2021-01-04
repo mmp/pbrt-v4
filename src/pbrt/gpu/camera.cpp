@@ -45,17 +45,15 @@ void GPUPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
             if (!InsideExclusive(pPixel, pixelBounds))
                 return;
 
-            // Sample wavelengths for ray path
-            Float lu = RadicalInverse(1, sampleIndex) + BlueNoise(47, pPixel);
-            if (lu >= 1)
-                lu -= 1;
-            if (GetOptions().disableWavelengthJitter)
-                lu = 0.5f;
-            SampledWavelengths lambda = film.SampleWavelengths(lu);
-
             // Initialize _Sampler_ for current pixel and sample
             Sampler pixelSampler = *sampler.Cast<Sampler>();
             pixelSampler.StartPixelSample(pPixel, sampleIndex, 0);
+
+            // Sample wavelengths for ray path
+            Float lu = pixelSampler.Get1D();
+            if (GetOptions().disableWavelengthJitter)
+                lu = 0.5f;
+            SampledWavelengths lambda = film.SampleWavelengths(lu);
 
             // Compute _CameraSample_ and generate ray
             CameraSample cameraSample = GetCameraSample(pixelSampler, pPixel, filter);
