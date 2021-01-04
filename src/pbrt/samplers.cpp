@@ -157,6 +157,52 @@ PaddedSobolSampler *PaddedSobolSampler::Create(const ParameterDictionary &parame
     return alloc.new_object<PaddedSobolSampler>(nsamp, randomizer);
 }
 
+// ZSobolSampler Method Definitions
+std::vector<SamplerHandle> ZSobolSampler::Clone(int n, Allocator alloc) {
+    std::vector<SamplerHandle> samplers(n);
+    ZSobolSampler *samplerMem =
+        (ZSobolSampler *)alloc.allocate_object<ZSobolSampler>(n);
+    for (int i = 0; i < n; ++i) {
+        alloc.construct(&samplerMem[i], *this);
+        samplers[i] = &samplerMem[i];
+    }
+    return samplers;
+}
+
+std::string ZSobolSampler::ToString() const {
+    return StringPrintf("[ ZSobolSampler randomizeStrategy: %s log2SamplesPerPixel: %d "
+                        " seed: %d nBase4Digits: %d mortonIndex: %d dimension: %d ]",
+                        randomizeStrategy, log2SamplesPerPixel, seed, nBase4Digits,
+                        mortonIndex, dimension);
+}
+
+ZSobolSampler *ZSobolSampler::Create(const ParameterDictionary &parameters,
+                                     Point2i fullResolution, const FileLoc *loc, Allocator alloc) {
+    int nsamp = parameters.GetOneInt("pixelsamples", 16);
+    if (Options->pixelSamples)
+        nsamp = *Options->pixelSamples;
+    if (Options->quickRender)
+        nsamp = 1;
+    int seed = parameters.GetOneInt("seed", Options->seed);
+
+    RandomizeStrategy randomizer;
+    std::string s = parameters.GetOneString("randomization", "fastowen");
+    if (s == "none")
+        randomizer = RandomizeStrategy::None;
+    else if (s == "cranleypatterson")
+        randomizer = RandomizeStrategy::CranleyPatterson;
+    else if (s == "permutedigits")
+        randomizer = RandomizeStrategy::PermuteDigits;
+    else if (s == "fastowen")
+        randomizer = RandomizeStrategy::FastOwen;
+    else if (s == "owen")
+        randomizer = RandomizeStrategy::Owen;
+    else
+        ErrorExit(loc, "%s: unknown randomization strategy given to ZSobolSampler", s);
+
+    return alloc.new_object<ZSobolSampler>(nsamp, fullResolution, randomizer, seed);
+}
+
 // PMJ02BNSampler Method Definitions
 PMJ02BNSampler::PMJ02BNSampler(int samplesPerPixel, int seed, Allocator alloc)
     : samplesPerPixel(samplesPerPixel), seed(seed) {
@@ -436,6 +482,8 @@ SamplerHandle SamplerHandle::Create(const std::string &name,
         sampler = HaltonSampler::Create(parameters, fullResolution, loc, alloc);
     else if (name == "sobol")
         sampler = SobolSampler::Create(parameters, fullResolution, loc, alloc);
+    else if (name == "zsobol")
+        sampler = ZSobolSampler::Create(parameters, fullResolution, loc, alloc);
     else if (name == "random")
         sampler = RandomSampler::Create(parameters, loc, alloc);
     else if (name == "stratified")

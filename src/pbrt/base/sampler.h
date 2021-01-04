@@ -31,14 +31,15 @@ class PMJ02BNSampler;
 class RandomSampler;
 class SobolSampler;
 class StratifiedSampler;
+class ZSobolSampler;
 class MLTSampler;
 class DebugMLTSampler;
 
 // SamplerHandle Definition
 class SamplerHandle
     : public TaggedPointer<RandomSampler, StratifiedSampler, HaltonSampler,
-                           PaddedSobolSampler, SobolSampler, PMJ02BNSampler, MLTSampler,
-                           DebugMLTSampler> {
+                           PaddedSobolSampler, SobolSampler, ZSobolSampler,
+                           PMJ02BNSampler, MLTSampler, DebugMLTSampler> {
   public:
     // Sampler Interface
     using TaggedPointer::TaggedPointer;
