@@ -566,9 +566,6 @@ LightPathIntegrator::LightPathIntegrator(int maxDepth, CameraHandle camera,
 void LightPathIntegrator::EvaluatePixelSample(Point2i pPixel, int sampleIndex,
                                               SamplerHandle sampler,
                                               ScratchBuffer &scratchBuffer) {
-    // Consume first two dimensions from sampler
-    (void)sampler.Get2D();
-
     // Sample wavelengths for the ray
     Float lu = RadicalInverse(1, sampleIndex) + BlueNoise(47, pPixel);
     if (lu >= 1)

@@ -56,6 +56,7 @@ class SamplerHandle
 
     PBRT_CPU_GPU inline Float Get1D();
     PBRT_CPU_GPU inline Point2f Get2D();
+    PBRT_CPU_GPU inline Point2f GetPixel2D();
 
     std::vector<SamplerHandle> Clone(int n, Allocator alloc = {});
 

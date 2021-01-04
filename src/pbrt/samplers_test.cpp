@@ -106,7 +106,7 @@ static void checkElementarySampler(const char *name, SamplerHandle sampler,
     std::vector<Point2f> samples;
     for (int i = 0; i < spp; ++i) {
         sampler.StartPixelSample(Point2i(0, 0), i);
-        samples.push_back(sampler.Get2D());
+        samples.push_back(sampler.GetPixel2D());
     }
 
     checkElementary(name, samples, logSamples);

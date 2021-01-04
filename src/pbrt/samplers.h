@@ -66,7 +66,7 @@ class HaltonSampler {
         }
 
         haltonIndex += sampleIndex * sampleStride;
-        dimension = dim;
+        dimension = std::max(2, dim);
     }
 
     PBRT_CPU_GPU
@@ -78,21 +78,21 @@ class HaltonSampler {
 
     PBRT_CPU_GPU
     Point2f Get2D() {
-        if (dimension == 0) {
-            // Return Halton pixel sample
-            dimension += 2;
-            return {RadicalInverse(0, haltonIndex >> baseExponents[0]),
-                    RadicalInverse(1, haltonIndex / baseScales[1])};
-
-        } else {
-            // Return non-pixel 2D Halton sample
-            if (dimension + 1 >= PrimeTableSize)
-                dimension = 2;
-            int dim = dimension;
-            dimension += 2;
-            return {SampleDimension(dim), SampleDimension(dim + 1)};
-        }
+        // Return non-pixel 2D Halton sample
+        if (dimension + 1 >= PrimeTableSize)
+            dimension = 2;
+        int dim = dimension;
+        dimension += 2;
+        return {SampleDimension(dim), SampleDimension(dim + 1)};
     }
+
+    PBRT_CPU_GPU
+    Point2f GetPixel2D() {
+        // Return Halton pixel sample
+        return {RadicalInverse(0, haltonIndex >> baseExponents[0]),
+                RadicalInverse(1, haltonIndex / baseScales[1])};
+    }
+
 
     std::vector<SamplerHandle> Clone(int n, Allocator alloc);
     std::string ToString() const;
@@ -217,6 +217,9 @@ class PaddedSobolSampler {
                     SampleDimension(1, index, hash >> 32)};
     }
 
+    PBRT_CPU_GPU
+    Point2f GetPixel2D() { return Get2D(); }
+
     std::vector<SamplerHandle> Clone(int n, Allocator alloc);
     std::string ToString() const;
 
@@ -323,6 +326,9 @@ class ZSobolSampler {
                     SobolSample(sampleIndex, 1, OwenScrambler(sampleHash[1]))};
     }
 
+    PBRT_CPU_GPU
+    Point2f GetPixel2D() { return Get2D(); }
+
     std::vector<SamplerHandle> Clone(int n, Allocator alloc);
     std::string ToString() const;
 
@@ -378,7 +384,7 @@ class PMJ02BNSampler {
     void StartPixelSample(const Point2i &p, int index, int dim) {
         pixel = p;
         sampleIndex = index;
-        dimension = dim;
+        dimension = std::max(2, dim);
     }
 
     PBRT_CPU_GPU
@@ -395,37 +401,36 @@ class PMJ02BNSampler {
 
     PBRT_CPU_GPU
     Point2f Get2D() {
-        if (dimension == 0) {
-            // Return pmj02bn pixel sample
-            int px = pixel.x % pixelTileSize, py = pixel.y % pixelTileSize;
-            int offset = (px + py * pixelTileSize) * samplesPerPixel;
-            dimension += 2;
-            return (*pixelSamples)[offset + sampleIndex];
-
-        } else {
-            // Compute index for 2D pmj02bn sample
-            int index = sampleIndex;
-            int pmjInstance = dimension / 2;
-            if (pmjInstance >= nPMJ02bnSets) {
-                // Permute index to be used for pmj02bn sample array
-                uint64_t hash =
-                    MixBits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
-                            ((uint64_t)dimension << 16) ^ seed);
-                index = PermutationElement(sampleIndex, samplesPerPixel, hash);
-            }
-
-            // Return randomized pmj02bn sample for current dimension
-            Point2f u = GetPMJ02BNSample(pmjInstance, index);
-            // Apply Cranley-Patterson rotation to pmj02bn sample _u_
-            u += Vector2f(BlueNoise(dimension, pixel), BlueNoise(dimension + 1, pixel));
-            if (u.x >= 1)
-                u.x -= 1;
-            if (u.y >= 1)
-                u.y -= 1;
-
-            dimension += 2;
-            return {std::min(u.x, OneMinusEpsilon), std::min(u.y, OneMinusEpsilon)};
+        // Compute index for 2D pmj02bn sample
+        int index = sampleIndex;
+        int pmjInstance = dimension / 2;
+        if (pmjInstance >= nPMJ02bnSets) {
+            // Permute index to be used for pmj02bn sample array
+            uint64_t hash =
+                MixBits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
+                        ((uint64_t)dimension << 16) ^ seed);
+            index = PermutationElement(sampleIndex, samplesPerPixel, hash);
         }
+
+        // Return randomized pmj02bn sample for current dimension
+        Point2f u = GetPMJ02BNSample(pmjInstance, index);
+        // Apply Cranley-Patterson rotation to pmj02bn sample _u_
+        u += Vector2f(BlueNoise(dimension, pixel), BlueNoise(dimension + 1, pixel));
+        if (u.x >= 1)
+            u.x -= 1;
+        if (u.y >= 1)
+            u.y -= 1;
+
+        dimension += 2;
+        return {std::min(u.x, OneMinusEpsilon), std::min(u.y, OneMinusEpsilon)};
+    }
+
+    PBRT_CPU_GPU
+    Point2f GetPixel2D() {
+        // Return pmj02bn pixel sample
+        int px = pixel.x % pixelTileSize, py = pixel.y % pixelTileSize;
+        int offset = (px + py * pixelTileSize) * samplesPerPixel;
+        return (*pixelSamples)[offset + sampleIndex];
     }
 
     std::vector<SamplerHandle> Clone(int n, Allocator alloc);
@@ -465,6 +470,8 @@ class RandomSampler {
     Float Get1D() { return rng.Uniform<Float>(); }
     PBRT_CPU_GPU
     Point2f Get2D() { return {rng.Uniform<Float>(), rng.Uniform<Float>()}; }
+    PBRT_CPU_GPU
+    Point2f GetPixel2D() { return {rng.Uniform<Float>(), rng.Uniform<Float>()}; }
 
     std::vector<SamplerHandle> Clone(int n, Allocator alloc);
     std::string ToString() const;
@@ -501,7 +508,7 @@ class SobolSampler {
     PBRT_CPU_GPU
     void StartPixelSample(const Point2i &p, int sampleIndex, int dim) {
         pixel = p;
-        dimension = dim;
+        dimension = std::max(2, dim);
         sobolIndex = SobolIntervalToIndex(Log2Int(scale), sampleIndex, pixel);
     }
 
@@ -517,15 +524,19 @@ class SobolSampler {
         if (dimension + 1 >= NSobolDimensions)
             dimension = 2;
         Point2f u(SampleDimension(dimension), SampleDimension(dimension + 1));
-        if (dimension == 0) {
-            // Remap Sobol$'$ dimensions used for pixel samples
-            for (int dim = 0; dim < 2; ++dim) {
-                CHECK_RARE(1e-7, u[dim] * scale - pixel[dim] < 0);
-                CHECK_RARE(1e-7, u[dim] * scale - pixel[dim] > 1);
-                u[dim] = Clamp(u[dim] * scale - pixel[dim], 0, OneMinusEpsilon);
-            }
-        }
         dimension += 2;
+        return u;
+    }
+
+    PBRT_CPU_GPU
+    Point2f GetPixel2D() {
+        Point2f u(SampleDimension(0), SampleDimension(1));
+        // Remap Sobol$'$ dimensions used for pixel samples
+        for (int dim = 0; dim < 2; ++dim) {
+            CHECK_RARE(1e-7, u[dim] * scale - pixel[dim] < 0);
+            CHECK_RARE(1e-7, u[dim] * scale - pixel[dim] > 1);
+            u[dim] = Clamp(u[dim] * scale - pixel[dim], 0, OneMinusEpsilon);
+        }
         return u;
     }
 
@@ -613,6 +624,9 @@ class StratifiedSampler {
         return {(x + dx) / xPixelSamples, (y + dy) / yPixelSamples};
     }
 
+    PBRT_CPU_GPU
+    Point2f GetPixel2D() { return Get2D(); }
+
     std::vector<SamplerHandle> Clone(int n, Allocator alloc);
     std::string ToString() const;
 
@@ -663,6 +677,9 @@ class MLTSampler {
 
     PBRT_CPU_GPU
     Point2f Get2D();
+
+    PBRT_CPU_GPU
+    Point2f GetPixel2D() { return Get2D(); }
 
     std::vector<SamplerHandle> Clone(int n, Allocator alloc);
 
@@ -743,6 +760,9 @@ class DebugMLTSampler : public MLTSampler {
     PBRT_CPU_GPU
     Point2f Get2D() { return {Get1D(), Get1D()}; }
 
+    PBRT_CPU_GPU
+    Point2f GetPixel2D() { return Get2D(); }
+
     std::string ToString() const {
         return StringPrintf("[ DebugMLTSampler %s u: %s ]",
                             ((const MLTSampler *)this)->ToString(), u);
@@ -777,11 +797,16 @@ inline Point2f SamplerHandle::Get2D() {
     return Dispatch(get);
 }
 
+inline Point2f SamplerHandle::GetPixel2D() {
+    auto get = [&](auto ptr) { return ptr->GetPixel2D(); };
+    return Dispatch(get);
+}
+
 // Sampler Inline Functions
 template <typename Sampler>
 inline PBRT_CPU_GPU CameraSample GetCameraSample(Sampler sampler, const Point2i &pPixel,
                                                  FilterHandle filter) {
-    FilterSample fs = filter.Sample(sampler.Get2D());
+    FilterSample fs = filter.Sample(sampler.GetPixel2D());
     if (GetOptions().disablePixelJitter) {
         fs.p = Point2f(0, 0);
         fs.weight = 1;
