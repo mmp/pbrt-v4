@@ -688,7 +688,13 @@ int RandomPermute4(int v, int p) {
     for (int i = 0; i <= 3; ++i) {
         int n = 4 - i;
         int other = i + (p % n);
+#ifdef PBRT_IS_GPU_CODE
+        Float tmp = perm[i];
+        perm[i] = perm[other];
+        perm[other] = tmp;
+#else
         std::swap(perm[i], perm[other]);
+#endif
         p /= n;
     }
     return perm[v];
