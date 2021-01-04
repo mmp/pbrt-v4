@@ -23,6 +23,7 @@ TEST(Sampler, ConsistentValues) {
     samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::None));
     samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::CranleyPatterson));
     samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::PermuteDigits));
+    samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::FastOwen));
     samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::Owen));
     samplers.push_back(new PMJ02BNSampler(spp));
     samplers.push_back(new StratifiedSampler(rootSpp, rootSpp, true));
@@ -31,6 +32,7 @@ TEST(Sampler, ConsistentValues) {
         new SobolSampler(spp, resolution, RandomizeStrategy::CranleyPatterson));
     samplers.push_back(new SobolSampler(spp, resolution, RandomizeStrategy::PermuteDigits));
     samplers.push_back(new SobolSampler(spp, resolution, RandomizeStrategy::Owen));
+    samplers.push_back(new SobolSampler(spp, resolution, RandomizeStrategy::FastOwen));
 
     for (auto &sampler : samplers) {
         std::vector<Float> s1d[spp];
