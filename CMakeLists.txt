@@ -8,7 +8,7 @@ set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # For sanitizers
-list (PREPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+list (INSERT CMAKE_MODULE_PATH 0 "${CMAKE_SOURCE_DIR}/cmake")
 
 # Configuration options
 
