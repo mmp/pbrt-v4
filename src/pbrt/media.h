@@ -28,6 +28,7 @@
 #include <nanovdb/util/CudaDeviceBuffer.h>
 #endif  // PBRT_BUILD_GPU_RENDERER
 
+#include <limits>
 #include <memory>
 #include <vector>
 
@@ -102,6 +103,7 @@ class HomogeneousMedium {
                                             F callback) const {
         // Normalize ray direction for homogeneous medium sampling
         tMax *= Length(ray.d);
+        if (std::isinf(tMax)) tMax = std::numeric_limits<Float>::max();
         ray.d = Normalize(ray.d);
 
         // Compute _SampledSpectrum_ scattering properties for medium
