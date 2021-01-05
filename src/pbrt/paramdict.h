@@ -40,12 +40,13 @@ enum class ParameterType {
 };
 
 // SpectrumType Definition
-enum class SpectrumType { General, Illuminant };
+enum class SpectrumType { Albedo, Unbounded, Illuminant };
 
 // NamedTextures Definition
 struct NamedTextures {
     std::map<std::string, FloatTextureHandle> floatTextures;
-    std::map<std::string, SpectrumTextureHandle> generalSpectrumTextures;
+    std::map<std::string, SpectrumTextureHandle> albedoSpectrumTextures;
+    std::map<std::string, SpectrumTextureHandle> unboundedSpectrumTextures;
     std::map<std::string, SpectrumTextureHandle> illuminantSpectrumTextures;
 };
 

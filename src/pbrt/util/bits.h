@@ -44,19 +44,20 @@ inline uint64_t ReverseBits64(uint64_t n) {
 }
 
 // https://fgiesen.wordpress.com/2009/12/13/decoding-morton-codes/
-// "Insert" a 0 bit after each of the 16 low bits of x
+// updated to 64 bits.
 PBRT_CPU_GPU
-inline uint32_t LeftShift2(uint32_t x) {
-    x &= 0x0000ffff;                  // x = ---- ---- ---- ---- fedc ba98 7654 3210
-    x = (x ^ (x << 8)) & 0x00ff00ff;  // x = ---- ---- fedc ba98 ---- ---- 7654 3210
-    x = (x ^ (x << 4)) & 0x0f0f0f0f;  // x = ---- fedc ---- ba98 ---- 7654 ---- 3210
-    x = (x ^ (x << 2)) & 0x33333333;  // x = --fe --dc --ba --98 --76 --54 --32 --10
-    x = (x ^ (x << 1)) & 0x55555555;  // x = -f-e -d-c -b-a -9-8 -7-6 -5-4 -3-2 -1-0
+inline uint64_t LeftShift2(uint64_t x) {
+    x &= 0xffffffff;
+    x = (x ^ (x << 16)) & 0x0000ffff0000ffff;
+    x = (x ^ (x << 8)) & 0x00ff00ff00ff00ff;
+    x = (x ^ (x << 4)) & 0x0f0f0f0f0f0f0f0f;
+    x = (x ^ (x << 2)) & 0x3333333333333333;
+    x = (x ^ (x << 1)) & 0x5555555555555555;
     return x;
 }
 
 PBRT_CPU_GPU
-inline uint32_t EncodeMorton2(uint16_t x, uint16_t y) {
+inline uint64_t EncodeMorton2(uint32_t x, uint32_t y) {
     return (LeftShift2(y) << 1) | LeftShift2(x);
 }
 
@@ -85,24 +86,26 @@ inline uint32_t EncodeMorton3(float x, float y, float z) {
 }
 
 PBRT_CPU_GPU
-inline uint32_t Compact1By1(uint32_t x) {
+inline uint32_t Compact1By1(uint64_t x) {
     // TODO: as of Haswell, the PEXT instruction could do all this in a
     // single instruction.
     // x = -f-e -d-c -b-a -9-8 -7-6 -5-4 -3-2 -1-0
-    x &= 0x55555555;
+    x &= 0x5555555555555555;
     // x = --fe --dc --ba --98 --76 --54 --32 --10
-    x = (x ^ (x >> 1)) & 0x33333333;
+    x = (x ^ (x >> 1)) & 0x3333333333333333;
     // x = ---- fedc ---- ba98 ---- 7654 ---- 3210
-    x = (x ^ (x >> 2)) & 0x0f0f0f0f;
+    x = (x ^ (x >> 2)) & 0x0f0f0f0f0f0f0f0f;
     // x = ---- ---- fedc ba98 ---- ---- 7654 3210
-    x = (x ^ (x >> 4)) & 0x00ff00ff;
+    x = (x ^ (x >> 4)) & 0x00ff00ff00ff00ff;
     // x = ---- ---- ---- ---- fedc ba98 7654 3210
-    x = (x ^ (x >> 8)) & 0x0000ffff;
+    x = (x ^ (x >> 8)) & 0x0000ffff0000ffff;
+    // ...
+    x = (x ^ (x >> 16)) & 0xffffffff;
     return x;
 }
 
 PBRT_CPU_GPU
-inline void DecodeMorton2(uint32_t v, uint16_t *x, uint16_t *y) {
+inline void DecodeMorton2(uint64_t v, uint32_t *x, uint32_t *y) {
     *x = Compact1By1(v);
     *y = Compact1By1(v >> 1);
 }

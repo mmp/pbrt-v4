@@ -1243,11 +1243,11 @@ TEST(SummedArea, Constant) {
 
     SummedAreaTable sat(v);
 
-    EXPECT_EQ(1, sat.Sum(Bounds2f(Point2f(0, 0), Point2f(1, 1))));
-    EXPECT_EQ(0.5, sat.Sum(Bounds2f(Point2f(0, 0), Point2f(1, 0.5))));
-    EXPECT_EQ(0.5, sat.Sum(Bounds2f(Point2f(0, 0), Point2f(0.5, 1))));
-    EXPECT_EQ(3. / 16., sat.Sum(Bounds2f(Point2f(0, 0), Point2f(.25, .75))));
-    EXPECT_EQ(3. / 16., sat.Sum(Bounds2f(Point2f(0.5, 0.25), Point2f(0.75, 1))));
+    EXPECT_EQ(1, sat.Integral(Bounds2f(Point2f(0, 0), Point2f(1, 1))));
+    EXPECT_EQ(0.5, sat.Integral(Bounds2f(Point2f(0, 0), Point2f(1, 0.5))));
+    EXPECT_EQ(0.5, sat.Integral(Bounds2f(Point2f(0, 0), Point2f(0.5, 1))));
+    EXPECT_EQ(3. / 16., sat.Integral(Bounds2f(Point2f(0, 0), Point2f(.25, .75))));
+    EXPECT_EQ(3. / 16., sat.Integral(Bounds2f(Point2f(0.5, 0.25), Point2f(0.75, 1))));
 }
 
 TEST(SummedArea, Rect) {
@@ -1271,7 +1271,7 @@ TEST(SummedArea, Rect) {
 
                     Bounds2f b(Point2f(Float(x0) / v.xSize(), Float(y0) / v.ySize()),
                                Point2f(Float(x1) / v.xSize(), Float(y1) / v.ySize()));
-                    EXPECT_EQ(mySum / (v.xSize() * v.ySize()), sat.Sum(b));
+                    EXPECT_EQ(mySum / (v.xSize() * v.ySize()), sat.Integral(b));
                 }
 }
 
@@ -1300,7 +1300,7 @@ TEST(SummedArea, Randoms) {
                 ref += v[p];
             ref /= v.xSize() * v.ySize();
 
-            double s = sat.Sum(bf);
+            double s = sat.Integral(bf);
             if (ref != s)
                 EXPECT_LT(std::abs((ref - s) / ref), 1e-3f)
                     << StringPrintf("ref %f s %f", ref, s);
@@ -1332,7 +1332,7 @@ TEST(SummedArea, NonCellAligned) {
         }
         Float sampledResult = sampledSum * b.Area() / nSamples;
 
-        double s = sat.Sum(b);
+        double s = sat.Integral(b);
         if (sampledResult != s)
             EXPECT_LT(std::abs((sampledResult - s) / sampledResult), 1e-3f)
                 << StringPrintf("sampled %f s %f", sampledResult, s);

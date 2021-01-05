@@ -76,11 +76,11 @@ TEST(Morton2, Basics) {
 
     RNG rng(12351);
     for (int i = 0; i < 100000; ++i) {
-        uint16_t x = rng.Uniform<uint32_t>() >> 16;
-        uint16_t y = rng.Uniform<uint32_t>() >> 16;
-        uint32_t m = EncodeMorton2(x, y);
+        uint32_t x = rng.Uniform<uint32_t>();
+        uint32_t y = rng.Uniform<uint32_t>();
+        uint64_t m = EncodeMorton2(x, y);
 
-        uint16_t xp, yp;
+        uint32_t xp, yp;
         DecodeMorton2(m, &xp, &yp);
         EXPECT_EQ(x, xp);
         EXPECT_EQ(y, yp);

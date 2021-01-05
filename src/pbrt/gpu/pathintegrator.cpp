@@ -41,7 +41,7 @@
 #include <windows.h>
 #else
 #include <sys/syscall.h>
-#endif // PBRT_IS_WINDOWS
+#endif  // PBRT_IS_WINDOWS
 #include "nvtx3/nvToolsExt.h"
 #include "nvtx3/nvToolsExtCuda.h"
 #endif
@@ -77,9 +77,8 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
     filter = FilterHandle::Create(scene.filter.name, scene.filter.parameters,
                                   &scene.filter.loc, alloc);
 
-    Float exposureTime =
-        scene.camera.parameters.GetOneFloat("shutterclose", 1.f) -
-        scene.camera.parameters.GetOneFloat("shutteropen", 0.f);
+    Float exposureTime = scene.camera.parameters.GetOneFloat("shutterclose", 1.f) -
+                         scene.camera.parameters.GetOneFloat("shutteropen", 0.f);
     if (exposureTime <= 0)
         ErrorExit(&scene.camera.loc,
                   "The specified camera shutter times imply that the shutter "
@@ -177,7 +176,8 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
     lightSampler = LightSamplerHandle::Create(lightSamplerName, allLights, alloc);
 
     if (scene.integrator.name != "path" && scene.integrator.name != "volpath")
-        Warning(&scene.integrator.loc, "The GPU renderer always uses a \"volpath\" integrator.");
+        Warning(&scene.integrator.loc,
+                "The GPU renderer always uses a \"volpath\" integrator.");
 
     // Integrator parameters
     regularize = scene.integrator.parameters.GetOneBool("regularize", false);
@@ -191,7 +191,7 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
     CHECK(mr != nullptr);
     size_t startSize = mr->BytesAllocated();
 
-    // Compute number of scanlines to render per pass.
+    // Compute number of scanlines to render per pass
     Vector2i resolution = film.PixelBounds().Diagonal();
     // TODO: make this configurable. Base it on the amount of GPU memory?
     int maxSamples = 1024 * 1024;
@@ -228,8 +228,6 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
         pstd::MakeConstSpan(&haveUniversalEvalMaterial[1],
                             haveUniversalEvalMaterial.size() - 1));
 
-    // Always allocate this, even if no media
-    mediumTransitionQueue = alloc.new_object<MediumTransitionQueue>(maxQueueSize, alloc);
     if (haveMedia) {
         mediumSampleQueue = alloc.new_object<MediumSampleQueue>(maxQueueSize, alloc);
         mediumScatterQueue = alloc.new_object<MediumScatterQueue>(maxQueueSize, alloc);
@@ -241,38 +239,11 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
     pathIntegratorBytes += endSize - startSize;
 }
 
-void GPUPathIntegrator::TraceShadowRays(int depth) {
-    if (haveMedia)
-        accel->IntersectShadowTr(maxQueueSize, shadowRayQueue);
-    else
-        accel->IntersectShadow(maxQueueSize, shadowRayQueue);
-
-    // Add contribution if light was visible
-    ForAllQueued(
-        "Incorporate shadow ray contribution", shadowRayQueue, maxQueueSize,
-        PBRT_GPU_LAMBDA(const ShadowRayWorkItem sr, int index) {
-            if (!sr.Ld)
-                return;
-
-            SampledSpectrum Lpixel = pixelSampleState.L[sr.pixelIndex];
-
-            PBRT_DBG("Adding shadow ray Ld %f %f %f %f at pixel index %d \n",
-                     sr.Ld[0], sr.Ld[1], sr.Ld[2], sr.Ld[3], sr.pixelIndex);
-
-            pixelSampleState.L[sr.pixelIndex] = Lpixel + sr.Ld;
-        });
-
-    GPUDo("Reset shadowRayQueue",
-          PBRT_GPU_LAMBDA() {
-              stats->shadowRays[depth] += shadowRayQueue->Size();
-              shadowRayQueue->Reset();
-          });
-}
-
-void GPUPathIntegrator::Render(ImageMetadata *metadata) {
+// GPUPathIntegrator Method Definitions
+void GPUPathIntegrator::Render() {
     Vector2i resolution = film.PixelBounds().Diagonal();
     int spp = sampler.SamplesPerPixel();
-
+    // Launch thread to copy image for display server, if enabled
     RGB *displayRGB = nullptr, *displayRGBHost = nullptr;
     std::atomic<bool> exitCopyThread{false};
     std::thread copyThread;
@@ -341,6 +312,7 @@ void GPUPathIntegrator::Render(ImageMetadata *metadata) {
     }
 
     int firstSampleIndex = 0, lastSampleIndex = spp;
+    // Update sample index range based on debug start, if provided
     if (!Options->debugStart.empty()) {
         std::vector<int> values = SplitStringToInts(Options->debugStart, ',');
         if (values.size() != 2)
@@ -352,113 +324,102 @@ void GPUPathIntegrator::Render(ImageMetadata *metadata) {
 
     ProgressReporter progress(lastSampleIndex - firstSampleIndex, "Rendering",
                               Options->quiet, true /* GPU */);
-
-    for (int sampleIndex = firstSampleIndex; sampleIndex < lastSampleIndex; ++sampleIndex) {
+    for (int sampleIndex = firstSampleIndex; sampleIndex < lastSampleIndex;
+         ++sampleIndex) {
+        // Render image for sample _sampleIndex_
         LOG_VERBOSE("Starting to submit work for sample %d", sampleIndex);
-
-        for (int y0 = 0; y0 < resolution.y; y0 += scanlinesPerPass) {
-            // We have to do the array indexing on the CPU...
-            // TODO: clean this up.
+        Bounds2i pixelBounds = film.PixelBounds();
+        for (int y0 = pixelBounds.pMin.y; y0 < pixelBounds.pMax.y;
+             y0 += scanlinesPerPass) {
+            // Generate camera rays for current scanline range
             RayQueue *cameraRayQueue = CurrentRayQueue(0);
-            GPUDo("Reset ray queue",
-                  PBRT_GPU_LAMBDA() {
-                      PBRT_DBG("Starting scanlines at y0 = %d, sample %d / %d\n", y0, sampleIndex,
-                               spp);
-                      cameraRayQueue->Reset();
-                  });
-
+            GPUDo(
+                "Reset ray queue", PBRT_GPU_LAMBDA() {
+                    PBRT_DBG("Starting scanlines at y0 = %d, sample %d / %d\n", y0,
+                             sampleIndex, spp);
+                    cameraRayQueue->Reset();
+                });
             GenerateCameraRays(y0, sampleIndex);
+            GPUDo(
+                "Update camera ray stats",
+                PBRT_GPU_LAMBDA() { stats->cameraRays += cameraRayQueue->Size(); });
 
-            GPUDo("Update camera ray stats",
-                  PBRT_GPU_LAMBDA() { stats->cameraRays += cameraRayQueue->Size(); });
-
+            // Trace rays and estimate radiance up to maximum ray depth
             for (int depth = 0; true; ++depth) {
+                // Reset queues before tracing rays
+                RayQueue *nextQueue = NextRayQueue(depth);
+                GPUDo(
+                    "Reset queues before tracing rays", PBRT_GPU_LAMBDA() {
+                        nextQueue->Reset();
+                        // Reset queues before tracing next batch of rays
+                        if (mediumSampleQueue)
+                            mediumSampleQueue->Reset();
+                        if (mediumScatterQueue)
+                            mediumScatterQueue->Reset();
+
+                        if (escapedRayQueue)
+                            escapedRayQueue->Reset();
+                        hitAreaLightQueue->Reset();
+
+                        basicEvalMaterialQueue->Reset();
+                        universalEvalMaterialQueue->Reset();
+
+                        if (bssrdfEvalQueue)
+                            bssrdfEvalQueue->Reset();
+                        if (subsurfaceScatterQueue)
+                            subsurfaceScatterQueue->Reset();
+                    });
+
+                // Follow active ray paths and accumulate radiance estimates
                 GenerateRaySamples(depth, sampleIndex);
-
-                // Same issue and same TODO as above with not indexing into
-                // the queues in the kernel.
-                RayQueue *resetQueue = NextRayQueue(depth);
-                GPUDo("Reset queues before tracing rays",
-                      PBRT_GPU_LAMBDA() {
-                          hitAreaLightQueue->Reset();
-                          if (escapedRayQueue)
-                              escapedRayQueue->Reset();
-
-                          basicEvalMaterialQueue->Reset();
-                          universalEvalMaterialQueue->Reset();
-
-                          if (bssrdfEvalQueue)
-                              bssrdfEvalQueue->Reset();
-                          if (subsurfaceScatterQueue)
-                              subsurfaceScatterQueue->Reset();
-
-                          mediumTransitionQueue->Reset();
-                          if (mediumSampleQueue)
-                              mediumSampleQueue->Reset();
-                          if (mediumScatterQueue)
-                              mediumScatterQueue->Reset();
-
-                          resetQueue->Reset();
-                      });
-
-                accel->IntersectClosest(
-                    maxQueueSize, escapedRayQueue, hitAreaLightQueue,
-                    basicEvalMaterialQueue, universalEvalMaterialQueue,
-                    mediumTransitionQueue, mediumSampleQueue, CurrentRayQueue(depth));
+                // Find closest intersections along active rays
+                IntersectClosest(CurrentRayQueue(depth), escapedRayQueue,
+                                 hitAreaLightQueue, basicEvalMaterialQueue,
+                                 universalEvalMaterialQueue, mediumSampleQueue,
+                                 NextRayQueue(depth));
 
                 if (depth > 0) {
                     // As above, with the indexing...
                     RayQueue *statsQueue = CurrentRayQueue(depth);
-                    GPUDo("Update indirect ray stats",
-                          PBRT_GPU_LAMBDA() {
-                              stats->indirectRays[depth] += statsQueue->Size();
-                          });
+                    GPUDo(
+                        "Update indirect ray stats", PBRT_GPU_LAMBDA() {
+                            stats->indirectRays[depth] += statsQueue->Size();
+                        });
                 }
-
                 if (haveMedia)
                     SampleMediumInteraction(depth);
-
                 if (escapedRayQueue)
                     HandleEscapedRays(depth);
-
                 HandleRayFoundEmission(depth);
-
                 if (depth == maxDepth)
                     break;
-
                 EvaluateMaterialsAndBSDFs(depth);
-
-                // Do immediately so that we have space for shadow rays for
-                // subsurface..
+                // Do immediately so that we have space for shadow rays for subsurface..
                 TraceShadowRays(depth);
-
-                HandleMediumTransitions(depth);
-
                 if (haveSubsurface)
                     SampleSubsurface(depth);
             }
 
             UpdateFilm();
-
+            // Copy updated film pixels to buffer for display
             if (!Options->displayServer.empty())
-                GPUParallelFor("Update Display RGB Buffer", maxQueueSize,
-                               PBRT_GPU_LAMBDA(int pixelIndex) {
-                                   Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
-                                   if (!InsideExclusive(pPixel, film.PixelBounds()))
-                                       return;
+                GPUParallelFor(
+                    "Update Display RGB Buffer", maxQueueSize,
+                    PBRT_GPU_LAMBDA(int pixelIndex) {
+                        Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
+                        if (!InsideExclusive(pPixel, film.PixelBounds()))
+                            return;
 
-                                   Point2i p(pPixel - film.PixelBounds().pMin);
-                                   displayRGB[p.x + p.y * resolution.x] =
-                                       film.GetPixelRGB(pPixel);
-                               });
+                        Point2i p(pPixel - film.PixelBounds().pMin);
+                        displayRGB[p.x + p.y * resolution.x] = film.GetPixelRGB(pPixel);
+                    });
         }
 
         progress.Update();
     }
     progress.Done();
-
-    CUDA_CHECK(cudaDeviceSynchronize());
-
+    GPUWait();
+    // Shut down display server thread, if active
     // Wait until rendering is all done before we start to shut down the
     // display stuff..
     if (!Options->displayServer.empty()) {
@@ -468,100 +429,114 @@ void GPUPathIntegrator::Render(ImageMetadata *metadata) {
 
     // Another synchronization to make sure no kernels are running on the
     // GPU so that we can safely access unified memory from the CPU.
-    CUDA_CHECK(cudaDeviceSynchronize());
+    GPUWait();
+}
 
-    metadata->samplesPerPixel = sampler.SamplesPerPixel();
-    camera.InitMetadata(metadata);
+void GPUPathIntegrator::IntersectClosest(RayQueue *rayQueue,
+                                         EscapedRayQueue *escapedRayQueue,
+                                         HitAreaLightQueue *hitAreaLightQueue,
+                                         MaterialEvalQueue *basicEvalMaterialQueue,
+                                         MaterialEvalQueue *universalEvalMaterialQueue,
+                                         MediumSampleQueue *mediumSampleQueue,
+                                         RayQueue *nextRayQueue) const {
+    accel->IntersectClosest(maxQueueSize, escapedRayQueue, hitAreaLightQueue,
+                            basicEvalMaterialQueue, universalEvalMaterialQueue,
+                            mediumSampleQueue, rayQueue, nextRayQueue);
 }
 
 void GPUPathIntegrator::HandleEscapedRays(int depth) {
-    ForAllQueued("Handle escaped rays", escapedRayQueue, maxQueueSize,
-                 PBRT_GPU_LAMBDA(const EscapedRayWorkItem er, int index) {
-                     Ray ray(er.rayo, er.rayd);
-                     SampledSpectrum Le = envLight.Le(ray, er.lambda);
-                     if (!Le)
-                         return;
+    ForAllQueued(
+        "Handle escaped rays", escapedRayQueue, maxQueueSize,
+        PBRT_GPU_LAMBDA(const EscapedRayWorkItem w) {
+            // Update pixel radiance for escaped ray
+            SampledSpectrum Le = envLight.Le(Ray(w.rayo, w.rayd), w.lambda);
+            if (!Le)
+                return;
+            // Compute path radiance contribution from infinite light
+            SampledSpectrum L(0.f);
 
-                     SampledSpectrum L(0.f);
+            PBRT_DBG("L %f %f %f %f T_hat %f %f %f %f Le %f %f %f %f", L[0], L[1], L[2],
+                     L[3], w.T_hat[0], w.T_hat[1], w.T_hat[2], w.T_hat[3], Le[0], Le[1],
+                     Le[2], Le[3]);
+            PBRT_DBG("pdf uni %f %f %f %f pdf nee %f %f %f %f", w.uniPathPDF[0],
+                     w.uniPathPDF[1], w.uniPathPDF[2], w.uniPathPDF[3], w.lightPathPDF[0],
+                     w.lightPathPDF[1], w.lightPathPDF[2], w.lightPathPDF[3]);
 
-                     PBRT_DBG("L %f %f %f %f beta %f %f %f %f Le %f %f %f %f",
-                         L[0], L[1], L[2], L[3], er.beta[0], er.beta[1], er.beta[2],
-                         er.beta[3], Le[0], Le[1], Le[2], Le[3]);
-                     PBRT_DBG("pdf uni %f %f %f %f pdf nee %f %f %f %f",
-                         er.pdfUni[0], er.pdfUni[1], er.pdfUni[2], er.pdfUni[3],
-                         er.pdfNEE[0], er.pdfNEE[1], er.pdfNEE[2], er.pdfNEE[3]);
+            if (depth == 0 || w.specularBounce) {
+                L = w.T_hat * Le / w.uniPathPDF.Average();
+            } else {
+                // Compute MIS-weighted radiance contribution from infinite light
+                LightSampleContext ctx = w.prevIntrCtx;
+                Float lightChoicePDF = lightSampler.PDF(ctx, envLight);
+                SampledSpectrum lightPathPDF =
+                    w.lightPathPDF * lightChoicePDF *
+                    envLight.PDF_Li(ctx, w.rayd, LightSamplingMode::WithMIS);
+                L = w.T_hat * Le / (w.uniPathPDF + lightPathPDF).Average();
+            }
+            L = SafeDiv(L, w.lambda.PDF());
 
-                     if (depth == 0 || er.specularBounce) {
-                         L = er.beta * Le / er.pdfUni.Average();
-                     } else {
-                         Float time = 0;  // FIXME
-                         LightSampleContext ctx(er.piPrev, er.nPrev, er.nsPrev);
+            PBRT_DBG("Added L %f %f %f %f for escaped ray pixel index %d\n", L[0], L[1],
+                     L[2], L[3], w.pixelIndex);
 
-                         Float lightChoicePDF = lightSampler.PDF(ctx, envLight);
-                         Float lightPDF =
-                             lightChoicePDF *
-                             envLight.PDF_Li(ctx, ray.d, LightSamplingMode::WithMIS);
-
-                         SampledSpectrum pdfUni = er.pdfUni;
-                         SampledSpectrum pdfNEE = er.pdfNEE * lightPDF;
-
-                         L = er.beta * Le / (pdfUni + pdfNEE).Average();
-                     }
-                     L = SafeDiv(L, er.lambda.PDF());
-
-                     PBRT_DBG("Added L %f %f %f %f for escaped ray pixel index %d\n", L[0],
-                         L[1], L[2], L[3], er.pixelIndex);
-
-                     L += pixelSampleState.L[er.pixelIndex];
-
-                     pixelSampleState.L[er.pixelIndex] = L;
-                 });
+            L += pixelSampleState.L[w.pixelIndex];
+            pixelSampleState.L[w.pixelIndex] = L;
+        });
 }
 
 void GPUPathIntegrator::HandleRayFoundEmission(int depth) {
     ForAllQueued(
         "Handle emitters hit by indirect rays", hitAreaLightQueue, maxQueueSize,
-        PBRT_GPU_LAMBDA(const HitAreaLightWorkItem he, int index) {
-            LightHandle areaLight = he.areaLight;
-            SampledSpectrum Le = areaLight.L(he.p, he.n, he.uv, he.wo, he.lambda);
+        PBRT_GPU_LAMBDA(const HitAreaLightWorkItem w) {
+            // Find emitted radiance from surface that ray hit
+            SampledSpectrum Le = w.areaLight.L(w.p, w.n, w.uv, w.wo, w.lambda);
             if (!Le)
                 return;
-
             PBRT_DBG("Got Le %f %f %f %f from hit area light at depth %d\n", Le[0], Le[1],
-                Le[2], Le[3], depth);
+                     Le[2], Le[3], depth);
 
+            // Compute area light's weighted radiance contribution to the path
             SampledSpectrum L(0.f);
-
-            if (depth == 0 || he.isSpecularBounce) {
-                L = he.beta * Le / he.pdfUni.Average();
+            if (depth == 0 || w.isSpecularBounce) {
+                L = w.T_hat * Le / w.uniPathPDF.Average();
             } else {
-                Vector3f wi = he.rayd;
-
-                LightSampleContext ctx(he.piPrev, he.nPrev, he.nsPrev);
-
-                Float lightChoicePDF = lightSampler.PDF(ctx, areaLight);
+                // Compute MIS-weighted radiance contribution from area light
+                Vector3f wi = -w.wo;
+                LightSampleContext ctx = w.prevIntrCtx;
+                Float lightChoicePDF = lightSampler.PDF(ctx, w.areaLight);
                 Float lightPDF = lightChoicePDF *
-                                 areaLight.PDF_Li(ctx, wi, LightSamplingMode::WithMIS);
+                                 w.areaLight.PDF_Li(ctx, wi, LightSamplingMode::WithMIS);
 
-                SampledSpectrum pdfUni = he.pdfUni;
-                SampledSpectrum pdfNEE = he.pdfNEE * lightPDF;
-
-                L = he.beta * Le / (pdfUni + pdfNEE).Average();
+                SampledSpectrum uniPathPDF = w.uniPathPDF;
+                SampledSpectrum lightPathPDF = w.lightPathPDF * lightPDF;
+                L = w.T_hat * Le / (uniPathPDF + lightPathPDF).Average();
             }
-            L = SafeDiv(L, he.lambda.PDF());
+            L = SafeDiv(L, w.lambda.PDF());
 
             PBRT_DBG("Added L %f %f %f %f for pixel index %d\n", L[0], L[1], L[2], L[3],
-                he.pixelIndex);
+                     w.pixelIndex);
 
-            L += pixelSampleState.L[he.pixelIndex];
+            // Update _L_ in _PixelSampleState_ for area light's radiance
+            L += pixelSampleState.L[w.pixelIndex];
+            pixelSampleState.L[w.pixelIndex] = L;
+        });
+}
 
-            pixelSampleState.L[he.pixelIndex] = L;
+void GPUPathIntegrator::TraceShadowRays(int depth) {
+    if (haveMedia)
+        accel->IntersectShadowTr(maxQueueSize, shadowRayQueue, &pixelSampleState);
+    else
+        accel->IntersectShadow(maxQueueSize, shadowRayQueue, &pixelSampleState);
+    // Reset shadow ray queue
+    GPUDo(
+        "Reset shadowRayQueue", PBRT_GPU_LAMBDA() {
+            stats->shadowRays[depth] += shadowRayQueue->Size();
+            shadowRayQueue->Reset();
         });
 }
 
 void GPURender(ParsedScene &scene) {
 #ifdef PBRT_IS_WINDOWS
-    // NOTE: on Windows, where only basic unified memory is upported, the
+    // NOTE: on Windows, where only basic unified memory is supported, the
     // GPUPathIntegrator itself is *not* allocated using the unified memory
     // allocator so that the CPU can access the values of its members
     // (e.g. maxDepth) concurrently while the GPU is rendering.  In turn,
@@ -592,7 +567,7 @@ void GPURender(ParsedScene &scene) {
         // like GPUPathIntegrator::haveSubsurface to conditionally launch
         // kernels according to what's in the scene...)
         CUDA_CHECK(cudaMemAdvise(integrator, sizeof(*integrator),
-                                 cudaMemAdviseSetReadMostly, /* ignored argument */0));
+                                 cudaMemAdviseSetReadMostly, /* ignored argument */ 0));
         CUDA_CHECK(cudaMemAdvise(integrator, sizeof(*integrator),
                                  cudaMemAdviseSetPreferredLocation, deviceIndex));
 
@@ -612,8 +587,7 @@ void GPURender(ParsedScene &scene) {
     ///////////////////////////////////////////////////////////////////////////
     // Render!
     Timer timer;
-    ImageMetadata metadata;
-    integrator->Render(&metadata);
+    integrator->Render();
 
     LOG_VERBOSE("Total rendering time: %.3f s", timer.ElapsedSeconds());
 
@@ -626,13 +600,15 @@ void GPURender(ParsedScene &scene) {
         Printf("%s\n", integrator->stats->Print());
     }
 
-    metadata.renderTimeSeconds = timer.ElapsedSeconds();
-    metadata.samplesPerPixel = integrator->sampler.SamplesPerPixel();
-
     std::vector<GPULogItem> logs = ReadGPULogs();
     for (const auto &item : logs)
         Log(item.level, item.file, item.line, item.message);
 
+    ImageMetadata metadata;
+    metadata.samplesPerPixel = integrator->sampler.SamplesPerPixel();
+    integrator->camera.InitMetadata(&metadata);
+    metadata.renderTimeSeconds = timer.ElapsedSeconds();
+    metadata.samplesPerPixel = integrator->sampler.SamplesPerPixel();
     integrator->film.WriteImage(metadata);
 }
 

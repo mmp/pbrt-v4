@@ -175,8 +175,8 @@ TEST(ProjectionLight, Sampling) {
 
 TEST(LightBounds, Basics) {
     LightBounds bounds(Bounds3f(Point3f(0, 0, 0), Point3f(.1, .1, .01)),
-                       Vector3f(0, 0, 1), 1.f /* phi */, 0.f /* theta_o: normal spread */,
-                       Pi / 2 /* theta_e: falloff given visible normal */,
+                       Vector3f(0, 0, 1), 1.f /* phi */, std::cos(0.f) /* theta_o: normal spread */,
+                       std::cos(Pi / 2) /* theta_e: falloff given visible normal */,
                        false /* two-sided */);
 
     // Positive importance for point on the emissive side

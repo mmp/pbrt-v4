@@ -45,11 +45,17 @@ class HomogeneousMedium;
 template <typename Provider>
 class CuboidMedium;
 class UniformGridMediumProvider;
+// UniformGridMedium Definition
 using UniformGridMedium = CuboidMedium<UniformGridMediumProvider>;
+
 class CloudMediumProvider;
+// CloudMedium Definition
 using CloudMedium = CuboidMedium<CloudMediumProvider>;
+
 class NanoVDBMediumProvider;
+// NanoVDBMedium Definition
 using NanoVDBMedium = CuboidMedium<NanoVDBMediumProvider>;
+
 struct MediumSample;
 
 // MediumHandle Definition
@@ -69,8 +75,9 @@ class MediumHandle : public TaggedPointer<HomogeneousMedium, UniformGridMedium,
     bool IsEmissive() const;
 
     template <typename F>
-    PBRT_CPU_GPU void SampleTmaj(Ray ray, Float tMax, RNG &rng,
-                                 const SampledWavelengths &lambda, F callback) const;
+    PBRT_CPU_GPU SampledSpectrum SampleTmaj(Ray ray, Float tMax, Float u, RNG &rng,
+                                            const SampledWavelengths &lambda,
+                                            F callback) const;
 };
 
 // MediumInterface Definition

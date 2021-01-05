@@ -33,7 +33,8 @@ class PortalImageInfiniteLight;
 class SpotLight;
 
 class LightSampleContext;
-struct LightBounds;
+class LightBounds;
+class CompactLightBounds;
 struct LightLiSample;
 struct LightLeSample;
 
@@ -79,19 +80,18 @@ class LightHandle : public TaggedPointer<  // Light Source Types
     PBRT_CPU_GPU inline SampledSpectrum L(Point3f p, Normal3f n, Point2f uv, Vector3f w,
                                           const SampledWavelengths &lambda) const;
 
-    // InfiniteAreaLights only
+    // InfiniteLights only
     PBRT_CPU_GPU inline SampledSpectrum Le(const Ray &ray,
                                            const SampledWavelengths &lambda) const;
 
     void Preprocess(const Bounds3f &sceneBounds);
 
-    LightBounds Bounds() const;
+    pstd::optional<LightBounds> Bounds() const;
 
     PBRT_CPU_GPU
-    LightLeSample SampleLe(const Point2f &u1, const Point2f &u2,
-                           SampledWavelengths &lambda, Float time) const;
+    pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
+                                           SampledWavelengths &lambda, Float time) const;
 
-    // Note shouldn't be called for area lights..
     PBRT_CPU_GPU
     void PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const;
 

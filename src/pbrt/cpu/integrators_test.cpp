@@ -245,13 +245,15 @@ std::vector<std::pair<SamplerHandle, std::string>> GetSamplers(
     std::vector<std::pair<SamplerHandle, std::string>> samplers;
 
     samplers.push_back(std::make_pair(new HaltonSampler(256, resolution), "Halton 256"));
-    samplers.push_back(std::make_pair(new PaddedSobolSampler(256, RandomizeStrategy::XOR),
+    samplers.push_back(std::make_pair(new PaddedSobolSampler(256, RandomizeStrategy::PermuteDigits),
                                       "Padded Sobol 256"));
+    samplers.push_back(std::make_pair(new ZSobolSampler(256, Point2i(16, 16), RandomizeStrategy::PermuteDigits),
+                                      "Z Sobol 256"));
     samplers.push_back(
         std::make_pair(new SobolSampler(256, resolution, RandomizeStrategy::None),
                        "Sobol 256 Not Randomized"));
     samplers.push_back(
-        std::make_pair(new SobolSampler(256, resolution, RandomizeStrategy::XOR),
+        std::make_pair(new SobolSampler(256, resolution, RandomizeStrategy::PermuteDigits),
                        "Sobol 256 XOR Scramble"));
     samplers.push_back(
         std::make_pair(new SobolSampler(256, resolution, RandomizeStrategy::Owen),
@@ -376,7 +378,7 @@ std::vector<TestIntegrator> GetIntegrators() {
 
             Integrator *integrator =
                 new BDPTIntegrator(camera, sampler.first, scene.aggregate, scene.lights,
-                                   6, false, false, "power", false);
+                                   6, false, false, false);
             integrators.push_back({integrator, filmp,
                                    "BDPT, depth 8, Perspective, " + sampler.second +
                                        ", " + scene.description,

@@ -70,7 +70,7 @@ class CameraHandle : public TaggedPointer<PerspectiveCamera, OrthographicCamera,
     void PDF_We(const Ray &ray, Float *pdfPos, Float *pdfDir) const;
 
     PBRT_CPU_GPU
-    pstd::optional<CameraWiSample> SampleWi(const Interaction &ref, const Point2f &u,
+    pstd::optional<CameraWiSample> SampleWi(const Interaction &ref, Point2f u,
                                             SampledWavelengths &lambda) const;
 };
 

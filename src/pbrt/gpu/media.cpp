@@ -12,77 +12,76 @@ namespace pbrt {
 
 // It's not unususal for these values to have very large or very small
 // magnitudes after multiple (null) scattering events, even though in the
-// end ratios like beta/pdfUni are generally around 1.  To avoid overflow,
+// end ratios like T_hat/uniPathPDF are generally around 1.  To avoid overflow,
 // we rescale all three of them by the same factor when they become large.
 PBRT_CPU_GPU
-static inline void rescale(SampledSpectrum &beta, SampledSpectrum &pdfLight,
-                           SampledSpectrum &pdfUni) {
+static inline void rescale(SampledSpectrum &T_hat, SampledSpectrum &lightPathPDF,
+                           SampledSpectrum &uniPathPDF) {
     // Note that no precision is lost in the rescaling since we're always
     // multiplying by an exact power of 2.
-    if (beta.MaxComponentValue() > 0x1p24f ||
-        pdfLight.MaxComponentValue() > 0x1p24f ||
-        pdfUni.MaxComponentValue() > 0x1p24f) {
-        beta *= 1.f / 0x1p24f;
-        pdfLight *= 1.f / 0x1p24f;
-        pdfUni *= 1.f / 0x1p24f;
-    } else if (beta.MaxComponentValue() < 0x1p-24f ||
-               pdfLight.MaxComponentValue() < 0x1p-24f ||
-               pdfUni.MaxComponentValue() < 0x1p-24f) {
-        beta *= 0x1p24f;
-        pdfLight *= 0x1p24f;
-        pdfUni *= 0x1p24f;
+    if (T_hat.MaxComponentValue() > 0x1p24f ||
+        lightPathPDF.MaxComponentValue() > 0x1p24f ||
+        uniPathPDF.MaxComponentValue() > 0x1p24f) {
+        T_hat *= 1.f / 0x1p24f;
+        lightPathPDF *= 1.f / 0x1p24f;
+        uniPathPDF *= 1.f / 0x1p24f;
+    } else if (T_hat.MaxComponentValue() < 0x1p-24f ||
+               lightPathPDF.MaxComponentValue() < 0x1p-24f ||
+               uniPathPDF.MaxComponentValue() < 0x1p-24f) {
+        T_hat *= 0x1p24f;
+        lightPathPDF *= 0x1p24f;
+        uniPathPDF *= 0x1p24f;
     }
 }
 
+// GPUPathIntegrator Participating Media Methods
 void GPUPathIntegrator::SampleMediumInteraction(int depth) {
+    RayQueue *nextRayQueue = NextRayQueue(depth);
     ForAllQueued(
         "Sample medium interaction", mediumSampleQueue, maxQueueSize,
-        PBRT_GPU_LAMBDA(MediumSampleWorkItem ms, int index) {
-            Ray ray = ms.ray;
-            Float tMax = ms.tMax;
+        PBRT_GPU_LAMBDA(MediumSampleWorkItem w) {
+            Ray ray = w.ray;
+            Float tMax = w.tMax;
 
-            PBRT_DBG("Sampling medium interaction pixel index %d depth %d ray %f %f %f d %f %f "
-                "%f tMax %f\n",
-                ms.pixelIndex, depth, ray.o.x, ray.o.y, ray.o.z, ray.d.x, ray.d.y, ray.d.z,
-                tMax);
+            PBRT_DBG("Sampling medium interaction pixel index %d depth %d ray %f %f %f d "
+                     "%f %f "
+                     "%f tMax %f\n",
+                     w.pixelIndex, depth, ray.o.x, ray.o.y, ray.o.z, ray.d.x, ray.d.y,
+                     ray.d.z, tMax);
 
-            SampledWavelengths lambda = ms.lambda;
-            SampledSpectrum beta = ms.beta;
-            SampledSpectrum pdfUni = ms.pdfUni;
-            SampledSpectrum pdfNEE = ms.pdfNEE;
+            SampledWavelengths lambda = w.lambda;
+            SampledSpectrum T_hat = w.T_hat;
+            SampledSpectrum uniPathPDF = w.uniPathPDF;
+            SampledSpectrum lightPathPDF = w.lightPathPDF;
             SampledSpectrum L(0.f);
             RNG rng(Hash(tMax), Hash(ray.d));
 
             PBRT_DBG("Lambdas %f %f %f %f\n", lambda[0], lambda[1], lambda[2], lambda[3]);
-            PBRT_DBG("Medium sample beta %f %f %f %f pdfUni %f %f %f %f pdfNEE %f %f %f %f\n",
-                beta[0], beta[1], beta[2], beta[3], pdfUni[0], pdfUni[1], pdfUni[2],
-                pdfUni[3], pdfNEE[0], pdfNEE[1], pdfNEE[2], pdfNEE[3]);
+            PBRT_DBG("Medium sample T_hat %f %f %f %f uniPathPDF %f %f %f %f "
+                     "lightPathPDF %f %f %f %f\n",
+                     T_hat[0], T_hat[1], T_hat[2], T_hat[3], uniPathPDF[0], uniPathPDF[1],
+                     uniPathPDF[2], uniPathPDF[3], lightPathPDF[0], lightPathPDF[1],
+                     lightPathPDF[2], lightPathPDF[3]);
 
             // Sample the medium according to T_maj, the homogeneous
             // transmission function based on the majorant.
             bool scattered = false;
-            ray.medium.SampleTmaj(
-                ray, tMax, rng, lambda, [&](const MediumSample &mediumSample) {
-                    rescale(beta, pdfUni, pdfNEE);
 
-                    if (!mediumSample.intr) {
-                        // No interaction was sampled, but update the path
-                        // throughput and unidirectional PDF to the end of
-                        // the ray segment.
-                        beta *= mediumSample.Tmaj;
-                        pdfUni *= mediumSample.Tmaj;
-                        PBRT_DBG("No intr: beta %f %f %f %f pdfUni %f %f %f %f\n", beta[0],
-                            beta[1], beta[2], beta[3], pdfUni[0], pdfUni[1], pdfUni[2],
-                            pdfUni[3]);
-                        return false;
-                    }
+            RaySamples raySamples = pixelSampleState.samples[w.pixelIndex];
+            Float uDist = raySamples.media.uDist;
+            Float uMode = raySamples.media.uMode;
 
-                    const MediumInteraction &intr = *mediumSample.intr;
+            SampledSpectrum Tmaj = ray.medium.SampleTmaj(
+                ray, tMax, uDist, rng, lambda, [&](const MediumSample &mediumSample) {
+                    rescale(T_hat, uniPathPDF, lightPathPDF);
+
+                    const MediumInteraction &intr = mediumSample.intr;
                     const SampledSpectrum &sigma_a = intr.sigma_a;
                     const SampledSpectrum &sigma_s = intr.sigma_s;
                     const SampledSpectrum &Tmaj = mediumSample.Tmaj;
 
-                    PBRT_DBG("Medium event Tmaj %f %f %f %f sigma_a %f %f %f %f sigma_s %f %f "
+                    PBRT_DBG(
+                        "Medium event Tmaj %f %f %f %f sigma_a %f %f %f %f sigma_s %f %f "
                         "%f %f\n",
                         Tmaj[0], Tmaj[1], Tmaj[2], Tmaj[3], sigma_a[0], sigma_a[1],
                         sigma_a[2], sigma_a[3], sigma_s[0], sigma_s[1], sigma_s[2],
@@ -92,39 +91,38 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                     // by sigma_a/sigma_maj rather than only doing it
                     // (without scaling) at absorption events.
                     if (depth < maxDepth && intr.Le)
-                        L += beta * intr.Le * sigma_a /
-                             (intr.sigma_maj[0] * pdfUni.Average());
+                        L += T_hat * intr.Le * sigma_a /
+                             (intr.sigma_maj[0] * uniPathPDF.Average());
 
                     // Compute probabilities for each type of scattering.
                     Float pAbsorb = sigma_a[0] / intr.sigma_maj[0];
                     Float pScatter = sigma_s[0] / intr.sigma_maj[0];
                     Float pNull = std::max<Float>(0, 1 - pAbsorb - pScatter);
-                    PBRT_DBG("Medium scattering probabilities: %f %f %f\n", pAbsorb, pScatter,
-                        pNull);
+                    PBRT_DBG("Medium scattering probabilities: %f %f %f\n", pAbsorb,
+                             pScatter, pNull);
 
                     // And randomly choose one.
-                    Float um = rng.Uniform<Float>();
-                    int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, um);
+                    int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, uMode);
 
                     if (mode == 0) {
                         // Absorption--done.
                         PBRT_DBG("absorbed\n");
-                        beta = SampledSpectrum(0.f);
+                        T_hat = SampledSpectrum(0.f);
                         // Tell the medium to stop traveral.
                         return false;
                     } else if (mode == 1) {
                         // Scattering.
                         PBRT_DBG("scattered\n");
-                        beta *= Tmaj * sigma_s;
-                        pdfUni *= Tmaj * sigma_s;
+                        T_hat *= Tmaj * sigma_s;
+                        uniPathPDF *= Tmaj * sigma_s;
 
                         // TODO: don't hard code a phase function.
                         const HGPhaseFunction *phase =
                             intr.phase.CastOrNullptr<HGPhaseFunction>();
                         // Enqueue medium scattering work.
                         mediumScatterQueue->Push(MediumScatterWorkItem{
-                            intr.p(), lambda, beta, pdfUni, *phase, -ray.d,
-                            ms.etaScale, ray.medium, ms.pixelIndex});
+                            intr.p(), lambda, T_hat, uniPathPDF, *phase, -ray.d,
+                            w.etaScale, ray.medium, w.pixelIndex});
                         scattered = true;
 
                         return false;
@@ -133,74 +131,75 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                         PBRT_DBG("null-scattered\n");
                         SampledSpectrum sigma_n = intr.sigma_n();
 
-                        beta *= Tmaj * sigma_n;
-                        pdfUni *= Tmaj * sigma_n;
-                        pdfNEE *= Tmaj * intr.sigma_maj;
+                        T_hat *= Tmaj * sigma_n;
+                        uniPathPDF *= Tmaj * sigma_n;
+                        lightPathPDF *= Tmaj * intr.sigma_maj;
+
+                        uMode = rng.Uniform<Float>();
 
                         return true;
                     }
                 });
+            if (!scattered && T_hat) {
+                T_hat *= Tmaj;
+                uniPathPDF *= Tmaj;
+                lightPathPDF *= Tmaj;
+            }
 
-            PBRT_DBG("Post ray medium sample L %f %f %f %f beta %f %f %f %f\n", L[0], L[1],
-                L[2], L[3], beta[0], beta[1], beta[2], beta[3]);
-            PBRT_DBG("Post ray medium sample pdfUni %f %f %f %f pdfNEE %f %f %f %f\n",
-                pdfUni[0], pdfUni[1], pdfUni[2], pdfUni[3], pdfNEE[0], pdfNEE[1],
-                pdfNEE[2], pdfNEE[3]);
+            PBRT_DBG("Post ray medium sample L %f %f %f %f T_hat %f %f %f %f\n", L[0],
+                     L[1], L[2], L[3], T_hat[0], T_hat[1], T_hat[2], T_hat[3]);
+            PBRT_DBG("Post ray medium sample uniPathPDF %f %f %f %f lightPathPDF %f %f "
+                     "%f %f\n",
+                     uniPathPDF[0], uniPathPDF[1], uniPathPDF[2], uniPathPDF[3],
+                     lightPathPDF[0], lightPathPDF[1], lightPathPDF[2], lightPathPDF[3]);
 
             // Add any emission found to its pixel sample's L value.
             if (L) {
-                SampledSpectrum Lp = pixelSampleState.L[ms.pixelIndex];
-                pixelSampleState.L[ms.pixelIndex] = Lp + SafeDiv(L, lambda.PDF());
-                PBRT_DBG("Added emitted radiance %f %f %f %f at pixel index %d\n",
-                    L[0], L[1], L[2], L[3], ms.pixelIndex);
+                SampledSpectrum Lp = pixelSampleState.L[w.pixelIndex];
+                pixelSampleState.L[w.pixelIndex] = Lp + SafeDiv(L, lambda.PDF());
+                PBRT_DBG("Added emitted radiance %f %f %f %f at pixel index %d\n", L[0],
+                         L[1], L[2], L[3], w.pixelIndex);
             }
 
             // There's no more work to do if there was a scattering event in
             // the medium.
-            if (scattered || !beta || depth == maxDepth)
+            if (scattered || !T_hat || depth == maxDepth)
                 return;
 
             // Otherwise, enqueue bump and medium stuff...
             // FIXME: this is all basically duplicate code w/optix.cu
-            if (ms.tMax == Infinity) {
+            if (w.tMax == Infinity) {
                 // no intersection
                 if (escapedRayQueue) {
                     PBRT_DBG("Adding ray to escapedRayQueue pixel index %d depth %d\n",
-                        ms.pixelIndex, depth);
+                             w.pixelIndex, depth);
                     escapedRayQueue->Push(EscapedRayWorkItem{
-                        beta, pdfUni, pdfNEE, lambda, ray.o, ray.d, ms.piPrev, ms.nPrev,
-                        ms.nsPrev, (int)ms.isSpecularBounce, ms.pixelIndex});
+                        ray.o, ray.d, lambda, w.pixelIndex, (int)w.isSpecularBounce,
+                        T_hat, uniPathPDF, lightPathPDF, w.prevIntrCtx});
                 }
             }
 
-            MaterialHandle material = ms.material;
+            MaterialHandle material = w.material;
             if (!material) {
-                Interaction intr(ms.pi, ms.n);
-                intr.mediumInterface = &ms.mediumInterface;
+                Interaction intr(w.pi, w.n);
+                intr.mediumInterface = &w.mediumInterface;
                 Ray newRay = intr.SpawnRay(ray.d);
-                mediumTransitionQueue->Push(MediumTransitionWorkItem{
-                    newRay, lambda, beta, pdfUni, pdfNEE, ms.piPrev, ms.nPrev, ms.nsPrev,
-                    ms.isSpecularBounce, ms.anyNonSpecularBounces, ms.etaScale,
-                    ms.pixelIndex});
-#if 0
-                // WHY NOT THIS?
-                rayQueues[(depth + 1) & 1]->PushIndirect(newRay, ms.piPrev, ms.nPrev, ms.nsPrev,
-                                                         beta, pdfUni, pdfNEE, lambda, ms.etaScale,
-                                                         ms.isSpecularBounce, ms.anyNonSpecularBounces,
-                                                         ms.pixelIndex);
-#endif
+                nextRayQueue->PushIndirectRay(newRay, w.prevIntrCtx, T_hat, uniPathPDF,
+                                              lightPathPDF, lambda, w.etaScale,
+                                              w.isSpecularBounce, w.anyNonSpecularBounces,
+                                              w.pixelIndex);
                 return;
             }
 
-            if (ms.areaLight) {
-                PBRT_DBG("Ray hit an area light: adding to hitAreaLightQueue pixel index %d "
+            if (w.areaLight) {
+                PBRT_DBG(
+                    "Ray hit an area light: adding to hitAreaLightQueue pixel index %d "
                     "depth %d\n",
-                    ms.pixelIndex, depth);
-                // TODO: intr.wo == -ray.d?
+                    w.pixelIndex, depth);
                 hitAreaLightQueue->Push(HitAreaLightWorkItem{
-                    ms.areaLight, lambda, beta, pdfUni, pdfNEE, Point3f(ms.pi), ms.n,
-                    ms.uv, -ray.d, ms.piPrev, ray.d, ray.time, ms.nPrev, ms.nsPrev,
-                    ms.isSpecularBounce, ms.pixelIndex});
+                    w.areaLight, Point3f(w.pi), w.n, w.uv, -ray.d, lambda, T_hat,
+                    uniPathPDF, lightPathPDF, w.prevIntrCtx, w.isSpecularBounce,
+                    w.pixelIndex});
             }
 
             FloatTextureHandle displacement = material.GetDisplacement();
@@ -216,10 +215,10 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
 
             auto enqueue = [=](auto ptr) {
                 using Material = typename std::remove_reference_t<decltype(*ptr)>;
-                q->Push<Material>(MaterialEvalWorkItem<Material>{
-                    ptr, lambda, beta, pdfUni, ms.pi, ms.n, ms.ns, ms.dpdus, ms.dpdvs,
-                    ms.dndus, ms.dndvs, -ray.d, ms.uv, ray.time, ms.anyNonSpecularBounces,
-                    ms.etaScale, ms.mediumInterface, ms.pixelIndex});
+                q->Push<MaterialEvalWorkItem<Material>>(MaterialEvalWorkItem<Material>{
+                    ptr, w.pi, w.n, w.ns, w.dpdus, w.dpdvs, w.dndus, w.dndvs, w.uv,
+                    lambda, w.anyNonSpecularBounces, -ray.d, w.pixelIndex, T_hat,
+                    uniPathPDF, w.etaScale, w.mediumInterface, ray.time});
             };
             material.Dispatch(enqueue);
         });
@@ -228,115 +227,94 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
         return;
 
     RayQueue *currentRayQueue = CurrentRayQueue(depth);
-    RayQueue *nextRayQueue = NextRayQueue(depth);
 
     using PhaseFunction = HGPhaseFunction;
     std::string desc = std::string("Sample direct/indirect - Henyey Greenstein");
     ForAllQueued(
         desc.c_str(), mediumScatterQueue, maxQueueSize,
-        PBRT_GPU_LAMBDA(MediumScatterWorkItem ms, int index) {
-            RaySamples raySamples = pixelSampleState.samples[ms.pixelIndex];
+        PBRT_GPU_LAMBDA(MediumScatterWorkItem w) {
+            RaySamples raySamples = pixelSampleState.samples[w.pixelIndex];
             Float time = 0;  // TODO: FIXME
-            Vector3f wo = ms.wo;
+            Vector3f wo = w.wo;
 
             // Sample direct lighting at medium scattering event.  First,
             // choose a light source.
-            LightSampleContext ctx(Point3fi(ms.p), Normal3f(0, 0, 0), Normal3f(0, 0, 0));
+            LightSampleContext ctx(Point3fi(w.p), Normal3f(0, 0, 0), Normal3f(0, 0, 0));
             pstd::optional<SampledLight> sampledLight =
                 lightSampler.Sample(ctx, raySamples.direct.uc);
 
             if (sampledLight) {
                 LightHandle light = sampledLight->light;
                 // And now sample a point on the light.
-                pstd::optional<LightLiSample> ls = light.SampleLi(ctx, raySamples.direct.u, ms.lambda,
-                                                  LightSamplingMode::WithMIS);
+                pstd::optional<LightLiSample> ls = light.SampleLi(
+                    ctx, raySamples.direct.u, w.lambda, LightSamplingMode::WithMIS);
                 if (ls && ls->L && ls->pdf > 0) {
                     Vector3f wi = ls->wi;
-                    SampledSpectrum beta = ms.beta * ms.phase.p(wo, wi);
+                    SampledSpectrum T_hat = w.T_hat * w.phase.p(wo, wi);
 
-                    PBRT_DBG("Phase phase beta %f %f %f %f\n", beta[0], beta[1], beta[2],
-                        beta[3]);
+                    PBRT_DBG("Phase phase T_hat %f %f %f %f\n", T_hat[0], T_hat[1],
+                             T_hat[2], T_hat[3]);
 
                     // Compute PDFs for direct lighting MIS calculation.
                     Float lightPDF = ls->pdf * sampledLight->pdf;
                     Float phasePDF =
-                        IsDeltaLight(light.Type()) ? 0.f : ms.phase.PDF(wo, wi);
-                    SampledSpectrum pdfUni = ms.pdfUni * phasePDF;
-                    SampledSpectrum pdfNEE = ms.pdfUni * lightPDF;
+                        IsDeltaLight(light.Type()) ? 0.f : w.phase.PDF(wo, wi);
+                    SampledSpectrum uniPathPDF = w.uniPathPDF * phasePDF;
+                    SampledSpectrum lightPathPDF = w.uniPathPDF * lightPDF;
 
-                    SampledSpectrum Ld = SafeDiv(beta * ls->L, ms.lambda.PDF());
-                    Ray ray(ms.p, ls->pLight.p() - ms.p, time, ms.medium);
+                    SampledSpectrum Ld = SafeDiv(T_hat * ls->L, w.lambda.PDF());
+                    Ray ray(w.p, ls->pLight.p() - w.p, time, w.medium);
 
                     // Enqueue shadow ray
-                    shadowRayQueue->Push(ray, 1 - ShadowEpsilon, ms.lambda, Ld,
-                                         pdfUni, pdfNEE, ms.pixelIndex);
+                    shadowRayQueue->Push(ray, 1 - ShadowEpsilon, w.lambda, Ld, uniPathPDF,
+                                         lightPathPDF, w.pixelIndex);
 
                     PBRT_DBG("Enqueued medium shadow ray depth %d "
-                             "Ld %f %f %f %f pdfUni %f %f %f %f "
-                             "pdfNEE %f %f %f %f pixel index %d\n",
-                             depth, Ld[0], Ld[1], Ld[2], Ld[3], pdfUni[0], pdfUni[1],
-                             pdfUni[2], pdfUni[3], pdfNEE[0], pdfNEE[1], pdfNEE[2], pdfNEE[3],
-                             ms.pixelIndex);
+                             "Ld %f %f %f %f uniPathPDF %f %f %f %f "
+                             "lightPathPDF %f %f %f %f pixel index %d\n",
+                             depth, Ld[0], Ld[1], Ld[2], Ld[3], uniPathPDF[0],
+                             uniPathPDF[1], uniPathPDF[2], uniPathPDF[3], lightPathPDF[0],
+                             lightPathPDF[1], lightPathPDF[2], lightPathPDF[3],
+                             w.pixelIndex);
                 }
             }
 
             // Sample indirect lighting.
             pstd::optional<PhaseFunctionSample> phaseSample =
-                ms.phase.Sample_p(wo, raySamples.indirect.u);
+                w.phase.Sample_p(wo, raySamples.indirect.u);
             if (!phaseSample || phaseSample->pdf == 0)
                 return;
 
-            SampledSpectrum beta = ms.beta * phaseSample->p;
-            SampledSpectrum pdfUni = ms.pdfUni * phaseSample->pdf;
-            SampledSpectrum pdfNEE = ms.pdfUni;
+            SampledSpectrum T_hat = w.T_hat * phaseSample->p;
+            SampledSpectrum uniPathPDF = w.uniPathPDF * phaseSample->pdf;
+            SampledSpectrum lightPathPDF = w.uniPathPDF;
 
             // Russian roulette
-            // TODO: should we even bother? Generally beta/pdfUni is one here,
+            // TODO: should we even bother? Generally T_hat/uniPathPDF is one here,
             // due to the way scattering events are scattered and because we're
             // sampling exactly from the phase function's distribution...
-            SampledSpectrum rrBeta = beta * ms.etaScale / pdfUni.Average();
+            SampledSpectrum rrBeta = T_hat * w.etaScale / uniPathPDF.Average();
             if (rrBeta.MaxComponentValue() < 1 && depth > 1) {
                 Float q = std::max<Float>(0, 1 - rrBeta.MaxComponentValue());
                 if (raySamples.indirect.rr < q) {
-                    PBRT_DBG("RR terminated medium indirect with q %f pixel index %d\n", q,
-                             ms.pixelIndex);
+                    PBRT_DBG("RR terminated medium indirect with q %f pixel index %d\n",
+                             q, w.pixelIndex);
                     return;
                 }
-                pdfUni *= 1 - q;
-                pdfNEE *= 1 - q;
+                uniPathPDF *= 1 - q;
+                lightPathPDF *= 1 - q;
             }
 
-            Ray ray(ms.p, phaseSample->wi, time, ms.medium);
+            Ray ray(w.p, phaseSample->wi, time, w.medium);
             bool isSpecularBounce = false;
             bool anyNonSpecularBounces = true;
 
             // Spawn indirect ray.
-            nextRayQueue->PushIndirect(
-                ray, Point3fi(ms.p), Normal3f(0, 0, 0), Normal3f(0, 0, 0), beta, pdfUni,
-                pdfNEE, ms.lambda, ms.etaScale, isSpecularBounce, anyNonSpecularBounces,
-                ms.pixelIndex);
+            nextRayQueue->PushIndirectRay(ray, ctx, T_hat, uniPathPDF, lightPathPDF,
+                                          w.lambda, w.etaScale, isSpecularBounce,
+                                          anyNonSpecularBounces, w.pixelIndex);
             PBRT_DBG("Enqueuing indirect medium ray at depth %d pixel index %d\n",
-                     depth + 1, ms.pixelIndex);
-        });
-}
-
-void GPUPathIntegrator::HandleMediumTransitions(int depth) {
-    RayQueue *rayQueue = NextRayQueue(depth);
-
-    ForAllQueued(
-        "Handle medium transitions", mediumTransitionQueue, maxQueueSize,
-        PBRT_GPU_LAMBDA(MediumTransitionWorkItem mt, int index) {
-            // Have to do this here, later, since we can't be writing into
-            // the other ray queue in optix closest hit.  (Wait--really?
-            // Why not? Basically boils down to current indirect enqueue (and other
-            // places?))
-            // TODO: figure this out...
-            rayQueue->PushIndirect(
-                mt.ray, mt.piPrev, mt.nPrev, mt.nsPrev, mt.beta, mt.pdfUni, mt.pdfNEE,
-                mt.lambda, mt.etaScale, mt.isSpecularBounce, mt.anyNonSpecularBounces,
-                mt.pixelIndex);
-            PBRT_DBG("Enqueuied ray after medium transition at depth %d pixel index %d",
-                depth + 1, mt.pixelIndex);
+                     depth + 1, w.pixelIndex);
         });
 }
 

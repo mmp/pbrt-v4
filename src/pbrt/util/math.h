@@ -178,6 +178,15 @@ PBRT_CPU_GPU inline Float Degrees(Float rad) {
     return (180 / Pi) * rad;
 }
 
+PBRT_CPU_GPU
+inline Float SmoothStep(Float x, Float a, Float b) {
+    if (a == b)
+        return (x < a) ? 0 : 1;
+    DCHECK_LT(a, b);
+    Float t = Clamp((x - a) / (b - a), 0, 1);
+    return t * t * (3 - 2 * t);
+}
+
 PBRT_CPU_GPU inline float SafeSqrt(float x) {
     DCHECK_GE(x, -1e-3f);  // not too negative
     return std::sqrt(std::max(0.f, x));
@@ -402,7 +411,7 @@ inline float FastExp(float x) {
     int i = (int)fxp;
 
     // Evaluate polynomial approximation of $2^f$
-    float twoToF = EvaluatePolynomial(f, 0.999813f, 0.696834f, 0.224131f, 0.0790209f);
+    float twoToF = EvaluatePolynomial(f, 1.f, 0.695556856f, 0.226173572f, 0.0781455737f);
 
     // Scale $2^f$ by $2^i$ and return final result
     int exponent = Exponent(twoToF) + i;
@@ -661,15 +670,6 @@ pstd::optional<SquareMatrix<N>> LinearLeastSquares(const Float A[][N], const Flo
     if (!AtAi)
         return {};
     return Transpose(*AtAi * AtB);
-}
-
-PBRT_CPU_GPU
-inline Float SmoothStep(Float x, Float a, Float b) {
-    if (a == b)
-        return (x < a) ? 0 : 1;
-    DCHECK_LT(a, b);
-    Float t = Clamp((x - a) / (b - a), 0, 1);
-    return t * t * (3 - 2 * t);
 }
 
 // Math Function Declarations

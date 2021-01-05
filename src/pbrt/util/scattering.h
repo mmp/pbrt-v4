@@ -92,6 +92,7 @@ inline Float FrDielectric(Float cosTheta_i, Float eta) {
     return (r_parl * r_parl + r_perp * r_perp) / 2;
 }
 
+// BSSRDF Utility Declarations
 PBRT_CPU_GPU
 Float FresnelMoment1(Float invEta);
 PBRT_CPU_GPU

@@ -51,7 +51,7 @@ struct LightLiSample {
 
 // LightLeSample Definition
 struct LightLeSample {
-  public:
+    // LightLeSample Public Methods
     LightLeSample() = default;
     PBRT_CPU_GPU
     LightLeSample(const SampledSpectrum &L, const Ray &ray, Float pdfPos, Float pdfDir)
@@ -66,10 +66,7 @@ struct LightLeSample {
     PBRT_CPU_GPU
     Float AbsCosTheta(const Vector3f &w) const { return intr ? AbsDot(w, intr->n) : 1; }
 
-    PBRT_CPU_GPU
-    // FIXME: should this be || or && ?. Review usage...
-    operator bool() const { return pdfPos > 0 || pdfDir > 0; }
-
+    // LightLeSample Public Members
     SampledSpectrum L;
     Ray ray;
     pstd::optional<Interaction> intr;
@@ -98,125 +95,38 @@ class LightSampleContext {
 };
 
 // LightBounds Definition
-struct LightBounds {
+class LightBounds {
+  public:
     // LightBounds Public Methods
-    PBRT_CPU_GPU
-    operator bool() const { return !b.IsDegenerate(); }
-
     LightBounds() = default;
-    LightBounds(const Bounds3f &b, const Vector3f &w, Float phi, Float theta_o,
-                Float theta_e, bool twoSided)
-        : b(b),
-          w(Normalize(w)),
-          phi(phi),
-          theta_o(theta_o),
-          theta_e(theta_e),
-          cosTheta_o(std::cos(theta_o)),
-          cosTheta_e(std::cos(theta_e)),
-          twoSided(twoSided) {}
-    LightBounds(const Point3f &p, const Vector3f &w, Float phi, Float theta_o,
-                Float theta_e, bool twoSided)
-        : b(p, p),
-          w(Normalize(w)),
-          phi(phi),
-          theta_o(theta_o),
-          theta_e(theta_e),
-          cosTheta_o(std::cos(theta_o)),
-          cosTheta_e(std::cos(theta_e)),
-          twoSided(twoSided) {}
+    LightBounds(const Bounds3f &b, const Vector3f &w, Float phi, Float cosTheta_o,
+                Float cosTheta_e, bool twoSided);
 
     PBRT_CPU_GPU
-    Float Importance(Point3f p, Normal3f n) const {
-        // Compute clamped squared distance to _intr_
-        Point3f pc = Centroid();
-        Float d2 = DistanceSquared(p, pc);
-        // Don't let d2 get too small if p is inside the bounds.
-        d2 = std::max(d2, Length(b.Diagonal()) / 2);
-
-        Vector3f wi = Normalize(p - pc);
-
-        Float cosTheta = Dot(w, wi);
-        if (twoSided)
-            cosTheta = std::abs(cosTheta);
-#if 0
-    else if (cosTheta < 0 && cosTheta_o == 1) {
-        // Catch the case where the point is outside the bounds and definitely
-        // not in the emitted cone even though the conservative theta_u test
-        // make suggest it could be.
-        // Doesn't seem to make much difference in practice.
-        if ((p.x < b.pMin.x || p.x > b.pMax.x) &&
-            (p.y < b.pMin.y || p.y > b.pMax.y) &&
-            (p.z < b.pMin.z || p.z > b.pMax.z))
-            return 0;
-    }
-#endif
-
-        // FIXME? unstable when cosTheta \approx 1
-        Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
-
-        // Define sine and cosine clamped subtraction lambdas
-        // cos(max(0, a-b))
-        auto cosSubClamped = [](Float sinThetaA, Float cosThetaA, Float sinThetaB,
-                                Float cosThetaB) -> Float {
-            if (cosThetaA > cosThetaB)
-                // Handle the max(0, ...)
-                return 1;
-            return cosThetaA * cosThetaB + sinThetaA * sinThetaB;
-        };
-        // sin(max(0, a-b))
-        auto sinSubClamped = [](Float sinThetaA, Float cosThetaA, Float sinThetaB,
-                                Float cosThetaB) -> Float {
-            if (cosThetaA > cosThetaB)
-                // Handle the max(0, ...)
-                return 0;
-            return sinThetaA * cosThetaB - cosThetaA * sinThetaB;
-        };
-
-        // Compute $\cos \theta_\roman{u}$ for _intr_
-        Float cosTheta_u = BoundSubtendedDirections(b, p).cosTheta;
-        Float sinTheta_u = SafeSqrt(1 - cosTheta_u * cosTheta_u);
-
-        // Compute $\cos \theta_\roman{p}$ for _intr_ and test against $\cos
-        // \theta_\roman{e}$
-        // cos(theta_p). Compute in two steps
-        Float cosTheta_x = cosSubClamped(
-            sinTheta, cosTheta, SafeSqrt(1 - cosTheta_o * cosTheta_o), cosTheta_o);
-        Float sinTheta_x = sinSubClamped(
-            sinTheta, cosTheta, SafeSqrt(1 - cosTheta_o * cosTheta_o), cosTheta_o);
-        Float cosTheta_p = cosSubClamped(sinTheta_x, cosTheta_x, sinTheta_u, cosTheta_u);
-        if (cosTheta_p <= cosTheta_e)
-            return 0;
-
-        Float imp = phi * cosTheta_p / d2;
-        DCHECK_GE(imp, -1e-3);
-
-        // Account for $\cos \theta_\roman{i}$ in importance at surfaces
-        if (n != Normal3f(0, 0, 0)) {
-            // cos(thetap_i) = cos(max(0, theta_i - theta_u))
-            // cos (a-b) = cos a cos b + sin a sin b
-            Float cosTheta_i = AbsDot(wi, n);
-            Float sinTheta_i = SafeSqrt(1 - cosTheta_i * cosTheta_i);
-            Float cosThetap_i =
-                cosSubClamped(sinTheta_i, cosTheta_i, sinTheta_u, cosTheta_u);
-            imp *= cosThetap_i;
-        }
-
-        return std::max<Float>(imp, 0);
-    }
+    Point3f Centroid() const { return (bounds.pMin + bounds.pMax) / 2; }
 
     PBRT_CPU_GPU
-    Point3f Centroid() const { return (b.pMin + b.pMax) / 2; }
+    Float Importance(Point3f p, Normal3f n) const;
 
     std::string ToString() const;
 
     // LightBounds Public Members
-    Bounds3f b;  // TODO: rename to |bounds|?
-    Vector3f w;
+    Bounds3f bounds;
     Float phi = 0;
-    Float theta_o = 0, theta_e = 0;
-    Float cosTheta_o = 1, cosTheta_e = 1;
-    bool twoSided = false;
+    Vector3f w;
+    Float cosTheta_o, cosTheta_e;
+    bool twoSided;
 };
+
+// LightBounds Inline Methods
+inline LightBounds::LightBounds(const Bounds3f &b, const Vector3f &w, Float phi,
+                                Float cosTheta_o, Float cosTheta_e, bool twoSided)
+    : bounds(b),
+      w(Normalize(w)),
+      phi(phi),
+      cosTheta_o(cosTheta_o),
+      cosTheta_e(cosTheta_e),
+      twoSided(twoSided) {}
 
 LightBounds Union(const LightBounds &a, const LightBounds &b);
 
@@ -266,8 +176,8 @@ class PointLight : public LightBase {
     void Preprocess(const Bounds3f &sceneBounds) {}
 
     PBRT_CPU_GPU
-    LightLeSample SampleLe(const Point2f &u1, const Point2f &u2,
-                           SampledWavelengths &lambda, Float time) const;
+    pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
+                                           SampledWavelengths &lambda, Float time) const;
     PBRT_CPU_GPU
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
@@ -276,7 +186,7 @@ class PointLight : public LightBase {
         LOG_FATAL("Shouldn't be called for non-area lights");
     }
 
-    LightBounds Bounds() const;
+    pstd::optional<LightBounds> Bounds() const;
 
     std::string ToString() const;
 
@@ -320,8 +230,8 @@ class DistantLight : public LightBase {
     Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const { return 0; }
 
     PBRT_CPU_GPU
-    LightLeSample SampleLe(const Point2f &u1, const Point2f &u2,
-                           SampledWavelengths &lambda, Float time) const;
+    pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
+                                           SampledWavelengths &lambda, Float time) const;
     PBRT_CPU_GPU
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
@@ -330,7 +240,7 @@ class DistantLight : public LightBase {
         LOG_FATAL("Shouldn't be called for non-area lights");
     }
 
-    LightBounds Bounds() const { return {}; }
+    pstd::optional<LightBounds> Bounds() const { return {}; }
 
     std::string ToString() const;
 
@@ -383,8 +293,8 @@ class ProjectionLight : public LightBase {
     Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
 
     PBRT_CPU_GPU
-    LightLeSample SampleLe(const Point2f &u1, const Point2f &u2,
-                           SampledWavelengths &lambda, Float time) const;
+    pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
+                                           SampledWavelengths &lambda, Float time) const;
     PBRT_CPU_GPU
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
@@ -393,7 +303,7 @@ class ProjectionLight : public LightBase {
         LOG_FATAL("Shouldn't be called for non-area lights");
     }
 
-    LightBounds Bounds() const;
+    pstd::optional<LightBounds> Bounds() const;
 
     std::string ToString() const;
 
@@ -435,8 +345,8 @@ class GoniometricLight : public LightBase {
     Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
 
     PBRT_CPU_GPU
-    LightLeSample SampleLe(const Point2f &u1, const Point2f &u2,
-                           SampledWavelengths &lambda, Float time) const;
+    pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
+                                           SampledWavelengths &lambda, Float time) const;
     PBRT_CPU_GPU
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
@@ -445,7 +355,7 @@ class GoniometricLight : public LightBase {
         LOG_FATAL("Shouldn't be called for non-area lights");
     }
 
-    LightBounds Bounds() const;
+    pstd::optional<LightBounds> Bounds() const;
 
     std::string ToString() const;
 
@@ -483,12 +393,12 @@ class DiffuseAreaLight : public LightBase {
     SampledSpectrum Phi(const SampledWavelengths &lambda) const;
 
     PBRT_CPU_GPU
-    LightLeSample SampleLe(const Point2f &u1, const Point2f &u2,
-                           SampledWavelengths &lambda, Float time) const;
+    pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
+                                           SampledWavelengths &lambda, Float time) const;
     PBRT_CPU_GPU
     void PDF_Le(const Interaction &, Vector3f &w, Float *pdfPos, Float *pdfDir) const;
 
-    LightBounds Bounds() const;
+    pstd::optional<LightBounds> Bounds() const;
 
     PBRT_CPU_GPU
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const {
@@ -519,28 +429,10 @@ class DiffuseAreaLight : public LightBase {
     PBRT_CPU_GPU
     pstd::optional<LightLiSample> SampleLi(LightSampleContext ctx, Point2f u,
                                            SampledWavelengths lambda,
-                                           LightSamplingMode mode) const {
-        // Sample point on shape for _DiffuseAreaLight_
-        ShapeSampleContext shapeCtx(ctx.pi, ctx.n, ctx.ns, 0 /* time */);
-        pstd::optional<ShapeSample> ss = shape.Sample(shapeCtx, u);
-        DCHECK(!IsNaN(ss->pdf));
-        if (!ss || ss->pdf == 0 || LengthSquared(ss->intr.p() - ctx.p()) == 0)
-            return {};
-        ss->intr.mediumInterface = &mediumInterface;
-
-        // Return _LightLiSample_ for sampled point on shape
-        Vector3f wi = Normalize(ss->intr.p() - ctx.p());
-        SampledSpectrum Le = L(ss->intr.p(), ss->intr.n, ss->intr.uv, -wi, lambda);
-        if (!Le)
-            return {};
-        return LightLiSample(Le, wi, ss->pdf, ss->intr);
-    }
+                                           LightSamplingMode mode) const;
 
     PBRT_CPU_GPU
-    Float PDF_Li(LightSampleContext ctx, Vector3f wi, LightSamplingMode) const {
-        ShapeSampleContext shapeCtx(ctx.pi, ctx.n, ctx.ns, 0 /* time */);
-        return shape.PDF(shapeCtx, wi);
-    }
+    Float PDF_Li(LightSampleContext ctx, Vector3f wi, LightSamplingMode) const;
 
   private:
     // DiffuseAreaLight Private Members
@@ -576,8 +468,8 @@ class UniformInfiniteLight : public LightBase {
     Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
 
     PBRT_CPU_GPU
-    LightLeSample SampleLe(const Point2f &u1, const Point2f &u2,
-                           SampledWavelengths &lambda, Float time) const;
+    pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
+                                           SampledWavelengths &lambda, Float time) const;
     PBRT_CPU_GPU
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
@@ -586,7 +478,7 @@ class UniformInfiniteLight : public LightBase {
         LOG_FATAL("Shouldn't be called for non-area lights");
     }
 
-    LightBounds Bounds() const { return {}; }
+    pstd::optional<LightBounds> Bounds() const { return {}; }
 
     std::string ToString() const;
 
@@ -616,8 +508,8 @@ class ImageInfiniteLight : public LightBase {
     Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
 
     PBRT_CPU_GPU
-    LightLeSample SampleLe(const Point2f &u1, const Point2f &u2,
-                           SampledWavelengths &lambda, Float time) const;
+    pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
+                                           SampledWavelengths &lambda, Float time) const;
     PBRT_CPU_GPU
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
@@ -660,7 +552,7 @@ class ImageInfiniteLight : public LightBase {
             Interaction(ctx.p() + wi * (2 * sceneRadius), &mediumInterface));
     }
 
-    LightBounds Bounds() const { return {}; }
+    pstd::optional<LightBounds> Bounds() const { return {}; }
 
   private:
     // ImageInfiniteLight Private Methods
@@ -710,8 +602,8 @@ class PortalImageInfiniteLight : public LightBase {
     Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
 
     PBRT_CPU_GPU
-    LightLeSample SampleLe(const Point2f &u1, const Point2f &u2,
-                           SampledWavelengths &lambda, Float time) const;
+    pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
+                                           SampledWavelengths &lambda, Float time) const;
     PBRT_CPU_GPU
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
@@ -720,49 +612,53 @@ class PortalImageInfiniteLight : public LightBase {
         LOG_FATAL("Shouldn't be called for non-area lights");
     }
 
-    LightBounds Bounds() const { return {}; }
+    pstd::optional<LightBounds> Bounds() const { return {}; }
 
     std::string ToString() const;
 
   private:
     // PortalImageInfiniteLight Private Methods
     PBRT_CPU_GPU
-    SampledSpectrum ImageLookup(const Point2f &st,
-                                const SampledWavelengths &lambda) const;
+    SampledSpectrum ImageLookup(Point2f uv, const SampledWavelengths &lambda) const;
 
     PBRT_CPU_GPU
-    Vector3f RenderFromImage(const Point2f &st, Float *duv_dw = nullptr) const {
-        Float alpha = -Pi / 2 + st.x * Pi, beta = -Pi / 2 + st.y * Pi;
-        Float x = std::tan(alpha), y = std::tan(beta);
-        DCHECK(!IsInf(x) && !IsInf(y));
-        Vector3f w = Normalize(Vector3f(x, y, -1));
-
-        if (w.z == 0)
-            w.z = 1e-5;
-        if (duv_dw)
-            *duv_dw = Pi * Pi * std::abs((1 - w.y * w.y) * (1 - w.x * w.x) / w.z);
-        return portalFrame.FromLocal(w);
-    }
-
-    PBRT_CPU_GPU
-    Point2f ImageFromRender(const Vector3f &wRender, Float *duv_dw = nullptr) const {
+    pstd::optional<Point2f> ImageFromRender(Vector3f wRender,
+                                            Float *duv_dw = nullptr) const {
         Vector3f w = portalFrame.ToLocal(wRender);
-        if (w.z == 0)
-            w.z = 1e-5;
+        if (w.z <= 0)
+            return {};
+        // Compute Jacobian determinant of mapping $\roman{d}(u,v)/\roman{d}\omega$ if
+        // needed
         if (duv_dw)
-            *duv_dw = Pi * Pi * std::abs((1 - w.y * w.y) * (1 - w.x * w.x) / w.z);
+            *duv_dw = Sqr(Pi) * (1 - Sqr(w.x)) * (1 - Sqr(w.y)) / w.z;
 
-        Float alpha = std::atan(w.x / -w.z), beta = std::atan(w.y / -w.z);
+        Float alpha = std::atan2(w.x, w.z), beta = std::atan2(w.y, w.z);
         DCHECK(!IsNaN(alpha + beta));
         return Point2f(Clamp((alpha + Pi / 2) / Pi, 0, 1),
                        Clamp((beta + Pi / 2) / Pi, 0, 1));
     }
 
     PBRT_CPU_GPU
-    Bounds2f ImageBounds(const Point3f &p) const {
-        Point2f p0 = ImageFromRender(Normalize(portal[0] - p));
-        Point2f p1 = ImageFromRender(Normalize(portal[2] - p));
-        return Bounds2f(p0, p1);
+    Vector3f RenderFromImage(Point2f uv, Float *duv_dw = nullptr) const {
+        Float alpha = -Pi / 2 + uv[0] * Pi, beta = -Pi / 2 + uv[1] * Pi;
+        Float x = std::tan(alpha), y = std::tan(beta);
+        DCHECK(!IsInf(x) && !IsInf(y));
+        Vector3f w = Normalize(Vector3f(x, y, 1));
+        // Compute Jacobian determinant of mapping $\roman{d}(u,v)/\roman{d}\omega$ if
+        // needed
+        if (duv_dw)
+            *duv_dw = Sqr(Pi) * (1 - Sqr(w.x)) * (1 - Sqr(w.y)) / w.z;
+
+        return portalFrame.FromLocal(w);
+    }
+
+    PBRT_CPU_GPU
+    pstd::optional<Bounds2f> ImageBounds(const Point3f &p) const {
+        pstd::optional<Point2f> p0 = ImageFromRender(Normalize(portal[0] - p));
+        pstd::optional<Point2f> p1 = ImageFromRender(Normalize(portal[2] - p));
+        if (!p0 || !p1)
+            return {};
+        return Bounds2f(*p0, *p1);
     }
 
     PBRT_CPU_GPU
@@ -771,15 +667,15 @@ class PortalImageInfiniteLight : public LightBase {
     }
 
     // PortalImageInfiniteLight Private Members
-    std::string filename;
+    pstd::array<Point3f, 4> portal;
+    Frame portalFrame;
     Image image;
+    WindowedPiecewiseConstant2D distribution;
     const RGBColorSpace *imageColorSpace;
     Float scale;
-    Frame portalFrame;
-    pstd::array<Point3f, 4> portal;
-    WindowedPiecewiseConstant2D distribution;
-    Point3f sceneCenter;
     Float sceneRadius;
+    std::string filename;
+    Point3f sceneCenter;
 };
 
 // SpotLight Definition
@@ -806,8 +702,8 @@ class SpotLight : public LightBase {
     Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
 
     PBRT_CPU_GPU
-    LightLeSample SampleLe(const Point2f &u1, const Point2f &u2,
-                           SampledWavelengths &lambda, Float time) const;
+    pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
+                                           SampledWavelengths &lambda, Float time) const;
     PBRT_CPU_GPU
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
@@ -816,7 +712,7 @@ class SpotLight : public LightBase {
         LOG_FATAL("Shouldn't be called for non-area lights");
     }
 
-    LightBounds Bounds() const;
+    pstd::optional<LightBounds> Bounds() const;
 
     std::string ToString() const;
 

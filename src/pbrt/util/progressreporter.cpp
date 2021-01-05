@@ -172,14 +172,13 @@ void ProgressReporter::Done() {
     if (!quiet) {
 #ifdef PBRT_BUILD_GPU_RENDERER
         if (gpuEvents.size()) {
-            CHECK_EQ(gpuEventsLaunchedOffset.load(), gpuEvents.size());
             while (gpuEventsFinishedOffset < gpuEventsLaunchedOffset) {
                 cudaError_t err =
                     cudaEventSynchronize(gpuEvents[gpuEventsFinishedOffset]);
                 if (err != cudaSuccess)
                     LOG_FATAL("CUDA error: %s", cudaGetErrorString(err));
             }
-            workDone = gpuEventsFinishedOffset;
+            workDone = gpuEvents.size();
         }
 #endif
 

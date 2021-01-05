@@ -72,10 +72,6 @@ pstd::vector<DigitPermutation> *ComputeRadicalInversePermutations(uint32_t seed,
                                                                   Allocator alloc = {});
 PBRT_CPU_GPU
 Float ScrambledRadicalInverse(int baseIndex, uint64_t a, const DigitPermutation &perm);
-#if 0
-PBRT_CPU_GPU
-Float ScrambledRadicalInverse(int baseIndex, uint64_t a, uint32_t seed);
-#endif
 
 // NoRandomizer Definition
 struct NoRandomizer {
@@ -128,6 +124,25 @@ PBRT_CPU_GPU inline Float ScrambledRadicalInverse(int baseIndex, uint64_t a,
     return std::min(invBaseN * reversedDigits, OneMinusEpsilon);
 }
 
+PBRT_CPU_GPU inline Float OwenScrambledRadicalInverse(int baseIndex, uint64_t a,
+                                                      uint32_t hash) {
+    int base = Primes[baseIndex];
+    Float invBase = (Float)1 / (Float)base, invBaseN = 1;
+    uint64_t reversedDigits = 0;
+    int digitIndex = 0;
+    while (1 - invBaseN < 1) {
+        uint64_t next = a / base;
+        int digitValue = a - next * base;
+        uint32_t digitHash = MixBits(hash ^ reversedDigits);
+        digitValue = PermutationElement(digitValue, base, digitHash);
+        reversedDigits = reversedDigits * base + digitValue;
+        invBaseN *= invBase;
+        ++digitIndex;
+        a = next;
+    }
+    return std::min(invBaseN * reversedDigits, OneMinusEpsilon);
+}
+
 PBRT_CPU_GPU inline uint32_t MultiplyGenerator(pstd::span<const uint32_t> C, uint32_t a) {
     uint32_t v = 0;
     for (int i = 0; a != 0; ++i, a >>= 1)
@@ -137,7 +152,7 @@ PBRT_CPU_GPU inline uint32_t MultiplyGenerator(pstd::span<const uint32_t> C, uin
 }
 
 // Laine et al., Stratified Sampling for Stochastic Transparency, Sec 3.1...
-PBRT_CPU_GPU inline uint32_t OwenScramble(uint32_t v, uint32_t hash) {
+PBRT_CPU_GPU inline uint32_t FastOwenBinaryScramble(uint32_t v, uint32_t hash) {
     v = ReverseBits32(v);
     v += hash;
     v ^= v * 0x6c50b47cu;
@@ -145,6 +160,19 @@ PBRT_CPU_GPU inline uint32_t OwenScramble(uint32_t v, uint32_t hash) {
     v ^= v * 0xc7afe638u;
     v ^= v * 0x8d22f6e6u;
     return ReverseBits32(v);
+}
+
+PBRT_CPU_GPU inline uint32_t OwenScrambleBinaryFull(uint32_t v, uint32_t hash) {
+    if (hash & 1)
+        v ^= 1u << 31;
+
+    for (int b = 1; b < 32; ++b) {
+        uint32_t mask = (~0u) << (32 - b);
+        if (MixBits((v & mask) ^ hash) & (1u << b))
+            v ^= 1u << (31 - b);
+    }
+
+    return v;
 }
 
 template <typename R>
@@ -159,6 +187,7 @@ PBRT_CPU_GPU inline Float SobolSample(int64_t index, int dimension, R randomizer
 template <typename R>
 PBRT_CPU_GPU inline float SobolSampleFloat(int64_t a, int dimension, R randomizer) {
     DCHECK_LT(dimension, NSobolDimensions);
+    DCHECK(a >= 0 && a < (1ull << SobolMatrixSize));
     // Compute initial Sobol sample _v_ using generator matrices
     uint32_t v = 0;
     for (int i = dimension * SobolMatrixSize; a != 0; a >>= 1, i++)
@@ -180,13 +209,22 @@ struct CranleyPattersonRotator {
     uint32_t delta;
 };
 
-// XORScrambler Definition
-struct XORScrambler {
+// BinaryPermuteScrambler Definition
+struct BinaryPermuteScrambler {
     PBRT_CPU_GPU
-    XORScrambler(uint32_t permutation) : permutation(permutation) {}
+    BinaryPermuteScrambler(uint32_t permutation) : permutation(permutation) {}
     PBRT_CPU_GPU
     uint32_t operator()(uint32_t v) const { return permutation ^ v; }
     uint32_t permutation;
+};
+
+// FastOwenScrambler Definition
+struct FastOwenScrambler {
+    PBRT_CPU_GPU
+    FastOwenScrambler(uint32_t seed) : seed(seed) {}
+    PBRT_CPU_GPU
+    uint32_t operator()(uint32_t v) const { return FastOwenBinaryScramble(v, seed); }
+    uint32_t seed;
 };
 
 // OwenScrambler Definition
@@ -194,12 +232,12 @@ struct OwenScrambler {
     PBRT_CPU_GPU
     OwenScrambler(uint32_t seed) : seed(seed) {}
     PBRT_CPU_GPU
-    uint32_t operator()(uint32_t v) const { return OwenScramble(v, seed); }
+    uint32_t operator()(uint32_t v) const { return OwenScrambleBinaryFull(v, seed); }
     uint32_t seed;
 };
 
 // RandomizeStrategy Definition
-enum class RandomizeStrategy { None, CranleyPatterson, XOR, Owen };
+enum class RandomizeStrategy { None, CranleyPatterson, PermuteDigits, FastOwen, Owen };
 
 std::string ToString(RandomizeStrategy r);
 
@@ -229,6 +267,7 @@ inline uint64_t SobolIntervalToIndex(uint32_t m, uint64_t frame, const Point2i &
 PBRT_CPU_GPU
 inline uint64_t SobolSampleBits64(int64_t a, int dimension) {
     CHECK_LT(dimension, NSobolDimensions);
+    DCHECK(a >= 0 && a < (1ull << SobolMatrixSize));
     uint64_t v = 0;
     for (int i = dimension * SobolMatrixSize; a != 0; a >>= 1, i++)
         if (a & 1)

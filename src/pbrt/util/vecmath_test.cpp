@@ -579,3 +579,16 @@ TEST(PointVector, Interval) {
 
     Vector3fi vv = Cross(v, v);
 }
+
+TEST(OctahedralVector, EncodeDecode) {
+    for (Point2 u : Hammersley2D(65535)) {
+        Vector3f v = SampleUniformSphere(u);
+
+        OctahedralVector ov(v);
+        Vector3f v2 = Vector3f(ov);
+
+        EXPECT_GT(Length(v2), .999f);
+        EXPECT_LT(Length(v2), 1.001f);
+        EXPECT_LT(std::abs(1 - Dot(v2, v)), .001f);
+    }
+}

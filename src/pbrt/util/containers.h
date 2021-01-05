@@ -88,6 +88,10 @@ template <typename T, typename... Ts>
 struct Prepend<T, TypePack<Ts...>> {
     using type = TypePack<T, Ts...>;
 };
+template <typename... Ts>
+struct Prepend<void, TypePack<Ts...>> {
+    using type = TypePack<Ts...>;
+};
 
 template <int index, typename T, typename... Ts>
 struct TakeFirstN;
@@ -99,6 +103,50 @@ struct TakeFirstN<index, TypePack<T, Ts...>> {
 template <typename T, typename... Ts>
 struct TakeFirstN<1, TypePack<T, Ts...>> {
     using type = TypePack<T>;
+};
+
+template <template <typename> class M, typename... Ts>
+struct MapType;
+template <template <typename> class M, typename T>
+struct MapType<M, TypePack<T>> {
+    using type = TypePack<M<T>>;
+};
+
+template <template <typename> class M, typename T, typename... Ts>
+struct MapType<M, TypePack<T, Ts...>> {
+    using type = typename Prepend<M<T>, typename MapType<M, TypePack<Ts...>>::type>::type;
+};
+
+template <template <typename> class Pred, typename... Ts>
+struct FilterTypes;
+
+namespace internal {
+
+template <typename T, bool>
+struct FilterTypesHelper;
+
+template <typename T>
+struct FilterTypesHelper<T, true> {
+    using type = T;
+};
+template <typename T>
+struct FilterTypesHelper<T, false> {
+    using type = void;
+};
+
+};  // namespace internal
+
+template <template <typename> class Pred, typename T>
+struct FilterTypes<Pred, TypePack<T>> {
+    using type = typename TypePack<
+        typename internal::FilterTypesHelper<T, Pred<T>::value>::type>::type;
+};
+
+template <template <typename> class Pred, typename T, typename... Ts>
+struct FilterTypes<Pred, TypePack<T, Ts...>> {
+    using type =
+        typename Prepend<typename internal::FilterTypesHelper<T, Pred<T>::value>::type,
+                         TypePack<Ts...>>::type;
 };
 
 template <typename F, typename... Ts>
@@ -750,27 +798,67 @@ class SampledGrid {
     const_iterator begin() const { return values.begin(); }
     const_iterator end() const { return values.end(); }
 
-    PBRT_CPU_GPU
-    T Lookup(const Point3f &p) const {
+    template <typename F>
+    PBRT_CPU_GPU auto Lookup(const Point3f &p, F convert) const {
         // Compute voxel coordinates and offsets for _p_
         Point3f pSamples(p.x * nx - .5f, p.y * ny - .5f, p.z * nz - .5f);
         Point3i pi = (Point3i)Floor(pSamples);
         Vector3f d = pSamples - (Point3f)pi;
 
         // Return trilinearly interpolated voxel values
-        T d00 = Lerp(d.x, Lookup(pi), Lookup(pi + Vector3i(1, 0, 0)));
-        T d10 = Lerp(d.x, Lookup(pi + Vector3i(0, 1, 0)), Lookup(pi + Vector3i(1, 1, 0)));
-        T d01 = Lerp(d.x, Lookup(pi + Vector3i(0, 0, 1)), Lookup(pi + Vector3i(1, 0, 1)));
-        T d11 = Lerp(d.x, Lookup(pi + Vector3i(0, 1, 1)), Lookup(pi + Vector3i(1, 1, 1)));
-        T d0 = Lerp(d.y, d00, d10);
-        T d1 = Lerp(d.y, d01, d11);
+        auto d00 =
+            Lerp(d.x, Lookup(pi, convert), Lookup(pi + Vector3i(1, 0, 0), convert));
+        auto d10 = Lerp(d.x, Lookup(pi + Vector3i(0, 1, 0), convert),
+                        Lookup(pi + Vector3i(1, 1, 0), convert));
+        auto d01 = Lerp(d.x, Lookup(pi + Vector3i(0, 0, 1), convert),
+                        Lookup(pi + Vector3i(1, 0, 1), convert));
+        auto d11 = Lerp(d.x, Lookup(pi + Vector3i(0, 1, 1), convert),
+                        Lookup(pi + Vector3i(1, 1, 1), convert));
+        auto d0 = Lerp(d.y, d00, d10);
+        auto d1 = Lerp(d.y, d01, d11);
         return Lerp(d.z, d0, d1);
     }
 
     PBRT_CPU_GPU
-    T Lookup(const Point3i &p) const;
+    T Lookup(const Point3f &p) const {
+        return Lookup(p, [] PBRT_CPU_GPU(T value) { return value; });
+    }
 
-    T MaximumValue(const Bounds3f &bounds) const;
+    template <typename F>
+    PBRT_CPU_GPU auto Lookup(const Point3i &p, F convert) const {
+        Bounds3i sampleBounds(Point3i(0, 0, 0), Point3i(nx, ny, nz));
+        if (!InsideExclusive(p, sampleBounds))
+            return convert(T{});
+        return convert(values[(p.z * ny + p.y) * nx + p.x]);
+    }
+
+    PBRT_CPU_GPU
+    T Lookup(const Point3i &p) const {
+        return Lookup(p, [] PBRT_CPU_GPU(T value) { return value; });
+    }
+
+    template <typename F>
+    Float MaxValue(const Bounds3f &bounds, F convert) const {
+        Point3f ps[2] = {Point3f(bounds.pMin.x * nx - .5f, bounds.pMin.y * ny - .5f,
+                                 bounds.pMin.z * nz - .5f),
+                         Point3f(bounds.pMax.x * nx - .5f, bounds.pMax.y * ny - .5f,
+                                 bounds.pMax.z * nz - .5f)};
+        Point3i pi[2] = {Max(Point3i(Floor(ps[0])), Point3i(0, 0, 0)),
+                         Min(Point3i(Floor(ps[1])) + Vector3i(1, 1, 1),
+                             Point3i(nx - 1, ny - 1, nz - 1))};
+
+        Float maxValue = Lookup(Point3i(pi[0]), convert);
+        for (int z = pi[0].z; z <= pi[1].z; ++z)
+            for (int y = pi[0].y; y <= pi[1].y; ++y)
+                for (int x = pi[0].x; x <= pi[1].x; ++x)
+                    maxValue = std::max(maxValue, Lookup(Point3i(x, y, z), convert));
+
+        return maxValue;
+    }
+
+    T MaxValue(const Bounds3f &bounds) const {
+        return MaxValue(bounds, [](T value) { return value; });
+    }
 
     std::string ToString() const {
         return StringPrintf("[ SampledGrid nx: %d ny: %d nz: %d values: %s ]", nx, ny, nz,
@@ -782,36 +870,6 @@ class SampledGrid {
     pstd::vector<T> values;
     int nx, ny, nz;
 };
-
-// SampledGrid Inline Methods
-template <typename T>
-PBRT_CPU_GPU inline T SampledGrid<T>::Lookup(const Point3i &p) const {
-    Bounds3i sampleBounds(Point3i(0, 0, 0), Point3i(nx, ny, nz));
-    if (!InsideExclusive(p, sampleBounds))
-        return {};
-    return values[(p.z * ny + p.y) * nx + p.x];
-}
-
-template <typename T>
-inline T SampledGrid<T>::MaximumValue(const Bounds3f &bounds) const {
-    Point3f ps[2] = {Point3f(bounds.pMin.x * nx - .5f, bounds.pMin.y * ny - .5f,
-                             bounds.pMin.z * nz - .5f),
-                     Point3f(bounds.pMax.x * nx - .5f, bounds.pMax.y * ny - .5f,
-                             bounds.pMax.z * nz - .5f)};
-    Point3i pi[2] = {
-        Max(Point3i(Floor(ps[0])), Point3i(0, 0, 0)),
-        Min(Point3i(Floor(ps[1])) + Vector3i(1, 1, 1), Point3i(nx - 1, ny - 1, nz - 1))};
-
-    T maxValue = Lookup(Point3i(pi[0]));
-    for (int z = pi[0].z; z <= pi[1].z; ++z)
-        for (int y = pi[0].y; y <= pi[1].y; ++y)
-            for (int x = pi[0].x; x <= pi[1].x; ++x) {
-                using std::max;
-                maxValue = max(maxValue, Lookup(Point3i(x, y, z)));
-            }
-
-    return maxValue;
-}
 
 }  // namespace pbrt
 

@@ -13,7 +13,6 @@
 #include <pbrt/util/error.h>
 #include <pbrt/util/file.h>
 #include <pbrt/util/memory.h>
-#include <pbrt/util/print.h>
 #include <pbrt/util/sampling.h>
 #include <pbrt/util/scattering.h>
 #include <pbrt/util/stats.h>
@@ -119,9 +118,10 @@ bool GetMediumScatteringProperties(const std::string &name, SpectrumHandle *sigm
 
     for (MeasuredSS &mss : SubsurfaceParameterTable) {
         if (name == mss.name) {
-            *sigma_a = alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB, mss.sigma_a);
-            *sigma_s =
-                alloc.new_object<RGBSpectrum>(*RGBColorSpace::sRGB, mss.sigma_prime_s);
+            *sigma_a =
+                alloc.new_object<RGBUnboundedSpectrum>(*RGBColorSpace::sRGB, mss.sigma_a);
+            *sigma_s = alloc.new_object<RGBUnboundedSpectrum>(*RGBColorSpace::sRGB,
+                                                              mss.sigma_prime_s);
             return true;
         }
     }
@@ -152,13 +152,13 @@ HomogeneousMedium *HomogeneousMedium::Create(const ParameterDictionary &paramete
     }
     if (sig_a == nullptr) {
         sig_a =
-            parameters.GetOneSpectrum("sigma_a", nullptr, SpectrumType::General, alloc);
+            parameters.GetOneSpectrum("sigma_a", nullptr, SpectrumType::Unbounded, alloc);
         if (sig_a == nullptr)
             sig_a = alloc.new_object<ConstantSpectrum>(1.f);
     }
     if (sig_s == nullptr) {
         sig_s =
-            parameters.GetOneSpectrum("sigma_s", nullptr, SpectrumType::General, alloc);
+            parameters.GetOneSpectrum("sigma_s", nullptr, SpectrumType::Unbounded, alloc);
         if (sig_s == nullptr)
             sig_s = alloc.new_object<ConstantSpectrum>(1.f);
     }
@@ -186,8 +186,9 @@ STAT_MEMORY_COUNTER("Memory/Volume grids", volumeGridBytes);
 // UniformGridMediumProvider Method Definitions
 UniformGridMediumProvider::UniformGridMediumProvider(
     const Bounds3f &bounds, pstd::optional<SampledGrid<Float>> dgrid,
-    pstd::optional<SampledGrid<RGB>> rgbgrid, const RGBColorSpace *colorSpace,
-    SpectrumHandle Le, SampledGrid<Float> Legrid, Allocator alloc)
+    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbgrid,
+    const RGBColorSpace *colorSpace, SpectrumHandle Le, SampledGrid<Float> Legrid,
+    Allocator alloc)
     : bounds(bounds),
       densityGrid(std::move(dgrid)),
       rgbDensityGrid(std::move(rgbgrid)),
@@ -220,11 +221,16 @@ UniformGridMediumProvider *UniformGridMediumProvider::Create(
     const RGBColorSpace *colorSpace = parameters.ColorSpace();
 
     pstd::optional<SampledGrid<Float>> densityGrid;
-    pstd::optional<SampledGrid<RGB>> rgbDensityGrid;
+    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbDensityGrid;
     if (density.size())
         densityGrid = SampledGrid<Float>(density, nx, ny, nz, alloc);
-    else
-        rgbDensityGrid = SampledGrid<RGB>(rgbDensity, nx, ny, nz, alloc);
+    else {
+        std::vector<RGBUnboundedSpectrum> rgbSpectrumDensity;
+        for (RGB rgb : rgbDensity)
+            rgbSpectrumDensity.push_back(RGBUnboundedSpectrum(*colorSpace, rgb));
+        rgbDensityGrid =
+            SampledGrid<RGBUnboundedSpectrum>(rgbSpectrumDensity, nx, ny, nz, alloc);
+    }
 
     SpectrumHandle Le =
         parameters.GetOneSpectrum("Le", nullptr, SpectrumType::Illuminant, alloc);

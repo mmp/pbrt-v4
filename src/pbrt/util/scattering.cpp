@@ -6,6 +6,7 @@
 
 namespace pbrt {
 
+// BSSRDF Utility Functions
 Float FresnelMoment1(Float eta) {
     Float eta2 = eta * eta, eta3 = eta2 * eta, eta4 = eta3 * eta, eta5 = eta4 * eta;
     if (eta < 1)

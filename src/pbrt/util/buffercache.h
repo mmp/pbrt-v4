@@ -56,6 +56,7 @@ class BufferCache {
         for (auto iter : cache)
             alloc.deallocate_object(const_cast<T *>(iter.ptr), iter.size);
         cache.clear();
+        bytesUsed = 0;
     }
 
     size_t BytesUsed() const { return bytesUsed; }

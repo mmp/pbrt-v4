@@ -128,3 +128,33 @@ TEST(TypePack, HasType) {
     EXPECT_FALSE((HasType<char, Pack>::value));
     EXPECT_FALSE((HasType<unsigned int, Pack>::value));
 }
+
+TEST(TypePack, TakeRemove) {
+    using Pack = TypePack<signed int, float, double>;
+
+    static_assert(std::is_same_v<TypePack<signed int>, typename TakeFirstN<1, Pack>::type>);
+    static_assert(std::is_same_v<TypePack<float>, typename TakeFirstN<1, typename RemoveFirstN<1, Pack>::type>::type>);
+    static_assert(std::is_same_v<TypePack<double>, typename TakeFirstN<1, typename RemoveFirstN<2, Pack>::type>::type>);
+}
+
+template <typename T> struct Set { };
+
+TEST(TypePack, Map) {
+    using SetPack = typename MapType<Set, TypePack<signed int, float, double>>::type;
+
+    static_assert(std::is_same_v<TypePack<Set<signed int>>,
+                  typename TakeFirstN<1, SetPack>::type>);
+    static_assert(std::is_same_v<TypePack<Set<float>>,
+                  typename TakeFirstN<1, typename RemoveFirstN<1, SetPack>::type>::type>);
+    static_assert(std::is_same_v<TypePack<Set<double>>,
+                  typename TakeFirstN<1, typename RemoveFirstN<2, SetPack>::type>::type>);
+}
+
+TEST(TypePack, Filter) {
+    using Pack = TypePack<signed int, float, double>;
+    using FilteredPack = typename FilterTypes<std::is_floating_point, Pack>::type;
+
+    static_assert(std::is_same_v<TypePack<float>, typename TakeFirstN<1, FilteredPack>::type>);
+    static_assert(std::is_same_v<TypePack<double>,
+                  typename TakeFirstN<1, typename RemoveFirstN<1, FilteredPack>::type>::type>);
+}

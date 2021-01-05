@@ -10,28 +10,31 @@
 
 namespace pbrt {
 
+// GPUPathIntegrator Film Methods
 void GPUPathIntegrator::UpdateFilm() {
-    GPUParallelFor("Update Film", maxQueueSize,
-    PBRT_GPU_LAMBDA(int pixelIndex) {
+    GPUParallelFor(
+        "Update Film", maxQueueSize, PBRT_GPU_LAMBDA(int pixelIndex) {
+            // Check pixel against film bounds
             Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
-        if (!InsideExclusive(pPixel, film.PixelBounds()))
-            return;
+            if (!InsideExclusive(pPixel, film.PixelBounds()))
+                return;
 
-        // Compute final weighted radiance value
-        SampledSpectrum Lw = SampledSpectrum(pixelSampleState.L[pixelIndex]) *
-                             pixelSampleState.cameraRayWeight[pixelIndex];
-        SampledWavelengths lambda = pixelSampleState.lambda[pixelIndex];
-        Float filterWeight = pixelSampleState.filterWeight[pixelIndex];
+            // Compute final weighted radiance value
+            SampledSpectrum Lw = SampledSpectrum(pixelSampleState.L[pixelIndex]) *
+                                 pixelSampleState.cameraRayWeight[pixelIndex];
 
-        PBRT_DBG("Adding Lw %f %f %f %f at pixel (%d, %d)", Lw[0], Lw[1], Lw[2], Lw[3],
-                 pPixel.x, pPixel.y);
-
-        if (initializeVisibleSurface) {
-            VisibleSurface visibleSurface = pixelSampleState.visibleSurface[pixelIndex];
-            film.AddSample(pPixel, Lw, lambda, &visibleSurface, filterWeight);
-        } else
-            film.AddSample(pPixel, Lw, lambda, nullptr, filterWeight);
-    });
+            PBRT_DBG("Adding Lw %f %f %f %f at pixel (%d, %d)", Lw[0], Lw[1], Lw[2],
+                     Lw[3], pPixel.x, pPixel.y);
+            // Provide sample radiance value to film
+            SampledWavelengths lambda = pixelSampleState.lambda[pixelIndex];
+            Float filterWeight = pixelSampleState.filterWeight[pixelIndex];
+            if (initializeVisibleSurface) {
+                VisibleSurface visibleSurface =
+                    pixelSampleState.visibleSurface[pixelIndex];
+                film.AddSample(pPixel, Lw, lambda, &visibleSurface, filterWeight);
+            } else
+                film.AddSample(pPixel, Lw, lambda, nullptr, filterWeight);
+        });
 }
 
 }  // namespace pbrt

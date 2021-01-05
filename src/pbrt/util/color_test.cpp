@@ -78,13 +78,24 @@ TEST(RGBColorSpace, StdIllumWhiteACES2065_1) {
     EXPECT_LE(rgb.b, 1.01);
 }
 
-TEST(RGBIlluminantSpectrum, MaxValue) {
+#if 0
+TEST(RGBUnboundedSpectrum, SmallValues) {
+    RGB rgb(0.00010678071, 0, 0.000010491596);
+    RGBUnboundedSpectrum rs(*RGBColorSpace::sRGB, rgb);
+
+    for (int lambda = 360; lambda < 840; ++lambda)
+        EXPECT_LT(rs(lambda), 0.05f) << ", lambda = " << lambda;
+}
+#endif
+
+TEST(RGBUnboundedSpectrum, MaxValue) {
     RNG rng;
     for (const auto &cs :
          {*RGBColorSpace::sRGB, *RGBColorSpace::Rec2020, *RGBColorSpace::ACES2065_1}) {
         for (int i = 0; i < 100; ++i) {
             RGB rgb(rng.Uniform<Float>(), rng.Uniform<Float>(), rng.Uniform<Float>());
-            RGBSpectrum rs(cs, rgb);
+            rgb *= 10.f;
+            RGBUnboundedSpectrum rs(cs, rgb);
 
             Float m = rs.MaxValue();
             Float sm = 0;
@@ -96,16 +107,106 @@ TEST(RGBIlluminantSpectrum, MaxValue) {
     }
 }
 
+TEST(RGBAlbedoSpectrum, MaxValue) {
+    RNG rng;
+    for (const auto &cs :
+         {*RGBColorSpace::sRGB, *RGBColorSpace::Rec2020, *RGBColorSpace::ACES2065_1}) {
+        for (int i = 0; i < 100; ++i) {
+            RGB rgb(rng.Uniform<Float>(), rng.Uniform<Float>(), rng.Uniform<Float>());
+            RGBAlbedoSpectrum rs(cs, rgb);
+
+            Float m = rs.MaxValue();
+            Float sm = 0;
+            for (Float lambda = 360; lambda <= 830; lambda += 1. / 16.)
+                sm = std::max(sm, rs(lambda));
+            EXPECT_LT(std::abs((sm - m) / sm), 1e-4)
+                << "sampled " << sm << " MaxValue " << m << " for " << rs;
+        }
+    }
+}
+
+TEST(RGBAlbedoSpectrum, RoundTripsRGB) {
+    RNG rng;
+    const RGBColorSpace &cs = *RGBColorSpace::sRGB;
+
+    for (int i = 0; i < 100; ++i) {
+        RGB rgb(rng.Uniform<Float>(), rng.Uniform<Float>(), rng.Uniform<Float>());
+        RGBAlbedoSpectrum rs(cs, rgb);
+
+        DenselySampledSpectrum rsIllum = DenselySampledSpectrum::SampleFunction(
+            [&](Float lambda) { return rs(lambda) * cs.illuminant(lambda); });
+        XYZ xyz = SpectrumToXYZ(&rsIllum);
+        RGB rgb2 = cs.ToRGB(xyz);
+
+        // Some error comes from the fact that piecewise linear (at 5nm)
+        // CIE curves were used for the optimization while we use piecewise
+        // linear at 1nm spacing converted to 1nm constant / densely
+        // sampled.
+        Float eps = .01;
+        EXPECT_LT(std::abs(rgb.r - rgb2.r), eps) << rgb << " vs " << rgb2;
+        EXPECT_LT(std::abs(rgb.g - rgb2.g), eps) << rgb << " vs " << rgb2;
+        EXPECT_LT(std::abs(rgb.b - rgb2.b), eps) << rgb << " vs " << rgb2;
+    }
+}
+
+TEST(RGBAlbedoSpectrum, RoundTripRec2020) {
+    RNG rng;
+    const RGBColorSpace &cs = *RGBColorSpace::Rec2020;
+
+    for (int i = 0; i < 100; ++i) {
+        RGB rgb(.1 + .7 * rng.Uniform<Float>(), .1 + .7 * rng.Uniform<Float>(),
+                .1 + .7 * rng.Uniform<Float>());
+        RGBAlbedoSpectrum rs(cs, rgb);
+
+        DenselySampledSpectrum rsIllum = DenselySampledSpectrum::SampleFunction(
+            [&](Float lambda) { return rs(lambda) * cs.illuminant(lambda); });
+        XYZ xyz = SpectrumToXYZ(&rsIllum);
+        RGB rgb2 = cs.ToRGB(xyz);
+
+        Float eps = .01;
+        EXPECT_LT(std::abs(rgb.r - rgb2.r), eps)
+            << rgb << " vs " << rgb2 << " xyz " << xyz;
+        EXPECT_LT(std::abs(rgb.g - rgb2.g), eps)
+            << rgb << " vs " << rgb2 << " xyz " << xyz;
+        EXPECT_LT(std::abs(rgb.b - rgb2.b), eps)
+            << rgb << " vs " << rgb2 << " xyz " << xyz;
+    }
+}
+
+TEST(RGBAlbedoSpectrum, RoundTripACES) {
+    RNG rng;
+    const RGBColorSpace &cs = *RGBColorSpace::ACES2065_1;
+
+    for (int i = 0; i < 100; ++i) {
+        RGB rgb(.3 + .4 * rng.Uniform<Float>(), .3 + .4 * rng.Uniform<Float>(),
+                .3 + .4 * rng.Uniform<Float>());
+        RGBAlbedoSpectrum rs(cs, rgb);
+
+        DenselySampledSpectrum rsIllum = DenselySampledSpectrum::SampleFunction(
+            [&](Float lambda) { return rs(lambda) * cs.illuminant(lambda); });
+        XYZ xyz = SpectrumToXYZ(&rsIllum);
+        RGB rgb2 = cs.ToRGB(xyz);
+
+        Float eps = .01;
+        EXPECT_LT(std::abs(rgb.r - rgb2.r), eps)
+            << rgb << " vs " << rgb2 << " xyz " << xyz;
+        EXPECT_LT(std::abs(rgb.g - rgb2.g), eps)
+            << rgb << " vs " << rgb2 << " xyz " << xyz;
+        EXPECT_LT(std::abs(rgb.b - rgb2.b), eps)
+            << rgb << " vs " << rgb2 << " xyz " << xyz;
+    }
+}
+
 TEST(RGBIlluminantSpectrum, RoundTripsRGB) {
     RNG rng;
     const RGBColorSpace &cs = *RGBColorSpace::sRGB;
 
     for (int i = 0; i < 100; ++i) {
         RGB rgb(rng.Uniform<Float>(), rng.Uniform<Float>(), rng.Uniform<Float>());
-        RGBSpectrum rs(cs, rgb);
+        RGBIlluminantSpectrum rs(cs, rgb);
 
         DenselySampledSpectrum rsIllum = DenselySampledSpectrum::SampleFunction(
-            [&](Float lambda) { return rs(lambda) * cs.illuminant(lambda); });
+            [&](Float lambda) { return rs(lambda); });
         XYZ xyz = SpectrumToXYZ(&rsIllum);
         RGB rgb2 = cs.ToRGB(xyz);
 
@@ -127,10 +228,10 @@ TEST(RGBIlluminantSpectrum, RoundTripRec2020) {
     for (int i = 0; i < 100; ++i) {
         RGB rgb(.1 + .7 * rng.Uniform<Float>(), .1 + .7 * rng.Uniform<Float>(),
                 .1 + .7 * rng.Uniform<Float>());
-        RGBSpectrum rs(cs, rgb);
+        RGBIlluminantSpectrum rs(cs, rgb);
 
         DenselySampledSpectrum rsIllum = DenselySampledSpectrum::SampleFunction(
-            [&](Float lambda) { return rs(lambda) * cs.illuminant(lambda); });
+            [&](Float lambda) { return rs(lambda); });
         XYZ xyz = SpectrumToXYZ(&rsIllum);
         RGB rgb2 = cs.ToRGB(xyz);
 
@@ -151,10 +252,10 @@ TEST(RGBIlluminantSpectrum, RoundTripACES) {
     for (int i = 0; i < 100; ++i) {
         RGB rgb(.3 + .4 * rng.Uniform<Float>(), .3 + .4 * rng.Uniform<Float>(),
                 .3 + .4 * rng.Uniform<Float>());
-        RGBSpectrum rs(cs, rgb);
+        RGBIlluminantSpectrum rs(cs, rgb);
 
         DenselySampledSpectrum rsIllum = DenselySampledSpectrum::SampleFunction(
-            [&](Float lambda) { return rs(lambda) * cs.illuminant(lambda); });
+            [&](Float lambda) { return rs(lambda); });
         XYZ xyz = SpectrumToXYZ(&rsIllum);
         RGB rgb2 = cs.ToRGB(xyz);
 

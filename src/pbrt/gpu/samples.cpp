@@ -11,44 +11,7 @@
 
 namespace pbrt {
 
-template <typename Sampler>
-void GPUPathIntegrator::GenerateRaySamples(int depth, int sampleIndex) {
-    std::string desc = std::string("Generate ray samples - ") + Sampler::Name();
-    RayQueue *rayQueue = CurrentRayQueue(depth);
-
-    ForAllQueued(desc.c_str(), rayQueue, maxQueueSize,
-    PBRT_GPU_LAMBDA(const RayWorkItem w, int index) {
-        // Figure out how many dimensions have been consumed so far: 5
-        // are used for the initial camera sample and then either 7 or
-        // 10 per ray, depending on whether there's subsurface
-        // scattering.
-        int dimension = 5 + 7 * depth;
-        if (haveSubsurface)
-            dimension += 3 * depth;
-
-        // Initialize a Sampler
-        Sampler pixelSampler = *sampler.Cast<Sampler>();
-        Point2i pPixel = pixelSampleState.pPixel[w.pixelIndex];
-        pixelSampler.StartPixelSample(pPixel, sampleIndex, dimension);
-
-        // Generate the samples for the ray and store them with it in
-        // the ray queue.
-        RaySamples rs;
-        rs.direct.u = pixelSampler.Get2D();
-        rs.direct.uc = pixelSampler.Get1D();
-        rs.indirect.u = pixelSampler.Get2D();
-        rs.indirect.uc = pixelSampler.Get1D();
-        rs.indirect.rr = pixelSampler.Get1D();
-        rs.haveSubsurface = haveSubsurface;
-        if (haveSubsurface) {
-            rs.subsurface.uc = pixelSampler.Get1D();
-            rs.subsurface.u = pixelSampler.Get2D();
-        }
-
-        pixelSampleState.samples[w.pixelIndex] = rs;
-   });
-}
-
+// GPUPathIntegrator Sampler Methods
 void GPUPathIntegrator::GenerateRaySamples(int depth, int sampleIndex) {
     auto generateSamples = [=](auto sampler) {
         using Sampler = std::remove_reference_t<decltype(*sampler)>;
@@ -56,9 +19,52 @@ void GPUPathIntegrator::GenerateRaySamples(int depth, int sampleIndex) {
                       !std::is_same_v<Sampler, DebugMLTSampler>)
             GenerateRaySamples<Sampler>(depth, sampleIndex);
     };
-    // Call the appropriate GenerateRaySamples specialization based on the
-    // Sampler's actual type.
     sampler.DispatchCPU(generateSamples);
+}
+
+template <typename Sampler>
+void GPUPathIntegrator::GenerateRaySamples(int depth, int sampleIndex) {
+    // Generate description string _desc_ for ray sample generation
+    std::string desc = std::string("Generate ray samples - ") + Sampler::Name();
+
+    RayQueue *rayQueue = CurrentRayQueue(depth);
+    ForAllQueued(
+        desc.c_str(), rayQueue, maxQueueSize, PBRT_GPU_LAMBDA(const RayWorkItem w) {
+            // Generate samples for ray segment at current sample index
+            // Find first sample dimension
+            int dimension = 5 + 7 * depth;
+            if (haveSubsurface)
+                dimension += 3 * depth;
+            if (haveMedia)
+                dimension += 2 * depth;
+
+            // Initialize _Sampler_ for pixel, sample index, and dimension
+            Sampler pixelSampler = *sampler.Cast<Sampler>();
+            Point2i pPixel = pixelSampleState.pPixel[w.pixelIndex];
+            pixelSampler.StartPixelSample(pPixel, sampleIndex, dimension);
+
+            // Initialize _RaySamples_ structure with sample values
+            RaySamples rs;
+            rs.direct.u = pixelSampler.Get2D();
+            rs.direct.uc = pixelSampler.Get1D();
+            // Initialize indirect and possibly subsurface samples in _rs_
+            rs.indirect.u = pixelSampler.Get2D();
+            rs.indirect.uc = pixelSampler.Get1D();
+            rs.indirect.rr = pixelSampler.Get1D();
+            rs.haveSubsurface = haveSubsurface;
+            if (haveSubsurface) {
+                rs.subsurface.uc = pixelSampler.Get1D();
+                rs.subsurface.u = pixelSampler.Get2D();
+            }
+            rs.haveMedia = haveMedia;
+            if (haveMedia) {
+                rs.media.uDist = pixelSampler.Get1D();
+                rs.media.uMode = pixelSampler.Get1D();
+            }
+
+            // Store _RaySamples_ in pixel sample state
+            pixelSampleState.samples[w.pixelIndex] = rs;
+        });
 }
 
 }  // namespace pbrt

@@ -49,7 +49,7 @@ class CUDATrackedMemoryResource : public CUDAMemoryResource {
 
   private:
     bool bypassSlab(size_t size) const {
-#ifndef NDEBUG
+#ifdef PBRT_DEBUG_BUILD
         return true;
 #else
         return size > slabSize / 4;

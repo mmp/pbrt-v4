@@ -1120,8 +1120,8 @@ void GPUAccel::IntersectClosest(
     int maxRays, EscapedRayQueue *escapedRayQueue, HitAreaLightQueue *hitAreaLightQueue,
     MaterialEvalQueue *basicEvalMaterialQueue,
     MaterialEvalQueue *universalEvalMaterialQueue,
-    MediumTransitionQueue *mediumTransitionQueue, MediumSampleQueue *mediumSampleQueue,
-    RayQueue *rayQueue) const {
+    MediumSampleQueue *mediumSampleQueue,
+    RayQueue *rayQueue, RayQueue *nextRayQueue) const {
     std::pair<cudaEvent_t, cudaEvent_t> events =
         GetProfilerEvents("Tracing closest hit rays");
 
@@ -1131,11 +1131,11 @@ void GPUAccel::IntersectClosest(
         RayIntersectParameters params;
         params.traversable = rootTraversable;
         params.rayQueue = rayQueue;
+        params.nextRayQueue = nextRayQueue;
         params.escapedRayQueue = escapedRayQueue;
         params.hitAreaLightQueue = hitAreaLightQueue;
         params.basicEvalMaterialQueue = basicEvalMaterialQueue;
         params.universalEvalMaterialQueue = universalEvalMaterialQueue;
-        params.mediumTransitionQueue = mediumTransitionQueue;
         params.mediumSampleQueue = mediumSampleQueue;
 
         ParamBufferState &pbs = getParamBuffer(params);
@@ -1164,7 +1164,8 @@ void GPUAccel::IntersectClosest(
     cudaEventRecord(events.second);
 };
 
-void GPUAccel::IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue) const {
+void GPUAccel::IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue,
+                               SOA<PixelSampleState> *pixelSampleState) const {
     std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents("Tracing shadow rays");
 
     cudaEventRecord(events.first);
@@ -1173,6 +1174,7 @@ void GPUAccel::IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue) cons
         RayIntersectParameters params;
         params.traversable = rootTraversable;
         params.shadowRayQueue = shadowRayQueue;
+        params.pixelSampleState = pixelSampleState;
 
         ParamBufferState &pbs = getParamBuffer(params);
 
@@ -1200,7 +1202,8 @@ void GPUAccel::IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue) cons
     cudaEventRecord(events.second);
 }
 
-void GPUAccel::IntersectShadowTr(int maxRays, ShadowRayQueue *shadowRayQueue) const {
+void GPUAccel::IntersectShadowTr(int maxRays, ShadowRayQueue *shadowRayQueue,
+                                 SOA<PixelSampleState> *pixelSampleState) const {
     std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents("Tracing shadow Tr rays");
 
     cudaEventRecord(events.first);
@@ -1209,6 +1212,7 @@ void GPUAccel::IntersectShadowTr(int maxRays, ShadowRayQueue *shadowRayQueue) co
         RayIntersectParameters params;
         params.traversable = rootTraversable;
         params.shadowRayQueue = shadowRayQueue;
+        params.pixelSampleState = pixelSampleState;
 
         ParamBufferState &pbs = getParamBuffer(params);
 

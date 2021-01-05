@@ -15,8 +15,8 @@ std::string BSDFSample::ToString() const {
 
 // BSDF Method Definitions
 std::string BSDF::ToString() const {
-    return StringPrintf("[ BSDF eta: %f bxdf: %s shadingFrame: %s ng: %s ]", eta, bxdf,
-                        shadingFrame, ng);
+    return StringPrintf("[ BSDF bxdf: %s shadingFrame: %s ng: %s ]", bxdf, shadingFrame,
+                        ng);
 }
 
 }  // namespace pbrt

@@ -283,6 +283,8 @@ TEST(Math, SumOfProducts) {
 }
 
 TEST(FastExp, Accuracy) {
+    EXPECT_EQ(1, FastExp(0));
+
     Float maxErr = 0;
     RNG rng(6502);
     for (int i = 0; i < 100; ++i) {

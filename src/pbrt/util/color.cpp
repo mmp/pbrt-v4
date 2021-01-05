@@ -9,6 +9,7 @@
 #include <cuda_runtime.h>
 #endif
 
+#include <pbrt/options.h>
 #include <pbrt/util/check.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/print.h>
@@ -99,77 +100,81 @@ const RGBToSpectrumTable *RGBToSpectrumTable::ACES2065_1;
 
 void RGBToSpectrumTable::Init(Allocator alloc) {
 #if defined(PBRT_BUILD_GPU_RENDERER)
-    extern const int sRGBToSpectrumTable_Res;
-    extern const float sRGBToSpectrumTable_Scale[64];
-    extern const float sRGBToSpectrumTable_Data[2359296];
+    if (Options->useGPU) {
+        extern const int sRGBToSpectrumTable_Res;
+        extern const float sRGBToSpectrumTable_Scale[64];
+        extern const float sRGBToSpectrumTable_Data[2359296];
 
-    extern const int DCI_P3ToSpectrumTable_Res;
-    extern const float DCI_P3ToSpectrumTable_Scale[64];
-    extern const float DCI_P3ToSpectrumTable_Data[2359296];
+        extern const int DCI_P3ToSpectrumTable_Res;
+        extern const float DCI_P3ToSpectrumTable_Scale[64];
+        extern const float DCI_P3ToSpectrumTable_Data[2359296];
 
-    extern const int REC2020ToSpectrumTable_Res;
-    extern const float REC2020ToSpectrumTable_Scale[64];
-    extern const float REC2020ToSpectrumTable_Data[2359296];
+        extern const int REC2020ToSpectrumTable_Res;
+        extern const float REC2020ToSpectrumTable_Scale[64];
+        extern const float REC2020ToSpectrumTable_Data[2359296];
 
-    extern const int ACES2065_1ToSpectrumTable_Res;
-    extern const float ACES2065_1ToSpectrumTable_Scale[64];
-    extern const float ACES2065_1ToSpectrumTable_Data[2359296];
+        extern const int ACES2065_1ToSpectrumTable_Res;
+        extern const float ACES2065_1ToSpectrumTable_Scale[64];
+        extern const float ACES2065_1ToSpectrumTable_Data[2359296];
 
-    // sRGB
-    float *sRGBToSpectrumTableScalePtr =
-        (float *)alloc.allocate_bytes(sizeof(sRGBToSpectrumTable_Scale));
-    memcpy(sRGBToSpectrumTableScalePtr, sRGBToSpectrumTable_Scale,
-           sizeof(sRGBToSpectrumTable_Scale));
-    float *sRGBToSpectrumTableDataPtr =
-        (float *)alloc.allocate_bytes(sizeof(sRGBToSpectrumTable_Data));
-    memcpy(sRGBToSpectrumTableDataPtr, sRGBToSpectrumTable_Data,
-           sizeof(sRGBToSpectrumTable_Data));
+        // sRGB
+        float *sRGBToSpectrumTableScalePtr =
+            (float *)alloc.allocate_bytes(sizeof(sRGBToSpectrumTable_Scale));
+        memcpy(sRGBToSpectrumTableScalePtr, sRGBToSpectrumTable_Scale,
+               sizeof(sRGBToSpectrumTable_Scale));
+        float *sRGBToSpectrumTableDataPtr =
+            (float *)alloc.allocate_bytes(sizeof(sRGBToSpectrumTable_Data));
+        memcpy(sRGBToSpectrumTableDataPtr, sRGBToSpectrumTable_Data,
+               sizeof(sRGBToSpectrumTable_Data));
 
-    sRGB = alloc.new_object<RGBToSpectrumTable>(
-        sRGBToSpectrumTable_Res, sRGBToSpectrumTableScalePtr, sRGBToSpectrumTableDataPtr);
+        sRGB = alloc.new_object<RGBToSpectrumTable>(sRGBToSpectrumTable_Res,
+                                                    sRGBToSpectrumTableScalePtr,
+                                                    sRGBToSpectrumTableDataPtr);
 
-    // DCI_P3
-    float *DCI_P3ToSpectrumTableScalePtr =
-        (float *)alloc.allocate_bytes(sizeof(DCI_P3ToSpectrumTable_Scale));
-    memcpy(DCI_P3ToSpectrumTableScalePtr, DCI_P3ToSpectrumTable_Scale,
-           sizeof(DCI_P3ToSpectrumTable_Scale));
-    float *DCI_P3ToSpectrumTableDataPtr =
-        (float *)alloc.allocate_bytes(sizeof(DCI_P3ToSpectrumTable_Data));
-    memcpy(DCI_P3ToSpectrumTableDataPtr, DCI_P3ToSpectrumTable_Data,
-           sizeof(DCI_P3ToSpectrumTable_Data));
+        // DCI_P3
+        float *DCI_P3ToSpectrumTableScalePtr =
+            (float *)alloc.allocate_bytes(sizeof(DCI_P3ToSpectrumTable_Scale));
+        memcpy(DCI_P3ToSpectrumTableScalePtr, DCI_P3ToSpectrumTable_Scale,
+               sizeof(DCI_P3ToSpectrumTable_Scale));
+        float *DCI_P3ToSpectrumTableDataPtr =
+            (float *)alloc.allocate_bytes(sizeof(DCI_P3ToSpectrumTable_Data));
+        memcpy(DCI_P3ToSpectrumTableDataPtr, DCI_P3ToSpectrumTable_Data,
+               sizeof(DCI_P3ToSpectrumTable_Data));
 
-    DCI_P3 = alloc.new_object<RGBToSpectrumTable>(DCI_P3ToSpectrumTable_Res,
-                                                  DCI_P3ToSpectrumTableScalePtr,
-                                                  DCI_P3ToSpectrumTableDataPtr);
+        DCI_P3 = alloc.new_object<RGBToSpectrumTable>(DCI_P3ToSpectrumTable_Res,
+                                                      DCI_P3ToSpectrumTableScalePtr,
+                                                      DCI_P3ToSpectrumTableDataPtr);
 
-    // Rec2020
-    float *REC2020ToSpectrumTableScalePtr =
-        (float *)alloc.allocate_bytes(sizeof(REC2020ToSpectrumTable_Scale));
-    memcpy(REC2020ToSpectrumTableScalePtr, REC2020ToSpectrumTable_Scale,
-           sizeof(REC2020ToSpectrumTable_Scale));
-    float *REC2020ToSpectrumTableDataPtr =
-        (float *)alloc.allocate_bytes(sizeof(REC2020ToSpectrumTable_Data));
-    memcpy(REC2020ToSpectrumTableDataPtr, REC2020ToSpectrumTable_Data,
-           sizeof(REC2020ToSpectrumTable_Data));
+        // Rec2020
+        float *REC2020ToSpectrumTableScalePtr =
+            (float *)alloc.allocate_bytes(sizeof(REC2020ToSpectrumTable_Scale));
+        memcpy(REC2020ToSpectrumTableScalePtr, REC2020ToSpectrumTable_Scale,
+               sizeof(REC2020ToSpectrumTable_Scale));
+        float *REC2020ToSpectrumTableDataPtr =
+            (float *)alloc.allocate_bytes(sizeof(REC2020ToSpectrumTable_Data));
+        memcpy(REC2020ToSpectrumTableDataPtr, REC2020ToSpectrumTable_Data,
+               sizeof(REC2020ToSpectrumTable_Data));
 
-    Rec2020 = alloc.new_object<RGBToSpectrumTable>(REC2020ToSpectrumTable_Res,
-                                                   REC2020ToSpectrumTableScalePtr,
-                                                   REC2020ToSpectrumTableDataPtr);
+        Rec2020 = alloc.new_object<RGBToSpectrumTable>(REC2020ToSpectrumTable_Res,
+                                                       REC2020ToSpectrumTableScalePtr,
+                                                       REC2020ToSpectrumTableDataPtr);
 
-    // ACES2065_1
-    float *ACES2065_1ToSpectrumTableScalePtr =
-        (float *)alloc.allocate_bytes(sizeof(ACES2065_1ToSpectrumTable_Scale));
-    memcpy(ACES2065_1ToSpectrumTableScalePtr, ACES2065_1ToSpectrumTable_Scale,
-           sizeof(ACES2065_1ToSpectrumTable_Scale));
-    float *ACES2065_1ToSpectrumTableDataPtr =
-        (float *)alloc.allocate_bytes(sizeof(ACES2065_1ToSpectrumTable_Data));
-    memcpy(ACES2065_1ToSpectrumTableDataPtr, ACES2065_1ToSpectrumTable_Data,
-           sizeof(ACES2065_1ToSpectrumTable_Data));
+        // ACES2065_1
+        float *ACES2065_1ToSpectrumTableScalePtr =
+            (float *)alloc.allocate_bytes(sizeof(ACES2065_1ToSpectrumTable_Scale));
+        memcpy(ACES2065_1ToSpectrumTableScalePtr, ACES2065_1ToSpectrumTable_Scale,
+               sizeof(ACES2065_1ToSpectrumTable_Scale));
+        float *ACES2065_1ToSpectrumTableDataPtr =
+            (float *)alloc.allocate_bytes(sizeof(ACES2065_1ToSpectrumTable_Data));
+        memcpy(ACES2065_1ToSpectrumTableDataPtr, ACES2065_1ToSpectrumTable_Data,
+               sizeof(ACES2065_1ToSpectrumTable_Data));
 
-    ACES2065_1 = alloc.new_object<RGBToSpectrumTable>(ACES2065_1ToSpectrumTable_Res,
-                                                      ACES2065_1ToSpectrumTableScalePtr,
-                                                      ACES2065_1ToSpectrumTableDataPtr);
-#else
+        ACES2065_1 = alloc.new_object<RGBToSpectrumTable>(
+            ACES2065_1ToSpectrumTable_Res, ACES2065_1ToSpectrumTableScalePtr,
+            ACES2065_1ToSpectrumTableDataPtr);
+        return;
+    }
+#endif
     sRGB = alloc.new_object<RGBToSpectrumTable>(
         sRGBToSpectrumTable_Res, sRGBToSpectrumTable_Scale, sRGBToSpectrumTable_Data);
     DCI_P3 = alloc.new_object<RGBToSpectrumTable>(DCI_P3ToSpectrumTable_Res,
@@ -181,7 +186,6 @@ void RGBToSpectrumTable::Init(Allocator alloc) {
     ACES2065_1 = alloc.new_object<RGBToSpectrumTable>(ACES2065_1ToSpectrumTable_Res,
                                                       ACES2065_1ToSpectrumTable_Scale,
                                                       ACES2065_1ToSpectrumTable_Data);
-#endif
 }
 
 std::string RGBToSpectrumTable::ToString() const {

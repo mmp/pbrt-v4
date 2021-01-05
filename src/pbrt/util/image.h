@@ -12,12 +12,12 @@
 #include <pbrt/util/containers.h>
 #include <pbrt/util/float.h>
 #include <pbrt/util/math.h>
+#include <pbrt/util/parallel.h>
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/vecmath.h>
 
 #include <cstdint>
 #include <cstring>
-#include <functional>
 #include <map>
 #include <vector>
 
@@ -325,10 +325,13 @@ class Image {
 
     Image GaussianFilter(const ImageChannelDesc &desc, int halfWidth, Float sigma) const;
 
+    template <typename F>
     Array2D<Float> GetSamplingDistribution(
-        std::function<Float(Point2f)> dxdA = [](Point2f) { return Float(1); },
-        const Bounds2f &domain = Bounds2f(Point2f(0, 0), Point2f(1, 1)),
+        F dxdA, const Bounds2f &domain = Bounds2f(Point2f(0, 0), Point2f(1, 1)),
         Allocator alloc = {});
+    Array2D<Float> GetSamplingDistribution() {
+        return GetSamplingDistribution([](Point2f) { return Float(1); });
+    }
 
     static ImageAndMetadata Read(const std::string &filename, Allocator alloc = {},
                                  ColorEncodingHandle encoding = nullptr);
@@ -433,6 +436,28 @@ inline void Image::SetChannel(Point2i p, int c, Float value) {
     default:
         LOG_FATAL("Unhandled PixelFormat in Image::SetChannel()");
     }
+}
+
+template <typename F>
+inline Array2D<Float> Image::GetSamplingDistribution(F dxdA, const Bounds2f &domain,
+                                                     Allocator alloc) {
+    Array2D<Float> dist(resolution[0], resolution[1], alloc);
+    ParallelFor(0, resolution[1], [&](int64_t y0, int64_t y1) {
+        for (int y = y0; y < y1; ++y) {
+            for (int x = 0; x < resolution[0]; ++x) {
+                // This is noticably better than MaxValue: discuss / show
+                // example..
+                Float value = GetChannels({x, y}).Average();
+
+                // Assume jacobian term is basically constant over the
+                // region.
+                Point2f p = domain.Lerp(
+                    Point2f((x + .5f) / resolution[0], (y + .5f) / resolution[1]));
+                dist(x, y) = value * dxdA(p);
+            }
+        }
+    });
+    return dist;
 }
 
 // ImageAndMetadata Definition

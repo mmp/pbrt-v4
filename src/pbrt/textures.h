@@ -651,9 +651,11 @@ class GPUSpectrumImageTexture {
             float4 tex = tex2D<float4>(texObj, st[0], 1 - st[1]);
             rgb = scale * RGB(tex.x, tex.y, tex.z);
         }
-        if (spectrumType == SpectrumType::General) {
+        if (spectrumType == SpectrumType::Unbounded)
+            return RGBUnboundedSpectrum(*colorSpace, rgb).Sample(lambda);
+        else if (spectrumType == SpectrumType::Albedo) {
             rgb = Clamp(rgb, 0, 1);
-            return RGBSpectrum(*colorSpace, rgb).Sample(lambda);
+            return RGBAlbedoSpectrum(*colorSpace, rgb).Sample(lambda);
         } else
             return RGBIlluminantSpectrum(*colorSpace, rgb).Sample(lambda);
 #endif
@@ -1018,29 +1020,29 @@ class UniversalTextureEvaluator {
                                SampledWavelengths lambda);
 };
 
+// BasicTextureEvaluator Definition
 class BasicTextureEvaluator {
   public:
+    // BasicTextureEvaluator Public Methods
     PBRT_CPU_GPU
     bool CanEvaluate(std::initializer_list<FloatTextureHandle> ftex,
                      std::initializer_list<SpectrumTextureHandle> stex) const {
         for (auto f : ftex)
-            if (f && (!f.Is<FloatConstantTexture>() && !f.Is<GPUFloatImageTexture>())) {
+            if (f && (!f.Is<FloatConstantTexture>() && !f.Is<GPUFloatImageTexture>()))
                 return false;
-            }
         for (auto s : stex)
             if (s &&
-                (!s.Is<SpectrumConstantTexture>() && !s.Is<GPUSpectrumImageTexture>())) {
+                (!s.Is<SpectrumConstantTexture>() && !s.Is<GPUSpectrumImageTexture>()))
                 return false;
-            }
         return true;
     }
 
     PBRT_CPU_GPU
     Float operator()(FloatTextureHandle tex, TextureEvalContext ctx) {
-        if (FloatConstantTexture *fc = tex.CastOrNullptr<FloatConstantTexture>())
-            return fc->Evaluate(ctx);
-        else if (GPUFloatImageTexture *fg = tex.CastOrNullptr<GPUFloatImageTexture>())
-            return fg->Evaluate(ctx);
+        if (FloatConstantTexture *fcTex = tex.CastOrNullptr<FloatConstantTexture>())
+            return fcTex->Evaluate(ctx);
+        else if (GPUFloatImageTexture *fiTex = tex.CastOrNullptr<GPUFloatImageTexture>())
+            return fiTex->Evaluate(ctx);
         else
             return 0.f;
     }

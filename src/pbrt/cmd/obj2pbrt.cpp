@@ -1366,7 +1366,7 @@ int main(int argc, char *argv[]) {
             if (mtl.diffuse[0] != 0 || mtl.diffuse[1] != 0 || mtl.diffuse[2] != 0) {
                 fprintf(f,
                         "Texture \"%s-kd-img\" \"spectrum\" \"imagemap\" "
-                        "\"string imagefile\" [\"%s\"]\n",
+                        "\"string filename\" [\"%s\"]\n",
                         mtl.name.c_str(), mtl.diffuse_texname.c_str());
                 float scale = (mtl.diffuse[0] + mtl.diffuse[1] + mtl.diffuse[2]) / 3;
                 if (mtl.diffuse[0] != mtl.diffuse[1] || mtl.diffuse[1] != mtl.diffuse[2])
@@ -1382,7 +1382,7 @@ int main(int argc, char *argv[]) {
             } else {
                 fprintf(f,
                         "Texture \"%s-kd\" \"spectrum\" \"imagemap\" "
-                        "\"string imagefile\" [\"%s\"]\n",
+                        "\"string filename\" [\"%s\"]\n",
                         mtl.name.c_str(), mtl.diffuse_texname.c_str());
             }
         }
@@ -1392,7 +1392,7 @@ int main(int argc, char *argv[]) {
             if (mtl.specular[0] != 0 || mtl.specular[1] != 0 || mtl.specular[2] != 0) {
                 fprintf(f,
                         "Texture \"%s-ks-img\" \"spectrum\" \"imagemap\" "
-                        "\"string imagefile\" [\"%s\"]\n",
+                        "\"string filename\" [\"%s\"]\n",
                         mtl.name.c_str(), mtl.specular_texname.c_str());
                 float scale = (mtl.specular[0] + mtl.specular[1] + mtl.specular[2]) / 3;
                 if (mtl.specular[0] != mtl.specular[1] ||
@@ -1409,7 +1409,7 @@ int main(int argc, char *argv[]) {
             } else {
                 fprintf(f,
                         "Texture \"%s-ks\" \"spectrum\" \"imagemap\" "
-                        "\"string imagefile\" [\"%s\"]\n",
+                        "\"string filename\" [\"%s\"]\n",
                         mtl.name.c_str(), mtl.specular_texname.c_str());
             }
         }
@@ -1417,12 +1417,12 @@ int main(int argc, char *argv[]) {
         if (!mtl.bump_texname.empty()) {
             fprintf(f,
                     "Texture \"%s-bump\" \"float\" \"imagemap\" "
-                    "\"string imagefile\" [\"%s\"]\n",
+                    "\"string filename\" [\"%s\"]\n",
                     mtl.name.c_str(), mtl.bump_texname.c_str());
         }
 
         float roughness = (mtl.shininess == 0) ? 0. : (1.f / mtl.shininess);
-        fprintf(f, R"(MakeNamedMaterial "%s" "string type" "uber" )", mtl.name.c_str());
+        fprintf(f, R"(MakeNamedMaterial "%s" "string type" "coateddiffuse" )", mtl.name.c_str());
 
         if (hasDiffuseTex)
             fprintf(f, R"("texture reflectance" "%s-kd" )", mtl.name.c_str());
@@ -1591,7 +1591,7 @@ int main(int argc, char *argv[]) {
                 fprintf(f, "]\n");
             }
             if (!st.empty()) {
-                fprintf(f, "  \"point2 st\" [ \n");
+                fprintf(f, "  \"point2 uv\" [ \n");
                 for (Point2f tex : st)
                     fprintf(f, "\t%.10g %.10g\n", tex.x, tex.y);
                 fprintf(f, "]\n");

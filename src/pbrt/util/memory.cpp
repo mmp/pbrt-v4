@@ -46,6 +46,9 @@ void CUDAMemoryResource::do_deallocate(void *p, size_t bytes, size_t alignment) 
 }
 
 void *CUDATrackedMemoryResource::do_allocate(size_t size, size_t alignment) {
+    if (size == 0)
+        return nullptr;
+
     std::lock_guard<std::mutex> lock(mutex);
 
     // GPU cache line alignment to avoid false sharing...

@@ -59,9 +59,13 @@ soa MediumInterface {
 soa TabulatedBSSRDF {
     Point3f po;
     Vector3f wo;
-    Float time;
     Normal3f ns;
     Float eta;
     const BSSRDFTable *table;
     SampledSpectrum sigma_t, rho;
+};
+
+soa LightSampleContext {
+    Point3fi pi;
+    Normal3f n, ns;
 };

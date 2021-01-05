@@ -41,7 +41,7 @@ TEST(Spectrum, Blackbody) {
     // consistent with this.
     for (Float T : {2700, 3000, 4500, 5600, 6000}) {
         Float lambdaMax = 2.8977721e-3 / T * 1e9;
-        Float lambda[3] = {Float(.999 * lambdaMax), lambdaMax, Float(1.001 * lambdaMax)};
+        Float lambda[3] = {Float(.99 * lambdaMax), lambdaMax, Float(1.01 * lambdaMax)};
         EXPECT_LT(Blackbody(lambda[0], T), Blackbody(lambda[1], T));
         EXPECT_GT(Blackbody(lambda[1], T), Blackbody(lambda[2], T));
     }
@@ -103,10 +103,15 @@ TEST(Spectrum, MaxValue) {
     RNG rng;
     for (int i = 0; i < 20; ++i) {
         RGB rgb(rng.Uniform<Float>(), rng.Uniform<Float>(), rng.Uniform<Float>());
-        RGBSpectrum sr(*RGBColorSpace::sRGB, rgb);
+        RGBAlbedoSpectrum sr(*RGBColorSpace::sRGB, rgb);
         Float m = sr.MaxValue() * 1.00001f;
         for (Float lambda = 360; lambda < 830; lambda += .92)
             EXPECT_LE(sr(lambda), m);
+
+        RGBUnboundedSpectrum su(*RGBColorSpace::sRGB, 10 * rgb);
+        m = su.MaxValue() * 1.00001f * 10.f;
+        for (Float lambda = 360; lambda < 830; lambda += .92)
+            EXPECT_LE(su(lambda), m);
 
         RGBIlluminantSpectrum si(*RGBColorSpace::sRGB, rgb);
         m = si.MaxValue() * 1.00001f;

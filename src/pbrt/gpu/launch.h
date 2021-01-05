@@ -39,14 +39,15 @@ inline int GetBlockSize(const char *description, F kernel) {
         return iter->second;
 
     int minGridSize, blockSize;
-    CUDA_CHECK(cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize,
-                                                  kernel, 0, 0));
+    CUDA_CHECK(
+        cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, kernel, 0, 0));
     kernelBlockSizes[index] = blockSize;
     LOG_VERBOSE("[%s]: block size %d", description, blockSize);
 
     return blockSize;
 }
 
+#ifdef __CUDACC__
 template <typename F>
 __global__ void Kernel(F func, int nItems) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -55,13 +56,20 @@ __global__ void Kernel(F func, int nItems) {
 
     func(tid);
 }
+#endif  // __CUDACC__
 
-#ifdef PBRT_IS_WINDOWS
-    #define PBRT_GPU_LAMBDA(...) [=,*this] PBRT_GPU(__VA_ARGS__) mutable
-#else
-    #define PBRT_GPU_LAMBDA(...) [=] PBRT_GPU(__VA_ARGS__)
-#endif
+// GPU Launch Function Declarations
+template <typename F>
+void GPUParallelFor(const char *description, int nItems, F func);
 
+template <typename F>
+void GPUDo(const char *description, F func) {
+    GPUParallelFor(description, 1, [=] PBRT_GPU(int) mutable { func(); });
+}
+
+void GPUWait();
+
+#ifdef __CUDACC__
 template <typename F>
 void GPUParallelFor(const char *description, int nItems, F func) {
 #ifdef NVTX
@@ -72,7 +80,7 @@ void GPUParallelFor(const char *description, int nItems, F func) {
     int blockSize = GetBlockSize(description, kernel);
     std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents(description);
 
-#ifndef NDEBUG
+#ifdef PBRT_DEBUG_BUILD
     LOG_VERBOSE("Launching %s", description);
 #endif
     cudaEventRecord(events.first);
@@ -80,7 +88,7 @@ void GPUParallelFor(const char *description, int nItems, F func) {
     kernel<<<gridSize, blockSize>>>(func, nItems);
     cudaEventRecord(events.second);
 
-#ifndef NDEBUG
+#ifdef PBRT_DEBUG_BUILD
     CUDA_CHECK(cudaDeviceSynchronize());
     LOG_VERBOSE("Post-sync %s", description);
 #endif
@@ -88,11 +96,7 @@ void GPUParallelFor(const char *description, int nItems, F func) {
     nvtxRangePop();
 #endif
 }
-
-template <typename F>
-void GPUDo(const char *description, F func) {
-    GPUParallelFor(description, 1, [=] PBRT_GPU(int) mutable { func(); });
-}
+#endif  // __CUDACC__
 
 void ReportKernelStats();
 

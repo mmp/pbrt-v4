@@ -215,7 +215,13 @@ RGB SampledSpectrum::ToRGB(const SampledWavelengths &lambda,
     return cs.ToRGB(xyz);
 }
 
-RGBSpectrum::RGBSpectrum(const RGBColorSpace &cs, const RGB &rgb) {
+RGBAlbedoSpectrum::RGBAlbedoSpectrum(const RGBColorSpace &cs, const RGB &rgb) {
+    DCHECK_LE(std::max({rgb.r, rgb.g, rgb.b}), 1);
+    DCHECK_GE(std::min({rgb.r, rgb.g, rgb.b}), 0);
+    rsp = cs.ToRGBCoeffs(rgb);
+}
+
+RGBUnboundedSpectrum::RGBUnboundedSpectrum(const RGBColorSpace &cs, const RGB &rgb) {
     Float m = std::max({rgb.r, rgb.g, rgb.b});
     if (m <= 1)
         rsp = cs.ToRGBCoeffs(rgb);
@@ -232,12 +238,16 @@ RGBIlluminantSpectrum::RGBIlluminantSpectrum(const RGBColorSpace &cs, const RGB 
     rsp = cs.ToRGBCoeffs(scale ? rgb / scale : RGB(0, 0, 0));
 }
 
-std::string RGBSpectrum::ToString() const {
-    return StringPrintf("[ RGBSpectrum rsp: %s ]", rsp);
+std::string RGBAlbedoSpectrum::ToString() const {
+    return StringPrintf("[ RGBAlbedoSpectrum rsp: %s ]", rsp);
+}
+
+std::string RGBUnboundedSpectrum::ToString() const {
+    return StringPrintf("[ RGBUnboundedSpectrum rsp: %s ]", rsp);
 }
 
 std::string RGBIlluminantSpectrum::ToString() const {
-    return StringPrintf("[ RGBIlluminantSpectrum: %s rsp: %s scale: %f illuminant: %s ]",
+    return StringPrintf("[ RGBIlluminantSpectrum: rsp: %s scale: %f illuminant: %s ]",
                         rsp, scale, *illuminant);
 }
 

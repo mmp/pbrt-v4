@@ -13,12 +13,15 @@
 #include <pbrt/lightsamplers.h>
 #include <pbrt/materials.h>
 #include <pbrt/ray.h>
+#include <pbrt/util/containers.h>
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/soa.h>
 
 namespace pbrt {
 
+// RaySamples Definition
 struct RaySamples {
+    // RaySamples Public Members
     struct {
         Point2f u;
         Float uc;
@@ -27,12 +30,15 @@ struct RaySamples {
         Float uc, rr;
         Point2f u;
     } indirect;
-
     bool haveSubsurface;
     struct {
         Float uc;
         Point2f u;
     } subsurface;
+    bool haveMedia;
+    struct {
+        Float uDist, uMode;
+    } media;
 };
 
 template <>
@@ -44,6 +50,8 @@ struct SOA<RaySamples> {
         direct = alloc.allocate_object<Float4>(size);
         indirect = alloc.allocate_object<Float4>(size);
         subsurface = alloc.allocate_object<Float4>(size);
+        mediaDist = alloc.allocate_object<Float>(size);
+        mediaMode = alloc.allocate_object<Float>(size);
     }
 
     PBRT_CPU_GPU
@@ -53,16 +61,23 @@ struct SOA<RaySamples> {
         rs.direct.u = Point2f(dir.v[0], dir.v[1]);
         rs.direct.uc = dir.v[2];
 
+        rs.haveSubsurface = int(dir.v[3]) & 1;
+        rs.haveMedia = int(dir.v[3]) & 2;
+
         Float4 ind = Load4(indirect + i);
         rs.indirect.uc = ind.v[0];
         rs.indirect.rr = ind.v[1];
         rs.indirect.u = Point2f(ind.v[2], ind.v[3]);
 
-        rs.haveSubsurface = dir.v[3] != 0;
         if (rs.haveSubsurface) {
             Float4 ss = Load4(subsurface + i);
             rs.subsurface.uc = ss.v[0];
             rs.subsurface.u = Point2f(ss.v[1], ss.v[2]);
+        }
+
+        if (rs.haveMedia) {
+            rs.media.uDist = mediaDist[i];
+            rs.media.uMode = mediaMode[i];
         }
 
         return rs;
@@ -74,13 +89,18 @@ struct SOA<RaySamples> {
 
         PBRT_CPU_GPU
         void operator=(RaySamples rs) {
-            soa->direct[index] = Float4{rs.direct.u[0], rs.direct.u[1], rs.direct.uc,
-                                        Float(rs.haveSubsurface)};
+            int flags = (rs.haveSubsurface ? 1 : 0) | (rs.haveMedia ? 2 : 0);
+            soa->direct[index] =
+                Float4{rs.direct.u[0], rs.direct.u[1], rs.direct.uc, Float(flags)};
             soa->indirect[index] = Float4{rs.indirect.uc, rs.indirect.rr,
                                           rs.indirect.u[0], rs.indirect.u[1]};
             if (rs.haveSubsurface)
                 soa->subsurface[index] =
                     Float4{rs.subsurface.uc, rs.subsurface.u.x, rs.subsurface.u.y, 0.f};
+            if (rs.haveMedia) {
+                soa->mediaDist[index] = rs.media.uDist;
+                soa->mediaMode[index] = rs.media.uMode;
+            }
         }
 
         SOA *soa;
@@ -94,72 +114,164 @@ struct SOA<RaySamples> {
     Float4 *__restrict__ direct;
     Float4 *__restrict__ indirect;
     Float4 *__restrict__ subsurface;
+    Float *__restrict__ mediaDist, *__restrict__ mediaMode;
 };
 
+// PixelSampleState Definition
 struct PixelSampleState {
-    Float filterWeight;
+    // PixelSampleState Public Members
     Point2i pPixel;
-    SampledWavelengths lambda;
     SampledSpectrum L;
-    SampledSpectrum cameraRayWeight;
+    SampledWavelengths lambda;
+    Float filterWeight;
     VisibleSurface visibleSurface;
+    SampledSpectrum cameraRayWeight;
     RaySamples samples;
 };
 
+// RayWorkItem Definition
 struct RayWorkItem {
+    // RayWorkItem Public Members
     Ray ray;
-    int pixelIndex;
     SampledWavelengths lambda;
-    SampledSpectrum beta, pdfUni, pdfNEE;
-    Point3fi piPrev;
-    Normal3f nPrev;
-    Normal3f nsPrev;
+    int pixelIndex;
+    SampledSpectrum T_hat, uniPathPDF, lightPathPDF;
+    LightSampleContext prevIntrCtx;
     Float etaScale;
     int isSpecularBounce;
     int anyNonSpecularBounces;
 };
 
+// EscapedRayWorkItem Definition
 struct EscapedRayWorkItem {
-    SampledSpectrum beta, pdfUni, pdfNEE;
-    SampledWavelengths lambda;
+    // EscapedRayWorkItem Public Members
     Point3f rayo;
     Vector3f rayd;
-    Point3fi piPrev;
-    Normal3f nPrev, nsPrev;
-    int specularBounce;
+    SampledWavelengths lambda;
     int pixelIndex;
+    int specularBounce;
+    SampledSpectrum T_hat, uniPathPDF, lightPathPDF;
+    LightSampleContext prevIntrCtx;
 };
 
+// EscapedRayQueue Definition
 using EscapedRayQueue = WorkQueue<EscapedRayWorkItem>;
 
+// HitAreaLightWorkItem Definition
 struct HitAreaLightWorkItem {
+    // HitAreaLightWorkItem Public Members
     LightHandle areaLight;
-    SampledWavelengths lambda;
-    SampledSpectrum beta, pdfUni, pdfNEE;
     Point3f p;
     Normal3f n;
     Point2f uv;
     Vector3f wo;
-    Point3fi piPrev;
-    Vector3f rayd;
-    Float time;
-    Normal3f nPrev, nsPrev;
+    SampledWavelengths lambda;
+    SampledSpectrum T_hat, uniPathPDF, lightPathPDF;
+    LightSampleContext prevIntrCtx;
     int isSpecularBounce;
     int pixelIndex;
 };
 
+// HitAreaLightQueue Definition
 using HitAreaLightQueue = WorkQueue<HitAreaLightWorkItem>;
 
+// ShadowRayWorkItem Definition
 struct ShadowRayWorkItem {
     Ray ray;
     Float tMax;
     SampledWavelengths lambda;
-    SampledSpectrum Ld, pdfUni, pdfNEE;
+    SampledSpectrum Ld, uniPathPDF, lightPathPDF;
     int pixelIndex;
 };
 
+// GetBSSRDFAndProbeRayWorkItem Definition
+struct GetBSSRDFAndProbeRayWorkItem {
+    PBRT_CPU_GPU
+    MaterialEvalContext GetMaterialEvalContext() const {
+        MaterialEvalContext ctx;
+        ctx.wo = wo;
+        ctx.n = n;
+        ctx.ns = ns;
+        ctx.dpdus = dpdus;
+        ctx.p = p;
+        ctx.uv = uv;
+        return ctx;
+    }
+
+    MaterialHandle material;
+    SampledWavelengths lambda;
+    SampledSpectrum T_hat, uniPathPDF;
+    Point3f p;
+    Vector3f wo;
+    Normal3f n, ns;
+    Vector3f dpdus;
+    Point2f uv;
+    MediumInterface mediumInterface;
+    Float etaScale;
+    int pixelIndex;
+};
+
+// SubsurfaceScatterWorkItem Definition
+struct SubsurfaceScatterWorkItem {
+    Point3f p0, p1;
+    MaterialHandle material;
+    TabulatedBSSRDF bssrdf;
+    SampledWavelengths lambda;
+    SampledSpectrum T_hat, uniPathPDF;
+    Float weight;
+    Float uLight;
+    SubsurfaceInteraction ssi;
+    MediumInterface mediumInterface;
+    Float etaScale;
+    int pixelIndex;
+};
+
+// MediumSampleWorkItem Definition
+struct MediumSampleWorkItem {
+    // Both enqueue types (have mtl and no hit)
+    Ray ray;
+    Float tMax;
+    SampledWavelengths lambda;
+    SampledSpectrum T_hat;
+    SampledSpectrum uniPathPDF;
+    SampledSpectrum lightPathPDF;
+    int pixelIndex;
+    LightSampleContext prevIntrCtx;
+    int isSpecularBounce;
+    int anyNonSpecularBounces;
+    Float etaScale;
+
+    // Have a hit material as well
+    LightHandle areaLight;
+    Point3fi pi;
+    Normal3f n;
+    Vector3f wo;
+    Point2f uv;
+    MaterialHandle material;
+    Normal3f ns;
+    Vector3f dpdus;
+    Vector3f dpdvs;
+    Normal3f dndus;
+    Normal3f dndvs;
+    MediumInterface mediumInterface;
+};
+
+// MediumScatterWorkItem Definition
+struct MediumScatterWorkItem {
+    Point3f p;
+    SampledWavelengths lambda;
+    SampledSpectrum T_hat, uniPathPDF;
+    HGPhaseFunction phase;
+    Vector3f wo;
+    Float etaScale;
+    MediumHandle medium;
+    int pixelIndex;
+};
+
+// MaterialEvalWorkItem Definition
 template <typename Material>
 struct MaterialEvalWorkItem {
+    // MaterialEvalWorkItem Public Methods
     PBRT_CPU_GPU
     BumpEvalContext GetBumpEvalContext() const {
         BumpEvalContext ctx;
@@ -185,192 +297,108 @@ struct MaterialEvalWorkItem {
         return ctx;
     }
 
+    // MaterialEvalWorkItem Public Members
     const Material *material;
-    SampledWavelengths lambda;
-    SampledSpectrum beta, pdfUni;
     Point3fi pi;
     Normal3f n, ns;
     Vector3f dpdus, dpdvs;
     Normal3f dndus, dndvs;
-    Vector3f wo;
     Point2f uv;
+    SampledWavelengths lambda;
+    int anyNonSpecularBounces;
+    Vector3f wo;
+    int pixelIndex;
+    SampledSpectrum T_hat, uniPathPDF;
+    Float etaScale;
+    MediumInterface mediumInterface;
     Float time;
-    int anyNonSpecularBounces;
-    Float etaScale;
-    MediumInterface mediumInterface;
-    int pixelIndex;
-};
-
-struct GetBSSRDFAndProbeRayWorkItem {
-    PBRT_CPU_GPU
-    MaterialEvalContext GetMaterialEvalContext() const {
-        MaterialEvalContext ctx;
-        ctx.wo = wo;
-        ctx.n = n;
-        ctx.ns = ns;
-        ctx.dpdus = dpdus;
-        ctx.p = p;
-        ctx.uv = uv;
-        return ctx;
-    }
-
-    MaterialHandle material;
-    SampledWavelengths lambda;
-    SampledSpectrum beta, pdfUni;
-    Point3f p;
-    Vector3f wo;
-    Normal3f n, ns;
-    Vector3f dpdus;
-    Point2f uv;
-    MediumInterface mediumInterface;
-    Float etaScale;
-    int pixelIndex;
-};
-
-struct SubsurfaceScatterWorkItem {
-    Point3f p0, p1;
-    MaterialHandle material;
-    TabulatedBSSRDF bssrdf;
-    SampledWavelengths lambda;
-    SampledSpectrum beta, pdfUni;
-    Float weight;
-    Float uLight;
-    SubsurfaceInteraction ssi;
-    MediumInterface mediumInterface;
-    Float etaScale;
-    int pixelIndex;
-};
-
-struct MediumTransitionWorkItem {
-    Ray ray;
-    SampledWavelengths lambda;
-    SampledSpectrum beta, pdfUni, pdfNEE;
-    Point3fi piPrev;
-    Normal3f nPrev, nsPrev;
-    int isSpecularBounce;
-    int anyNonSpecularBounces;
-    Float etaScale;
-    int pixelIndex;
-};
-
-using MediumTransitionQueue = WorkQueue<MediumTransitionWorkItem>;
-
-struct MediumSampleWorkItem {
-    // Both enqueue types (have mtl and no hit)
-    Ray ray;
-    Float tMax;
-    SampledWavelengths lambda;
-    SampledSpectrum beta;
-    SampledSpectrum pdfUni;
-    SampledSpectrum pdfNEE;
-    int pixelIndex;
-    Point3fi piPrev;
-    Normal3f nPrev;
-    Normal3f nsPrev;
-    int isSpecularBounce;
-    int anyNonSpecularBounces;
-    Float etaScale;
-
-    // Have a hit material as well
-    LightHandle areaLight;
-    Point3fi pi;
-    Normal3f n;
-    Vector3f wo;
-    Point2f uv;
-    MaterialHandle material;
-    Normal3f ns;
-    Vector3f dpdus;
-    Vector3f dpdvs;
-    Normal3f dndus;
-    Normal3f dndvs;
-    MediumInterface mediumInterface;
-};
-
-struct MediumScatterWorkItem {
-    Point3f p;
-    SampledWavelengths lambda;
-    SampledSpectrum beta, pdfUni;
-    HGPhaseFunction phase;
-    Vector3f wo;
-    Float etaScale;
-    MediumHandle medium;
-    int pixelIndex;
 };
 
 #include "gpu_workitems_soa.h"
 
+// RayQueue Definition
 class RayQueue : public WorkQueue<RayWorkItem> {
+  public:
+    using WorkQueue::WorkQueue;
+    // RayQueue Public Methods
+    PBRT_CPU_GPU
+    int PushCameraRay(const Ray &ray, const SampledWavelengths &lambda, int pixelIndex);
+
+    PBRT_CPU_GPU
+    int PushIndirectRay(const Ray &ray, const LightSampleContext &prevIntrCtx,
+                        const SampledSpectrum &T_hat, const SampledSpectrum &uniPathPDF,
+                        const SampledSpectrum &lightPathPDF,
+                        const SampledWavelengths &lambda, Float etaScale,
+                        bool isSpecularBounce, bool anyNonSpecularBounces,
+                        int pixelIndex);
+};
+
+// RayQueue Inline Methods
+inline int RayQueue::PushCameraRay(const Ray &ray, const SampledWavelengths &lambda,
+                                   int pixelIndex) {
+    int index = AllocateEntry();
+    DCHECK(!ray.HasNaN());
+    this->ray[index] = ray;
+    this->pixelIndex[index] = pixelIndex;
+    this->lambda[index] = lambda;
+    this->T_hat[index] = SampledSpectrum(1.f);
+    this->etaScale[index] = 1.f;
+    this->anyNonSpecularBounces[index] = false;
+    this->uniPathPDF[index] = SampledSpectrum(1.f);
+    this->lightPathPDF[index] = SampledSpectrum(1.f);
+    this->isSpecularBounce[index] = false;
+    return index;
+}
+
+PBRT_CPU_GPU
+inline int RayQueue::PushIndirectRay(
+    const Ray &ray, const LightSampleContext &prevIntrCtx, const SampledSpectrum &T_hat,
+    const SampledSpectrum &uniPathPDF, const SampledSpectrum &lightPathPDF,
+    const SampledWavelengths &lambda, Float etaScale, bool isSpecularBounce,
+    bool anyNonSpecularBounces, int pixelIndex) {
+    int index = AllocateEntry();
+    DCHECK(!ray.HasNaN());
+    this->ray[index] = ray;
+    this->pixelIndex[index] = pixelIndex;
+    this->prevIntrCtx[index] = prevIntrCtx;
+    this->T_hat[index] = T_hat;
+    this->uniPathPDF[index] = uniPathPDF;
+    this->lightPathPDF[index] = lightPathPDF;
+    this->lambda[index] = lambda;
+    this->anyNonSpecularBounces[index] = anyNonSpecularBounces;
+    this->isSpecularBounce[index] = isSpecularBounce;
+    this->etaScale[index] = etaScale;
+    return index;
+}
+
+// ShadowRayQueue Definition
+class ShadowRayQueue : public WorkQueue<ShadowRayWorkItem> {
+  public:
+    using WorkQueue::WorkQueue;
+    // ShadowRayQueue Public Methods
+    PBRT_CPU_GPU
+    void Push(const Ray &ray, Float tMax, SampledWavelengths lambda, SampledSpectrum Ld,
+              SampledSpectrum uniPathPDF, SampledSpectrum lightPathPDF, int pixelIndex) {
+        WorkQueue<ShadowRayWorkItem>::Push(ShadowRayWorkItem{
+            ray, tMax, lambda, Ld, uniPathPDF, lightPathPDF, pixelIndex});
+    }
+};
+
+// GetBSSRDFAndProbeRayQueue Definition
+class GetBSSRDFAndProbeRayQueue : public WorkQueue<GetBSSRDFAndProbeRayWorkItem> {
   public:
     using WorkQueue::WorkQueue;
 
     PBRT_CPU_GPU
-    int PushCameraRay(const Ray &ray, const SampledWavelengths &lambda, int pixelIndex) {
-        int index = AllocateEntry();
-        DCHECK(!ray.HasNaN());
-        this->ray[index] = ray;
-        this->pixelIndex[index] = pixelIndex;
-        this->lambda[index] = lambda;
-        this->beta[index] = SampledSpectrum(1.f);
-        this->etaScale[index] = 1.f;
-        this->anyNonSpecularBounces[index] = false;
-        this->pdfUni[index] = SampledSpectrum(1.f);
-        this->pdfNEE[index] = SampledSpectrum(1.f);
-        this->isSpecularBounce[index] = false;
-        return index;
-    }
-
-    PBRT_CPU_GPU
-    int PushIndirect(const Ray &ray, const Point3fi &piPrev, const Normal3f &nPrev,
-                     const Normal3f &nsPrev, const SampledSpectrum &beta,
-                     const SampledSpectrum &pdfUni, const SampledSpectrum &pdfNEE,
-                     const SampledWavelengths &lambda, Float etaScale,
-                     bool isSpecularBounce, bool anyNonSpecularBounces, int pixelIndex) {
-        int index = AllocateEntry();
-        DCHECK(!ray.HasNaN());
-        this->ray[index] = ray;
-        this->pixelIndex[index] = pixelIndex;
-        this->piPrev[index] = piPrev;
-        this->nPrev[index] = nPrev;
-        this->nsPrev[index] = nsPrev;
-        this->beta[index] = beta;
-        this->pdfUni[index] = pdfUni;
-        this->pdfNEE[index] = pdfNEE;
-        this->lambda[index] = lambda;
-        this->anyNonSpecularBounces[index] = anyNonSpecularBounces;
-        this->isSpecularBounce[index] = isSpecularBounce;
-        this->etaScale[index] = etaScale;
-        return index;
-    }
-};
-
-class ShadowRayQueue : public WorkQueue<ShadowRayWorkItem> {
-public:
-    using WorkQueue::WorkQueue;
-
-    PBRT_CPU_GPU
-    void Push(const Ray &ray, Float tMax, SampledWavelengths lambda,
-              SampledSpectrum Ld, SampledSpectrum pdfUni, SampledSpectrum pdfNEE,
-              int pixelIndex) {
-        WorkQueue<ShadowRayWorkItem>::Push(
-            ShadowRayWorkItem{ray, tMax, lambda, Ld, pdfUni, pdfNEE, pixelIndex});
-    }
-};
-
-class GetBSSRDFAndProbeRayQueue : public WorkQueue<GetBSSRDFAndProbeRayWorkItem> {
-public:
-    using WorkQueue::WorkQueue;
-
-    PBRT_CPU_GPU
-    int Push(MaterialHandle material, SampledWavelengths lambda,
-             SampledSpectrum beta, SampledSpectrum pdfUni,
-             Point3f p, Vector3f wo, Normal3f n, Normal3f ns,
-             Vector3f dpdus, Point2f uv, MediumInterface mediumInterface,
-             Float etaScale, int pixelIndex) {
+    int Push(MaterialHandle material, SampledWavelengths lambda, SampledSpectrum T_hat,
+             SampledSpectrum uniPathPDF, Point3f p, Vector3f wo, Normal3f n, Normal3f ns,
+             Vector3f dpdus, Point2f uv, MediumInterface mediumInterface, Float etaScale,
+             int pixelIndex) {
         int index = AllocateEntry();
         this->material[index] = material;
         this->lambda[index] = lambda;
-        this->beta[index] = beta;
-        this->pdfUni[index] = pdfUni;
+        this->T_hat[index] = T_hat;
+        this->uniPathPDF[index] = uniPathPDF;
         this->p[index] = p;
         this->wo[index] = wo;
         this->n[index] = n;
@@ -384,13 +412,14 @@ public:
     }
 };
 
+// SubsurfaceScatterQueue Definition
 class SubsurfaceScatterQueue : public WorkQueue<SubsurfaceScatterWorkItem> {
   public:
     using WorkQueue::WorkQueue;
 
     PBRT_CPU_GPU
     int Push(Point3f p0, Point3f p1, MaterialHandle material, TabulatedBSSRDF bssrdf,
-             SampledWavelengths lambda, SampledSpectrum beta, SampledSpectrum pdfUni,
+             SampledWavelengths lambda, SampledSpectrum T_hat, SampledSpectrum uniPathPDF,
              MediumInterface mediumInterface, Float etaScale, int pixelIndex) {
         int index = AllocateEntry();
         this->p0[index] = p0;
@@ -398,8 +427,8 @@ class SubsurfaceScatterQueue : public WorkQueue<SubsurfaceScatterWorkItem> {
         this->material[index] = material;
         this->bssrdf[index] = bssrdf;
         this->lambda[index] = lambda;
-        this->beta[index] = beta;
-        this->pdfUni[index] = pdfUni;
+        this->T_hat[index] = T_hat;
+        this->uniPathPDF[index] = uniPathPDF;
         this->mediumInterface[index] = mediumInterface;
         this->etaScale[index] = etaScale;
         this->pixelIndex[index] = pixelIndex;
@@ -407,6 +436,7 @@ class SubsurfaceScatterQueue : public WorkQueue<SubsurfaceScatterWorkItem> {
     }
 };
 
+// MediumSampleQueue Definition
 class MediumSampleQueue : public WorkQueue<MediumSampleWorkItem> {
   public:
     using WorkQueue::WorkQueue;
@@ -414,21 +444,19 @@ class MediumSampleQueue : public WorkQueue<MediumSampleWorkItem> {
     using WorkQueue::Push;
 
     PBRT_CPU_GPU
-    int Push(Ray ray, Float tMax, SampledWavelengths lambda, SampledSpectrum beta,
-             SampledSpectrum pdfUni, SampledSpectrum pdfNEE, int pixelIndex,
-             Point3fi piPrev, Normal3f nPrev, Normal3f nsPrev, int isSpecularBounce,
+    int Push(Ray ray, Float tMax, SampledWavelengths lambda, SampledSpectrum T_hat,
+             SampledSpectrum uniPathPDF, SampledSpectrum lightPathPDF, int pixelIndex,
+             LightSampleContext prevIntrCtx, int isSpecularBounce,
              int anyNonSpecularBounces, Float etaScale) {
         int index = AllocateEntry();
         this->ray[index] = ray;
         this->tMax[index] = tMax;
         this->lambda[index] = lambda;
-        this->beta[index] = beta;
-        this->pdfUni[index] = pdfUni;
-        this->pdfNEE[index] = pdfNEE;
+        this->T_hat[index] = T_hat;
+        this->uniPathPDF[index] = uniPathPDF;
+        this->lightPathPDF[index] = lightPathPDF;
         this->pixelIndex[index] = pixelIndex;
-        this->piPrev[index] = piPrev;
-        this->nPrev[index] = nPrev;
-        this->nsPrev[index] = nsPrev;
+        this->prevIntrCtx[index] = prevIntrCtx;
         this->isSpecularBounce[index] = isSpecularBounce;
         this->anyNonSpecularBounces[index] = anyNonSpecularBounces;
         this->etaScale[index] = etaScale;
@@ -436,13 +464,12 @@ class MediumSampleQueue : public WorkQueue<MediumSampleWorkItem> {
     }
 };
 
+// MediumScatterQueue Definition
 using MediumScatterQueue = WorkQueue<MediumScatterWorkItem>;
 
-using MaterialEvalQueue =
-    MultiWorkQueue<MaterialEvalWorkItem, CoatedDiffuseMaterial, CoatedConductorMaterial,
-                   ConductorMaterial, DielectricMaterial, DiffuseMaterial,
-                   DiffuseTransmissionMaterial, HairMaterial, MeasuredMaterial,
-                   SubsurfaceMaterial, ThinDielectricMaterial, MixMaterial>;
+// MaterialEvalQueue Definition
+using MaterialEvalQueue = MultiWorkQueue<
+    typename MapType<MaterialEvalWorkItem, typename MaterialHandle::Types>::type>;
 
 }  // namespace pbrt
 

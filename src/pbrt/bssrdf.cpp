@@ -57,19 +57,18 @@ Float BeamDiffusionMS(Float sigma_s, Float sigma_a, Float g, Float eta, Float r)
         Float dr = std::sqrt(r * r + zr * zr), dv = std::sqrt(r * r + zv * zv);
         // Compute dipole fluence rate $\dipole(r)$ using Equation
         // $(\ref{eq:diffusion-dipole})$
-        Float phiD = Inv4Pi / D_g *
-                     (std::exp(-sigma_tr * dr) / dr - std::exp(-sigma_tr * dv) / dv);
+        Float phiD =
+            Inv4Pi / D_g * (FastExp(-sigma_tr * dr) / dr - FastExp(-sigma_tr * dv) / dv);
 
         // Compute dipole vector irradiance $-\N{}\cdot\dipoleE(r)$ using Equation
         // $(\ref{eq:diffusion-dipole-vector-irradiance-normal})$
-        Float EDn =
-            Inv4Pi *
-            (zr * (1 + sigma_tr * dr) * std::exp(-sigma_tr * dr) / (dr * dr * dr) -
-             zv * (1 + sigma_tr * dv) * std::exp(-sigma_tr * dv) / (dv * dv * dv));
+        Float EDn = Inv4Pi *
+                    (zr * (1 + sigma_tr * dr) * FastExp(-sigma_tr * dr) / (dr * dr * dr) -
+                     zv * (1 + sigma_tr * dv) * FastExp(-sigma_tr * dv) / (dv * dv * dv));
 
         // Add contribution from dipole for depth $\depthreal$ to _Ed_
         Float E = phiD * cPhi + EDn * cE;
-        Float kappa = 1 - std::exp(-2 * sigmap_t * (dr + zr));
+        Float kappa = 1 - FastExp(-2 * sigmap_t * (dr + zr));
         Ed += kappa * rhop * rhop * E;
     }
     return Ed / nSamples;
@@ -90,7 +89,7 @@ Float BeamDiffusionSS(Float sigma_s, Float sigma_a, Float g, Float eta, Float r)
         Float cosTheta_o = ti / d;
 
         // Add contribution of single scattering at depth $t$
-        Ess += rho * std::exp(-sigma_t * (d + tCrit)) / (d * d) *
+        Ess += rho * FastExp(-sigma_t * (d + tCrit)) / (d * d) *
                HenyeyGreenstein(cosTheta_o, g) * (1 - FrDielectric(-cosTheta_o, eta)) *
                std::abs(cosTheta_o);
     }
@@ -106,8 +105,8 @@ void ComputeBeamDiffusionBSSRDF(Float g, Float eta, BSSRDFTable *t) {
 
     // Choose albedo values of the diffusion profile discretization
     for (int i = 0; i < t->rhoSamples.size(); ++i)
-        t->rhoSamples[i] = (1 - std::exp(-8 * i / (Float)(t->rhoSamples.size() - 1))) /
-                           (1 - std::exp(-8));
+        t->rhoSamples[i] =
+            (1 - FastExp(-8 * i / (Float)(t->rhoSamples.size() - 1))) / (1 - FastExp(-8));
 
     ParallelFor(0, t->rhoSamples.size(), [&](int i) {
         // Compute the diffusion profile for the _i_th albedo sample

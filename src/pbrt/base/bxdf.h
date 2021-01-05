@@ -107,7 +107,7 @@ std::string ToString(BxDFFlags flags);
 enum class TransportMode { Radiance, Importance };
 
 PBRT_CPU_GPU
-inline TransportMode operator~(TransportMode mode) {
+inline TransportMode operator!(TransportMode mode) {
     return (mode == TransportMode::Radiance) ? TransportMode::Importance
                                              : TransportMode::Radiance;
 }
@@ -119,9 +119,14 @@ struct BSDFSample {
     // BSDFSample Public Methods
     BSDFSample() = default;
     PBRT_CPU_GPU
-    BSDFSample(SampledSpectrum f, Vector3f wi, Float pdf, BxDFFlags flags,
+    BSDFSample(SampledSpectrum f, Vector3f wi, Float pdf, BxDFFlags flags, Float eta = 1,
                bool pdfIsProportional = false)
-        : f(f), wi(wi), pdf(pdf), flags(flags), pdfIsProportional(pdfIsProportional) {}
+        : f(f),
+          wi(wi),
+          pdf(pdf),
+          flags(flags),
+          eta(eta),
+          pdfIsProportional(pdfIsProportional) {}
 
     PBRT_CPU_GPU
     bool IsReflection() const { return pbrt::IsReflective(flags); }
@@ -139,6 +144,7 @@ struct BSDFSample {
     Vector3f wi;
     Float pdf = 0;
     BxDFFlags flags;
+    Float eta = 1;
     bool pdfIsProportional;
 };
 
@@ -149,7 +155,7 @@ class ThinDielectricBxDF;
 class HairBxDF;
 class MeasuredBxDF;
 class ConductorBxDF;
-class BSSRDFAdapter;
+class NormalizedFresnelBxDF;
 class CoatedDiffuseBxDF;
 class CoatedConductorBxDF;
 
@@ -157,7 +163,7 @@ class CoatedConductorBxDF;
 class BxDFHandle : public TaggedPointer<IdealDiffuseBxDF, DiffuseBxDF, CoatedDiffuseBxDF,
                                         CoatedConductorBxDF, DielectricInterfaceBxDF,
                                         ThinDielectricBxDF, HairBxDF, MeasuredBxDF,
-                                        ConductorBxDF, BSSRDFAdapter> {
+                                        ConductorBxDF, NormalizedFresnelBxDF> {
   public:
     // BxDF Interface
     PBRT_CPU_GPU inline SampledSpectrum f(Vector3f wo, Vector3f wi,

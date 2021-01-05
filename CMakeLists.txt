@@ -60,8 +60,8 @@ check_ext ("stb" "stb/tools" b42009b3b9d4ca35bc703f5310eedc74f584be58)
 check_ext ("OpenVDB" "openvdb/nanovdb" 1c306bcaf7e9f7d52525bab716202bd4f7fff5d1)
 check_ext ("zlib" "zlib/doc" 54d591eabf9fe0e84c725638f8d5d8d202a093fa)
 
-if (NOT CMAKE_BUILD_TYPE MATCHES Debug)
-  add_definitions (-D NDEBUG)
+if (CMAKE_BUILD_TYPE MATCHES Debug)
+  add_definitions (-D PBRT_DEBUG_BUILD)
 endif ()
 # To build a release build with CHECKs enabled, comment-out the above
 # 3 lines and un-comment out this one:
@@ -239,10 +239,12 @@ if (CMAKE_CUDA_COMPILER)
           # avoid CMake identifying those as macros and using the proper (but
           # broken) way of specifying them.
           if (${CMAKE_GENERATOR} MATCHES "^Visual Studio")
-            # As NDEBUG is specified globally as a definition, we need to
+            # As PBRT_DEBUG_BUILD is specified globally as a definition, we need to
             # manually add it due to the bug mentioned earlier and due to it
             # not being found in PBRT_DEFINITIONS.
-            set (cuda_definitions "--define-macro=NDEBUG")
+            if (CMAKE_BUILD_TYPE MATCHES Debug)
+                set (cuda_definitions "--define-macro=PBRT_DEBUG_BUILD")
+            endif ()
             foreach (arg ${PBRT_DEFINITIONS})
               list (APPEND cuda_definitions "--define-macro=${arg}")
             endforeach ()
@@ -281,8 +283,15 @@ endif ()
 INCLUDE(CheckCXXCompilerFlag)
 
 # TODO: how to specify this on windows?
+
+# TODO: the following works given --forward-unknown-to-host-compiler
+# starting with CUDA 11.1, but is broken in 11.0.  Unfortunately cmake
+# still reports 0 for CUDA_VERSION_MINOR with 11.1, so it's not clear how
+# to detect that vs CUDA 11.0...
+
 check_cxx_compiler_flag ("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
-if (COMPILER_SUPPORTS_MARCH_NATIVE AND PBRT_BUILD_NATIVE_EXECUTABLE)
+if (COMPILER_SUPPORTS_MARCH_NATIVE AND PBRT_BUILD_NATIVE_EXECUTABLE AND
+    NOT PBRT_CUDA_ENABLED)
   list (APPEND PBRT_CXX_FLAGS "-march=native")
 endif ()
 
@@ -443,6 +452,8 @@ set (PBRT_SOURCE
   src/pbrt/cpu/integrators.cpp
   src/pbrt/cpu/primitive.cpp
   src/pbrt/cpu/render.cpp
+
+  src/pbrt/cmd/pspec_gpu.cpp
   )
 
 set (PBRT_SOURCE_HEADERS
@@ -628,6 +639,8 @@ if (PBRT_CUDA_ENABLED)
    src/pbrt/util/vecmath.cpp
 
     ${PBRT_GPU_SOURCE}
+
+    src/pbrt/cmd/pspec_gpu.cpp
 
     PROPERTIES LANGUAGE CUDA
   )
@@ -818,6 +831,19 @@ target_link_libraries (imgtool PRIVATE ${ALL_PBRT_LIBS} pbrt_warnings sky_lib fl
 add_sanitizers (imgtool)
 
 ######################
+# pspec
+
+add_executable (pspec src/pbrt/cmd/pspec.cpp)
+add_executable (pbrt::pspec ALIAS pspec)
+
+target_compile_definitions (pspec PRIVATE ${PBRT_DEFINITIONS})
+target_compile_options (pspec PRIVATE ${PBRT_CXX_FLAGS})
+target_include_directories (pspec PRIVATE src src/ext)
+target_link_libraries (pspec PRIVATE ${ALL_PBRT_LIBS})
+
+add_sanitizers (pspec)
+
+######################
 # obj2pbrt
 
 add_executable (obj2pbrt src/pbrt/cmd/obj2pbrt.cpp)
@@ -893,6 +919,7 @@ add_test (pbrt_unit_test pbrt_test)
 install (TARGETS
   pbrt_exe
   imgtool
+  pspec
   obj2pbrt
   cyhair2pbrt
   DESTINATION
