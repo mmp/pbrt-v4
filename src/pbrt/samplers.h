@@ -262,7 +262,7 @@ class ZSobolSampler {
         log2SamplesPerPixel = Log2Int(samplesPerPixel);
 
         int res = RoundUpPow2(std::max(fullResolution.x, fullResolution.y));
-        int log4SamplesPerPixel = log2SamplesPerPixel / 2;
+        int log4SamplesPerPixel = (log2SamplesPerPixel + 1) / 2;
         nBase4Digits = Log2Int(res) + log4SamplesPerPixel;
     }
 
@@ -343,16 +343,16 @@ class ZSobolSampler {
             {3, 2, 1, 0}, {3, 2, 0, 1}, {3, 0, 2, 1}, {3, 0, 1, 2}};
 
         uint64_t sampleIndex = 0;
-        bool pow2Samples = log2SamplesPerPixel & 1;
         for (int i = nBase4Digits - 1; i >= 0; --i) {
-            int digitShift = 2 * i + int(pow2Samples);
+            int digitShift = 2 * i;
             int digit = (mortonIndex >> digitShift) & 3;
             int p = HashPerm(mortonIndex >> (digitShift + 2));
             digit = permutations[p][digit];
             sampleIndex |= uint64_t(digit) << digitShift;
         }
-        if (pow2Samples && (mortonIndex & 1))
-            sampleIndex |= 1;
+        bool pow2Samples = log2SamplesPerPixel & 1;
+        if (pow2Samples)
+            sampleIndex >>= 1;
         return sampleIndex;
     }
 
