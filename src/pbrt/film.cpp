@@ -550,12 +550,23 @@ Image RGBFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
     PixelFormat format = writeFP16 ? PixelFormat::Half : PixelFormat::Float;
     Image image(format, Point2i(pixelBounds.Diagonal()), {"R", "G", "B"});
 
+    std::atomic<int> nClamped{0};
     ParallelFor2D(pixelBounds, [&](Point2i p) {
         RGB rgb = GetPixelRGB(p, splatScale);
+
+        if (writeFP16 && std::max({rgb.r, rgb.g, rgb.b}) > 65504) {
+            if (rgb.r > 65504) rgb.r = 65504;
+            if (rgb.g > 65504) rgb.g = 65504;
+            if (rgb.b > 65504) rgb.b = 65504;
+            ++nClamped;
+        }
 
         Point2i pOffset(p.x - pixelBounds.pMin.x, p.y - pixelBounds.pMin.y);
         image.SetChannels(pOffset, {rgb[0], rgb[1], rgb[2]});
     });
+
+    if (nClamped.load() > 0)
+        Warning("%d pixel values clamped to maximum fp16 value.", nClamped.load());
 
     metadata->pixelBounds = pixelBounds;
     metadata->fullResolution = fullResolution;
@@ -712,6 +723,7 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
     ImageChannelDesc relVarianceDesc = image.GetChannelDesc(
         {"RelativeVariance.R", "RelativeVariance.G", "RelativeVariance.B"});
 
+    std::atomic<int> nClamped{0};
     ParallelFor2D(pixelBounds, [&](Point2i p) {
         Pixel &pixel = pixels[p];
         RGB rgb(pixel.rgbSum[0], pixel.rgbSum[1], pixel.rgbSum[2]);
@@ -735,6 +747,13 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
 
         rgb = outputRGBFromSensorRGB * rgb;
 
+        if (writeFP16 && std::max({rgb.r, rgb.g, rgb.b}) > 65504) {
+            if (rgb.r > 65504) rgb.r = 65504;
+            if (rgb.g > 65504) rgb.g = 65504;
+            if (rgb.b > 65504) rgb.b = 65504;
+            ++nClamped;
+        }
+
         Point2i pOffset(p.x - pixelBounds.pMin.x, p.y - pixelBounds.pMin.y);
         image.SetChannels(pOffset, rgbDesc, {rgb[0], rgb[1], rgb[2]});
         image.SetChannels(pOffset, albedoRgbDesc,
@@ -757,6 +776,9 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
                            pixel.varianceEstimator[1].RelativeVariance(),
                            pixel.varianceEstimator[2].RelativeVariance()});
     });
+
+    if (nClamped.load() > 0)
+        Warning("%d pixel values clamped to maximum fp16 value.", nClamped.load());
 
     metadata->pixelBounds = pixelBounds;
     metadata->fullResolution = fullResolution;

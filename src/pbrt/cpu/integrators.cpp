@@ -241,6 +241,7 @@ void ImageTileIntegrator::Render() {
         waveEnd = std::min(spp, waveEnd + nextWaveSize);
         if (!referenceImage)
             nextWaveSize = std::min(2 * nextWaveSize, 64);
+        if (waveStart == spp) progress.Done();
 
         // Optionally write current image to disk
         if (waveStart == spp || Options->writePartialImages || referenceImage) {
@@ -267,7 +268,6 @@ void ImageTileIntegrator::Render() {
 
     if (mseOutFile)
         fclose(mseOutFile);
-    progress.Done();
     DisconnectFromDisplayServer();
     LOG_VERBOSE("Rendering finished");
 }
