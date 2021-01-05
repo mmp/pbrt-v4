@@ -279,7 +279,9 @@ class ZSobolSampler {
     PBRT_CPU_GPU
     void StartPixelSample(const Point2i &p, int index, int dim) {
         dimension = dim;
-        mortonIndex = (EncodeMorton2(p.x, p.y) << log2SamplesPerPixel) | index;
+        bool pow2Samples = log2SamplesPerPixel & 1;
+        if (pow2Samples) index <<= 1;
+        mortonIndex = (EncodeMorton2(p.x, p.y) << ((log2SamplesPerPixel + 1) & ~1)) | index;
     }
 
     PBRT_CPU_GPU
@@ -343,16 +345,19 @@ class ZSobolSampler {
             {3, 2, 1, 0}, {3, 2, 0, 1}, {3, 0, 2, 1}, {3, 0, 1, 2}};
 
         uint64_t sampleIndex = 0;
-        for (int i = nBase4Digits - 1; i >= 0; --i) {
+        bool pow2Samples = log2SamplesPerPixel & 1;
+        int lastDigit = pow2Samples ? 1 : 0;
+        for (int i = nBase4Digits - 1; i >= lastDigit; --i) {
             int digitShift = 2 * i;
             int digit = (mortonIndex >> digitShift) & 3;
             int p = HashPerm(mortonIndex >> (digitShift + 2));
             digit = permutations[p][digit];
             sampleIndex |= uint64_t(digit) << digitShift;
         }
-        bool pow2Samples = log2SamplesPerPixel & 1;
-        if (pow2Samples)
+        if (pow2Samples) {
+            sampleIndex |= (mortonIndex & 3);
             sampleIndex >>= 1;
+        }
         return sampleIndex;
     }
 
