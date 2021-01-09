@@ -409,7 +409,7 @@ FloatImageTexture *FloatImageTexture::Create(const Transform &renderFromTexture,
 
     const char *defaultEncoding = HasExtension(filename, "png") ? "sRGB" : "linear";
     std::string encodingString = parameters.GetOneString("encoding", defaultEncoding);
-    ColorEncodingHandle encoding = ColorEncodingHandle::Get(encodingString);
+    ColorEncodingHandle encoding = ColorEncodingHandle::Get(encodingString, alloc);
 
     return alloc.new_object<FloatImageTexture>(map, filename, filterOptions, *wrapMode,
                                                scale, encoding, alloc);
@@ -442,7 +442,7 @@ SpectrumImageTexture *SpectrumImageTexture::Create(
 
     const char *defaultEncoding = HasExtension(filename, "png") ? "sRGB" : "linear";
     std::string encodingString = parameters.GetOneString("encoding", defaultEncoding);
-    ColorEncodingHandle encoding = ColorEncodingHandle::Get(encodingString);
+    ColorEncodingHandle encoding = ColorEncodingHandle::Get(encodingString, alloc);
 
     return alloc.new_object<SpectrumImageTexture>(map, filename, filterOptions, *wrapMode,
                                                   scale, encoding, spectrumType, alloc);
@@ -668,7 +668,7 @@ FloatPtexTexture *FloatPtexTexture::Create(const Transform &renderFromTexture,
                                            const FileLoc *loc, Allocator alloc) {
     std::string filename = ResolveFilename(parameters.GetOneString("filename", ""));
     std::string encodingString = parameters.GetOneString("encoding", "gamma 2.2");
-    ColorEncodingHandle encoding = ColorEncodingHandle::Get(encodingString);
+    ColorEncodingHandle encoding = ColorEncodingHandle::Get(encodingString, alloc);
     return alloc.new_object<FloatPtexTexture>(filename, encoding);
 }
 
@@ -677,7 +677,7 @@ SpectrumPtexTexture *SpectrumPtexTexture::Create(
     SpectrumType spectrumType, const FileLoc *loc, Allocator alloc) {
     std::string filename = ResolveFilename(parameters.GetOneString("filename", ""));
     std::string encodingString = parameters.GetOneString("encoding", "gamma 2.2");
-    ColorEncodingHandle encoding = ColorEncodingHandle::Get(encodingString);
+    ColorEncodingHandle encoding = ColorEncodingHandle::Get(encodingString, alloc);
     return alloc.new_object<SpectrumPtexTexture>(filename, encoding, spectrumType);
 }
 
@@ -866,7 +866,7 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
       const char *defaultEncoding = HasExtension(filename, "png") ? "sRGB" :
       "linear"; std::string encodingString = parameters.GetOneString("encoding",
       defaultEncoding); const ColorEncoding *encoding =
-      ColorEncodingHandle::Get(encodingString);
+      ColorEncodingHandle::Get(encodingString, alloc);
     */
 
     std::string filename = ResolveFilename(parameters.GetOneString("filename", ""));
@@ -1061,7 +1061,7 @@ GPUFloatImageTexture *GPUFloatImageTexture::Create(
       const char *defaultEncoding = HasExtension(filename, "png") ? "sRGB" :
       "linear"; std::string encodingString = parameters.GetOneString("encoding",
       defaultEncoding); const ColorEncoding *encoding =
-      ColorEncodingHandle::Get(encodingString);
+      ColorEncodingHandle::Get(encodingString, alloc);
     */
     std::string filename = ResolveFilename(parameters.GetOneString("filename", ""));
 
