@@ -84,6 +84,12 @@ class CameraTransform {
         return renderFromCamera.ApplyInverse(v, time);
     }
 
+    PBRT_CPU_GPU
+    const AnimatedTransform &RenderFromCamera() const { return renderFromCamera; }
+
+    PBRT_CPU_GPU
+    const Transform &WorldFromRender() const { return worldFromRender; }
+
     std::string ToString() const;
 
   private:

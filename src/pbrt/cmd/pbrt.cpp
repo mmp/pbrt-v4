@@ -131,7 +131,7 @@ int main(int argc, char *argv[]) {
             exit(1);
         };
 
-        std::string cropWindow, pixelBounds, pixel;
+        std::string cropWindow, pixelBounds, pixel, pixelMaterial;
         if (ParseArg(&argv, "cropwindow", &cropWindow, onError)) {
             std::vector<Float> c = SplitStringToFloats(cropWindow, ',');
             if (c.size() != 4) {
@@ -154,6 +154,13 @@ int main(int argc, char *argv[]) {
                 return 1;
             }
             options.pixelBounds = Bounds2i(Point2i(p[0], p[2]), Point2i(p[1], p[3]));
+        } else if (ParseArg(&argv, "pixelmaterial", &pixelMaterial, onError)) {
+            std::vector<int> p = SplitStringToInts(pixelMaterial, ',');
+            if (p.size() != 2) {
+                usage("Didn't find two values after --pixelmaterial");
+                return 1;
+            }
+            options.pixelMaterial = Point2i(p[0], p[1]);
         } else if (
 #ifdef PBRT_BUILD_GPU_RENDERER
             ParseArg(&argv, "gpu", &options.useGPU, onError) ||
@@ -222,6 +229,11 @@ int main(int argc, char *argv[]) {
                   "--mse-reference-out");
     if (!options.mseReferenceOutput.empty() && options.mseReferenceImage.empty())
         ErrorExit("Must provide MSE reference image via --mse-reference-image");
+
+    if (options.pixelMaterial && options.useGPU) {
+        Warning("Disabling --use-gpu since --pixelmaterial was specified.");
+        options.useGPU = false;
+    }
 
     options.logLevel = LogLevelFromString(logLevel);
 

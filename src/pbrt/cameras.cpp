@@ -47,6 +47,7 @@ CameraTransform::CameraTransform(const AnimatedTransform &worldFromCamera) {
     default:
         LOG_FATAL("Unhandled rendering coordinate space");
     }
+    LOG_VERBOSE("World-space position: %s", worldFromRender(Point3f(0, 0, 0)));
     // Compute _renderFromCamera_ transformation
     Transform renderFromWorld = Inverse(worldFromRender);
     Transform rfc[2] = {renderFromWorld * worldFromCamera.startTransform,

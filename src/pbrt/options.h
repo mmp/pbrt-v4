@@ -43,6 +43,7 @@ struct PBRTOptions : BasicPBRTOptions {
     std::string displayServer;
     pstd::optional<Bounds2f> cropWindow;
     pstd::optional<Bounds2i> pixelBounds;
+    pstd::optional<Point2i> pixelMaterial;
 
     std::string ToString() const;
 };
