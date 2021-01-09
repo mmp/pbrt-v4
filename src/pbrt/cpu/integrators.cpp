@@ -56,57 +56,6 @@ std::string RandomWalkIntegrator::ToString() const {
     return StringPrintf("[ RandomWalkIntegrator maxDepth: %d ]", maxDepth);
 }
 
-SampledSpectrum RandomWalkIntegrator::Li(RayDifferential ray, SampledWavelengths &lambda,
-                                         SamplerHandle sampler,
-                                         ScratchBuffer &scratchBuffer,
-                                         VisibleSurface *visibleSurface) const {
-    SampledSpectrum L = LiRandomWalk(ray, lambda, sampler, scratchBuffer, 0);
-    return SafeDiv(L, lambda.PDF());
-}
-
-SampledSpectrum RandomWalkIntegrator::LiRandomWalk(RayDifferential ray,
-                                                   SampledWavelengths &lambda,
-                                                   SamplerHandle sampler,
-                                                   ScratchBuffer &scratchBuffer,
-                                                   int depth) const {
-    SampledSpectrum L(0.f);
-    // Intersect ray with scene and return if no intersection
-    pstd::optional<ShapeIntersection> si = Intersect(ray);
-    if (!si) {
-        // Return emitted light from infinite light sources
-        for (LightHandle light : infiniteLights)
-            L += light.Le(ray, lambda);
-        return L;
-    }
-    SurfaceInteraction &isect = si->intr;
-
-    // Get emitted radiance at surface intersection
-    L = isect.Le(-ray.d, lambda);
-
-    // Terminate random walk if maximum depth has been reached
-    if (depth == maxDepth)
-        return L;
-
-    // Compute BSDF at random walk intersection point
-    BSDF bsdf = isect.GetBSDF(ray, lambda, camera, scratchBuffer, sampler);
-    if (!bsdf)
-        return L;
-
-    // Randomly sample direction leaving surface for random walk
-    Point2f u = sampler.Get2D();
-    Vector3f wi = SampleUniformSphere(u);
-
-    // Evaluate BSDF at surface for sampled direction
-    Vector3f wo = -ray.d;
-    SampledSpectrum beta = bsdf.f(wo, wi) * AbsDot(wi, isect.shading.n) / (1 / (4 * Pi));
-    if (!beta)
-        return L;
-
-    // Recursively trace ray to estimate incident radiance at surface
-    ray = isect.SpawnRay(wi);
-    return L + beta * LiRandomWalk(ray, lambda, sampler, scratchBuffer, depth + 1);
-}
-
 // Integrator Method Definitions
 Integrator::~Integrator() {}
 
@@ -241,7 +190,8 @@ void ImageTileIntegrator::Render() {
         waveEnd = std::min(spp, waveEnd + nextWaveSize);
         if (!referenceImage)
             nextWaveSize = std::min(2 * nextWaveSize, 64);
-        if (waveStart == spp) progress.Done();
+        if (waveStart == spp)
+            progress.Done();
 
         // Optionally write current image to disk
         if (waveStart == spp || Options->writePartialImages || referenceImage) {
@@ -299,7 +249,7 @@ void RayIntegrator::EvaluatePixelSample(Point2i pPixel, int sampleIndex,
         DCHECK_LT(Length(cameraRay->ray.d), 1.001f);
         // Scale camera ray differentials based on sampling rate
         Float rayDiffScale =
-            std::max<Float>(.125, 1 / std::sqrt((Float)sampler.SamplesPerPixel()));
+            std::max<Float>(.125f, 1 / std::sqrt((Float)sampler.SamplesPerPixel()));
         if (!Options->disablePixelJitter)
             cameraRay->ray.ScaleDifferentials(rayDiffScale);
 

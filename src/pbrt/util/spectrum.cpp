@@ -174,10 +174,13 @@ std::string DenselySampledSpectrum::ToString() const {
 }
 
 std::string SampledWavelengths::ToString() const {
-    std::string r = "[";
+    std::string r = "[ SampledWavelengths lambda: [";
     for (size_t i = 0; i < lambda.size(); ++i)
         r += StringPrintf(" %f%c", lambda[i], i != lambda.size() - 1 ? ',' : ' ');
-    r += ']';
+    r += "] pdf: [";
+    for (size_t i = 0; i < lambda.size(); ++i)
+        r += StringPrintf(" %f%c", pdf[i], i != pdf.size() - 1 ? ',' : ' ');
+    r += "] ]";
     return r;
 }
 
@@ -1265,6 +1268,28 @@ const Float Cu_k[] = {
     729.318665, 4.430000,   751.419250, 4.619563,   774.901123, 4.817000,   799.897949,
     5.034125,   826.561157, 5.260000,   855.063293, 5.485625,   885.601257, 5.717000,
 };
+
+const Float CuZn_eta[] = {
+    290, 1.358, 300, 1.388, 310, 1.419, 320, 1.446, 330, 1.473, 340, 1.494, 350, 1.504,
+    360, 1.503, 370, 1.497, 380, 1.487, 390, 1.471, 400, 1.445, 410, 1.405, 420, 1.350,
+    430, 1.278, 440, 1.191, 450, 1.094, 460, 0.994, 470, 0.900, 480, 0.816, 490, 0.745,
+    500, 0.686, 510, 0.639, 520, 0.602, 530, 0.573, 540, 0.549, 550, 0.527, 560, 0.505,
+    570, 0.484, 580, 0.468, 590, 0.460, 600, 0.450, 610, 0.452, 620, 0.449, 630, 0.445,
+    640, 0.444, 650, 0.444, 660, 0.445, 670, 0.444, 680, 0.444, 690, 0.445, 700, 0.446,
+    710, 0.448, 720, 0.450, 730, 0.452, 740, 0.455, 750, 0.457, 760, 0.458, 770, 0.460,
+    780, 0.464, 790, 0.469, 800, 0.473, 810, 0.478, 820, 0.481, 830, 0.483, 840, 0.486,
+    850, 0.490, 860, 0.494, 870, 0.500, 880, 0.507, 890, 0.515};
+
+const Float CuZn_k[] = {
+    290, 1.688, 300, 1.731, 310, 1.764, 320, 1.789, 330, 1.807, 340, 1.815, 350, 1.815,
+    360, 1.815, 370, 1.818, 380, 1.818, 390, 1.813, 400, 1.805, 410, 1.794, 420, 1.786,
+    430, 1.784, 440, 1.797, 450, 1.829, 460, 1.883, 470, 1.957, 480, 2.046, 490, 2.145,
+    500, 2.250, 510, 2.358, 520, 2.464, 530, 2.568, 540, 2.668, 550, 2.765, 560, 2.860,
+    570, 2.958, 580, 3.059, 590, 3.159, 600, 3.253, 610, 3.345, 620, 3.434, 630, 3.522,
+    640, 3.609, 650, 3.695, 660, 3.778, 670, 3.860, 680, 3.943, 690, 4.025, 700, 4.106,
+    710, 4.186, 720, 4.266, 730, 4.346, 740, 4.424, 750, 4.501, 760, 4.579, 770, 4.657,
+    780, 4.737, 790, 4.814, 800, 4.890, 810, 4.965, 820, 5.039, 830, 5.115, 840, 5.192,
+    850, 5.269, 860, 5.346, 870, 5.423, 880, 5.500, 890, 5.575};
 
 const Float MgO_eta[] = {
     309.950012, 1.798000,   330.613007, 1.785000,   351.118988, 1.776800,   355.549011,
@@ -2661,6 +2686,9 @@ void Init(Allocator alloc) {
     SpectrumHandle auk = PiecewiseLinearSpectrum::FromInterleaved(Au_k, false, alloc);
     SpectrumHandle cueta = PiecewiseLinearSpectrum::FromInterleaved(Cu_eta, false, alloc);
     SpectrumHandle cuk = PiecewiseLinearSpectrum::FromInterleaved(Cu_k, false, alloc);
+    SpectrumHandle cuzneta =
+        PiecewiseLinearSpectrum::FromInterleaved(CuZn_eta, false, alloc);
+    SpectrumHandle cuznk = PiecewiseLinearSpectrum::FromInterleaved(CuZn_k, false, alloc);
     SpectrumHandle mgoeta =
         PiecewiseLinearSpectrum::FromInterleaved(MgO_eta, false, alloc);
     SpectrumHandle mgok = PiecewiseLinearSpectrum::FromInterleaved(MgO_k, false, alloc);
@@ -2699,6 +2727,8 @@ void Init(Allocator alloc) {
         {"metal-Au-k", auk},
         {"metal-Cu-eta", cueta},
         {"metal-Cu-k", cuk},
+        {"metal-CuZn-eta", cuzneta},
+        {"metal-CuZn-k", cuznk},
         {"metal-MgO-eta", mgoeta},
         {"metal-MgO-k", mgok},
         {"metal-TiO2-eta", tio2eta},

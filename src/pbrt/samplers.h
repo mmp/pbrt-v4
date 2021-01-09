@@ -280,8 +280,10 @@ class ZSobolSampler {
     void StartPixelSample(const Point2i &p, int index, int dim) {
         dimension = dim;
         bool pow2Samples = log2SamplesPerPixel & 1;
-        if (pow2Samples) index <<= 1;
-        mortonIndex = (EncodeMorton2(p.x, p.y) << ((log2SamplesPerPixel + 1) & ~1)) | index;
+        if (pow2Samples)
+            index <<= 1;
+        mortonIndex =
+            (EncodeMorton2(p.x, p.y) << ((log2SamplesPerPixel + 1) & ~1)) | index;
     }
 
     PBRT_CPU_GPU

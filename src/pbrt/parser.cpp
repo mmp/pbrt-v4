@@ -421,6 +421,8 @@ static ParsedParameterVector parseParameters(
         if (formatting) {  // close enough: upgrade...
             if (param->type == "point")
                 param->type = "point3";
+            if (param->type == "vector")
+                param->type = "vector3";
             if (param->type == "color")
                 param->type = "rgb";
         }

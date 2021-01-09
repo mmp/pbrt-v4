@@ -81,7 +81,7 @@ void PrintStackTrace();
 #define DCHECK_LT(a, b) EMPTY_CHECK
 #define DCHECK_LE(a, b) EMPTY_CHECK
 
-#endif  // !defined(NDEBUG)
+#endif
 
 #define CHECK_RARE_TO_STRING(x) #x
 #define CHECK_RARE_EXPAND_AND_TO_STRING(x) CHECK_RARE_TO_STRING(x)

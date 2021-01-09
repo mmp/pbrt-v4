@@ -110,9 +110,8 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene)
             scene.camera.cameraTransform, outsideMedium, &light.loc, alloc);
 
         if (l.Is<UniformInfiniteLight>() || l.Is<ImageInfiniteLight>() ||
-            l.Is<PortalImageInfiniteLight>()) {
+            l.Is<PortalImageInfiniteLight>())
             envLights.push_back(l);
-        }
 
         allLights.push_back(l);
     }
@@ -180,6 +179,18 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene)
     // Integrator parameters
     regularize = scene.integrator.parameters.GetOneBool("regularize", false);
     maxDepth = scene.integrator.parameters.GetOneInt("maxdepth", 5);
+
+    // Warn about unsupported stuff...
+    if (Options->forceDiffuse)
+        Warning("The GPU rendering path does not support --force-diffuse.");
+    if (Options->writePartialImages)
+        Warning("The GPU rendering path does not support --write-partial-images.");
+    if (Options->recordPixelStatistics)
+        Warning("The GPU rendering path does not support --pixelstats.");
+    if (!Options->mseReferenceImage.empty())
+        Warning("The GPU rendering path does not support --mse-reference-image.");
+    if (!Options->mseReferenceOutput.empty())
+        Warning("The GPU rendering path does not support --mse-reference-out.");
 
     ///////////////////////////////////////////////////////////////////////////
     // Allocate storage for all of the queues/buffers...
@@ -451,13 +462,13 @@ void GPUPathIntegrator::HandleEscapedRays(int depth) {
             for (const auto &light : envLights) {
                 if (SampledSpectrum Le = light.Le(Ray(w.rayo, w.rayd), w.lambda); Le) {
                     // Compute path radiance contribution from infinite light
-
-                    PBRT_DBG("L %f %f %f %f T_hat %f %f %f %f Le %f %f %f %f", L[0], L[1], L[2],
-                             L[3], w.T_hat[0], w.T_hat[1], w.T_hat[2], w.T_hat[3], Le[0], Le[1],
-                             Le[2], Le[3]);
+                    PBRT_DBG("L %f %f %f %f T_hat %f %f %f %f Le %f %f %f %f", L[0], L[1],
+                             L[2], L[3], w.T_hat[0], w.T_hat[1], w.T_hat[2], w.T_hat[3],
+                             Le[0], Le[1], Le[2], Le[3]);
                     PBRT_DBG("pdf uni %f %f %f %f pdf nee %f %f %f %f", w.uniPathPDF[0],
-                             w.uniPathPDF[1], w.uniPathPDF[2], w.uniPathPDF[3], w.lightPathPDF[0],
-                             w.lightPathPDF[1], w.lightPathPDF[2], w.lightPathPDF[3]);
+                             w.uniPathPDF[1], w.uniPathPDF[2], w.uniPathPDF[3],
+                             w.lightPathPDF[0], w.lightPathPDF[1], w.lightPathPDF[2],
+                             w.lightPathPDF[3]);
 
                     if (depth == 0 || w.specularBounce) {
                         L += w.T_hat * Le / w.uniPathPDF.Average();
@@ -475,8 +486,8 @@ void GPUPathIntegrator::HandleEscapedRays(int depth) {
             if (L) {
                 L = SafeDiv(L, w.lambda.PDF());
 
-                PBRT_DBG("Added L %f %f %f %f for escaped ray pixel index %d\n", L[0], L[1],
-                         L[2], L[3], w.pixelIndex);
+                PBRT_DBG("Added L %f %f %f %f for escaped ray pixel index %d\n", L[0],
+                         L[1], L[2], L[3], w.pixelIndex);
 
                 L += pixelSampleState.L[w.pixelIndex];
                 pixelSampleState.L[w.pixelIndex] = L;

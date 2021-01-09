@@ -555,9 +555,12 @@ Image RGBFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
         RGB rgb = GetPixelRGB(p, splatScale);
 
         if (writeFP16 && std::max({rgb.r, rgb.g, rgb.b}) > 65504) {
-            if (rgb.r > 65504) rgb.r = 65504;
-            if (rgb.g > 65504) rgb.g = 65504;
-            if (rgb.b > 65504) rgb.b = 65504;
+            if (rgb.r > 65504)
+                rgb.r = 65504;
+            if (rgb.g > 65504)
+                rgb.g = 65504;
+            if (rgb.b > 65504)
+                rgb.b = 65504;
             ++nClamped;
         }
 
@@ -748,9 +751,12 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
         rgb = outputRGBFromSensorRGB * rgb;
 
         if (writeFP16 && std::max({rgb.r, rgb.g, rgb.b}) > 65504) {
-            if (rgb.r > 65504) rgb.r = 65504;
-            if (rgb.g > 65504) rgb.g = 65504;
-            if (rgb.b > 65504) rgb.b = 65504;
+            if (rgb.r > 65504)
+                rgb.r = 65504;
+            if (rgb.g > 65504)
+                rgb.g = 65504;
+            if (rgb.b > 65504)
+                rgb.b = 65504;
             ++nClamped;
         }
 

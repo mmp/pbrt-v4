@@ -1485,7 +1485,7 @@ void FormattingScene::LightSource(const std::string &name, ParsedParameterVector
                               "Please modify your scene file manually.");
             return;
         }
-        dict.RemoveInt("nsamples");
+        dict.RemoveInt("samples");
 
         if (dict.GetOneString("mapname", "").empty() == false) {
             if (name == "infinite" && !upgradeRGBToScale(&dict, "L", &totalScale)) {

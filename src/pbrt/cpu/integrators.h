@@ -121,9 +121,6 @@ class RandomWalkIntegrator : public RayIntegrator {
     RandomWalkIntegrator(int maxDepth, CameraHandle camera, SamplerHandle sampler,
                          PrimitiveHandle aggregate, std::vector<LightHandle> lights)
         : RayIntegrator(camera, sampler, aggregate, lights), maxDepth(maxDepth) {}
-    SampledSpectrum Li(RayDifferential ray, SampledWavelengths &lambda,
-                       SamplerHandle sampler, ScratchBuffer &scratchBuffer,
-                       VisibleSurface *visibleSurface = nullptr) const;
 
     static std::unique_ptr<RandomWalkIntegrator> Create(
         const ParameterDictionary &parameters, CameraHandle camera, SamplerHandle sampler,
@@ -131,11 +128,56 @@ class RandomWalkIntegrator : public RayIntegrator {
 
     std::string ToString() const;
 
+    SampledSpectrum Li(RayDifferential ray, SampledWavelengths &lambda,
+                       SamplerHandle sampler, ScratchBuffer &scratchBuffer,
+                       VisibleSurface *visibleSurface) const {
+        SampledSpectrum L = LiRandomWalk(ray, lambda, sampler, scratchBuffer, 0);
+        return SafeDiv(L, lambda.PDF());
+    }
+
   private:
     // RandomWalkIntegrator Private Methods
     SampledSpectrum LiRandomWalk(RayDifferential ray, SampledWavelengths &lambda,
                                  SamplerHandle sampler, ScratchBuffer &scratchBuffer,
-                                 int depth) const;
+                                 int depth) const {
+        SampledSpectrum L(0.f);
+        // Intersect ray with scene and return if no intersection
+        pstd::optional<ShapeIntersection> si = Intersect(ray);
+        if (!si) {
+            // Return emitted light from infinite light sources
+            for (LightHandle light : infiniteLights)
+                L += light.Le(ray, lambda);
+            return L;
+        }
+        SurfaceInteraction &isect = si->intr;
+
+        // Get emitted radiance at surface intersection
+        L = isect.Le(-ray.d, lambda);
+
+        // Terminate random walk if maximum depth has been reached
+        if (depth == maxDepth)
+            return L;
+
+        // Compute BSDF at random walk intersection point
+        BSDF bsdf = isect.GetBSDF(ray, lambda, camera, scratchBuffer, sampler);
+        if (!bsdf)
+            return L;
+
+        // Randomly sample direction leaving surface for random walk
+        Point2f u = sampler.Get2D();
+        Vector3f wi = SampleUniformSphere(u);
+
+        // Evaluate BSDF at surface for sampled direction
+        Vector3f wo = -ray.d;
+        SampledSpectrum beta =
+            bsdf.f(wo, wi) * AbsDot(wi, isect.shading.n) / (1 / (4 * Pi));
+        if (!beta)
+            return L;
+
+        // Recursively trace ray to estimate incident radiance at surface
+        ray = isect.SpawnRay(wi);
+        return L + beta * LiRandomWalk(ray, lambda, sampler, scratchBuffer, depth + 1);
+    }
 
     // RandomWalkIntegrator Private Members
     int maxDepth;
