@@ -50,7 +50,8 @@ namespace pbrt {
 
 STAT_MEMORY_COUNTER("Memory/GPU path integrator pixel state", pathIntegratorBytes);
 
-GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) {
+GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene)
+    : envLights(alloc) {
     // Allocate all of the data structures that represent the scene...
     std::map<std::string, MediumHandle> media = scene.CreateMedia(alloc);
 
@@ -110,10 +111,7 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
 
         if (l.Is<UniformInfiniteLight>() || l.Is<ImageInfiniteLight>() ||
             l.Is<PortalImageInfiniteLight>()) {
-            if (envLight)
-                Warning(&light.loc,
-                        "Multiple infinite lights specified. Using this one.");
-            envLight = l;
+            envLights.push_back(l);
         }
 
         allLights.push_back(l);
@@ -216,7 +214,7 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
             alloc.new_object<SubsurfaceScatterQueue>(maxQueueSize, alloc);
     }
 
-    if (envLight)
+    if (envLights.size())
         escapedRayQueue = alloc.new_object<EscapedRayQueue>(maxQueueSize, alloc);
     hitAreaLightQueue = alloc.new_object<HitAreaLightQueue>(maxQueueSize, alloc);
 
@@ -449,37 +447,40 @@ void GPUPathIntegrator::HandleEscapedRays(int depth) {
         "Handle escaped rays", escapedRayQueue, maxQueueSize,
         PBRT_GPU_LAMBDA(const EscapedRayWorkItem w) {
             // Update pixel radiance for escaped ray
-            SampledSpectrum Le = envLight.Le(Ray(w.rayo, w.rayd), w.lambda);
-            if (!Le)
-                return;
-            // Compute path radiance contribution from infinite light
             SampledSpectrum L(0.f);
+            for (const auto &light : envLights) {
+                if (SampledSpectrum Le = light.Le(Ray(w.rayo, w.rayd), w.lambda); Le) {
+                    // Compute path radiance contribution from infinite light
 
-            PBRT_DBG("L %f %f %f %f T_hat %f %f %f %f Le %f %f %f %f", L[0], L[1], L[2],
-                     L[3], w.T_hat[0], w.T_hat[1], w.T_hat[2], w.T_hat[3], Le[0], Le[1],
-                     Le[2], Le[3]);
-            PBRT_DBG("pdf uni %f %f %f %f pdf nee %f %f %f %f", w.uniPathPDF[0],
-                     w.uniPathPDF[1], w.uniPathPDF[2], w.uniPathPDF[3], w.lightPathPDF[0],
-                     w.lightPathPDF[1], w.lightPathPDF[2], w.lightPathPDF[3]);
+                    PBRT_DBG("L %f %f %f %f T_hat %f %f %f %f Le %f %f %f %f", L[0], L[1], L[2],
+                             L[3], w.T_hat[0], w.T_hat[1], w.T_hat[2], w.T_hat[3], Le[0], Le[1],
+                             Le[2], Le[3]);
+                    PBRT_DBG("pdf uni %f %f %f %f pdf nee %f %f %f %f", w.uniPathPDF[0],
+                             w.uniPathPDF[1], w.uniPathPDF[2], w.uniPathPDF[3], w.lightPathPDF[0],
+                             w.lightPathPDF[1], w.lightPathPDF[2], w.lightPathPDF[3]);
 
-            if (depth == 0 || w.specularBounce) {
-                L = w.T_hat * Le / w.uniPathPDF.Average();
-            } else {
-                // Compute MIS-weighted radiance contribution from infinite light
-                LightSampleContext ctx = w.prevIntrCtx;
-                Float lightChoicePDF = lightSampler.PDF(ctx, envLight);
-                SampledSpectrum lightPathPDF =
-                    w.lightPathPDF * lightChoicePDF *
-                    envLight.PDF_Li(ctx, w.rayd, LightSamplingMode::WithMIS);
-                L = w.T_hat * Le / (w.uniPathPDF + lightPathPDF).Average();
+                    if (depth == 0 || w.specularBounce) {
+                        L += w.T_hat * Le / w.uniPathPDF.Average();
+                    } else {
+                        // Compute MIS-weighted radiance contribution from infinite light
+                        LightSampleContext ctx = w.prevIntrCtx;
+                        Float lightChoicePDF = lightSampler.PDF(ctx, light);
+                        SampledSpectrum lightPathPDF =
+                            w.lightPathPDF * lightChoicePDF *
+                            light.PDF_Li(ctx, w.rayd, LightSamplingMode::WithMIS);
+                        L += w.T_hat * Le / (w.uniPathPDF + lightPathPDF).Average();
+                    }
+                }
             }
-            L = SafeDiv(L, w.lambda.PDF());
+            if (L) {
+                L = SafeDiv(L, w.lambda.PDF());
 
-            PBRT_DBG("Added L %f %f %f %f for escaped ray pixel index %d\n", L[0], L[1],
-                     L[2], L[3], w.pixelIndex);
+                PBRT_DBG("Added L %f %f %f %f for escaped ray pixel index %d\n", L[0], L[1],
+                         L[2], L[3], w.pixelIndex);
 
-            L += pixelSampleState.L[w.pixelIndex];
-            pixelSampleState.L[w.pixelIndex] = L;
+                L += pixelSampleState.L[w.pixelIndex];
+                pixelSampleState.L[w.pixelIndex] = L;
+            }
         });
 }
 

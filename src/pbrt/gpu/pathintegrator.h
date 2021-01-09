@@ -100,7 +100,7 @@ class GPUPathIntegrator {
     FilmHandle film;
     SamplerHandle sampler;
     CameraHandle camera;
-    LightHandle envLight;
+    pstd::vector<LightHandle> envLights;
     LightSamplerHandle lightSampler;
 
     int maxDepth;
