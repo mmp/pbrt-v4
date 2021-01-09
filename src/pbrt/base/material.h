@@ -66,6 +66,8 @@ class MaterialHandle
 
     PBRT_CPU_GPU inline FloatTextureHandle GetDisplacement() const;
 
+    PBRT_CPU_GPU inline const Image *GetNormalMap() const;
+
     PBRT_CPU_GPU inline bool IsTransparent() const;
     PBRT_CPU_GPU inline bool HasSubsurfaceScattering() const;
 };

@@ -57,8 +57,23 @@ DielectricMaterial *DielectricMaterial::Create(
     FloatTextureHandle displacement =
         parameters.GetFloatTextureOrNull("displacement", alloc);
     bool remapRoughness = parameters.GetOneBool("remaproughness", true);
+    // Initialize normal map for material
+    Image *normalMap = nullptr;
+    std::string normalMapFilename = parameters.GetOneString("normalmap", "");
+    if (!normalMapFilename.empty()) {
+        ImageAndMetadata immeta =
+            Image::Read(normalMapFilename, Allocator(), ColorEncodingHandle::Linear);
+        Image &image = immeta.image;
+        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
+        if (!rgbDesc)
+            Error(loc, "%s: normal map image must contain R, G, and B channels",
+                  normalMapFilename);
+        normalMap = alloc.new_object<Image>(alloc);
+        *normalMap = image.SelectChannels(rgbDesc);
+    }
+
     return alloc.new_object<DielectricMaterial>(uRoughness, vRoughness, etaF, etaS,
-                                                displacement, remapRoughness);
+                                                displacement, normalMap, remapRoughness);
 }
 
 // ThinDielectricMaterial Method Definitions
@@ -82,8 +97,22 @@ ThinDielectricMaterial *ThinDielectricMaterial::Create(
 
     FloatTextureHandle displacement =
         parameters.GetFloatTextureOrNull("displacement", alloc);
+    // Initialize normal map for material
+    Image *normalMap = nullptr;
+    std::string normalMapFilename = parameters.GetOneString("normalmap", "");
+    if (!normalMapFilename.empty()) {
+        ImageAndMetadata immeta =
+            Image::Read(normalMapFilename, Allocator(), ColorEncodingHandle::Linear);
+        Image &image = immeta.image;
+        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
+        if (!rgbDesc)
+            Error(loc, "%s: normal map image must contain R, G, and B channels",
+                  normalMapFilename);
+        normalMap = alloc.new_object<Image>(alloc);
+        *normalMap = image.SelectChannels(rgbDesc);
+    }
 
-    return alloc.new_object<ThinDielectricMaterial>(etaF, etaS, displacement);
+    return alloc.new_object<ThinDielectricMaterial>(etaF, etaS, displacement, normalMap);
 }
 
 // MixMaterial Method Definitions
@@ -189,7 +218,22 @@ DiffuseMaterial *DiffuseMaterial::Create(const TextureParameterDictionary &param
     FloatTextureHandle sigma = parameters.GetFloatTexture("sigma", 0.f, alloc);
     FloatTextureHandle displacement =
         parameters.GetFloatTextureOrNull("displacement", alloc);
-    return alloc.new_object<DiffuseMaterial>(reflectance, sigma, displacement);
+    // Initialize normal map for material
+    Image *normalMap = nullptr;
+    std::string normalMapFilename = parameters.GetOneString("normalmap", "");
+    if (!normalMapFilename.empty()) {
+        ImageAndMetadata immeta =
+            Image::Read(normalMapFilename, Allocator(), ColorEncodingHandle::Linear);
+        Image &image = immeta.image;
+        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
+        if (!rgbDesc)
+            Error(loc, "%s: normal map image must contain R, G, and B channels",
+                  normalMapFilename);
+        normalMap = alloc.new_object<Image>(alloc);
+        *normalMap = image.SelectChannels(rgbDesc);
+    }
+
+    return alloc.new_object<DiffuseMaterial>(reflectance, sigma, displacement, normalMap);
 }
 
 // ConductorMaterial Method Definitions
@@ -217,8 +261,23 @@ ConductorMaterial *ConductorMaterial::Create(const TextureParameterDictionary &p
     FloatTextureHandle displacement =
         parameters.GetFloatTextureOrNull("displacement", alloc);
     bool remapRoughness = parameters.GetOneBool("remaproughness", true);
+    // Initialize normal map for material
+    Image *normalMap = nullptr;
+    std::string normalMapFilename = parameters.GetOneString("normalmap", "");
+    if (!normalMapFilename.empty()) {
+        ImageAndMetadata immeta =
+            Image::Read(normalMapFilename, Allocator(), ColorEncodingHandle::Linear);
+        Image &image = immeta.image;
+        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
+        if (!rgbDesc)
+            Error(loc, "%s: normal map image must contain R, G, and B channels",
+                  normalMapFilename);
+        normalMap = alloc.new_object<Image>(alloc);
+        *normalMap = image.SelectChannels(rgbDesc);
+    }
+
     return alloc.new_object<ConductorMaterial>(eta, k, uRoughness, vRoughness,
-                                               displacement, remapRoughness);
+                                               displacement, normalMap, remapRoughness);
 }
 
 // CoatedDiffuseMaterial Method Definitions
@@ -263,9 +322,24 @@ CoatedDiffuseMaterial *CoatedDiffuseMaterial::Create(
     FloatTextureHandle displacement =
         parameters.GetFloatTextureOrNull("displacement", alloc);
     bool remapRoughness = parameters.GetOneBool("remaproughness", true);
-    return alloc.new_object<CoatedDiffuseMaterial>(reflectance, uRoughness, vRoughness,
-                                                   thickness, albedo, g, eta,
-                                                   displacement, remapRoughness, config);
+    // Initialize normal map for material
+    Image *normalMap = nullptr;
+    std::string normalMapFilename = parameters.GetOneString("normalmap", "");
+    if (!normalMapFilename.empty()) {
+        ImageAndMetadata immeta =
+            Image::Read(normalMapFilename, Allocator(), ColorEncodingHandle::Linear);
+        Image &image = immeta.image;
+        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
+        if (!rgbDesc)
+            Error(loc, "%s: normal map image must contain R, G, and B channels",
+                  normalMapFilename);
+        normalMap = alloc.new_object<Image>(alloc);
+        *normalMap = image.SelectChannels(rgbDesc);
+    }
+
+    return alloc.new_object<CoatedDiffuseMaterial>(
+        reflectance, uRoughness, vRoughness, thickness, albedo, g, eta, displacement,
+        normalMap, remapRoughness, config);
 }
 
 std::string CoatedConductorMaterial::ToString() const {
@@ -329,10 +403,25 @@ CoatedConductorMaterial *CoatedConductorMaterial::Create(
         parameters.GetFloatTextureOrNull("displacement", alloc);
     bool remapRoughness = parameters.GetOneBool("remaproughness", true);
 
+    // Initialize normal map for material
+    Image *normalMap = nullptr;
+    std::string normalMapFilename = parameters.GetOneString("normalmap", "");
+    if (!normalMapFilename.empty()) {
+        ImageAndMetadata immeta =
+            Image::Read(normalMapFilename, Allocator(), ColorEncodingHandle::Linear);
+        Image &image = immeta.image;
+        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
+        if (!rgbDesc)
+            Error(loc, "%s: normal map image must contain R, G, and B channels",
+                  normalMapFilename);
+        normalMap = alloc.new_object<Image>(alloc);
+        *normalMap = image.SelectChannels(rgbDesc);
+    }
+
     return alloc.new_object<CoatedConductorMaterial>(
         interfaceURoughness, interfaceVRoughness, thickness, interfaceEta, g, albedo,
         conductorURoughness, conductorVRoughness, conductorEta, k, displacement,
-        remapRoughness, config);
+        normalMap, remapRoughness, config);
 }
 
 // SubsurfaceMaterial Method Definitions
@@ -410,9 +499,24 @@ SubsurfaceMaterial *SubsurfaceMaterial::Create(
     FloatTextureHandle displacement =
         parameters.GetFloatTextureOrNull("displacement", alloc);
     bool remapRoughness = parameters.GetOneBool("remaproughness", true);
-    return alloc.new_object<SubsurfaceMaterial>(scale, sigma_a, sigma_s, reflectance, mfp,
-                                                g, eta, uRoughness, vRoughness,
-                                                displacement, remapRoughness, alloc);
+    // Initialize normal map for material
+    Image *normalMap = nullptr;
+    std::string normalMapFilename = parameters.GetOneString("normalmap", "");
+    if (!normalMapFilename.empty()) {
+        ImageAndMetadata immeta =
+            Image::Read(normalMapFilename, Allocator(), ColorEncodingHandle::Linear);
+        Image &image = immeta.image;
+        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
+        if (!rgbDesc)
+            Error(loc, "%s: normal map image must contain R, G, and B channels",
+                  normalMapFilename);
+        normalMap = alloc.new_object<Image>(alloc);
+        *normalMap = image.SelectChannels(rgbDesc);
+    }
+
+    return alloc.new_object<SubsurfaceMaterial>(
+        scale, sigma_a, sigma_s, reflectance, mfp, g, eta, uRoughness, vRoughness,
+        displacement, normalMap, remapRoughness, alloc);
 }
 
 // DiffuseTransmissionMaterial Method Definitions
@@ -441,18 +545,35 @@ DiffuseTransmissionMaterial *DiffuseTransmissionMaterial::Create(
     bool remapRoughness = parameters.GetOneBool("remaproughness", true);
     FloatTextureHandle sigma = parameters.GetFloatTexture("sigma", 0.f, alloc);
     Float scale = parameters.GetOneFloat("scale", 1.f);
-    return alloc.new_object<DiffuseTransmissionMaterial>(reflectance, transmittance,
-                                                         sigma, displacement, scale);
+    // Initialize normal map for material
+    Image *normalMap = nullptr;
+    std::string normalMapFilename = parameters.GetOneString("normalmap", "");
+    if (!normalMapFilename.empty()) {
+        ImageAndMetadata immeta =
+            Image::Read(normalMapFilename, Allocator(), ColorEncodingHandle::Linear);
+        Image &image = immeta.image;
+        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
+        if (!rgbDesc)
+            Error(loc, "%s: normal map image must contain R, G, and B channels",
+                  normalMapFilename);
+        normalMap = alloc.new_object<Image>(alloc);
+        *normalMap = image.SelectChannels(rgbDesc);
+    }
+
+    return alloc.new_object<DiffuseTransmissionMaterial>(
+        reflectance, transmittance, sigma, displacement, normalMap, scale);
 }
 
 MeasuredMaterial::MeasuredMaterial(const std::string &filename,
-                                   FloatTextureHandle displacement, Allocator alloc)
-    : displacement(displacement) {
+                                   FloatTextureHandle displacement, Image *normalMap,
+                                   Allocator alloc)
+    : displacement(displacement), normalMap(normalMap) {
     brdf = MeasuredBxDF::BRDFDataFromFile(filename, alloc);
 }
 
 std::string MeasuredMaterial::ToString() const {
-    return StringPrintf("[ MeasuredMaterial displacement: %s ]", displacement);
+    return StringPrintf("[ MeasuredMaterial displacement: %s normalMap: %p ]",
+                        displacement, normalMap);
 }
 
 MeasuredMaterial *MeasuredMaterial::Create(const TextureParameterDictionary &parameters,
@@ -464,7 +585,22 @@ MeasuredMaterial *MeasuredMaterial::Create(const TextureParameterDictionary &par
     }
     FloatTextureHandle displacement =
         parameters.GetFloatTextureOrNull("displacement", alloc);
-    return alloc.new_object<MeasuredMaterial>(filename, displacement, alloc);
+    // Initialize normal map for material
+    Image *normalMap = nullptr;
+    std::string normalMapFilename = parameters.GetOneString("normalmap", "");
+    if (!normalMapFilename.empty()) {
+        ImageAndMetadata immeta =
+            Image::Read(normalMapFilename, Allocator(), ColorEncodingHandle::Linear);
+        Image &image = immeta.image;
+        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
+        if (!rgbDesc)
+            Error(loc, "%s: normal map image must contain R, G, and B channels",
+                  normalMapFilename);
+        normalMap = alloc.new_object<Image>(alloc);
+        *normalMap = image.SelectChannels(rgbDesc);
+    }
+
+    return alloc.new_object<MeasuredMaterial>(filename, displacement, normalMap, alloc);
 }
 
 std::string MaterialHandle::ToString() const {

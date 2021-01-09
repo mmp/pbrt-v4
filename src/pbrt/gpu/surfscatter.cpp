@@ -84,11 +84,13 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
             Normal3f ns = w.ns;
             Vector3f dpdus = w.dpdus;
             FloatTextureHandle displacement = w.material->GetDisplacement();
-            if (displacement) {
-                DCHECK(texEval.CanEvaluate({displacement}, {}));
+            const Image *normalMap = w.material->GetNormalMap();
+            if (displacement || normalMap) {
+                if (displacement)
+                    DCHECK(texEval.CanEvaluate({displacement}, {}));
                 BumpEvalContext bctx = w.GetBumpEvalContext();
                 Vector3f dpdvs;
-                Bump(texEval, displacement, bctx, &dpdus, &dpdvs);
+                Bump(texEval, displacement, normalMap, bctx, &dpdus, &dpdvs);
                 ns = Normal3f(Normalize(Cross(dpdus, dpdvs)));
                 ns = FaceForward(ns, w.n);
             }

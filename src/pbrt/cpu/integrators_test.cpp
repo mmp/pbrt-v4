@@ -79,7 +79,7 @@ std::vector<TestScene> GetScenes() {
         SpectrumTextureHandle Kd = alloc.new_object<SpectrumConstantTexture>(&cs);
         FloatTextureHandle sigma = alloc.new_object<FloatConstantTexture>(0.);
         // FIXME: here and below, Materials leak...
-        MaterialHandle material = new DiffuseMaterial(Kd, sigma, nullptr);
+        MaterialHandle material = new DiffuseMaterial(Kd, sigma, nullptr, nullptr);
 
         MediumInterface mediumInterface;
         std::vector<PrimitiveHandle> prims;
@@ -106,7 +106,7 @@ std::vector<TestScene> GetScenes() {
         static ConstantSpectrum cs(0.5);
         SpectrumTextureHandle Kd = alloc.new_object<SpectrumConstantTexture>(&cs);
         FloatTextureHandle sigma = alloc.new_object<FloatConstantTexture>(0.);
-        const MaterialHandle material = new DiffuseMaterial(Kd, sigma, nullptr);
+        const MaterialHandle material = new DiffuseMaterial(Kd, sigma, nullptr, nullptr);
 
         MediumInterface mediumInterface;
         std::vector<PrimitiveHandle> prims;
@@ -136,7 +136,7 @@ std::vector<TestScene> GetScenes() {
         static ConstantSpectrum cs(0.5);
         SpectrumTextureHandle Kd = alloc.new_object<SpectrumConstantTexture>(&cs);
         FloatTextureHandle sigma = alloc.new_object<FloatConstantTexture>(0.);
-        const MaterialHandle material = new DiffuseMaterial(Kd, sigma, nullptr);
+        const MaterialHandle material = new DiffuseMaterial(Kd, sigma, nullptr, nullptr);
 
         // We have to do this little dance here to make sure the spectrum is
         // properly normalized (this is usually all handled inside *Light::Create())

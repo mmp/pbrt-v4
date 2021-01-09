@@ -165,9 +165,10 @@ BSDF SurfaceInteraction::GetBSDF(const RayDifferential &ray, SampledWavelengths 
 
     // Evaluate bump map and compute shading normal
     FloatTextureHandle displacement = material.GetDisplacement();
-    if (displacement) {
+    const Image *normalMap = material.GetNormalMap();
+    if (displacement || normalMap) {
         Vector3f dpdu, dpdv;
-        Bump(UniversalTextureEvaluator(), displacement, *this, &dpdu, &dpdv);
+        Bump(UniversalTextureEvaluator(), displacement, normalMap, *this, &dpdu, &dpdv);
         SetShadingGeometry(Normal3f(Normalize(Cross(dpdu, dpdv))), dpdu, dpdv,
                            shading.dndu, shading.dndv, false);
     }
