@@ -526,8 +526,8 @@ class ImageTextureBase {
     // ImageTextureBase Public Methods
     ImageTextureBase(TextureMapping2DHandle mapping, std::string filename,
                      MIPMapFilterOptions filterOptions, WrapMode wrapMode, Float scale,
-                     ColorEncodingHandle encoding, Allocator alloc)
-        : mapping(mapping), scale(scale) {
+                     bool invert, ColorEncodingHandle encoding, Allocator alloc)
+        : mapping(mapping), scale(scale), invert(invert) {
         // Get _MIPMap_ from texture cache if present
         TexInfo texInfo(filename, filterOptions, wrapMode, encoding);
         std::unique_lock<std::mutex> lock(textureCacheMutex);
@@ -556,6 +556,7 @@ class ImageTextureBase {
     // ImageTextureBase Protected Members
     TextureMapping2DHandle mapping;
     Float scale;
+    bool invert;
     MIPMap *mipmap;
 
   private:
@@ -569,8 +570,9 @@ class FloatImageTexture : public ImageTextureBase {
   public:
     FloatImageTexture(TextureMapping2DHandle m, const std::string &filename,
                       MIPMapFilterOptions filterOptions, WrapMode wm, Float scale,
-                      ColorEncodingHandle encoding, Allocator alloc)
-        : ImageTextureBase(m, filename, filterOptions, wm, scale, encoding, alloc) {}
+                      bool invert, ColorEncodingHandle encoding, Allocator alloc)
+        : ImageTextureBase(m, filename, filterOptions, wm, scale, invert, encoding,
+                           alloc) {}
     PBRT_CPU_GPU
     Float Evaluate(TextureEvalContext ctx) const {
 #ifdef PBRT_IS_GPU_CODE
@@ -582,7 +584,8 @@ class FloatImageTexture : public ImageTextureBase {
         // Texture coordinates are (0,0) in the lower left corner, but
         // image coordinates are (0,0) in the upper left.
         st[1] = 1 - st[1];
-        return scale * mipmap->Filter<Float>(st, dstdx, dstdy);
+        Float v = scale * mipmap->Filter<Float>(st, dstdx, dstdy);
+        return invert ? std::max<Float>(0, 1 - v) : v;
 #endif
     }
 
@@ -599,10 +602,10 @@ class SpectrumImageTexture : public ImageTextureBase {
     // SpectrumImageTexture Public Methods
     SpectrumImageTexture(TextureMapping2DHandle mapping, std::string filename,
                          MIPMapFilterOptions filterOptions, WrapMode wrapMode,
-                         Float scale, ColorEncodingHandle encoding,
+                         Float scale, bool invert, ColorEncodingHandle encoding,
                          SpectrumType spectrumType, Allocator alloc)
-        : ImageTextureBase(mapping, filename, filterOptions, wrapMode, scale, encoding,
-                           alloc),
+        : ImageTextureBase(mapping, filename, filterOptions, wrapMode, scale, invert,
+                           encoding, alloc),
           spectrumType(spectrumType) {}
 
     PBRT_CPU_GPU
@@ -624,11 +627,12 @@ class SpectrumImageTexture : public ImageTextureBase {
 class GPUSpectrumImageTexture {
   public:
     GPUSpectrumImageTexture(TextureMapping2DHandle mapping, cudaTextureObject_t texObj,
-                            Float scale, bool isSingleChannel,
+                            Float scale, bool invert, bool isSingleChannel,
                             const RGBColorSpace *colorSpace, SpectrumType spectrumType)
         : mapping(mapping),
           texObj(texObj),
           scale(scale),
+          invert(invert),
           isSingleChannel(isSingleChannel),
           colorSpace(colorSpace),
           spectrumType(spectrumType) {}
@@ -651,6 +655,8 @@ class GPUSpectrumImageTexture {
             float4 tex = tex2D<float4>(texObj, st[0], 1 - st[1]);
             rgb = scale * RGB(tex.x, tex.y, tex.z);
         }
+        if (invert)
+            rgb = ClampZero(RGB(1, 1, 1) - rgb);
         if (spectrumType == SpectrumType::Unbounded)
             return RGBUnboundedSpectrum(*colorSpace, rgb).Sample(lambda);
         else if (spectrumType == SpectrumType::Albedo) {
@@ -673,7 +679,7 @@ class GPUSpectrumImageTexture {
     TextureMapping2DHandle mapping;
     cudaTextureObject_t texObj;
     Float scale;
-    bool isSingleChannel;
+    bool invert, isSingleChannel;
     const RGBColorSpace *colorSpace;
     SpectrumType spectrumType;
 };
@@ -681,8 +687,8 @@ class GPUSpectrumImageTexture {
 class GPUFloatImageTexture {
   public:
     GPUFloatImageTexture(TextureMapping2DHandle mapping, cudaTextureObject_t texObj,
-                         Float scale)
-        : mapping(mapping), texObj(texObj), scale(scale) {}
+                         Float scale, bool invert)
+        : mapping(mapping), texObj(texObj), scale(scale), invert(invert) {}
 
     PBRT_CPU_GPU
     Float Evaluate(TextureEvalContext ctx) const {
@@ -694,7 +700,8 @@ class GPUFloatImageTexture {
         Point2f st = mapping.Map(ctx, &dstdx, &dstdy);
         // flip y coord since image has (0,0) at upper left, texture at lower
         // left
-        return scale * tex2D<float>(texObj, st[0], 1 - st[1]);
+        Float v = scale * tex2D<float>(texObj, st[0], 1 - st[1]);
+        return invert ? std::max<Float>(0, 1 - v) : v;
 #endif
     }
 
@@ -709,6 +716,7 @@ class GPUFloatImageTexture {
     TextureMapping2DHandle mapping;
     cudaTextureObject_t texObj;
     Float scale;
+    bool invert;
 };
 
 #else  // PBRT_BUILD_GPU_RENDERER && __NVCC__
