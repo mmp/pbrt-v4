@@ -45,6 +45,7 @@ class MaterialHandle
 
     static MaterialHandle Create(
         const std::string &name, const TextureParameterDictionary &parameters,
+        Image *normalMap,
         /*const */ std::map<std::string, MaterialHandle> &namedMaterials,
         const FileLoc *loc, Allocator alloc);
 

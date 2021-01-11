@@ -615,6 +615,44 @@ void ParsedScene::CreateMaterials(
     /*const*/ NamedTextures &textures, Allocator alloc,
     std::map<std::string, MaterialHandle> *namedMaterialsOut,
     std::vector<MaterialHandle> *materialsOut) const {
+    // First, load all of the normal maps in parallel.
+    std::set<std::string> normalMapFilenames;
+    for (const auto &nm : namedMaterials) {
+        std::string fn = nm.second.parameters.GetOneString("normalmap", "");
+        if (!fn.empty())
+            normalMapFilenames.insert(fn);
+    }
+    for (const auto &mtl : materials) {
+        std::string fn = mtl.parameters.GetOneString("normalmap", "");
+        if (!fn.empty())
+            normalMapFilenames.insert(fn);
+    }
+
+    std::vector<std::string> normalMapFilenameVector;
+    std::copy(normalMapFilenames.begin(), normalMapFilenames.end(),
+              std::back_inserter(normalMapFilenameVector));
+
+    LOG_VERBOSE("Reading %d normal maps in parallel", normalMapFilenameVector.size());
+    std::map<std::string, Image *> normalMapCache;
+    std::mutex mutex;
+    ParallelFor(0, normalMapFilenameVector.size(), [&](int64_t index) {
+        std::string filename = normalMapFilenameVector[index];
+        ImageAndMetadata immeta =
+            Image::Read(filename, Allocator(), ColorEncodingHandle::Linear);
+        Image &image = immeta.image;
+        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
+        if (!rgbDesc)
+            ErrorExitDeferred("%s: normal map image must contain R, G, and B channels",
+                              filename);
+        Image *normalMap = alloc.new_object<Image>(alloc);
+        *normalMap = image.SelectChannels(rgbDesc);
+
+        mutex.lock();
+        normalMapCache[filename] = normalMap;
+        mutex.unlock();
+    });
+    LOG_VERBOSE("Done reading normal maps");
+
     // Named materials
     for (const auto &nm : namedMaterials) {
         const std::string &name = nm.first;
@@ -632,18 +670,25 @@ void ParsedScene::CreateMaterials(
                               name);
             continue;
         }
+
+        std::string fn = nm.second.parameters.GetOneString("normalmap", "");
+        Image *normalMap = !fn.empty() ? normalMapCache[fn] : nullptr;
+
         TextureParameterDictionary texDict(&mtl.parameters, &textures);
-        MaterialHandle m =
-            MaterialHandle::Create(type, texDict, *namedMaterialsOut, &mtl.loc, alloc);
+        MaterialHandle m = MaterialHandle::Create(type, texDict, normalMap,
+                                                  *namedMaterialsOut, &mtl.loc, alloc);
         (*namedMaterialsOut)[name] = m;
     }
 
     // Regular materials
     materialsOut->reserve(materials.size());
     for (const auto &mtl : materials) {
+        std::string fn = mtl.parameters.GetOneString("normalmap", "");
+        Image *normalMap = !fn.empty() ? normalMapCache[fn] : nullptr;
+
         TextureParameterDictionary texDict(&mtl.parameters, &textures);
-        MaterialHandle m = MaterialHandle::Create(mtl.name, texDict, *namedMaterialsOut,
-                                                  &mtl.loc, alloc);
+        MaterialHandle m = MaterialHandle::Create(mtl.name, texDict, normalMap,
+                                                  *namedMaterialsOut, &mtl.loc, alloc);
         materialsOut->push_back(m);
     }
 }

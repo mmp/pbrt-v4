@@ -31,11 +31,13 @@ std::string DielectricMaterial::ToString() const {
     return StringPrintf("[ DielectricMaterial displacement: %s uRoughness: %s "
                         "vRoughness: %s etaF: %s "
                         "etaS: %s remapRoughness: %s ]",
-                        displacement, uRoughness, vRoughness, etaF, etaS, remapRoughness);
+                        displacement, uRoughness, vRoughness, etaF, etaS,
+                        remapRoughness);
 }
 
 DielectricMaterial *DielectricMaterial::Create(
-    const TextureParameterDictionary &parameters, const FileLoc *loc, Allocator alloc) {
+    const TextureParameterDictionary &parameters, Image *normalMap, const FileLoc *loc,
+    Allocator alloc) {
     FloatTextureHandle etaF = parameters.GetFloatTextureOrNull("eta", alloc);
     SpectrumTextureHandle etaS =
         parameters.GetSpectrumTextureOrNull("eta", SpectrumType::Unbounded, alloc);
@@ -57,20 +59,6 @@ DielectricMaterial *DielectricMaterial::Create(
     FloatTextureHandle displacement =
         parameters.GetFloatTextureOrNull("displacement", alloc);
     bool remapRoughness = parameters.GetOneBool("remaproughness", true);
-    // Initialize normal map for material
-    Image *normalMap = nullptr;
-    std::string normalMapFilename = parameters.GetOneString("normalmap", "");
-    if (!normalMapFilename.empty()) {
-        ImageAndMetadata immeta =
-            Image::Read(normalMapFilename, Allocator(), ColorEncodingHandle::Linear);
-        Image &image = immeta.image;
-        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
-        if (!rgbDesc)
-            Error(loc, "%s: normal map image must contain R, G, and B channels",
-                  normalMapFilename);
-        normalMap = alloc.new_object<Image>(alloc);
-        *normalMap = image.SelectChannels(rgbDesc);
-    }
 
     return alloc.new_object<DielectricMaterial>(uRoughness, vRoughness, etaF, etaS,
                                                 displacement, normalMap, remapRoughness);
@@ -83,7 +71,8 @@ std::string ThinDielectricMaterial::ToString() const {
 }
 
 ThinDielectricMaterial *ThinDielectricMaterial::Create(
-    const TextureParameterDictionary &parameters, const FileLoc *loc, Allocator alloc) {
+    const TextureParameterDictionary &parameters, Image *normalMap, const FileLoc *loc,
+    Allocator alloc) {
     FloatTextureHandle etaF = parameters.GetFloatTextureOrNull("eta", alloc);
     SpectrumTextureHandle etaS =
         parameters.GetSpectrumTextureOrNull("eta", SpectrumType::Unbounded, alloc);
@@ -97,20 +86,6 @@ ThinDielectricMaterial *ThinDielectricMaterial::Create(
 
     FloatTextureHandle displacement =
         parameters.GetFloatTextureOrNull("displacement", alloc);
-    // Initialize normal map for material
-    Image *normalMap = nullptr;
-    std::string normalMapFilename = parameters.GetOneString("normalmap", "");
-    if (!normalMapFilename.empty()) {
-        ImageAndMetadata immeta =
-            Image::Read(normalMapFilename, Allocator(), ColorEncodingHandle::Linear);
-        Image &image = immeta.image;
-        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
-        if (!rgbDesc)
-            Error(loc, "%s: normal map image must contain R, G, and B channels",
-                  normalMapFilename);
-        normalMap = alloc.new_object<Image>(alloc);
-        *normalMap = image.SelectChannels(rgbDesc);
-    }
 
     return alloc.new_object<ThinDielectricMaterial>(etaF, etaS, displacement, normalMap);
 }
@@ -209,7 +184,8 @@ std::string DiffuseMaterial::ToString() const {
 }
 
 DiffuseMaterial *DiffuseMaterial::Create(const TextureParameterDictionary &parameters,
-                                         const FileLoc *loc, Allocator alloc) {
+                                         Image *normalMap, const FileLoc *loc,
+                                         Allocator alloc) {
     SpectrumTextureHandle reflectance = parameters.GetSpectrumTexture(
         "reflectance", nullptr, SpectrumType::Albedo, alloc);
     if (!reflectance)
@@ -218,20 +194,6 @@ DiffuseMaterial *DiffuseMaterial::Create(const TextureParameterDictionary &param
     FloatTextureHandle sigma = parameters.GetFloatTexture("sigma", 0.f, alloc);
     FloatTextureHandle displacement =
         parameters.GetFloatTextureOrNull("displacement", alloc);
-    // Initialize normal map for material
-    Image *normalMap = nullptr;
-    std::string normalMapFilename = parameters.GetOneString("normalmap", "");
-    if (!normalMapFilename.empty()) {
-        ImageAndMetadata immeta =
-            Image::Read(normalMapFilename, Allocator(), ColorEncodingHandle::Linear);
-        Image &image = immeta.image;
-        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
-        if (!rgbDesc)
-            Error(loc, "%s: normal map image must contain R, G, and B channels",
-                  normalMapFilename);
-        normalMap = alloc.new_object<Image>(alloc);
-        *normalMap = image.SelectChannels(rgbDesc);
-    }
 
     return alloc.new_object<DiffuseMaterial>(reflectance, sigma, displacement, normalMap);
 }
@@ -245,7 +207,8 @@ std::string ConductorMaterial::ToString() const {
 }
 
 ConductorMaterial *ConductorMaterial::Create(const TextureParameterDictionary &parameters,
-                                             const FileLoc *loc, Allocator alloc) {
+                                             Image *normalMap, const FileLoc *loc,
+                                             Allocator alloc) {
     SpectrumTextureHandle eta = parameters.GetSpectrumTexture(
         "eta", GetNamedSpectrum("metal-Cu-eta"), SpectrumType::Unbounded, alloc);
     SpectrumTextureHandle k = parameters.GetSpectrumTexture(
@@ -261,20 +224,6 @@ ConductorMaterial *ConductorMaterial::Create(const TextureParameterDictionary &p
     FloatTextureHandle displacement =
         parameters.GetFloatTextureOrNull("displacement", alloc);
     bool remapRoughness = parameters.GetOneBool("remaproughness", true);
-    // Initialize normal map for material
-    Image *normalMap = nullptr;
-    std::string normalMapFilename = parameters.GetOneString("normalmap", "");
-    if (!normalMapFilename.empty()) {
-        ImageAndMetadata immeta =
-            Image::Read(normalMapFilename, Allocator(), ColorEncodingHandle::Linear);
-        Image &image = immeta.image;
-        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
-        if (!rgbDesc)
-            Error(loc, "%s: normal map image must contain R, G, and B channels",
-                  normalMapFilename);
-        normalMap = alloc.new_object<Image>(alloc);
-        *normalMap = image.SelectChannels(rgbDesc);
-    }
 
     return alloc.new_object<ConductorMaterial>(eta, k, uRoughness, vRoughness,
                                                displacement, normalMap, remapRoughness);
@@ -290,7 +239,8 @@ std::string CoatedDiffuseMaterial::ToString() const {
 }
 
 CoatedDiffuseMaterial *CoatedDiffuseMaterial::Create(
-    const TextureParameterDictionary &parameters, const FileLoc *loc, Allocator alloc) {
+    const TextureParameterDictionary &parameters, Image *normalMap, const FileLoc *loc,
+    Allocator alloc) {
     SpectrumTextureHandle reflectance = parameters.GetSpectrumTexture(
         "reflectance", nullptr, SpectrumType::Albedo, alloc);
     if (!reflectance)
@@ -322,20 +272,6 @@ CoatedDiffuseMaterial *CoatedDiffuseMaterial::Create(
     FloatTextureHandle displacement =
         parameters.GetFloatTextureOrNull("displacement", alloc);
     bool remapRoughness = parameters.GetOneBool("remaproughness", true);
-    // Initialize normal map for material
-    Image *normalMap = nullptr;
-    std::string normalMapFilename = parameters.GetOneString("normalmap", "");
-    if (!normalMapFilename.empty()) {
-        ImageAndMetadata immeta =
-            Image::Read(normalMapFilename, Allocator(), ColorEncodingHandle::Linear);
-        Image &image = immeta.image;
-        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
-        if (!rgbDesc)
-            Error(loc, "%s: normal map image must contain R, G, and B channels",
-                  normalMapFilename);
-        normalMap = alloc.new_object<Image>(alloc);
-        *normalMap = image.SelectChannels(rgbDesc);
-    }
 
     return alloc.new_object<CoatedDiffuseMaterial>(
         reflectance, uRoughness, vRoughness, thickness, albedo, g, eta, displacement,
@@ -354,7 +290,8 @@ std::string CoatedConductorMaterial::ToString() const {
 }
 
 CoatedConductorMaterial *CoatedConductorMaterial::Create(
-    const TextureParameterDictionary &parameters, const FileLoc *loc, Allocator alloc) {
+    const TextureParameterDictionary &parameters, Image *normalMap, const FileLoc *loc,
+    Allocator alloc) {
     // interface
     FloatTextureHandle interfaceURoughness =
         parameters.GetFloatTextureOrNull("interface.uroughness", alloc);
@@ -403,21 +340,6 @@ CoatedConductorMaterial *CoatedConductorMaterial::Create(
         parameters.GetFloatTextureOrNull("displacement", alloc);
     bool remapRoughness = parameters.GetOneBool("remaproughness", true);
 
-    // Initialize normal map for material
-    Image *normalMap = nullptr;
-    std::string normalMapFilename = parameters.GetOneString("normalmap", "");
-    if (!normalMapFilename.empty()) {
-        ImageAndMetadata immeta =
-            Image::Read(normalMapFilename, Allocator(), ColorEncodingHandle::Linear);
-        Image &image = immeta.image;
-        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
-        if (!rgbDesc)
-            Error(loc, "%s: normal map image must contain R, G, and B channels",
-                  normalMapFilename);
-        normalMap = alloc.new_object<Image>(alloc);
-        *normalMap = image.SelectChannels(rgbDesc);
-    }
-
     return alloc.new_object<CoatedConductorMaterial>(
         interfaceURoughness, interfaceVRoughness, thickness, interfaceEta, g, albedo,
         conductorURoughness, conductorVRoughness, conductorEta, k, displacement,
@@ -435,7 +357,8 @@ std::string SubsurfaceMaterial::ToString() const {
 }
 
 SubsurfaceMaterial *SubsurfaceMaterial::Create(
-    const TextureParameterDictionary &parameters, const FileLoc *loc, Allocator alloc) {
+    const TextureParameterDictionary &parameters, Image *normalMap, const FileLoc *loc,
+    Allocator alloc) {
     SpectrumTextureHandle sigma_a, sigma_s, reflectance, mfp;
 
     Float g = parameters.GetOneFloat("g", 0.0f);
@@ -499,20 +422,6 @@ SubsurfaceMaterial *SubsurfaceMaterial::Create(
     FloatTextureHandle displacement =
         parameters.GetFloatTextureOrNull("displacement", alloc);
     bool remapRoughness = parameters.GetOneBool("remaproughness", true);
-    // Initialize normal map for material
-    Image *normalMap = nullptr;
-    std::string normalMapFilename = parameters.GetOneString("normalmap", "");
-    if (!normalMapFilename.empty()) {
-        ImageAndMetadata immeta =
-            Image::Read(normalMapFilename, Allocator(), ColorEncodingHandle::Linear);
-        Image &image = immeta.image;
-        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
-        if (!rgbDesc)
-            Error(loc, "%s: normal map image must contain R, G, and B channels",
-                  normalMapFilename);
-        normalMap = alloc.new_object<Image>(alloc);
-        *normalMap = image.SelectChannels(rgbDesc);
-    }
 
     return alloc.new_object<SubsurfaceMaterial>(
         scale, sigma_a, sigma_s, reflectance, mfp, g, eta, uRoughness, vRoughness,
@@ -527,7 +436,8 @@ std::string DiffuseTransmissionMaterial::ToString() const {
 }
 
 DiffuseTransmissionMaterial *DiffuseTransmissionMaterial::Create(
-    const TextureParameterDictionary &parameters, const FileLoc *loc, Allocator alloc) {
+    const TextureParameterDictionary &parameters, Image *normalMap, const FileLoc *loc,
+    Allocator alloc) {
     SpectrumTextureHandle reflectance = parameters.GetSpectrumTexture(
         "reflectance", nullptr, SpectrumType::Albedo, alloc);
     if (!reflectance)
@@ -545,20 +455,6 @@ DiffuseTransmissionMaterial *DiffuseTransmissionMaterial::Create(
     bool remapRoughness = parameters.GetOneBool("remaproughness", true);
     FloatTextureHandle sigma = parameters.GetFloatTexture("sigma", 0.f, alloc);
     Float scale = parameters.GetOneFloat("scale", 1.f);
-    // Initialize normal map for material
-    Image *normalMap = nullptr;
-    std::string normalMapFilename = parameters.GetOneString("normalmap", "");
-    if (!normalMapFilename.empty()) {
-        ImageAndMetadata immeta =
-            Image::Read(normalMapFilename, Allocator(), ColorEncodingHandle::Linear);
-        Image &image = immeta.image;
-        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
-        if (!rgbDesc)
-            Error(loc, "%s: normal map image must contain R, G, and B channels",
-                  normalMapFilename);
-        normalMap = alloc.new_object<Image>(alloc);
-        *normalMap = image.SelectChannels(rgbDesc);
-    }
 
     return alloc.new_object<DiffuseTransmissionMaterial>(
         reflectance, transmittance, sigma, displacement, normalMap, scale);
@@ -577,7 +473,8 @@ std::string MeasuredMaterial::ToString() const {
 }
 
 MeasuredMaterial *MeasuredMaterial::Create(const TextureParameterDictionary &parameters,
-                                           const FileLoc *loc, Allocator alloc) {
+                                           Image *normalMap, const FileLoc *loc,
+                                           Allocator alloc) {
     std::string filename = ResolveFilename(parameters.GetOneString("filename", ""));
     if (filename.empty()) {
         Error("Filename must be provided for MeasuredMaterial");
@@ -585,20 +482,6 @@ MeasuredMaterial *MeasuredMaterial::Create(const TextureParameterDictionary &par
     }
     FloatTextureHandle displacement =
         parameters.GetFloatTextureOrNull("displacement", alloc);
-    // Initialize normal map for material
-    Image *normalMap = nullptr;
-    std::string normalMapFilename = parameters.GetOneString("normalmap", "");
-    if (!normalMapFilename.empty()) {
-        ImageAndMetadata immeta =
-            Image::Read(normalMapFilename, Allocator(), ColorEncodingHandle::Linear);
-        Image &image = immeta.image;
-        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
-        if (!rgbDesc)
-            Error(loc, "%s: normal map image must contain R, G, and B channels",
-                  normalMapFilename);
-        normalMap = alloc.new_object<Image>(alloc);
-        *normalMap = image.SelectChannels(rgbDesc);
-    }
 
     return alloc.new_object<MeasuredMaterial>(filename, displacement, normalMap, alloc);
 }
@@ -615,31 +498,32 @@ STAT_COUNTER("Scene/Materials", nMaterialsCreated);
 
 MaterialHandle MaterialHandle::Create(
     const std::string &name, const TextureParameterDictionary &parameters,
+    Image *normalMap,
     /*const */ std::map<std::string, MaterialHandle> &namedMaterials, const FileLoc *loc,
     Allocator alloc) {
     MaterialHandle material;
     if (name.empty() || name == "none")
         return nullptr;
     else if (name == "diffuse")
-        material = DiffuseMaterial::Create(parameters, loc, alloc);
+        material = DiffuseMaterial::Create(parameters, normalMap, loc, alloc);
     else if (name == "coateddiffuse")
-        material = CoatedDiffuseMaterial::Create(parameters, loc, alloc);
+        material = CoatedDiffuseMaterial::Create(parameters, normalMap, loc, alloc);
     else if (name == "coatedconductor")
-        material = CoatedConductorMaterial::Create(parameters, loc, alloc);
+        material = CoatedConductorMaterial::Create(parameters, normalMap, loc, alloc);
     else if (name == "diffusetransmission")
-        material = DiffuseTransmissionMaterial::Create(parameters, loc, alloc);
+        material = DiffuseTransmissionMaterial::Create(parameters, normalMap, loc, alloc);
     else if (name == "dielectric")
-        material = DielectricMaterial::Create(parameters, loc, alloc);
+        material = DielectricMaterial::Create(parameters, normalMap, loc, alloc);
     else if (name == "thindielectric")
-        material = ThinDielectricMaterial::Create(parameters, loc, alloc);
+        material = ThinDielectricMaterial::Create(parameters, normalMap, loc, alloc);
     else if (name == "hair")
         material = HairMaterial::Create(parameters, loc, alloc);
     else if (name == "conductor")
-        material = ConductorMaterial::Create(parameters, loc, alloc);
+        material = ConductorMaterial::Create(parameters, normalMap, loc, alloc);
     else if (name == "measured")
-        material = MeasuredMaterial::Create(parameters, loc, alloc);
+        material = MeasuredMaterial::Create(parameters, normalMap, loc, alloc);
     else if (name == "subsurface")
-        material = SubsurfaceMaterial::Create(parameters, loc, alloc);
+        material = SubsurfaceMaterial::Create(parameters, normalMap, loc, alloc);
     else if (name == "mix") {
         std::vector<std::string> materials = parameters.GetStringArray("materials");
         if (materials.size() != 2)
