@@ -376,9 +376,18 @@ void CPURender(ParsedScene &parsedScene) {
         if (!intr.material)
             ErrorExit("No material at intersection point.");
 
+        Transform worldFromRender = camera.GetCameraTransform().WorldFromRender();
+        Printf("World-space p: %s\n", worldFromRender(intr.p()));
+        Printf("World-space n: %s\n", worldFromRender(intr.n));
+        Printf("World-space ns: %s\n", worldFromRender(intr.shading.n));
+
         for (const auto &mtl : namedMaterials)
-            if (mtl.second == intr.material)
+            if (mtl.second == intr.material) {
                 Printf("Named material: %s\n", mtl.first);
+                return;
+            }
+
+        // If we didn't find a named material, dump out the whole thing.
         Printf("%s\n\n", intr.material.ToString());
 
         return;
