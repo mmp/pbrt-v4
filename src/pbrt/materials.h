@@ -142,13 +142,14 @@ class DielectricMaterial {
     DielectricMaterial(FloatTextureHandle uRoughness, FloatTextureHandle vRoughness,
                        FloatTextureHandle etaF, SpectrumTextureHandle etaS,
                        FloatTextureHandle displacement, Image *normalMap,
-                       bool remapRoughness)
+                       SpectrumTextureHandle tint, bool remapRoughness)
         : displacement(displacement),
           normalMap(normalMap),
           uRoughness(uRoughness),
           vRoughness(vRoughness),
           etaF(etaF),
           etaS(etaS),
+          tint(tint),
           remapRoughness(remapRoughness) {
         CHECK((bool)etaF ^ (bool)etaS);
     }
@@ -157,7 +158,7 @@ class DielectricMaterial {
 
     template <typename TextureEvaluator>
     PBRT_CPU_GPU bool CanEvaluateTextures(TextureEvaluator texEval) const {
-        return texEval.CanEvaluate({etaF, uRoughness, vRoughness}, {etaS});
+        return texEval.CanEvaluate({etaF, uRoughness, vRoughness}, {etaS, tint});
     }
 
     PBRT_CPU_GPU
@@ -200,7 +201,8 @@ class DielectricMaterial {
         TrowbridgeReitzDistribution distrib(urough, vrough);
 
         // Return BSDF for dielectric material
-        *bxdf = DielectricInterfaceBxDF(eta, distrib);
+        SampledSpectrum t = tint ? texEval(tint, ctx, lambda) : SampledSpectrum(1.f);
+        *bxdf = DielectricInterfaceBxDF(eta, t, distrib);
         return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf);
     }
 
@@ -210,6 +212,7 @@ class DielectricMaterial {
     Image *normalMap;
     FloatTextureHandle uRoughness, vRoughness, etaF;
     SpectrumTextureHandle etaS;
+    SpectrumTextureHandle tint;
     bool remapRoughness;
 };
 
@@ -629,7 +632,7 @@ class CoatedDiffuseMaterial {
         Float gg = Clamp(texEval(g, ctx), -1, 1);
 
         *bxdf =
-            CoatedDiffuseBxDF(DielectricInterfaceBxDF(e, distrib),
+            CoatedDiffuseBxDF(DielectricInterfaceBxDF(e, SampledSpectrum(1.f), distrib),
                               IdealDiffuseBxDF(r), thick, a, gg, config);
         return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf);
     }
@@ -731,7 +734,7 @@ class CoatedConductorMaterial {
         Float gg = Clamp(texEval(g, ctx), -1, 1);
 
         *bxdf = CoatedConductorBxDF(
-            DielectricInterfaceBxDF(ieta, interfaceDistrib),
+            DielectricInterfaceBxDF(ieta, SampledSpectrum(1.f), interfaceDistrib),
             ConductorBxDF(conductorDistrib, ce, ck), thick, a, gg, config);
         return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf);
     }
@@ -817,7 +820,7 @@ class SubsurfaceMaterial {
         TrowbridgeReitzDistribution distrib(urough, vrough);
 
         // Initialize _bsdf_ for smooth or rough dielectric
-        *bxdf = DielectricInterfaceBxDF(eta, distrib);
+        *bxdf = DielectricInterfaceBxDF(eta, SampledSpectrum(1.f), distrib);
         return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf);
     }
 

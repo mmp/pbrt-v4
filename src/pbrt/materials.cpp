@@ -30,8 +30,8 @@ namespace pbrt {
 std::string DielectricMaterial::ToString() const {
     return StringPrintf("[ DielectricMaterial displacement: %s uRoughness: %s "
                         "vRoughness: %s etaF: %s "
-                        "etaS: %s remapRoughness: %s ]",
-                        displacement, uRoughness, vRoughness, etaF, etaS,
+                        "etaS: %s tint: %s remapRoughness: %s ]",
+                        displacement, uRoughness, vRoughness, etaF, etaS, tint,
                         remapRoughness);
 }
 
@@ -60,8 +60,11 @@ DielectricMaterial *DielectricMaterial::Create(
         parameters.GetFloatTextureOrNull("displacement", alloc);
     bool remapRoughness = parameters.GetOneBool("remaproughness", true);
 
+    SpectrumTextureHandle tint =
+        parameters.GetSpectrumTextureOrNull("tint", SpectrumType::Albedo, alloc);
     return alloc.new_object<DielectricMaterial>(uRoughness, vRoughness, etaF, etaS,
-                                                displacement, normalMap, remapRoughness);
+                                                displacement, normalMap, tint,
+                                                remapRoughness);
 }
 
 // ThinDielectricMaterial Method Definitions

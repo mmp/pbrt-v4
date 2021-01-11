@@ -88,8 +88,8 @@ SampledSpectrum DielectricInterfaceBxDF::f(Vector3f wo, Vector3f wi,
             return SampledSpectrum(0.);
         wh = Normalize(wh);
         Float F = FrDielectric(Dot(wi, FaceForward(wh, Vector3f(0, 0, 1))), eta);
-        return SampledSpectrum(mfDistrib.D(wh) * mfDistrib.G(wo, wi) * F /
-                               (4 * cosTheta_i * cosTheta_o));
+        return tint * SampledSpectrum(mfDistrib.D(wh) * mfDistrib.G(wo, wi) * F /
+                                      (4 * cosTheta_i * cosTheta_o));
 
     } else {
         // Compute transmission at non-delta dielectric interface
@@ -112,7 +112,8 @@ SampledSpectrum DielectricInterfaceBxDF::f(Vector3f wo, Vector3f wi,
         Float F = FrDielectric(Dot(wo, wh), eta);
         Float sqrtDenom = Dot(wo, wh) + etap * Dot(wi, wh);
         Float factor = (mode == TransportMode::Radiance) ? Sqr(1 / etap) : 1;
-        return SampledSpectrum((1 - F) * factor *
+        return tint *
+               SampledSpectrum((1 - F) * factor *
                                std::abs(mfDistrib.D(wh) * mfDistrib.G(wo, wi) *
                                         AbsDot(wi, wh) * AbsDot(wo, wh) /
                                         (cosTheta_i * cosTheta_o * Sqr(sqrtDenom))));
@@ -137,7 +138,7 @@ pstd::optional<BSDFSample> DielectricInterfaceBxDF::Sample_f(
         if (uc < pr / (pr + pt)) {
             // Sample perfect specular reflection at interface
             Vector3f wi(-wo.x, -wo.y, wo.z);
-            SampledSpectrum fr(R / AbsCosTheta(wi));
+            SampledSpectrum fr(tint * R / AbsCosTheta(wi));
             return BSDFSample(fr, wi, pr / (pr + pt), BxDFFlags::SpecularReflection);
 
         } else {
@@ -153,7 +154,7 @@ pstd::optional<BSDFSample> DielectricInterfaceBxDF::Sample_f(
             if (tir)
                 return {};
 
-            SampledSpectrum ft(T / AbsCosTheta(wi));
+            SampledSpectrum ft(tint * T / AbsCosTheta(wi));
             // Account for non-symmetry with transmission to different medium
             if (mode == TransportMode::Radiance)
                 ft /= Sqr(etap);
@@ -285,8 +286,8 @@ Float DielectricInterfaceBxDF::PDF(Vector3f wo, Vector3f wi, TransportMode mode,
 }
 
 std::string DielectricInterfaceBxDF::ToString() const {
-    return StringPrintf("[ DielectricInterfaceBxDF eta: %f mfDistrib: %s ]", eta,
-                        mfDistrib.ToString());
+    return StringPrintf("[ DielectricInterfaceBxDF eta: %f mfDistrib: %s tint: %s ]", eta,
+                        mfDistrib.ToString(), tint);
 }
 
 std::string ThinDielectricBxDF::ToString() const {
