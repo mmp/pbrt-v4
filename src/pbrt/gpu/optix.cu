@@ -189,9 +189,10 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
     MaterialHandle material = intr.material;
 
     const MixMaterial *mix = material.CastOrNullptr<MixMaterial>();
-    if (mix) {
-        MaterialEvalContext ctx(intr);
-        material = mix->ChooseMaterial(BasicTextureEvaluator(), ctx);
+    while (mix) {
+         MaterialEvalContext ctx(intr);
+         material = mix->ChooseMaterial(BasicTextureEvaluator(), ctx);
+         mix = material.CastOrNullptr<MixMaterial>();
     }
 
     if (!material) {

@@ -108,12 +108,7 @@ MixMaterial *MixMaterial::Create(MaterialHandle materials[2],
         // Check for this stuff here, where we can include the FileLoc in
         // the error message. Note that both of these limitations could be
         // relaxed if they were problematic; the issue is that we currently
-        // resolve MixMaterials in the closest hit shader, where we'd like
-        // to, for example, not introduce the complexity of potentially
-        // recursively evaluating textures, etc.
-        if (materials[0].Is<MixMaterial>() || materials[1].Is<MixMaterial>())
-            ErrorExit(loc, "The GPU renderer doesn't currently support using "
-                           "\"mix\" materials as parameters to the \"mix\" material.");
+        // resolve MixMaterials in the closest hit shader...
         if (!BasicTextureEvaluator().CanEvaluate({amount}, {}))
             ErrorExit(loc, "The GPU renderer currently only supports basic textures "
                            "for its \"amount\" parameter.");

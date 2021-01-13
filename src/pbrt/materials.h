@@ -117,10 +117,11 @@ PBRT_CPU_GPU void Bump(TextureEvaluator texEval, FloatTextureHandle displacement
 
     } else {
         // Sample normal map to compute shading normal
+        WrapMode2D wrap(WrapMode::Repeat);
         Point2f uv(ctx.uv[0], 1 - ctx.uv[1]);
-        Vector3f ns(2 * normalMap->BilerpChannel(uv, 0) - 1,
-                    2 * normalMap->BilerpChannel(uv, 1) - 1,
-                    2 * normalMap->BilerpChannel(uv, 2) - 1);
+        Vector3f ns(2 * normalMap->BilerpChannel(uv, 0, wrap) - 1,
+                    2 * normalMap->BilerpChannel(uv, 1, wrap) - 1,
+                    2 * normalMap->BilerpChannel(uv, 2, wrap) - 1);
         ns = Normalize(ns);
         Frame frame = Frame::FromZ(ctx.shading.n);
         ns = frame.FromLocal(ns);
@@ -345,7 +346,7 @@ class MixMaterial {
         if (amt >= 1)
             return materials[1];
 
-        Float u = uint32_t(Hash(ctx.p, ctx.wo)) * 0x1p-32;
+        Float u = uint32_t(Hash(ctx.p, ctx.wo, materials[0], materials[1])) * 0x1p-32;
         return (amt < u) ? materials[0] : materials[1];
     }
 
