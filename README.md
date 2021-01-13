@@ -6,8 +6,8 @@ pbrt, Version 4 (Early Release)
 This is an early release of pbrt-v4, the rendering system that will be
 described in the (eventually) forthcoming fourth edition of *Physically
 Based Rendering: From Theory to Implementation*.  (We hope to have an
-online version of the book posted late in 2020 and printed books available
-in Spring 2021.)
+online version of the book posted a few months into 2020 and printed books available
+in Summer 2021.)
 
 We are making this code available for hardy adventurers; it's not yet
 extensively documented, but if you're familiar with previous versions of
