@@ -105,9 +105,8 @@ template <int N>
 class SquareMatrix;
 
 // Math Inline Functions
-PBRT_CPU_GPU
-inline Float Lerp(Float t, Float a, Float b) {
-    return (1 - t) * a + t * b;
+PBRT_CPU_GPU inline Float Lerp(Float x, Float a, Float b) {
+    return (1 - x) * a + x * b;
 }
 
 // http://www.plunk.org/~hatch/rightway.php
@@ -566,8 +565,7 @@ InnerProduct(T... terms) {
     return Float(ip);
 }
 
-PBRT_CPU_GPU
-inline bool Quadratic(float a, float b, float c, float *t0, float *t1) {
+PBRT_CPU_GPU inline bool Quadratic(float a, float b, float c, float *t0, float *t1) {
     // Handle case of $a=0$ for quadratic solution
     if (a == 0) {
         *t0 = *t1 = -c / b;

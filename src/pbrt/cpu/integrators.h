@@ -69,7 +69,8 @@ class Integrator {
     Integrator(PrimitiveHandle aggregate, std::vector<LightHandle> lights)
         : aggregate(aggregate), lights(lights) {
         // Integrator constructor implementation
-        Bounds3f sceneBounds = aggregate.Bounds();
+        Bounds3f sceneBounds = aggregate ? aggregate.Bounds() : Bounds3f();
+        LOG_VERBOSE("Scene bounds %s", sceneBounds);
         for (auto &light : lights) {
             light.Preprocess(sceneBounds);
             if (light.Type() == LightType::Infinite)
