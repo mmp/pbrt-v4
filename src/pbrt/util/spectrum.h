@@ -33,7 +33,6 @@ constexpr Float Lambda_min = 360, Lambda_max = 830;
 static constexpr int NSpectrumSamples = 4;
 
 static constexpr Float CIE_Y_integral = 106.856895;
-static constexpr Float K_m = 683;
 
 // SpectrumHandle Definition
 class BlackbodySpectrum;
@@ -49,7 +48,7 @@ class SpectrumHandle : public TaggedPointer<ConstantSpectrum, DenselySampledSpec
                                             RGBUnboundedSpectrum, RGBIlluminantSpectrum,
                                             BlackbodySpectrum> {
   public:
-    // SpectrumHandle Public Methods
+    // Spectrum Interface
     using TaggedPointer::TaggedPointer;
     std::string ToString() const;
 
@@ -70,7 +69,7 @@ PBRT_CPU_GPU inline Float Blackbody(Float lambda, Float T) {
     const Float c = 299792458;
     const Float h = 6.62606957e-34;
     const Float kb = 1.3806488e-23;
-    // Return emitted radiance for blackbody at wavelength _lambda[i]_
+    // Return emitted radiance for blackbody at wavelength _lambda_
     Float l = lambda * 1e-9f;
     Float Le = (2 * h * c * c) / (Pow<5>(l) * (FastExp((h * c) / (l * kb * T)) - 1));
     CHECK(!IsNaN(Le));
@@ -78,8 +77,9 @@ PBRT_CPU_GPU inline Float Blackbody(Float lambda, Float T) {
 }
 
 namespace Spectra {
-DenselySampledSpectrum D(Float temperature, Allocator alloc);
+DenselySampledSpectrum D(Float T, Allocator alloc);
 }  // namespace Spectra
+
 Float SpectrumToPhotometric(SpectrumHandle s);
 
 Float SpectrumToPhotometric(SpectrumHandle s);
@@ -260,7 +260,6 @@ class SampledSpectrum {
 
   private:
     friend class SOA<SampledSpectrum>;
-    // SampledSpectrum Private Members
     pstd::array<Float, NSpectrumSamples> values;
 };
 
@@ -344,13 +343,16 @@ class SampledWavelengths {
   private:
     // SampledWavelengths Private Members
     friend class SOA<SampledWavelengths>;
-    pstd::array<Float, NSpectrumSamples> lambda;
-    pstd::array<Float, NSpectrumSamples> pdf;
+    pstd::array<Float, NSpectrumSamples> lambda, pdf;
 };
 
 // Spectrum Definitions
 class ConstantSpectrum {
   public:
+    PBRT_CPU_GPU
+    ConstantSpectrum(Float c) : c(c) {}
+    PBRT_CPU_GPU
+    Float operator()(Float lambda) const { return c; }
     // ConstantSpectrum Public Methods
     PBRT_CPU_GPU
     SampledSpectrum Sample(const SampledWavelengths &) const;
@@ -360,13 +362,7 @@ class ConstantSpectrum {
 
     std::string ToString() const;
 
-    ConstantSpectrum(Float c) : c(c) {}
-
-    PBRT_CPU_GPU
-    Float operator()(Float lambda) const { return c; }
-
   private:
-    // ConstantSpectrum Private Members
     Float c;
 };
 
@@ -481,8 +477,8 @@ class BlackbodySpectrum {
     PBRT_CPU_GPU
     BlackbodySpectrum(Float T) : T(T) {
         // Compute blackbody normalization constant for given temperature
-        Float lambdaMax = Float(2.8977721e-3 / T * 1e9);
-        normalizationFactor = 1 / Blackbody(lambdaMax, T);
+        Float lambdaMax = Float(2.8977721e-3 / T);
+        normalizationFactor = 1 / Blackbody(lambdaMax * 1e9f, T);
     }
 
     PBRT_CPU_GPU
@@ -600,11 +596,10 @@ class RGBIlluminantSpectrum {
 };
 
 // SampledSpectrum Inline Functions
-PBRT_CPU_GPU
-inline SampledSpectrum SafeDiv(const SampledSpectrum &s1, const SampledSpectrum &s2) {
+PBRT_CPU_GPU inline SampledSpectrum SafeDiv(SampledSpectrum a, SampledSpectrum b) {
     SampledSpectrum r;
     for (int i = 0; i < NSpectrumSamples; ++i)
-        r[i] = (s2[i] != 0) ? s1[i] / s2[i] : 0.;
+        r[i] = (b[i] != 0) ? a[i] / b[i] : 0.;
     return r;
 }
 

@@ -177,6 +177,23 @@ inline RGB Lerp(Float t, const RGB &s1, const RGB &s2) {
 class XYZ {
   public:
     // XYZ Public Methods
+    XYZ() = default;
+    PBRT_CPU_GPU
+    XYZ(Float X, Float Y, Float Z) : X(X), Y(Y), Z(Z) {}
+
+    PBRT_CPU_GPU
+    Float Average() const { return (X + Y + Z) / 3; }
+
+    PBRT_CPU_GPU
+    Point2f xy() const { return Point2f(X / (X + Y + Z), Y / (X + Y + Z)); }
+
+    PBRT_CPU_GPU
+    static XYZ FromxyY(Point2f xy, Float Y = 1) {
+        if (xy.y == 0)
+            return XYZ(0, 0, 0);
+        return XYZ(xy.x * Y / xy.y, Y, (1 - xy.x - xy.y) * Y / xy.y);
+    }
+
     PBRT_CPU_GPU
     XYZ &operator+=(const XYZ &s) {
         X += s.X;
@@ -285,23 +302,6 @@ class XYZ {
     }
 
     std::string ToString() const;
-
-    XYZ() = default;
-    PBRT_CPU_GPU
-    XYZ(Float X, Float Y, Float Z) : X(X), Y(Y), Z(Z) {}
-
-    PBRT_CPU_GPU
-    Float Average() const { return (X + Y + Z) / 3; }
-
-    PBRT_CPU_GPU
-    Point2f xy() const { return Point2f(X / (X + Y + Z), Y / (X + Y + Z)); }
-
-    PBRT_CPU_GPU
-    static XYZ FromxyY(Point2f xy, Float Y = 1) {
-        if (xy.y == 0)
-            return XYZ(0, 0, 0);
-        return XYZ(xy.x * Y / xy.y, Y, (1 - xy.x - xy.y) * Y / xy.y);
-    }
 
     // XYZ Public Members
     Float X = 0, Y = 0, Z = 0;

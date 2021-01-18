@@ -215,6 +215,7 @@ PixelSensor *PixelSensor::Create(const ParameterDictionary &parameters,
     if (sensorName != "cie1931" && whiteBalanceTemp == 0)
         whiteBalanceTemp = 6500;
 
+    const Float K_m = 683;
     Float imagingRatio = Pi * exposureTime * ISO * K_m / (C * fNumber * fNumber);
 
     if (sensorName == "cie1931") {

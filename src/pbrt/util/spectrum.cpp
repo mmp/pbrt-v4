@@ -44,6 +44,7 @@ Float SpectrumToPhotometric(SpectrumHandle s) {
     for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda)
         y += Spectra::Y()(lambda) * s(lambda);
 
+    const Float K_m = 683;
     return y * K_m;
 }
 
@@ -67,11 +68,10 @@ Float PiecewiseLinearSpectrum::operator()(Float lambda) const {
         return 0;
 
     // Find offset to largest _lambdas_ below _lambda_ and interpolate
-    int offset =
-        FindInterval(lambdas.size(), [&](int index) { return lambdas[index] <= lambda; });
-    DCHECK(lambda >= lambdas[offset] && lambda <= lambdas[offset + 1]);
-    Float t = (lambda - lambdas[offset]) / (lambdas[offset + 1] - lambdas[offset]);
-    return Lerp(t, values[offset], values[offset + 1]);
+    int o = FindInterval(lambdas.size(), [&](int i) { return lambdas[i] <= lambda; });
+    DCHECK(lambda >= lambdas[o] && lambda <= lambdas[o + 1]);
+    Float t = (lambda - lambdas[o]) / (lambdas[o + 1] - lambdas[o]);
+    return Lerp(t, values[o], values[o + 1]);
 }
 
 Float PiecewiseLinearSpectrum::MaxValue() const {
@@ -173,17 +173,6 @@ std::string DenselySampledSpectrum::ToString() const {
     return s;
 }
 
-std::string SampledWavelengths::ToString() const {
-    std::string r = "[ SampledWavelengths lambda: [";
-    for (size_t i = 0; i < lambda.size(); ++i)
-        r += StringPrintf(" %f%c", lambda[i], i != lambda.size() - 1 ? ',' : ' ');
-    r += "] pdf: [";
-    for (size_t i = 0; i < lambda.size(); ++i)
-        r += StringPrintf(" %f%c", pdf[i], i != pdf.size() - 1 ? ',' : ' ');
-    r += "] ]";
-    return r;
-}
-
 std::string SampledSpectrum::ToString() const {
     std::string str = "[ ";
     for (int i = 0; i < NSpectrumSamples; ++i) {
@@ -195,12 +184,25 @@ std::string SampledSpectrum::ToString() const {
     return str;
 }
 
+std::string SampledWavelengths::ToString() const {
+    std::string r = "[ SampledWavelengths lambda: [";
+    for (size_t i = 0; i < lambda.size(); ++i)
+        r += StringPrintf(" %f%c", lambda[i], i != lambda.size() - 1 ? ',' : ' ');
+    r += "] pdf: [";
+    for (size_t i = 0; i < lambda.size(); ++i)
+        r += StringPrintf(" %f%c", pdf[i], i != pdf.size() - 1 ? ',' : ' ');
+    r += "] ]";
+    return r;
+}
+
 XYZ SampledSpectrum::ToXYZ(const SampledWavelengths &lambda) const {
+    // Sample the $X$, $Y$, and $Z$ matching curves at _lambda_
     SampledSpectrum X = Spectra::X().Sample(lambda);
     SampledSpectrum Y = Spectra::Y().Sample(lambda);
     SampledSpectrum Z = Spectra::Z().Sample(lambda);
-    SampledSpectrum pdf = lambda.PDF();
 
+    // Evaluate estimator to compute $(x,y,z)$ coefficients
+    SampledSpectrum pdf = lambda.PDF();
     return XYZ(SafeDiv(X * *this, pdf).Average(), SafeDiv(Y * *this, pdf).Average(),
                SafeDiv(Z * *this, pdf).Average()) /
            CIE_Y_integral;

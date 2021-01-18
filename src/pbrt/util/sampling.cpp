@@ -25,15 +25,6 @@
 namespace pbrt {
 
 // Sampling Function Definitions
-Point2f RejectionSampleDisk(RNG &rng) {
-    Point2f p;
-    do {
-        p.x = 1 - 2 * rng.Uniform<Float>();
-        p.y = 1 - 2 * rng.Uniform<Float>();
-    } while (p.x * p.x + p.y * p.y > 1);
-    return p;
-}
-
 pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v,
                                               const Point3f &p, const Point2f &u,
                                               Float *pdf) {
@@ -390,6 +381,15 @@ Vector3f SampleHenyeyGreenstein(Vector3f wo, Float g, Point2f u, Float *pdf) {
     return wi;
 }
 
+Point2f RejectionSampleDisk(RNG &rng) {
+    Point2f p;
+    do {
+        p.x = 1 - 2 * rng.Uniform<Float>();
+        p.y = 1 - 2 * rng.Uniform<Float>();
+    } while (p.x * p.x + p.y * p.y > 1);
+    return p;
+}
+
 Float SampleCatmullRom(pstd::span<const Float> nodes, pstd::span<const Float> f,
                        pstd::span<const Float> F, Float u, Float *fval, Float *pdf) {
     CHECK_EQ(nodes.size(), f.size());
@@ -560,11 +560,11 @@ void PiecewiseConstant2D::TestCompareDistributions(const PiecewiseConstant2D &da
                                                    Float eps) {
     PiecewiseConstant1D::TestCompareDistributions(da.pMarginal, db.pMarginal, eps);
 
-    ASSERT_EQ(da.pConditionalY.size(), db.pConditionalY.size());
+    ASSERT_EQ(da.pConditionalV.size(), db.pConditionalV.size());
     ASSERT_EQ(da.domain, db.domain);
-    for (size_t i = 0; i < da.pConditionalY.size(); ++i)
-        PiecewiseConstant1D::TestCompareDistributions(da.pConditionalY[i],
-                                                      db.pConditionalY[i], eps);
+    for (size_t i = 0; i < da.pConditionalV.size(); ++i)
+        PiecewiseConstant1D::TestCompareDistributions(da.pConditionalV[i],
+                                                      db.pConditionalV[i], eps);
 }
 
 // AliasTable Method Definitions
