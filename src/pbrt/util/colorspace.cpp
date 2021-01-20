@@ -20,26 +20,17 @@ extern const SquareMatrix<3> LMSFromXYZ, XYZFromLMS;
 
 // RGBColorSpace Method Definitions
 RGBColorSpace::RGBColorSpace(Point2f r, Point2f g, Point2f b, SpectrumHandle illuminant,
-                             const RGBToSpectrumTable *rgbToSpectrumTable,
-                             Allocator alloc)
-    : r(r),
-      g(g),
-      b(b),
-      illuminant(illuminant, alloc),
-      rgbToSpectrumTable(rgbToSpectrumTable) {
-    // Compute whitepoint primaries
+                             const RGBToSpectrumTable *rgbToSpec, Allocator alloc)
+    : r(r), g(g), b(b), illuminant(illuminant, alloc), rgbToSpectrumTable(rgbToSpec) {
+    // Compute whitepoint primaries and XYZ coordinates
     XYZ W = SpectrumToXYZ(illuminant);
     w = W.xy();
-
-    // Compute XYZ coordinates of primaries
     XYZ R = XYZ::FromxyY(r), G = XYZ::FromxyY(g), B = XYZ::FromxyY(b);
 
-    // Compute _XYZFromRGB_ matrix for color space
+    // Initialize XYZ color space conversion matrices
     SquareMatrix<3> rgb(R.X, G.X, B.X, R.Y, G.Y, B.Y, R.Z, G.Z, B.Z);
     XYZ C = *Inverse(rgb) * W;
     XYZFromRGB = rgb * SquareMatrix<3>::Diag(C[0], C[1], C[2]);
-
-    // Compute _RGBFromXYZ_ matrix for color space
     RGBFromXYZ = *Inverse(XYZFromRGB);
 }
 

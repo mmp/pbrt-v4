@@ -79,12 +79,12 @@ Transform RotateZ(Float theta) {
 // clang-format on
 
 Transform LookAt(const Point3f &pos, const Point3f &look, const Vector3f &up) {
-    SquareMatrix<4> cameraToWorld;
+    SquareMatrix<4> worldFromCamera;
     // Initialize fourth column of viewing matrix
-    cameraToWorld[0][3] = pos.x;
-    cameraToWorld[1][3] = pos.y;
-    cameraToWorld[2][3] = pos.z;
-    cameraToWorld[3][3] = 1;
+    worldFromCamera[0][3] = pos.x;
+    worldFromCamera[1][3] = pos.y;
+    worldFromCamera[2][3] = pos.z;
+    worldFromCamera[3][3] = 1;
 
     // Initialize first three columns of viewing matrix
     Vector3f dir = Normalize(look - pos);
@@ -95,24 +95,24 @@ Transform LookAt(const Point3f &pos, const Point3f &look, const Vector3f &up) {
                   up.x, up.y, up.z, dir.x, dir.y, dir.z);
     Vector3f right = Normalize(Cross(Normalize(up), dir));
     Vector3f newUp = Cross(dir, right);
-    cameraToWorld[0][0] = right.x;
-    cameraToWorld[1][0] = right.y;
-    cameraToWorld[2][0] = right.z;
-    cameraToWorld[3][0] = 0.;
-    cameraToWorld[0][1] = newUp.x;
-    cameraToWorld[1][1] = newUp.y;
-    cameraToWorld[2][1] = newUp.z;
-    cameraToWorld[3][1] = 0.;
-    cameraToWorld[0][2] = dir.x;
-    cameraToWorld[1][2] = dir.y;
-    cameraToWorld[2][2] = dir.z;
-    cameraToWorld[3][2] = 0.;
+    worldFromCamera[0][0] = right.x;
+    worldFromCamera[1][0] = right.y;
+    worldFromCamera[2][0] = right.z;
+    worldFromCamera[3][0] = 0.;
+    worldFromCamera[0][1] = newUp.x;
+    worldFromCamera[1][1] = newUp.y;
+    worldFromCamera[2][1] = newUp.z;
+    worldFromCamera[3][1] = 0.;
+    worldFromCamera[0][2] = dir.x;
+    worldFromCamera[1][2] = dir.y;
+    worldFromCamera[2][2] = dir.z;
+    worldFromCamera[3][2] = 0.;
 
-    pstd::optional<SquareMatrix<4>> worldToCamera = Inverse(cameraToWorld);
+    pstd::optional<SquareMatrix<4>> cameraFromWorld = Inverse(worldFromCamera);
 #ifdef PBRT_DEBUG_BUILD
-    DCHECK(worldToCamera);
+    DCHECK(cameraFromWorld);
 #endif
-    return Transform(*worldToCamera, cameraToWorld);
+    return Transform(*cameraFromWorld, worldFromCamera);
 }
 
 Transform Orthographic(Float zNear, Float zFar) {

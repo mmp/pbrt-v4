@@ -877,8 +877,7 @@ PBRT_CPU_GPU inline auto Length(const Vector2<T> &v) -> typename TupleLength<T>:
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto Normalize(const Vector2<T> &v)
-    -> Vector2<typename TupleLength<T>::type> {
+PBRT_CPU_GPU inline auto Normalize(const Vector2<T> &v) {
     return v / Length(v);
 }
 
@@ -918,7 +917,7 @@ PBRT_CPU_GPU inline Vector3<T> Cross(const Normal3<T> &v1, const Vector3<T> &v2)
 
 template <typename T>
 PBRT_CPU_GPU inline T LengthSquared(const Vector3<T> &v) {
-    return v.x * v.x + v.y * v.y + v.z * v.z;
+    return Sqr(v.x) + Sqr(v.y) + Sqr(v.z);
 }
 
 template <typename T>
@@ -928,7 +927,7 @@ PBRT_CPU_GPU inline auto Length(const Vector3<T> &v) -> typename TupleLength<T>:
 }
 
 template <typename T>
-PBRT_CPU_GPU inline Vector3<T> Normalize(const Vector3<T> &v) {
+PBRT_CPU_GPU inline auto Normalize(const Vector3<T> &v) {
     return v / Length(v);
 }
 
@@ -963,8 +962,8 @@ PBRT_CPU_GPU inline Float AngleBetween(const Normal3<T> &a, const Normal3<T> &b)
 }
 
 template <typename T>
-PBRT_CPU_GPU inline Vector3<T> GramSchmidt(const Vector3<T> &a, const Vector3<T> &b) {
-    return a - Dot(a, b) * b;
+PBRT_CPU_GPU inline Vector3<T> GramSchmidt(const Vector3<T> &v, const Vector3<T> &w) {
+    return v - Dot(v, w) * w;
 }
 
 template <typename T>
@@ -1025,8 +1024,7 @@ PBRT_CPU_GPU inline auto Length(const Normal3<T> &n) -> typename TupleLength<T>:
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto Normalize(const Normal3<T> &n)
-    -> Normal3<typename TupleLength<T>::type> {
+PBRT_CPU_GPU inline auto Normalize(const Normal3<T> &n) {
     return n / Length(n);
 }
 
@@ -1509,7 +1507,7 @@ PBRT_CPU_GPU inline auto DistanceSquared(const Point3<T> &p, const Bounds3<U> &b
     TDist dx = std::max<TDist>({0, b.pMin.x - p.x, p.x - b.pMax.x});
     TDist dy = std::max<TDist>({0, b.pMin.y - p.y, p.y - b.pMax.y});
     TDist dz = std::max<TDist>({0, b.pMin.z - p.z, p.z - b.pMax.z});
-    return dx * dx + dy * dy + dz * dz;
+    return Sqr(dx) + Sqr(dy) + Sqr(dz);
 }
 
 template <typename T, typename U>
@@ -1620,21 +1618,59 @@ PBRT_CPU_GPU inline Bounds2<T> Union(const Bounds2<T> &b, const Point2<T> &p) {
 }
 
 // Spherical Geometry Inline Functions
-PBRT_CPU_GPU
-inline Vector3f SphericalDirection(Float sinTheta, Float cosTheta, Float phi) {
+PBRT_CPU_GPU inline Float SphericalTriangleArea(Vector3f a, Vector3f b, Vector3f c) {
+    // Compute normalized cross products of all direction pairs
+    Vector3f n_ab = Cross(a, b), n_bc = Cross(b, c), n_ca = Cross(c, a);
+    if (LengthSquared(n_ab) == 0 || LengthSquared(n_bc) == 0 || LengthSquared(n_ca) == 0)
+        return {};
+    n_ab = Normalize(n_ab);
+    n_bc = Normalize(n_bc);
+    n_ca = Normalize(n_ca);
+
+    // Compute angles $\alpha$, $\beta$, and $\gamma$ at spherical triangle vertices
+    Float alpha = AngleBetween(n_ab, -n_ca);
+    Float beta = AngleBetween(n_bc, -n_ab);
+    Float gamma = AngleBetween(n_ca, -n_bc);
+
+    return std::abs(alpha + beta + gamma - Pi);
+}
+
+PBRT_CPU_GPU inline Float SphericalQuadArea(Vector3f a, Vector3f b, Vector3f c,
+                                            Vector3f d);
+
+PBRT_CPU_GPU inline Float SphericalQuadArea(Vector3f a, Vector3f b, Vector3f c,
+                                            Vector3f d) {
+    Vector3f axb = Cross(a, b), bxc = Cross(b, c);
+    Vector3f cxd = Cross(c, d), dxa = Cross(d, a);
+    if (LengthSquared(axb) == 0 || LengthSquared(bxc) == 0 || LengthSquared(cxd) == 0 ||
+        LengthSquared(dxa) == 0)
+        return 0;
+    axb = Normalize(axb);
+    bxc = Normalize(bxc);
+    cxd = Normalize(cxd);
+    dxa = Normalize(dxa);
+
+    Float alpha = AngleBetween(dxa, -axb);
+    Float beta = AngleBetween(axb, -bxc);
+    Float gamma = AngleBetween(bxc, -cxd);
+    Float delta = AngleBetween(cxd, -dxa);
+
+    return std::abs(alpha + beta + gamma + delta - 2 * Pi);
+}
+
+PBRT_CPU_GPU inline Vector3f SphericalDirection(Float sinTheta, Float cosTheta,
+                                                Float phi) {
     DCHECK(sinTheta >= -1.0001 && sinTheta <= 1.0001);
     DCHECK(cosTheta >= -1.0001 && cosTheta <= 1.0001);
     return Vector3f(Clamp(sinTheta, -1, 1) * std::cos(phi),
                     Clamp(sinTheta, -1, 1) * std::sin(phi), Clamp(cosTheta, -1, 1));
 }
 
-PBRT_CPU_GPU
-inline Float SphericalTheta(const Vector3f &v) {
+PBRT_CPU_GPU inline Float SphericalTheta(const Vector3f &v) {
     return SafeACos(v.z);
 }
 
-PBRT_CPU_GPU
-inline Float SphericalPhi(const Vector3f &v) {
+PBRT_CPU_GPU inline Float SphericalPhi(const Vector3f &v) {
     Float p = std::atan2(v.y, v.x);
     return (p < 0) ? (p + 2 * Pi) : p;
 }
@@ -1643,7 +1679,7 @@ PBRT_CPU_GPU inline Float CosTheta(const Vector3f &w) {
     return w.z;
 }
 PBRT_CPU_GPU inline Float Cos2Theta(const Vector3f &w) {
-    return w.z * w.z;
+    return Sqr(w.z);
 }
 PBRT_CPU_GPU inline Float AbsCosTheta(const Vector3f &w) {
     return std::abs(w.z);
@@ -1663,13 +1699,11 @@ PBRT_CPU_GPU inline Float Tan2Theta(const Vector3f &w) {
     return Sin2Theta(w) / Cos2Theta(w);
 }
 
-PBRT_CPU_GPU
-inline Float CosPhi(const Vector3f &w) {
+PBRT_CPU_GPU inline Float CosPhi(const Vector3f &w) {
     Float sinTheta = SinTheta(w);
     return (sinTheta == 0) ? 1 : Clamp(w.x / sinTheta, -1, 1);
 }
-PBRT_CPU_GPU
-inline Float SinPhi(const Vector3f &w) {
+PBRT_CPU_GPU inline Float SinPhi(const Vector3f &w) {
     Float sinTheta = SinTheta(w);
     return (sinTheta == 0) ? 0 : Clamp(w.y / sinTheta, -1, 1);
 }
@@ -1680,48 +1714,6 @@ inline Float CosDPhi(const Vector3f &wa, const Vector3f &wb) {
     if (waxy == 0 || wbxy == 0)
         return 1;
     return Clamp((wa.x * wb.x + wa.y * wb.y) / std::sqrt(waxy * wbxy), -1, 1);
-}
-
-PBRT_CPU_GPU inline Float SphericalTriangleArea(const Vector3f &a, const Vector3f &b,
-                                                const Vector3f &c) {
-    // Compute normalized cross products of all direction pairs
-    Vector3f n_ab = Cross(a, b), n_bc = Cross(b, c), n_ca = Cross(c, a);
-    if (LengthSquared(n_ab) == 0 || LengthSquared(n_bc) == 0 || LengthSquared(n_ca) == 0)
-        return {};
-    n_ab = Normalize(n_ab);
-    n_bc = Normalize(n_bc);
-    n_ca = Normalize(n_ca);
-
-    // Compute angles $\alpha$, $\beta$, and $\gamma$ at spherical triangle vertices
-    Float alpha = AngleBetween(n_ab, -n_ca);
-    Float beta = AngleBetween(n_bc, -n_ab);
-    Float gamma = AngleBetween(n_ca, -n_bc);
-
-    return std::abs(alpha + beta + gamma - Pi);
-}
-
-PBRT_CPU_GPU inline Float SphericalQuadArea(const Vector3f &a, const Vector3f &b,
-                                            const Vector3f &c, const Vector3f &d);
-
-PBRT_CPU_GPU
-inline Float SphericalQuadArea(const Vector3f &a, const Vector3f &b, const Vector3f &c,
-                               const Vector3f &d) {
-    Vector3f axb = Cross(a, b), bxc = Cross(b, c);
-    Vector3f cxd = Cross(c, d), dxa = Cross(d, a);
-    if (LengthSquared(axb) == 0 || LengthSquared(bxc) == 0 || LengthSquared(cxd) == 0 ||
-        LengthSquared(dxa) == 0)
-        return 0;
-    axb = Normalize(axb);
-    bxc = Normalize(bxc);
-    cxd = Normalize(cxd);
-    dxa = Normalize(dxa);
-
-    Float alpha = AngleBetween(dxa, -axb);
-    Float beta = AngleBetween(axb, -bxc);
-    Float gamma = AngleBetween(bxc, -cxd);
-    Float delta = AngleBetween(cxd, -dxa);
-
-    return std::abs(alpha + beta + gamma + delta - 2 * Pi);
 }
 
 PBRT_CPU_GPU
@@ -1740,14 +1732,15 @@ class OctahedralVector {
     // OctahedralVector Public Methods
     OctahedralVector() = default;
     PBRT_CPU_GPU
-    OctahedralVector(const Vector3f &v) {
-        Float invL1Norm = 1 / (std::abs(v.x) + std::abs(v.y) + std::abs(v.z));
-        if (v.z < 0.0f) {
-            x = Encode((1 - std::abs(v.y * invL1Norm)) * SignNotZero(v.x));
-            y = Encode((1 - std::abs(v.x * invL1Norm)) * SignNotZero(v.y));
+    OctahedralVector(Vector3f v) {
+        v /= std::abs(v.x) + std::abs(v.y) + std::abs(v.z);
+        if (v.z >= 0) {
+            x = Encode(v.x);
+            y = Encode(v.y);
         } else {
-            x = Encode(v.x * invL1Norm);
-            y = Encode(v.y * invL1Norm);
+            // Encode octahedral vector with $z < 0$
+            x = Encode((1 - std::abs(v.y)) * SignNotZero(v.x));
+            y = Encode((1 - std::abs(v.x)) * SignNotZero(v.y));
         }
     }
 
@@ -1757,11 +1750,13 @@ class OctahedralVector {
         v.x = -1 + 2 * (x / 65535.f);
         v.y = -1 + 2 * (y / 65535.f);
         v.z = 1 - (std::abs(v.x) + std::abs(v.y));
+        // Reparameterize directions in the $z<0$ portion of the octahedron
         if (v.z < 0) {
             Float xo = v.x;
             v.x = (1 - std::abs(v.y)) * SignNotZero(xo);
             v.y = (1 - std::abs(xo)) * SignNotZero(v.y);
         }
+
         return Normalize(v);
     }
 
@@ -1772,12 +1767,12 @@ class OctahedralVector {
   private:
     // OctahedralVector Private Methods
     PBRT_CPU_GPU
-    static Float SignNotZero(Float v) { return (v < 0) ? -1 : 1; }
-
-    PBRT_CPU_GPU
     static uint16_t Encode(Float f) {
         return std::round(Clamp((f + 1) / 2, 0, 1) * 65535.f);
     }
+
+    PBRT_CPU_GPU
+    static Float SignNotZero(Float v) { return (v < 0) ? -1 : 1; }
 
     // OctahedralVector Private Members
     uint16_t x, y;
