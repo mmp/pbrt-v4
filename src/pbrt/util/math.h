@@ -249,45 +249,6 @@ PBRT_CPU_GPU inline constexpr Float EvaluatePolynomial(Float t, C c, Args... cRe
 }
 
 PBRT_CPU_GPU
-inline Float ApproxSin(Float x);
-PBRT_CPU_GPU
-inline Float ApproxCos(Float x);
-
-PBRT_CPU_GPU
-inline Float ApproxSin(Float x) {
-#ifdef PBRT_IS_GPU_CODE
-    return __sinf(x * (Pi / 4));
-#else
-    DCHECK_RARE(1e-5, x < 0 || x > 2);
-    x = Clamp(x, 0, 2);
-
-    // Coefficients for minimax approximation of sin(x*pi/4), x=[0,2].
-    const float s1 = 0.7853975892066955566406250000000000f;
-    const float s2 = -0.0807407423853874206542968750000000f;
-    const float s3 = 0.0024843954015523195266723632812500f;
-    const float s4 = -0.0000341485538228880614042282104492f;
-    return EvaluatePolynomial(x * x, s1, s2, s3, s4) * x;
-#endif
-}
-
-PBRT_CPU_GPU
-inline Float ApproxCos(Float x) {
-#ifdef PBRT_IS_GPU_CODE
-    return __cosf(x * (Pi / 4));
-#else
-    DCHECK_RARE(1e-5, x < 0 || x > 2);
-    x = Clamp(x, 0, 2);
-
-    // Coefficients for minimax approximation of cos(x*pi/4), x=[0,2].
-    const float c1 = 0.9999932952821962577665326692990000f;
-    const float c2 = -0.3083711259464511647371969120320000f;
-    const float c3 = 0.0157862649459062213825197189573000f;
-    const float c4 = -0.0002983708648233575495551227373110f;
-    return EvaluatePolynomial(x * x, c1, c2, c3, c4);
-#endif
-}
-
-PBRT_CPU_GPU
 inline float SafeASin(float x) {
     DCHECK(x >= -1.0001 && x <= 1.0001);
     return std::asin(Clamp(x, -1, 1));

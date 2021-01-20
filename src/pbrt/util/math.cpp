@@ -288,62 +288,41 @@ Float IntegrateCatmullRom(pstd::span<const Float> nodes, pstd::span<const Float>
 }
 
 // Square--Sphere Mapping Function Definitions
-//  ------------------------------------------------------------------------
-/// Transform a 2D position p=(u,v) in the unit square to a normalized 3D
-/// vector on the unit sphere. Optimized scalar implementation.
-//  ------------------------------------------------------------------------
+// Via source code from Clarberg: Fast Equal-Area Mapping of the (Hemi)Sphere using SIMD
 Vector3f EqualAreaSquareToSphere(const Point2f &p) {
     CHECK(p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1);
-
-    // Transform p from [0,1] to [-1,1]
+    // Transform _p_ to $[-1,1]^2$ and compute absolute values
     Float u = 2 * p.x - 1, v = 2 * p.y - 1;
+    Float up = std::abs(u), vp = std::abs(v);
 
-    // Take the absolute values to move u,v to the first quadrant
-    Float au = std::abs(u), av = std::abs(v);
-
-    // Compute the radius based on the signed distance along the diagonal
-    Float sd = 1 - (au + av);
-    Float d = std::abs(sd);
+    // Compute radius _r_ as signed distance from diagonal
+    Float signedDistance = 1 - (up + vp);
+    Float d = std::abs(signedDistance);
     Float r = 1 - d;
 
-    // Compute phi*2/pi based on u, v and r (avoid div-by-zero if r=0)
-    Float phi = r == 0 ? 1 : (av - au) / r + 1;  // phi = [0,2)
+    // Compute angle $\phi$ for square to sphere mapping
+    Float phi = (r == 0 ? 1 : (vp - up) / r + 1) * Pi / 4;
 
-    // Compute the z coordinate (flip sign based on signed distance)
-    Float r2 = r * r;
-    Float z = 1 - r2;
+    // Find $z$ coordinate for spherical direction
+    Float z = std::copysign(1 - Sqr(r), signedDistance);
 
-    // Return a float with a's magnitude, but negated if b is negative.
-    auto FlipSign = [](Float a, Float b) {
-        return BitsToFloat(FloatToBits(a) ^ SignBit(b));
-    };
-    z = FlipSign(z, sd);
-    Float sinTheta = r * SafeSqrt(2 - r2);
-
-    // Flip signs of sin/cos based on signs of u,v
-    Float cosPhi = FlipSign(ApproxCos(phi), u);
-    Float sinPhi = FlipSign(ApproxSin(phi), v);
-
-    return {sinTheta * cosPhi, sinTheta * sinPhi, z};
+    // Compute $\cos \phi$ and $\sin \phi$ for original quadrant and return vector
+    Float cosPhi = std::copysign(std::cos(phi), u);
+    Float sinPhi = std::copysign(std::sin(phi), v);
+    return Vector3f(cosPhi * r * SafeSqrt(2 - Sqr(r)), sinPhi * r * SafeSqrt(2 - Sqr(r)),
+                    z);
 }
 
-//  ------------------------------------------------------------------------
-/// Transforms a normalized 3D vector to a 2D position in the unit square.
-/// Optimized scalar implementation using trigonometric approximations.
-//  ------------------------------------------------------------------------
+// Via source code from Clarberg: Fast Equal-Area Mapping of the (Hemi)Sphere using SIMD
 Point2f EqualAreaSphereToSquare(const Vector3f &d) {
-    CHECK(LengthSquared(d) > .999 && LengthSquared(d) < 1.001);
-
-    Float x = std::abs(d.x);
-    Float y = std::abs(d.y);
-    Float z = std::abs(d.z);
+    DCHECK(LengthSquared(d) > .999 && LengthSquared(d) < 1.001);
+    Float x = std::abs(d.x), y = std::abs(d.y), z = std::abs(d.z);
 
     // Compute the radius r
     Float r = SafeSqrt(1 - z);  // r = sqrt(1-|z|)
 
     // Compute the argument to atan (detect a=0 to avoid div-by-zero)
-    Float a = std::max(x, y);
-    Float b = std::min(x, y);
+    Float a = std::max(x, y), b = std::min(x, y);
     b = a == 0 ? 0 : b / a;
 
     // Polynomial approximation of atan(x)*2/pi, x=b
@@ -373,20 +352,12 @@ Point2f EqualAreaSphereToSquare(const Vector3f &d) {
         v = 1 - v;
     }
 
-    // Return a float with a's magnitude, but negated if b is negative.
-    auto FlipSign = [](Float a, Float b) {
-        return BitsToFloat(FloatToBits(a) ^ SignBit(b));
-    };
-
     // Move (u,v) to the correct quadrant based on the signs of (x,y)
-    u = FlipSign(u, d.x);
-    v = FlipSign(v, d.y);
+    u = std::copysign(u, d.x);
+    v = std::copysign(v, d.y);
 
     // Transform (u,v) from [-1,1] to [0,1]
-    u = 0.5f * (u + 1);
-    v = 0.5f * (v + 1);
-
-    return Point2f(u, v);
+    return Point2f(0.5f * (u + 1), 0.5f * (v + 1));
 }
 
 Point2f WrapEqualAreaSquare(Point2f uv) {
