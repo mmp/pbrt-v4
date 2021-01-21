@@ -703,6 +703,7 @@ NamedTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
     // Figure out which textures to load in parallel
     // Need to be careful since two textures can use the same image file;
     // we only want to load it once in that case...
+    int nMissingTextures = 0;
     for (size_t i = 0; i < floatTextures.size(); ++i) {
         const auto &tex = floatTextures[i];
 
@@ -720,6 +721,10 @@ NamedTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
             ResolveFilename(tex.second.parameters.GetOneString("filename", ""));
         if (filename.empty())
             continue;
+        if (!FileExists(filename)) {
+            Error(&tex.second.loc, "%s: file not found.", filename);
+            ++nMissingTextures;
+        }
 
         if (seenFloatTextureFilenames.find(filename) == seenFloatTextureFilenames.end()) {
             seenFloatTextureFilenames.insert(filename);
@@ -744,6 +749,10 @@ NamedTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
             ResolveFilename(tex.second.parameters.GetOneString("filename", ""));
         if (filename.empty())
             continue;
+        if (!FileExists(filename)) {
+            Error(&tex.second.loc, "%s: file not found.", filename);
+            ++nMissingTextures;
+        }
 
         if (seenSpectrumTextureFilenames.find(filename) ==
             seenSpectrumTextureFilenames.end()) {
@@ -752,6 +761,9 @@ NamedTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
         } else
             serialSpectrumTextures.push_back(i);
     }
+
+    if (nMissingTextures > 0)
+        ErrorExit("%d missing textures", nMissingTextures);
 
     LOG_VERBOSE("Loading %d,%d textures in parallel, %d,%d serially",
                 parallelFloatTextures.size(), parallelSpectrumTextures.size(),

@@ -97,6 +97,11 @@ std::vector<std::string> MatchingFilenames(const std::string &filenameBase) {
     return filenames;
 }
 
+bool FileExists(const std::string &filename) {
+    std::ifstream ifs(filename);
+    return (bool)ifs;
+}
+
 std::string ReadFileContents(const std::string &filename) {
     std::ifstream ifs(filename, std::ios::binary);
     if (!ifs)
