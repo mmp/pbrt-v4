@@ -158,6 +158,23 @@ equi-area mapping); you can upgrade environment maps using
 $ imgtool makeenv old.exr --outfile new.exr
 ```
 
+Converting scenes to pbrt's file format
+---------------------------------------
+
+The best option for importing scenes to pbrt is to use
+[assimp](https://www.assimp.org/), which as of January 21, 2021 includes
+support for exporting to pbrt-v4's file format:
+```bash
+$ assimp export scene.fbx scene.pbrt
+```
+
+While the converter tries to convert materials to pbrt's material model,
+some manual tweaking may be necessary after export.  Furthermore, area
+light sources are not always successfully detected; manual intervention may
+be required for them as well.  Use of pbrt's built-in support for
+converting meshes to use the binary PLY format is also recommended after
+conversion. (`pbrt --toply scene.pbrt > newscene.pbrt`).
+
 Using pbrt on the GPU
 ---------------------
 
