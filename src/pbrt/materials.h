@@ -519,7 +519,7 @@ class ConductorMaterial {
     // ConductorMaterial Public Methods
     template <typename TextureEvaluator>
     PBRT_CPU_GPU bool CanEvaluateTextures(TextureEvaluator texEval) const {
-        return texEval.CanEvaluate({uRoughness, vRoughness}, {eta, k});
+        return texEval.CanEvaluate({uRoughness, vRoughness}, {eta, k, reflectance});
     }
 
     template <typename TextureEvaluator>
@@ -531,22 +531,29 @@ class ConductorMaterial {
             uRough = TrowbridgeReitzDistribution::RoughnessToAlpha(uRough);
             vRough = TrowbridgeReitzDistribution::RoughnessToAlpha(vRough);
         }
-        SampledSpectrum etas = texEval(eta, ctx, lambda);
-        SampledSpectrum ks = texEval(k, ctx, lambda);
-
+        SampledSpectrum etas, ks;
+        if (eta) {
+            etas = texEval(eta, ctx, lambda);
+            ks = texEval(k, ctx, lambda);
+        } else {
+            SampledSpectrum r = texEval(reflectance, ctx, lambda);
+            etas = SampledSpectrum(1.f);
+            ks = 2 * Sqrt(r) / Sqrt(ClampZero(SampledSpectrum(1) - r));
+        }
         TrowbridgeReitzDistribution distrib(uRough, vRough);
         *bxdf = ConductorBxDF(distrib, etas, ks);
         return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf);
     }
 
     ConductorMaterial(SpectrumTextureHandle eta, SpectrumTextureHandle k,
-                      FloatTextureHandle uRoughness, FloatTextureHandle vRoughness,
-                      FloatTextureHandle displacement, Image *normalMap,
-                      bool remapRoughness)
+                      SpectrumTextureHandle reflectance, FloatTextureHandle uRoughness,
+                      FloatTextureHandle vRoughness, FloatTextureHandle displacement,
+                      Image *normalMap, bool remapRoughness)
         : displacement(displacement),
           normalMap(normalMap),
           eta(eta),
           k(k),
+          reflectance(reflectance),
           uRoughness(uRoughness),
           vRoughness(vRoughness),
           remapRoughness(remapRoughness) {}
@@ -575,7 +582,7 @@ class ConductorMaterial {
     // ConductorMaterial Private Data
     FloatTextureHandle displacement;
     Image *normalMap;
-    SpectrumTextureHandle eta, k;
+    SpectrumTextureHandle eta, k, reflectance;
     FloatTextureHandle uRoughness, vRoughness;
     bool remapRoughness;
 };
@@ -679,6 +686,7 @@ class CoatedConductorMaterial {
                             FloatTextureHandle conductorURoughness,
                             FloatTextureHandle conductorVRoughness,
                             SpectrumTextureHandle conductorEta, SpectrumTextureHandle k,
+                            SpectrumTextureHandle reflectance,
                             FloatTextureHandle displacement, Image *normalMap,
                             bool remapRoughness, LayeredBxDFConfig config)
         : displacement(displacement),
@@ -693,6 +701,7 @@ class CoatedConductorMaterial {
           conductorVRoughness(conductorVRoughness),
           conductorEta(conductorEta),
           k(k),
+          reflectance(reflectance),
           remapRoughness(remapRoughness),
           config(config) {}
 
@@ -703,7 +712,7 @@ class CoatedConductorMaterial {
         return texEval.CanEvaluate(
             {interfaceURoughness, interfaceVRoughness, thickness, g, interfaceEta,
              conductorURoughness, conductorVRoughness},
-            {conductorEta, k, albedo});
+            {conductorEta, k, reflectance, albedo});
     }
 
     template <typename TextureEvaluator>
@@ -721,8 +730,16 @@ class CoatedConductorMaterial {
         Float thick = texEval(thickness, ctx);
         Float ieta = texEval(interfaceEta, ctx);
 
-        SampledSpectrum ce = texEval(conductorEta, ctx, lambda);
-        SampledSpectrum ck = texEval(k, ctx, lambda);
+        SampledSpectrum ce, ck;
+        if (conductorEta) {
+            ce = texEval(conductorEta, ctx, lambda);
+            ck = texEval(k, ctx, lambda);
+        } else {
+            SampledSpectrum r = texEval(reflectance, ctx, lambda);
+            ce = SampledSpectrum(1.f);
+            ck = 2 * Sqrt(r) / Sqrt(ClampZero(SampledSpectrum(1) - r));
+        }
+
         Float curough = texEval(conductorURoughness, ctx);
         Float cvrough = texEval(conductorVRoughness, ctx);
         if (remapRoughness) {
@@ -766,7 +783,7 @@ class CoatedConductorMaterial {
     FloatTextureHandle g;
     SpectrumTextureHandle albedo;
     FloatTextureHandle conductorURoughness, conductorVRoughness;
-    SpectrumTextureHandle conductorEta, k;
+    SpectrumTextureHandle conductorEta, k, reflectance;
     bool remapRoughness;
     LayeredBxDFConfig config;
 };

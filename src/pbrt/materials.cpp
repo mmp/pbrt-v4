@@ -198,19 +198,33 @@ DiffuseMaterial *DiffuseMaterial::Create(const TextureParameterDictionary &param
 
 // ConductorMaterial Method Definitions
 std::string ConductorMaterial::ToString() const {
-    return StringPrintf(
-        "[ ConductorMaterial displacement: %s eta: %s k: %s uRoughness: %s "
-        "vRoughness: %s remapRoughness: %s]",
-        displacement, eta, k, uRoughness, vRoughness, remapRoughness);
+    return StringPrintf("[ ConductorMaterial displacement: %s eta: %s k: %s reflectance: "
+                        "%s uRoughness: %s "
+                        "vRoughness: %s remapRoughness: %s]",
+                        displacement, eta, k, reflectance, uRoughness, vRoughness,
+                        remapRoughness);
 }
 
 ConductorMaterial *ConductorMaterial::Create(const TextureParameterDictionary &parameters,
                                              Image *normalMap, const FileLoc *loc,
                                              Allocator alloc) {
-    SpectrumTextureHandle eta = parameters.GetSpectrumTexture(
-        "eta", GetNamedSpectrum("metal-Cu-eta"), SpectrumType::Unbounded, alloc);
-    SpectrumTextureHandle k = parameters.GetSpectrumTexture(
-        "k", GetNamedSpectrum("metal-Cu-k"), SpectrumType::Unbounded, alloc);
+    SpectrumTextureHandle eta =
+        parameters.GetSpectrumTextureOrNull("eta", SpectrumType::Unbounded, alloc);
+    SpectrumTextureHandle k =
+        parameters.GetSpectrumTextureOrNull("k", SpectrumType::Unbounded, alloc);
+    SpectrumTextureHandle reflectance =
+        parameters.GetSpectrumTextureOrNull("reflectance", SpectrumType::Albedo, alloc);
+
+    if (reflectance && (eta || k))
+        ErrorExit(loc, "For the conductor material, both \"reflectance\" "
+                       "and \"eta\" and \"k\" can't be provided.");
+    if (!reflectance) {
+        if (!eta)
+            eta = alloc.new_object<SpectrumConstantTexture>(
+                GetNamedSpectrum("metal-Cu-eta"));
+        if (!k)
+            k = alloc.new_object<SpectrumConstantTexture>(GetNamedSpectrum("metal-Cu-k"));
+    }
 
     FloatTextureHandle uRoughness = parameters.GetFloatTextureOrNull("uroughness", alloc);
     FloatTextureHandle vRoughness = parameters.GetFloatTextureOrNull("vroughness", alloc);
@@ -223,8 +237,9 @@ ConductorMaterial *ConductorMaterial::Create(const TextureParameterDictionary &p
         parameters.GetFloatTextureOrNull("displacement", alloc);
     bool remapRoughness = parameters.GetOneBool("remaproughness", true);
 
-    return alloc.new_object<ConductorMaterial>(eta, k, uRoughness, vRoughness,
-                                               displacement, normalMap, remapRoughness);
+    return alloc.new_object<ConductorMaterial>(eta, k, reflectance, uRoughness,
+                                               vRoughness, displacement, normalMap,
+                                               remapRoughness);
 }
 
 // CoatedDiffuseMaterial Method Definitions
@@ -277,14 +292,15 @@ CoatedDiffuseMaterial *CoatedDiffuseMaterial::Create(
 }
 
 std::string CoatedConductorMaterial::ToString() const {
-    return StringPrintf("[ CoatedConductorMaterial displacement: %f interfaceURoughness: "
-                        "%f interfaceVRoughness: %f thickness: %f "
-                        "interfaceEta: %f g: %s albedo: %s conductorURoughness: %s "
-                        "conductorVRoughness: %s "
-                        "conductorEta: %s k: %s remapRoughness: %s config: %s",
-                        displacement, interfaceURoughness, interfaceVRoughness, thickness,
-                        interfaceEta, g, albedo, conductorURoughness, conductorVRoughness,
-                        conductorEta, k, remapRoughness, config);
+    return StringPrintf(
+        "[ CoatedConductorMaterial displacement: %f interfaceURoughness: %f "
+        "interfaceVRoughness: %f thickness: %f "
+        "interfaceEta: %f g: %s albedo: %s conductorURoughness: %s conductorVRoughness: "
+        "%s "
+        "conductorEta: %s k: %s conductorReflectance: %s remapRoughness: %s config: %s",
+        displacement, interfaceURoughness, interfaceVRoughness, thickness, interfaceEta,
+        g, albedo, conductorURoughness, conductorVRoughness, conductorEta, k, reflectance,
+        remapRoughness, config);
 }
 
 CoatedConductorMaterial *CoatedConductorMaterial::Create(
@@ -317,11 +333,23 @@ CoatedConductorMaterial *CoatedConductorMaterial::Create(
     if (!conductorVRoughness)
         conductorVRoughness =
             parameters.GetFloatTexture("conductor.roughness", 0.f, alloc);
-    SpectrumTextureHandle conductorEta =
-        parameters.GetSpectrumTexture("conductor.eta", GetNamedSpectrum("metal-Cu-eta"),
-                                      SpectrumType::Unbounded, alloc);
-    SpectrumTextureHandle k = parameters.GetSpectrumTexture(
-        "conductor.k", GetNamedSpectrum("metal-Cu-k"), SpectrumType::Unbounded, alloc);
+    SpectrumTextureHandle conductorEta = parameters.GetSpectrumTextureOrNull(
+        "conductor.eta", SpectrumType::Unbounded, alloc);
+    SpectrumTextureHandle k = parameters.GetSpectrumTextureOrNull(
+        "conductor.k", SpectrumType::Unbounded, alloc);
+    SpectrumTextureHandle reflectance =
+        parameters.GetSpectrumTextureOrNull("reflectance", SpectrumType::Albedo, alloc);
+
+    if (reflectance && (conductorEta || k))
+        ErrorExit(loc, "For the coated conductor material, both \"reflectance\" "
+                       "and \"eta\" and \"k\" can't be provided.");
+    if (!reflectance) {
+        if (!conductorEta)
+            conductorEta = alloc.new_object<SpectrumConstantTexture>(
+                GetNamedSpectrum("metal-Cu-eta"));
+        if (!k)
+            k = alloc.new_object<SpectrumConstantTexture>(GetNamedSpectrum("metal-Cu-k"));
+    }
 
     LayeredBxDFConfig config;
     config.maxDepth = parameters.GetOneInt("maxdepth", config.maxDepth);
@@ -340,8 +368,8 @@ CoatedConductorMaterial *CoatedConductorMaterial::Create(
 
     return alloc.new_object<CoatedConductorMaterial>(
         interfaceURoughness, interfaceVRoughness, thickness, interfaceEta, g, albedo,
-        conductorURoughness, conductorVRoughness, conductorEta, k, displacement,
-        normalMap, remapRoughness, config);
+        conductorURoughness, conductorVRoughness, conductorEta, k, reflectance,
+        displacement, normalMap, remapRoughness, config);
 }
 
 // SubsurfaceMaterial Method Definitions
