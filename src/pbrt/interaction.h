@@ -29,8 +29,7 @@ class Interaction {
     Interaction() = default;
 
     PBRT_CPU_GPU
-    Interaction(const Point3fi &pi, const Normal3f &n, const Point2f &uv,
-                const Vector3f &wo, Float time)
+    Interaction(Point3fi pi, Normal3f n, Point2f uv, Vector3f wo, Float time)
         : pi(pi), n(n), uv(uv), wo(Normalize(wo)), time(time) {}
 
     PBRT_CPU_GPU
@@ -46,6 +45,7 @@ class Interaction {
         CHECK(IsSurfaceInteraction());
         return (const SurfaceInteraction &)*this;
     }
+
     PBRT_CPU_GPU
     SurfaceInteraction &AsSurface() {
         CHECK(IsSurfaceInteraction());
@@ -54,26 +54,24 @@ class Interaction {
 
     // used by medium ctor
     PBRT_CPU_GPU
-    Interaction(const Point3f &p, const Vector3f &wo, Float time, MediumHandle medium)
+    Interaction(Point3f p, Vector3f wo, Float time, MediumHandle medium)
         : pi(p), time(time), wo(wo), medium(medium) {}
     PBRT_CPU_GPU
-    Interaction(const Point3f &p, const Normal3f &n, Float time, MediumHandle medium)
+    Interaction(Point3f p, Normal3f n, Float time, MediumHandle medium)
         : pi(p), n(n), time(time), medium(medium) {}
     PBRT_CPU_GPU
-    Interaction(const Point3fi &pi, const Normal3f &n, Float time = 0,
-                const Point2f &uv = {})
+    Interaction(const Point3fi &pi, Normal3f n, Float time = 0, Point2f uv = {})
         : pi(pi), n(n), uv(uv), time(time) {}
     PBRT_CPU_GPU
-    Interaction(const Point3fi &pi, const Normal3f &n, const Point2f &uv)
-        : pi(pi), n(n), uv(uv) {}
+    Interaction(const Point3fi &pi, Normal3f n, Point2f uv) : pi(pi), n(n), uv(uv) {}
     PBRT_CPU_GPU
-    Interaction(const Point3f &p, Float time, MediumHandle medium)
+    Interaction(Point3f p, Float time, MediumHandle medium)
         : pi(p), time(time), medium(medium) {}
     PBRT_CPU_GPU
-    Interaction(const Point3f &p, const MediumInterface *mediumInterface)
+    Interaction(Point3f p, const MediumInterface *mediumInterface)
         : pi(p), mediumInterface(mediumInterface) {}
     PBRT_CPU_GPU
-    Interaction(const Point3f &p, Float time, const MediumInterface *mediumInterface)
+    Interaction(Point3f p, Float time, const MediumInterface *mediumInterface)
         : pi(p), time(time), mediumInterface(mediumInterface) {}
     PBRT_CPU_GPU
     const MediumInteraction &AsMedium() const {
@@ -178,9 +176,8 @@ class SurfaceInteraction : public Interaction {
     SurfaceInteraction() = default;
 
     PBRT_CPU_GPU
-    SurfaceInteraction(const Point3fi &pi, const Point2f &uv, const Vector3f &wo,
-                       const Vector3f &dpdu, const Vector3f &dpdv, const Normal3f &dndu,
-                       const Normal3f &dndv, Float time, bool flipNormal)
+    SurfaceInteraction(Point3fi pi, Point2f uv, Vector3f wo, Vector3f dpdu, Vector3f dpdv,
+                       Normal3f dndu, Normal3f dndv, Float time, bool flipNormal)
         : Interaction(pi, Normal3f(Normalize(Cross(dpdu, dpdv))), uv, wo, time),
           dpdu(dpdu),
           dpdv(dpdv),
@@ -201,17 +198,16 @@ class SurfaceInteraction : public Interaction {
     }
 
     PBRT_CPU_GPU
-    SurfaceInteraction(const Point3fi &pi, const Point2f &uv, const Vector3f &wo,
-                       const Vector3f &dpdu, const Vector3f &dpdv, const Normal3f &dndu,
-                       const Normal3f &dndv, Float time, bool flipNormal, int faceIndex)
+    SurfaceInteraction(Point3fi pi, Point2f uv, Vector3f wo, Vector3f dpdu, Vector3f dpdv,
+                       Normal3f dndu, Normal3f dndv, Float time, bool flipNormal,
+                       int faceIndex)
         : SurfaceInteraction(pi, uv, wo, dpdu, dpdv, dndu, dndv, time, flipNormal) {
         this->faceIndex = faceIndex;
     }
 
     PBRT_CPU_GPU
-    void SetShadingGeometry(const Normal3f &ns, const Vector3f &dpdus,
-                            const Vector3f &dpdvs, const Normal3f &dndus,
-                            const Normal3f &dndvs, bool orientationIsAuthoritative) {
+    void SetShadingGeometry(Normal3f ns, Vector3f dpdus, Vector3f dpdvs, Normal3f dndus,
+                            Normal3f dndvs, bool orientationIsAuthoritative) {
         // Compute _shading.n_ for _SurfaceInteraction_
         shading.n = ns;
         DCHECK_NE(shading.n, Normal3f(0, 0, 0));

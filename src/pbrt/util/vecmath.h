@@ -798,16 +798,16 @@ class Quaternion {
     Quaternion() = default;
 
     PBRT_CPU_GPU
-    Quaternion &operator+=(const Quaternion &q) {
+    Quaternion &operator+=(Quaternion q) {
         v += q.v;
         w += q.w;
         return *this;
     }
 
     PBRT_CPU_GPU
-    Quaternion operator+(const Quaternion &q) const { return {v + q.v, w + q.w}; }
+    Quaternion operator+(Quaternion q) const { return {v + q.v, w + q.w}; }
     PBRT_CPU_GPU
-    Quaternion &operator-=(const Quaternion &q) {
+    Quaternion &operator-=(Quaternion q) {
         v -= q.v;
         w -= q.w;
         return *this;
@@ -815,7 +815,7 @@ class Quaternion {
     PBRT_CPU_GPU
     Quaternion operator-() const { return {-v, -w}; }
     PBRT_CPU_GPU
-    Quaternion operator-(const Quaternion &q) const { return {v - q.v, w - q.w}; }
+    Quaternion operator-(Quaternion q) const { return {v - q.v, w - q.w}; }
     PBRT_CPU_GPU
     Quaternion &operator*=(Float f) {
         v *= f;
@@ -1094,27 +1094,23 @@ PBRT_CPU_GPU inline Vector3<T> FaceForward(const Vector3<T> &v, const Normal3<T>
 
 // Quaternion Inline Functions
 PBRT_CPU_GPU
-inline Quaternion operator*(Float f, const Quaternion &q) {
+inline Quaternion operator*(Float f, Quaternion q) {
     return q * f;
 }
 
-PBRT_CPU_GPU
-inline Float Dot(const Quaternion &q1, const Quaternion &q2) {
+PBRT_CPU_GPU inline Float Dot(Quaternion q1, Quaternion q2) {
     return Dot(q1.v, q2.v) + q1.w * q2.w;
 }
 
-PBRT_CPU_GPU
-inline Float Length(const Quaternion &q) {
+PBRT_CPU_GPU inline Float Length(Quaternion q) {
     return std::sqrt(Dot(q, q));
 }
-PBRT_CPU_GPU
-inline Quaternion Normalize(const Quaternion &q) {
+PBRT_CPU_GPU inline Quaternion Normalize(Quaternion q) {
     DCHECK_GT(Length(q), 0);
     return q / Length(q);
 }
 
-PBRT_CPU_GPU
-inline Float AngleBetween(const Quaternion &q1, const Quaternion &q2) {
+PBRT_CPU_GPU inline Float AngleBetween(Quaternion q1, Quaternion q2) {
     if (Dot(q1, q2) < 0)
         return Pi - 2 * SafeASin(Length(q1 + q2) / 2);
     else
@@ -1122,8 +1118,7 @@ inline Float AngleBetween(const Quaternion &q1, const Quaternion &q2) {
 }
 
 // http://www.plunk.org/~hatch/rightway.php
-PBRT_CPU_GPU
-inline Quaternion Slerp(Float t, const Quaternion &q1, const Quaternion &q2) {
+PBRT_CPU_GPU inline Quaternion Slerp(Float t, Quaternion q1, Quaternion q2) {
     Float theta = AngleBetween(q1, q2);
     Float sinThetaOverTheta = SinXOverX(theta);
     return q1 * (1 - t) * SinXOverX((1 - t) * theta) / sinThetaOverTheta +
@@ -1206,7 +1201,7 @@ class Bounds2 {
         return Point2<T>((*this)[(corner & 1)].x, (*this)[(corner & 2) ? 1 : 0].y);
     }
     PBRT_CPU_GPU
-    Point2<T> Lerp(const Point2f &t) const {
+    Point2<T> Lerp(Point2f t) const {
         return Point2<T>(pbrt::Lerp(t.x, pMin.x, pMax.x),
                          pbrt::Lerp(t.y, pMin.y, pMax.y));
     }
@@ -1296,7 +1291,7 @@ class Bounds3 {
     }
 
     PBRT_CPU_GPU
-    Point3<T> Lerp(const Point3f &t) const {
+    Point3<T> Lerp(Point3f t) const {
         return Point3<T>(pbrt::Lerp(t.x, pMin.x, pMax.x), pbrt::Lerp(t.y, pMin.y, pMax.y),
                          pbrt::Lerp(t.z, pMin.z, pMax.z));
     }
@@ -1666,50 +1661,49 @@ PBRT_CPU_GPU inline Vector3f SphericalDirection(Float sinTheta, Float cosTheta,
                     Clamp(sinTheta, -1, 1) * std::sin(phi), Clamp(cosTheta, -1, 1));
 }
 
-PBRT_CPU_GPU inline Float SphericalTheta(const Vector3f &v) {
+PBRT_CPU_GPU inline Float SphericalTheta(Vector3f v) {
     return SafeACos(v.z);
 }
 
-PBRT_CPU_GPU inline Float SphericalPhi(const Vector3f &v) {
+PBRT_CPU_GPU inline Float SphericalPhi(Vector3f v) {
     Float p = std::atan2(v.y, v.x);
     return (p < 0) ? (p + 2 * Pi) : p;
 }
 
-PBRT_CPU_GPU inline Float CosTheta(const Vector3f &w) {
+PBRT_CPU_GPU inline Float CosTheta(Vector3f w) {
     return w.z;
 }
-PBRT_CPU_GPU inline Float Cos2Theta(const Vector3f &w) {
+PBRT_CPU_GPU inline Float Cos2Theta(Vector3f w) {
     return Sqr(w.z);
 }
-PBRT_CPU_GPU inline Float AbsCosTheta(const Vector3f &w) {
+PBRT_CPU_GPU inline Float AbsCosTheta(Vector3f w) {
     return std::abs(w.z);
 }
 
-PBRT_CPU_GPU inline Float Sin2Theta(const Vector3f &w) {
+PBRT_CPU_GPU inline Float Sin2Theta(Vector3f w) {
     return std::max<Float>(0, 1 - Cos2Theta(w));
 }
-PBRT_CPU_GPU inline Float SinTheta(const Vector3f &w) {
+PBRT_CPU_GPU inline Float SinTheta(Vector3f w) {
     return std::sqrt(Sin2Theta(w));
 }
 
-PBRT_CPU_GPU inline Float TanTheta(const Vector3f &w) {
+PBRT_CPU_GPU inline Float TanTheta(Vector3f w) {
     return SinTheta(w) / CosTheta(w);
 }
-PBRT_CPU_GPU inline Float Tan2Theta(const Vector3f &w) {
+PBRT_CPU_GPU inline Float Tan2Theta(Vector3f w) {
     return Sin2Theta(w) / Cos2Theta(w);
 }
 
-PBRT_CPU_GPU inline Float CosPhi(const Vector3f &w) {
+PBRT_CPU_GPU inline Float CosPhi(Vector3f w) {
     Float sinTheta = SinTheta(w);
     return (sinTheta == 0) ? 1 : Clamp(w.x / sinTheta, -1, 1);
 }
-PBRT_CPU_GPU inline Float SinPhi(const Vector3f &w) {
+PBRT_CPU_GPU inline Float SinPhi(Vector3f w) {
     Float sinTheta = SinTheta(w);
     return (sinTheta == 0) ? 0 : Clamp(w.y / sinTheta, -1, 1);
 }
 
-PBRT_CPU_GPU
-inline Float CosDPhi(const Vector3f &wa, const Vector3f &wb) {
+PBRT_CPU_GPU inline Float CosDPhi(Vector3f wa, Vector3f wb) {
     Float waxy = Sqr(wa.x) + Sqr(wa.y), wbxy = Sqr(wb.x) + Sqr(wb.y);
     if (waxy == 0 || wbxy == 0)
         return 1;
@@ -1717,12 +1711,12 @@ inline Float CosDPhi(const Vector3f &wa, const Vector3f &wb) {
 }
 
 PBRT_CPU_GPU
-inline bool SameHemisphere(const Vector3f &w, const Vector3f &wp) {
+inline bool SameHemisphere(Vector3f w, Vector3f wp) {
     return w.z * wp.z > 0;
 }
 
 PBRT_CPU_GPU
-inline bool SameHemisphere(const Vector3f &w, const Normal3f &wp) {
+inline bool SameHemisphere(Vector3f w, Normal3f wp) {
     return w.z * wp.z > 0;
 }
 
@@ -1784,10 +1778,10 @@ class DirectionCone {
     // DirectionCone Public Methods
     DirectionCone() = default;
     PBRT_CPU_GPU
-    DirectionCone(const Vector3f &w, Float cosTheta)
+    DirectionCone(Vector3f w, Float cosTheta)
         : w(Normalize(w)), cosTheta(cosTheta), empty(false) {}
     PBRT_CPU_GPU
-    explicit DirectionCone(const Vector3f &w) : DirectionCone(w, 1) {}
+    explicit DirectionCone(Vector3f w) : DirectionCone(w, 1) {}
 
     PBRT_CPU_GPU
     static DirectionCone EntireSphere() { return DirectionCone(Vector3f(0, 0, 1), -1); }
@@ -1804,13 +1798,11 @@ class DirectionCone {
 };
 
 // DirectionCone Inline Functions
-PBRT_CPU_GPU
-inline bool Inside(const DirectionCone &d, const Vector3f &w) {
+PBRT_CPU_GPU inline bool Inside(const DirectionCone &d, Vector3f w) {
     return !d.empty && Dot(d.w, Normalize(w)) >= d.cosTheta;
 }
 
-PBRT_CPU_GPU
-inline DirectionCone BoundSubtendedDirections(const Bounds3f &b, const Point3f &p) {
+PBRT_CPU_GPU inline DirectionCone BoundSubtendedDirections(const Bounds3f &b, Point3f p) {
     // Compute bounding sphere for _b_ and check if _p_ is inside
     Float radius;
     Point3f pCenter;
@@ -1820,8 +1812,8 @@ inline DirectionCone BoundSubtendedDirections(const Bounds3f &b, const Point3f &
 
     // Compute and return _DirectionCone_ for bounding sphere
     Vector3f w = Normalize(pCenter - p);
-    Float sinThetaMax2 = radius * radius / DistanceSquared(pCenter, p);
-    Float cosThetaMax = SafeSqrt(1 - sinThetaMax2);
+    Float sin2ThetaMax = Sqr(radius) / DistanceSquared(pCenter, p);
+    Float cosThetaMax = SafeSqrt(1 - sin2ThetaMax);
     return DirectionCone(w, cosThetaMax);
 }
 
@@ -1854,7 +1846,7 @@ class Frame {
     PBRT_CPU_GPU
     Frame() : x(1, 0, 0), y(0, 1, 0), z(0, 0, 1) {}
     PBRT_CPU_GPU
-    Frame(const Vector3f &x, const Vector3f &y, const Vector3f &z) : x(x), y(y), z(z) {
+    Frame(Vector3f x, Vector3f y, Vector3f z) : x(x), y(y), z(z) {
         DCHECK_LT(std::abs(LengthSquared(x) - 1), 1e-4);
         DCHECK_LT(std::abs(LengthSquared(y) - 1), 1e-4);
         DCHECK_LT(std::abs(LengthSquared(z) - 1), 1e-4);
@@ -1864,68 +1856,63 @@ class Frame {
     }
 
     PBRT_CPU_GPU
-    static Frame FromXZ(const Vector3f &x, const Vector3f &z) {
-        return Frame(x, Cross(z, x), z);
-    }
+    static Frame FromXZ(Vector3f x, Vector3f z) { return Frame(x, Cross(z, x), z); }
     PBRT_CPU_GPU
-    static Frame FromXY(const Vector3f &x, const Vector3f &y) {
-        return Frame(x, y, Cross(x, y));
-    }
+    static Frame FromXY(Vector3f x, Vector3f y) { return Frame(x, y, Cross(x, y)); }
 
     PBRT_CPU_GPU
-    static Frame FromZ(const Vector3f &z) {
+    static Frame FromZ(Vector3f z) {
         Vector3f x, y;
         CoordinateSystem(z, &x, &y);
         return Frame(x, y, z);
     }
 
     PBRT_CPU_GPU
-    static Frame FromX(const Vector3f &x) {
+    static Frame FromX(Vector3f x) {
         Vector3f y, z;
         CoordinateSystem(x, &y, &z);
         return Frame(x, y, z);
     }
 
     PBRT_CPU_GPU
-    static Frame FromY(const Vector3f &y) {
+    static Frame FromY(Vector3f y) {
         Vector3f x, z;
         CoordinateSystem(y, &z, &x);
         return Frame(x, y, z);
     }
 
     PBRT_CPU_GPU
-    static Frame FromX(const Normal3f &x) {
+    static Frame FromX(Normal3f x) {
         Vector3f y, z;
         CoordinateSystem(x, &y, &z);
         return Frame(Vector3f(x), y, z);
     }
 
     PBRT_CPU_GPU
-    static Frame FromY(const Normal3f &y) {
+    static Frame FromY(Normal3f y) {
         Vector3f x, z;
         CoordinateSystem(y, &z, &x);
         return Frame(x, Vector3f(y), z);
     }
 
     PBRT_CPU_GPU
-    static Frame FromZ(const Normal3f &z) { return FromZ(Vector3f(z)); }
+    static Frame FromZ(Normal3f z) { return FromZ(Vector3f(z)); }
 
     PBRT_CPU_GPU
-    Vector3f ToLocal(const Vector3f &v) const {
+    Vector3f ToLocal(Vector3f v) const {
         return Vector3f(Dot(v, x), Dot(v, y), Dot(v, z));
     }
 
     PBRT_CPU_GPU
-    Normal3f ToLocal(const Normal3f &n) const {
+    Normal3f ToLocal(Normal3f n) const {
         return Normal3f(Dot(n, x), Dot(n, y), Dot(n, z));
     }
 
     PBRT_CPU_GPU
-    Vector3f FromLocal(const Vector3f &v) const { return v.x * x + v.y * y + v.z * z; }
+    Vector3f FromLocal(Vector3f v) const { return v.x * x + v.y * y + v.z * z; }
+
     PBRT_CPU_GPU
-    Normal3f FromLocal(const Normal3f &n) const {
-        return Normal3f(n.x * x + n.y * y + n.z * z);
-    }
+    Normal3f FromLocal(Normal3f n) const { return Normal3f(n.x * x + n.y * y + n.z * z); }
 
     std::string ToString() const {
         return StringPrintf("[ Frame x: %s y: %s z: %s ]", x, y, z);

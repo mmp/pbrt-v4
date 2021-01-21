@@ -106,8 +106,7 @@ class SquareMatrix;
 
 // Math Inline Functions
 // http://www.plunk.org/~hatch/rightway.php
-PBRT_CPU_GPU
-inline Float SinXOverX(Float x) {
+PBRT_CPU_GPU inline Float SinXOverX(Float x) {
     if (1 + x * x == 1)
         return 1;
     return std::sin(x) / x;
@@ -1104,9 +1103,9 @@ PBRT_CPU_GPU inline Interval SumSquares(Interval i, Args... args) {
 }
 
 PBRT_CPU_GPU
-Vector3f EqualAreaSquareToSphere(const Point2f &p);
+Vector3f EqualAreaSquareToSphere(Point2f p);
 PBRT_CPU_GPU
-Point2f EqualAreaSphereToSquare(const Vector3f &v);
+Point2f EqualAreaSphereToSquare(Vector3f v);
 PBRT_CPU_GPU
 Point2f WrapEqualAreaSquare(Point2f p);
 

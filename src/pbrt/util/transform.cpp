@@ -18,7 +18,7 @@ namespace pbrt {
 
 // Transform Function Definitions
 // clang-format off
-Transform Translate(const Vector3f &delta) {
+Transform Translate(Vector3f delta) {
     SquareMatrix<4> m(1, 0, 0, delta.x,
                       0, 1, 0, delta.y,
                       0, 0, 1, delta.z,
@@ -78,7 +78,7 @@ Transform RotateZ(Float theta) {
 }
 // clang-format on
 
-Transform LookAt(const Point3f &pos, const Point3f &look, const Vector3f &up) {
+Transform LookAt(Point3f pos, Point3f look, Vector3f up) {
     SquareMatrix<4> worldFromCamera;
     // Initialize fourth column of viewing matrix
     worldFromCamera[0][3] = pos.x;
@@ -998,7 +998,7 @@ RayDifferential AnimatedTransform::operator()(const RayDifferential &r,
     }
 }
 
-Point3f AnimatedTransform::operator()(const Point3f &p, Float time) const {
+Point3f AnimatedTransform::operator()(Point3f p, Float time) const {
     if (!actuallyAnimated || time <= startTime)
         return startTransform(p);
     else if (time >= endTime)
@@ -1007,7 +1007,7 @@ Point3f AnimatedTransform::operator()(const Point3f &p, Float time) const {
     return t(p);
 }
 
-Vector3f AnimatedTransform::operator()(const Vector3f &v, Float time) const {
+Vector3f AnimatedTransform::operator()(Vector3f v, Float time) const {
     if (!actuallyAnimated || time <= startTime)
         return startTransform(v);
     else if (time >= endTime)
@@ -1016,7 +1016,7 @@ Vector3f AnimatedTransform::operator()(const Vector3f &v, Float time) const {
     return t(v);
 }
 
-Normal3f AnimatedTransform::operator()(const Normal3f &n, Float time) const {
+Normal3f AnimatedTransform::operator()(Normal3f n, Float time) const {
     if (!actuallyAnimated || time <= startTime)
         return startTransform(n);
     else if (time >= endTime)
@@ -1097,7 +1097,7 @@ Bounds3f AnimatedTransform::MotionBounds(const Bounds3f &b) const {
     return bounds;
 }
 
-Bounds3f AnimatedTransform::BoundPointMotion(const Point3f &p) const {
+Bounds3f AnimatedTransform::BoundPointMotion(Point3f p) const {
     if (!actuallyAnimated)
         return Bounds3f(startTransform(p));
     Bounds3f bounds(startTransform(p), endTransform(p));

@@ -477,7 +477,7 @@ class BlackbodySpectrum {
     PBRT_CPU_GPU
     BlackbodySpectrum(Float T) : T(T) {
         // Compute blackbody normalization constant for given temperature
-        Float lambdaMax = Float(2.8977721e-3 / T);
+        Float lambdaMax = 2.8977721e-3f / T;
         normalizationFactor = 1 / Blackbody(lambdaMax * 1e9f, T);
     }
 

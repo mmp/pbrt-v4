@@ -114,7 +114,7 @@ class Transform {
     explicit Transform(const Frame &frame);
 
     PBRT_CPU_GPU
-    explicit Transform(const Quaternion &q);
+    explicit Transform(Quaternion q);
 
     PBRT_CPU_GPU
     explicit operator Quaternion() const;
@@ -188,7 +188,7 @@ class Transform {
 
 // Transform Function Declarations
 PBRT_CPU_GPU
-Transform Translate(const Vector3f &delta);
+Transform Translate(Vector3f delta);
 
 PBRT_CPU_GPU
 Transform Scale(Float x, Float y, Float z);
@@ -201,7 +201,7 @@ PBRT_CPU_GPU
 Transform RotateZ(Float theta);
 
 PBRT_CPU_GPU
-Transform LookAt(const Point3f &pos, const Point3f &look, const Vector3f &up);
+Transform LookAt(Point3f pos, Point3f look, Vector3f up);
 
 PBRT_CPU_GPU
 Transform Orthographic(Float znear, Float zfar);
@@ -210,18 +210,15 @@ PBRT_CPU_GPU
 Transform Perspective(Float fov, Float znear, Float zfar);
 
 // Transform Inline Functions
-PBRT_CPU_GPU
-inline Transform Inverse(const Transform &t) {
+PBRT_CPU_GPU inline Transform Inverse(const Transform &t) {
     return Transform(t.GetInverseMatrix(), t.GetMatrix());
 }
 
-PBRT_CPU_GPU
-inline Transform Transpose(const Transform &t) {
+PBRT_CPU_GPU inline Transform Transpose(const Transform &t) {
     return Transform(Transpose(t.GetMatrix()), Transpose(t.GetInverseMatrix()));
 }
 
-PBRT_CPU_GPU
-inline Transform Rotate(Float sinTheta, Float cosTheta, const Vector3f &axis) {
+PBRT_CPU_GPU inline Transform Rotate(Float sinTheta, Float cosTheta, Vector3f axis) {
     Vector3f a = Normalize(axis);
     SquareMatrix<4> m;
     // Compute rotation of first basis vector
@@ -244,8 +241,7 @@ inline Transform Rotate(Float sinTheta, Float cosTheta, const Vector3f &axis) {
     return Transform(m, Transpose(m));
 }
 
-PBRT_CPU_GPU
-inline Transform Rotate(Float theta, const Vector3f &axis) {
+PBRT_CPU_GPU inline Transform Rotate(Float theta, Vector3f axis) {
     Float sinTheta = std::sin(Radians(theta));
     Float cosTheta = std::cos(Radians(theta));
     return Rotate(sinTheta, cosTheta, axis);
@@ -253,20 +249,23 @@ inline Transform Rotate(Float theta, const Vector3f &axis) {
 
 // Hughes-Moller 1999-ish. (But with |x| computed differently to avoid edge case when it
 // happens to equal |to|.)
-PBRT_CPU_GPU inline Transform RotateFromTo(const Vector3f &from, const Vector3f &to) {
-    Vector3f x = Cross(from, to);
-    if (LengthSquared(x) == 0)
+PBRT_CPU_GPU inline Transform RotateFromTo(Vector3f from, Vector3f to) {
+    // Compute intermediate vector for vector reflection
+    Vector3f axis = Cross(from, to);
+    if (LengthSquared(axis) == 0)
         return Transform();
-    x = Normalize(x);
+    axis = Normalize(axis);
 
-    Vector3f u = x - from, v = x - to;
+    // Initialize matrix _r_ for rotation
+    Vector3f u = axis - from, v = axis - to;
     SquareMatrix<4> r;
     for (int i = 0; i < 3; ++i)
-        for (int j = 0; j < 3; ++j) {
+        for (int j = 0; j < 3; ++j)
+            // Initialize matrix element _r[i][j]_
             r[i][j] = ((i == j) ? 1 : 0) - 2 / Dot(u, u) * u[i] * u[j] -
                       2 / Dot(v, v) * v[i] * v[j] +
                       4 * Dot(u, v) / (Dot(u, u) * Dot(v, v)) * v[i] * u[j];
-        }
+
     return Transform(r, Transpose(r));
 }
 
@@ -368,7 +367,7 @@ inline Transform::Transform(const Frame &frame)
                                 frame.y.z, 0, frame.z.x, frame.z.y, frame.z.z, 0, 0, 0, 0,
                                 1)) {}
 
-inline Transform::Transform(const Quaternion &q) {
+inline Transform::Transform(Quaternion q) {
     Float xx = q.v.x * q.v.x, yy = q.v.y * q.v.y, zz = q.v.z * q.v.z;
     Float xy = q.v.x * q.v.y, xz = q.v.x * q.v.z, yz = q.v.y * q.v.z;
     Float wx = q.v.x * q.w, wy = q.v.y * q.w, wz = q.v.z * q.w;
@@ -460,21 +459,21 @@ class AnimatedTransform {
     Ray ApplyInverse(const Ray &r, Float *tMax = nullptr) const;
 
     PBRT_CPU_GPU
-    Point3f ApplyInverse(const Point3f &p, Float time) const {
+    Point3f ApplyInverse(Point3f p, Float time) const {
         if (!actuallyAnimated)
             return startTransform.ApplyInverse(p);
         return Interpolate(time).ApplyInverse(p);
     }
     PBRT_CPU_GPU
-    Vector3f ApplyInverse(const Vector3f &v, Float time) const {
+    Vector3f ApplyInverse(Vector3f v, Float time) const {
         if (!actuallyAnimated)
             return startTransform.ApplyInverse(v);
         return Interpolate(time).ApplyInverse(v);
     }
     PBRT_CPU_GPU
-    Normal3f operator()(const Normal3f &n, Float time) const;
+    Normal3f operator()(Normal3f n, Float time) const;
     PBRT_CPU_GPU
-    Normal3f ApplyInverse(const Normal3f &n, Float time) const {
+    Normal3f ApplyInverse(Normal3f n, Float time) const {
         if (!actuallyAnimated)
             return startTransform.ApplyInverse(n);
         return Interpolate(time).ApplyInverse(n);
@@ -500,15 +499,15 @@ class AnimatedTransform {
     PBRT_CPU_GPU
     RayDifferential operator()(const RayDifferential &r, Float *tMax = nullptr) const;
     PBRT_CPU_GPU
-    Point3f operator()(const Point3f &p, Float time) const;
+    Point3f operator()(Point3f p, Float time) const;
     PBRT_CPU_GPU
-    Vector3f operator()(const Vector3f &v, Float time) const;
+    Vector3f operator()(Vector3f v, Float time) const;
 
     PBRT_CPU_GPU
     Bounds3f MotionBounds(const Bounds3f &b) const;
 
     PBRT_CPU_GPU
-    Bounds3f BoundPointMotion(const Point3f &p) const;
+    Bounds3f BoundPointMotion(Point3f p) const;
 
     // AnimatedTransform Public Members
     Transform startTransform, endTransform;
@@ -534,7 +533,7 @@ class AnimatedTransform {
         DerivativeTerm(Float c, Float x, Float y, Float z) : kc(c), kx(x), ky(y), kz(z) {}
         Float kc, kx, ky, kz;
         PBRT_CPU_GPU
-        Float Eval(const Point3f &p) const { return kc + kx * p.x + ky * p.y + kz * p.z; }
+        Float Eval(Point3f p) const { return kc + kx * p.x + ky * p.y + kz * p.z; }
     };
     DerivativeTerm c1[3], c2[3], c3[3], c4[3], c5[3];
 };

@@ -289,7 +289,7 @@ Float IntegrateCatmullRom(pstd::span<const Float> nodes, pstd::span<const Float>
 
 // Square--Sphere Mapping Function Definitions
 // Via source code from Clarberg: Fast Equal-Area Mapping of the (Hemi)Sphere using SIMD
-Vector3f EqualAreaSquareToSphere(const Point2f &p) {
+Vector3f EqualAreaSquareToSphere(Point2f p) {
     CHECK(p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1);
     // Transform _p_ to $[-1,1]^2$ and compute absolute values
     Float u = 2 * p.x - 1, v = 2 * p.y - 1;
@@ -314,7 +314,7 @@ Vector3f EqualAreaSquareToSphere(const Point2f &p) {
 }
 
 // Via source code from Clarberg: Fast Equal-Area Mapping of the (Hemi)Sphere using SIMD
-Point2f EqualAreaSphereToSquare(const Vector3f &d) {
+Point2f EqualAreaSphereToSquare(Vector3f d) {
     DCHECK(LengthSquared(d) > .999 && LengthSquared(d) < 1.001);
     Float x = std::abs(d.x), y = std::abs(d.y), z = std::abs(d.z);
 
