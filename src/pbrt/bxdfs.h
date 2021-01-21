@@ -943,8 +943,6 @@ class CoatedDiffuseBxDF : public LayeredBxDF<DielectricInterfaceBxDF, IdealDiffu
     using LayeredBxDF::LayeredBxDF;
     PBRT_CPU_GPU
     static constexpr const char *Name() { return "CoatedDiffuseBxDF"; }
-
-    friend class SOA<CoatedDiffuseBxDF>;
 };
 
 // CoatedConductorBxDF Definition
@@ -954,8 +952,6 @@ class CoatedConductorBxDF : public LayeredBxDF<DielectricInterfaceBxDF, Conducto
     PBRT_CPU_GPU
     static constexpr const char *Name() { return "CoatedConductorBxDF"; }
     using LayeredBxDF::LayeredBxDF;
-
-    friend class SOA<CoatedConductorBxDF>;
 };
 
 // HairBxDF Definition
