@@ -44,6 +44,10 @@ jobs:
     - name: Build
       run: cmake --build build --parallel
       
-    - name: Test
-      run: pbrt_test
+    - name: Test (Ubuntu/MacOS)
+      run: ./pbrt_test
+      working-directory: build
+
+    - name: Test (Windows)
+      run: pbrt_test.exe
       working-directory: build
