@@ -844,17 +844,6 @@ target_link_libraries (pspec PRIVATE ${ALL_PBRT_LIBS})
 add_sanitizers (pspec)
 
 ######################
-# obj2pbrt
-
-add_executable (obj2pbrt src/pbrt/cmd/obj2pbrt.cpp)
-
-target_compile_definitions (obj2pbrt PRIVATE ${PBRT_DEFINITIONS})
-target_compile_options (obj2pbrt PRIVATE ${PBRT_CXX_FLAGS})
-target_link_libraries (obj2pbrt PRIVATE pbrt_warnings)
-
-add_sanitizers (obj2pbrt)
-
-######################
 # cyhair2pbrt
 
 add_executable (cyhair2pbrt src/pbrt/cmd/cyhair2pbrt.cpp)
@@ -920,7 +909,6 @@ install (TARGETS
   pbrt_exe
   imgtool
   pspec
-  obj2pbrt
   cyhair2pbrt
   DESTINATION
   bin
