@@ -25,7 +25,7 @@ TEST(Parallel, Basics) {
     EXPECT_EQ(1000, counter);
 
     counter = 0;
-    ParallelFor2D(Bounds2i{{0, 0}, {15, 14}}, [&](Bounds2i b) { ++counter; });
+    ParallelFor2D(Bounds2i{{0, 0}, {15, 14}}, [&](Point2i p) { ++counter; });
     EXPECT_EQ(15 * 14, counter);
 }
 
