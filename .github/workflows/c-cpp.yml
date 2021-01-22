@@ -37,7 +37,6 @@ jobs:
 
     - name: Configure
       run: |
-        mkdir build
         cd build
         cmake .. -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True
       
