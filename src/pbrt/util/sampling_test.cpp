@@ -500,8 +500,8 @@ TEST(Sampling, SphericalTriangleInverse) {
                     return std::abs((a - ref) / ref);
             };
             // The tolerance has to be fiarly high, unfortunately...
-            EXPECT_LT(err(ui[0], u[0]), 0.025) << u << " vs inverse " << ui;
-            EXPECT_LT(err(ui[1], u[1]), 0.025) << u << " vs inverse " << ui;
+            EXPECT_LT(err(ui[0], u[0]), 0.04f) << u << " vs inverse " << ui;
+            EXPECT_LT(err(ui[1], u[1]), 0.04f) << u << " vs inverse " << ui;
         }
     }
 }

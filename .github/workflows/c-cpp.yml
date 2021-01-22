@@ -1,17 +1,12 @@
 name: ci
 
-on:
-  push:
-    branches: [ github-actions ]
-  pull_request:
-    branches: [ github-actions ]
+on: [push, pull_request]
 
 jobs:
-  build:
-    runs-on: ubuntu-20.04
+  build-ubuntu-2004:
+    name: Build and test on Ubuntu 20.04
 
-    strategy:
-      max-parallel: 2
+    runs-on: ubuntu-20.04
 
     steps:
     - uses: actions/checkout@v2
@@ -37,3 +32,5 @@ jobs:
     - name: Test
       run: ./pbrt_test
       working-directory: build
+
+# macos-latest, windows-latest
