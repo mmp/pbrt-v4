@@ -52,4 +52,4 @@ jobs:
     - name: Test (Windows)
       if: ${{ matrix.os == 'windows-latest' }}
       run: pbrt_test.exe
-      working-directory: build
+      working-directory: build/Debug
