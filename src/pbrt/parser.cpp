@@ -901,6 +901,8 @@ void ParseFiles(SceneRepresentation *scene, pstd::span<const std::string> filena
                 parse(scene, std::move(t));
         }
     }
+
+    scene->EndOfFiles();
 }
 
 void ParseString(SceneRepresentation *scene, std::string str) {
@@ -911,6 +913,8 @@ void ParseString(SceneRepresentation *scene, std::string str) {
     if (!t)
         return;
     parse(scene, std::move(t));
+
+    scene->EndOfFiles();
 }
 
 }  // namespace pbrt
