@@ -1,0 +1,39 @@
+name: ci
+
+on:
+  push:
+    branches: [ github-actions ]
+  pull_request:
+    branches: [ github-actions ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      max-parallel: 1
+
+    steps:
+    - uses: actions/checkout@v2
+      
+    - name: Checkout submodules
+      uses: textbook/git-checkout-submodule-action@master
+      
+    - name: Get cmake
+      uses: lukka/get-cmake@latest
+
+    - name: Install OpenEXR
+      run: sudo apt-get -y install libopenexr-dev
+
+    - name: Configure
+      run: |
+        mkdir build
+        cd build
+        cmake ..
+      
+    - name: Build
+      run: cmake --build build --parallel
+      
+    - name: Test
+      run: ./pbrt_test
+      working-directory: build
