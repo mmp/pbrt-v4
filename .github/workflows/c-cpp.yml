@@ -22,11 +22,11 @@ jobs:
       uses: lukka/get-cmake@latest
 
     - name: Install OpenEXR (Ubuntu)
-      if: ${{ os == 'ubuntu-20.04' }}
+      if: ${{ matrix.os == 'ubuntu-20.04' }}
       run: sudo apt-get -y install libopenexr-dev
 
     - name: Install OpenEXR (MacOS)
-      if: ${{ os == 'macos-latest' }}
+      if: ${{ matrix.os == 'macos-latest' }}
       run: brew install openexr
 
     - name: Configure
