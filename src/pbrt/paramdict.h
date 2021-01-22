@@ -125,6 +125,8 @@ class ParameterDictionary {
 
     void ReportUnused() const;
 
+    const ParsedParameterVector &GetParameterVector() const { return params; }
+
   private:
     friend class TextureParameterDictionary;
     // ParameterDictionary Private Methods

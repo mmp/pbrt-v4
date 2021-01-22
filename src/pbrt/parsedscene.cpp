@@ -387,6 +387,55 @@ void ParsedScene::EndOfFiles() {
 
     if (errorExit)
         ErrorExit("Fatal errors during scene construction");
+
+    // LOG_VERBOSE messages about any unused textures..
+    std::set<std::string> unusedFloatTextures, unusedSpectrumTextures;
+    for (const auto f : floatTextures) {
+        CHECK(unusedFloatTextures.find(f.first) == unusedFloatTextures.end());
+        unusedFloatTextures.insert(f.first);
+    }
+    for (const auto s : spectrumTextures) {
+        CHECK(unusedSpectrumTextures.find(s.first) == unusedSpectrumTextures.end());
+        unusedSpectrumTextures.insert(s.first);
+    }
+
+    auto checkVec = [&](const ParsedParameterVector &vec) {
+        for (const ParsedParameter *p : vec) {
+            if (p->type == "texture") {
+                CHECK(!p->strings.empty());
+                if (auto iter = unusedFloatTextures.find(p->strings[0]); iter != unusedFloatTextures.end())
+                    unusedFloatTextures.erase(iter);
+                else if (auto iter = unusedSpectrumTextures.find(p->strings[0]); iter != unusedSpectrumTextures.end())
+                    unusedSpectrumTextures.erase(iter);
+            }
+        }
+    };
+
+    // Walk through everything that uses textures..
+    for (const auto &nm : namedMaterials)
+        checkVec(nm.second.parameters.GetParameterVector());
+    for (const auto &m : materials)
+        checkVec(m.parameters.GetParameterVector());
+    for (const auto &ft : floatTextures)
+        checkVec(ft.second.parameters.GetParameterVector());
+    for (const auto &st : spectrumTextures)
+        checkVec(st.second.parameters.GetParameterVector());
+    for (const auto &s : shapes)
+        checkVec(s.parameters.GetParameterVector());
+    for (const auto &as : animatedShapes)
+        checkVec(as.parameters.GetParameterVector());
+    for (const auto &id : instanceDefinitions) {
+        for (const auto &s : id.second.shapes)
+            checkVec(s.parameters.GetParameterVector());
+        for (const auto &as : id.second.animatedShapes)
+            checkVec(as.parameters.GetParameterVector());
+    }
+
+    // And complain about what's left.
+    for (const std::string &s : unusedFloatTextures)
+        LOG_VERBOSE("%s: float texture unused in scene", s);
+    for (const std::string &s : unusedSpectrumTextures)
+        LOG_VERBOSE("%s: spectrum texture unused in scene", s);
 }
 
 void ParsedScene::Option(const std::string &name, const std::string &value, FileLoc loc) {
