@@ -13,10 +13,9 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
+    - name: Checkout pbrt
     - uses: actions/checkout@v2
-      
-    - name: Checkout submodules
-      uses: textbook/git-checkout-submodule-action@master
+      submodules: true
       
     - name: Get cmake
       uses: lukka/get-cmake@latest
