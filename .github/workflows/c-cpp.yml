@@ -17,6 +17,12 @@ jobs:
       uses: actions/checkout@v2
       with:
         submodules: true
+
+    - name: Checkout rgb2spectrum tables
+      uses: actions/checkout@v2
+      with:
+        repository: mmp/rgb2spectrum
+        path: build
       
     - name: Get cmake
       uses: lukka/get-cmake@latest
@@ -33,7 +39,7 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake ..
+        cmake .. -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True
       
     - name: Build
       run: cmake --build build --parallel
