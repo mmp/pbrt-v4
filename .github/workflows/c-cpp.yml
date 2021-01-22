@@ -15,7 +15,8 @@ jobs:
     steps:
     - name: Checkout pbrt
       uses: actions/checkout@v2
-      submodules: true
+      with:
+        submodules: true
       
     - name: Get cmake
       uses: lukka/get-cmake@latest
