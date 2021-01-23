@@ -49,6 +49,7 @@ int main(int argc, char **argv) {
         if (ParseArg(&argv, "list-tests", &listTests, onError) ||
             ParseArg(&argv, "log-level", &logLevel, onError) ||
             ParseArg(&argv, "nthreads", &opt.nThreads, onError) ||
+            ParseArg(&argv, "gtest-filter", &testFilter, onError) ||
             ParseArg(&argv, "test-filter", &testFilter, onError)) {
             // success
         } else if ((strcmp(*argv, "--help") == 0) || (strcmp(*argv, "-h") == 0)) {

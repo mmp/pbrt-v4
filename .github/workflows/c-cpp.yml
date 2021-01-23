@@ -34,6 +34,7 @@ jobs:
 
     - name: Install OpenEXR (MacOS)
       if: ${{ matrix.os == 'macos-latest' }}
+      env: HOMEBREW_NO_INSTALL_CLEANUP
       run: brew install openexr
 
     - name: Configure
