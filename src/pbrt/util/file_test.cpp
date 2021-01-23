@@ -76,5 +76,5 @@ l5l
     floats = ReadFloatFile(fn);
     EXPECT_TRUE(floats.empty());
 
-    EXPECT_EQ(0, remove(fn.c_str()));
+    remove(fn.c_str());
 }
