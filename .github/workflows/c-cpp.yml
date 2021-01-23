@@ -39,10 +39,10 @@ jobs:
     - name: Configure
       run: |
         cd build
-        cmake .. -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True -DCMAKE_BUILD_TYPE=Release
+        cmake .. -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True
       
     - name: Build
-      run: cmake --build build --parallel
+      run: cmake --build build --parallel --config Release
       
     - name: Test (Ubuntu/MacOS)
       if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'macos-latest' }}
@@ -51,5 +51,5 @@ jobs:
 
     - name: Test (Windows)
       if: ${{ matrix.os == 'windows-latest' }}
-      run: .\Debug\pbrt_test.exe
+      run: .\Release\pbrt_test.exe
       working-directory: build
