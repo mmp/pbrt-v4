@@ -1,7 +1,7 @@
 pbrt, Version 4 (Early Release)
 ===============================
 
-<img src="https://github.com/mmp/pbrt-v4/workflows/ci/badge.svg">
+[<img src="https://github.com/mmp/pbrt-v4/workflows/ci/badge.svg">](https://github.com/mmp/pbrt-v4/actions)
 
 ![Transparent Machines frame, via @beeple](images/teaser-transparent-machines.png)
 
