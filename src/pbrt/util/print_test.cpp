@@ -23,10 +23,12 @@ TEST(StringPrintf, Basics) {
     EXPECT_EQ(StringPrintf("Hello, world"), "Hello, world");
     EXPECT_EQ(StringPrintf("x = %d", 5), "x = 5");
     EXPECT_EQ(StringPrintf("%f, %f, %f", 1., 1.5, -8.125), "1, 1.5, -8.125");
+#ifndef PBRT_IS_WINDOWS
     EXPECT_DEATH(StringPrintf("not enough %s"), "Not enough optional values");
     EXPECT_DEATH(StringPrintf("not enough %f yolo"), "Not enough optional values");
     EXPECT_DEATH(StringPrintf("too many %f yolo", 1, 2), "Excess values passed");
     EXPECT_DEATH(StringPrintf("too many", 1), "Excess values passed");
+#endif
 }
 
 TEST(StringPrintf, FancyPctS) {

@@ -1,6 +1,8 @@
 pbrt, Version 4 (Early Release)
 ===============================
 
+<img src="https://github.com/mmp/pbrt-v4/workflows/ci/badge.svg">
+
 ![Transparent Machines frame, via @beeple](images/teaser-transparent-machines.png)
 
 This is an early release of pbrt-v4, the rendering system that will be

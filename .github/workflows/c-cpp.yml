@@ -1,0 +1,57 @@
+name: ci
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: Build and test
+
+    strategy:
+      matrix:
+        os: [ ubuntu-20.04, macos-latest, windows-latest ]
+      fail-fast: false
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout pbrt
+      uses: actions/checkout@v2
+      with:
+        submodules: true
+
+    - name: Checkout rgb2spectrum tables
+      uses: actions/checkout@v2
+      with:
+        repository: mmp/rgb2spectrum
+        path: build
+      
+    - name: Get cmake
+      uses: lukka/get-cmake@latest
+
+    - name: Install OpenEXR (Ubuntu)
+      if: ${{ matrix.os == 'ubuntu-20.04' }}
+      run: sudo apt-get -y install libopenexr-dev
+
+    - name: Install OpenEXR (MacOS)
+      if: ${{ matrix.os == 'macos-latest' }}
+      env:
+          HOMEBREW_NO_INSTALL_CLEANUP: 1
+      run: brew install openexr
+
+    - name: Configure
+      run: |
+        cd build
+        cmake .. -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True
+      
+    - name: Build
+      run: cmake --build build --parallel --config Release
+      
+    - name: Test (Ubuntu/MacOS)
+      if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'macos-latest' }}
+      run: ./pbrt_test
+      working-directory: build
+
+    - name: Test (Windows)
+      if: ${{ matrix.os == 'windows-latest' }}
+      run: .\Release\pbrt_test.exe
+      working-directory: build

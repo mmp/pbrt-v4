@@ -65,7 +65,7 @@ TEST(File, Failures) {
     std::vector<float> floats = ReadFloatFile("NO_SUCH_FILE_64622");
     EXPECT_EQ(0, floats.size());
 
-    std::string fn = inTestDir("floatfile_malformed.txt");
+    std::string fn = inTestDir("malformed.txt");
     EXPECT_TRUE(WriteFile(fn, R"(1
 2 3 4
 l5l
@@ -76,5 +76,5 @@ l5l
     floats = ReadFloatFile(fn);
     EXPECT_TRUE(floats.empty());
 
-    EXPECT_EQ(0, remove(fn.c_str()));
+    remove(fn.c_str());
 }
