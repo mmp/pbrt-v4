@@ -36,6 +36,17 @@ jobs:
       if: ${{ matrix.os == 'macos-latest' }}
       run: brew install openexr
 
+    - name: Install OpenEXR (Windows)
+      if: ${{ matrix.os == 'windows-latest' }}
+      uses: lukka/run-vcpkg@v2
+      id: runvcpkg
+      with:
+          vcpkgArguments: openexr
+          vcpkgDirectory: ${{ runner.workspace }}/vcpkg/
+          vcpkgTriplet: x64-windows
+
+      run: vcpkg install openexr:x64-windows
+
     - name: Configure
       run: |
         cd build
