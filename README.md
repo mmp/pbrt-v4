@@ -157,7 +157,7 @@ intervention is required; an error message will be printed in this case.
 The environment map parameterization has also changed (from equi-rect to an
 equi-area mapping); you can upgrade environment maps using
 ```bash
-$ imgtool makeenv old.exr --outfile new.exr
+$ imgtool makeequiarea old.exr --outfile new.exr
 ```
 
 Converting scenes to pbrt's file format
