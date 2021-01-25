@@ -247,17 +247,18 @@ PBRT_CPU_GPU inline Transform Rotate(Float theta, Vector3f axis) {
     return Rotate(sinTheta, cosTheta, axis);
 }
 
-// Hughes-Moller 1999-ish. (But with |x| computed differently to avoid edge case when it
-// happens to equal |to|.)
 PBRT_CPU_GPU inline Transform RotateFromTo(Vector3f from, Vector3f to) {
     // Compute intermediate vector for vector reflection
-    Vector3f axis = Cross(from, to);
-    if (LengthSquared(axis) == 0)
-        return Transform();
-    axis = Normalize(axis);
+    Vector3f refl;
+    if (std::abs(from.x) < 0.72f && std::abs(to.x) < 0.72f)
+        refl = Vector3f(1, 0, 0);
+    else if (std::abs(from.y) < 0.72f && std::abs(to.y) < 0.72f)
+        refl = Vector3f(0, 1, 0);
+    else
+        refl = Vector3f(0, 0, 1);
 
     // Initialize matrix _r_ for rotation
-    Vector3f u = axis - from, v = axis - to;
+    Vector3f u = refl - from, v = refl - to;
     SquareMatrix<4> r;
     for (int i = 0; i < 3; ++i)
         for (int j = 0; j < 3; ++j)
