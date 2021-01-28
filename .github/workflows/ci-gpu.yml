@@ -1,0 +1,75 @@
+name: gpu-build-only
+
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+      - 'images/**'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'images/**'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        optix: [ optix-7.1.0, optix-7.2.0 ]
+        cuda: [ '11.0', '11.1', '11.2' ]
+
+    name: GPU Build Only (CUDA ${{ matrix.cuda }}, ${{ matrix.optix }})
+
+    runs-on: ubuntu-20.04
+
+    steps:
+    - name: Checkout pbrt
+      uses: actions/checkout@v2
+      with:
+        submodules: true
+
+    - name: Checkout rgb2spectrum tables
+      uses: actions/checkout@v2
+      with:
+        repository: mmp/rgb2spectrum
+        path: build
+
+    - name: Checkout OptiX headers
+      uses: actions/checkout@v2
+      with:
+        ssh-key: ${{ secrets.CHECKOUT_KEY }}
+        repository: mmp/optix-headers
+        path: optix
+
+    - name: Get cmake
+      uses: lukka/get-cmake@latest
+
+    - name: Install OpenEXR
+      run: sudo apt-get -y install libopenexr-dev
+
+    - name: Try to restore CUDA install from cache
+      id: cache-cuda
+      uses: actions/cache@v2
+      with:
+        path: /usr/local/cuda-${{ matrix.cuda }}
+        key: cuda-usr-local-${{ matrix.cuda }}
+
+    - name: Install CUDA
+      if: steps.cache-cuda.outputs.cache-hit != 'true'
+      run: |
+        wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin
+        sudo mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600
+        sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub
+        sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
+        cuda=`echo ${{ matrix.cuda }} | tr . -`
+        sudo apt install -y cuda-compiler-${cuda} cuda-libraries-${cuda} cuda-libraries-dev-${cuda}
+        echo /usr/local/cuda-${{ matrix.cuda }}/bin >> $GITHUB_PATH
+        
+    - name: Configure
+      run: |
+        cd build
+        cmake .. -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True -DPBRT_OPTIX7_PATH=../optix/${{ matrix.optix }} -DPBRT_GPU_SHADER_MODEL=sm_80
+      
+    - name: Build
+      # We need to limit the number of jobs so that it doesn't OOM 
+      run: cmake --build build --parallel 3 --config Release

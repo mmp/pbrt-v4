@@ -159,7 +159,9 @@ if (CMAKE_CUDA_COMPILER)
     else ()
         enable_language (CUDA)
         list (APPEND PBRT_DEFINITIONS "PBRT_BUILD_GPU_RENDERER")
-        list (APPEND PBRT_DEFINITIONS "NVTX")
+        if (PBRT_NVTX)
+            list (APPEND PBRT_DEFINITIONS "NVTX")
+        endif ()
         set (PBRT_CUDA_ENABLED ON)
 
         # FIXME

@@ -33,7 +33,6 @@
 #include <map>
 
 #include <cuda.h>
-#include <cuda_profiler_api.h>
 #include <cuda_runtime.h>
 
 #ifdef NVTX
@@ -602,8 +601,6 @@ void GPURender(ParsedScene &scene) {
     integrator->Render();
 
     LOG_VERBOSE("Total rendering time: %.3f s", timer.ElapsedSeconds());
-
-    CUDA_CHECK(cudaProfilerStop());
 
     if (!Options->quiet) {
         ReportKernelStats();
