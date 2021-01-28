@@ -18,7 +18,7 @@ jobs:
         optix: [ optix-7.1.0, optix-7.2.0 ]
         cuda: [ '11.0', '11.1', '11.2' ]
 
-    name: Build only (GPU with CUDA ${{ matrix.cuda }}, ${{ matrix.optix }})
+    name: GPU Build Only (CUDA ${{ matrix.cuda }}, ${{ matrix.optix }})
 
     runs-on: ubuntu-20.04
 
@@ -52,7 +52,7 @@ jobs:
       uses: actions/cache@v2
       with:
         path: /usr/local/cuda-${{ matrix.cuda }}
-        key: ${{ matrix.cuda }}
+        key: cuda-usr-local-${{ matrix.cuda }}
 
     - name: Install CUDA
       if: steps.cache-cuda.outputs.cache-hit != 'true'
