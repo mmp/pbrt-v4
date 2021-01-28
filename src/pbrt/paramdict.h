@@ -95,6 +95,8 @@ class ParameterDictionary {
 
     const FileLoc *loc(const std::string &) const;
 
+    const ParsedParameterVector &GetParameterVector() const { return params; }
+
     Float GetOneFloat(const std::string &name, Float def) const;
     int GetOneInt(const std::string &name, int def) const;
     bool GetOneBool(const std::string &name, bool def) const;
@@ -124,8 +126,6 @@ class ParameterDictionary {
     std::vector<std::string> GetStringArray(const std::string &name) const;
 
     void ReportUnused() const;
-
-    const ParsedParameterVector &GetParameterVector() const { return params; }
 
   private:
     friend class TextureParameterDictionary;

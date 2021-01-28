@@ -58,9 +58,6 @@ class PixelSensor {
         XYZFromSensorRGB = *m;
     }
 
-    PBRT_CPU_GPU
-    Float ImagingRatio() const { return imagingRatio; }
-
     PixelSensor(const RGBColorSpace *outputColorSpace, Float wbTemp, Float imagingRatio,
                 Allocator alloc)
         : r_bar(&Spectra::X(), alloc),
@@ -78,9 +75,9 @@ class PixelSensor {
 
     PBRT_CPU_GPU
     RGB ToSensorRGB(const SampledSpectrum &s, const SampledWavelengths &lambda) const {
-        return RGB((r_bar.Sample(lambda) * s).Average(),
-                   (g_bar.Sample(lambda) * s).Average(),
-                   (b_bar.Sample(lambda) * s).Average());
+        return imagingRatio * RGB((r_bar.Sample(lambda) * s).Average(),
+                                  (g_bar.Sample(lambda) * s).Average(),
+                                  (b_bar.Sample(lambda) * s).Average());
     }
 
     // PixelSensor Public Members
@@ -228,13 +225,11 @@ class RGBFilm : public FilmBase {
                    const SampledWavelengths &lambda, const VisibleSurface *,
                    Float weight) {
         // Convert sample radiance to _PixelSensor_ RGB
-        SampledSpectrum H = L * sensor->ImagingRatio();
-        RGB rgb = sensor->ToSensorRGB(H, lambda);
+        RGB rgb = sensor->ToSensorRGB(L, lambda);
 
         // Optionally clamp sensor RGB value
         Float m = std::max({rgb.r, rgb.g, rgb.b});
         if (m > maxComponentValue) {
-            H *= maxComponentValue / m;
             rgb *= maxComponentValue / m;
         }
 
@@ -287,7 +282,7 @@ class RGBFilm : public FilmBase {
 
     PBRT_CPU_GPU
     RGB ToOutputRGB(const SampledSpectrum &L, const SampledWavelengths &lambda) const {
-        RGB sensorRGB = sensor->ToSensorRGB(L * sensor->ImagingRatio(), lambda);
+        RGB sensorRGB = sensor->ToSensorRGB(L, lambda);
         return outputRGBFromSensorRGB * sensorRGB;
     }
 
@@ -334,7 +329,7 @@ class GBufferFilm : public FilmBase {
 
     PBRT_CPU_GPU
     RGB ToOutputRGB(const SampledSpectrum &L, const SampledWavelengths &lambda) const {
-        RGB cameraRGB = sensor->ToSensorRGB(L * sensor->ImagingRatio(), lambda);
+        RGB cameraRGB = sensor->ToSensorRGB(L, lambda);
         return outputRGBFromSensorRGB * cameraRGB;
     }
 

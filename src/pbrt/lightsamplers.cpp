@@ -222,7 +222,7 @@ std::pair<int, LightBounds> BVHLightSampler::buildBVH(
     // Allocate interior _LightBVHNode_ and recursively initialize children
     int nodeIndex = nodes.size();
     nodes.push_back(LightBVHNode());
-    CHECK_LT(depth, 32);
+    CHECK_LT(depth, 64);
     std::pair<int, LightBounds> child0 =
         buildBVH(bvhLights, start, mid, bitTrail, depth + 1, alloc);
     CHECK_EQ(nodeIndex + 1, child0.first);

@@ -511,13 +511,11 @@ void RGBFilm::AddSplat(const Point2f &p, SampledSpectrum L,
                        const SampledWavelengths &lambda) {
     CHECK(!L.HasNaNs());
     // Convert sample radiance to _PixelSensor_ RGB
-    SampledSpectrum H = L * sensor->ImagingRatio();
-    RGB rgb = sensor->ToSensorRGB(H, lambda);
+    RGB rgb = sensor->ToSensorRGB(L, lambda);
 
     // Optionally clamp sensor RGB value
     Float m = std::max({rgb.r, rgb.g, rgb.b});
     if (m > maxComponentValue) {
-        H *= maxComponentValue / m;
         rgb *= maxComponentValue / m;
     }
 
@@ -603,14 +601,10 @@ RGBFilm *RGBFilm::Create(const ParameterDictionary &parameters, Float exposureTi
 void GBufferFilm::AddSample(const Point2i &pFilm, SampledSpectrum L,
                             const SampledWavelengths &lambda,
                             const VisibleSurface *visibleSurface, Float weight) {
-    // First convert to sensor exposure, H, then to camera RGB
-    SampledSpectrum H = L * sensor->ImagingRatio();
-    RGB rgb = sensor->ToSensorRGB(H, lambda);
+    RGB rgb = sensor->ToSensorRGB(L, lambda);
     Float m = std::max({rgb.r, rgb.g, rgb.b});
-    if (m > maxComponentValue) {
-        H *= maxComponentValue / m;
+    if (m > maxComponentValue)
         rgb *= maxComponentValue / m;
-    }
 
     Pixel &p = pixels[pFilm];
     if (visibleSurface && *visibleSurface) {
@@ -659,9 +653,7 @@ void GBufferFilm::AddSplat(const Point2f &p, SampledSpectrum v,
                            const SampledWavelengths &lambda) {
     // NOTE: same code as RGBFilm::AddSplat()...
     CHECK(!v.HasNaNs());
-    // First convert to sensor exposure, H, then to camera RGB
-    SampledSpectrum H = v * sensor->ImagingRatio();
-    RGB rgb = sensor->ToSensorRGB(H, lambda);
+    RGB rgb = sensor->ToSensorRGB(v, lambda);
     Float m = std::max({rgb.r, rgb.g, rgb.b});
     if (m > maxComponentValue)
         rgb *= maxComponentValue / m;

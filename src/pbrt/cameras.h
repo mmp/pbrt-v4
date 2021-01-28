@@ -170,7 +170,7 @@ class CameraBase {
 
     PBRT_CPU_GPU
     static pstd::optional<CameraRayDifferential> GenerateRayDifferential(
-        CameraHandle camera, const CameraSample &sample, SampledWavelengths &lambda);
+        CameraHandle camera, CameraSample sample, SampledWavelengths &lambda);
 
     PBRT_CPU_GPU
     Ray RenderFromCamera(const Ray &r) const {
@@ -275,7 +275,7 @@ class OrthographicCamera : public ProjectiveCamera {
 
     PBRT_CPU_GPU
     pstd::optional<CameraRayDifferential> GenerateRayDifferential(
-        const CameraSample &sample, SampledWavelengths &lambda) const;
+        CameraSample sample, SampledWavelengths &lambda) const;
 
     static OrthographicCamera *Create(const ParameterDictionary &parameters,
                                       const CameraTransform &cameraTransform,
@@ -354,7 +354,7 @@ class PerspectiveCamera : public ProjectiveCamera {
 
     PBRT_CPU_GPU
     pstd::optional<CameraRayDifferential> GenerateRayDifferential(
-        const CameraSample &sample, SampledWavelengths &lambda) const;
+        CameraSample sample, SampledWavelengths &lambda) const;
 
     PBRT_CPU_GPU
     SampledSpectrum We(const Ray &ray, SampledWavelengths &lambda,
@@ -398,7 +398,7 @@ class SphericalCamera : public CameraBase {
 
     PBRT_CPU_GPU
     pstd::optional<CameraRayDifferential> GenerateRayDifferential(
-        const CameraSample &sample, SampledWavelengths &lambda) const {
+        CameraSample sample, SampledWavelengths &lambda) const {
         return CameraBase::GenerateRayDifferential(this, sample, lambda);
     }
 
@@ -447,7 +447,7 @@ class RealisticCamera : public CameraBase {
 
     PBRT_CPU_GPU
     pstd::optional<CameraRayDifferential> GenerateRayDifferential(
-        const CameraSample &sample, SampledWavelengths &lambda) const {
+        CameraSample sample, SampledWavelengths &lambda) const {
         return CameraBase::GenerateRayDifferential(this, sample, lambda);
     }
 
@@ -532,15 +532,14 @@ class RealisticCamera : public CameraBase {
     void DrawRayPathFromFilm(const Ray &r, bool arrow, bool toOpticalIntercept) const;
     void DrawRayPathFromScene(const Ray &r, bool arrow, bool toOpticalIntercept) const;
 
-    static void ComputeCardinalPoints(const Ray &rIn, const Ray &rOut, Float *p,
-                                      Float *f);
+    static void ComputeCardinalPoints(Ray rIn, Ray rOut, Float *p, Float *f);
     void ComputeThickLensApproximation(Float pz[2], Float f[2]) const;
     Float FocusThickLens(Float focusDistance);
     Bounds2f BoundExitPupil(Float filmX0, Float filmX1) const;
     void RenderExitPupil(Float sx, Float sy, const char *filename) const;
 
     PBRT_CPU_GPU
-    Point3f SampleExitPupil(const Point2f &pFilm, const Point2f &lensSample,
+    Point3f SampleExitPupil(Point2f pFilm, Point2f lensSample,
                             Float *sampleBoundsArea) const;
 
     void TestExitPupilBounds() const;

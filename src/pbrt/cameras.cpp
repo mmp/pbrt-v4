@@ -63,7 +63,7 @@ std::string CameraTransform::ToString() const {
 
 // Camera Method Definitions
 pstd::optional<CameraRayDifferential> CameraHandle::GenerateRayDifferential(
-    const CameraSample &sample, SampledWavelengths &lambda) const {
+    CameraSample sample, SampledWavelengths &lambda) const {
     auto gen = [&](auto ptr) { return ptr->GenerateRayDifferential(sample, lambda); };
     return Dispatch(gen);
 }
@@ -111,7 +111,7 @@ CameraBase::CameraBase(CameraBaseParameters p)
       film(p.film),
       medium(p.medium) {
     if (cameraTransform.CameraFromRenderHasScale())
-        Warning("Scaling detected in world-to-camera transformation!\n"
+        Warning("Scaling detected in rendering space to camera space transformation!\n"
                 "The system has numerous assumptions, implicit and explicit,\n"
                 "that this transform will have no scale factors in it.\n"
                 "Proceed at your own risk; your image may have errors or\n"
@@ -119,7 +119,7 @@ CameraBase::CameraBase(CameraBaseParameters p)
 }
 
 pstd::optional<CameraRayDifferential> CameraBase::GenerateRayDifferential(
-    CameraHandle camera, const CameraSample &sample, SampledWavelengths &lambda) {
+    CameraHandle camera, CameraSample sample, SampledWavelengths &lambda) {
     // Generate regular camera ray _cr_ for ray differential
     pstd::optional<CameraRay> cr = camera.GenerateRay(sample, lambda);
     if (!cr)
@@ -342,7 +342,7 @@ pstd::optional<CameraRay> OrthographicCamera::GenerateRay(
 }
 
 pstd::optional<CameraRayDifferential> OrthographicCamera::GenerateRayDifferential(
-    const CameraSample &sample, SampledWavelengths &lambda) const {
+    CameraSample sample, SampledWavelengths &lambda) const {
     // Compute main orthographic viewing ray
     // Compute raster and camera sample positions
     Point3f pFilm = Point3f(sample.pFilm.x, sample.pFilm.y, 0);
@@ -458,7 +458,7 @@ pstd::optional<CameraRay> PerspectiveCamera::GenerateRay(
 }
 
 pstd::optional<CameraRayDifferential> PerspectiveCamera::GenerateRayDifferential(
-    const CameraSample &sample, SampledWavelengths &lambda) const {
+    CameraSample sample, SampledWavelengths &lambda) const {
     // Compute raster and camera sample positions
     Point3f pFilm = Point3f(sample.pFilm.x, sample.pFilm.y, 0);
     Point3f pCamera = cameraFromRaster(pFilm);
@@ -724,7 +724,7 @@ RealisticCamera::RealisticCamera(CameraBaseParameters baseParameters,
     // Compute film's physical extent
     Float aspect = (Float)film.FullResolution().y / (Float)film.FullResolution().x;
     Float diagonal = film.Diagonal();
-    Float x = std::sqrt(diagonal * diagonal / (1 + aspect * aspect));
+    Float x = std::sqrt(Sqr(diagonal) / (1 + Sqr(aspect)));
     Float y = aspect * x;
     physicalExtent = Bounds2f(Point2f(-x / 2, -y / 2), Point2f(x / 2, y / 2));
 
@@ -809,8 +809,8 @@ Float RealisticCamera::TraceLensesFromFilm(const Ray &rCamera, Ray *rOut) const 
 
         } else {
             // Check intersection point against spherical aperture
-            Float r2 = pHit.x * pHit.x + pHit.y * pHit.y;
-            if (r2 > element.apertureRadius * element.apertureRadius)
+            Float r2 = Sqr(pHit.x) + Sqr(pHit.y);
+            if (r2 > Sqr(element.apertureRadius))
                 return 0;
         }
         rLens.o = pHit;
@@ -835,8 +835,7 @@ Float RealisticCamera::TraceLensesFromFilm(const Ray &rCamera, Ray *rOut) const 
     return weight;
 }
 
-void RealisticCamera::ComputeCardinalPoints(const Ray &rIn, const Ray &rOut, Float *pz,
-                                            Float *fz) {
+void RealisticCamera::ComputeCardinalPoints(Ray rIn, Ray rOut, Float *pz, Float *fz) {
     Float tf = -rOut.o.x / rOut.d.x;
     *fz = -rOut(tf).z;
     Float tp = (rIn.o.x - rOut.o.x) / rOut.d.x;
@@ -921,10 +920,10 @@ Bounds2f RealisticCamera::BoundExitPupil(Float filmX0, Float filmX1) const {
     return pupilBounds;
 }
 
-Point3f RealisticCamera::SampleExitPupil(const Point2f &pFilm, const Point2f &lensSample,
+Point3f RealisticCamera::SampleExitPupil(Point2f pFilm, Point2f lensSample,
                                          Float *sampleBoundsArea) const {
     // Find exit pupil bound for sample distance from film center
-    Float rFilm = std::sqrt(pFilm.x * pFilm.x + pFilm.y * pFilm.y);
+    Float rFilm = std::sqrt(Sqr(pFilm.x) + Sqr(pFilm.y));
     int rIndex = rFilm / (film.Diagonal() / 2) * exitPupilBounds.size();
     rIndex = std::min<int>(exitPupilBounds.size() - 1, rIndex);
     Bounds2f pupilBounds = exitPupilBounds[rIndex];

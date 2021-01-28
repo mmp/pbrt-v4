@@ -403,9 +403,11 @@ void ParsedScene::EndOfFiles() {
         for (const ParsedParameter *p : vec) {
             if (p->type == "texture") {
                 CHECK(!p->strings.empty());
-                if (auto iter = unusedFloatTextures.find(p->strings[0]); iter != unusedFloatTextures.end())
+                if (auto iter = unusedFloatTextures.find(p->strings[0]);
+                    iter != unusedFloatTextures.end())
                     unusedFloatTextures.erase(iter);
-                else if (auto iter = unusedSpectrumTextures.find(p->strings[0]); iter != unusedSpectrumTextures.end())
+                else if (auto iter = unusedSpectrumTextures.find(p->strings[0]);
+                         iter != unusedSpectrumTextures.end())
                     unusedSpectrumTextures.erase(iter);
             }
         }
