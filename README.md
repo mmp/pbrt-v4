@@ -1,8 +1,8 @@
 pbrt, Version 4 (Early Release)
 ===============================
 
-[<img src="https://github.com/mmp/pbrt-v4/workflows/cpu-build-and-test/badge.svg">](https://github.com/mmp/pbrt-v4/actions)
-[<img src="https://github.com/mmp/pbrt-v4/workflows/gpu-build-only/badge.svg">](https://github.com/mmp/pbrt-v4/actions)
+[<img src="https://github.com/mmp/pbrt-v4/workflows/cpu-build-and-test/badge.svg">](https://github.com/mmp/pbrt-v4/actions?query=workflow%3Acpu-build-and-test)
+[<img src="https://github.com/mmp/pbrt-v4/workflows/gpu-build-only/badge.svg">](https://github.com/mmp/pbrt-v4/actions?query=workflow%3Agpu-build-only)
 
 ![Transparent Machines frame, via @beeple](images/teaser-transparent-machines.png)
 
