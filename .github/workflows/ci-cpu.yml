@@ -1,6 +1,14 @@
-name: ci
+name: cpu-build-and-test
 
-on: [push, pull_request]
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+      - 'images/**'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'images/**'
 
 jobs:
   build:
