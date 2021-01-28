@@ -17,6 +17,7 @@ option (PBRT_BUILD_NATIVE_EXECUTABLE "Build executable optimized for CPU archite
 option (PBRT_NVTX "Insert NVTX annotations for NVIDIA Profiling and Debugging Tools" OFF)
 option (PBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES "Use pregenerated rgbspectrum_*.cpp files rather than running rgb2spec_opt to generate them at build time" OFF)
 set (PBRT_OPTIX7_PATH "" CACHE PATH "Path to OptiX 7 SDK")
+set (PBRT_GPU_SHADER_MODEL "" CACHE STRING "")
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message (STATUS "Setting build type to 'Release' as none was specified.")
@@ -188,24 +189,30 @@ if (CMAKE_CUDA_COMPILER)
                 "$<$<COMPILE_LANGUAGE:CUDA>:$<IF:$<AND:$<CONFIG:Debug>,$<NOT:$<BOOL:$<TARGET_PROPERTY:CUDA_PTX_COMPILATION>>>>,-G;-g,-lineinfo;-maxrregcount;128>>"
         )
 
-        # https://wagonhelm.github.io/articles/2018-03/detecting-cuda-capability-with-cmake
-        # Get CUDA compute capability
-        set (CHECK_CUDA_OUTPUT_EXE ${CMAKE_BINARY_DIR}/checkcuda)
-        if (MSVC)
+        if (PBRT_GPU_SHADER_MODEL STREQUAL "")
+            # https://wagonhelm.github.io/articles/2018-03/detecting-cuda-capability-with-cmake
+            # Get CUDA compute capability
+            set (CHECK_CUDA_OUTPUT_EXE ${CMAKE_BINARY_DIR}/checkcuda)
+            if (MSVC)
                 execute_process (COMMAND nvcc -lcuda ${CMAKE_SOURCE_DIR}/cmake/checkcuda.cu -ccbin ${CMAKE_CXX_COMPILER} -o ${CHECK_CUDA_OUTPUT_EXE})
-        else  ()
+            else  ()
                 execute_process (COMMAND nvcc -lcuda ${CMAKE_SOURCE_DIR}/cmake/checkcuda.cu -o ${CHECK_CUDA_OUTPUT_EXE})
-        endif ()
+            endif ()
 
-        execute_process (COMMAND ${CHECK_CUDA_OUTPUT_EXE}
-                         RESULT_VARIABLE CUDA_RETURN_CODE
-                         OUTPUT_VARIABLE CHECK_CUDA_OUTPUT)
+            execute_process (COMMAND ${CHECK_CUDA_OUTPUT_EXE}
+                             RESULT_VARIABLE CUDA_RETURN_CODE
+                             OUTPUT_VARIABLE CHECK_CUDA_OUTPUT)
 
-        if (NOT ${CUDA_RETURN_CODE} EQUAL 0)
-            message (SEND_ERROR ${CHECK_CUDA_OUTPUT})
-          else ()
-            set(ARCH "${CHECK_CUDA_OUTPUT}")
-            message (STATUS "CUDA Architecture: ${ARCH}")
+            if (NOT ${CUDA_RETURN_CODE} EQUAL 0)
+                message (SEND_ERROR ${CHECK_CUDA_OUTPUT})
+              else ()
+                set(ARCH "${CHECK_CUDA_OUTPUT}")
+                message (STATUS "Detected CUDA Architecture: ${ARCH}")
+                string (APPEND CMAKE_CUDA_FLAGS " --gpu-architecture=${ARCH}")
+            endif ()
+        else ()
+            set(ARCH "${PBRT_GPU_SHADER_MODEL}")
+            message (STATUS "Specified CUDA Architecture: ${ARCH}")
             string (APPEND CMAKE_CUDA_FLAGS " --gpu-architecture=${ARCH}")
         endif ()
 
