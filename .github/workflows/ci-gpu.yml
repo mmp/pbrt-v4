@@ -48,7 +48,7 @@ jobs:
       run: sudo apt-get -y install libopenexr-dev
 
     - name: Make /usr/local world writable
-      run: chmod 777 /usr/local
+      run: sudo chmod 777 /usr/local
 
     - name: Try to restore CUDA install from cache
       id: cache-cuda
