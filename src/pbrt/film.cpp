@@ -200,12 +200,7 @@ PixelSensor *PixelSensor::Create(const ParameterDictionary &parameters,
     // The defaults here represent a "passthrough" setup such that the imaging
     // ratio will be exactly 1. This is a useful default since scenes that
     // weren't authored with a physical camera in mind will render as expected.
-    Float fNumber = parameters.GetOneFloat("fnumber", 1.);
     Float ISO = parameters.GetOneFloat("iso", 100.);
-    // Note: in the talk we mention using 312.5 for historical reasons. The
-    // choice of 100 * Pi here just means that the other parameters make nice
-    // "round" numbers like 1 and 100.
-    Float C = parameters.GetOneFloat("c", 100.0 * Pi);
     Float whiteBalanceTemp = parameters.GetOneFloat("whitebalance", 0);
 
     std::string sensorName = parameters.GetOneString("sensor", "cie1931");
@@ -215,8 +210,10 @@ PixelSensor *PixelSensor::Create(const ParameterDictionary &parameters,
     if (sensorName != "cie1931" && whiteBalanceTemp == 0)
         whiteBalanceTemp = 6500;
 
-    const Float K_m = 683;
-    Float imagingRatio = Pi * exposureTime * ISO * K_m / (C * fNumber * fNumber);
+    // Note: in the talk we mention using 312.5 for historical reasons. The
+    // choice of 100 here just means that the other parameters make nice
+    // "round" numbers like 1 and 100.
+    Float imagingRatio = exposureTime * ISO / 100;
 
     if (sensorName == "cie1931") {
         return alloc.new_object<PixelSensor>(colorSpace, whiteBalanceTemp, imagingRatio,
@@ -238,37 +235,11 @@ PixelSensor *PixelSensor::CreateDefault(Allocator alloc) {
     return Create(ParameterDictionary(), RGBColorSpace::sRGB, 1.0, nullptr, alloc);
 }
 
-pstd::optional<SquareMatrix<3>> PixelSensor::SolveXYZFromSensorRGB(
-    SpectrumHandle sensorIllum, SpectrumHandle outputIllum) const {
-    Float rgbCamera[24][3], xyzOutput[24][3];
-    // Compute _rgbCamera_ values for training swatches
-    for (size_t i = 0; i < swatchReflectances.size(); ++i) {
-        RGB rgb = ProjectReflectance<RGB>(swatchReflectances[i], sensorIllum, &r_bar,
-                                          &g_bar, &b_bar);
-        for (int c = 0; c < 3; ++c)
-            rgbCamera[i][c] = rgb[c];
-    }
-
-    // Compute _xyzOutput_ values for training swatches
-    Float sensorWhiteG = InnerProduct(sensorIllum, &g_bar);
-    Float sensorWhiteY = InnerProduct(sensorIllum, &Spectra::Y());
-    for (size_t i = 0; i < swatchReflectances.size(); ++i) {
-        SpectrumHandle s = swatchReflectances[i];
-        XYZ xyz = ProjectReflectance<XYZ>(s, outputIllum, &Spectra::X(), &Spectra::Y(),
-                                          &Spectra::Z()) *
-                  (sensorWhiteY / sensorWhiteG);
-        for (int c = 0; c < 3; ++c)
-            xyzOutput[i][c] = xyz[c];
-    }
-
-    return LinearLeastSquares<3>(rgbCamera, xyzOutput, swatchReflectances.size());
-}
-
 // Swatch reflectances are taken from Danny Pascale's Macbeth chart measurements
 // BabelColor ColorChecker data: Copyright (c) 2004-2012 Danny Pascale
 // (www.babelcolor.com); used by permission.
 // http://www.babelcolor.com/index_htm_files/ColorChecker_RGB_and_spectra.zip
-std::vector<SpectrumHandle> PixelSensor::swatchReflectances{
+SpectrumHandle PixelSensor::swatchReflectances[nSwatchReflectances]{
     PiecewiseLinearSpectrum::FromInterleaved(
         {380.0, 0.055, 390.0, 0.058, 400.0, 0.061, 410.0, 0.062, 420.0, 0.062, 430.0,
          0.062, 440.0, 0.062, 450.0, 0.062, 460.0, 0.062, 470.0, 0.062, 480.0, 0.062,

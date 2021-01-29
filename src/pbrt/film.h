@@ -42,17 +42,38 @@ class PixelSensor {
 
     static PixelSensor *CreateDefault(Allocator alloc = {});
 
-    PixelSensor(SpectrumHandle r_bar, SpectrumHandle g_bar, SpectrumHandle b_bar,
+    PixelSensor(SpectrumHandle r, SpectrumHandle g, SpectrumHandle b,
                 const RGBColorSpace *outputColorSpace, Float wbTemp, Float imagingRatio,
                 Allocator alloc)
-        : r_bar(r_bar, alloc),
-          g_bar(g_bar, alloc),
-          b_bar(b_bar, alloc),
-          imagingRatio(imagingRatio) {
+        : r_bar(r, alloc), g_bar(g, alloc), b_bar(b, alloc), imagingRatio(imagingRatio) {
         // Compute XYZ from camera RGB matrix
-        DenselySampledSpectrum sensorIlluminant = Spectra::D(wbTemp, alloc);
+        // Compute _rgbCamera_ values for training swatches
+        DenselySampledSpectrum sensorIllum = Spectra::D(wbTemp, alloc);
+        Float rgbCamera[nSwatchReflectances][3];
+        for (int i = 0; i < nSwatchReflectances; ++i) {
+            RGB rgb = ProjectReflectance<RGB>(swatchReflectances[i], &sensorIllum, &r_bar,
+                                              &g_bar, &b_bar);
+            for (int c = 0; c < 3; ++c)
+                rgbCamera[i][c] = rgb[c];
+        }
+
+        // Compute _xyzOutput_ values for training swatches
+        Float xyzOutput[24][3];
+        Float sensorWhiteG = InnerProduct(&sensorIllum, &g_bar);
+        Float sensorWhiteY = InnerProduct(&sensorIllum, &Spectra::Y());
+        for (size_t i = 0; i < nSwatchReflectances; ++i) {
+            SpectrumHandle s = swatchReflectances[i];
+            XYZ xyz =
+                ProjectReflectance<XYZ>(s, &outputColorSpace->illuminant, &Spectra::X(),
+                                        &Spectra::Y(), &Spectra::Z()) *
+                (sensorWhiteY / sensorWhiteG);
+            for (int c = 0; c < 3; ++c)
+                xyzOutput[i][c] = xyz[c];
+        }
+
+        // Initialize _XYZFromSensorRGB_ using linear least squares
         pstd::optional<SquareMatrix<3>> m =
-            SolveXYZFromSensorRGB(&sensorIlluminant, &outputColorSpace->illuminant);
+            LinearLeastSquares<3>(rgbCamera, xyzOutput, nSwatchReflectances);
         if (!m)
             ErrorExit("Sensor XYZ from RGB matrix could not be solved.");
         XYZFromSensorRGB = *m;
@@ -74,10 +95,10 @@ class PixelSensor {
     }
 
     PBRT_CPU_GPU
-    RGB ToSensorRGB(const SampledSpectrum &s, const SampledWavelengths &lambda) const {
-        return imagingRatio * RGB((r_bar.Sample(lambda) * s).Average(),
-                                  (g_bar.Sample(lambda) * s).Average(),
-                                  (b_bar.Sample(lambda) * s).Average());
+    RGB ToSensorRGB(const SampledSpectrum &L, const SampledWavelengths &lambda) const {
+        return imagingRatio * RGB((r_bar.Sample(lambda) * L).Average(),
+                                  (g_bar.Sample(lambda) * L).Average(),
+                                  (b_bar.Sample(lambda) * L).Average());
     }
 
     // PixelSensor Public Members
@@ -85,24 +106,16 @@ class PixelSensor {
 
   private:
     // PixelSensor Private Methods
-    pstd::optional<SquareMatrix<3>> SolveXYZFromSensorRGB(
-        SpectrumHandle sensorIlluminant, SpectrumHandle outputIlluminant) const;
-
-    RGB IlluminantToSensorRGB(SpectrumHandle illum) const {
-        RGB rgb(InnerProduct(illum, &r_bar), InnerProduct(illum, &g_bar),
-                InnerProduct(illum, &b_bar));
-        return rgb / rgb.g;
-    }
-
     template <typename Triplet>
-    static Triplet ProjectReflectance(SpectrumHandle refl, SpectrumHandle illum,
+    static Triplet ProjectReflectance(SpectrumHandle r, SpectrumHandle illum,
                                       SpectrumHandle b1, SpectrumHandle b2,
                                       SpectrumHandle b3);
 
     // PixelSensor Private Members
     DenselySampledSpectrum r_bar, g_bar, b_bar;
     Float imagingRatio;
-    static std::vector<SpectrumHandle> swatchReflectances;
+    static constexpr int nSwatchReflectances = 24;
+    static SpectrumHandle swatchReflectances[nSwatchReflectances];
 };
 
 // PixelSensor Inline Methods

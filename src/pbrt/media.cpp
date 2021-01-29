@@ -165,14 +165,17 @@ HomogeneousMedium *HomogeneousMedium::Create(const ParameterDictionary &paramete
 
     SpectrumHandle Le =
         parameters.GetOneSpectrum("Le", nullptr, SpectrumType::Illuminant, alloc);
-    if (Le == nullptr)
+    Float LeScale = parameters.GetOneFloat("Lescale", 1.f);
+    if (Le == nullptr || Le.MaxValue() == 0)
         Le = alloc.new_object<ConstantSpectrum>(0.f);
+    else
+        LeScale /= SpectrumToPhotometric(Le);
 
     Float sigScale = parameters.GetOneFloat("scale", 1.f);
-
     Float g = parameters.GetOneFloat("g", 0.0f);
 
-    return alloc.new_object<HomogeneousMedium>(sig_a, sig_s, sigScale, Le, g, alloc);
+    return alloc.new_object<HomogeneousMedium>(sig_a, sig_s, sigScale, Le, LeScale, g,
+                                               alloc);
 }
 
 std::string HomogeneousMedium::ToString() const {
@@ -234,18 +237,23 @@ UniformGridMediumProvider *UniformGridMediumProvider::Create(
 
     SpectrumHandle Le =
         parameters.GetOneSpectrum("Le", nullptr, SpectrumType::Illuminant, alloc);
-    if (Le == nullptr)
+    Float LeNorm = 1;
+    if (Le == nullptr || Le.MaxValue() == 0)
         Le = alloc.new_object<ConstantSpectrum>(0.f);
+    else
+        LeNorm = 1 / SpectrumToPhotometric(Le);
 
     SampledGrid<Float> LeGrid(alloc);
     std::vector<Float> LeScale = parameters.GetFloatArray("Lescale");
     if (LeScale.empty())
-        LeGrid = SampledGrid<Float>({1.f}, 1, 1, 1, alloc);
+        LeGrid = SampledGrid<Float>({LeNorm}, 1, 1, 1, alloc);
     else {
         if (LeScale.size() != nx * ny * nz)
             ErrorExit("Expected %d x %d %d = %d values for \"Lescale\" but were "
                       "given %d.",
                       nx, ny, nz, nx * ny * nz, LeScale.size());
+        for (int i = 0; i < nx * ny * nz; ++i)
+            LeScale[i] *= LeNorm;
         LeGrid = SampledGrid<Float>(LeScale, nx, ny, nz, alloc);
     }
 

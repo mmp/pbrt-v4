@@ -85,11 +85,12 @@ class HomogeneousMedium {
   public:
     // HomogeneousMedium Public Methods
     HomogeneousMedium(SpectrumHandle sigma_a, SpectrumHandle sigma_s, Float sigScale,
-                      SpectrumHandle Le, Float g, Allocator alloc)
+                      SpectrumHandle Le, Float LeScale, Float g, Allocator alloc)
         : sigma_a_spec(sigma_a, alloc),
           sigma_s_spec(sigma_s, alloc),
           sigScale(sigScale),
           Le_spec(Le, alloc),
+          LeScale(LeScale),
           phase(g) {}
 
     static HomogeneousMedium *Create(const ParameterDictionary &parameters,
@@ -121,7 +122,7 @@ class HomogeneousMedium {
         if (t < tMax) {
             // Report scattering event in homogeneous medium
             SampledSpectrum Tmaj = FastExp(-t * sigma_maj);
-            SampledSpectrum Le = Le_spec.Sample(lambda);
+            SampledSpectrum Le = LeScale * Le_spec.Sample(lambda);
             MediumInteraction intr(ray(t), -ray.d, ray.time, sigma_a, sigma_s, sigma_maj,
                                    Le, this, &phase);
             callback(MediumSample(intr, Tmaj));
@@ -136,7 +137,7 @@ class HomogeneousMedium {
   private:
     // HomogeneousMedium Private Data
     DenselySampledSpectrum sigma_a_spec, sigma_s_spec, Le_spec;
-    Float sigScale;
+    Float sigScale, LeScale;
     HGPhaseFunction phase;
 };
 

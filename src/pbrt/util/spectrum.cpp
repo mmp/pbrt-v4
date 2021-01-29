@@ -44,8 +44,7 @@ Float SpectrumToPhotometric(SpectrumHandle s) {
     for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda)
         y += Spectra::Y()(lambda) * s(lambda);
 
-    const Float K_m = 683;
-    return y * K_m;
+    return y;
 }
 
 XYZ SpectrumToXYZ(SpectrumHandle s) {
