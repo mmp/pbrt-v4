@@ -194,11 +194,17 @@ these capabilities are only available via CUDA and OptiX on NVIDIA GPUs
 today, though we'd be happy to see pbrt running on any other GPUs that
 provided those capabilities.
 
-pbrt's GPU path currently requires CUDA 11.0 and OptiX 7.1.  The build
-scripts will automatically attempt to find a CUDA compiler, looking in the
-usual places; the cmake output will indicate whether it was successful.  It
-is necessary to manually set the cmake `PBRT_OPTIX7_PATH` configuration
-option to point at an OptiX 7.1 install.
+pbrt's GPU path currently requires CUDA 11.0 or later and OptiX 7.1 or
+later.  At the moment, only Linux is supported, but PRs to fix the GPU
+Windows build would be much appreciated.
+
+The build scripts automatically attempt to find a CUDA compiler, looking in
+the usual places; the cmake output will indicate whether it was successful.
+It is necessary to manually set the cmake `PBRT_OPTIX7_PATH` configuration
+option to point at an OptiX installation.  By default, the GPU shader model
+that pbrt targets is set automatically based on the GPU in the system.
+Alternatively, the `PBRT_GPU_SHADER_MODEL` option can be set manually
+(e.g., `-DPBRT_GPU_SHADER_MODEL=sm_80`).
 
 Even when compiled with GPU support, pbrt uses the CPU by default unless
 the `--gpu` command-line option is given.  Note that when rendering with
@@ -206,11 +212,13 @@ the GPU, the `--spp` command-line flag can be helpful to easily crank up
 the number of samples per pixel. Also, it's extra fun to use *tev* to watch
 rendering progress.
 
-If you'd like to use the OptiX denoiser to denoise rendered images, set the
-scene's "Film" type to be "gbuffer" when rendering and use EXR for the
-image format; a "deep" image will be generated with auxiliary channels like
-albedo and normal that are useful for the denoiser.  The resulting EXR can
-be denoised using:
+The imgtool program that is built as part of pbrt provides support for the
+OptiX denoiser in the GPU build.  The denoiser is capable of operating on
+RGB-only images, but gives better results with "deep" images that include
+auxiliary channels like albedo and normal.  Setting the scene's "Film" type
+to be "gbuffer" when rendering and using EXR for the image format causes
+pbrt to generate such a "deep" image.  In either case, using the denoiser
+is straightforward:
 ```bash
 $ imgtool denoise-optix noisy.exr --outfile denoised.exr
 ```
