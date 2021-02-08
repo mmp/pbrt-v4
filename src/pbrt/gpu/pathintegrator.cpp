@@ -49,8 +49,7 @@ namespace pbrt {
 
 STAT_MEMORY_COUNTER("Memory/GPU path integrator pixel state", pathIntegratorBytes);
 
-GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene)
-    : envLights(alloc) {
+GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) {
     // Allocate all of the data structures that represent the scene...
     std::map<std::string, MediumHandle> media = scene.CreateMedia(alloc);
 
@@ -98,6 +97,7 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene)
 
     pstd::vector<LightHandle> allLights;
 
+    envLights = alloc.new_object<pstd::vector<LightHandle>>(alloc);
     for (const auto &light : scene.lights) {
         MediumHandle outsideMedium = findMedium(light.medium, &light.loc);
         if (light.renderFromObject.IsAnimated())
@@ -110,7 +110,7 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene)
 
         if (l.Is<UniformInfiniteLight>() || l.Is<ImageInfiniteLight>() ||
             l.Is<PortalImageInfiniteLight>())
-            envLights.push_back(l);
+            envLights->push_back(l);
 
         allLights.push_back(l);
     }
@@ -224,7 +224,7 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene)
             alloc.new_object<SubsurfaceScatterQueue>(maxQueueSize, alloc);
     }
 
-    if (envLights.size())
+    if (envLights->size())
         escapedRayQueue = alloc.new_object<EscapedRayQueue>(maxQueueSize, alloc);
     hitAreaLightQueue = alloc.new_object<HitAreaLightQueue>(maxQueueSize, alloc);
 
@@ -458,7 +458,7 @@ void GPUPathIntegrator::HandleEscapedRays(int depth) {
         PBRT_GPU_LAMBDA(const EscapedRayWorkItem w) {
             // Update pixel radiance for escaped ray
             SampledSpectrum L(0.f);
-            for (const auto &light : envLights) {
+            for (const auto &light : *envLights) {
                 if (SampledSpectrum Le = light.Le(Ray(w.rayo, w.rayd), w.lambda); Le) {
                     // Compute path radiance contribution from infinite light
                     PBRT_DBG("L %f %f %f %f T_hat %f %f %f %f Le %f %f %f %f", L[0], L[1],
