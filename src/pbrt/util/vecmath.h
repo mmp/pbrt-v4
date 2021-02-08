@@ -1622,7 +1622,7 @@ PBRT_CPU_GPU inline Float SphericalTriangleArea(Vector3f a, Vector3f b, Vector3f
     n_bc = Normalize(n_bc);
     n_ca = Normalize(n_ca);
 
-    // Compute angles $\alpha$, $\beta$, and $\gamma$ at spherical triangle vertices
+    // Find angles $\alpha$, $\beta$, and $\gamma$ at spherical triangle vertices
     Float alpha = AngleBetween(n_ab, -n_ca);
     Float beta = AngleBetween(n_bc, -n_ab);
     Float gamma = AngleBetween(n_ca, -n_bc);

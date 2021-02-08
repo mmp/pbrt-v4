@@ -24,8 +24,6 @@ class PixelSensor;
 class FilmHandle : public TaggedPointer<RGBFilm, GBufferFilm> {
   public:
     // Film Interface
-    PBRT_CPU_GPU inline SampledWavelengths SampleWavelengths(Float u) const;
-
     PBRT_CPU_GPU inline void AddSample(const Point2i &pFilm, SampledSpectrum L,
                                        const SampledWavelengths &lambda,
                                        const VisibleSurface *visibleSurface,
@@ -36,6 +34,8 @@ class FilmHandle : public TaggedPointer<RGBFilm, GBufferFilm> {
 
     PBRT_CPU_GPU
     void AddSplat(const Point2f &p, SampledSpectrum v, const SampledWavelengths &lambda);
+
+    PBRT_CPU_GPU inline SampledWavelengths SampleWavelengths(Float u) const;
 
     PBRT_CPU_GPU inline Point2i FullResolution() const;
     PBRT_CPU_GPU inline Bounds2i PixelBounds() const;

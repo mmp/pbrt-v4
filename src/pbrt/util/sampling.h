@@ -28,9 +28,8 @@ namespace pbrt {
 
 // Sampling Function Declarations
 PBRT_CPU_GPU
-pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v,
-                                              const Point3f &p, const Point2f &u,
-                                              Float *pdf = nullptr);
+pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v, Point3f p,
+                                              Point2f u, Float *pdf = nullptr);
 
 PBRT_CPU_GPU
 Point2f InvertSphericalTriangleSample(const pstd::array<Point3f, 3> &v, const Point3f &p,
@@ -38,8 +37,7 @@ Point2f InvertSphericalTriangleSample(const pstd::array<Point3f, 3> &v, const Po
 
 PBRT_CPU_GPU
 Point3f SampleSphericalRectangle(const Point3f &p, const Point3f &v00, const Vector3f &ex,
-                                 const Vector3f &ey, const Point2f &u,
-                                 Float *pdf = nullptr);
+                                 const Vector3f &ey, Point2f u, Float *pdf = nullptr);
 
 PBRT_CPU_GPU
 Point2f InvertSphericalRectangleSample(const Point3f &pRef, const Point3f &v00,
@@ -67,19 +65,17 @@ Float SampleCatmullRom2D(pstd::span<const Float> nodes1, pstd::span<const Float>
                          Float *pdf = nullptr);
 
 // Sampling Inline Functions
-PBRT_CPU_GPU
-inline Float XYZMatchingPDF(Float lambda) {
+PBRT_CPU_GPU inline Float XYZMatchingPDF(Float lambda) {
     if (lambda < 360 || lambda > 830)
         return 0;
     return 0.0039398042f / Sqr(std::cosh(0.0072f * (lambda - 538)));
 }
 
-PBRT_CPU_GPU
-inline Float SampleXYZMatching(Float u) {
+PBRT_CPU_GPU inline Float SampleXYZMatching(Float u) {
     return 538 - 138.888889f * std::atanh(0.85691062f - 1.82750197f * u);
 }
 
-PBRT_CPU_GPU inline pstd::array<Float, 3> SampleUniformTriangle(const Point2f &u) {
+PBRT_CPU_GPU inline pstd::array<Float, 3> SampleUniformTriangle(Point2f u) {
     Float b0, b1;
     if (u[0] < u[1]) {
         b0 = u[0] / 2;

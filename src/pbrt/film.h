@@ -211,6 +211,11 @@ class FilmBase {
     const PixelSensor *GetPixelSensor() const { return sensor; }
     std::string GetFilename() const { return filename; }
 
+    PBRT_CPU_GPU
+    SampledWavelengths SampleWavelengths(Float u) const {
+        return SampledWavelengths::SampleXYZ(u);
+    }
+
     std::string BaseToString() const;
 
     PBRT_CPU_GPU
@@ -283,9 +288,6 @@ class RGBFilm : public FilmBase {
                            const FileLoc *loc, Allocator alloc);
 
     PBRT_CPU_GPU
-    SampledWavelengths SampleWavelengths(Float u) const;
-
-    PBRT_CPU_GPU
     void AddSplat(const Point2f &p, SampledSpectrum v, const SampledWavelengths &lambda);
 
     void WriteImage(ImageMetadata metadata, Float splatScale = 1);
@@ -294,7 +296,7 @@ class RGBFilm : public FilmBase {
     std::string ToString() const;
 
     PBRT_CPU_GPU
-    RGB ToOutputRGB(const SampledSpectrum &L, const SampledWavelengths &lambda) const {
+    RGB ToOutputRGB(SampledSpectrum L, const SampledWavelengths &lambda) const {
         RGB sensorRGB = sensor->ToSensorRGB(L, lambda);
         return outputRGBFromSensorRGB * sensorRGB;
     }
@@ -328,9 +330,6 @@ class GBufferFilm : public FilmBase {
     static GBufferFilm *Create(const ParameterDictionary &parameters, Float exposureTime,
                                FilterHandle filter, const RGBColorSpace *colorSpace,
                                const FileLoc *loc, Allocator alloc);
-
-    PBRT_CPU_GPU
-    SampledWavelengths SampleWavelengths(Float u) const;
 
     PBRT_CPU_GPU
     void AddSample(const Point2i &pFilm, SampledSpectrum L,

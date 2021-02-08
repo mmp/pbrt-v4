@@ -25,9 +25,8 @@
 namespace pbrt {
 
 // Sampling Function Definitions
-pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v,
-                                              const Point3f &p, const Point2f &u,
-                                              Float *pdf) {
+pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v, Point3f p,
+                                              Point2f u, Float *pdf) {
     if (pdf != nullptr)
         *pdf = 0;
     // Compute vectors _a_, _b_, and _c_ to spherical triangle vertices
@@ -47,7 +46,7 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v,
     n_bc = Normalize(n_bc);
     n_ca = Normalize(n_ca);
 
-    // Compute angles $\alpha$, $\beta$, and $\gamma$ at spherical triangle vertices
+    // Find angles $\alpha$, $\beta$, and $\gamma$ at spherical triangle vertices
     Float alpha = AngleBetween(n_ab, -n_ca);
     Float beta = AngleBetween(n_bc, -n_ab);
     Float gamma = AngleBetween(n_ca, -n_bc);
@@ -56,13 +55,12 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v,
     Float A = alpha + beta + gamma - Pi;
     if (A <= 0)
         return {};
+    Float Ap = u[0] * A;
     if (pdf != nullptr)
         *pdf = 1 / A;
-    Float Ap = u[0] * A;
 
-    // Compute $\sin \beta'$ and $\cos \beta'$ for point along _b_ for sampled area
+    // Find $\cos \beta'$ for point along _b_ for sampled area
     Float cosAlpha = std::cos(alpha), sinAlpha = std::sin(alpha);
-
     Float sinPhi = std::sin(Ap) * cosAlpha - std::cos(Ap) * sinAlpha;
     Float cosPhi = std::cos(Ap) * cosAlpha + std::sin(Ap) * sinAlpha;
 
@@ -82,7 +80,7 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v,
 
     // Compute sampled spherical triangle direction and return barycentrics
     Float cosTheta = 1 - u[1] * (1 - Dot(cp, b));
-    Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
+    Float sinTheta = SafeSqrt(1 - Sqr(cosTheta));
     Vector3f w = cosTheta * b + sinTheta * Normalize(GramSchmidt(cp, b));
     // Find barycentric coordinates for sampled direction _w_
     Vector3f e1(v[1] - v[0]), e2(v[2] - v[0]);
@@ -97,8 +95,7 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v,
     Float invDivisor = 1 / divisor;
     Vector3f s(p - v[0]);
     Float b1 = Dot(s, s1) * invDivisor;
-    Vector3f s2 = Cross(s, e1);
-    Float b2 = Dot(w, s2) * invDivisor;
+    Float b2 = Dot(w, Cross(s, e1)) * invDivisor;
 
     // Return clamped barycentrics for sampled direction
     b1 = Clamp(b1, 0, 1);
@@ -123,8 +120,6 @@ Point2f InvertSphericalTriangleSample(const pstd::array<Point3f, 3> &v, const Po
     b = Normalize(b);
     c = Normalize(c);
 
-    // TODO: have a shared snippet that goes from here to computing
-    // alpha/beta/gamma, use it also in Triangle::SolidAngle().
     Vector3d axb = Cross(a, b), bxc = Cross(b, c), cxa = Cross(c, a);
     CHECK_RARE(1e-5, LengthSquared(axb) == 0 || LengthSquared(bxc) == 0 ||
                          LengthSquared(cxa) == 0);
@@ -174,7 +169,7 @@ Point2f InvertSphericalTriangleSample(const pstd::array<Point3f, 3> &v, const Po
 }
 
 Point3f SampleSphericalRectangle(const Point3f &pRef, const Point3f &s,
-                                 const Vector3f &ex, const Vector3f &ey, const Point2f &u,
+                                 const Vector3f &ex, const Vector3f &ey, Point2f u,
                                  Float *pdf) {
     // Compute local reference frame and transform rectangle coordinates
     Float exl = Length(ex), eyl = Length(ey);

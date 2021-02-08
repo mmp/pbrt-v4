@@ -155,7 +155,7 @@ pstd::optional<ShapeIntersection> AnimatedPrimitive::Intersect(const Ray &r,
     if (!si)
         return {};
 
-    // Transform instance's intersection data to render space
+    // Transform instance's intersection data to rendering space
     si->intr = interpRenderFromPrimitive(si->intr);
     CHECK_GE(Dot(si->intr.n, si->intr.shading.n), 0);
     return si;

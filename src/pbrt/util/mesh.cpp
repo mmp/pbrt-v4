@@ -32,7 +32,7 @@ TriangleMesh::TriangleMesh(const Transform &renderFromObject, bool reverseOrient
     // Initialize mesh _vertexIndices_
     vertexIndices = intBufferCache->LookupOrAdd(indices);
 
-    // Transform mesh vertices to render space and initialize mesh _p_
+    // Transform mesh vertices to rendering space and initialize mesh _p_
     for (Point3f &pt : p)
         pt = renderFromObject(pt);
     this->p = point3BufferCache->LookupOrAdd(p);

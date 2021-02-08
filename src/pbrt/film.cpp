@@ -471,11 +471,8 @@ RGBFilm::RGBFilm(FilmBaseParameters p, const RGBColorSpace *colorSpace,
     CHECK(!pixelBounds.IsEmpty());
     CHECK(colorSpace != nullptr);
     filmPixelMemory += pixelBounds.Area() * sizeof(Pixel);
+    // Compute _outputRGBFromSensorRGB_ matrix
     outputRGBFromSensorRGB = colorSpace->RGBFromXYZ * sensor->XYZFromSensorRGB;
-}
-
-SampledWavelengths RGBFilm::SampleWavelengths(Float u) const {
-    return SampledWavelengths::SampleXYZ(u);
 }
 
 void RGBFilm::AddSplat(const Point2f &p, SampledSpectrum L,
@@ -614,10 +611,6 @@ GBufferFilm::GBufferFilm(FilmBaseParameters p, const RGBColorSpace *colorSpace,
     CHECK(!pixelBounds.IsEmpty());
     filmPixelMemory += pixelBounds.Area() * sizeof(Pixel);
     outputRGBFromSensorRGB = colorSpace->RGBFromXYZ * sensor->XYZFromSensorRGB;
-}
-
-SampledWavelengths GBufferFilm::SampleWavelengths(Float u) const {
-    return SampledWavelengths::SampleXYZ(u);
 }
 
 void GBufferFilm::AddSplat(const Point2f &p, SampledSpectrum v,

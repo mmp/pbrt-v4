@@ -545,12 +545,13 @@ const SquareMatrix<3> XYZFromLMS( 0.986993,   -0.147054,  0.159963,
 // clang-format on
 
 inline SquareMatrix<3> WhiteBalance(Point2f srcWhite, Point2f targetWhite) {
+    // Find LMS coefficients for source and target white
     XYZ srcXYZ = XYZ::FromxyY(srcWhite), dstXYZ = XYZ::FromxyY(targetWhite);
-
     auto srcLMS = LMSFromXYZ * srcXYZ, dstLMS = LMSFromXYZ * dstXYZ;
+
+    // Return white balancing matrix for source and target white
     SquareMatrix<3> LMScorrect = SquareMatrix<3>::Diag(
         dstLMS[0] / srcLMS[0], dstLMS[1] / srcLMS[1], dstLMS[2] / srcLMS[2]);
-
     return XYZFromLMS * LMScorrect * LMSFromXYZ;
 }
 

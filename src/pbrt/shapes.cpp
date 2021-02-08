@@ -33,7 +33,7 @@ Bounds3f Sphere::Bounds() const {
         Bounds3f(Point3f(-radius, -radius, zMin), Point3f(radius, radius, zMax)));
 }
 
-pstd::optional<ShapeSample> Sphere::Sample(const Point2f &u) const {
+pstd::optional<ShapeSample> Sphere::Sample(Point2f u) const {
     Point3f pObj = Point3f(0, 0, 0) + radius * SampleUniformSphere(u);
     // Reproject _pObj_ to sphere surface and compute _pObjError_
     pObj *= radius / Distance(pObj, Point3f(0, 0, 0));
@@ -107,7 +107,7 @@ Disk *Disk::Create(const Transform *renderFromObject, const Transform *objectFro
 // Cylinder Method Definitions
 Bounds3f Cylinder::Bounds() const {
     return (*renderFromObject)(
-        Bounds3f(Point3f(-radius, -radius, zMin), Point3f(radius, radius, zMax)));
+        Bounds3f({-radius, -radius, zMin}, {radius, radius, zMax}));
 }
 
 std::string Cylinder::ToString() const {
@@ -156,9 +156,8 @@ STAT_MEMORY_COUNTER("Memory/Triangles", triangleBytes);
 
 // Triangle Functions
 pstd::optional<TriangleIntersection> IntersectTriangle(const Ray &ray, Float tMax,
-                                                       const Point3f &p0,
-                                                       const Point3f &p1,
-                                                       const Point3f &p2) {
+                                                       Point3f p0, Point3f p1,
+                                                       Point3f p2) {
     // Return no intersection if triangle is degenerate
     if (LengthSquared(Cross(p2 - p0, p1 - p0)) == 0)
         return {};
@@ -318,7 +317,6 @@ pstd::optional<ShapeIntersection> Triangle::Intersect(const Ray &ray, Float tMax
         IntersectTriangle(ray, tMax, p0, p1, p2);
     if (!triIsect)
         return {};
-
     SurfaceInteraction intr =
         InteractionFromIntersection(mesh, triIndex, *triIsect, ray.time, -ray.d);
 #ifndef PBRT_IS_GPU_CODE
@@ -725,7 +723,7 @@ bool Curve::RecursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Poin
     }
 }
 
-pstd::optional<ShapeSample> Curve::Sample(const Point2f &u) const {
+pstd::optional<ShapeSample> Curve::Sample(Point2f u) const {
     LOG_FATAL("Curve::Sample not implemented.");
     return {};
 }
@@ -736,12 +734,12 @@ Float Curve::PDF(const Interaction &) const {
 }
 
 pstd::optional<ShapeSample> Curve::Sample(const ShapeSampleContext &ctx,
-                                          const Point2f &u) const {
+                                          Point2f u) const {
     LOG_FATAL("Curve::Sample not implemented.");
     return {};
 }
 
-Float Curve::PDF(const ShapeSampleContext &ctx, const Vector3f &wi) const {
+Float Curve::PDF(const ShapeSampleContext &ctx, Vector3f wi) const {
     LOG_FATAL("Curve::PDF not implemented.");
     return {};
 }
@@ -1273,7 +1271,7 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,
     }
 }
 
-Float BilinearPatch::PDF(const ShapeSampleContext &ctx, const Vector3f &wi) const {
+Float BilinearPatch::PDF(const ShapeSampleContext &ctx, Vector3f wi) const {
     // Intersect sample ray with shape geometry
     Ray ray = ctx.SpawnRay(wi);
     pstd::optional<ShapeIntersection> isect = Intersect(ray);
