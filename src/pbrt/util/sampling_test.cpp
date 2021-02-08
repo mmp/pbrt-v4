@@ -481,10 +481,14 @@ TEST(Sampling, SphericalTriangleInverse) {
                        Lerp(rng.Uniform<Float>(), low, high));
     };
 
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 100; ++i) {
         pstd::array<Point3f, 3> v = {rp(), rp(), rp()};
         Point3f p = rp(-1, 1);
-        for (int j = 0; j < 10; ++j) {
+        if (SphericalTriangleArea(Normalize(v[0] - p), Normalize(v[1] - p),
+                                  Normalize(v[2] - p)) < 5e-3)
+            continue;
+
+        for (int j = 0; j < 100; ++j) {
             Float pdf;
             Point2f u(rng.Uniform<Float>(), rng.Uniform<Float>());
             pstd::array<Float, 3> bs = SampleSphericalTriangle(v, p, u, &pdf);
@@ -494,14 +498,14 @@ TEST(Sampling, SphericalTriangleInverse) {
             Point2f ui = InvertSphericalTriangleSample(v, p, Normalize(pTri - p));
 
             auto err = [](Float a, Float ref) {
-                if (ref < 1e-3)
+                if (ref < 0.05f)
                     return std::abs(a - ref);
                 else
                     return std::abs((a - ref) / ref);
             };
-            // The tolerance has to be fiarly high, unfortunately...
-            EXPECT_LT(err(ui[0], u[0]), 0.04f) << u << " vs inverse " << ui;
-            EXPECT_LT(err(ui[1], u[1]), 0.04f) << u << " vs inverse " << ui;
+            // The tolerance has to be fairly high, unfortunately...
+            EXPECT_LT(std::abs(ui[0] - u[0]), 0.025f) << u << " vs inverse " << ui;
+            EXPECT_LT(err(ui[1], u[1]), 0.005f) << u << " vs inverse " << ui;
         }
     }
 }

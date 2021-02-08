@@ -52,21 +52,21 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v, 
     Float gamma = AngleBetween(n_ca, -n_bc);
 
     // Uniformly sample triangle area $A$ to compute $A'$
-    Float A = alpha + beta + gamma - Pi;
-    if (A <= 0)
-        return {};
-    Float Ap = u[0] * A;
-    if (pdf != nullptr)
-        *pdf = 1 / A;
+    Float A_pi = alpha + beta + gamma;
+    Float Ap_pi = Lerp(u[0], Pi, A_pi);
+    if (pdf != nullptr) {
+        Float A = A_pi - Pi;
+        *pdf = (A <= 0) ? 0 : 1 / A;
+    }
 
     // Find $\cos \beta'$ for point along _b_ for sampled area
     Float cosAlpha = std::cos(alpha), sinAlpha = std::sin(alpha);
-    Float sinPhi = std::sin(Ap) * cosAlpha - std::cos(Ap) * sinAlpha;
-    Float cosPhi = std::cos(Ap) * cosAlpha + std::sin(Ap) * sinAlpha;
+    Float sinPhi = -std::sin(Ap_pi) * cosAlpha + std::cos(Ap_pi) * sinAlpha;
+    Float cosPhi = -std::cos(Ap_pi) * cosAlpha - std::sin(Ap_pi) * sinAlpha;
     Float k1 = cosPhi - cosAlpha;
     Float k2 = sinPhi + sinAlpha * Dot(a, b) /* cos c */;
-    Float cosBp = ((k2 * cosPhi - k1 * sinPhi) * cosAlpha - k2) /
-                  ((k2 * sinPhi + k1 * cosPhi) * sinAlpha);
+    Float cosBp = ((DifferenceOfProducts(k2, cosPhi, k1, sinPhi)) * cosAlpha - k2) /
+                  ((SumOfProducts(k2, sinPhi, k1, cosPhi)) * sinAlpha);
     // Happens if the triangle basically covers the entire hemisphere.
     // We currently depend on calling code to detect this case, which
     // is sort of ugly/unfortunate.
@@ -131,36 +131,34 @@ Point2f InvertSphericalTriangleSample(const pstd::array<Point3f, 3> &v, const Po
     Float beta = AngleBetween(n_bc, -n_ab);
     Float gamma = AngleBetween(n_ca, -n_bc);
 
-    // Spherical area of the triangle.
-    Float A = alpha + beta + gamma - Pi;
-
-    // Assume that w is normalized...
-
+    // Find vertex $\VEC{c'}$ along $\VEC{a}\VEC{c}$ arc for $\w{}$
     // Compute the new C vertex, which lies on the arc defined by b-w
     // and the arc defined by a-c.
     Vector3f cp = Normalize(Cross(Cross(b, w), Cross(c, a)));
-
     // Adjust the sign of cp.  Make sure it's on the arc between A and C.
     if (Dot(cp, a + c) < 0)
         cp = -cp;
 
-    // Compute x1, the area of the sub-triangle over the original area.
-    // The AngleBetween() calls are computing the dihedral angles (a, b, cp)
-    // and (a, cp, b) respectively, FWIW...
-    Vector3f n_cpb = Cross(cp, b), n_acp = Cross(a, cp);
-    CHECK_RARE(1e-5, LengthSquared(n_cpb) == 0 || LengthSquared(n_acp) == 0);
-    if (LengthSquared(n_cpb) == 0 || LengthSquared(n_acp) == 0)
-        return Point2f(0.5, 0.5);
-    n_cpb = Normalize(n_cpb);
-    n_acp = Normalize(n_acp);
+    Float u0;
+    if (Dot(a, cp) > 0.99999847691f /* 0.1 degrees */)
+        u0 = 0;
+    else {
+        // Compute area $A'$ of sub-triangle
+        Vector3f n_cpb = Cross(cp, b), n_acp = Cross(a, cp);
+        CHECK_RARE(1e-5, LengthSquared(n_cpb) == 0 || LengthSquared(n_acp) == 0);
+        if (LengthSquared(n_cpb) == 0 || LengthSquared(n_acp) == 0)
+            return Point2f(0.5, 0.5);
+        n_cpb = Normalize(n_cpb);
+        n_acp = Normalize(n_acp);
+        Float Ap_pi = alpha + AngleBetween(n_ab, n_cpb) + AngleBetween(n_acp, -n_cpb);
 
-    Float Ap = alpha + AngleBetween(n_ab, n_cpb) + AngleBetween(n_acp, -n_cpb) - Pi;
-    Float u0 = Ap / A;
-
-    // Now compute the second coordinate using the new C vertex.
+        // Compute first sample value, which gives the area $A'$
+        Float A_pi = alpha + beta + gamma;
+        u0 = (Ap_pi - Pi) / (A_pi - Pi);
+    }
+    // Compute second sample value for $\w{}$ along $\VEC{b}\VEC{c'}$ and return result
     Float z = Dot(w, b);
     Float u1 = (1 - z) / (1 - Dot(cp, b));
-
     return Point2f(Clamp(u0, 0, 1), Clamp(u1, 0, 1));
 }
 
