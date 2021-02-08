@@ -100,16 +100,19 @@ static void checkElementary(const char *name, std::vector<Point2f> samples,
 }
 
 static void checkElementarySampler(const char *name, SamplerHandle sampler,
-                                   int logSamples) {
+                                   int logSamples, int res = 1) {
     // Get all of the samples for a pixel.
     int spp = sampler.SamplesPerPixel();
     std::vector<Point2f> samples;
-    for (int i = 0; i < spp; ++i) {
-        sampler.StartPixelSample(Point2i(0, 0), i);
-        samples.push_back(sampler.GetPixel2D());
-    }
+    for (Point2i p : Bounds2i(Point2i(0, 0), Point2i(res, res))) {
+        samples.clear();
+        for (int i = 0; i < spp; ++i) {
+            sampler.StartPixelSample(p, i);
+            samples.push_back(sampler.GetPixel2D());
+        }
 
-    checkElementary(name, samples, logSamples);
+        checkElementary(name, samples, logSamples);
+    }
 }
 
 // TODO: check Halton (where the elementary intervals are (2^i, 3^j)).
@@ -128,8 +131,8 @@ TEST(ZSobolSampler, ElementaryIntervals) {
          {RandomizeStrategy::None, RandomizeStrategy::Owen, RandomizeStrategy::PermuteDigits})
         for (int logSamples = 2; logSamples <= 10; ++logSamples)
             checkElementarySampler("ZSobolSampler",
-                                   new ZSobolSampler(1 << logSamples, Point2i(100, 100), rand),
-                                   logSamples);
+                                   new ZSobolSampler(1 << logSamples, Point2i(10, 10), rand),
+                                   logSamples, 1);
 }
 
 TEST(SobolUnscrambledSampler, ElementaryIntervals) {
