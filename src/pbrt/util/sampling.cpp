@@ -63,20 +63,19 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v, 
     Float cosAlpha = std::cos(alpha), sinAlpha = std::sin(alpha);
     Float sinPhi = std::sin(Ap) * cosAlpha - std::cos(Ap) * sinAlpha;
     Float cosPhi = std::cos(Ap) * cosAlpha + std::sin(Ap) * sinAlpha;
-
-    Float uu = cosPhi - cosAlpha;
-    Float vv = sinPhi + sinAlpha * Dot(a, b) /* cos c */;
-    Float cosBetap = (((vv * cosPhi - uu * sinPhi) * cosAlpha - vv) /
-                      ((vv * sinPhi + uu * cosPhi) * sinAlpha));
+    Float k1 = cosPhi - cosAlpha;
+    Float k2 = sinPhi + sinAlpha * Dot(a, b) /* cos c */;
+    Float cosBp = ((k2 * cosPhi - k1 * sinPhi) * cosAlpha - k2) /
+                  ((k2 * sinPhi + k1 * cosPhi) * sinAlpha);
     // Happens if the triangle basically covers the entire hemisphere.
     // We currently depend on calling code to detect this case, which
     // is sort of ugly/unfortunate.
-    CHECK(!IsNaN(cosBetap));
-    cosBetap = Clamp(cosBetap, -1, 1);
-    Float sinBetap = SafeSqrt(1 - cosBetap * cosBetap);
+    CHECK(!IsNaN(cosBp));
+    cosBp = Clamp(cosBp, -1, 1);
 
-    // Compute $c'$ along the arc between $b'$ and $a$
-    Vector3f cp = cosBetap * a + sinBetap * Normalize(GramSchmidt(c, a));
+    // Sample $c'$ along the arc between $b'$ and $a$
+    Float sinBp = SafeSqrt(1 - Sqr(cosBp));
+    Vector3f cp = cosBp * a + sinBp * Normalize(GramSchmidt(c, a));
 
     // Compute sampled spherical triangle direction and return barycentrics
     Float cosTheta = 1 - u[1] * (1 - Dot(cp, b));
@@ -110,9 +109,8 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v, 
 // Via Jim Arvo's SphTri.C
 Point2f InvertSphericalTriangleSample(const pstd::array<Point3f, 3> &v, const Point3f &p,
                                       const Vector3f &w) {
-    // TODO: is double precision really necessary here??
-    using Vector3d = Vector3<double>;
-    Vector3d a(v[0] - p), b(v[1] - p), c(v[2] - p);
+    // Compute vectors _a_, _b_, and _c_ to spherical triangle vertices
+    Vector3f a(v[0] - p), b(v[1] - p), c(v[2] - p);
     CHECK_GT(LengthSquared(a), 0);
     CHECK_GT(LengthSquared(b), 0);
     CHECK_GT(LengthSquared(c), 0);
@@ -120,29 +118,27 @@ Point2f InvertSphericalTriangleSample(const pstd::array<Point3f, 3> &v, const Po
     b = Normalize(b);
     c = Normalize(c);
 
-    Vector3d axb = Cross(a, b), bxc = Cross(b, c), cxa = Cross(c, a);
-    CHECK_RARE(1e-5, LengthSquared(axb) == 0 || LengthSquared(bxc) == 0 ||
-                         LengthSquared(cxa) == 0);
-    if (LengthSquared(axb) == 0 || LengthSquared(bxc) == 0 || LengthSquared(cxa) == 0)
-        return Point2f(0.5, 0.5);
+    // Compute normalized cross products of all direction pairs
+    Vector3f n_ab = Cross(a, b), n_bc = Cross(b, c), n_ca = Cross(c, a);
+    if (LengthSquared(n_ab) == 0 || LengthSquared(n_bc) == 0 || LengthSquared(n_ca) == 0)
+        return {};
+    n_ab = Normalize(n_ab);
+    n_bc = Normalize(n_bc);
+    n_ca = Normalize(n_ca);
 
-    axb = Normalize(axb);
-    bxc = Normalize(bxc);
-    cxa = Normalize(cxa);
-
-    // See comment in Triangle::SolidAngle() for ordering...
-    double alpha = AngleBetween(cxa, -axb);
-    double beta = AngleBetween(axb, -bxc);
-    double gamma = AngleBetween(bxc, -cxa);
+    // Find angles $\alpha$, $\beta$, and $\gamma$ at spherical triangle vertices
+    Float alpha = AngleBetween(n_ab, -n_ca);
+    Float beta = AngleBetween(n_bc, -n_ab);
+    Float gamma = AngleBetween(n_ca, -n_bc);
 
     // Spherical area of the triangle.
-    double A = alpha + beta + gamma - Pi;
+    Float A = alpha + beta + gamma - Pi;
 
     // Assume that w is normalized...
 
     // Compute the new C vertex, which lies on the arc defined by b-w
     // and the arc defined by a-c.
-    Vector3d cp = Normalize(Cross(Cross(b, Vector3d(w)), Cross(c, a)));
+    Vector3f cp = Normalize(Cross(Cross(b, w), Cross(c, a)));
 
     // Adjust the sign of cp.  Make sure it's on the arc between A and C.
     if (Dot(cp, a + c) < 0)
@@ -151,18 +147,18 @@ Point2f InvertSphericalTriangleSample(const pstd::array<Point3f, 3> &v, const Po
     // Compute x1, the area of the sub-triangle over the original area.
     // The AngleBetween() calls are computing the dihedral angles (a, b, cp)
     // and (a, cp, b) respectively, FWIW...
-    Vector3d cnxb = Cross(cp, b), axcn = Cross(a, cp);
-    CHECK_RARE(1e-5, LengthSquared(cnxb) == 0 || LengthSquared(axcn) == 0);
-    if (LengthSquared(cnxb) == 0 || LengthSquared(axcn) == 0)
+    Vector3f n_cpb = Cross(cp, b), n_acp = Cross(a, cp);
+    CHECK_RARE(1e-5, LengthSquared(n_cpb) == 0 || LengthSquared(n_acp) == 0);
+    if (LengthSquared(n_cpb) == 0 || LengthSquared(n_acp) == 0)
         return Point2f(0.5, 0.5);
-    cnxb = Normalize(cnxb);
-    axcn = Normalize(axcn);
+    n_cpb = Normalize(n_cpb);
+    n_acp = Normalize(n_acp);
 
-    Float sub_area = alpha + AngleBetween(axb, cnxb) + AngleBetween(axcn, -cnxb) - Pi;
-    Float u0 = sub_area / A;
+    Float Ap = alpha + AngleBetween(n_ab, n_cpb) + AngleBetween(n_acp, -n_cpb) - Pi;
+    Float u0 = Ap / A;
 
     // Now compute the second coordinate using the new C vertex.
-    Float z = Dot(Vector3d(w), b);
+    Float z = Dot(w, b);
     Float u1 = (1 - z) / (1 - Dot(cp, b));
 
     return Point2f(Clamp(u0, 0, 1), Clamp(u1, 0, 1));
