@@ -154,9 +154,9 @@ class Sphere {
         // Solve quadratic equation to compute sphere _t0_ and _t1_
         Interval t0, t1;
         // Compute sphere quadratic coefficients
-        Interval a = SumSquares(di.x, di.y, di.z);
+        Interval a = Sqr(di.x) + Sqr(di.y) + Sqr(di.z);
         Interval b = 2 * (di.x * oi.x + di.y * oi.y + di.z * oi.z);
-        Interval c = SumSquares(oi.x, oi.y, oi.z) - Sqr(Interval(radius));
+        Interval c = Sqr(oi.x) + Sqr(oi.y) + Sqr(oi.z) - Sqr(Interval(radius));
 
         // Compute sphere quadratic discriminant _discrim_
         Interval f = b / (2 * a);
@@ -604,9 +604,9 @@ class Cylinder {
         // Solve quadratic equation to find cylinder _t0_ and _t1_ values
         Interval t0, t1;
         // Compute cylinder quadratic coefficients
-        Interval a = SumSquares(di.x, di.y);
+        Interval a = Sqr(di.x) + Sqr(di.y);
         Interval b = 2 * (di.x * oi.x + di.y * oi.y);
-        Interval c = SumSquares(oi.x, oi.y) - Sqr(Interval(radius));
+        Interval c = Sqr(oi.x) + Sqr(oi.y) - Sqr(Interval(radius));
 
         // Compute cylinder quadratic discriminant _discrim_
         Interval f = b / (2 * a);
@@ -1371,41 +1371,36 @@ class BilinearPatch {
 
     PBRT_CPU_GPU
     static SurfaceInteraction InteractionFromIntersection(const BilinearPatchMesh *mesh,
-                                                          int patchIndex, Point2f uv,
-                                                          Float time,
-                                                          const Vector3f &wo) {
+                                                          int blpIndex, Point2f uv,
+                                                          Float time, Vector3f wo) {
         // Compute bilinear patch intersection point, $\dpdu$, and $\dpdv$
-        const int *v = &mesh->vertexIndices[4 * patchIndex];
-        Point3f p00 = mesh->p[v[0]], p10 = mesh->p[v[1]], p01 = mesh->p[v[2]],
-                p11 = mesh->p[v[3]];
+        // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
+        const int *v = &mesh->vertexIndices[4 * blpIndex];
+        const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
+        const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
+
         Point3f pHit = Lerp(uv[0], Lerp(uv[1], p00, p01), Lerp(uv[1], p10, p11));
         Vector3f dpdu = Lerp(uv[1], p10, p11) - Lerp(uv[1], p00, p01);
         Vector3f dpdv = Lerp(uv[0], p01, p11) - Lerp(uv[0], p00, p10);
 
-        Point2f uvTex = uv;
+        // Compute texture coordinates at bilinear patch intersection
+        Point2f st = uv;
+        Float duds = 1, dudt = 0, dvds = 0, dvdt = 1;
         if (mesh->uv != nullptr) {
             // Compute texture coordinates for bilinear patch intersection point
-            const Point2f &uv00 = mesh->uv[v[0]], &uv10 = mesh->uv[v[1]];
-            const Point2f &uv01 = mesh->uv[v[2]], &uv11 = mesh->uv[v[3]];
-            uvTex = Lerp(uv[0], Lerp(uv[1], uv00, uv01), Lerp(uv[1], uv10, uv11));
-            // Update bilinear patch $\dpdu$ and $\dpdv$ accounting for texture
-            // coordinates Compute partial derivatives of $(u,v)$ with respect to
-            // interpolated texture coordinates
-            Float dsdu =
-                -uv00[0] + uv10[0] + uv[1] * (uv00[0] - uv01[0] - uv10[0] + uv11[0]);
-            Float dsdv =
-                -uv00[0] + uv01[0] + uv[0] * (uv00[0] - uv01[0] - uv10[0] + uv11[0]);
-            Float dtdu =
-                -uv00[1] + uv10[1] + uv[1] * (uv00[1] - uv01[1] - uv10[1] + uv11[1]);
-            Float dtdv =
-                -uv00[1] + uv01[1] + uv[0] * (uv00[1] - uv01[1] - uv10[1] + uv11[1]);
-            Float duds = std::abs(dsdu) < 1e-8f ? 0 : 1 / dsdu;
-            Float dvds = std::abs(dsdv) < 1e-8f ? 0 : 1 / dsdv;
-            Float dudt = std::abs(dtdu) < 1e-8f ? 0 : 1 / dtdu;
-            Float dvdt = std::abs(dtdv) < 1e-8f ? 0 : 1 / dtdv;
+            Point2f uv00 = mesh->uv[v[0]], uv10 = mesh->uv[v[1]];
+            Point2f uv01 = mesh->uv[v[2]], uv11 = mesh->uv[v[3]];
+            st = Lerp(uv[0], Lerp(uv[1], uv00, uv01), Lerp(uv[1], uv10, uv11));
+            // Update bilinear patch $\dpdu$ and $\dpdv$ accounting for $(s,t)$
+            // Compute partial derivatives of $(u,v)$ with respect to $(s,t)$
+            Vector2f dstdu = Lerp(uv[1], uv10, uv11) - Lerp(uv[1], uv00, uv01);
+            Vector2f dstdv = Lerp(uv[0], uv01, uv11) - Lerp(uv[0], uv00, uv10);
+            duds = std::abs(dstdu[0]) < 1e-8f ? 0 : 1 / dstdu[0];
+            dvds = std::abs(dstdv[0]) < 1e-8f ? 0 : 1 / dstdv[0];
+            dudt = std::abs(dstdu[1]) < 1e-8f ? 0 : 1 / dstdu[1];
+            dvdt = std::abs(dstdv[1]) < 1e-8f ? 0 : 1 / dstdv[1];
 
-            // Compute partial derivatives of $\pt{}$ with respect to interpolated texture
-            // coordinates
+            // Compute partial derivatives of $\pt{}$ with respect to $(s,t)$
             Vector3f dpds = dpdu * duds + dpdv * dvds;
             Vector3f dpdt = dpdu * dudt + dpdv * dvdt;
 
@@ -1413,12 +1408,13 @@ class BilinearPatch {
             if (Cross(dpds, dpdt) != Vector3f(0, 0, 0)) {
                 if (Dot(Cross(dpdu, dpdv), Cross(dpds, dpdt)) < 0)
                     dpdt = -dpdt;
-                CHECK_GE(Dot(Normalize(Cross(dpdu, dpdv)), Normalize(Cross(dpds, dpdt))),
-                         -1e-3);
+                DCHECK_GE(Dot(Normalize(Cross(dpdu, dpdv)), Normalize(Cross(dpds, dpdt))),
+                          -1e-3);
                 dpdu = dpds;
                 dpdv = dpdt;
             }
         }
+
         // Find partial derivatives $\dndu$ and $\dndv$ for bilinear patch
         Vector3f d2Pduu(0, 0, 0), d2Pdvv(0, 0, 0);
         Vector3f d2Pduv(p00.x - p01.x - p10.x + p11.x, p00.y - p01.y - p10.y + p11.y,
@@ -1445,11 +1441,12 @@ class BilinearPatch {
             gamma(4) * Vector3f(Max(Max(Abs(p00), Abs(p10)), Max(Abs(p01), Abs(p11))));
 
         // Initialize _SurfaceInteraction_ for bilinear patch intersection
-        int faceIndex = mesh->faceIndices ? mesh->faceIndices[patchIndex] : 0;
+        int faceIndex = mesh->faceIndices ? mesh->faceIndices[blpIndex] : 0;
         bool flipNormal = mesh->reverseOrientation ^ mesh->transformSwapsHandedness;
-        SurfaceInteraction isect(Point3fi(pHit, pError), uvTex, wo, dpdu, dpdv, dndu,
-                                 dndv, time, flipNormal, faceIndex);
+        SurfaceInteraction isect(Point3fi(pHit, pError), st, wo, dpdu, dpdv, dndu, dndv,
+                                 time, flipNormal, faceIndex);
 
+        // Compute bilinear patch shading normal if necessary
         if (mesh->n != nullptr) {
             // Compute shading normals for bilinear patch intersection point
             Normal3f n00 = mesh->n[v[0]], n10 = mesh->n[v[1]], n01 = mesh->n[v[2]],
@@ -1464,8 +1461,8 @@ class BilinearPatch {
                     Normal3f dndu = Lerp(uv[1], n10, n11) - Lerp(uv[1], n00, n01);
                     Normal3f dndv = Lerp(uv[0], n01, n11) - Lerp(uv[0], n00, n10);
                     axis = Normalize(axis);
-                    Float cosTheta = Dot(n, ns),
-                          sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
+                    Float cosTheta = Dot(n, ns);
+                    Float sinTheta = SafeSqrt(1 - Sqr(cosTheta));
                     Transform r = Rotate(sinTheta, cosTheta, axis);
                     Vector3f sdpdu = r(dpdu), sdpdv = r(dpdv);
                     sdpdu = GramSchmidt(sdpdu, Vector3f(ns));
@@ -1473,6 +1470,7 @@ class BilinearPatch {
                 }
             }
         }
+
         return isect;
     }
 
@@ -1489,9 +1487,11 @@ class BilinearPatch {
 
     PBRT_CPU_GPU
     bool IsRectangle(const BilinearPatchMesh *mesh) const {
+        // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
         const int *v = &mesh->vertexIndices[4 * blpIndex];
         const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
         const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
+
         if (p00 == p01 || p01 == p11 || p11 == p10 || p10 == p00)
             return false;
         // Check if bilinear patch vertices are coplanar
@@ -1511,8 +1511,8 @@ class BilinearPatch {
 
     // BilinearPatch Private Members
     int meshIndex, blpIndex;
-    Float area;
     static pstd::vector<const BilinearPatchMesh *> *allMeshes;
+    Float area;
     static constexpr Float MinSphericalSampleArea = 1e-4;
 };
 

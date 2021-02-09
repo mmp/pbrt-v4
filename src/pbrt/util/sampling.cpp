@@ -61,11 +61,11 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v, 
 
     // Find $\cos \beta'$ for point along _b_ for sampled area
     Float cosAlpha = std::cos(alpha), sinAlpha = std::sin(alpha);
-    Float sinPhi = -std::sin(Ap_pi) * cosAlpha + std::cos(Ap_pi) * sinAlpha;
-    Float cosPhi = -std::cos(Ap_pi) * cosAlpha - std::sin(Ap_pi) * sinAlpha;
-    Float k1 = cosPhi - cosAlpha;
-    Float k2 = sinPhi + sinAlpha * Dot(a, b) /* cos c */;
-    Float cosBp = ((DifferenceOfProducts(k2, cosPhi, k1, sinPhi)) * cosAlpha - k2) /
+    Float sinPhi = std::sin(Ap_pi) * cosAlpha - std::cos(Ap_pi) * sinAlpha;
+    Float cosPhi = std::cos(Ap_pi) * cosAlpha + std::sin(Ap_pi) * sinAlpha;
+    Float k1 = cosPhi + cosAlpha;
+    Float k2 = sinPhi - sinAlpha * Dot(a, b) /* cos c */;
+    Float cosBp = ((DifferenceOfProducts(k2, cosPhi, k1, sinPhi)) * cosAlpha + k2) /
                   ((SumOfProducts(k2, sinPhi, k1, cosPhi)) * sinAlpha);
     // Happens if the triangle basically covers the entire hemisphere.
     // We currently depend on calling code to detect this case, which
@@ -107,8 +107,8 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v, 
 }
 
 // Via Jim Arvo's SphTri.C
-Point2f InvertSphericalTriangleSample(const pstd::array<Point3f, 3> &v, const Point3f &p,
-                                      const Vector3f &w) {
+Point2f InvertSphericalTriangleSample(const pstd::array<Point3f, 3> &v, Point3f p,
+                                      Vector3f w) {
     // Compute vectors _a_, _b_, and _c_ to spherical triangle vertices
     Vector3f a(v[0] - p), b(v[1] - p), c(v[2] - p);
     CHECK_GT(LengthSquared(a), 0);
@@ -132,13 +132,11 @@ Point2f InvertSphericalTriangleSample(const pstd::array<Point3f, 3> &v, const Po
     Float gamma = AngleBetween(n_ca, -n_bc);
 
     // Find vertex $\VEC{c'}$ along $\VEC{a}\VEC{c}$ arc for $\w{}$
-    // Compute the new C vertex, which lies on the arc defined by b-w
-    // and the arc defined by a-c.
     Vector3f cp = Normalize(Cross(Cross(b, w), Cross(c, a)));
-    // Adjust the sign of cp.  Make sure it's on the arc between A and C.
     if (Dot(cp, a + c) < 0)
         cp = -cp;
 
+    // Invert uniform area sampling to find _u0_
     Float u0;
     if (Dot(a, cp) > 0.99999847691f /* 0.1 degrees */)
         u0 = 0;
@@ -150,21 +148,20 @@ Point2f InvertSphericalTriangleSample(const pstd::array<Point3f, 3> &v, const Po
             return Point2f(0.5, 0.5);
         n_cpb = Normalize(n_cpb);
         n_acp = Normalize(n_acp);
-        Float Ap_pi = alpha + AngleBetween(n_ab, n_cpb) + AngleBetween(n_acp, -n_cpb);
+        Float Ap = alpha + AngleBetween(n_ab, n_cpb) + AngleBetween(n_acp, -n_cpb) - Pi;
 
-        // Compute first sample value, which gives the area $A'$
-        Float A_pi = alpha + beta + gamma;
-        u0 = (Ap_pi - Pi) / (A_pi - Pi);
+        // Compute sample _u0_ that gives the area $A'$
+        Float A = alpha + beta + gamma - Pi;
+        u0 = Ap / A;
     }
-    // Compute second sample value for $\w{}$ along $\VEC{b}\VEC{c'}$ and return result
-    Float z = Dot(w, b);
-    Float u1 = (1 - z) / (1 - Dot(cp, b));
+
+    // Invert arc sampling to find _u1_ and return result
+    Float u1 = (1 - Dot(w, b)) / (1 - Dot(cp, b));
     return Point2f(Clamp(u0, 0, 1), Clamp(u1, 0, 1));
 }
 
-Point3f SampleSphericalRectangle(const Point3f &pRef, const Point3f &s,
-                                 const Vector3f &ex, const Vector3f &ey, Point2f u,
-                                 Float *pdf) {
+Point3f SampleSphericalRectangle(Point3f pRef, Point3f s, Vector3f ex, Vector3f ey,
+                                 Point2f u, Float *pdf) {
     // Compute local reference frame and transform rectangle coordinates
     Float exl = Length(ex), eyl = Length(ey);
     Frame R = Frame::FromXY(ex / exl, ey / eyl);
@@ -223,9 +220,8 @@ Point3f SampleSphericalRectangle(const Point3f &pRef, const Point3f &s,
     return pRef + R.FromLocal(Vector3f(xu, yv, z0));
 }
 
-Point2f InvertSphericalRectangleSample(const Point3f &pRef, const Point3f &s,
-                                       const Vector3f &ex, const Vector3f &ey,
-                                       const Point3f &pRect) {
+Point2f InvertSphericalRectangleSample(Point3f pRef, Point3f s, Vector3f ex, Vector3f ey,
+                                       Point3f pRect) {
     // TODO: Delete anything unused in the below...
 
     // SphQuadInit()

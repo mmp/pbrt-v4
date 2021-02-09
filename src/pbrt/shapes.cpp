@@ -1018,9 +1018,11 @@ BilinearPatch::BilinearPatch(const BilinearPatchMesh *mesh, int meshIndex, int b
     : meshIndex(meshIndex), blpIndex(blpIndex) {
     blpBytes += sizeof(*this);
     // Store area of bilinear patch in _area_
+    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const int *v = &mesh->vertexIndices[4 * blpIndex];
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
+
     if (IsRectangle(mesh))
         area = Distance(p00, p01) * Distance(p00, p10);
     else {
@@ -1045,8 +1047,8 @@ BilinearPatch::BilinearPatch(const BilinearPatchMesh *mesh, int meshIndex, int b
 }
 
 Bounds3f BilinearPatch::Bounds() const {
-    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const BilinearPatchMesh *mesh = GetMesh();
+    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const int *v = &mesh->vertexIndices[4 * blpIndex];
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
@@ -1055,8 +1057,8 @@ Bounds3f BilinearPatch::Bounds() const {
 }
 
 DirectionCone BilinearPatch::NormalBounds() const {
-    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const BilinearPatchMesh *mesh = GetMesh();
+    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const int *v = &mesh->vertexIndices[4 * blpIndex];
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
@@ -1104,8 +1106,8 @@ DirectionCone BilinearPatch::NormalBounds() const {
 
 pstd::optional<ShapeIntersection> BilinearPatch::Intersect(const Ray &ray,
                                                            Float tMax) const {
-    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const BilinearPatchMesh *mesh = GetMesh();
+    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const int *v = &mesh->vertexIndices[4 * blpIndex];
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
@@ -1120,8 +1122,8 @@ pstd::optional<ShapeIntersection> BilinearPatch::Intersect(const Ray &ray,
 }
 
 bool BilinearPatch::IntersectP(const Ray &ray, Float tMax) const {
-    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const BilinearPatchMesh *mesh = GetMesh();
+    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const int *v = &mesh->vertexIndices[4 * blpIndex];
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
@@ -1130,8 +1132,8 @@ bool BilinearPatch::IntersectP(const Ray &ray, Float tMax) const {
 }
 
 pstd::optional<ShapeSample> BilinearPatch::Sample(Point2f u) const {
-    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const BilinearPatchMesh *mesh = GetMesh();
+    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const int *v = &mesh->vertexIndices[4 * blpIndex];
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
@@ -1178,8 +1180,8 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(Point2f u) const {
 }
 
 Float BilinearPatch::PDF(const Interaction &intr) const {
-    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const BilinearPatchMesh *mesh = GetMesh();
+    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const int *v = &mesh->vertexIndices[4 * blpIndex];
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
@@ -1210,8 +1212,8 @@ Float BilinearPatch::PDF(const Interaction &intr) const {
 
 pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,
                                                   Point2f u) const {
-    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const BilinearPatchMesh *mesh = GetMesh();
+    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const int *v = &mesh->vertexIndices[4 * blpIndex];
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
@@ -1278,8 +1280,8 @@ Float BilinearPatch::PDF(const ShapeSampleContext &ctx, Vector3f wi) const {
     if (!isect)
         return 0;
 
-    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const BilinearPatchMesh *mesh = GetMesh();
+    // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const int *v = &mesh->vertexIndices[4 * blpIndex];
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
