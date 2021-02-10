@@ -36,12 +36,12 @@ Point2f InvertSphericalTriangleSample(const pstd::array<Point3f, 3> &v, Point3f 
                                       Vector3f w);
 
 PBRT_CPU_GPU
-Point3f SampleSphericalRectangle(Point3f p, Point3f v00, Vector3f ex, Vector3f ey,
+Point3f SampleSphericalRectangle(Point3f p, Point3f v00, Vector3f eu, Vector3f ev,
                                  Point2f u, Float *pdf = nullptr);
 
 PBRT_CPU_GPU
-Point2f InvertSphericalRectangleSample(Point3f pRef, Point3f v00, Vector3f ex,
-                                       Vector3f ey, Point3f pRect);
+Point2f InvertSphericalRectangleSample(Point3f pRef, Point3f v00, Vector3f eu,
+                                       Vector3f ev, Point3f pRect);
 
 PBRT_CPU_GPU
 Vector3f SampleHenyeyGreenstein(Vector3f wo, Float g, Point2f u, Float *pdf = nullptr);

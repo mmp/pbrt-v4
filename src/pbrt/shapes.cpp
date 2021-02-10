@@ -968,6 +968,9 @@ BilinearPatchMesh *BilinearPatch::CreateMesh(const Transform *renderFromObject,
     PiecewiseConstant2D *imageDist = nullptr;
     if (!filename.empty()) {
         ImageAndMetadata im = Image::Read(filename, alloc);
+        // Account for v inversion in DiffuseAreaLight lookup, which in turn is there to
+        // match ImageTexture...
+        im.image.FlipY();
         Bounds2f domain = Bounds2f(Point2f(0, 0), Point2f(1, 1));
         Array2D<Float> d = im.image.GetSamplingDistribution();
         imageDist = alloc.new_object<PiecewiseConstant2D>(d, domain, alloc);
@@ -1141,10 +1144,9 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(Point2f u) const {
     // Sample bilinear patch parametric $(u,v)$ coordinates
     Float pdf = 1;
     Point2f uv;
-    if (mesh->imageDistribution) {
+    if (mesh->imageDistribution)
         uv = mesh->imageDistribution->Sample(u, &pdf);
-        uv[1] = 1 - uv[1];
-    } else if (!IsRectangle(mesh)) {
+    else if (!IsRectangle(mesh)) {
         // Sample patch $(u,v)$ with approximate uniform area sampling
         // Initialize _w_ array with differential area at bilinear patch corners
         pstd::array<Float, 4> w = {
@@ -1157,13 +1159,46 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(Point2f u) const {
     } else
         uv = u;
 
-    // Compute position, $\dpdu$, and $\dpdv$ for sampled bilinear patch $(u,v)$
+    // Compute bilinear patch geometric quantities at sampled $(u,v)$
+    // Compute $\pt{}$, $\dpdu$, and $\dpdv$ for sampled $(u,v)$
     Point3f pu0 = Lerp(uv[1], p00, p01), pu1 = Lerp(uv[1], p10, p11);
     Point3f p = Lerp(uv[0], pu0, pu1);
     Vector3f dpdu = pu1 - pu0;
     Vector3f dpdv = Lerp(uv[0], p01, p11) - Lerp(uv[0], p00, p10);
     if (LengthSquared(dpdu) == 0 || LengthSquared(dpdv) == 0)
         return {};
+
+    // Compute $(s,t)$ texture coordinates at bilinear patch $(u,v)$
+    Point2f st = uv;
+    Float duds = 1, dudt = 0, dvds = 0, dvdt = 1;
+    if (mesh->uv != nullptr) {
+        // Compute texture coordinates for bilinear patch intersection point
+        Point2f uv00 = mesh->uv[v[0]], uv10 = mesh->uv[v[1]];
+        Point2f uv01 = mesh->uv[v[2]], uv11 = mesh->uv[v[3]];
+        st = Lerp(uv[0], Lerp(uv[1], uv00, uv01), Lerp(uv[1], uv10, uv11));
+        // Update bilinear patch $\dpdu$ and $\dpdv$ accounting for $(s,t)$
+        // Compute partial derivatives of $(u,v)$ with respect to $(s,t)$
+        Vector2f dstdu = Lerp(uv[1], uv10, uv11) - Lerp(uv[1], uv00, uv01);
+        Vector2f dstdv = Lerp(uv[0], uv01, uv11) - Lerp(uv[0], uv00, uv10);
+        duds = std::abs(dstdu[0]) < 1e-8f ? 0 : 1 / dstdu[0];
+        dvds = std::abs(dstdv[0]) < 1e-8f ? 0 : 1 / dstdv[0];
+        dudt = std::abs(dstdu[1]) < 1e-8f ? 0 : 1 / dstdu[1];
+        dvdt = std::abs(dstdv[1]) < 1e-8f ? 0 : 1 / dstdv[1];
+
+        // Compute partial derivatives of $\pt{}$ with respect to $(s,t)$
+        Vector3f dpds = dpdu * duds + dpdv * dvds;
+        Vector3f dpdt = dpdu * dudt + dpdv * dvdt;
+
+        // Set _dpdu_ and _dpdt_ to updated partial derivatives
+        if (Cross(dpds, dpdt) != Vector3f(0, 0, 0)) {
+            if (Dot(Cross(dpdu, dpdv), Cross(dpds, dpdt)) < 0)
+                dpdt = -dpdt;
+            DCHECK_GE(Dot(Normalize(Cross(dpdu, dpdv)), Normalize(Cross(dpds, dpdt))),
+                      -1e-3);
+            dpdu = dpds;
+            dpdv = dpdt;
+        }
+    }
 
     // Compute surface normal for sampled bilinear patch $(u,v)$
     Normal3f n = Normal3f(Normalize(Cross(dpdu, dpdv)));
@@ -1175,7 +1210,7 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(Point2f u) const {
         gamma(4) * Vector3f(Max(Max(Abs(p00), Abs(p10)), Max(Abs(p01), Abs(p11))));
 
     // Return _ShapeSample_ for sampled bilinear patch point
-    return ShapeSample{Interaction(Point3fi(p, pError), n, uv),
+    return ShapeSample{Interaction(Point3fi(p, pError), n, st),
                        pdf / Length(Cross(dpdu, dpdv))};
 }
 
@@ -1189,7 +1224,7 @@ Float BilinearPatch::PDF(const Interaction &intr) const {
     // Compute PDF for sampling the $(u,v)$ coordinates given by _intr.uv_
     Float pdf;
     if (mesh->imageDistribution)
-        pdf = mesh->imageDistribution->PDF(Point2f(intr.uv[0], 1 - intr.uv[1]));
+        pdf = mesh->imageDistribution->PDF(intr.uv);
     else if (!IsRectangle(mesh)) {
         // Initialize _w_ array with differential area at bilinear patch corners
         pstd::array<Float, 4> w = {
@@ -1218,43 +1253,11 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
 
-    // Find normalized vectors to corners of bilinear patch
+    // Sample bilinear patch with respect to solid angle from reference point
     Vector3f v00 = Normalize(p00 - ctx.p()), v10 = Normalize(p10 - ctx.p());
     Vector3f v01 = Normalize(p01 - ctx.p()), v11 = Normalize(p11 - ctx.p());
-
-    if (IsRectangle(mesh) && !mesh->imageDistribution &&
-        SphericalQuadArea(v00, v10, v11, v01) > MinSphericalSampleArea) {
-        // Sample direction to rectanglular bilinear patch
-        Float pdf = 1;
-        if (ctx.ns != Normal3f(0, 0, 0)) {
-            // Warp uniform sample _u_ to account for incident $\cos \theta$ factor
-            // Compute $\cos \theta$ weights for rectangle seen from _ctx.p()_
-            Point3f rp = ctx.p();
-            pstd::array<Float, 4> w = pstd::array<Float, 4>{
-                std::max<Float>(0.01, AbsDot(Normalize(p00 - rp), ctx.ns)),
-                std::max<Float>(0.01, AbsDot(Normalize(p10 - rp), ctx.ns)),
-                std::max<Float>(0.01, AbsDot(Normalize(p01 - rp), ctx.ns)),
-                std::max<Float>(0.01, AbsDot(Normalize(p11 - rp), ctx.ns))};
-
-            u = SampleBilinear(u, w);
-            pdf *= BilinearPDF(u, w);
-        }
-        // Sample spherical rectangle at reference point $\pt{}$
-        Float quadPDF;
-        Point3f p =
-            SampleSphericalRectangle(ctx.p(), p00, p10 - p00, p01 - p00, u, &quadPDF);
-        pdf *= quadPDF;
-
-        // Compute surface normal and $(u,v)$ for sampled point on rectangle
-        Normal3f n = Normal3f(Normalize(Cross(p10 - p00, p01 - p00)));
-        if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
-            n *= -1;
-        Point2f uv(Dot(p - p00, p10 - p00) / DistanceSquared(p10, p00),
-                   Dot(p - p00, p01 - p00) / DistanceSquared(p01, p00));
-
-        return ShapeSample{Interaction(p, n, ctx.time, uv), pdf};
-
-    } else {
+    if (!IsRectangle(mesh) || mesh->imageDistribution ||
+        SphericalQuadArea(v00, v10, v11, v01) <= MinSphericalSampleArea) {
         // Uniformly sample shape and compute incident direction _wi_
         pstd::optional<ShapeSample> ss = Sample(u);
         DCHECK(ss.has_value());
@@ -1271,51 +1274,76 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,
 
         return ss;
     }
+    // Sample direction to rectanglular bilinear patch
+    Float pdf = 1;
+    // Warp uniform sample _u_ to account for incident $\cos \theta$ factor
+    if (ctx.ns != Normal3f(0, 0, 0)) {
+        // Compute $\cos \theta$ weights for rectangle seen from reference point
+        pstd::array<Float, 4> w =
+            pstd::array<Float, 4>{std::max<Float>(0.01, AbsDot(v00, ctx.ns)),
+                                  std::max<Float>(0.01, AbsDot(v10, ctx.ns)),
+                                  std::max<Float>(0.01, AbsDot(v01, ctx.ns)),
+                                  std::max<Float>(0.01, AbsDot(v11, ctx.ns))};
+
+        u = SampleBilinear(u, w);
+        pdf *= BilinearPDF(u, w);
+    }
+
+    // Sample spherical rectangle at reference point
+    Vector3f eu = p10 - p00, ev = p01 - p00;
+    Float quadPDF;
+    Point3f p = SampleSphericalRectangle(ctx.p(), p00, eu, ev, u, &quadPDF);
+    pdf *= quadPDF;
+
+    // Compute surface normal and $(u,v)$ for sampled point on rectangle
+    Normal3f n = Normal3f(Normalize(Cross(eu, ev)));
+    if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
+        n *= -1;
+    Point2f uv(Dot(p - p00, eu) / DistanceSquared(p10, p00),
+               Dot(p - p00, ev) / DistanceSquared(p01, p00));
+
+    return ShapeSample{Interaction(p, n, ctx.time, uv), pdf};
 }
 
 Float BilinearPatch::PDF(const ShapeSampleContext &ctx, Vector3f wi) const {
-    // Intersect sample ray with shape geometry
-    Ray ray = ctx.SpawnRay(wi);
-    pstd::optional<ShapeIntersection> isect = Intersect(ray);
-    if (!isect)
-        return 0;
-
     const BilinearPatchMesh *mesh = GetMesh();
     // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const int *v = &mesh->vertexIndices[4 * blpIndex];
     const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
     const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
 
-    // Find normalized vectors to corners of bilinear patch
+    // Compute solid angle PDF for sampling bilinear patch from _ctx_
+    // Intersect sample ray with shape geometry
+    Ray ray = ctx.SpawnRay(wi);
+    pstd::optional<ShapeIntersection> isect = Intersect(ray);
+    if (!isect)
+        return 0;
+
     Vector3f v00 = Normalize(p00 - ctx.p()), v10 = Normalize(p10 - ctx.p());
     Vector3f v01 = Normalize(p01 - ctx.p()), v11 = Normalize(p11 - ctx.p());
+    if (!IsRectangle(mesh) || mesh->imageDistribution ||
+        SphericalQuadArea(v00, v10, v11, v01) <= MinSphericalSampleArea) {
+        // Return solid angle PDF for area sampled bilinear patch
+        Float pdf = PDF(isect->intr) * (DistanceSquared(ctx.p(), isect->intr.p()) /
+                                        AbsDot(isect->intr.n, -wi));
+        return IsInf(pdf) ? 0 : pdf;
 
-    if (IsRectangle(mesh) && !mesh->imageDistribution &&
-        SphericalQuadArea(v00, v10, v11, v01) > MinSphericalSampleArea) {
+    } else {
         // Return PDF for sample in spherical rectangle
         Float pdf = 1 / SphericalQuadArea(v00, v10, v11, v01);
         if (ctx.ns != Normal3f(0, 0, 0)) {
-            // Compute $\cos \theta$ weights for rectangle seen from _ctx.p()_
-            Point3f rp = ctx.p();
-            pstd::array<Float, 4> w = pstd::array<Float, 4>{
-                std::max<Float>(0.01, AbsDot(Normalize(p00 - rp), ctx.ns)),
-                std::max<Float>(0.01, AbsDot(Normalize(p10 - rp), ctx.ns)),
-                std::max<Float>(0.01, AbsDot(Normalize(p01 - rp), ctx.ns)),
-                std::max<Float>(0.01, AbsDot(Normalize(p11 - rp), ctx.ns))};
+            // Compute $\cos \theta$ weights for rectangle seen from reference point
+            pstd::array<Float, 4> w =
+                pstd::array<Float, 4>{std::max<Float>(0.01, AbsDot(v00, ctx.ns)),
+                                      std::max<Float>(0.01, AbsDot(v10, ctx.ns)),
+                                      std::max<Float>(0.01, AbsDot(v01, ctx.ns)),
+                                      std::max<Float>(0.01, AbsDot(v11, ctx.ns))};
 
-            Point2f u = InvertSphericalRectangleSample(rp, p00, p10 - p00, p01 - p00,
+            Point2f u = InvertSphericalRectangleSample(ctx.p(), p00, p10 - p00, p01 - p00,
                                                        isect->intr.p());
             return BilinearPDF(u, w) * pdf;
         } else
             return pdf;
-
-    } else {
-        // Return solid angle PDF for sampling bilinear patch at _intr_
-        Float pdf = PDF(isect->intr) / (AbsDot(isect->intr.n, -wi) /
-                                        DistanceSquared(ctx.p(), isect->intr.p()));
-        if (IsInf(pdf))
-            pdf = 0;
-        return pdf;
     }
 }
 

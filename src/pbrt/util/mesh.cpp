@@ -165,7 +165,7 @@ BilinearPatchMesh::BilinearPatchMesh(const Transform &renderFromObject,
       transformSwapsHandedness(renderFromObject.SwapsHandedness()),
       nPatches(indices.size() / 4),
       nVertices(P.size()),
-      imageDistribution(std::move(imageDist)) {
+      imageDistribution(imageDist) {
     CHECK_EQ((indices.size() % 4), 0);
     ++nBilinearMeshes;
     nBlps += nPatches;

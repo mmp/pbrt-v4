@@ -1373,17 +1373,17 @@ class BilinearPatch {
     static SurfaceInteraction InteractionFromIntersection(const BilinearPatchMesh *mesh,
                                                           int blpIndex, Point2f uv,
                                                           Float time, Vector3f wo) {
-        // Compute bilinear patch intersection point, $\dpdu$, and $\dpdv$
+        // Compute bilinear patch point $\pt{}$, $\dpdu$, and $\dpdv$ for $(u,v)$
         // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
         const int *v = &mesh->vertexIndices[4 * blpIndex];
         const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
         const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
 
-        Point3f pHit = Lerp(uv[0], Lerp(uv[1], p00, p01), Lerp(uv[1], p10, p11));
+        Point3f p = Lerp(uv[0], Lerp(uv[1], p00, p01), Lerp(uv[1], p10, p11));
         Vector3f dpdu = Lerp(uv[1], p10, p11) - Lerp(uv[1], p00, p01);
         Vector3f dpdv = Lerp(uv[0], p01, p11) - Lerp(uv[0], p00, p10);
 
-        // Compute texture coordinates at bilinear patch intersection
+        // Compute $(s,t)$ texture coordinates at bilinear patch $(u,v)$
         Point2f st = uv;
         Float duds = 1, dudt = 0, dvds = 0, dvdt = 1;
         if (mesh->uv != nullptr) {
@@ -1436,6 +1436,12 @@ class BilinearPatch {
         Normal3f dndv =
             Normal3f((g * F - f * G) * invEGF2 * dpdu + (f * F - g * E) * invEGF2 * dpdv);
 
+        // Update $\dndu$ and $\dndv$ to account for $(s,t)$ parameterization
+        Normal3f dnds = dndu * duds + dndv * dvds;
+        Normal3f dndt = dndu * dudt + dndv * dvdt;
+        dndu = dnds;
+        dndv = dndt;
+
         // Initialize bilinear patch intersection point error _pError_
         Vector3f pError =
             gamma(4) * Vector3f(Max(Max(Abs(p00), Abs(p10)), Max(Abs(p01), Abs(p11))));
@@ -1443,31 +1449,28 @@ class BilinearPatch {
         // Initialize _SurfaceInteraction_ for bilinear patch intersection
         int faceIndex = mesh->faceIndices ? mesh->faceIndices[blpIndex] : 0;
         bool flipNormal = mesh->reverseOrientation ^ mesh->transformSwapsHandedness;
-        SurfaceInteraction isect(Point3fi(pHit, pError), st, wo, dpdu, dpdv, dndu, dndv,
+        SurfaceInteraction isect(Point3fi(p, pError), st, wo, dpdu, dpdv, dndu, dndv,
                                  time, flipNormal, faceIndex);
 
         // Compute bilinear patch shading normal if necessary
         if (mesh->n != nullptr) {
             // Compute shading normals for bilinear patch intersection point
-            Normal3f n00 = mesh->n[v[0]], n10 = mesh->n[v[1]], n01 = mesh->n[v[2]],
-                     n11 = mesh->n[v[3]];
+            Normal3f n00 = mesh->n[v[0]], n10 = mesh->n[v[1]];
+            Normal3f n01 = mesh->n[v[2]], n11 = mesh->n[v[3]];
             Normal3f ns = Lerp(uv[0], Lerp(uv[1], n00, n01), Lerp(uv[1], n10, n11));
             if (LengthSquared(ns) > 0) {
                 ns = Normalize(ns);
-                Normal3f n = Normal3f(Normalize(isect.n));
-                Vector3f axis = Cross(Vector3f(n), Vector3f(ns));
-                if (LengthSquared(axis) > 1e-14f) {
-                    // Set shading geometry for bilinear patch intersection
-                    Normal3f dndu = Lerp(uv[1], n10, n11) - Lerp(uv[1], n00, n01);
-                    Normal3f dndv = Lerp(uv[0], n01, n11) - Lerp(uv[0], n00, n10);
-                    axis = Normalize(axis);
-                    Float cosTheta = Dot(n, ns);
-                    Float sinTheta = SafeSqrt(1 - Sqr(cosTheta));
-                    Transform r = Rotate(sinTheta, cosTheta, axis);
-                    Vector3f sdpdu = r(dpdu), sdpdv = r(dpdv);
-                    sdpdu = GramSchmidt(sdpdu, Vector3f(ns));
-                    isect.SetShadingGeometry(ns, sdpdu, sdpdv, dndu, dndv, true);
-                }
+                // Set shading geometry for bilinear patch intersection
+                Normal3f dndu = Lerp(uv[1], n10, n11) - Lerp(uv[1], n00, n01);
+                Normal3f dndv = Lerp(uv[0], n01, n11) - Lerp(uv[0], n00, n10);
+                // Update $\dndu$ and $\dndv$ to account for $(s,t)$ parameterization
+                Normal3f dnds = dndu * duds + dndv * dvds;
+                Normal3f dndt = dndu * dudt + dndv * dvdt;
+                dndu = dnds;
+                dndv = dndt;
+
+                Transform r = RotateFromTo(Vector3f(Normalize(isect.n)), Vector3f(ns));
+                isect.SetShadingGeometry(ns, r(dpdu), r(dpdv), dndu, dndv, true);
             }
         }
 

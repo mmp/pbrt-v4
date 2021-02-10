@@ -185,7 +185,7 @@ Point3f SampleSphericalRectangle(Point3f pRef, Point3f s, Vector3f ex, Vector3f 
     Float g2 = AngleBetween(-n2, n3), g3 = AngleBetween(-n3, n0);
 
     // Compute spherical rectangle solid angle and PDF
-    Float solidAngle = double(g0) + double(g1) + double(g2) + double(g3) - 2. * Pi;
+    Float solidAngle = g0 + g1 + g2 + g3 - 2 * Pi;
     CHECK_RARE(1e-5, solidAngle <= 0);
     if (solidAngle <= 0) {
         if (pdf != nullptr)
@@ -199,8 +199,7 @@ Point3f SampleSphericalRectangle(Point3f pRef, Point3f s, Vector3f ex, Vector3f 
 
     // Sample _cu_ for spherical rectangle sample
     Float b0 = n0.z, b1 = n2.z;
-    // Float au = u[0] * solidAngle + k;   // original
-    Float au = u[0] * solidAngle - g2 - g3;
+    Float au = u[0] * (g0 + g1 - 2 * Pi) + (u[0] - 1) * (g2 + g3);
     Float fu = (std::cos(au) * b0 - b1) / std::sin(au);
     Float cu = std::copysign(1 / std::sqrt(Sqr(fu) + Sqr(b0)), fu);
     cu = Clamp(cu, -OneMinusEpsilon, OneMinusEpsilon);  // avoid NaNs
@@ -281,7 +280,7 @@ Point2f InvertSphericalRectangleSample(Point3f pRef, Point3f s, Vector3f ex, Vec
     if (xu == 0)
         xu = 1e-10;
 
-    // DOing all this in double actually makes things slightly worse???!?
+    // Doing all this in double actually makes things slightly worse???!?
     // Float fusq = (1 - b0sq * Sqr(cu)) / Sqr(cu);
     // Float fusq = 1 / Sqr(cu) - b0sq;  // more stable
     Float invcusq = 1 + z0sq / Sqr(xu);
