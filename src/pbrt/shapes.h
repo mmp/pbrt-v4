@@ -159,11 +159,10 @@ class Sphere {
         Interval c = Sqr(oi.x) + Sqr(oi.y) + Sqr(oi.z) - Sqr(Interval(radius));
 
         // Compute sphere quadratic discriminant _discrim_
-        Interval f = b / (2 * a);
-        Point3fi fp = oi - f * di;
-        Interval sqrtf = Sqrt(Sqr(fp.x) + Sqr(fp.y) + Sqr(fp.z));
+        Vector3fi v(oi - b / (2 * a) * di);
+        Interval length = Sqrt(Dot(v, v));
         Interval discrim =
-            4 * a * (Interval(radius) + sqrtf) * (Interval(radius) - sqrtf);
+            4 * a * (Interval(radius) + length) * (Interval(radius) - length);
         if (discrim.LowerBound() < 0)
             return {};
 
@@ -610,10 +609,10 @@ class Cylinder {
 
         // Compute cylinder quadratic discriminant _discrim_
         Interval f = b / (2 * a);
-        Interval fx = oi.x - f * di.x, fy = oi.y - f * di.y;
-        Interval sqrtf = Sqrt(Sqr(fx) + Sqr(fy));
+        Interval vx = oi.x - f * di.x, vy = oi.y - f * di.y;
+        Interval length = Sqrt(Sqr(vx) + Sqr(vy));
         Interval discrim =
-            4 * a * (Interval(radius) + sqrtf) * (Interval(radius) - sqrtf);
+            4 * a * (Interval(radius) + length) * (Interval(radius) - length);
         if (discrim.LowerBound() < 0)
             return {};
 
@@ -643,7 +642,7 @@ class Cylinder {
         // Compute cylinder hit point and $\phi$
         pHit = Point3f(oi) + (Float)tShapeHit * Vector3f(di);
         // Refine cylinder intersection point
-        Float hitRad = std::sqrt(pHit.x * pHit.x + pHit.y * pHit.y);
+        Float hitRad = std::sqrt(Sqr(pHit.x) + Sqr(pHit.y));
         pHit.x *= radius / hitRad;
         pHit.y *= radius / hitRad;
 
@@ -661,7 +660,7 @@ class Cylinder {
             // Compute cylinder hit point and $\phi$
             pHit = Point3f(oi) + (Float)tShapeHit * Vector3f(di);
             // Refine cylinder intersection point
-            Float hitRad = std::sqrt(pHit.x * pHit.x + pHit.y * pHit.y);
+            Float hitRad = std::sqrt(Sqr(pHit.x) + Sqr(pHit.y));
             pHit.x *= radius / hitRad;
             pHit.y *= radius / hitRad;
 
@@ -732,7 +731,7 @@ class Cylinder {
         // Compute cylinder sample position _pi_ and normal _n_ from $z$ and $\phi$
         Point3f pObj = Point3f(radius * std::cos(phi), radius * std::sin(phi), z);
         // Reproject _pObj_ to cylinder surface and compute _pObjError_
-        Float hitRad = std::sqrt(pObj.x * pObj.x + pObj.y * pObj.y);
+        Float hitRad = std::sqrt(Sqr(pObj.x) + Sqr(pObj.y));
         pObj.x *= radius / hitRad;
         pObj.y *= radius / hitRad;
         Vector3f pObjError = gamma(3) * Abs(Vector3f(pObj.x, pObj.y, 0));
@@ -1257,8 +1256,7 @@ struct BilinearIntersection {
 
 // Bilinear Patch Inline Functions
 PBRT_CPU_GPU inline pstd::optional<BilinearIntersection> IntersectBilinearPatch(
-    const Ray &ray, Float tMax, const Point3f &p00, const Point3f &p10,
-    const Point3f &p01, const Point3f &p11) {
+    const Ray &ray, Float tMax, Point3f p00, Point3f p10, Point3f p01, Point3f p11) {
     // Find quadratic coefficients for distance from ray to $u$ iso-lines
     Float a = Dot(Cross(p10 - p00, p01 - p11), ray.d);
     Float c = Dot(Cross(p00 - ray.o, ray.d), p01 - p00);
@@ -1269,8 +1267,8 @@ PBRT_CPU_GPU inline pstd::optional<BilinearIntersection> IntersectBilinearPatch(
     if (!Quadratic(a, b, c, &u1, &u2))
         return {};
 
-    Float t = tMax, u, v;
     // Compute $v$ and $t$ for to first $u$ intersection
+    Float t = tMax, u, v;
     if (0 <= u1 && u1 <= 1) {
         // Precompute common terms for $v$ and $t$ computation
         Point3f uo = Lerp(u1, p00, p10);
@@ -1417,8 +1415,7 @@ class BilinearPatch {
 
         // Find partial derivatives $\dndu$ and $\dndv$ for bilinear patch
         Vector3f d2Pduu(0, 0, 0), d2Pdvv(0, 0, 0);
-        Vector3f d2Pduv(p00.x - p01.x - p10.x + p11.x, p00.y - p01.y - p10.y + p11.y,
-                        p00.z - p01.z - p10.z + p11.z);
+        Vector3f d2Pduv = (p00 - p01) + (p11 - p10);
         // Compute coefficients for fundamental forms
         Float E = Dot(dpdu, dpdu);
         Float F = Dot(dpdu, dpdv);

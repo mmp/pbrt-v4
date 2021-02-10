@@ -593,7 +593,7 @@ bool Curve::IntersectRay(const Ray &r, Float tMax,
 }
 
 bool Curve::RecursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Point3f> cp,
-                               const Transform &ObjectFromRay, Float u0, Float u1,
+                               const Transform &objectFromRay, Float u0, Float u1,
                                int depth, pstd::optional<ShapeIntersection> *si) const {
     Float rayLength = Length(ray.d);
     if (depth > 0) {
@@ -614,7 +614,7 @@ bool Curve::RecursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Poin
                 continue;
 
             // Recursively test ray-segment intersection
-            bool hit = RecursiveIntersect(ray, tMax, cps, ObjectFromRay, u[seg],
+            bool hit = RecursiveIntersect(ray, tMax, cps, objectFromRay, u[seg],
                                           u[seg + 1], depth - 1, si);
             if (hit && si == nullptr)
                 return true;
@@ -663,8 +663,8 @@ bool Curve::RecursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Poin
         Vector3f dpcdw;
         Point3f pc =
             EvaluateCubicBezier(pstd::span<const Point3f>(cp), Clamp(w, 0, 1), &dpcdw);
-        Float ptCurveDist2 = pc.x * pc.x + pc.y * pc.y;
-        if (ptCurveDist2 > hitWidth * hitWidth * .25f)
+        Float ptCurveDist2 = Sqr(pc.x) + Sqr(pc.y);
+        if (ptCurveDist2 > Sqr(hitWidth) * .25f)
             return false;
         if (pc.z < 0 || pc.z > rayLength * tMax)
             return false;
@@ -692,7 +692,7 @@ bool Curve::RecursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Poin
                 dpdv = Normalize(Cross(nHit, dpdu)) * hitWidth;
             else {
                 // Compute curve $\dpdv$ for flat and cylinder curves
-                Vector3f dpduPlane = ObjectFromRay.ApplyInverse(dpdu);
+                Vector3f dpduPlane = objectFromRay.ApplyInverse(dpdu);
                 Vector3f dpdvPlane =
                     Normalize(Vector3f(-dpduPlane.y, dpduPlane.x, 0)) * hitWidth;
                 if (common->type == CurveType::Cylinder) {
@@ -701,7 +701,7 @@ bool Curve::RecursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Poin
                     Transform rot = Rotate(-theta, dpduPlane);
                     dpdvPlane = rot(dpdvPlane);
                 }
-                dpdv = ObjectFromRay(dpdvPlane);
+                dpdv = objectFromRay(dpdvPlane);
             }
 
             // Compute error bounds for curve intersection
@@ -1274,7 +1274,7 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,
 
         return ss;
     }
-    // Sample direction to rectanglular bilinear patch
+    // Sample direction to rectangular bilinear patch
     Float pdf = 1;
     // Warp uniform sample _u_ to account for incident $\cos \theta$ factor
     if (ctx.ns != Normal3f(0, 0, 0)) {
