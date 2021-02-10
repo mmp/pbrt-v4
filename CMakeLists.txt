@@ -62,12 +62,7 @@ check_ext ("stb" "stb/tools" b42009b3b9d4ca35bc703f5310eedc74f584be58)
 check_ext ("OpenVDB" "openvdb/nanovdb" 1c306bcaf7e9f7d52525bab716202bd4f7fff5d1)
 check_ext ("zlib" "zlib/doc" 54d591eabf9fe0e84c725638f8d5d8d202a093fa)
 
-if (CMAKE_BUILD_TYPE MATCHES Debug)
-  add_definitions (-D PBRT_DEBUG_BUILD)
-endif ()
-# To build a release build with CHECKs enabled, comment-out the above
-# 3 lines and un-comment out this one:
-# SET(CMAKE_CXX_FLAGS_RELEASE "-O3")
+add_compile_definitions ("$<$<CONFIG:DEBUG>:PBRT_DEBUG_BUILD>")
 
 enable_testing ()
 
@@ -128,6 +123,8 @@ target_compile_options (
         "$<$<CXX_COMPILER_ID:MSVC>:$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcompiler >/wd26451>" # arithmetic on 4-byte value, then cast to 8-byte
         "$<$<CXX_COMPILER_ID:MSVC>:$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcompiler >/wd26495>" # uninitialized member variable
 )
+
+add_library (pbrt_opt INTERFACE)
 
 #########################################
 ## CUDA / OptiX
@@ -266,7 +263,7 @@ if (CMAKE_CUDA_COMPILER)
           endif()
           target_include_directories ("${lib_name}" PRIVATE src ${CMAKE_BINARY_DIR})
           target_include_directories ("${lib_name}" SYSTEM PRIVATE ${NANOVDB_INCLUDE})
-          target_link_libraries ("${lib_name}" PRIVATE cuda_build_configuration pbrt_warnings)
+          target_link_libraries ("${lib_name}" PRIVATE cuda_build_configuration pbrt_opt pbrt_warnings)
           add_dependencies ("${lib_name}" pbrt_soa_generated)
           set (c_var_name ${output_var})
           set (embedded_file ${cuda_file}.ptx_embedded.c)
@@ -294,17 +291,10 @@ endif ()
 
 INCLUDE(CheckCXXCompilerFlag)
 
-# TODO: how to specify this on windows?
-
-# TODO: the following works given --forward-unknown-to-host-compiler
-# starting with CUDA 11.1, but is broken in 11.0.  Unfortunately cmake
-# still reports 0 for CUDA_VERSION_MINOR with 11.1, so it's not clear how
-# to detect that vs CUDA 11.0...
-
 check_cxx_compiler_flag ("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
-if (COMPILER_SUPPORTS_MARCH_NATIVE AND PBRT_BUILD_NATIVE_EXECUTABLE AND
-    NOT PBRT_CUDA_ENABLED)
-  list (APPEND PBRT_CXX_FLAGS "-march=native")
+if (COMPILER_SUPPORTS_MARCH_NATIVE AND PBRT_BUILD_NATIVE_EXECUTABLE)
+    target_compile_options (pbrt_opt INTERFACE
+          "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcompiler >-march=native")
 endif ()
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
@@ -682,7 +672,7 @@ add_executable (pbrt::soac ALIAS soac)
 
 target_compile_definitions (soac PRIVATE ${PBRT_DEFINITIONS})
 target_compile_options (soac PUBLIC ${PBRT_CXX_FLAGS})
-target_link_libraries (soac PRIVATE pbrt_warnings)
+target_link_libraries (soac PRIVATE pbrt_warnings pbrt_opt)
 
 set_target_properties (soac PROPERTIES OUTPUT_NAME soac)
 
@@ -749,7 +739,7 @@ endif ()
 
 target_compile_options (pbrt_lib PUBLIC ${PBRT_CXX_FLAGS})
 
-target_link_libraries (pbrt_lib PRIVATE pbrt_warnings $<$<BOOL:PBRT_CUDA_ENABLED>:cuda_build_configuration>)
+target_link_libraries (pbrt_lib PRIVATE pbrt_warnings pbrt_opt $<$<BOOL:PBRT_CUDA_ENABLED>:cuda_build_configuration>)
 
 add_sanitizers (pbrt_lib)
 
@@ -793,7 +783,7 @@ add_executable (pbrt::rgb2spec_opt ALIAS rgb2spec_opt)
 
 target_compile_definitions (rgb2spec_opt PRIVATE ${PBRT_DEFINITIONS})
 target_compile_options (rgb2spec_opt PUBLIC ${PBRT_CXX_FLAGS})
-target_link_libraries (rgb2spec_opt PRIVATE ${CMAKE_THREAD_LIBS_INIT} pbrt_warnings)
+target_link_libraries (rgb2spec_opt PRIVATE ${CMAKE_THREAD_LIBS_INIT} pbrt_opt pbrt_warnings)
 
 if (NOT PBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES)
   add_custom_command (OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/rgbspectrum_aces.cpp
@@ -822,7 +812,7 @@ add_executable (pbrt::pbrt_exe ALIAS pbrt_exe)
 target_compile_definitions (pbrt_exe PRIVATE ${PBRT_DEFINITIONS})
 target_compile_options (pbrt_exe PRIVATE ${PBRT_CXX_FLAGS})
 target_include_directories (pbrt_exe PRIVATE src src/ext)
-target_link_libraries (pbrt_exe PRIVATE ${ALL_PBRT_LIBS} pbrt_warnings)
+target_link_libraries (pbrt_exe PRIVATE ${ALL_PBRT_LIBS} pbrt_opt pbrt_warnings)
 
 set_target_properties (pbrt_exe PROPERTIES OUTPUT_NAME pbrt)
 
@@ -840,7 +830,7 @@ set_property (TARGET sky_lib PROPERTY FOLDER "ext")
 target_compile_definitions (imgtool PRIVATE ${PBRT_DEFINITIONS})
 target_compile_options (imgtool PRIVATE ${PBRT_CXX_FLAGS})
 target_include_directories (imgtool PRIVATE src src/ext ${FLIP_INCLUDE} )
-target_link_libraries (imgtool PRIVATE ${ALL_PBRT_LIBS} pbrt_warnings sky_lib flip_lib)
+target_link_libraries (imgtool PRIVATE ${ALL_PBRT_LIBS} pbrt_opt pbrt_warnings sky_lib flip_lib)
 
 add_sanitizers (imgtool)
 
@@ -864,7 +854,7 @@ add_executable (cyhair2pbrt src/pbrt/cmd/cyhair2pbrt.cpp)
 
 target_compile_definitions (cyhair2pbrt PRIVATE ${PBRT_DEFINITIONS})
 target_compile_options (cyhair2pbrt PRIVATE ${PBRT_CXX_FLAGS})
-target_link_libraries (cyhair2pbrt PRIVATE pbrt_warnings)
+target_link_libraries (cyhair2pbrt PRIVATE pbrt_opt pbrt_warnings)
 
 add_sanitizers (cyhair2pbrt)
 
@@ -907,7 +897,7 @@ set (PBRT_TEST_SOURCE
 
 add_executable (pbrt_test src/pbrt/cmd/pbrt_test.cpp ${PBRT_TEST_SOURCE})
 
-target_link_libraries (pbrt_test PRIVATE ${ALL_PBRT_LIBS} pbrt_warnings)
+target_link_libraries (pbrt_test PRIVATE ${ALL_PBRT_LIBS} pbrt_opt pbrt_warnings)
 target_compile_definitions (pbrt_test PRIVATE ${PBRT_DEFINITIONS})
 target_include_directories (pbrt_test PRIVATE src src/ext ${DOUBLE_CONVERSION_INCLUDE})
 target_compile_options(pbrt_test PUBLIC ${PBRT_CXX_FLAGS})
