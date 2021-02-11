@@ -296,7 +296,7 @@ static __forceinline__ __device__ bool alphaKilled(const TriangleMeshRecord &rec
     else {
         float3 o = optixGetWorldRayOrigin();
         float3 d = optixGetWorldRayDirection();
-        Float u = uint32_t(Hash(o, d)) * 0x1p-32f;
+        Float u = HashFloat(o, d);
         return u > alpha;
     }
 }
@@ -598,7 +598,7 @@ extern "C" __global__ void __intersection__quadric() {
 
             float3 o = optixGetWorldRayOrigin();
             float3 d = optixGetWorldRayDirection();
-            Float u = uint32_t(Hash(o.x, o.y, o.z, d.x, d.y, d.z)) * 0x1p-32f;
+            Float u = HashFloat(o.x, o.y, o.z, d.x, d.y, d.z);
             if (u > alpha)
                 // no hit
                 return;
@@ -676,7 +676,7 @@ extern "C" __global__ void __intersection__bilinearPatch() {
 
             float3 o = optixGetWorldRayOrigin();
             float3 d = optixGetWorldRayDirection();
-            Float u = uint32_t(Hash(o, d)) * 0x1p-32f;
+            Float u = HashFloat(o, d);
             if (u > alpha)
                 // no hit
                 return;

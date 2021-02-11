@@ -89,6 +89,11 @@ PBRT_CPU_GPU inline uint64_t Hash(Args... args) {
     return hashInternal(0, args...);
 }
 
+template <typename... Args>
+PBRT_CPU_GPU inline Float HashFloat(Args... args) {
+    return uint32_t(Hash(args...)) * 0x1p-32f;
+}
+
 }  // namespace pbrt
 
 #endif  // PBRT_UTIL_HASH_H

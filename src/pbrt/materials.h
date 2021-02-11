@@ -346,7 +346,7 @@ class MixMaterial {
         if (amt >= 1)
             return materials[1];
 
-        Float u = uint32_t(Hash(ctx.p, ctx.wo, materials[0], materials[1])) * 0x1p-32;
+        Float u = HashFloat(ctx.p, ctx.wo, materials[0], materials[1]);
         return (amt < u) ? materials[0] : materials[1];
     }
 
