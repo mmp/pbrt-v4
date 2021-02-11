@@ -336,7 +336,6 @@ class ZSobolSampler {
     std::vector<SamplerHandle> Clone(int n, Allocator alloc);
     std::string ToString() const;
 
-  private:
     PBRT_CPU_GPU
     uint64_t GetSampleIndex() const {
         static const uint8_t permutations[24][4] = {
@@ -363,6 +362,7 @@ class ZSobolSampler {
         return sampleIndex;
     }
 
+  private:
     PBRT_CPU_GPU
     int HashPerm(uint64_t index) const {
         return uint32_t(MixBits(index ^ (0x55555555 * dimension)) >> 24) % 24;

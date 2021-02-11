@@ -8,6 +8,8 @@
 
 #include <pbrt/samplers.h>
 
+#include <set>
+
 using namespace pbrt;
 
 // Make sure all samplers give the same sample values if we go back to the
@@ -163,4 +165,34 @@ TEST(PMJ02BNSampler, ElementaryIntervals) {
     for (int logSamples = 2; logSamples <= 10; logSamples += 2)
         checkElementarySampler("PMJ02BNSampler", new PMJ02BNSampler(1 << logSamples),
                                logSamples);
+}
+
+TEST(ZSobolSampler, ValidIndices) {
+    Point2i res(16, 9);
+    for (int logSamples = 0; logSamples <= 10; ++logSamples) {
+        int spp = 1 << logSamples;
+        ZSobolSampler sampler(spp, res);
+
+        for (int dim = 0; dim < 7; dim += 3) {
+            std::set<uint64_t> returnedIndices;
+            for (Point2i p : Bounds2i(Point2i(0, 0), res)) {
+                uint64_t pow2Base;
+                for (int i = 0; i < spp; ++i) {
+                    sampler.StartPixelSample(p, i, dim);
+                    uint64_t index = sampler.GetSampleIndex();
+
+                    // Make sure no index is repeated across multiple pixels
+                    EXPECT_TRUE(returnedIndices.find(index) == returnedIndices.end());
+                    returnedIndices.insert(index);
+
+                    // Make sure that all samples for this pixel are within the
+                    // same pow2 aligned and sized range of the sample indices.
+                    if (i == 0)
+                        pow2Base = index / spp;
+                    else
+                        EXPECT_EQ(index / spp, pow2Base);
+                }
+            }
+        }
+    }
 }
