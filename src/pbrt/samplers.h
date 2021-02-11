@@ -358,6 +358,7 @@ class ZSobolSampler {
         if (pow2Samples) {
             sampleIndex |= (mortonIndex & 3);
             sampleIndex >>= 1;
+            sampleIndex ^= MixBits((mortonIndex >> 2) ^ (0x55555555 * dimension)) & 1;
         }
         return sampleIndex;
     }

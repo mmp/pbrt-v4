@@ -121,7 +121,7 @@ static void checkElementarySampler(const char *name, SamplerHandle sampler,
 
 TEST(PaddedSobolSampler, ElementaryIntervals) {
     for (auto rand :
-         {RandomizeStrategy::None, RandomizeStrategy::Owen, RandomizeStrategy::PermuteDigits})
+         {RandomizeStrategy::None, RandomizeStrategy::PermuteDigits})
         for (int logSamples = 2; logSamples <= 10; ++logSamples)
             checkElementarySampler("PaddedSobolSampler",
                                    new PaddedSobolSampler(1 << logSamples, rand),
@@ -129,12 +129,13 @@ TEST(PaddedSobolSampler, ElementaryIntervals) {
 }
 
 TEST(ZSobolSampler, ElementaryIntervals) {
-    for (auto rand :
-         {RandomizeStrategy::None, RandomizeStrategy::Owen, RandomizeStrategy::PermuteDigits})
-        for (int logSamples = 2; logSamples <= 10; ++logSamples)
-            checkElementarySampler("ZSobolSampler",
-                                   new ZSobolSampler(1 << logSamples, Point2i(10, 10), rand),
-                                   logSamples, 1);
+    for (int seed : {0, 1, 5, 6, 10, 15})
+        for (auto rand :
+                 {RandomizeStrategy::None, RandomizeStrategy::PermuteDigits})
+            for (int logSamples = 2; logSamples <= 8; ++logSamples)
+                checkElementarySampler(StringPrintf("ZSobolSampler - %s - %d", rand, seed).c_str(),
+                                       new ZSobolSampler(1 << logSamples, Point2i(10, 10), rand, seed),
+                                       logSamples, 10);
 }
 
 TEST(SobolUnscrambledSampler, ElementaryIntervals) {
