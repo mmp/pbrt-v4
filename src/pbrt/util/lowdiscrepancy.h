@@ -66,6 +66,8 @@ class DigitPermutation {
 inline PBRT_CPU_GPU uint64_t SobolIntervalToIndex(const uint32_t log2Scale,
                                                   uint64_t sampleIndex, const Point2i &p);
 
+PBRT_CPU_GPU inline Float BlueNoiseSample(Point2i p, int instance);
+
 PBRT_CPU_GPU
 Float RadicalInverse(int baseIndex, uint64_t a);
 pstd::vector<DigitPermutation> *ComputeRadicalInversePermutations(uint32_t seed,
@@ -196,6 +198,35 @@ PBRT_CPU_GPU inline float SobolSampleFloat(int64_t a, int dimension, R randomize
 
     v = randomizer(v);
     return std::min(v * 0x1p-32f, FloatOneMinusEpsilon);
+}
+
+PBRT_CPU_GPU inline Float BlueNoiseSample(Point2i p, int instance) {
+    auto HashPerm = [&](uint64_t index) -> int {
+        return uint32_t(MixBits(index ^ (0x55555555 * instance)) >> 24) % 24;
+    };
+
+    int nBase4Digits = 8;  // Log2Int(256)
+    p.x &= 255;
+    p.y &= 255;
+    uint64_t mortonIndex = EncodeMorton2(p.x, p.y);
+
+    static const uint8_t permutations[24][4] = {
+        {0, 1, 2, 3}, {0, 1, 3, 2}, {0, 2, 1, 3}, {0, 2, 3, 1}, {0, 3, 2, 1},
+        {0, 3, 1, 2}, {1, 0, 2, 3}, {1, 0, 3, 2}, {1, 2, 0, 3}, {1, 2, 3, 0},
+        {1, 3, 2, 0}, {1, 3, 0, 2}, {2, 1, 0, 3}, {2, 1, 3, 0}, {2, 0, 1, 3},
+        {2, 0, 3, 1}, {2, 3, 0, 1}, {2, 3, 1, 0}, {3, 1, 2, 0}, {3, 1, 0, 2},
+        {3, 2, 1, 0}, {3, 2, 0, 1}, {3, 0, 2, 1}, {3, 0, 1, 2}};
+
+    uint32_t sampleIndex = 0;
+    for (int i = nBase4Digits - 1; i >= 0; --i) {
+        int digitShift = 2 * i;
+        int digit = (mortonIndex >> digitShift) & 3;
+        int p = HashPerm(mortonIndex >> (digitShift + 2));
+        digit = permutations[p][digit];
+        sampleIndex |= digit << digitShift;
+    }
+
+    return ReverseBits32(sampleIndex) * 0x1p-32f;
 }
 
 // CranleyPattersonRotator Definition
