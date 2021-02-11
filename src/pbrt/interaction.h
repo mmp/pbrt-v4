@@ -231,14 +231,14 @@ class SurfaceInteraction : public Interaction {
     std::string ToString() const;
 
     void SetIntersectionProperties(MaterialHandle mtl, LightHandle area,
-                                   const MediumInterface *primitiveMediumInterface,
+                                   const MediumInterface *primMediumInterface,
                                    MediumHandle rayMedium) {
         material = mtl;
         areaLight = area;
         CHECK_GE(Dot(n, shading.n), 0.);
         // Set medium properties at surface intersection
-        if (primitiveMediumInterface && primitiveMediumInterface->IsMediumTransition())
-            mediumInterface = primitiveMediumInterface;
+        if (primMediumInterface && primMediumInterface->IsMediumTransition())
+            mediumInterface = primMediumInterface;
         else
             medium = rayMedium;
     }

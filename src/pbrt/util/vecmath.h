@@ -537,8 +537,7 @@ class Vector3fi : public Vector3<Interval> {
     Vector3fi(const Vector3f &p)
         : Vector3<Interval>(Interval(p.x), Interval(p.y), Interval(p.z)) {}
     template <typename T>
-    PBRT_CPU_GPU
-    explicit Vector3fi(Point3<T> p)
+    PBRT_CPU_GPU explicit Vector3fi(Point3<T> p)
         : Vector3<Interval>(Interval(p.x), Interval(p.y), Interval(p.z)) {}
 
     PBRT_CPU_GPU Vector3fi(const Vector3<Interval> &pfi) : Vector3<Interval>(pfi) {}

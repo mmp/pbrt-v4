@@ -138,10 +138,10 @@ struct alignas(32) LinearBVHNode {
 };
 
 // BVHAggregate Method Definitions
-BVHAggregate::BVHAggregate(std::vector<PrimitiveHandle> p, int maxPrimsInNode,
+BVHAggregate::BVHAggregate(std::vector<PrimitiveHandle> prims, int maxPrimsInNode,
                            SplitMethod splitMethod)
     : maxPrimsInNode(std::min(255, maxPrimsInNode)),
-      primitives(std::move(p)),
+      primitives(std::move(prims)),
       splitMethod(splitMethod) {
     CHECK(!primitives.empty());
     // Build BVH from _primitives_
@@ -160,24 +160,26 @@ BVHAggregate::BVHAggregate(std::vector<PrimitiveHandle> p, int maxPrimsInNode,
     for (size_t i = 0; i < nThreads; ++i)
         threadAllocators.push_back(Allocator(&threadResources[i]));
 
-    std::atomic<int> totalNodes{0};
     std::vector<PrimitiveHandle> orderedPrims(primitives.size());
     BVHBuildNode *root;
+    // Build BVH according to selected _splitMethod_
+    std::atomic<int> totalNodes{0};
     if (splitMethod == SplitMethod::HLBVH) {
         root = buildHLBVH(alloc, bvhPrimitives, &totalNodes, orderedPrims);
     } else {
         std::atomic<int> orderedPrimsOffset{0};
-        root = buildRecursive(threadAllocators, bvhPrimitives, 0, primitives.size(),
+        size_t nPrimitives = primitives.size();
+        root = buildRecursive(threadAllocators, bvhPrimitives, 0, nPrimitives,
                               &totalNodes, &orderedPrimsOffset, orderedPrims);
         CHECK_EQ(orderedPrimsOffset.load(), orderedPrims.size());
     }
     primitives.swap(orderedPrims);
+
+    // Convert BVH into compact representation in _nodes_ array
     bvhPrimitives.resize(0);
     LOG_VERBOSE("BVH created with %d nodes for %d primitives (%.2f MB)",
                 totalNodes.load(), (int)primitives.size(),
                 float(totalNodes.load() * sizeof(LinearBVHNode)) / (1024.f * 1024.f));
-
-    // Flatten BVH into _nodes_ array
     treeBytes += totalNodes * sizeof(LinearBVHNode) + sizeof(*this) +
                  primitives.size() * sizeof(primitives[0]);
     nodes = new LinearBVHNode[totalNodes];
@@ -245,7 +247,7 @@ BVHBuildNode *BVHAggregate::buildRecursive(std::vector<Allocator> &threadAllocat
                                    });
                 mid = midPtr - &bvhPrimitives[0];
                 // For lots of prims with large overlapping bounding boxes, this
-                // may fail to partition; in that case don't break and fall through
+                // may fail to partition; in that case do not break and fall through
                 // to EqualCounts.
                 if (mid != start && mid != end)
                     break;
@@ -944,12 +946,14 @@ retrySplit:
     }
     CHECK(nBelow == nPrimitives && nAbove == 0);
 
-    // Create leaf if no good splits were found
+    // Try to split along another axis if no good splits were found
     if (bestAxis == -1 && retries < 2) {
         ++retries;
         axis = (axis + 1) % 3;
         goto retrySplit;
     }
+
+    // Create leaf if no good splits were found
     if (bestCost > leafCost)
         ++badRefines;
     if ((bestCost > 4 * leafCost && nPrimitives < 16) || bestAxis == -1 ||
