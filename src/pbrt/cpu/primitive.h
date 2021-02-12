@@ -29,8 +29,8 @@ class AnimatedPrimitive;
 class BVHAggregate;
 class KdTreeAggregate;
 
-// PrimitiveHandle Definition
-class PrimitiveHandle
+// Primitive Definition
+class Primitive
     : public TaggedPointer<SimplePrimitive, GeometricPrimitive, TransformedPrimitive,
                            AnimatedPrimitive, BVHAggregate, KdTreeAggregate> {
   public:
@@ -48,20 +48,20 @@ class PrimitiveHandle
 class GeometricPrimitive {
   public:
     // GeometricPrimitive Public Methods
-    GeometricPrimitive(ShapeHandle shape, MaterialHandle material, LightHandle areaLight,
+    GeometricPrimitive(Shape shape, Material material, Light areaLight,
                        const MediumInterface &mediumInterface,
-                       FloatTextureHandle alpha = nullptr);
+                       FloatTexture alpha = nullptr);
     Bounds3f Bounds() const;
     pstd::optional<ShapeIntersection> Intersect(const Ray &r, Float tMax) const;
     bool IntersectP(const Ray &r, Float tMax) const;
 
   private:
     // GeometricPrimitive Private Members
-    ShapeHandle shape;
-    MaterialHandle material;
-    LightHandle areaLight;
+    Shape shape;
+    Material material;
+    Light areaLight;
     MediumInterface mediumInterface;
-    FloatTextureHandle alpha;
+    FloatTexture alpha;
 };
 
 // SimplePrimitive Definition
@@ -71,19 +71,19 @@ class SimplePrimitive {
     Bounds3f Bounds() const;
     pstd::optional<ShapeIntersection> Intersect(const Ray &r, Float tMax) const;
     bool IntersectP(const Ray &r, Float tMax) const;
-    SimplePrimitive(ShapeHandle shape, MaterialHandle material);
+    SimplePrimitive(Shape shape, Material material);
 
   private:
     // SimplePrimitive Private Members
-    ShapeHandle shape;
-    MaterialHandle material;
+    Shape shape;
+    Material material;
 };
 
 // TransformedPrimitive Definition
 class TransformedPrimitive {
   public:
     // TransformedPrimitive Public Methods
-    TransformedPrimitive(PrimitiveHandle primitive, const Transform *renderFromPrimitive)
+    TransformedPrimitive(Primitive primitive, const Transform *renderFromPrimitive)
         : primitive(primitive), renderFromPrimitive(renderFromPrimitive) {
         primitiveMemory += sizeof(*this);
     }
@@ -95,7 +95,7 @@ class TransformedPrimitive {
 
   private:
     // TransformedPrimitive Private Members
-    PrimitiveHandle primitive;
+    Primitive primitive;
     const Transform *renderFromPrimitive;
 };
 
@@ -107,14 +107,13 @@ class AnimatedPrimitive {
         return renderFromPrimitive.MotionBounds(primitive.Bounds());
     }
 
-    AnimatedPrimitive(PrimitiveHandle primitive,
-                      const AnimatedTransform &renderFromPrimitive);
+    AnimatedPrimitive(Primitive primitive, const AnimatedTransform &renderFromPrimitive);
     pstd::optional<ShapeIntersection> Intersect(const Ray &r, Float tMax) const;
     bool IntersectP(const Ray &r, Float tMax) const;
 
   private:
     // AnimatedPrimitive Private Members
-    PrimitiveHandle primitive;
+    Primitive primitive;
     AnimatedTransform renderFromPrimitive;
 };
 

@@ -179,7 +179,7 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                 }
             }
 
-            MaterialHandle material = w.material;
+            Material material = w.material;
             if (!material) {
                 Interaction intr(w.pi, w.n);
                 intr.mediumInterface = &w.mediumInterface;
@@ -202,7 +202,7 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                     w.pixelIndex});
             }
 
-            FloatTextureHandle displacement = material.GetDisplacement();
+            FloatTexture displacement = material.GetDisplacement();
 
             MaterialEvalQueue *q =
                 (material.CanEvaluateTextures(BasicTextureEvaluator()) &&
@@ -244,7 +244,7 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                 lightSampler.Sample(ctx, raySamples.direct.uc);
 
             if (sampledLight) {
-                LightHandle light = sampledLight->light;
+                Light light = sampledLight->light;
                 // And now sample a point on the light.
                 pstd::optional<LightLiSample> ls = light.SampleLi(
                     ctx, raySamples.direct.u, w.lambda, LightSamplingMode::WithMIS);

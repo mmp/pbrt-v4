@@ -664,8 +664,8 @@ void ParsedScene::AreaLightSource(const std::string &name, ParsedParameterVector
 
 void ParsedScene::CreateMaterials(
     /*const*/ NamedTextures &textures, Allocator alloc,
-    std::map<std::string, MaterialHandle> *namedMaterialsOut,
-    std::vector<MaterialHandle> *materialsOut) const {
+    std::map<std::string, pbrt::Material> *namedMaterialsOut,
+    std::vector<pbrt::Material> *materialsOut) const {
     // First, load all of the normal maps in parallel.
     std::set<std::string> normalMapFilenames;
     for (const auto &nm : namedMaterials) {
@@ -689,7 +689,7 @@ void ParsedScene::CreateMaterials(
     ParallelFor(0, normalMapFilenameVector.size(), [&](int64_t index) {
         std::string filename = normalMapFilenameVector[index];
         ImageAndMetadata immeta =
-            Image::Read(filename, Allocator(), ColorEncodingHandle::Linear);
+            Image::Read(filename, Allocator(), ColorEncoding::Linear);
         Image &image = immeta.image;
         ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
         if (!rgbDesc)
@@ -726,8 +726,8 @@ void ParsedScene::CreateMaterials(
         Image *normalMap = !fn.empty() ? normalMapCache[fn] : nullptr;
 
         TextureParameterDictionary texDict(&mtl.parameters, &textures);
-        MaterialHandle m = MaterialHandle::Create(type, texDict, normalMap,
-                                                  *namedMaterialsOut, &mtl.loc, alloc);
+        class Material m = Material::Create(type, texDict, normalMap, *namedMaterialsOut,
+                                            &mtl.loc, alloc);
         (*namedMaterialsOut)[name] = m;
     }
 
@@ -738,8 +738,8 @@ void ParsedScene::CreateMaterials(
         Image *normalMap = !fn.empty() ? normalMapCache[fn] : nullptr;
 
         TextureParameterDictionary texDict(&mtl.parameters, &textures);
-        MaterialHandle m = MaterialHandle::Create(mtl.name, texDict, normalMap,
-                                                  *namedMaterialsOut, &mtl.loc, alloc);
+        class Material m = Material::Create(mtl.name, texDict, normalMap,
+                                            *namedMaterialsOut, &mtl.loc, alloc);
         materialsOut->push_back(m);
     }
 }
@@ -830,8 +830,8 @@ NamedTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
         // Pass nullptr for the textures, since they shouldn't be accessed
         // anyway.
         TextureParameterDictionary texDict(&tex.second.parameters, nullptr);
-        FloatTextureHandle t = FloatTextureHandle::Create(
-            tex.second.texName, renderFromTexture, texDict, &tex.second.loc, alloc, gpu);
+        FloatTexture t = FloatTexture::Create(tex.second.texName, renderFromTexture,
+                                              texDict, &tex.second.loc, alloc, gpu);
         std::lock_guard<std::mutex> lock(mutex);
         textures.floatTextures[tex.first] = t;
     });
@@ -842,14 +842,14 @@ NamedTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
         pbrt::Transform renderFromTexture = tex.second.renderFromObject.startTransform;
         // nullptr for the textures, as above.
         TextureParameterDictionary texDict(&tex.second.parameters, nullptr);
-        SpectrumTextureHandle albedoTex = SpectrumTextureHandle::Create(
-            tex.second.texName, renderFromTexture, texDict, SpectrumType::Albedo,
-            &tex.second.loc, alloc, gpu);
+        SpectrumTexture albedoTex =
+            SpectrumTexture::Create(tex.second.texName, renderFromTexture, texDict,
+                                    SpectrumType::Albedo, &tex.second.loc, alloc, gpu);
         // These should be fast since they should hit the texture cache
-        SpectrumTextureHandle unboundedTex = SpectrumTextureHandle::Create(
-            tex.second.texName, renderFromTexture, texDict, SpectrumType::Unbounded,
-            &tex.second.loc, alloc, gpu);
-        SpectrumTextureHandle illumTex = SpectrumTextureHandle::Create(
+        SpectrumTexture unboundedTex =
+            SpectrumTexture::Create(tex.second.texName, renderFromTexture, texDict,
+                                    SpectrumType::Unbounded, &tex.second.loc, alloc, gpu);
+        SpectrumTexture illumTex = SpectrumTexture::Create(
             tex.second.texName, renderFromTexture, texDict, SpectrumType::Illuminant,
             &tex.second.loc, alloc, gpu);
 
@@ -866,8 +866,8 @@ NamedTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
 
         pbrt::Transform renderFromTexture = tex.second.renderFromObject.startTransform;
         TextureParameterDictionary texDict(&tex.second.parameters, &textures);
-        FloatTextureHandle t = FloatTextureHandle::Create(
-            tex.second.texName, renderFromTexture, texDict, &tex.second.loc, alloc, gpu);
+        FloatTexture t = FloatTexture::Create(tex.second.texName, renderFromTexture,
+                                              texDict, &tex.second.loc, alloc, gpu);
         textures.floatTextures[tex.first] = t;
     }
     for (size_t index : serialSpectrumTextures) {
@@ -879,13 +879,13 @@ NamedTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
 
         pbrt::Transform renderFromTexture = tex.second.renderFromObject.startTransform;
         TextureParameterDictionary texDict(&tex.second.parameters, &textures);
-        SpectrumTextureHandle albedoTex = SpectrumTextureHandle::Create(
-            tex.second.texName, renderFromTexture, texDict, SpectrumType::Albedo,
-            &tex.second.loc, alloc, gpu);
-        SpectrumTextureHandle unboundedTex = SpectrumTextureHandle::Create(
-            tex.second.texName, renderFromTexture, texDict, SpectrumType::Unbounded,
-            &tex.second.loc, alloc, gpu);
-        SpectrumTextureHandle illumTex = SpectrumTextureHandle::Create(
+        SpectrumTexture albedoTex =
+            SpectrumTexture::Create(tex.second.texName, renderFromTexture, texDict,
+                                    SpectrumType::Albedo, &tex.second.loc, alloc, gpu);
+        SpectrumTexture unboundedTex =
+            SpectrumTexture::Create(tex.second.texName, renderFromTexture, texDict,
+                                    SpectrumType::Unbounded, &tex.second.loc, alloc, gpu);
+        SpectrumTexture illumTex = SpectrumTexture::Create(
             tex.second.texName, renderFromTexture, texDict, SpectrumType::Illuminant,
             &tex.second.loc, alloc, gpu);
 
@@ -898,8 +898,8 @@ NamedTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
     return textures;
 }
 
-std::map<std::string, MediumHandle> ParsedScene::CreateMedia(Allocator alloc) const {
-    std::map<std::string, MediumHandle> mediaMap;
+std::map<std::string, Medium> ParsedScene::CreateMedia(Allocator alloc) const {
+    std::map<std::string, Medium> mediaMap;
 
     for (const auto &m : media) {
         std::string type = m.second.parameters.GetOneString("type", "");
@@ -910,9 +910,9 @@ std::map<std::string, MediumHandle> ParsedScene::CreateMedia(Allocator alloc) co
             Warning(&m.second.loc,
                     "Animated transformation provided for medium. Only the "
                     "start transform will be used.");
-        MediumHandle medium = MediumHandle::Create(
-            type, m.second.parameters, m.second.renderFromObject.startTransform,
-            &m.second.loc, alloc);
+        Medium medium = Medium::Create(type, m.second.parameters,
+                                       m.second.renderFromObject.startTransform,
+                                       &m.second.loc, alloc);
         mediaMap[m.first] = medium;
     }
 
@@ -1553,8 +1553,7 @@ void FormattingScene::NamedMaterial(const std::string &name, FileLoc loc) {
 
 static bool upgradeRGBToScale(ParameterDictionary *dict, const char *name,
                               Float *totalScale) {
-    std::vector<SpectrumHandle> s =
-        dict->GetSpectrumArray(name, SpectrumType::Unbounded, {});
+    std::vector<Spectrum> s = dict->GetSpectrumArray(name, SpectrumType::Unbounded, {});
     if (s.empty())
         return true;
 

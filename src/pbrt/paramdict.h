@@ -44,10 +44,10 @@ enum class SpectrumType { Albedo, Unbounded, Illuminant };
 
 // NamedTextures Definition
 struct NamedTextures {
-    std::map<std::string, FloatTextureHandle> floatTextures;
-    std::map<std::string, SpectrumTextureHandle> albedoSpectrumTextures;
-    std::map<std::string, SpectrumTextureHandle> unboundedSpectrumTextures;
-    std::map<std::string, SpectrumTextureHandle> illuminantSpectrumTextures;
+    std::map<std::string, FloatTexture> floatTextures;
+    std::map<std::string, SpectrumTexture> albedoSpectrumTextures;
+    std::map<std::string, SpectrumTexture> unboundedSpectrumTextures;
+    std::map<std::string, SpectrumTexture> illuminantSpectrumTextures;
 };
 
 template <ParameterType PT>
@@ -108,8 +108,8 @@ class ParameterDictionary {
     Normal3f GetOneNormal3f(const std::string &name, const Normal3f &def) const;
     std::string GetOneString(const std::string &name, const std::string &def) const;
 
-    SpectrumHandle GetOneSpectrum(const std::string &name, SpectrumHandle def,
-                                  SpectrumType spectrumType, Allocator alloc) const;
+    Spectrum GetOneSpectrum(const std::string &name, Spectrum def,
+                            SpectrumType spectrumType, Allocator alloc) const;
 
     std::vector<Float> GetFloatArray(const std::string &name) const;
     std::vector<int> GetIntArray(const std::string &name) const;
@@ -120,9 +120,9 @@ class ParameterDictionary {
     std::vector<Point3f> GetPoint3fArray(const std::string &name) const;
     std::vector<Vector3f> GetVector3fArray(const std::string &name) const;
     std::vector<Normal3f> GetNormal3fArray(const std::string &name) const;
-    std::vector<SpectrumHandle> GetSpectrumArray(const std::string &name,
-                                                 SpectrumType spectrumType,
-                                                 Allocator alloc) const;
+    std::vector<Spectrum> GetSpectrumArray(const std::string &name,
+                                           SpectrumType spectrumType,
+                                           Allocator alloc) const;
     std::vector<std::string> GetStringArray(const std::string &name) const;
 
     void ReportUnused() const;
@@ -144,9 +144,9 @@ class ParameterDictionary {
                                         const char *typeName, int nPerItem, G getValues,
                                         C convert) const;
 
-    std::vector<SpectrumHandle> extractSpectrumArray(const ParsedParameter &param,
-                                                     SpectrumType spectrumType,
-                                                     Allocator alloc) const;
+    std::vector<Spectrum> extractSpectrumArray(const ParsedParameter &param,
+                                               SpectrumType spectrumType,
+                                               Allocator alloc) const;
 
     void remove(const std::string &name, const char *typeName);
     void checkParameterTypes();
@@ -174,8 +174,8 @@ class TextureParameterDictionary {
     Point3f GetOnePoint3f(const std::string &name, const Point3f &def) const;
     Vector3f GetOneVector3f(const std::string &name, const Vector3f &def) const;
     Normal3f GetOneNormal3f(const std::string &name, const Normal3f &def) const;
-    SpectrumHandle GetOneSpectrum(const std::string &name, SpectrumHandle def,
-                                  SpectrumType spectrumType, Allocator alloc) const;
+    Spectrum GetOneSpectrum(const std::string &name, Spectrum def,
+                            SpectrumType spectrumType, Allocator alloc) const;
     std::string GetOneString(const std::string &name, const std::string &def) const;
 
     std::vector<Float> GetFloatArray(const std::string &name) const;
@@ -186,25 +186,22 @@ class TextureParameterDictionary {
     std::vector<Point3f> GetPoint3fArray(const std::string &name) const;
     std::vector<Vector3f> GetVector3fArray(const std::string &name) const;
     std::vector<Normal3f> GetNormal3fArray(const std::string &name) const;
-    std::vector<SpectrumHandle> GetSpectrumArray(const std::string &name,
-                                                 SpectrumType spectrumType,
-                                                 Allocator alloc) const;
+    std::vector<Spectrum> GetSpectrumArray(const std::string &name,
+                                           SpectrumType spectrumType,
+                                           Allocator alloc) const;
     std::vector<std::string> GetStringArray(const std::string &name) const;
 
-    FloatTextureHandle GetFloatTexture(const std::string &name, Float defaultValue,
-                                       Allocator alloc) const;
-    FloatTextureHandle GetFloatTextureOrNull(const std::string &name,
-                                             Allocator alloc) const;
+    FloatTexture GetFloatTexture(const std::string &name, Float defaultValue,
+                                 Allocator alloc) const;
+    FloatTexture GetFloatTextureOrNull(const std::string &name, Allocator alloc) const;
 
     void ReportUnused() const;
 
-    SpectrumTextureHandle GetSpectrumTexture(const std::string &name,
-                                             SpectrumHandle defaultValue,
+    SpectrumTexture GetSpectrumTexture(const std::string &name, Spectrum defaultValue,
+                                       SpectrumType spectrumType, Allocator alloc) const;
+    SpectrumTexture GetSpectrumTextureOrNull(const std::string &name,
                                              SpectrumType spectrumType,
                                              Allocator alloc) const;
-    SpectrumTextureHandle GetSpectrumTextureOrNull(const std::string &name,
-                                                   SpectrumType spectrumType,
-                                                   Allocator alloc) const;
 
   private:
     // TextureParameterDictionary Private Members

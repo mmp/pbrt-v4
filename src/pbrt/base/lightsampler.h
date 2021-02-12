@@ -15,7 +15,7 @@ namespace pbrt {
 
 // SampledLight Definition
 struct SampledLight {
-    LightHandle light;
+    Light light;
     Float pdf = 0;
     std::string ToString() const;
 };
@@ -25,26 +25,25 @@ class PowerLightSampler;
 class BVHLightSampler;
 class ExhaustiveLightSampler;
 
-// LightSamplerHandle Definition
-class LightSamplerHandle : public TaggedPointer<UniformLightSampler, PowerLightSampler,
-                                                BVHLightSampler, ExhaustiveLightSampler> {
+// LightSampler Definition
+class LightSampler : public TaggedPointer<UniformLightSampler, PowerLightSampler,
+                                          BVHLightSampler, ExhaustiveLightSampler> {
   public:
     // LightSampler Interface
     using TaggedPointer::TaggedPointer;
 
-    static LightSamplerHandle Create(const std::string &name,
-                                     pstd::span<const LightHandle> lights,
-                                     Allocator alloc);
+    static LightSampler Create(const std::string &name, pstd::span<const Light> lights,
+                               Allocator alloc);
 
     std::string ToString() const;
 
     PBRT_CPU_GPU inline pstd::optional<SampledLight> Sample(const LightSampleContext &ctx,
                                                             Float u) const;
 
-    PBRT_CPU_GPU inline Float PDF(const LightSampleContext &ctx, LightHandle light) const;
+    PBRT_CPU_GPU inline Float PDF(const LightSampleContext &ctx, Light light) const;
 
     PBRT_CPU_GPU inline pstd::optional<SampledLight> Sample(Float u) const;
-    PBRT_CPU_GPU inline Float PDF(LightHandle light) const;
+    PBRT_CPU_GPU inline Float PDF(Light light) const;
 };
 
 }  // namespace pbrt

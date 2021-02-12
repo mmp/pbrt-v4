@@ -22,7 +22,7 @@ class BSDF {
     BSDF() = default;
     PBRT_CPU_GPU
     BSDF(const Vector3f &wo, const Normal3f &n, const Normal3f &ns, const Vector3f &dpdus,
-         BxDFHandle bxdf)
+         BxDF bxdf)
         : bxdf(bxdf),
           ng(n),
           shadingFrame(Frame::FromXZ(Normalize(dpdus), Vector3f(ns))) {}
@@ -165,7 +165,7 @@ class BSDF {
 
   private:
     // BSDF Private Members
-    BxDFHandle bxdf;
+    BxDF bxdf;
     Normal3f ng;
     Frame shadingFrame;
 };

@@ -36,13 +36,10 @@ class Integrator {
     // Integrator Public Methods
     virtual ~Integrator();
 
-    static std::unique_ptr<Integrator> Create(const std::string &name,
-                                              const ParameterDictionary &parameters,
-                                              CameraHandle camera, SamplerHandle sampler,
-                                              PrimitiveHandle aggregate,
-                                              std::vector<LightHandle> lights,
-                                              const RGBColorSpace *colorSpace,
-                                              const FileLoc *loc);
+    static std::unique_ptr<Integrator> Create(
+        const std::string &name, const ParameterDictionary &parameters, Camera camera,
+        Sampler sampler, Primitive aggregate, std::vector<Light> lights,
+        const RGBColorSpace *colorSpace, const FileLoc *loc);
 
     virtual std::string ToString() const = 0;
 
@@ -60,13 +57,13 @@ class Integrator {
                        const SampledWavelengths &lambda, RNG &rng) const;
 
     // Integrator Public Members
-    PrimitiveHandle aggregate;
-    std::vector<LightHandle> lights;
-    std::vector<LightHandle> infiniteLights;
+    Primitive aggregate;
+    std::vector<Light> lights;
+    std::vector<Light> infiniteLights;
 
   protected:
     // Integrator Private Methods
-    Integrator(PrimitiveHandle aggregate, std::vector<LightHandle> lights)
+    Integrator(Primitive aggregate, std::vector<Light> lights)
         : aggregate(aggregate), lights(lights) {
         // Integrator constructor implementation
         Bounds3f sceneBounds = aggregate ? aggregate.Bounds() : Bounds3f();
@@ -83,35 +80,34 @@ class Integrator {
 class ImageTileIntegrator : public Integrator {
   public:
     // ImageTileIntegrator Public Methods
-    ImageTileIntegrator(CameraHandle camera, SamplerHandle sampler,
-                        PrimitiveHandle aggregate, std::vector<LightHandle> lights)
+    ImageTileIntegrator(Camera camera, Sampler sampler, Primitive aggregate,
+                        std::vector<Light> lights)
         : Integrator(aggregate, lights), camera(camera), samplerPrototype(sampler) {}
 
     void Render();
 
-    virtual void EvaluatePixelSample(Point2i pPixel, int sampleIndex,
-                                     SamplerHandle sampler,
+    virtual void EvaluatePixelSample(Point2i pPixel, int sampleIndex, Sampler sampler,
                                      ScratchBuffer &scratchBuffer) = 0;
 
   protected:
     // ImageTileIntegrator Protected Members
-    CameraHandle camera;
-    SamplerHandle samplerPrototype;
+    Camera camera;
+    Sampler samplerPrototype;
 };
 
 // RayIntegrator Definition
 class RayIntegrator : public ImageTileIntegrator {
   public:
     // RayIntegrator Public Methods
-    RayIntegrator(CameraHandle camera, SamplerHandle sampler, PrimitiveHandle aggregate,
-                  std::vector<LightHandle> lights)
+    RayIntegrator(Camera camera, Sampler sampler, Primitive aggregate,
+                  std::vector<Light> lights)
         : ImageTileIntegrator(camera, sampler, aggregate, lights) {}
 
-    void EvaluatePixelSample(Point2i pPixel, int sampleIndex, SamplerHandle sampler,
+    void EvaluatePixelSample(Point2i pPixel, int sampleIndex, Sampler sampler,
                              ScratchBuffer &scratchBuffer) final;
 
     virtual SampledSpectrum Li(RayDifferential ray, SampledWavelengths &lambda,
-                               SamplerHandle sampler, ScratchBuffer &scratchBuffer,
+                               Sampler sampler, ScratchBuffer &scratchBuffer,
                                VisibleSurface *visibleSurface) const = 0;
 };
 
@@ -119,18 +115,18 @@ class RayIntegrator : public ImageTileIntegrator {
 class RandomWalkIntegrator : public RayIntegrator {
   public:
     // RandomWalkIntegrator Public Methods
-    RandomWalkIntegrator(int maxDepth, CameraHandle camera, SamplerHandle sampler,
-                         PrimitiveHandle aggregate, std::vector<LightHandle> lights)
+    RandomWalkIntegrator(int maxDepth, Camera camera, Sampler sampler,
+                         Primitive aggregate, std::vector<Light> lights)
         : RayIntegrator(camera, sampler, aggregate, lights), maxDepth(maxDepth) {}
 
     static std::unique_ptr<RandomWalkIntegrator> Create(
-        const ParameterDictionary &parameters, CameraHandle camera, SamplerHandle sampler,
-        PrimitiveHandle aggregate, std::vector<LightHandle> lights, const FileLoc *loc);
+        const ParameterDictionary &parameters, Camera camera, Sampler sampler,
+        Primitive aggregate, std::vector<Light> lights, const FileLoc *loc);
 
     std::string ToString() const;
 
-    SampledSpectrum Li(RayDifferential ray, SampledWavelengths &lambda,
-                       SamplerHandle sampler, ScratchBuffer &scratchBuffer,
+    SampledSpectrum Li(RayDifferential ray, SampledWavelengths &lambda, Sampler sampler,
+                       ScratchBuffer &scratchBuffer,
                        VisibleSurface *visibleSurface) const {
         SampledSpectrum L = LiRandomWalk(ray, lambda, sampler, scratchBuffer, 0);
         return SafeDiv(L, lambda.PDF());
@@ -139,14 +135,14 @@ class RandomWalkIntegrator : public RayIntegrator {
   private:
     // RandomWalkIntegrator Private Methods
     SampledSpectrum LiRandomWalk(RayDifferential ray, SampledWavelengths &lambda,
-                                 SamplerHandle sampler, ScratchBuffer &scratchBuffer,
+                                 Sampler sampler, ScratchBuffer &scratchBuffer,
                                  int depth) const {
         SampledSpectrum L(0.f);
         // Intersect ray with scene and return if no intersection
         pstd::optional<ShapeIntersection> si = Intersect(ray);
         if (!si) {
             // Return emitted light from infinite light sources
-            for (LightHandle light : infiniteLights)
+            for (Light light : infiniteLights)
                 L += light.Le(ray, lambda);
             return L;
         }
@@ -188,17 +184,16 @@ class RandomWalkIntegrator : public RayIntegrator {
 class SimplePathIntegrator : public RayIntegrator {
   public:
     // SimplePathIntegrator Public Methods
-    SimplePathIntegrator(int maxDepth, bool sampleLights, bool sampleBSDF,
-                         CameraHandle camera, SamplerHandle sampler,
-                         PrimitiveHandle aggregate, std::vector<LightHandle> lights);
+    SimplePathIntegrator(int maxDepth, bool sampleLights, bool sampleBSDF, Camera camera,
+                         Sampler sampler, Primitive aggregate, std::vector<Light> lights);
 
-    SampledSpectrum Li(RayDifferential ray, SampledWavelengths &lambda,
-                       SamplerHandle sampler, ScratchBuffer &scratchBuffer,
+    SampledSpectrum Li(RayDifferential ray, SampledWavelengths &lambda, Sampler sampler,
+                       ScratchBuffer &scratchBuffer,
                        VisibleSurface *visibleSurface) const;
 
     static std::unique_ptr<SimplePathIntegrator> Create(
-        const ParameterDictionary &parameters, CameraHandle camera, SamplerHandle sampler,
-        PrimitiveHandle aggregate, std::vector<LightHandle> lights, const FileLoc *loc);
+        const ParameterDictionary &parameters, Camera camera, Sampler sampler,
+        Primitive aggregate, std::vector<Light> lights, const FileLoc *loc);
 
     std::string ToString() const;
 
@@ -213,29 +208,31 @@ class SimplePathIntegrator : public RayIntegrator {
 class PathIntegrator : public RayIntegrator {
   public:
     // PathIntegrator Public Methods
-    PathIntegrator(int maxDepth, CameraHandle camera, SamplerHandle sampler,
-                   PrimitiveHandle aggregate, std::vector<LightHandle> lights,
+    PathIntegrator(int maxDepth, Camera camera, Sampler sampler, Primitive aggregate,
+                   std::vector<Light> lights,
                    const std::string &lightSampleStrategy = "bvh",
                    bool regularize = false);
 
-    SampledSpectrum Li(RayDifferential ray, SampledWavelengths &lambda,
-                       SamplerHandle sampler, ScratchBuffer &scratchBuffer,
+    SampledSpectrum Li(RayDifferential ray, SampledWavelengths &lambda, Sampler sampler,
+                       ScratchBuffer &scratchBuffer,
                        VisibleSurface *visibleSurface) const;
 
-    static std::unique_ptr<PathIntegrator> Create(
-        const ParameterDictionary &parameters, CameraHandle camera, SamplerHandle sampler,
-        PrimitiveHandle aggregate, std::vector<LightHandle> lights, const FileLoc *loc);
+    static std::unique_ptr<PathIntegrator> Create(const ParameterDictionary &parameters,
+                                                  Camera camera, Sampler sampler,
+                                                  Primitive aggregate,
+                                                  std::vector<Light> lights,
+                                                  const FileLoc *loc);
 
     std::string ToString() const;
 
   private:
     // PathIntegrator Private Methods
     SampledSpectrum SampleLd(const SurfaceInteraction &intr, const BSDF *bsdf,
-                             SampledWavelengths &lambda, SamplerHandle sampler) const;
+                             SampledWavelengths &lambda, Sampler sampler) const;
 
     // PathIntegrator Private Members
     int maxDepth;
-    LightSamplerHandle lightSampler;
+    LightSampler lightSampler;
     bool regularize;
 };
 
@@ -243,16 +240,16 @@ class PathIntegrator : public RayIntegrator {
 class SimpleVolPathIntegrator : public RayIntegrator {
   public:
     // SimpleVolPathIntegrator Public Methods
-    SimpleVolPathIntegrator(int maxDepth, CameraHandle camera, SamplerHandle sampler,
-                            PrimitiveHandle aggregate, std::vector<LightHandle> lights);
+    SimpleVolPathIntegrator(int maxDepth, Camera camera, Sampler sampler,
+                            Primitive aggregate, std::vector<Light> lights);
 
-    SampledSpectrum Li(RayDifferential ray, SampledWavelengths &lambda,
-                       SamplerHandle sampler, ScratchBuffer &scratchBuffer,
+    SampledSpectrum Li(RayDifferential ray, SampledWavelengths &lambda, Sampler sampler,
+                       ScratchBuffer &scratchBuffer,
                        VisibleSurface *visibleSurface) const;
 
     static std::unique_ptr<SimpleVolPathIntegrator> Create(
-        const ParameterDictionary &parameters, CameraHandle camera, SamplerHandle sampler,
-        PrimitiveHandle aggregate, std::vector<LightHandle> lights, const FileLoc *loc);
+        const ParameterDictionary &parameters, Camera camera, Sampler sampler,
+        Primitive aggregate, std::vector<Light> lights, const FileLoc *loc);
 
     std::string ToString() const;
 
@@ -265,30 +262,29 @@ class SimpleVolPathIntegrator : public RayIntegrator {
 class VolPathIntegrator : public RayIntegrator {
   public:
     // VolPathIntegrator Public Methods
-    VolPathIntegrator(int maxDepth, CameraHandle camera, SamplerHandle sampler,
-                      PrimitiveHandle aggregate, std::vector<LightHandle> lights,
+    VolPathIntegrator(int maxDepth, Camera camera, Sampler sampler, Primitive aggregate,
+                      std::vector<Light> lights,
                       const std::string &lightSampleStrategy = "bvh",
                       bool regularize = false)
         : RayIntegrator(camera, sampler, aggregate, lights),
           maxDepth(maxDepth),
-          lightSampler(
-              LightSamplerHandle::Create(lightSampleStrategy, lights, Allocator())),
+          lightSampler(LightSampler::Create(lightSampleStrategy, lights, Allocator())),
           regularize(regularize) {}
 
-    SampledSpectrum Li(RayDifferential ray, SampledWavelengths &lambda,
-                       SamplerHandle sampler, ScratchBuffer &scratchBuffer,
+    SampledSpectrum Li(RayDifferential ray, SampledWavelengths &lambda, Sampler sampler,
+                       ScratchBuffer &scratchBuffer,
                        VisibleSurface *visibleSurface) const;
 
     static std::unique_ptr<VolPathIntegrator> Create(
-        const ParameterDictionary &parameters, CameraHandle camera, SamplerHandle sampler,
-        PrimitiveHandle aggregate, std::vector<LightHandle> lights, const FileLoc *loc);
+        const ParameterDictionary &parameters, Camera camera, Sampler sampler,
+        Primitive aggregate, std::vector<Light> lights, const FileLoc *loc);
 
     std::string ToString() const;
 
   private:
     // VolPathIntegrator Private Methods
     SampledSpectrum SampleLd(const Interaction &intr, const BSDF *bsdf,
-                             SampledWavelengths &lambda, SamplerHandle sampler,
+                             SampledWavelengths &lambda, Sampler sampler,
                              const SampledSpectrum &beta,
                              const SampledSpectrum &pathPDF) const;
 
@@ -314,7 +310,7 @@ class VolPathIntegrator : public RayIntegrator {
 
     // VolPathIntegrator Private Members
     int maxDepth;
-    LightSamplerHandle lightSampler;
+    LightSampler lightSampler;
     bool regularize;
 };
 
@@ -322,25 +318,25 @@ class VolPathIntegrator : public RayIntegrator {
 class AOIntegrator : public RayIntegrator {
   public:
     // AOIntegrator Public Methods
-    AOIntegrator(bool cosSample, Float maxDist, CameraHandle camera,
-                 SamplerHandle sampler, PrimitiveHandle aggregate,
-                 std::vector<LightHandle> lights, SpectrumHandle illuminant);
+    AOIntegrator(bool cosSample, Float maxDist, Camera camera, Sampler sampler,
+                 Primitive aggregate, std::vector<Light> lights, Spectrum illuminant);
 
-    SampledSpectrum Li(RayDifferential ray, SampledWavelengths &lambda,
-                       SamplerHandle sampler, ScratchBuffer &scratchBuffer,
+    SampledSpectrum Li(RayDifferential ray, SampledWavelengths &lambda, Sampler sampler,
+                       ScratchBuffer &scratchBuffer,
                        VisibleSurface *visibleSurface) const;
 
-    static std::unique_ptr<AOIntegrator> Create(
-        const ParameterDictionary &parameters, SpectrumHandle illuminant,
-        CameraHandle camera, SamplerHandle sampler, PrimitiveHandle aggregate,
-        std::vector<LightHandle> lights, const FileLoc *loc);
+    static std::unique_ptr<AOIntegrator> Create(const ParameterDictionary &parameters,
+                                                Spectrum illuminant, Camera camera,
+                                                Sampler sampler, Primitive aggregate,
+                                                std::vector<Light> lights,
+                                                const FileLoc *loc);
 
     std::string ToString() const;
 
   private:
     bool cosSample;
     Float maxDist;
-    SpectrumHandle illuminant;
+    Spectrum illuminant;
     Float illumScale;
 };
 
@@ -348,15 +344,15 @@ class AOIntegrator : public RayIntegrator {
 class LightPathIntegrator : public ImageTileIntegrator {
   public:
     // LightPathIntegrator Public Methods
-    LightPathIntegrator(int maxDepth, CameraHandle camera, SamplerHandle sampler,
-                        PrimitiveHandle aggregate, std::vector<LightHandle> lights);
+    LightPathIntegrator(int maxDepth, Camera camera, Sampler sampler, Primitive aggregate,
+                        std::vector<Light> lights);
 
-    void EvaluatePixelSample(Point2i pPixel, int sampleIndex, SamplerHandle sampler,
+    void EvaluatePixelSample(Point2i pPixel, int sampleIndex, Sampler sampler,
                              ScratchBuffer &scratchBuffer);
 
     static std::unique_ptr<LightPathIntegrator> Create(
-        const ParameterDictionary &parameters, CameraHandle camera, SamplerHandle sampler,
-        PrimitiveHandle aggregate, std::vector<LightHandle> lights, const FileLoc *loc);
+        const ParameterDictionary &parameters, Camera camera, Sampler sampler,
+        Primitive aggregate, std::vector<Light> lights, const FileLoc *loc);
 
     std::string ToString() const;
 
@@ -371,10 +367,9 @@ struct Vertex;
 class BDPTIntegrator : public RayIntegrator {
   public:
     // BDPTIntegrator Public Methods
-    BDPTIntegrator(CameraHandle camera, SamplerHandle sampler, PrimitiveHandle aggregate,
-                   std::vector<LightHandle> lights, int maxDepth,
-                   bool visualizeStrategies, bool visualizeWeights,
-                   bool regularize = false)
+    BDPTIntegrator(Camera camera, Sampler sampler, Primitive aggregate,
+                   std::vector<Light> lights, int maxDepth, bool visualizeStrategies,
+                   bool visualizeWeights, bool regularize = false)
         : RayIntegrator(camera, sampler, aggregate, lights),
           maxDepth(maxDepth),
           regularize(regularize),
@@ -382,13 +377,15 @@ class BDPTIntegrator : public RayIntegrator {
           visualizeStrategies(visualizeStrategies),
           visualizeWeights(visualizeWeights) {}
 
-    SampledSpectrum Li(RayDifferential ray, SampledWavelengths &lambda,
-                       SamplerHandle sampler, ScratchBuffer &scratchBuffer,
+    SampledSpectrum Li(RayDifferential ray, SampledWavelengths &lambda, Sampler sampler,
+                       ScratchBuffer &scratchBuffer,
                        VisibleSurface *visibleSurface) const;
 
-    static std::unique_ptr<BDPTIntegrator> Create(
-        const ParameterDictionary &parameters, CameraHandle camera, SamplerHandle sampler,
-        PrimitiveHandle aggregate, std::vector<LightHandle> lights, const FileLoc *loc);
+    static std::unique_ptr<BDPTIntegrator> Create(const ParameterDictionary &parameters,
+                                                  Camera camera, Sampler sampler,
+                                                  Primitive aggregate,
+                                                  std::vector<Light> lights,
+                                                  const FileLoc *loc);
 
     std::string ToString() const;
 
@@ -398,9 +395,9 @@ class BDPTIntegrator : public RayIntegrator {
     // BDPTIntegrator Private Members
     int maxDepth;
     bool regularize;
-    LightSamplerHandle lightSampler;
+    LightSampler lightSampler;
     bool visualizeStrategies, visualizeWeights;
-    mutable std::vector<FilmHandle> weightFilms;
+    mutable std::vector<Film> weightFilms;
 };
 
 // MLTIntegrator Definition
@@ -409,10 +406,9 @@ class MLTSampler;
 class MLTIntegrator : public Integrator {
   public:
     // MLTIntegrator Public Methods
-    MLTIntegrator(CameraHandle camera, PrimitiveHandle aggregate,
-                  std::vector<LightHandle> lights, int maxDepth, int nBootstrap,
-                  int nChains, int mutationsPerPixel, Float sigma,
-                  Float largeStepProbability, bool regularize)
+    MLTIntegrator(Camera camera, Primitive aggregate, std::vector<Light> lights,
+                  int maxDepth, int nBootstrap, int nChains, int mutationsPerPixel,
+                  Float sigma, Float largeStepProbability, bool regularize)
         : Integrator(aggregate, lights),
           lightSampler(new PowerLightSampler(lights, Allocator())),
           camera(camera),
@@ -427,9 +423,8 @@ class MLTIntegrator : public Integrator {
     void Render();
 
     static std::unique_ptr<MLTIntegrator> Create(const ParameterDictionary &parameters,
-                                                 CameraHandle camera,
-                                                 PrimitiveHandle aggregate,
-                                                 std::vector<LightHandle> lights,
+                                                 Camera camera, Primitive aggregate,
+                                                 std::vector<Light> lights,
                                                  const FileLoc *loc);
 
     std::string ToString() const;
@@ -450,9 +445,9 @@ class MLTIntegrator : public Integrator {
     }
 
     // MLTIntegrator Private Members
-    CameraHandle camera;
+    Camera camera;
     bool regularize;
-    LightSamplerHandle lightSampler;
+    LightSampler lightSampler;
     int maxDepth;
     int nBootstrap;
     int mutationsPerPixel;
@@ -464,8 +459,8 @@ class MLTIntegrator : public Integrator {
 class SPPMIntegrator : public Integrator {
   public:
     // SPPMIntegrator Public Methods
-    SPPMIntegrator(CameraHandle camera, SamplerHandle sampler, PrimitiveHandle aggregate,
-                   std::vector<LightHandle> lights, int photonsPerIteration, int maxDepth,
+    SPPMIntegrator(Camera camera, Sampler sampler, Primitive aggregate,
+                   std::vector<Light> lights, int photonsPerIteration, int maxDepth,
                    Float initialSearchRadius, int seed, const RGBColorSpace *colorSpace)
         : Integrator(aggregate, lights),
           camera(camera),
@@ -478,10 +473,12 @@ class SPPMIntegrator : public Integrator {
           colorSpace(colorSpace),
           digitPermutationsSeed(seed) {}
 
-    static std::unique_ptr<SPPMIntegrator> Create(
-        const ParameterDictionary &parameters, const RGBColorSpace *colorSpace,
-        CameraHandle camera, SamplerHandle sampler, PrimitiveHandle aggregate,
-        std::vector<LightHandle> lights, const FileLoc *loc);
+    static std::unique_ptr<SPPMIntegrator> Create(const ParameterDictionary &parameters,
+                                                  const RGBColorSpace *colorSpace,
+                                                  Camera camera, Sampler sampler,
+                                                  Primitive aggregate,
+                                                  std::vector<Light> lights,
+                                                  const FileLoc *loc);
 
     std::string ToString() const;
 
@@ -490,13 +487,13 @@ class SPPMIntegrator : public Integrator {
   private:
     // SPPMIntegrator Private Methods
     SampledSpectrum SampleLd(const SurfaceInteraction &intr, const BSDF *bsdf,
-                             SampledWavelengths &lambda, SamplerHandle sampler,
-                             LightSamplerHandle lightSampler) const;
+                             SampledWavelengths &lambda, Sampler sampler,
+                             LightSampler lightSampler) const;
 
     // SPPMIntegrator Private Members
-    CameraHandle camera;
+    Camera camera;
     Float initialSearchRadius;
-    SamplerHandle samplerPrototype;
+    Sampler samplerPrototype;
     int digitPermutationsSeed;
     int maxDepth;
     int photonsPerIteration;
@@ -507,11 +504,10 @@ class SPPMIntegrator : public Integrator {
 class FunctionIntegrator : public Integrator {
   public:
     FunctionIntegrator(std::function<Float(Point2f)> func,
-                       const std::string &outputFilename, CameraHandle camera,
-                       SamplerHandle sampler);
+                       const std::string &outputFilename, Camera camera, Sampler sampler);
 
     static std::unique_ptr<FunctionIntegrator> Create(
-        const ParameterDictionary &parameters, CameraHandle camera, SamplerHandle sampler,
+        const ParameterDictionary &parameters, Camera camera, Sampler sampler,
         const FileLoc *loc);
 
     void Render();
@@ -521,8 +517,8 @@ class FunctionIntegrator : public Integrator {
   private:
     std::function<Float(Point2f)> func;
     std::string outputFilename;
-    CameraHandle camera;
-    SamplerHandle baseSampler;
+    Camera camera;
+    Sampler baseSampler;
 };
 
 }  // namespace pbrt

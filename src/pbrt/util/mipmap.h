@@ -53,7 +53,7 @@ class MIPMap {
            Allocator alloc, const MIPMapFilterOptions &options);
     static MIPMap *CreateFromFile(const std::string &filename,
                                   const MIPMapFilterOptions &options, WrapMode wrapMode,
-                                  ColorEncodingHandle encoding, Allocator alloc);
+                                  ColorEncoding encoding, Allocator alloc);
 
     template <typename T>
     T Filter(Point2f st, Vector2f dstdx, Vector2f dstdy) const;

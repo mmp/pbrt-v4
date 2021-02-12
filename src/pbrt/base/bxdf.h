@@ -159,11 +159,11 @@ class NormalizedFresnelBxDF;
 class CoatedDiffuseBxDF;
 class CoatedConductorBxDF;
 
-// BxDFHandle Definition
-class BxDFHandle : public TaggedPointer<IdealDiffuseBxDF, DiffuseBxDF, CoatedDiffuseBxDF,
-                                        CoatedConductorBxDF, DielectricInterfaceBxDF,
-                                        ThinDielectricBxDF, HairBxDF, MeasuredBxDF,
-                                        ConductorBxDF, NormalizedFresnelBxDF> {
+// BxDF Definition
+class BxDF : public TaggedPointer<IdealDiffuseBxDF, DiffuseBxDF, CoatedDiffuseBxDF,
+                                  CoatedConductorBxDF, DielectricInterfaceBxDF,
+                                  ThinDielectricBxDF, HairBxDF, MeasuredBxDF,
+                                  ConductorBxDF, NormalizedFresnelBxDF> {
   public:
     // BxDF Interface
     PBRT_CPU_GPU inline SampledSpectrum f(Vector3f wo, Vector3f wi,

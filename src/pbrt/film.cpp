@@ -30,23 +30,23 @@
 
 namespace pbrt {
 
-void FilmHandle::AddSplat(const Point2f &p, SampledSpectrum v,
-                          const SampledWavelengths &lambda) {
+void Film::AddSplat(const Point2f &p, SampledSpectrum v,
+                    const SampledWavelengths &lambda) {
     auto splat = [&](auto ptr) { return ptr->AddSplat(p, v, lambda); };
     return Dispatch(splat);
 }
 
-void FilmHandle::WriteImage(ImageMetadata metadata, Float splatScale) {
+void Film::WriteImage(ImageMetadata metadata, Float splatScale) {
     auto write = [&](auto ptr) { return ptr->WriteImage(metadata, splatScale); };
     return DispatchCPU(write);
 }
 
-Image FilmHandle::GetImage(ImageMetadata *metadata, Float splatScale) {
+Image Film::GetImage(ImageMetadata *metadata, Float splatScale) {
     auto get = [&](auto ptr) { return ptr->GetImage(metadata, splatScale); };
     return DispatchCPU(get);
 }
 
-std::string FilmHandle::ToString() const {
+std::string Film::ToString() const {
     if (ptr() == nullptr)
         return "(nullptr)";
 
@@ -54,14 +54,14 @@ std::string FilmHandle::ToString() const {
     return DispatchCPU(ts);
 }
 
-std::string FilmHandle::GetFilename() const {
+std::string Film::GetFilename() const {
     auto get = [&](auto ptr) { return ptr->GetFilename(); };
     return DispatchCPU(get);
 }
 
 // FilmBaseParameters Method Definitions
 FilmBaseParameters::FilmBaseParameters(const ParameterDictionary &parameters,
-                                       FilterHandle filter, const PixelSensor *sensor,
+                                       Filter filter, const PixelSensor *sensor,
                                        const FileLoc *loc)
     : filter(filter), sensor(sensor) {
     filename = parameters.GetOneString("filename", "");
@@ -219,9 +219,9 @@ PixelSensor *PixelSensor::Create(const ParameterDictionary &parameters,
         return alloc.new_object<PixelSensor>(colorSpace, whiteBalanceTemp, imagingRatio,
                                              alloc);
     } else {
-        SpectrumHandle r = GetNamedSpectrum(sensorName + "_r");
-        SpectrumHandle g = GetNamedSpectrum(sensorName + "_g");
-        SpectrumHandle b = GetNamedSpectrum(sensorName + "_b");
+        Spectrum r = GetNamedSpectrum(sensorName + "_r");
+        Spectrum g = GetNamedSpectrum(sensorName + "_g");
+        Spectrum b = GetNamedSpectrum(sensorName + "_b");
 
         if (!r || !g || !b)
             ErrorExit(loc, "%s: unknown sensor type", sensorName);
@@ -239,7 +239,7 @@ PixelSensor *PixelSensor::CreateDefault(Allocator alloc) {
 // BabelColor ColorChecker data: Copyright (c) 2004-2012 Danny Pascale
 // (www.babelcolor.com); used by permission.
 // http://www.babelcolor.com/index_htm_files/ColorChecker_RGB_and_spectra.zip
-SpectrumHandle PixelSensor::swatchReflectances[nSwatchReflectances]{
+Spectrum PixelSensor::swatchReflectances[nSwatchReflectances]{
     PiecewiseLinearSpectrum::FromInterleaved(
         {380.0, 0.055, 390.0, 0.058, 400.0, 0.061, 410.0, 0.062, 420.0, 0.062, 430.0,
          0.062, 440.0, 0.062, 450.0, 0.062, 460.0, 0.062, 470.0, 0.062, 480.0, 0.062,
@@ -552,7 +552,7 @@ std::string RGBFilm::ToString() const {
 }
 
 RGBFilm *RGBFilm::Create(const ParameterDictionary &parameters, Float exposureTime,
-                         FilterHandle filter, const RGBColorSpace *colorSpace,
+                         Filter filter, const RGBColorSpace *colorSpace,
                          const FileLoc *loc, Allocator alloc) {
     Float maxComponentValue = parameters.GetOneFloat("maxcomponentvalue", Infinity);
     bool writeFP16 = parameters.GetOneBool("savefp16", true);
@@ -757,7 +757,7 @@ std::string GBufferFilm::ToString() const {
 }
 
 GBufferFilm *GBufferFilm::Create(const ParameterDictionary &parameters,
-                                 Float exposureTime, FilterHandle filter,
+                                 Float exposureTime, Filter filter,
                                  const RGBColorSpace *colorSpace, const FileLoc *loc,
                                  Allocator alloc) {
     Float maxComponentValue = parameters.GetOneFloat("maxcomponentvalue", Infinity);
@@ -776,10 +776,10 @@ GBufferFilm *GBufferFilm::Create(const ParameterDictionary &parameters,
                                          maxComponentValue, writeFP16, alloc);
 }
 
-FilmHandle FilmHandle::Create(const std::string &name,
-                              const ParameterDictionary &parameters, Float exposureTime,
-                              FilterHandle filter, const FileLoc *loc, Allocator alloc) {
-    FilmHandle film;
+Film Film::Create(const std::string &name, const ParameterDictionary &parameters,
+                  Float exposureTime, Filter filter, const FileLoc *loc,
+                  Allocator alloc) {
+    Film film;
     if (name == "rgb")
         film = RGBFilm::Create(parameters, exposureTime, filter, parameters.ColorSpace(),
                                loc, alloc);

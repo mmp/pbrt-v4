@@ -19,7 +19,7 @@ PBRT_CONST RGBColorSpace *RGBColorSpace_ACES2065_1;
 extern const SquareMatrix<3> LMSFromXYZ, XYZFromLMS;
 
 // RGBColorSpace Method Definitions
-RGBColorSpace::RGBColorSpace(Point2f r, Point2f g, Point2f b, SpectrumHandle illuminant,
+RGBColorSpace::RGBColorSpace(Point2f r, Point2f g, Point2f b, Spectrum illuminant,
                              const RGBToSpectrumTable *rgbToSpec, Allocator alloc)
     : r(r), g(g), b(b), illuminant(illuminant, alloc), rgbToSpectrumTable(rgbToSpec) {
     // Compute whitepoint primaries and XYZ coordinates

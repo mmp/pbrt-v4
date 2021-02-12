@@ -39,8 +39,8 @@ std::string MediumInteraction::ToString() const {
 }
 
 // SurfaceInteraction Method Definitions
-void SurfaceInteraction::ComputeDifferentials(const RayDifferential &ray,
-                                              CameraHandle camera, int samplesPerPixel) {
+void SurfaceInteraction::ComputeDifferentials(const RayDifferential &ray, Camera camera,
+                                              int samplesPerPixel) {
     if (ray.hasDifferentials && Dot(n, ray.rxDirection) != 0 &&
         Dot(n, ray.ryDirection) != 0) {
         // Estimate screen-space change in $\pt{}$
@@ -150,8 +150,8 @@ RayDifferential SurfaceInteraction::SpawnRay(const RayDifferential &rayi,
 }
 
 BSDF SurfaceInteraction::GetBSDF(const RayDifferential &ray, SampledWavelengths &lambda,
-                                 CameraHandle camera, ScratchBuffer &scratchBuffer,
-                                 SamplerHandle sampler) {
+                                 Camera camera, ScratchBuffer &scratchBuffer,
+                                 Sampler sampler) {
     ComputeDifferentials(ray, camera, sampler.SamplesPerPixel());
     // Resolve _MixMaterial_ if necessary
     while (material.Is<MixMaterial>()) {
@@ -164,7 +164,7 @@ BSDF SurfaceInteraction::GetBSDF(const RayDifferential &ray, SampledWavelengths 
         return {};
 
     // Evaluate bump map and compute shading normal
-    FloatTextureHandle displacement = material.GetDisplacement();
+    FloatTexture displacement = material.GetDisplacement();
     const Image *normalMap = material.GetNormalMap();
     if (displacement || normalMap) {
         Vector3f dpdu, dpdv;
@@ -185,10 +185,9 @@ BSDF SurfaceInteraction::GetBSDF(const RayDifferential &ray, SampledWavelengths 
     return bsdf;
 }
 
-BSSRDFHandle SurfaceInteraction::GetBSSRDF(const RayDifferential &ray,
-                                           SampledWavelengths &lambda,
-                                           CameraHandle camera,
-                                           ScratchBuffer &scratchBuffer) {
+BSSRDF SurfaceInteraction::GetBSSRDF(const RayDifferential &ray,
+                                     SampledWavelengths &lambda, Camera camera,
+                                     ScratchBuffer &scratchBuffer) {
     // Resolve _MixMaterial_ if necessary
     while (material.Is<MixMaterial>()) {
         MixMaterial *mix = material.CastOrNullptr<MixMaterial>();

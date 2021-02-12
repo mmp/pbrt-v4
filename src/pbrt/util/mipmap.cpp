@@ -345,7 +345,7 @@ T MIPMap::EWA(int level, Point2f st, Vector2f dst0, Vector2f dst1) const {
 
 MIPMap *MIPMap::CreateFromFile(const std::string &filename,
                                const MIPMapFilterOptions &options, WrapMode wrapMode,
-                               ColorEncodingHandle encoding, Allocator alloc) {
+                               ColorEncoding encoding, Allocator alloc) {
     ImageAndMetadata imageAndMetadata = Image::Read(filename, alloc, encoding);
 
     Image &image = imageAndMetadata.image;

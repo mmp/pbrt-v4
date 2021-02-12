@@ -23,7 +23,7 @@ using namespace pbrt;
 
 TEST(BVHLightSampling, OneSpot) {
     Transform id;
-    std::vector<LightHandle> lights;
+    std::vector<Light> lights;
     ConstantSpectrum one(1.f);
     lights.push_back(new SpotLight(id, MediumInterface(), &one, 1.f /* scale */,
                                    45.f /* total width */,
@@ -36,7 +36,7 @@ TEST(BVHLightSampling, OneSpot) {
         Point3f p{Lerp(rng.Uniform<Float>(), -5, 5), Lerp(rng.Uniform<Float>(), -5, 5),
                   Lerp(rng.Uniform<Float>(), -5, 5)};
 
-        Interaction in(p, 0., (MediumHandle) nullptr);
+        Interaction in(p, 0., (Medium) nullptr);
         Point2f u{rng.Uniform<Float>(), rng.Uniform<Float>()};
         SampledWavelengths lambda = SampledWavelengths::SampleUniform(0.5);
         pstd::optional<LightLiSample> ls = lights[0].SampleLi(in, u, lambda);
@@ -60,8 +60,8 @@ TEST(BVHLightSampling, OneSpot) {
 // with an appropriate ratio of frequency to pdf.
 TEST(BVHLightSampling, Point) {
     RNG rng;
-    std::vector<LightHandle> lights;
-    std::unordered_map<LightHandle, int, LightHandleHash> lightToIndex;
+    std::vector<Light> lights;
+    std::unordered_map<Light, int, LightHash> lightToIndex;
     ConstantSpectrum one(1.f);
     for (int i = 0; i < 33; ++i) {
         // Random point in [-5, 5]
@@ -84,7 +84,7 @@ TEST(BVHLightSampling, Point) {
         std::vector<Float> sumWt(lights.size(), 0.f);
         const int nSamples = 10000;
         for (Float u : Stratified1D(nSamples)) {
-            Interaction intr(p, 0, (MediumHandle) nullptr);
+            Interaction intr(p, 0, (Medium) nullptr);
             pstd::optional<SampledLight> sampledLight = distrib.Sample(intr, u);
             // Can assume this because it's all point lights
             ASSERT_TRUE((bool)sampledLight);
@@ -106,11 +106,11 @@ TEST(BVHLightSampling, Point) {
 // Similar to BVHLightSampling.Point, but vary light power
 TEST(BVHLightSampling, PointVaryPower) {
     RNG rng(53251);
-    std::vector<LightHandle> lights;
+    std::vector<Light> lights;
     std::vector<Float> lightPower;
     std::vector<std::unique_ptr<ConstantSpectrum>> lightSpectra;
     Float sumPower = 0;
-    std::unordered_map<LightHandle, int, LightHandleHash> lightToIndex;
+    std::unordered_map<Light, int, LightHash> lightToIndex;
     for (int i = 0; i < 82; ++i) {
         // Random point in [-5, 5]
         Vector3f p{Lerp(rng.Uniform<Float>(), -5, 5), Lerp(rng.Uniform<Float>(), -5, 5),
@@ -140,7 +140,7 @@ TEST(BVHLightSampling, PointVaryPower) {
             // Again because it's all point lights...
             ASSERT_TRUE((bool)sampledLight);
 
-            LightHandle light = sampledLight->light;
+            Light light = sampledLight->light;
             Float pdf = sampledLight->pdf;
             EXPECT_GT(pdf, 0);
             sumWt[lightToIndex[light]] += 1 / (pdf * nSamples);
@@ -171,7 +171,7 @@ TEST(BVHLightSampling, PointVaryPower) {
         for (Float u : Stratified1D(nSamples)) {
             pstd::optional<SampledLight> sampledLight = distrib.Sample(intr, u);
             ASSERT_TRUE((bool)sampledLight);
-            LightHandle light = sampledLight->light;
+            Light light = sampledLight->light;
             Float pdf = sampledLight->pdf;
             EXPECT_GT(pdf, 0);
             ++counts[lightToIndex[light]];
@@ -197,7 +197,7 @@ TEST(BVHLightSampling, OneTri) {
     auto tris = Triangle::CreateTriangles(&mesh, Allocator());
 
     ASSERT_EQ(1, tris.size());
-    std::vector<LightHandle> lights;
+    std::vector<Light> lights;
     ConstantSpectrum one(1.f);
     lights.push_back(new DiffuseAreaLight(id, MediumInterface(), &one, 1.f, tris[0],
                                           Image(), nullptr, false /* two sided */,
@@ -210,7 +210,7 @@ TEST(BVHLightSampling, OneTri) {
         Point3f p{Lerp(rng.Uniform<Float>(), -5, 5), Lerp(rng.Uniform<Float>(), -5, 5),
                   Lerp(rng.Uniform<Float>(), -5, 5)};
 
-        Interaction in(p, 0., (MediumHandle) nullptr);
+        Interaction in(p, 0., (Medium) nullptr);
         Point2f u{rng.Uniform<Float>(), rng.Uniform<Float>()};
         SampledWavelengths lambda = SampledWavelengths::SampleUniform(0.5);
         pstd::optional<LightLiSample> ls = lights[0].SampleLi(in, u, lambda);
@@ -227,10 +227,10 @@ TEST(BVHLightSampling, OneTri) {
     }
 }
 
-static std::tuple<std::vector<LightHandle>, std::vector<ShapeHandle>> randomLights(
+static std::tuple<std::vector<Light>, std::vector<Shape>> randomLights(
     int n, Allocator alloc) {
-    std::vector<LightHandle> lights;
-    std::vector<ShapeHandle> allTris;
+    std::vector<Light> lights;
+    std::vector<Shape> allTris;
     RNG rng(6502);
     auto r = [&rng]() { return rng.Uniform<Float>(); };
 
@@ -272,8 +272,8 @@ TEST(BVHLightSampling, PdfMethod) {
     RNG rng(5251);
     auto r = [&rng]() { return rng.Uniform<Float>(); };
 
-    std::vector<LightHandle> lights;
-    std::vector<ShapeHandle> tris;
+    std::vector<Light> lights;
+    std::vector<Shape> tris;
     std::tie(lights, tris) = randomLights(20, Allocator());
 
     BVHLightSampler distrib(lights, Allocator());
@@ -294,8 +294,8 @@ TEST(ExhaustiveLightSampling, PdfMethod) {
     RNG rng(5251);
     auto r = [&rng]() { return rng.Uniform<Float>(); };
 
-    std::vector<LightHandle> lights;
-    std::vector<ShapeHandle> tris;
+    std::vector<Light> lights;
+    std::vector<Shape> tris;
     std::tie(lights, tris) = randomLights(20, Allocator());
 
     ExhaustiveLightSampler distrib(lights, Allocator());
@@ -313,8 +313,8 @@ TEST(UniformLightSampling, PdfMethod) {
     RNG rng(5251);
     auto r = [&rng]() { return rng.Uniform<Float>(); };
 
-    std::vector<LightHandle> lights;
-    std::vector<ShapeHandle> tris;
+    std::vector<Light> lights;
+    std::vector<Shape> tris;
     std::tie(lights, tris) = randomLights(20, Allocator());
 
     UniformLightSampler distrib(lights, Allocator());
@@ -332,8 +332,8 @@ TEST(PowerLightSampling, PdfMethod) {
     RNG rng(5251);
     auto r = [&rng]() { return rng.Uniform<Float>(); };
 
-    std::vector<LightHandle> lights;
-    std::vector<ShapeHandle> tris;
+    std::vector<Light> lights;
+    std::vector<Shape> tris;
     std::tie(lights, tris) = randomLights(20, Allocator());
 
     PowerLightSampler distrib(lights, Allocator());

@@ -38,29 +38,26 @@ class CompactLightBounds;
 struct LightLiSample;
 struct LightLeSample;
 
-// LightHandle Definition
-class LightHandle : public TaggedPointer<  // Light Source Types
-                        PointLight, DistantLight, ProjectionLight, GoniometricLight,
-                        SpotLight, DiffuseAreaLight, UniformInfiniteLight,
-                        ImageInfiniteLight, PortalImageInfiniteLight
+// Light Definition
+class Light : public TaggedPointer<  // Light Source Types
+                  PointLight, DistantLight, ProjectionLight, GoniometricLight, SpotLight,
+                  DiffuseAreaLight, UniformInfiniteLight, ImageInfiniteLight,
+                  PortalImageInfiniteLight
 
-                        > {
+                  > {
   public:
     // Light Interface
     using TaggedPointer::TaggedPointer;
 
-    static LightHandle Create(const std::string &name,
-                              const ParameterDictionary &parameters,
-                              const Transform &renderFromLight,
-                              const CameraTransform &cameraTransform,
-                              MediumHandle outsideMedium, const FileLoc *loc,
-                              Allocator alloc);
-    static LightHandle CreateArea(const std::string &name,
-                                  const ParameterDictionary &parameters,
-                                  const Transform &renderFromLight,
-                                  const MediumInterface &mediumInterface,
-                                  const ShapeHandle shape, const FileLoc *loc,
-                                  Allocator alloc);
+    static Light Create(const std::string &name, const ParameterDictionary &parameters,
+                        const Transform &renderFromLight,
+                        const CameraTransform &cameraTransform, Medium outsideMedium,
+                        const FileLoc *loc, Allocator alloc);
+    static Light CreateArea(const std::string &name,
+                            const ParameterDictionary &parameters,
+                            const Transform &renderFromLight,
+                            const MediumInterface &mediumInterface, const Shape shape,
+                            const FileLoc *loc, Allocator alloc);
 
     SampledSpectrum Phi(const SampledWavelengths &lambda) const;
 

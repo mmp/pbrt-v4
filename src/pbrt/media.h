@@ -35,8 +35,8 @@
 namespace pbrt {
 
 // Media Function Declarations
-bool GetMediumScatteringProperties(const std::string &name, SpectrumHandle *sigma_a,
-                                   SpectrumHandle *sigma_s, Allocator alloc);
+bool GetMediumScatteringProperties(const std::string &name, Spectrum *sigma_a,
+                                   Spectrum *sigma_s, Allocator alloc);
 
 // HGPhaseFunction Definition
 class HGPhaseFunction {
@@ -84,8 +84,8 @@ struct MediumSample {
 class HomogeneousMedium {
   public:
     // HomogeneousMedium Public Methods
-    HomogeneousMedium(SpectrumHandle sigma_a, SpectrumHandle sigma_s, Float sigScale,
-                      SpectrumHandle Le, Float LeScale, Float g, Allocator alloc)
+    HomogeneousMedium(Spectrum sigma_a, Spectrum sigma_s, Float sigScale, Spectrum Le,
+                      Float LeScale, Float g, Allocator alloc)
         : sigma_a_spec(sigma_a, alloc),
           sigma_s_spec(sigma_s, alloc),
           sigScale(sigScale),
@@ -146,7 +146,7 @@ template <typename Provider>
 class CuboidMedium {
   public:
     // CuboidMedium Public Methods
-    CuboidMedium(const Provider *provider, SpectrumHandle sigma_a, SpectrumHandle sigma_s,
+    CuboidMedium(const Provider *provider, Spectrum sigma_a, Spectrum sigma_s,
                  Float sigScale, Float g, const Transform &renderFromMedium,
                  Allocator alloc)
         : provider(provider),
@@ -297,7 +297,7 @@ class CuboidMedium {
                                           const ParameterDictionary &parameters,
                                           const Transform &renderFromMedium,
                                           const FileLoc *loc, Allocator alloc) {
-        SpectrumHandle sig_a = nullptr, sig_s = nullptr;
+        Spectrum sig_a = nullptr, sig_s = nullptr;
         std::string preset = parameters.GetOneString("preset", "");
         if (!preset.empty()) {
             if (!GetMediumScatteringProperties(preset, &sig_a, &sig_s, alloc))
@@ -344,8 +344,8 @@ class UniformGridMediumProvider {
     UniformGridMediumProvider(
         const Bounds3f &bounds, pstd::optional<SampledGrid<Float>> densityGrid,
         pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbDensityGrid,
-        const RGBColorSpace *colorSpace, SpectrumHandle Le,
-        SampledGrid<Float> LeScaleGrid, Allocator alloc);
+        const RGBColorSpace *colorSpace, Spectrum Le, SampledGrid<Float> LeScaleGrid,
+        Allocator alloc);
 
     static UniformGridMediumProvider *Create(const ParameterDictionary &parameters,
                                              const FileLoc *loc, Allocator alloc);
@@ -685,25 +685,25 @@ class NanoVDBMediumProvider {
     Float LeScale, temperatureCutoff, temperatureScale;
 };
 
-inline Float PhaseFunctionHandle::p(Vector3f wo, Vector3f wi) const {
+inline Float PhaseFunction::p(Vector3f wo, Vector3f wi) const {
     auto p = [&](auto ptr) { return ptr->p(wo, wi); };
     return Dispatch(p);
 }
 
-inline pstd::optional<PhaseFunctionSample> PhaseFunctionHandle::Sample_p(
-    Vector3f wo, Point2f u) const {
+inline pstd::optional<PhaseFunctionSample> PhaseFunction::Sample_p(Vector3f wo,
+                                                                   Point2f u) const {
     auto sample = [&](auto ptr) { return ptr->Sample_p(wo, u); };
     return Dispatch(sample);
 }
 
-inline Float PhaseFunctionHandle::PDF(Vector3f wo, Vector3f wi) const {
+inline Float PhaseFunction::PDF(Vector3f wo, Vector3f wi) const {
     auto pdf = [&](auto ptr) { return ptr->PDF(wo, wi); };
     return Dispatch(pdf);
 }
 
 template <typename F>
-SampledSpectrum MediumHandle::SampleTmaj(Ray ray, Float tMax, Float u, RNG &rng,
-                                         const SampledWavelengths &lambda, F func) const {
+SampledSpectrum Medium::SampleTmaj(Ray ray, Float tMax, Float u, RNG &rng,
+                                   const SampledWavelengths &lambda, F func) const {
     auto sampletn = [&](auto ptr) {
         return ptr->SampleTmaj(ray, tMax, u, rng, lambda, func);
     };

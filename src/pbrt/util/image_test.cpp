@@ -31,7 +31,7 @@ using namespace pbrt;
 // FlipY()
 
 TEST(Image, Basics) {
-    const ColorEncodingHandle encoding = ColorEncodingHandle::Linear;
+    const ColorEncoding encoding = ColorEncoding::Linear;
     Image y8(PixelFormat::U256, {4, 8}, {"Y"}, encoding);
     EXPECT_EQ(y8.NChannels(), 1);
     EXPECT_EQ(y8.BytesUsed(), y8.Resolution()[0] * y8.Resolution()[1]);
@@ -106,7 +106,7 @@ TEST(Image, GetSetY) {
     pstd::vector<float> yPixels = GetFloatPixels(res, 1);
 
     for (auto format : {PixelFormat::U256, PixelFormat::Half, PixelFormat::Float}) {
-        Image image(format, res, {"Y"}, ColorEncodingHandle::Linear);
+        Image image(format, res, {"Y"}, ColorEncoding::Linear);
         for (int y = 0; y < res[1]; ++y)
             for (int x = 0; x < res[0]; ++x) {
                 image.SetChannel({x, y}, 0, yPixels[y * res[0] + x]);
@@ -142,7 +142,7 @@ TEST(Image, GetSetRGB) {
     pstd::vector<float> rgbPixels = GetFloatPixels(res, 3);
 
     for (auto format : {PixelFormat::U256, PixelFormat::Half, PixelFormat::Float}) {
-        Image image(format, res, {"R", "G", "B"}, ColorEncodingHandle::Linear);
+        Image image(format, res, {"R", "G", "B"}, ColorEncoding::Linear);
         for (int y = 0; y < res[1]; ++y)
             for (int x = 0; x < res[0]; ++x)
                 for (int c = 0; c < 3; ++c)
@@ -182,7 +182,7 @@ TEST(Image, GetSetBGR) {
     pstd::vector<float> rgbPixels = GetFloatPixels(res, 3);
 
     for (auto format : {PixelFormat::U256, PixelFormat::Half, PixelFormat::Float}) {
-        Image image(format, res, {"R", "G", "B"}, ColorEncodingHandle::Linear);
+        Image image(format, res, {"R", "G", "B"}, ColorEncoding::Linear);
         for (int y = 0; y < res[1]; ++y)
             for (int x = 0; x < res[0]; ++x)
                 for (int c = 0; c < 3; ++c)
@@ -228,7 +228,7 @@ TEST(Image, CopyRectOut) {
             for (int i = 1; i < nc; ++i)
                 channelNames.push_back(std::string(1, 'A' + 1));
 
-            Image image(format, res, channelNames, ColorEncodingHandle::Linear);
+            Image image(format, res, channelNames, ColorEncoding::Linear);
 
             auto origIter = orig.begin();
             for (int y = 0; y < res[1]; ++y)
@@ -267,7 +267,7 @@ TEST(Image, CopyRectIn) {
             for (int i = 1; i < nc; ++i)
                 channelNames.push_back(std::string(1, 'A' + 1));
 
-            Image image(format, res, channelNames, ColorEncodingHandle::Linear);
+            Image image(format, res, channelNames, ColorEncoding::Linear);
             auto origIter = orig.begin();
             for (int y = 0; y < res[1]; ++y)
                 for (int x = 0; x < res[0]; ++x)
@@ -328,7 +328,7 @@ TEST(Image, ExrIO) {
     pstd::vector<float> rgbPixels = GetFloatPixels(res, 3);
 
     for (auto format : {PixelFormat::U256, PixelFormat::Half, PixelFormat::Float}) {
-        Image image(format, res, {"R", "G", "B"}, ColorEncodingHandle::Linear);
+        Image image(format, res, {"R", "G", "B"}, ColorEncoding::Linear);
         image.CopyRectIn({{0, 0}, res}, rgbPixels);
 
         // Check CopyRectIn()
@@ -468,7 +468,7 @@ TEST(Image, PngRgbIO) {
     EXPECT_EQ(image.Resolution(), read.image.Resolution());
     EXPECT_EQ(read.image.Format(), PixelFormat::U256);
     ASSERT_TRUE(read.image.Encoding() != nullptr);
-    // EXPECT_EQ(*read.image.Encoding(), *ColorEncodingHandle::sRGB);
+    // EXPECT_EQ(*read.image.Encoding(), *ColorEncoding::sRGB);
     ASSERT_TRUE((bool)read.metadata.colorSpace);
     ASSERT_TRUE(*read.metadata.colorSpace != nullptr);
     EXPECT_EQ(*RGBColorSpace::sRGB, *read.metadata.GetColorSpace());

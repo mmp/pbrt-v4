@@ -19,7 +19,7 @@ namespace pbrt {
 class RGBColorSpace {
   public:
     // RGBColorSpace Public Methods
-    RGBColorSpace(Point2f r, Point2f g, Point2f b, SpectrumHandle illuminant,
+    RGBColorSpace(Point2f r, Point2f g, Point2f b, Spectrum illuminant,
                   const RGBToSpectrumTable *rgbToSpectrumTable, Allocator alloc);
 
     PBRT_CPU_GPU

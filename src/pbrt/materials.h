@@ -82,7 +82,7 @@ struct BumpEvalContext {
 
 // Bump-mapping Function Definitions
 template <typename TextureEvaluator>
-PBRT_CPU_GPU void Bump(TextureEvaluator texEval, FloatTextureHandle displacement,
+PBRT_CPU_GPU void Bump(TextureEvaluator texEval, FloatTexture displacement,
                        const Image *normalMap, const BumpEvalContext &ctx, Vector3f *dpdu,
                        Vector3f *dpdv) {
     DCHECK(displacement != nullptr || normalMap != nullptr);
@@ -140,10 +140,9 @@ class DielectricMaterial {
     using BSSRDF = void;
 
     // DielectricMaterial Public Methods
-    DielectricMaterial(FloatTextureHandle uRoughness, FloatTextureHandle vRoughness,
-                       FloatTextureHandle etaF, SpectrumTextureHandle etaS,
-                       FloatTextureHandle displacement, Image *normalMap,
-                       SpectrumTextureHandle tint, bool remapRoughness)
+    DielectricMaterial(FloatTexture uRoughness, FloatTexture vRoughness,
+                       FloatTexture etaF, SpectrumTexture etaS, FloatTexture displacement,
+                       Image *normalMap, SpectrumTexture tint, bool remapRoughness)
         : displacement(displacement),
           normalMap(normalMap),
           uRoughness(uRoughness),
@@ -163,7 +162,7 @@ class DielectricMaterial {
     }
 
     PBRT_CPU_GPU
-    FloatTextureHandle GetDisplacement() const { return displacement; }
+    FloatTexture GetDisplacement() const { return displacement; }
     PBRT_CPU_GPU
     const Image *GetNormalMap() const { return normalMap; }
 
@@ -209,11 +208,11 @@ class DielectricMaterial {
 
   private:
     // DielectricMaterial Private Members
-    FloatTextureHandle displacement;
+    FloatTexture displacement;
     Image *normalMap;
-    FloatTextureHandle uRoughness, vRoughness, etaF;
-    SpectrumTextureHandle etaS;
-    SpectrumTextureHandle tint;
+    FloatTexture uRoughness, vRoughness, etaF;
+    SpectrumTexture etaS;
+    SpectrumTexture tint;
     bool remapRoughness;
 };
 
@@ -249,8 +248,8 @@ class ThinDielectricMaterial {
     PBRT_CPU_GPU
     bool IsTransparent() const { return true; }
 
-    ThinDielectricMaterial(FloatTextureHandle etaF, SpectrumTextureHandle etaS,
-                           FloatTextureHandle displacement, Image *normalMap)
+    ThinDielectricMaterial(FloatTexture etaF, SpectrumTexture etaS,
+                           FloatTexture displacement, Image *normalMap)
         : displacement(displacement), normalMap(normalMap), etaF(etaF), etaS(etaS) {
         CHECK((bool)etaF ^ (bool)etaS);
     }
@@ -258,7 +257,7 @@ class ThinDielectricMaterial {
     static const char *Name() { return "ThinDielectricMaterial"; }
 
     PBRT_CPU_GPU
-    FloatTextureHandle GetDisplacement() const { return displacement; }
+    FloatTexture GetDisplacement() const { return displacement; }
     PBRT_CPU_GPU
     const Image *GetNormalMap() const { return normalMap; }
 
@@ -276,10 +275,10 @@ class ThinDielectricMaterial {
 
   private:
     // ThinDielectricMaterial Private Data
-    FloatTextureHandle displacement;
+    FloatTexture displacement;
     Image *normalMap;
-    FloatTextureHandle etaF;
-    SpectrumTextureHandle etaS;
+    FloatTexture etaF;
+    SpectrumTexture etaS;
 };
 
 // MixMaterial Definition
@@ -290,18 +289,18 @@ class MixMaterial {
     using BSSRDF = void;
 
     // MixMaterial Public Methods
-    MixMaterial(MaterialHandle m[2], FloatTextureHandle amount) : amount(amount) {
+    MixMaterial(Material m[2], FloatTexture amount) : amount(amount) {
         materials[0] = m[0];
         materials[1] = m[1];
     }
 
     PBRT_CPU_GPU
-    MaterialHandle GetMaterial(int i) const { return materials[i]; }
+    Material GetMaterial(int i) const { return materials[i]; }
 
     static const char *Name() { return "MixMaterial"; }
 
     PBRT_CPU_GPU
-    FloatTextureHandle GetDisplacement() const {
+    FloatTexture GetDisplacement() const {
 #ifndef PBRT_IS_GPU_CODE
         LOG_FATAL("Shouldn't be called");
 #endif
@@ -316,7 +315,7 @@ class MixMaterial {
         return nullptr;
     }
 
-    static MixMaterial *Create(MaterialHandle materials[2],
+    static MixMaterial *Create(Material materials[2],
                                const TextureParameterDictionary &parameters,
                                const FileLoc *loc, Allocator alloc);
 
@@ -338,8 +337,8 @@ class MixMaterial {
     }
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU MaterialHandle ChooseMaterial(TextureEvaluator texEval,
-                                               MaterialEvalContext ctx) const {
+    PBRT_CPU_GPU Material ChooseMaterial(TextureEvaluator texEval,
+                                         MaterialEvalContext ctx) const {
         Float amt = texEval(amount, ctx);
         if (amt <= 0)
             return materials[0];
@@ -370,8 +369,8 @@ class MixMaterial {
 
   private:
     // MixMaterial Private Members
-    FloatTextureHandle amount;
-    MaterialHandle materials[2];
+    FloatTexture amount;
+    Material materials[2];
 };
 
 // HairMaterial Definition
@@ -381,10 +380,9 @@ class HairMaterial {
     using BSSRDF = void;
 
     // HairMaterial Public Methods
-    HairMaterial(SpectrumTextureHandle sigma_a, SpectrumTextureHandle color,
-                 FloatTextureHandle eumelanin, FloatTextureHandle pheomelanin,
-                 FloatTextureHandle eta, FloatTextureHandle beta_m,
-                 FloatTextureHandle beta_n, FloatTextureHandle alpha)
+    HairMaterial(SpectrumTexture sigma_a, SpectrumTexture color, FloatTexture eumelanin,
+                 FloatTexture pheomelanin, FloatTexture eta, FloatTexture beta_m,
+                 FloatTexture beta_n, FloatTexture alpha)
         : sigma_a(sigma_a),
           color(color),
           eumelanin(eumelanin),
@@ -434,7 +432,7 @@ class HairMaterial {
                                 const FileLoc *loc, Allocator alloc);
 
     PBRT_CPU_GPU
-    FloatTextureHandle GetDisplacement() const { return nullptr; }
+    FloatTexture GetDisplacement() const { return nullptr; }
     PBRT_CPU_GPU
     const Image *GetNormalMap() const { return nullptr; }
 
@@ -449,9 +447,9 @@ class HairMaterial {
 
   private:
     // HairMaterial Private Data
-    SpectrumTextureHandle sigma_a, color;
-    FloatTextureHandle eumelanin, pheomelanin, eta;
-    FloatTextureHandle beta_m, beta_n, alpha;
+    SpectrumTexture sigma_a, color;
+    FloatTexture eumelanin, pheomelanin, eta;
+    FloatTexture beta_m, beta_n, alpha;
 };
 
 // DiffuseMaterial Definition
@@ -465,7 +463,7 @@ class DiffuseMaterial {
     static const char *Name() { return "DiffuseMaterial"; }
 
     PBRT_CPU_GPU
-    FloatTextureHandle GetDisplacement() const { return displacement; }
+    FloatTexture GetDisplacement() const { return displacement; }
     PBRT_CPU_GPU
     const Image *GetNormalMap() const { return normalMap; }
 
@@ -481,8 +479,8 @@ class DiffuseMaterial {
 
     std::string ToString() const;
 
-    DiffuseMaterial(SpectrumTextureHandle reflectance, FloatTextureHandle sigma,
-                    FloatTextureHandle displacement, Image *normalMap)
+    DiffuseMaterial(SpectrumTexture reflectance, FloatTexture sigma,
+                    FloatTexture displacement, Image *normalMap)
         : displacement(displacement),
           normalMap(normalMap),
           reflectance(reflectance),
@@ -504,10 +502,10 @@ class DiffuseMaterial {
 
   private:
     // DiffuseMaterial Private Members
-    FloatTextureHandle displacement;
+    FloatTexture displacement;
     Image *normalMap;
-    SpectrumTextureHandle reflectance;
-    FloatTextureHandle sigma;
+    SpectrumTexture reflectance;
+    FloatTexture sigma;
 };
 
 // ConductorMaterial Definition
@@ -545,10 +543,9 @@ class ConductorMaterial {
         return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf);
     }
 
-    ConductorMaterial(SpectrumTextureHandle eta, SpectrumTextureHandle k,
-                      SpectrumTextureHandle reflectance, FloatTextureHandle uRoughness,
-                      FloatTextureHandle vRoughness, FloatTextureHandle displacement,
-                      Image *normalMap, bool remapRoughness)
+    ConductorMaterial(SpectrumTexture eta, SpectrumTexture k, SpectrumTexture reflectance,
+                      FloatTexture uRoughness, FloatTexture vRoughness,
+                      FloatTexture displacement, Image *normalMap, bool remapRoughness)
         : displacement(displacement),
           normalMap(normalMap),
           eta(eta),
@@ -561,7 +558,7 @@ class ConductorMaterial {
     static const char *Name() { return "ConductorMaterial"; }
 
     PBRT_CPU_GPU
-    FloatTextureHandle GetDisplacement() const { return displacement; }
+    FloatTexture GetDisplacement() const { return displacement; }
     PBRT_CPU_GPU
     const Image *GetNormalMap() const { return normalMap; }
 
@@ -580,10 +577,10 @@ class ConductorMaterial {
 
   private:
     // ConductorMaterial Private Data
-    FloatTextureHandle displacement;
+    FloatTexture displacement;
     Image *normalMap;
-    SpectrumTextureHandle eta, k, reflectance;
-    FloatTextureHandle uRoughness, vRoughness;
+    SpectrumTexture eta, k, reflectance;
+    FloatTexture uRoughness, vRoughness;
     bool remapRoughness;
 };
 
@@ -593,11 +590,10 @@ class CoatedDiffuseMaterial {
     using BxDF = CoatedDiffuseBxDF;
     using BSSRDF = void;
     // CoatedDiffuseMaterial Public Methods
-    CoatedDiffuseMaterial(SpectrumTextureHandle reflectance,
-                          FloatTextureHandle uRoughness, FloatTextureHandle vRoughness,
-                          FloatTextureHandle thickness, SpectrumTextureHandle albedo,
-                          FloatTextureHandle g, FloatTextureHandle eta,
-                          FloatTextureHandle displacement, Image *normalMap,
+    CoatedDiffuseMaterial(SpectrumTexture reflectance, FloatTexture uRoughness,
+                          FloatTexture vRoughness, FloatTexture thickness,
+                          SpectrumTexture albedo, FloatTexture g, FloatTexture eta,
+                          FloatTexture displacement, Image *normalMap,
                           bool remapRoughness, LayeredBxDFConfig config)
         : displacement(displacement),
           normalMap(normalMap),
@@ -646,7 +642,7 @@ class CoatedDiffuseMaterial {
     }
 
     PBRT_CPU_GPU
-    FloatTextureHandle GetDisplacement() const { return displacement; }
+    FloatTexture GetDisplacement() const { return displacement; }
     PBRT_CPU_GPU
     const Image *GetNormalMap() const { return normalMap; }
 
@@ -665,10 +661,10 @@ class CoatedDiffuseMaterial {
 
   private:
     // CoatedDiffuseMaterial Private Members
-    FloatTextureHandle displacement;
+    FloatTexture displacement;
     Image *normalMap;
-    SpectrumTextureHandle reflectance, albedo;
-    FloatTextureHandle uRoughness, vRoughness, thickness, g, eta;
+    SpectrumTexture reflectance, albedo;
+    FloatTexture uRoughness, vRoughness, thickness, g, eta;
     bool remapRoughness;
     LayeredBxDFConfig config;
 };
@@ -679,16 +675,15 @@ class CoatedConductorMaterial {
     using BxDF = CoatedConductorBxDF;
     using BSSRDF = void;
     // CoatedConductorMaterial Public Methods
-    CoatedConductorMaterial(FloatTextureHandle interfaceURoughness,
-                            FloatTextureHandle interfaceVRoughness,
-                            FloatTextureHandle thickness, FloatTextureHandle interfaceEta,
-                            FloatTextureHandle g, SpectrumTextureHandle albedo,
-                            FloatTextureHandle conductorURoughness,
-                            FloatTextureHandle conductorVRoughness,
-                            SpectrumTextureHandle conductorEta, SpectrumTextureHandle k,
-                            SpectrumTextureHandle reflectance,
-                            FloatTextureHandle displacement, Image *normalMap,
-                            bool remapRoughness, LayeredBxDFConfig config)
+    CoatedConductorMaterial(FloatTexture interfaceURoughness,
+                            FloatTexture interfaceVRoughness, FloatTexture thickness,
+                            FloatTexture interfaceEta, FloatTexture g,
+                            SpectrumTexture albedo, FloatTexture conductorURoughness,
+                            FloatTexture conductorVRoughness,
+                            SpectrumTexture conductorEta, SpectrumTexture k,
+                            SpectrumTexture reflectance, FloatTexture displacement,
+                            Image *normalMap, bool remapRoughness,
+                            LayeredBxDFConfig config)
         : displacement(displacement),
           normalMap(normalMap),
           interfaceURoughness(interfaceURoughness),
@@ -758,7 +753,7 @@ class CoatedConductorMaterial {
     }
 
     PBRT_CPU_GPU
-    FloatTextureHandle GetDisplacement() const { return displacement; }
+    FloatTexture GetDisplacement() const { return displacement; }
     PBRT_CPU_GPU
     const Image *GetNormalMap() const { return normalMap; }
 
@@ -777,13 +772,13 @@ class CoatedConductorMaterial {
 
   private:
     // CoatedConductorMaterial Private Members
-    FloatTextureHandle displacement;
+    FloatTexture displacement;
     Image *normalMap;
-    FloatTextureHandle interfaceURoughness, interfaceVRoughness, thickness, interfaceEta;
-    FloatTextureHandle g;
-    SpectrumTextureHandle albedo;
-    FloatTextureHandle conductorURoughness, conductorVRoughness;
-    SpectrumTextureHandle conductorEta, k, reflectance;
+    FloatTexture interfaceURoughness, interfaceVRoughness, thickness, interfaceEta;
+    FloatTexture g;
+    SpectrumTexture albedo;
+    FloatTexture conductorURoughness, conductorVRoughness;
+    SpectrumTexture conductorEta, k, reflectance;
     bool remapRoughness;
     LayeredBxDFConfig config;
 };
@@ -796,12 +791,11 @@ class SubsurfaceMaterial {
     using BSSRDF = TabulatedBSSRDF;
 
     // SubsurfaceMaterial Public Methods
-    SubsurfaceMaterial(Float scale, SpectrumTextureHandle sigma_a,
-                       SpectrumTextureHandle sigma_s, SpectrumTextureHandle reflectance,
-                       SpectrumTextureHandle mfp, Float g, Float eta,
-                       FloatTextureHandle uRoughness, FloatTextureHandle vRoughness,
-                       FloatTextureHandle displacement, Image *normalMap,
-                       bool remapRoughness, Allocator alloc)
+    SubsurfaceMaterial(Float scale, SpectrumTexture sigma_a, SpectrumTexture sigma_s,
+                       SpectrumTexture reflectance, SpectrumTexture mfp, Float g,
+                       Float eta, FloatTexture uRoughness, FloatTexture vRoughness,
+                       FloatTexture displacement, Image *normalMap, bool remapRoughness,
+                       Allocator alloc)
         : displacement(displacement),
           normalMap(normalMap),
           scale(scale),
@@ -863,7 +857,7 @@ class SubsurfaceMaterial {
     }
 
     PBRT_CPU_GPU
-    FloatTextureHandle GetDisplacement() const { return displacement; }
+    FloatTexture GetDisplacement() const { return displacement; }
     PBRT_CPU_GPU
     const Image *GetNormalMap() const { return normalMap; }
 
@@ -880,11 +874,11 @@ class SubsurfaceMaterial {
 
   private:
     // SubsurfaceMaterial Private Members
-    FloatTextureHandle displacement;
+    FloatTexture displacement;
     Image *normalMap;
-    SpectrumTextureHandle sigma_a, sigma_s, reflectance, mfp;
+    SpectrumTexture sigma_a, sigma_s, reflectance, mfp;
     Float scale, eta;
-    FloatTextureHandle uRoughness, vRoughness;
+    FloatTexture uRoughness, vRoughness;
     bool remapRoughness;
     BSSRDFTable table;
 };
@@ -895,10 +889,9 @@ class DiffuseTransmissionMaterial {
     using BxDF = DiffuseBxDF;
     using BSSRDF = void;
     // DiffuseTransmissionMaterial Public Methods
-    DiffuseTransmissionMaterial(SpectrumTextureHandle reflectance,
-                                SpectrumTextureHandle transmittance,
-                                FloatTextureHandle sigma, FloatTextureHandle displacement,
-                                Image *normalMap, Float scale)
+    DiffuseTransmissionMaterial(SpectrumTexture reflectance,
+                                SpectrumTexture transmittance, FloatTexture sigma,
+                                FloatTexture displacement, Image *normalMap, Float scale)
         : displacement(displacement),
           normalMap(normalMap),
           reflectance(reflectance),
@@ -924,7 +917,7 @@ class DiffuseTransmissionMaterial {
     }
 
     PBRT_CPU_GPU
-    FloatTextureHandle GetDisplacement() const { return displacement; }
+    FloatTexture GetDisplacement() const { return displacement; }
     PBRT_CPU_GPU
     const Image *GetNormalMap() const { return normalMap; }
 
@@ -943,10 +936,10 @@ class DiffuseTransmissionMaterial {
 
   private:
     // DiffuseTransmissionMaterial Private Data
-    FloatTextureHandle displacement;
+    FloatTexture displacement;
     Image *normalMap;
-    SpectrumTextureHandle reflectance, transmittance;
-    FloatTextureHandle sigma;
+    SpectrumTexture reflectance, transmittance;
+    FloatTexture sigma;
     Float scale;
 };
 
@@ -963,7 +956,7 @@ class MeasuredMaterial {
         return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf);
     }
 
-    MeasuredMaterial(const std::string &filename, FloatTextureHandle displacement,
+    MeasuredMaterial(const std::string &filename, FloatTexture displacement,
                      Image *normalMap, Allocator alloc);
 
     static const char *Name() { return "MeasuredMaterial"; }
@@ -974,7 +967,7 @@ class MeasuredMaterial {
     }
 
     PBRT_CPU_GPU
-    FloatTextureHandle GetDisplacement() const { return displacement; }
+    FloatTexture GetDisplacement() const { return displacement; }
     PBRT_CPU_GPU
     const Image *GetNormalMap() const { return normalMap; }
 
@@ -993,17 +986,17 @@ class MeasuredMaterial {
 
   private:
     // MeasuredMaterial Private Members
-    FloatTextureHandle displacement;
+    FloatTexture displacement;
     Image *normalMap;
     const MeasuredBRDF *brdf;
 };
 
-// MaterialHandle Inline Method Definitions
+// Material Inline Method Definitions
 template <typename TextureEvaluator>
-inline BSDF MaterialHandle::GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
-                                    SampledWavelengths &lambda,
-                                    ScratchBuffer &scratchBuffer) const {
-    // Define _getBSDF_ lamba function for _MaterialHandle::GetBSDF()_
+inline BSDF Material::GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
+                              SampledWavelengths &lambda,
+                              ScratchBuffer &scratchBuffer) const {
+    // Define _getBSDF_ lamba function for _Material::GetBSDF()_
     auto getBSDF = [&](auto mtl) -> BSDF {
         using Material = typename std::remove_reference<decltype(*mtl)>::type;
         using BxDF = typename Material::BxDF;
@@ -1015,17 +1008,16 @@ inline BSDF MaterialHandle::GetBSDF(TextureEvaluator texEval, MaterialEvalContex
 }
 
 template <typename TextureEvaluator>
-inline bool MaterialHandle::CanEvaluateTextures(TextureEvaluator texEval) const {
+inline bool Material::CanEvaluateTextures(TextureEvaluator texEval) const {
     auto eval = [&](auto ptr) { return ptr->CanEvaluateTextures(texEval); };
     return Dispatch(eval);
 }
 
 template <typename TextureEvaluator>
-inline BSSRDFHandle MaterialHandle::GetBSSRDF(TextureEvaluator texEval,
-                                              MaterialEvalContext ctx,
-                                              SampledWavelengths &lambda,
-                                              ScratchBuffer &scratchBuffer) const {
-    auto get = [&](auto ptr) -> BSSRDFHandle {
+inline BSSRDF Material::GetBSSRDF(TextureEvaluator texEval, MaterialEvalContext ctx,
+                                  SampledWavelengths &lambda,
+                                  ScratchBuffer &scratchBuffer) const {
+    auto get = [&](auto ptr) -> BSSRDF {
         using Material = typename std::remove_reference<decltype(*ptr)>::type;
         using BSSRDF = typename Material::BSSRDF;
         if constexpr (std::is_same_v<BSSRDF, void>)
@@ -1040,22 +1032,22 @@ inline BSSRDFHandle MaterialHandle::GetBSSRDF(TextureEvaluator texEval,
     return Dispatch(get);
 }
 
-inline bool MaterialHandle::IsTransparent() const {
+inline bool Material::IsTransparent() const {
     auto transp = [&](auto ptr) { return ptr->IsTransparent(); };
     return Dispatch(transp);
 }
 
-inline bool MaterialHandle::HasSubsurfaceScattering() const {
+inline bool Material::HasSubsurfaceScattering() const {
     auto has = [&](auto ptr) { return ptr->HasSubsurfaceScattering(); };
     return Dispatch(has);
 }
 
-inline FloatTextureHandle MaterialHandle::GetDisplacement() const {
+inline FloatTexture Material::GetDisplacement() const {
     auto disp = [&](auto ptr) { return ptr->GetDisplacement(); };
     return Dispatch(disp);
 }
 
-inline const Image *MaterialHandle::GetNormalMap() const {
+inline const Image *Material::GetNormalMap() const {
     auto nmap = [&](auto ptr) { return ptr->GetNormalMap(); };
     return Dispatch(nmap);
 }

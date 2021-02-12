@@ -1170,32 +1170,32 @@ class NormalizedFresnelBxDF {
     Float eta;
 };
 
-inline SampledSpectrum BxDFHandle::f(Vector3f wo, Vector3f wi, TransportMode mode) const {
+inline SampledSpectrum BxDF::f(Vector3f wo, Vector3f wi, TransportMode mode) const {
     auto f = [&](auto ptr) -> SampledSpectrum { return ptr->f(wo, wi, mode); };
     return Dispatch(f);
 }
 
-inline pstd::optional<BSDFSample> BxDFHandle::Sample_f(
-    Vector3f wo, Float uc, Point2f u, TransportMode mode,
-    BxDFReflTransFlags sampleFlags) const {
+inline pstd::optional<BSDFSample> BxDF::Sample_f(Vector3f wo, Float uc, Point2f u,
+                                                 TransportMode mode,
+                                                 BxDFReflTransFlags sampleFlags) const {
     auto sample_f = [&](auto ptr) -> pstd::optional<BSDFSample> {
         return ptr->Sample_f(wo, uc, u, mode, sampleFlags);
     };
     return Dispatch(sample_f);
 }
 
-inline Float BxDFHandle::PDF(Vector3f wo, Vector3f wi, TransportMode mode,
-                             BxDFReflTransFlags sampleFlags) const {
+inline Float BxDF::PDF(Vector3f wo, Vector3f wi, TransportMode mode,
+                       BxDFReflTransFlags sampleFlags) const {
     auto pdf = [&](auto ptr) { return ptr->PDF(wo, wi, mode, sampleFlags); };
     return Dispatch(pdf);
 }
 
-inline BxDFFlags BxDFHandle::Flags() const {
+inline BxDFFlags BxDF::Flags() const {
     auto flags = [&](auto ptr) { return ptr->Flags(); };
     return Dispatch(flags);
 }
 
-inline void BxDFHandle::Regularize() {
+inline void BxDF::Regularize() {
     auto regularize = [&](auto ptr) { ptr->Regularize(); };
     return Dispatch(regularize);
 }

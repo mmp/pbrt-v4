@@ -130,12 +130,11 @@ struct CameraRayDifferential {
 struct CameraBaseParameters {
     CameraTransform cameraTransform;
     Float shutterOpen = 0, shutterClose = 1;
-    FilmHandle film;
-    MediumHandle medium;
+    Film film;
+    Medium medium;
     CameraBaseParameters() = default;
-    CameraBaseParameters(const CameraTransform &cameraTransform, FilmHandle film,
-                         MediumHandle medium, const ParameterDictionary &parameters,
-                         const FileLoc *loc);
+    CameraBaseParameters(const CameraTransform &cameraTransform, Film film, Medium medium,
+                         const ParameterDictionary &parameters, const FileLoc *loc);
 };
 
 // CameraBase Definition
@@ -143,7 +142,7 @@ class CameraBase {
   public:
     // CameraBase Public Methods
     PBRT_CPU_GPU
-    FilmHandle GetFilm() const { return film; }
+    Film GetFilm() const { return film; }
     PBRT_CPU_GPU
     const CameraTransform &GetCameraTransform() const { return cameraTransform; }
 
@@ -159,8 +158,8 @@ class CameraBase {
     // CameraBase Protected Members
     CameraTransform cameraTransform;
     Float shutterOpen, shutterClose;
-    FilmHandle film;
-    MediumHandle medium;
+    Film film;
+    Medium medium;
     Vector3f minPosDifferentialX, minPosDifferentialY;
     Vector3f minDirDifferentialX, minDirDifferentialY;
 
@@ -170,7 +169,7 @@ class CameraBase {
 
     PBRT_CPU_GPU
     static pstd::optional<CameraRayDifferential> GenerateRayDifferential(
-        CameraHandle camera, CameraSample sample, SampledWavelengths &lambda);
+        Camera camera, CameraSample sample, SampledWavelengths &lambda);
 
     PBRT_CPU_GPU
     Ray RenderFromCamera(const Ray &r) const {
@@ -212,7 +211,7 @@ class CameraBase {
         return cameraTransform.CameraFromRender(p, time);
     }
 
-    void FindMinimumDifferentials(CameraHandle camera);
+    void FindMinimumDifferentials(Camera camera);
 };
 
 // ProjectiveCamera Definition
@@ -278,9 +277,9 @@ class OrthographicCamera : public ProjectiveCamera {
         CameraSample sample, SampledWavelengths &lambda) const;
 
     static OrthographicCamera *Create(const ParameterDictionary &parameters,
-                                      const CameraTransform &cameraTransform,
-                                      FilmHandle film, MediumHandle medium,
-                                      const FileLoc *loc, Allocator alloc = {});
+                                      const CameraTransform &cameraTransform, Film film,
+                                      Medium medium, const FileLoc *loc,
+                                      Allocator alloc = {});
 
     PBRT_CPU_GPU
     SampledSpectrum We(const Ray &ray, SampledWavelengths &lambda,
@@ -344,9 +343,9 @@ class PerspectiveCamera : public ProjectiveCamera {
     PerspectiveCamera() = default;
 
     static PerspectiveCamera *Create(const ParameterDictionary &parameters,
-                                     const CameraTransform &cameraTransform,
-                                     FilmHandle film, MediumHandle medium,
-                                     const FileLoc *loc, Allocator alloc = {});
+                                     const CameraTransform &cameraTransform, Film film,
+                                     Medium medium, const FileLoc *loc,
+                                     Allocator alloc = {});
 
     PBRT_CPU_GPU
     pstd::optional<CameraRay> GenerateRay(CameraSample sample,
@@ -388,9 +387,9 @@ class SphericalCamera : public CameraBase {
     }
 
     static SphericalCamera *Create(const ParameterDictionary &parameters,
-                                   const CameraTransform &cameraTransform,
-                                   FilmHandle film, MediumHandle medium,
-                                   const FileLoc *loc, Allocator alloc = {});
+                                   const CameraTransform &cameraTransform, Film film,
+                                   Medium medium, const FileLoc *loc,
+                                   Allocator alloc = {});
 
     PBRT_CPU_GPU
     pstd::optional<CameraRay> GenerateRay(CameraSample sample,
@@ -437,9 +436,9 @@ class RealisticCamera : public CameraBase {
                     Float apertureDiameter, Image apertureImage, Allocator alloc);
 
     static RealisticCamera *Create(const ParameterDictionary &parameters,
-                                   const CameraTransform &cameraTransform,
-                                   FilmHandle film, MediumHandle medium,
-                                   const FileLoc *loc, Allocator alloc = {});
+                                   const CameraTransform &cameraTransform, Film film,
+                                   Medium medium, const FileLoc *loc,
+                                   Allocator alloc = {});
 
     PBRT_CPU_GPU
     pstd::optional<CameraRay> GenerateRay(CameraSample sample,
@@ -551,23 +550,23 @@ class RealisticCamera : public CameraBase {
     pstd::vector<Bounds2f> exitPupilBounds;
 };
 
-inline pstd::optional<CameraRay> CameraHandle::GenerateRay(
-    CameraSample sample, SampledWavelengths &lambda) const {
+inline pstd::optional<CameraRay> Camera::GenerateRay(CameraSample sample,
+                                                     SampledWavelengths &lambda) const {
     auto generate = [&](auto ptr) { return ptr->GenerateRay(sample, lambda); };
     return Dispatch(generate);
 }
 
-inline FilmHandle CameraHandle::GetFilm() const {
+inline Film Camera::GetFilm() const {
     auto getfilm = [&](auto ptr) { return ptr->GetFilm(); };
     return Dispatch(getfilm);
 }
 
-inline Float CameraHandle::SampleTime(Float u) const {
+inline Float Camera::SampleTime(Float u) const {
     auto sample = [&](auto ptr) { return ptr->SampleTime(u); };
     return Dispatch(sample);
 }
 
-inline const CameraTransform &CameraHandle::GetCameraTransform() const {
+inline const CameraTransform &Camera::GetCameraTransform() const {
     auto gtc = [&](auto ptr) -> auto && { return ptr->GetCameraTransform(); };
     return DispatchCRef(gtc);
 }

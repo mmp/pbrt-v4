@@ -253,15 +253,15 @@ Normal3f ParameterDictionary::GetOneNormal3f(const std::string &name,
     return lookupSingle<ParameterType::Normal3f>(name, def);
 }
 
-SpectrumHandle ParameterDictionary::GetOneSpectrum(const std::string &name,
-                                                   SpectrumHandle defaultValue,
-                                                   SpectrumType spectrumType,
-                                                   Allocator alloc) const {
+Spectrum ParameterDictionary::GetOneSpectrum(const std::string &name,
+                                             Spectrum defaultValue,
+                                             SpectrumType spectrumType,
+                                             Allocator alloc) const {
     for (const ParsedParameter *p : params) {
         if (p->name != name)
             continue;
 
-        std::vector<SpectrumHandle> s = extractSpectrumArray(*p, spectrumType, alloc);
+        std::vector<Spectrum> s = extractSpectrumArray(*p, spectrumType, alloc);
         if (!s.empty()) {
             if (s.size() > 1)
                 ErrorExit(&p->loc, "More than one value provided for parameter \"%s\".",
@@ -352,15 +352,15 @@ std::vector<Normal3f> ParameterDictionary::GetNormal3fArray(
     return lookupArray<ParameterType::Normal3f>(name);
 }
 
-static std::map<std::string, SpectrumHandle> cachedSpectra;
+static std::map<std::string, Spectrum> cachedSpectra;
 
 // TODO: move this functionality (but not the caching?) to a Spectrum method.
-static SpectrumHandle readSpectrumFromFile(const std::string &filename, Allocator alloc) {
+static Spectrum readSpectrumFromFile(const std::string &filename, Allocator alloc) {
     std::string fn = ResolveFilename(filename);
     if (cachedSpectra.find(fn) != cachedSpectra.end())
         return cachedSpectra[fn];
 
-    pstd::optional<SpectrumHandle> pls = PiecewiseLinearSpectrum::Read(fn, alloc);
+    pstd::optional<Spectrum> pls = PiecewiseLinearSpectrum::Read(fn, alloc);
     if (!pls)
         return nullptr;
 
@@ -368,13 +368,13 @@ static SpectrumHandle readSpectrumFromFile(const std::string &filename, Allocato
     return *pls;
 }
 
-std::vector<SpectrumHandle> ParameterDictionary::extractSpectrumArray(
+std::vector<Spectrum> ParameterDictionary::extractSpectrumArray(
     const ParsedParameter &param, SpectrumType spectrumType, Allocator alloc) const {
     if (param.type == "rgb" || (Options->upgrade && param.type == "color"))
-        return returnArray<SpectrumHandle>(
+        return returnArray<Spectrum>(
             param.numbers, param, 3,
             [this, spectrumType, &alloc, &param](const double *v,
-                                                 const FileLoc *loc) -> SpectrumHandle {
+                                                 const FileLoc *loc) -> Spectrum {
                 RGB rgb(v[0], v[1], v[2]);
                 const RGBColorSpace &cs =
                     param.colorSpace ? *param.colorSpace : *colorSpace;
@@ -394,9 +394,9 @@ std::vector<SpectrumHandle> ParameterDictionary::extractSpectrumArray(
                 }
             });
     else if (param.type == "blackbody")
-        return returnArray<SpectrumHandle>(
+        return returnArray<Spectrum>(
             param.numbers, param, 1,
-            [this, &alloc](const double *v, const FileLoc *loc) -> SpectrumHandle {
+            [this, &alloc](const double *v, const FileLoc *loc) -> Spectrum {
                 return alloc.new_object<BlackbodySpectrum>(v[0]);
             });
     else if (param.type == "spectrum" && !param.numbers.empty()) {
@@ -404,10 +404,10 @@ std::vector<SpectrumHandle> ParameterDictionary::extractSpectrumArray(
             ErrorExit(&param.loc, "Found odd number of values for \"%s\"", param.name);
 
         int nSamples = param.numbers.size() / 2;
-        return returnArray<SpectrumHandle>(
+        return returnArray<Spectrum>(
             param.numbers, param, param.numbers.size(),
             [this, nSamples, &alloc, param](const double *v,
-                                            const FileLoc *Loc) -> SpectrumHandle {
+                                            const FileLoc *Loc) -> Spectrum {
                 std::vector<Float> lambda(nSamples), value(nSamples);
                 for (int i = 0; i < nSamples; ++i) {
                     if (i > 0 && v[2 * i] <= lambda[i - 1])
@@ -421,10 +421,10 @@ std::vector<SpectrumHandle> ParameterDictionary::extractSpectrumArray(
                 return alloc.new_object<PiecewiseLinearSpectrum>(lambda, value, alloc);
             });
     } else if (param.type == "spectrum" && !param.strings.empty())
-        return returnArray<SpectrumHandle>(
+        return returnArray<Spectrum>(
             param.strings, param, 1,
-            [param, &alloc](const std::string *s, const FileLoc *loc) -> SpectrumHandle {
-                SpectrumHandle spd = GetNamedSpectrum(*s);
+            [param, &alloc](const std::string *s, const FileLoc *loc) -> Spectrum {
+                Spectrum spd = GetNamedSpectrum(*s);
                 if (spd)
                     return spd;
 
@@ -437,13 +437,14 @@ std::vector<SpectrumHandle> ParameterDictionary::extractSpectrumArray(
     return {};
 }
 
-std::vector<SpectrumHandle> ParameterDictionary::GetSpectrumArray(
-    const std::string &name, SpectrumType spectrumType, Allocator alloc) const {
+std::vector<Spectrum> ParameterDictionary::GetSpectrumArray(const std::string &name,
+                                                            SpectrumType spectrumType,
+                                                            Allocator alloc) const {
     for (const ParsedParameter *p : params) {
         if (p->name != name)
             continue;
 
-        std::vector<SpectrumHandle> s = extractSpectrumArray(*p, spectrumType, alloc);
+        std::vector<Spectrum> s = extractSpectrumArray(*p, spectrumType, alloc);
         if (!s.empty())
             return s;
     }
@@ -724,10 +725,9 @@ Normal3f TextureParameterDictionary::GetOneNormal3f(const std::string &name,
     return dict->GetOneNormal3f(name, def);
 }
 
-SpectrumHandle TextureParameterDictionary::GetOneSpectrum(const std::string &name,
-                                                          SpectrumHandle def,
-                                                          SpectrumType spectrumType,
-                                                          Allocator alloc) const {
+Spectrum TextureParameterDictionary::GetOneSpectrum(const std::string &name, Spectrum def,
+                                                    SpectrumType spectrumType,
+                                                    Allocator alloc) const {
     return dict->GetOneSpectrum(name, def, spectrumType, alloc);
 }
 
@@ -775,7 +775,7 @@ std::vector<Normal3f> TextureParameterDictionary::GetNormal3fArray(
     return dict->GetNormal3fArray(name);
 }
 
-std::vector<SpectrumHandle> TextureParameterDictionary::GetSpectrumArray(
+std::vector<Spectrum> TextureParameterDictionary::GetSpectrumArray(
     const std::string &name, SpectrumType spectrumType, Allocator alloc) const {
     return dict->GetSpectrumArray(name, spectrumType, alloc);
 }
@@ -785,10 +785,11 @@ std::vector<std::string> TextureParameterDictionary::GetStringArray(
     return dict->GetStringArray(name);
 }
 
-SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTexture(
-    const std::string &name, SpectrumHandle defaultValue, SpectrumType spectrumType,
-    Allocator alloc) const {
-    SpectrumTextureHandle tex = GetSpectrumTextureOrNull(name, spectrumType, alloc);
+SpectrumTexture TextureParameterDictionary::GetSpectrumTexture(const std::string &name,
+                                                               Spectrum defaultValue,
+                                                               SpectrumType spectrumType,
+                                                               Allocator alloc) const {
+    SpectrumTexture tex = GetSpectrumTextureOrNull(name, spectrumType, alloc);
     if (tex)
         return tex;
     else if (defaultValue)
@@ -797,7 +798,7 @@ SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTexture(
         return nullptr;
 }
 
-SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTextureOrNull(
+SpectrumTexture TextureParameterDictionary::GetSpectrumTextureOrNull(
     const std::string &name, SpectrumType spectrumType, Allocator alloc) const {
     const auto &spectrumTextures = (spectrumType == SpectrumType::Unbounded)
                                        ? textures->unboundedSpectrumTextures
@@ -837,7 +838,7 @@ SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTextureOrNull(
             if (rgb.r < 0 || rgb.g < 0 || rgb.b < 0)
                 ErrorExit(&p->loc, "Negative value provided for RGB parameter \"%s\".",
                           p->name);
-            SpectrumHandle s;
+            Spectrum s;
             if (spectrumType == SpectrumType::Illuminant)
                 s = alloc.new_object<RGBIlluminantSpectrum>(*dict->ColorSpace(), rgb);
             else if (spectrumType == SpectrumType::Unbounded)
@@ -852,7 +853,7 @@ SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTextureOrNull(
             }
             return alloc.new_object<SpectrumConstantTexture>(s);
         } else if (p->type == "spectrum" || p->type == "blackbody") {
-            SpectrumHandle s = GetOneSpectrum(name, nullptr, spectrumType, alloc);
+            Spectrum s = GetOneSpectrum(name, nullptr, spectrumType, alloc);
             CHECK(s != nullptr);
             return alloc.new_object<SpectrumConstantTexture>(s);
         }
@@ -861,15 +862,15 @@ SpectrumTextureHandle TextureParameterDictionary::GetSpectrumTextureOrNull(
     return nullptr;
 }
 
-FloatTextureHandle TextureParameterDictionary::GetFloatTexture(const std::string &name,
-                                                               Float defaultValue,
-                                                               Allocator alloc) const {
-    FloatTextureHandle tex = GetFloatTextureOrNull(name, alloc);
+FloatTexture TextureParameterDictionary::GetFloatTexture(const std::string &name,
+                                                         Float defaultValue,
+                                                         Allocator alloc) const {
+    FloatTexture tex = GetFloatTextureOrNull(name, alloc);
     return tex ? tex : alloc.new_object<FloatConstantTexture>(defaultValue);
 }
 
-FloatTextureHandle TextureParameterDictionary::GetFloatTextureOrNull(
-    const std::string &name, Allocator alloc) const {
+FloatTexture TextureParameterDictionary::GetFloatTextureOrNull(const std::string &name,
+                                                               Allocator alloc) const {
     for (const ParsedParameter *p : dict->params) {
         if (p->name != name)
             continue;

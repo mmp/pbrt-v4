@@ -226,12 +226,12 @@ Float sRGBColorEncoding::ToFloatLinear(Float v) const {
     return SRGBToLinear(v);
 }
 
-void ColorEncodingHandle::Init(Allocator alloc) {
+void ColorEncoding::Init(Allocator alloc) {
     Linear = alloc.new_object<LinearColorEncoding>();
     sRGB = alloc.new_object<sRGBColorEncoding>();
 }
 
-std::string ColorEncodingHandle::ToString() const {
+std::string ColorEncoding::ToString() const {
     if (!ptr())
         return "(nullptr)";
 
@@ -239,17 +239,16 @@ std::string ColorEncodingHandle::ToString() const {
     return DispatchCPU(ts);
 }
 
-ColorEncodingHandle ColorEncodingHandle::Linear;
-ColorEncodingHandle ColorEncodingHandle::sRGB;
+ColorEncoding ColorEncoding::Linear;
+ColorEncoding ColorEncoding::sRGB;
 
-const ColorEncodingHandle ColorEncodingHandle::Get(const std::string &name,
-                                                   Allocator alloc) {
+const ColorEncoding ColorEncoding::Get(const std::string &name, Allocator alloc) {
     if (name == "linear")
         return Linear;
     else if (name == "sRGB")
         return sRGB;
     else {
-        static std::map<float, ColorEncodingHandle> cache;
+        static std::map<float, ColorEncoding> cache;
 
         std::vector<std::string> params = SplitStringsFromWhitespace(name);
         if (params.size() != 2 || params[0] != "gamma")
@@ -262,7 +261,7 @@ const ColorEncodingHandle ColorEncodingHandle::Get(const std::string &name,
         if (iter != cache.end())
             return iter->second;
 
-        ColorEncodingHandle enc = alloc.new_object<GammaColorEncoding>(gamma);
+        ColorEncoding enc = alloc.new_object<GammaColorEncoding>(gamma);
         cache[gamma] = enc;
         LOG_VERBOSE("Added ColorEncoding %s for gamma %f -> %s", name, gamma, enc);
         return enc;

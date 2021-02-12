@@ -62,40 +62,40 @@ std::string CameraTransform::ToString() const {
 }
 
 // Camera Method Definitions
-pstd::optional<CameraRayDifferential> CameraHandle::GenerateRayDifferential(
+pstd::optional<CameraRayDifferential> Camera::GenerateRayDifferential(
     CameraSample sample, SampledWavelengths &lambda) const {
     auto gen = [&](auto ptr) { return ptr->GenerateRayDifferential(sample, lambda); };
     return Dispatch(gen);
 }
 
-void CameraHandle::ApproximatedPdxy(SurfaceInteraction &si, int samplesPerPixel) const {
+void Camera::ApproximatedPdxy(SurfaceInteraction &si, int samplesPerPixel) const {
     auto approx = [&](auto ptr) { return ptr->ApproximatedPdxy(si, samplesPerPixel); };
     return Dispatch(approx);
 }
 
-SampledSpectrum CameraHandle::We(const Ray &ray, SampledWavelengths &lambda,
-                                 Point2f *pRaster2) const {
+SampledSpectrum Camera::We(const Ray &ray, SampledWavelengths &lambda,
+                           Point2f *pRaster2) const {
     auto we = [&](auto ptr) { return ptr->We(ray, lambda, pRaster2); };
     return Dispatch(we);
 }
 
-void CameraHandle::PDF_We(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
+void Camera::PDF_We(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
     auto pdf = [&](auto ptr) { return ptr->PDF_We(ray, pdfPos, pdfDir); };
     return Dispatch(pdf);
 }
 
-pstd::optional<CameraWiSample> CameraHandle::SampleWi(const Interaction &ref, Point2f u,
-                                                      SampledWavelengths &lambda) const {
+pstd::optional<CameraWiSample> Camera::SampleWi(const Interaction &ref, Point2f u,
+                                                SampledWavelengths &lambda) const {
     auto sample = [&](auto ptr) { return ptr->SampleWi(ref, u, lambda); };
     return Dispatch(sample);
 }
 
-void CameraHandle::InitMetadata(ImageMetadata *metadata) const {
+void Camera::InitMetadata(ImageMetadata *metadata) const {
     auto init = [&](auto ptr) { return ptr->InitMetadata(metadata); };
     return DispatchCPU(init);
 }
 
-std::string CameraHandle::ToString() const {
+std::string Camera::ToString() const {
     if (ptr() == nullptr)
         return "(nullptr)";
 
@@ -119,7 +119,7 @@ CameraBase::CameraBase(CameraBaseParameters p)
 }
 
 pstd::optional<CameraRayDifferential> CameraBase::GenerateRayDifferential(
-    CameraHandle camera, CameraSample sample, SampledWavelengths &lambda) {
+    Camera camera, CameraSample sample, SampledWavelengths &lambda) {
     // Generate regular camera ray _cr_ for ray differential
     pstd::optional<CameraRay> cr = camera.GenerateRay(sample, lambda);
     if (!cr)
@@ -185,7 +185,7 @@ void CameraBase::ApproximatedPdxy(SurfaceInteraction &si, int samplesPerPixel) c
         sppScale * RenderFromCamera(DownZFromCamera.ApplyInverse(py - pDownZ), si.time);
 }
 
-void CameraBase::FindMinimumDifferentials(CameraHandle camera) {
+void CameraBase::FindMinimumDifferentials(Camera camera) {
     minPosDifferentialX = minPosDifferentialY = minDirDifferentialX =
         minDirDifferentialY = Vector3f(Infinity, Infinity, Infinity);
 
@@ -273,12 +273,10 @@ std::string ProjectiveCamera::BaseToString() const {
                         screenFromRaster, lensRadius, focalDistance);
 }
 
-CameraHandle CameraHandle::Create(const std::string &name,
-                                  const ParameterDictionary &parameters,
-                                  MediumHandle medium,
-                                  const CameraTransform &cameraTransform, FilmHandle film,
-                                  const FileLoc *loc, Allocator alloc) {
-    CameraHandle camera;
+Camera Camera::Create(const std::string &name, const ParameterDictionary &parameters,
+                      Medium medium, const CameraTransform &cameraTransform, Film film,
+                      const FileLoc *loc, Allocator alloc) {
+    Camera camera;
     if (name == "perspective")
         camera = PerspectiveCamera::Create(parameters, cameraTransform, film, medium, loc,
                                            alloc);
@@ -303,7 +301,7 @@ CameraHandle CameraHandle::Create(const std::string &name,
 
 // CameraBaseParameters Method Definitions
 CameraBaseParameters::CameraBaseParameters(const CameraTransform &cameraTransform,
-                                           FilmHandle film, MediumHandle medium,
+                                           Film film, Medium medium,
                                            const ParameterDictionary &parameters,
                                            const FileLoc *loc)
     : cameraTransform(cameraTransform), film(film), medium(medium) {
@@ -395,7 +393,7 @@ std::string OrthographicCamera::ToString() const {
 
 OrthographicCamera *OrthographicCamera::Create(const ParameterDictionary &parameters,
                                                const CameraTransform &cameraTransform,
-                                               FilmHandle film, MediumHandle medium,
+                                               Film film, Medium medium,
                                                const FileLoc *loc, Allocator alloc) {
     CameraBaseParameters cameraBaseParameters(cameraTransform, film, medium, parameters,
                                               loc);
@@ -516,8 +514,8 @@ std::string PerspectiveCamera::ToString() const {
 
 PerspectiveCamera *PerspectiveCamera::Create(const ParameterDictionary &parameters,
                                              const CameraTransform &cameraTransform,
-                                             FilmHandle film, MediumHandle medium,
-                                             const FileLoc *loc, Allocator alloc) {
+                                             Film film, Medium medium, const FileLoc *loc,
+                                             Allocator alloc) {
     CameraBaseParameters cameraBaseParameters(cameraTransform, film, medium, parameters,
                                               loc);
 
@@ -657,8 +655,8 @@ pstd::optional<CameraRay> SphericalCamera::GenerateRay(CameraSample sample,
 
 SphericalCamera *SphericalCamera::Create(const ParameterDictionary &parameters,
                                          const CameraTransform &cameraTransform,
-                                         FilmHandle film, MediumHandle medium,
-                                         const FileLoc *loc, Allocator alloc) {
+                                         Film film, Medium medium, const FileLoc *loc,
+                                         Allocator alloc) {
     CameraBaseParameters cameraBaseParameters(cameraTransform, film, medium, parameters,
                                               loc);
 
@@ -1316,8 +1314,8 @@ std::string RealisticCamera::ToString() const {
 
 RealisticCamera *RealisticCamera::Create(const ParameterDictionary &parameters,
                                          const CameraTransform &cameraTransform,
-                                         FilmHandle film, MediumHandle medium,
-                                         const FileLoc *loc, Allocator alloc) {
+                                         Film film, Medium medium, const FileLoc *loc,
+                                         Allocator alloc) {
     CameraBaseParameters cameraBaseParameters(cameraTransform, film, medium, parameters,
                                               loc);
 

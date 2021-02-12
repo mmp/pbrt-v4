@@ -20,8 +20,8 @@ class RGBFilm;
 class GBufferFilm;
 class PixelSensor;
 
-// FilmHandle Definition
-class FilmHandle : public TaggedPointer<RGBFilm, GBufferFilm> {
+// Film Definition
+class Film : public TaggedPointer<RGBFilm, GBufferFilm> {
   public:
     // Film Interface
     PBRT_CPU_GPU inline void AddSample(const Point2i &pFilm, SampledSpectrum L,
@@ -50,15 +50,15 @@ class FilmHandle : public TaggedPointer<RGBFilm, GBufferFilm> {
     PBRT_CPU_GPU
     RGB GetPixelRGB(const Point2i &p, Float splatScale = 1) const;
 
-    PBRT_CPU_GPU inline FilterHandle GetFilter() const;
+    PBRT_CPU_GPU inline Filter GetFilter() const;
     PBRT_CPU_GPU inline const PixelSensor *GetPixelSensor() const;
     std::string GetFilename() const;
 
     using TaggedPointer::TaggedPointer;
 
-    static FilmHandle Create(const std::string &name,
-                             const ParameterDictionary &parameters, Float exposureTime,
-                             FilterHandle filter, const FileLoc *loc, Allocator alloc);
+    static Film Create(const std::string &name, const ParameterDictionary &parameters,
+                       Float exposureTime, Filter filter, const FileLoc *loc,
+                       Allocator alloc);
 
     std::string ToString() const;
 

@@ -19,7 +19,7 @@ TEST(Sampler, ConsistentValues) {
     constexpr int spp = rootSpp * rootSpp;
     Point2i resolution(100, 101);
 
-    std::vector<SamplerHandle> samplers;
+    std::vector<Sampler> samplers;
     samplers.push_back(new HaltonSampler(spp, resolution));
     samplers.push_back(new RandomSampler(spp));
     samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::None));
@@ -101,7 +101,7 @@ static void checkElementary(const char *name, std::vector<Point2f> samples,
     }
 }
 
-static void checkElementarySampler(const char *name, SamplerHandle sampler,
+static void checkElementarySampler(const char *name, Sampler sampler,
                                    int logSamples, int res = 1) {
     // Get all of the samples for a pixel.
     int spp = sampler.SamplesPerPixel();

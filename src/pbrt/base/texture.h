@@ -28,8 +28,8 @@ class FloatScaledTexture;
 class WindyTexture;
 class WrinkledTexture;
 
-// FloatTextureHandle Definition
-class FloatTextureHandle
+// FloatTexture Definition
+class FloatTexture
     : public TaggedPointer<  // FloatTextures
           FloatImageTexture, GPUFloatImageTexture, FloatMixTexture, FloatScaledTexture,
           FloatConstantTexture, FloatBilerpTexture, FloatCheckerboardTexture,
@@ -40,10 +40,10 @@ class FloatTextureHandle
     // FloatTexture Interface
     using TaggedPointer::TaggedPointer;
 
-    static FloatTextureHandle Create(const std::string &name,
-                                     const Transform &renderFromTexture,
-                                     const TextureParameterDictionary &parameters,
-                                     const FileLoc *loc, Allocator alloc, bool gpu);
+    static FloatTexture Create(const std::string &name,
+                               const Transform &renderFromTexture,
+                               const TextureParameterDictionary &parameters,
+                               const FileLoc *loc, Allocator alloc, bool gpu);
 
     std::string ToString() const;
 
@@ -63,8 +63,8 @@ class SpectrumDotsTexture;
 class SpectrumPtexTexture;
 class SpectrumScaledTexture;
 
-// SpectrumTextureHandle Definition
-class SpectrumTextureHandle
+// SpectrumTexture Definition
+class SpectrumTexture
     : public TaggedPointer<  // SpectrumTextures
           SpectrumImageTexture, GPUSpectrumImageTexture, SpectrumMixTexture,
           SpectrumScaledTexture, SpectrumConstantTexture, SpectrumBilerpTexture,
@@ -76,11 +76,11 @@ class SpectrumTextureHandle
     // SpectrumTexture Interface
     using TaggedPointer::TaggedPointer;
 
-    static SpectrumTextureHandle Create(const std::string &name,
-                                        const Transform &renderFromTexture,
-                                        const TextureParameterDictionary &parameters,
-                                        SpectrumType spectrumType, const FileLoc *loc,
-                                        Allocator alloc, bool gpu);
+    static SpectrumTexture Create(const std::string &name,
+                                  const Transform &renderFromTexture,
+                                  const TextureParameterDictionary &parameters,
+                                  SpectrumType spectrumType, const FileLoc *loc,
+                                  Allocator alloc, bool gpu);
 
     std::string ToString() const;
 

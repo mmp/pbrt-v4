@@ -48,9 +48,9 @@ class GPUPathIntegrator {
     void HandleRayFoundEmission(int depth);
 
     void EvaluateMaterialsAndBSDFs(int depth);
-    template <typename Material>
+    template <typename Mtl>
     void EvaluateMaterialAndBSDF(int depth);
-    template <typename Material, typename TextureEvaluator>
+    template <typename Mtl, typename TextureEvaluator>
     void EvaluateMaterialAndBSDF(TextureEvaluator texEval, MaterialEvalQueue *evalQueue,
                                  int depth);
 
@@ -80,8 +80,8 @@ class GPUPathIntegrator {
     bool initializeVisibleSurface;
     bool haveSubsurface;
     bool haveMedia;
-    pstd::array<bool, MaterialHandle::NumTags()> haveBasicEvalMaterial;
-    pstd::array<bool, MaterialHandle::NumTags()> haveUniversalEvalMaterial;
+    pstd::array<bool, Material::NumTags()> haveBasicEvalMaterial;
+    pstd::array<bool, Material::NumTags()> haveUniversalEvalMaterial;
 
     GPUAccel *accel = nullptr;
 
@@ -96,12 +96,12 @@ class GPUPathIntegrator {
     };
     Stats *stats;
 
-    FilterHandle filter;
-    FilmHandle film;
-    SamplerHandle sampler;
-    CameraHandle camera;
-    pstd::vector<LightHandle> *envLights;
-    LightSamplerHandle lightSampler;
+    Filter filter;
+    Film film;
+    Sampler sampler;
+    Camera camera;
+    pstd::vector<Light> *envLights;
+    LightSampler lightSampler;
 
     int maxDepth;
     bool regularize;

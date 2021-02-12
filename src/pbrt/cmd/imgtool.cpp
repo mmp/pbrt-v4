@@ -1705,7 +1705,7 @@ int whitebalance(int argc, char *argv[]) {
     Point2f srcWhite, targetWhite = colorSpace->w;
     if (!illuminant.empty()) {
         std::string name = "stdillum-" + illuminant;
-        SpectrumHandle illum = GetNamedSpectrum(name);
+        Spectrum illum = GetNamedSpectrum(name);
         if (!illum) {
             fprintf(stderr, "%s: illuminant unknown.\n", name.c_str());
             return 1;

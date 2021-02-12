@@ -24,12 +24,12 @@ struct PhaseFunctionSample {
     Float pdf;
 };
 
-// PhaseFunctionHandle Definition
+// PhaseFunction Definition
 class HGPhaseFunction;
 
-class PhaseFunctionHandle : public TaggedPointer<HGPhaseFunction> {
+class PhaseFunction : public TaggedPointer<HGPhaseFunction> {
   public:
-    // PhaseFunctionHandle Interface
+    // PhaseFunction Interface
     using TaggedPointer::TaggedPointer;
 
     std::string ToString() const;
@@ -58,17 +58,16 @@ using NanoVDBMedium = CuboidMedium<NanoVDBMediumProvider>;
 
 struct MediumSample;
 
-// MediumHandle Definition
-class MediumHandle : public TaggedPointer<HomogeneousMedium, UniformGridMedium,
-                                          CloudMedium, NanoVDBMedium> {
+// Medium Definition
+class Medium : public TaggedPointer<HomogeneousMedium, UniformGridMedium, CloudMedium,
+                                    NanoVDBMedium> {
   public:
-    // MediumHandle Interface
+    // Medium Interface
     using TaggedPointer::TaggedPointer;
 
-    static MediumHandle Create(const std::string &name,
-                               const ParameterDictionary &parameters,
-                               const Transform &renderFromMedium, const FileLoc *loc,
-                               Allocator alloc);
+    static Medium Create(const std::string &name, const ParameterDictionary &parameters,
+                         const Transform &renderFromMedium, const FileLoc *loc,
+                         Allocator alloc);
 
     std::string ToString() const;
 
@@ -87,16 +86,15 @@ struct MediumInterface {
 
     MediumInterface() = default;
     PBRT_CPU_GPU
-    MediumInterface(MediumHandle medium) : inside(medium), outside(medium) {}
+    MediumInterface(Medium medium) : inside(medium), outside(medium) {}
     PBRT_CPU_GPU
-    MediumInterface(MediumHandle inside, MediumHandle outside)
-        : inside(inside), outside(outside) {}
+    MediumInterface(Medium inside, Medium outside) : inside(inside), outside(outside) {}
 
     PBRT_CPU_GPU
     bool IsMediumTransition() const { return inside != outside; }
 
     // MediumInterface Public Members
-    MediumHandle inside, outside;
+    Medium inside, outside;
 };
 
 }  // namespace pbrt

@@ -30,15 +30,15 @@ static std::string inTestDir(const std::string &path) {
 }
 
 struct TestScene {
-    PrimitiveHandle aggregate;
-    std::vector<LightHandle> lights;
+    Primitive aggregate;
+    std::vector<Light> lights;
     std::string description;
     float expected;
 };
 
 struct TestIntegrator {
     Integrator *integrator;
-    const FilmHandle film;
+    const Film film;
     std::string description;
     TestScene scene;
 };
@@ -72,26 +72,26 @@ std::vector<TestScene> GetScenes() {
     {
         // Unit sphere, Kd = 0.5, point light I = 3.1415 at center
         // -> With GI, should have radiance of 1.
-        ShapeHandle sphere = new Sphere(&identity, &identity,
+        Shape sphere = new Sphere(&identity, &identity,
                                         true /* reverse orientation */, 1, -1, 1, 360);
 
         static ConstantSpectrum cs(0.5);
-        SpectrumTextureHandle Kd = alloc.new_object<SpectrumConstantTexture>(&cs);
-        FloatTextureHandle sigma = alloc.new_object<FloatConstantTexture>(0.);
+        SpectrumTexture Kd = alloc.new_object<SpectrumConstantTexture>(&cs);
+        FloatTexture sigma = alloc.new_object<FloatConstantTexture>(0.);
         // FIXME: here and below, Materials leak...
-        MaterialHandle material = new DiffuseMaterial(Kd, sigma, nullptr, nullptr);
+        Material material = new DiffuseMaterial(Kd, sigma, nullptr, nullptr);
 
         MediumInterface mediumInterface;
-        std::vector<PrimitiveHandle> prims;
-        prims.push_back(PrimitiveHandle(
+        std::vector<Primitive> prims;
+        prims.push_back(Primitive(
             new GeometricPrimitive(sphere, material, nullptr, mediumInterface)));
-        PrimitiveHandle bvh(new BVHAggregate(std::move(prims)));
+        Primitive bvh(new BVHAggregate(std::move(prims)));
 
         // We have to do this little dance here to make sure the spectrum is
         // properly normalized (this is usually all handled inside *Light::Create())
         ConstantSpectrum I(1);
         Float scale = Pi / SpectrumToPhotometric(&I);
-        std::vector<LightHandle> lights;
+        std::vector<Light> lights;
         lights.push_back(new PointLight(identity, MediumInterface(), &I, scale, Allocator()));
 
         scenes.push_back({bvh, lights, "Sphere, 1 light, Kd = 0.5", 1.0});
@@ -100,25 +100,25 @@ std::vector<TestScene> GetScenes() {
     {
         // Unit sphere, Kd = 0.5, 4 point lights I = 3.1415/4 at center
         // -> With GI, should have radiance of 1.
-        ShapeHandle sphere = new Sphere(&identity, &identity,
+        Shape sphere = new Sphere(&identity, &identity,
                                         true /* reverse orientation */, 1, -1, 1, 360);
 
         static ConstantSpectrum cs(0.5);
-        SpectrumTextureHandle Kd = alloc.new_object<SpectrumConstantTexture>(&cs);
-        FloatTextureHandle sigma = alloc.new_object<FloatConstantTexture>(0.);
-        const MaterialHandle material = new DiffuseMaterial(Kd, sigma, nullptr, nullptr);
+        SpectrumTexture Kd = alloc.new_object<SpectrumConstantTexture>(&cs);
+        FloatTexture sigma = alloc.new_object<FloatConstantTexture>(0.);
+        const Material material = new DiffuseMaterial(Kd, sigma, nullptr, nullptr);
 
         MediumInterface mediumInterface;
-        std::vector<PrimitiveHandle> prims;
-        prims.push_back(PrimitiveHandle(
+        std::vector<Primitive> prims;
+        prims.push_back(Primitive(
             new GeometricPrimitive(sphere, material, nullptr, mediumInterface)));
-        PrimitiveHandle bvh(new BVHAggregate(std::move(prims)));
+        Primitive bvh(new BVHAggregate(std::move(prims)));
 
         // We have to do this little dance here to make sure the spectrum is
         // properly normalized (this is usually all handled inside *Light::Create())
         ConstantSpectrum I(1);
         Float scale = Pi / (4 * SpectrumToPhotometric(&I));
-        std::vector<LightHandle> lights;
+        std::vector<Light> lights;
         lights.push_back(new PointLight(identity, MediumInterface(), &I, scale, Allocator()));
         lights.push_back(new PointLight(identity, MediumInterface(), &I, scale, Allocator()));
         lights.push_back(new PointLight(identity, MediumInterface(), &I, scale, Allocator()));
@@ -130,30 +130,30 @@ std::vector<TestScene> GetScenes() {
     {
         // Unit sphere, Kd = 0.5, Le = 0.5
         // -> With GI, should have radiance of 1.
-        ShapeHandle sphere = new Sphere(&identity, &identity,
+        Shape sphere = new Sphere(&identity, &identity,
                                         true /* reverse orientation */, 1, -1, 1, 360);
 
         static ConstantSpectrum cs(0.5);
-        SpectrumTextureHandle Kd = alloc.new_object<SpectrumConstantTexture>(&cs);
-        FloatTextureHandle sigma = alloc.new_object<FloatConstantTexture>(0.);
-        const MaterialHandle material = new DiffuseMaterial(Kd, sigma, nullptr, nullptr);
+        SpectrumTexture Kd = alloc.new_object<SpectrumConstantTexture>(&cs);
+        FloatTexture sigma = alloc.new_object<FloatConstantTexture>(0.);
+        const Material material = new DiffuseMaterial(Kd, sigma, nullptr, nullptr);
 
         // We have to do this little dance here to make sure the spectrum is
         // properly normalized (this is usually all handled inside *Light::Create())
         ConstantSpectrum Le(1);
         Float scale = 0.5 / SpectrumToPhotometric(&Le);
-        LightHandle areaLight =
+        Light areaLight =
             new DiffuseAreaLight(identity, MediumInterface(), &Le, scale, sphere, Image(),
                                  nullptr, false, Allocator());
 
-        std::vector<LightHandle> lights;
+        std::vector<Light> lights;
         lights.push_back(areaLight);
 
         MediumInterface mediumInterface;
-        std::vector<PrimitiveHandle> prims;
-        prims.push_back(PrimitiveHandle(
+        std::vector<Primitive> prims;
+        prims.push_back(Primitive(
             new GeometricPrimitive(sphere, material, lights.back(), mediumInterface)));
-        PrimitiveHandle bvh(new BVHAggregate(std::move(prims)));
+        Primitive bvh(new BVHAggregate(std::move(prims)));
 
         scenes.push_back({bvh, lights, "Sphere, Kd = 0.5, Le = 0.5", 1.0});
     }
@@ -162,33 +162,33 @@ std::vector<TestScene> GetScenes() {
     {
         // Unit sphere, Kd = 0.25, Kr = .5, point light I = 7.4 at center
         // -> With GI, should have radiance of ~1.
-        ShapeHandle sphere = new Sphere(
+        Shape sphere = new Sphere(
             &identity, &identity, true /* reverse orientation */, 1, -1, 1, 360);
 
         static ConstantSpectrum cs5(0.5), cs25(0.25);
-        SpectrumTextureHandle Kd =
+        SpectrumTexture Kd =
             alloc.new_object<SpectrumConstantTexture>(&cs25);
-        SpectrumTextureHandle Kr =
+        SpectrumTexture Kr =
             alloc.new_object<SpectrumConstantTexture>(&cs5);
-        SpectrumTextureHandle black =
+        SpectrumTexture black =
             alloc.new_object<SpectrumConstantTexture>(Spectra::Zero());
-        SpectrumTextureHandle white =
+        SpectrumTexture white =
             alloc.new_object<SpectrumConstantTexture>(Spectra::One());
-        FloatTextureHandle zero =
+        FloatTexture zero =
             alloc.new_object<FloatConstantTexture>(0.);
-        FloatTextureHandle one =
+        FloatTexture one =
             alloc.new_object<FloatConstantTexture>(1.);
-        const MaterialHandle material = new UberMaterial(
+        const Material material = new UberMaterial(
             Kd, black, Kr, black, zero, zero, one, nullptr, false, nullptr);
 
         MediumInterface mediumInterface;
-        std::vector<PrimitiveHandle> prims;
-        prims.push_back(PrimitiveHandle(new GeometricPrimitive(
+        std::vector<Primitive> prims;
+        prims.push_back(Primitive(new GeometricPrimitive(
             sphere, material, nullptr, mediumInterface)));
-        PrimitiveHandle bvh(new BVHAggregate(std::move(prims)));
+        Primitive bvh(new BVHAggregate(std::move(prims)));
 
         static ConstantSpectrum I(3. * Pi);
-        std::vector<LightHandle> lights;
+        std::vector<Light> lights;
         lights.push_back(std::make_unique<PointLight>(identity,
                                                       nullptr, &I, Allocator()));
 
@@ -200,21 +200,21 @@ std::vector<TestScene> GetScenes() {
   {
     // Unit sphere, Kd = 0.25, Kr = .5, Le .587
     // -> With GI, should have radiance of ~1.
-    ShapeHandle sphere = new Sphere(
+    Shape sphere = new Sphere(
         &identity, &identity, true /* reverse orientation */, 1, -1, 1, 360);
 
     static ConstantSpectrum cs5(0.5), cs25(0.25);
-    SpectrumTextureHandle Kd =
+    SpectrumTexture Kd =
         alloc.new_object<SpectrumConstantTexture>(&cs25);
-    SpectrumTextureHandle Kr =
+    SpectrumTexture Kr =
         alloc.new_object<SpectrumConstantTexture>(&cs5);
-    SpectrumTextureHandle black =
+    SpectrumTexture black =
         alloc.new_object<SpectrumConstantTexture>(Spectra::Zero());
-    SpectrumTextureHandle white =
+    SpectrumTexture white =
         alloc.new_object<SpectrumConstantTexture>(Spectra::One());
-    FloatTextureHandle zero =
+    FloatTexture zero =
         alloc.new_object<FloatConstantTexture>(0.);
-    FloatTextureHandle one =
+    FloatTexture one =
         alloc.new_object<FloatConstantTexture>(1.);
     std::shared_ptr<Material> material = std::make_shared<UberMaterial>(
         Kd, black, Kr, black, zero, zero, zero, white, one, nullptr, false, nullptr);
@@ -226,9 +226,9 @@ std::vector<TestScene> GetScenes() {
 
     MediumInterface mediumInterface;
     std::vector<std::shared_ptr<Primitive>> prims;
-    prims.push_back(PrimitiveHandle(new GeometricPrimitive(
+    prims.push_back(Primitive(new GeometricPrimitive(
         sphere, material, areaLight, mediumInterface)));
-    PrimitiveHandle bvh(new BVHAggregate(std::move(prims)));
+    Primitive bvh(new BVHAggregate(std::move(prims)));
 
     std::vector<std::shared_ptr<Light>> lights;
     lights.push_back(std::move(areaLight));
@@ -240,9 +240,9 @@ std::vector<TestScene> GetScenes() {
     return scenes;
 }
 
-std::vector<std::pair<SamplerHandle, std::string>> GetSamplers(
+std::vector<std::pair<Sampler, std::string>> GetSamplers(
     const Point2i &resolution) {
-    std::vector<std::pair<SamplerHandle, std::string>> samplers;
+    std::vector<std::pair<Sampler, std::string>> samplers;
 
     samplers.push_back(std::make_pair(new HaltonSampler(256, resolution), "Halton 256"));
     samplers.push_back(std::make_pair(new PaddedSobolSampler(256, RandomizeStrategy::PermuteDigits),
@@ -275,7 +275,7 @@ std::vector<TestIntegrator> GetIntegrators() {
     for (const auto &scene : GetScenes()) {
         // Path tracing integrators
         for (auto &sampler : GetSamplers(resolution)) {
-            FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
+            Filter filter = new BoxFilter(Vector2f(0.5, 0.5));
             FilmBaseParameters fp(resolution, Bounds2i(Point2i(0, 0), resolution),
                                   filter, 1., PixelSensor::CreateDefault(), inTestDir("test.exr"));
             RGBFilm *film = new RGBFilm(fp, RGBColorSpace::sRGB);
@@ -283,7 +283,7 @@ std::vector<TestIntegrator> GetIntegrators() {
             PerspectiveCamera *camera = new PerspectiveCamera(cbp, 45,
                 Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10.);
 
-            const FilmHandle filmp = camera->GetFilm();
+            const Film filmp = camera->GetFilm();
             Integrator *integrator = new PathIntegrator(8, camera, sampler.first,
                                                         scene.aggregate, scene.lights);
             integrators.push_back({integrator, filmp,
@@ -293,14 +293,14 @@ std::vector<TestIntegrator> GetIntegrators() {
         }
 
         for (auto &sampler : GetSamplers(resolution)) {
-            FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
+            Filter filter = new BoxFilter(Vector2f(0.5, 0.5));
             FilmBaseParameters fp(resolution, Bounds2i(Point2i(0, 0), resolution),
                                   filter, 1., PixelSensor::CreateDefault(), inTestDir("test.exr"));
             RGBFilm *film = new RGBFilm(fp, RGBColorSpace::sRGB);
             CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
             OrthographicCamera *camera = new OrthographicCamera(cbp,
                 Bounds2f(Point2f(-.1, -.1), Point2f(.1, .1)), 0., 10.);
-            const FilmHandle filmp = camera->GetFilm();
+            const Film filmp = camera->GetFilm();
 
             Integrator *integrator = new PathIntegrator(8, camera, sampler.first,
                                                         scene.aggregate, scene.lights);
@@ -312,14 +312,14 @@ std::vector<TestIntegrator> GetIntegrators() {
 
         // Volume path tracing integrators
         for (auto &sampler : GetSamplers(resolution)) {
-            FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
+            Filter filter = new BoxFilter(Vector2f(0.5, 0.5));
             FilmBaseParameters fp(resolution, Bounds2i(Point2i(0, 0), resolution),
                                   filter, 1., PixelSensor::CreateDefault(), inTestDir("test.exr"));
             RGBFilm *film = new RGBFilm(fp, RGBColorSpace::sRGB);
             CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
             PerspectiveCamera *camera = new PerspectiveCamera(cbp, 45,
                 Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10.);
-            const FilmHandle filmp = camera->GetFilm();
+            const Film filmp = camera->GetFilm();
 
             Integrator *integrator = new VolPathIntegrator(8, camera, sampler.first,
                                                            scene.aggregate, scene.lights);
@@ -329,14 +329,14 @@ std::vector<TestIntegrator> GetIntegrators() {
                                    scene});
         }
         for (auto &sampler : GetSamplers(resolution)) {
-            FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
+            Filter filter = new BoxFilter(Vector2f(0.5, 0.5));
             FilmBaseParameters fp(resolution, Bounds2i(Point2i(0, 0), resolution),
                                   filter, 1., PixelSensor::CreateDefault(), inTestDir("test.exr"));
             RGBFilm *film = new RGBFilm(fp, RGBColorSpace::sRGB);
             CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
             OrthographicCamera *camera = new OrthographicCamera(cbp,
                 Bounds2f(Point2f(-.1, -.1), Point2f(.1, .1)), 0., 10.);
-            const FilmHandle filmp = camera->GetFilm();
+            const Film filmp = camera->GetFilm();
 
             Integrator *integrator = new VolPathIntegrator(8, camera, sampler.first,
                                                            scene.aggregate, scene.lights);
@@ -348,7 +348,7 @@ std::vector<TestIntegrator> GetIntegrators() {
 
         // Simple path (perspective only, still sample light and BSDFs). Yolo
         for (auto &sampler : GetSamplers(resolution)) {
-            FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
+            Filter filter = new BoxFilter(Vector2f(0.5, 0.5));
             FilmBaseParameters fp(resolution, Bounds2i(Point2i(0, 0), resolution),
                                   filter, 1., PixelSensor::CreateDefault(), inTestDir("test.exr"));
             RGBFilm *film = new RGBFilm(fp, RGBColorSpace::sRGB);
@@ -356,7 +356,7 @@ std::vector<TestIntegrator> GetIntegrators() {
             PerspectiveCamera *camera = new PerspectiveCamera(cbp, 45,
                 Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10.);
 
-            const FilmHandle filmp = camera->GetFilm();
+            const Film filmp = camera->GetFilm();
             Integrator *integrator = new SimplePathIntegrator(
                 8, true, true, camera, sampler.first, scene.aggregate, scene.lights);
             integrators.push_back({integrator, filmp,
@@ -367,14 +367,14 @@ std::vector<TestIntegrator> GetIntegrators() {
 
         // BDPT
         for (auto &sampler : GetSamplers(resolution)) {
-            FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
+            Filter filter = new BoxFilter(Vector2f(0.5, 0.5));
             FilmBaseParameters fp(resolution, Bounds2i(Point2i(0, 0), resolution),
                                   filter, 1., PixelSensor::CreateDefault(), inTestDir("test.exr"));
             RGBFilm *film = new RGBFilm(fp, RGBColorSpace::sRGB);
             CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
             PerspectiveCamera *camera = new PerspectiveCamera(cbp, 45,
                 Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10.);
-            const FilmHandle filmp = camera->GetFilm();
+            const Film filmp = camera->GetFilm();
 
             Integrator *integrator =
                 new BDPTIntegrator(camera, sampler.first, scene.aggregate, scene.lights,
@@ -387,14 +387,14 @@ std::vector<TestIntegrator> GetIntegrators() {
 
         // MLT
         {
-            FilterHandle filter = new BoxFilter(Vector2f(0.5, 0.5));
+            Filter filter = new BoxFilter(Vector2f(0.5, 0.5));
             FilmBaseParameters fp(resolution, Bounds2i(Point2i(0, 0), resolution),
                                   filter, 1., PixelSensor::CreateDefault(), inTestDir("test.exr"));
             RGBFilm *film = new RGBFilm(fp, RGBColorSpace::sRGB);
             CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
             PerspectiveCamera *camera = new PerspectiveCamera(cbp, 45,
                 Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10.);
-            const FilmHandle filmp = camera->GetFilm();
+            const Film filmp = camera->GetFilm();
 
             Integrator *integrator =
                 new MLTIntegrator(camera, scene.aggregate, scene.lights, 8 /* depth */,

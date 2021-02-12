@@ -59,7 +59,7 @@ void InitPBRT(const PBRTOptions &opt) {
 
         CUDA_CHECK(cudaMemcpyToSymbol(OptionsGPU, Options, sizeof(OptionsGPU)));
 
-        ColorEncodingHandle::Init(gpuMemoryAllocator);
+        ColorEncoding::Init(gpuMemoryAllocator);
         Spectra::Init(gpuMemoryAllocator);
         RGBToSpectrumTable::Init(gpuMemoryAllocator);
 
@@ -71,7 +71,7 @@ void InitPBRT(const PBRTOptions &opt) {
         LOG_FATAL("Options::useGPU set with non-GPU build");
 #endif
     } else {
-        ColorEncodingHandle::Init(Allocator{});
+        ColorEncoding::Init(Allocator{});
         // Before RGBColorSpace::Init!
         Spectra::Init(Allocator{});
         RGBToSpectrumTable::Init(Allocator{});

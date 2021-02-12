@@ -6,8 +6,8 @@
 flat int;
 flat Float;
 flat bool;
-flat BxDFHandle;
-flat MediumHandle;
+flat BxDF;
+flat Medium;
 flat LayeredBxDFConfig;
 
 soa SampledSpectrum;
@@ -28,7 +28,7 @@ soa Ray {
     Point3f o;
     Vector3f d;
     Float time;
-    MediumHandle medium;
+    Medium medium;
 };
 
 soa SubsurfaceInteraction {
@@ -53,7 +53,7 @@ soa VisibleSurface {
 };
 
 soa MediumInterface {
-    MediumHandle inside, outside;
+    Medium inside, outside;
 };
 
 soa TabulatedBSSRDF {

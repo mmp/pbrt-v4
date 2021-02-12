@@ -204,7 +204,7 @@ GenerateSamples(std::string samplerName, int nPoints, int iter) {
                 Point2f(u2, OwenScrambledRadicalInverse(1, i, r[1])));
         }
     } else {
-        SamplerHandle sampler = [&]() -> SamplerHandle {
+        Sampler sampler = [&]() -> Sampler {
             if (samplerName == "random")
                 return new RandomSampler(nPoints, Options->seed);
             else if (samplerName == "stratified") {

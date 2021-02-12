@@ -34,7 +34,7 @@ static constexpr int NSpectrumSamples = 4;
 
 static constexpr Float CIE_Y_integral = 106.856895;
 
-// SpectrumHandle Definition
+// Spectrum Definition
 class BlackbodySpectrum;
 class ConstantSpectrum;
 class PiecewiseLinearSpectrum;
@@ -43,10 +43,10 @@ class RGBAlbedoSpectrum;
 class RGBUnboundedSpectrum;
 class RGBIlluminantSpectrum;
 
-class SpectrumHandle : public TaggedPointer<ConstantSpectrum, DenselySampledSpectrum,
-                                            PiecewiseLinearSpectrum, RGBAlbedoSpectrum,
-                                            RGBUnboundedSpectrum, RGBIlluminantSpectrum,
-                                            BlackbodySpectrum> {
+class Spectrum : public TaggedPointer<ConstantSpectrum, DenselySampledSpectrum,
+                                      PiecewiseLinearSpectrum, RGBAlbedoSpectrum,
+                                      RGBUnboundedSpectrum, RGBIlluminantSpectrum,
+                                      BlackbodySpectrum> {
   public:
     // Spectrum Interface
     using TaggedPointer::TaggedPointer;
@@ -80,10 +80,10 @@ namespace Spectra {
 DenselySampledSpectrum D(Float T, Allocator alloc);
 }  // namespace Spectra
 
-Float SpectrumToPhotometric(SpectrumHandle s);
+Float SpectrumToPhotometric(Spectrum s);
 
-Float SpectrumToPhotometric(SpectrumHandle s);
-XYZ SpectrumToXYZ(SpectrumHandle s);
+Float SpectrumToPhotometric(Spectrum s);
+XYZ SpectrumToXYZ(Spectrum s);
 
 // SampledSpectrum Definition
 class SampledSpectrum {
@@ -374,7 +374,7 @@ class DenselySampledSpectrum {
         : lambda_min(lambda_min),
           lambda_max(lambda_max),
           values(lambda_max - lambda_min + 1, alloc) {}
-    DenselySampledSpectrum(SpectrumHandle s, Allocator alloc)
+    DenselySampledSpectrum(Spectrum s, Allocator alloc)
         : DenselySampledSpectrum(s, Lambda_min, Lambda_max, alloc) {}
 
     PBRT_CPU_GPU
@@ -395,7 +395,7 @@ class DenselySampledSpectrum {
 
     std::string ToString() const;
 
-    DenselySampledSpectrum(SpectrumHandle spec, int lambda_min = Lambda_min,
+    DenselySampledSpectrum(Spectrum spec, int lambda_min = Lambda_min,
                            int lambda_max = Lambda_max, Allocator alloc = {})
         : lambda_min(lambda_min),
           lambda_max(lambda_max),
@@ -460,8 +460,7 @@ class PiecewiseLinearSpectrum {
     PiecewiseLinearSpectrum(pstd::span<const Float> lambdas,
                             pstd::span<const Float> values, Allocator alloc = {});
 
-    static pstd::optional<SpectrumHandle> Read(const std::string &filename,
-                                               Allocator alloc);
+    static pstd::optional<Spectrum> Read(const std::string &filename, Allocator alloc);
 
     static PiecewiseLinearSpectrum *FromInterleaved(pstd::span<const Float> samples,
                                                     bool normalize, Allocator alloc);
@@ -719,9 +718,9 @@ inline const DenselySampledSpectrum &Z() {
 }  // namespace Spectra
 
 // Spectral Function Declarations
-SpectrumHandle GetNamedSpectrum(const std::string &name);
+Spectrum GetNamedSpectrum(const std::string &name);
 
-std::string FindMatchingNamedSpectrum(SpectrumHandle s);
+std::string FindMatchingNamedSpectrum(Spectrum s);
 
 namespace Spectra {
 inline const DenselySampledSpectrum &X();
@@ -730,25 +729,25 @@ inline const DenselySampledSpectrum &Z();
 }  // namespace Spectra
 
 // Spectrum Inline Functions
-inline Float InnerProduct(SpectrumHandle a, SpectrumHandle b) {
+inline Float InnerProduct(Spectrum a, Spectrum b) {
     Float result = 0;
     for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda)
         result += a(lambda) * b(lambda);
     return result / CIE_Y_integral;
 }
 
-// SpectrumHandle Inline Method Definitions
-inline Float SpectrumHandle::operator()(Float lambda) const {
+// Spectrum Inline Method Definitions
+inline Float Spectrum::operator()(Float lambda) const {
     auto op = [&](auto ptr) { return (*ptr)(lambda); };
     return Dispatch(op);
 }
 
-inline SampledSpectrum SpectrumHandle::Sample(const SampledWavelengths &lambda) const {
+inline SampledSpectrum Spectrum::Sample(const SampledWavelengths &lambda) const {
     auto samp = [&](auto ptr) { return ptr->Sample(lambda); };
     return Dispatch(samp);
 }
 
-inline Float SpectrumHandle::MaxValue() const {
+inline Float Spectrum::MaxValue() const {
     auto max = [&](auto ptr) { return ptr->MaxValue(); };
     return Dispatch(max);
 }

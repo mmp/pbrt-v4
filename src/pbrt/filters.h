@@ -26,7 +26,7 @@ struct FilterSample {
 class FilterSampler {
   public:
     // FilterSampler Public Methods
-    FilterSampler(FilterHandle filter, Allocator alloc = {});
+    FilterSampler(Filter filter, Allocator alloc = {});
     std::string ToString() const;
 
     PBRT_CPU_GPU
@@ -236,22 +236,22 @@ class TriangleFilter {
     Vector2f radius;
 };
 
-inline Float FilterHandle::Evaluate(const Point2f &p) const {
+inline Float Filter::Evaluate(const Point2f &p) const {
     auto eval = [&](auto ptr) { return ptr->Evaluate(p); };
     return Dispatch(eval);
 }
 
-inline FilterSample FilterHandle::Sample(const Point2f &u) const {
+inline FilterSample Filter::Sample(const Point2f &u) const {
     auto sample = [&](auto ptr) { return ptr->Sample(u); };
     return Dispatch(sample);
 }
 
-inline Vector2f FilterHandle::Radius() const {
+inline Vector2f Filter::Radius() const {
     auto radius = [&](auto ptr) { return ptr->Radius(); };
     return Dispatch(radius);
 }
 
-inline Float FilterHandle::Integral() const {
+inline Float Filter::Integral() const {
     auto integral = [&](auto ptr) { return ptr->Integral(); };
     return Dispatch(integral);
 }

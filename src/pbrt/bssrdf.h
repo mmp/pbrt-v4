@@ -287,13 +287,12 @@ PBRT_CPU_GPU inline void SubsurfaceFromDiffuse(const BSSRDFTable &t,
     }
 }
 
-inline pstd::optional<BSSRDFProbeSegment> BSSRDFHandle::SampleSp(Float u1,
-                                                                 Point2f u2) const {
+inline pstd::optional<BSSRDFProbeSegment> BSSRDF::SampleSp(Float u1, Point2f u2) const {
     auto sample = [&](auto ptr) { return ptr->SampleSp(u1, u2); };
     return Dispatch(sample);
 }
 
-inline BSSRDFSample BSSRDFHandle::ProbeIntersectionToSample(
+inline BSSRDFSample BSSRDF::ProbeIntersectionToSample(
     const SubsurfaceInteraction &si, ScratchBuffer &scratchBuffer) const {
     auto pits = [&](auto ptr) {
         using BxDF = typename std::remove_reference<decltype(*ptr)>::type::BxDF;

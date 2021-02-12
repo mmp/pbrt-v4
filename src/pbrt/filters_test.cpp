@@ -35,7 +35,7 @@ TEST(Sinc, ZeroHandling) {
 }
 
 TEST(Filter, ZeroPastRadius) {
-    auto makeFilters = [](const Vector2f &radius) -> std::vector<FilterHandle> {
+    auto makeFilters = [](const Vector2f &radius) -> std::vector<Filter> {
         return {new BoxFilter(radius), new GaussianFilter(radius),
                 new MitchellFilter(radius), new LanczosSincFilter(radius),
                 new TriangleFilter(radius)};
@@ -43,7 +43,7 @@ TEST(Filter, ZeroPastRadius) {
 
     for (Vector2f r : {Vector2f(1, 1), Vector2f(1.5, .25), Vector2f(.33, 5.2),
                        Vector2f(.1, .1), Vector2f(3, 3)}) {
-        for (FilterHandle f : makeFilters(r)) {
+        for (Filter f : makeFilters(r)) {
             EXPECT_EQ(0, f.Evaluate(Point2f(0, r.y + 1e-3)));
             EXPECT_EQ(0, f.Evaluate(Point2f(r.x, r.y + 1e-3)));
             EXPECT_EQ(0, f.Evaluate(Point2f(-r.x, r.y + 1e-3)));
@@ -60,7 +60,7 @@ TEST(Filter, ZeroPastRadius) {
     }
 }
 
-static Float integrateFilter(FilterHandle f) {
+static Float integrateFilter(Filter f) {
     Float sum = 0;
     int sqrtSamples = 256;
     int nSamples = sqrtSamples * sqrtSamples;
@@ -80,21 +80,21 @@ TEST(Filter, Integral) {
         else
             return 2 * std::abs(a - b) / std::abs(a + b) < 1e-2;
     };
-    auto makeFilters = [](const Vector2f &radius) -> std::vector<FilterHandle> {
+    auto makeFilters = [](const Vector2f &radius) -> std::vector<Filter> {
         return {new BoxFilter(radius), new GaussianFilter(radius),
                 new MitchellFilter(radius), new LanczosSincFilter(radius),
                 new TriangleFilter(radius)};
     };
 
-    for (FilterHandle f : makeFilters(Vector2f(1, 1)))
+    for (Filter f : makeFilters(Vector2f(1, 1)))
         EXPECT_TRUE(approxEqual(f.Integral(), integrateFilter(f))) << f;
 
-    for (FilterHandle f : makeFilters(Vector2f(2.5, 1)))
+    for (Filter f : makeFilters(Vector2f(2.5, 1)))
         EXPECT_TRUE(approxEqual(f.Integral(), integrateFilter(f))) << f;
 
-    for (FilterHandle f : makeFilters(Vector2f(1, 2.5)))
+    for (Filter f : makeFilters(Vector2f(1, 2.5)))
         EXPECT_TRUE(approxEqual(f.Integral(), integrateFilter(f))) << f;
 
-    for (FilterHandle f : makeFilters(Vector2f(3.4, 2.5)))
+    for (Filter f : makeFilters(Vector2f(3.4, 2.5)))
         EXPECT_TRUE(approxEqual(f.Integral(), integrateFilter(f))) << f;
 }

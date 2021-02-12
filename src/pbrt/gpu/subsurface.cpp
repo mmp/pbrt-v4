@@ -153,7 +153,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                     lightSampler.Sample(ctx, raySamples.direct.uc);
                 if (!sampledLight)
                     return;
-                LightHandle light = sampledLight->light;
+                Light light = sampledLight->light;
 
                 pstd::optional<LightLiSample> ls = light.SampleLi(
                     ctx, raySamples.direct.u, lambda, LightSamplingMode::WithMIS);

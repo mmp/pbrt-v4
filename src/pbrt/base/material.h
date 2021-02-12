@@ -31,8 +31,8 @@ class SubsurfaceMaterial;
 class ThinDielectricMaterial;
 class MixMaterial;
 
-// MaterialHandle Definition
-class MaterialHandle
+// Material Definition
+class Material
     : public TaggedPointer<  // Material Types
           CoatedDiffuseMaterial, CoatedConductorMaterial, ConductorMaterial,
           DielectricMaterial, DiffuseMaterial, DiffuseTransmissionMaterial, HairMaterial,
@@ -43,11 +43,10 @@ class MaterialHandle
     // Material Interface
     using TaggedPointer::TaggedPointer;
 
-    static MaterialHandle Create(
-        const std::string &name, const TextureParameterDictionary &parameters,
-        Image *normalMap,
-        /*const */ std::map<std::string, MaterialHandle> &namedMaterials,
-        const FileLoc *loc, Allocator alloc);
+    static Material Create(const std::string &name,
+                           const TextureParameterDictionary &parameters, Image *normalMap,
+                           /*const */ std::map<std::string, Material> &namedMaterials,
+                           const FileLoc *loc, Allocator alloc);
 
     std::string ToString() const;
 
@@ -57,15 +56,15 @@ class MaterialHandle
                                      ScratchBuffer &buf) const;
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU inline BSSRDFHandle GetBSSRDF(TextureEvaluator texEval,
-                                               MaterialEvalContext ctx,
-                                               SampledWavelengths &lambda,
-                                               ScratchBuffer &buf) const;
+    PBRT_CPU_GPU inline BSSRDF GetBSSRDF(TextureEvaluator texEval,
+                                         MaterialEvalContext ctx,
+                                         SampledWavelengths &lambda,
+                                         ScratchBuffer &buf) const;
 
     template <typename TextureEvaluator>
     PBRT_CPU_GPU inline bool CanEvaluateTextures(TextureEvaluator texEval) const;
 
-    PBRT_CPU_GPU inline FloatTextureHandle GetDisplacement() const;
+    PBRT_CPU_GPU inline FloatTexture GetDisplacement() const;
 
     PBRT_CPU_GPU inline const Image *GetNormalMap() const;
 

@@ -25,25 +25,25 @@ class BilinearPatchMesh;
 
 struct TriangleMeshRecord {
     const TriangleMesh *mesh;
-    MaterialHandle material;
-    FloatTextureHandle alphaTexture;
-    pstd::span<LightHandle> areaLights;
+    Material material;
+    FloatTexture alphaTexture;
+    pstd::span<Light> areaLights;
     MediumInterface *mediumInterface;
 };
 
 struct BilinearMeshRecord {
     const BilinearPatchMesh *mesh;
-    MaterialHandle material;
-    FloatTextureHandle alphaTexture;
-    pstd::span<LightHandle> areaLights;
+    Material material;
+    FloatTexture alphaTexture;
+    pstd::span<Light> areaLights;
     MediumInterface *mediumInterface;
 };
 
 struct QuadricRecord {
-    ShapeHandle shape;
-    MaterialHandle material;
-    FloatTextureHandle alphaTexture;
-    LightHandle areaLight;
+    Shape shape;
+    Material material;
+    FloatTexture alphaTexture;
+    Light areaLight;
     MediumInterface *mediumInterface;
 };
 

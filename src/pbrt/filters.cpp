@@ -10,7 +10,7 @@
 
 namespace pbrt {
 
-std::string FilterHandle::ToString() const {
+std::string Filter::ToString() const {
     if (ptr() == nullptr)
         return "(nullptr)";
 
@@ -106,10 +106,9 @@ TriangleFilter *TriangleFilter::Create(const ParameterDictionary &parameters,
     return alloc.new_object<TriangleFilter>(Vector2f(xw, yw));
 }
 
-FilterHandle FilterHandle::Create(const std::string &name,
-                                  const ParameterDictionary &parameters,
-                                  const FileLoc *loc, Allocator alloc) {
-    FilterHandle filter = nullptr;
+Filter Filter::Create(const std::string &name, const ParameterDictionary &parameters,
+                      const FileLoc *loc, Allocator alloc) {
+    Filter filter = nullptr;
     if (name == "box")
         filter = BoxFilter::Create(parameters, loc, alloc);
     else if (name == "gaussian")
@@ -131,7 +130,7 @@ FilterHandle FilterHandle::Create(const std::string &name,
 }
 
 // FilterSampler Method Definitions
-FilterSampler::FilterSampler(FilterHandle filter, Allocator alloc)
+FilterSampler::FilterSampler(Filter filter, Allocator alloc)
     : domain(Point2f(-filter.Radius()), Point2f(filter.Radius())),
       values(int(32 * filter.Radius().x), int(32 * filter.Radius().y), alloc),
       distrib(alloc) {

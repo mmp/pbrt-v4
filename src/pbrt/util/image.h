@@ -221,15 +221,15 @@ class Image {
           format(PixelFormat::U256),
           resolution(0, 0) {}
     Image(pstd::vector<uint8_t> p8, Point2i resolution,
-          pstd::span<const std::string> channels, ColorEncodingHandle encoding);
+          pstd::span<const std::string> channels, ColorEncoding encoding);
     Image(pstd::vector<Half> p16, Point2i resolution,
           pstd::span<const std::string> channels);
     Image(pstd::vector<float> p32, Point2i resolution,
           pstd::span<const std::string> channels);
 
     Image(PixelFormat format, Point2i resolution,
-          pstd::span<const std::string> channelNames,
-          ColorEncodingHandle encoding = nullptr, Allocator alloc = {});
+          pstd::span<const std::string> channelNames, ColorEncoding encoding = nullptr,
+          Allocator alloc = {});
 
     PBRT_CPU_GPU
     PixelFormat Format() const { return format; }
@@ -240,7 +240,7 @@ class Image {
     PBRT_CPU_GPU
     int NChannels() const { return channelNames.size(); }
     std::vector<std::string> ChannelNames() const;
-    const ColorEncodingHandle Encoding() const { return encoding; }
+    const ColorEncoding Encoding() const { return encoding; }
 
     PBRT_CPU_GPU
     size_t PixelOffset(Point2i p) const {
@@ -334,12 +334,11 @@ class Image {
     }
 
     static ImageAndMetadata Read(const std::string &filename, Allocator alloc = {},
-                                 ColorEncodingHandle encoding = nullptr);
+                                 ColorEncoding encoding = nullptr);
 
     bool Write(std::string name, const ImageMetadata &metadata = {}) const;
 
-    Image ConvertToFormat(PixelFormat format,
-                          ColorEncodingHandle encoding = nullptr) const;
+    Image ConvertToFormat(PixelFormat format, ColorEncoding encoding = nullptr) const;
 
     // TODO? provide an iterator to iterate over all pixels and channels?
 
@@ -407,7 +406,7 @@ class Image {
     PixelFormat format;
     Point2i resolution;
     pstd::vector<std::string> channelNames;
-    ColorEncodingHandle encoding = nullptr;
+    ColorEncoding encoding = nullptr;
     pstd::vector<uint8_t> p8;
     pstd::vector<Half> p16;
     pstd::vector<float> p32;

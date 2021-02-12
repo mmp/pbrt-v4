@@ -168,12 +168,12 @@ std::string PointLight::ToString() const {
     return StringPrintf("[ PointLight %s I: %s scale: %f ]", BaseToString(), I, scale);
 }
 
-PointLight *PointLight::Create(const Transform &renderFromLight, MediumHandle medium,
+PointLight *PointLight::Create(const Transform &renderFromLight, Medium medium,
                                const ParameterDictionary &parameters,
                                const RGBColorSpace *colorSpace, const FileLoc *loc,
                                Allocator alloc) {
-    SpectrumHandle I = parameters.GetOneSpectrum("I", &colorSpace->illuminant,
-                                                 SpectrumType::Illuminant, alloc);
+    Spectrum I = parameters.GetOneSpectrum("I", &colorSpace->illuminant,
+                                           SpectrumType::Illuminant, alloc);
     Float sc = parameters.GetOneFloat("scale", 1);
 
     sc /= SpectrumToPhotometric(I);
@@ -226,8 +226,8 @@ DistantLight *DistantLight::Create(const Transform &renderFromLight,
                                    const ParameterDictionary &parameters,
                                    const RGBColorSpace *colorSpace, const FileLoc *loc,
                                    Allocator alloc) {
-    SpectrumHandle L = parameters.GetOneSpectrum("L", &colorSpace->illuminant,
-                                                 SpectrumType::Illuminant, alloc);
+    Spectrum L = parameters.GetOneSpectrum("L", &colorSpace->illuminant,
+                                           SpectrumType::Illuminant, alloc);
     Float sc = parameters.GetOneFloat("scale", 1);
 
     Point3f from = parameters.GetOnePoint3f("from", Point3f(0, 0, 0));
@@ -448,8 +448,7 @@ void ProjectionLight::PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const
               (A * Pow<3>(CosTheta(w)));
 }
 
-ProjectionLight *ProjectionLight::Create(const Transform &renderFromLight,
-                                         MediumHandle medium,
+ProjectionLight *ProjectionLight::Create(const Transform &renderFromLight, Medium medium,
                                          const ParameterDictionary &parameters,
                                          const FileLoc *loc, Allocator alloc) {
     Float scale = parameters.GetOneFloat("scale", 1);
@@ -479,9 +478,8 @@ ProjectionLight *ProjectionLight::Create(const Transform &renderFromLight,
 
 // GoniometricLight Method Definitions
 GoniometricLight::GoniometricLight(const Transform &renderFromLight,
-                                   const MediumInterface &mediumInterface,
-                                   SpectrumHandle Iemit, Float scale, Image im,
-                                   Allocator alloc)
+                                   const MediumInterface &mediumInterface, Spectrum Iemit,
+                                   Float scale, Image im, Allocator alloc)
     : LightBase(LightType::DeltaPosition, renderFromLight, mediumInterface),
       Iemit(Iemit, alloc),
       scale(scale),
@@ -561,12 +559,12 @@ std::string GoniometricLight::ToString() const {
 }
 
 GoniometricLight *GoniometricLight::Create(const Transform &renderFromLight,
-                                           MediumHandle medium,
+                                           Medium medium,
                                            const ParameterDictionary &parameters,
                                            const RGBColorSpace *colorSpace,
                                            const FileLoc *loc, Allocator alloc) {
-    SpectrumHandle I = parameters.GetOneSpectrum("I", &colorSpace->illuminant,
-                                                 SpectrumType::Illuminant, alloc);
+    Spectrum I = parameters.GetOneSpectrum("I", &colorSpace->illuminant,
+                                           SpectrumType::Illuminant, alloc);
     Float sc = parameters.GetOneFloat("scale", 1);
 
     Image image(alloc);
@@ -631,9 +629,8 @@ GoniometricLight *GoniometricLight::Create(const Transform &renderFromLight,
 
 // DiffuseAreaLight Method Definitions
 DiffuseAreaLight::DiffuseAreaLight(const Transform &renderFromLight,
-                                   const MediumInterface &mediumInterface,
-                                   SpectrumHandle Le, Float scale,
-                                   const ShapeHandle shape, Image im,
+                                   const MediumInterface &mediumInterface, Spectrum Le,
+                                   Float scale, const Shape shape, Image im,
                                    const RGBColorSpace *imageColorSpace, bool twoSided,
                                    Allocator alloc)
     : LightBase(LightType::Area, renderFromLight, mediumInterface),
@@ -789,13 +786,12 @@ std::string DiffuseAreaLight::ToString() const {
 }
 
 DiffuseAreaLight *DiffuseAreaLight::Create(const Transform &renderFromLight,
-                                           MediumHandle medium,
+                                           Medium medium,
                                            const ParameterDictionary &parameters,
                                            const RGBColorSpace *colorSpace,
                                            const FileLoc *loc, Allocator alloc,
-                                           const ShapeHandle shape) {
-    SpectrumHandle L =
-        parameters.GetOneSpectrum("L", nullptr, SpectrumType::Illuminant, alloc);
+                                           const Shape shape) {
+    Spectrum L = parameters.GetOneSpectrum("L", nullptr, SpectrumType::Illuminant, alloc);
     Float scale = parameters.GetOneFloat("scale", 1);
     bool twoSided = parameters.GetOneBool("twosided", false);
 
@@ -859,8 +855,7 @@ DiffuseAreaLight *DiffuseAreaLight::Create(const Transform &renderFromLight,
 
 // UniformInfiniteLight Method Definitions
 UniformInfiniteLight::UniformInfiniteLight(const Transform &renderFromLight,
-                                           SpectrumHandle Lemit, Float scale,
-                                           Allocator alloc)
+                                           Spectrum Lemit, Float scale, Allocator alloc)
     : LightBase(LightType::Infinite, renderFromLight, MediumInterface()),
       Lemit(Lemit, alloc),
       scale(scale) {}
@@ -1253,8 +1248,8 @@ std::string PortalImageInfiniteLight::ToString() const {
 
 // SpotLight Method Definitions
 SpotLight::SpotLight(const Transform &renderFromLight,
-                     const MediumInterface &mediumInterface, SpectrumHandle Iemit,
-                     Float scale, Float totalWidth, Float falloffStart, Allocator alloc)
+                     const MediumInterface &mediumInterface, Spectrum Iemit, Float scale,
+                     Float totalWidth, Float falloffStart, Allocator alloc)
     : LightBase(LightType::DeltaPosition, renderFromLight, mediumInterface),
       Iemit(Iemit, alloc),
       scale(scale),
@@ -1337,12 +1332,12 @@ std::string SpotLight::ToString() const {
         BaseToString(), Iemit, cosFalloffStart, cosFalloffEnd);
 }
 
-SpotLight *SpotLight::Create(const Transform &renderFromLight, MediumHandle medium,
+SpotLight *SpotLight::Create(const Transform &renderFromLight, Medium medium,
                              const ParameterDictionary &parameters,
                              const RGBColorSpace *colorSpace, const FileLoc *loc,
                              Allocator alloc) {
-    SpectrumHandle I = parameters.GetOneSpectrum("I", &colorSpace->illuminant,
-                                                 SpectrumType::Illuminant, alloc);
+    Spectrum I = parameters.GetOneSpectrum("I", &colorSpace->illuminant,
+                                           SpectrumType::Illuminant, alloc);
     Float sc = parameters.GetOneFloat("scale", 1);
 
     Float coneangle = parameters.GetOneFloat("coneangle", 30.);
@@ -1370,34 +1365,34 @@ SpotLight *SpotLight::Create(const Transform &renderFromLight, MediumHandle medi
                                        coneangle - conedelta, alloc);
 }
 
-SampledSpectrum LightHandle::Phi(const SampledWavelengths &lambda) const {
+SampledSpectrum Light::Phi(const SampledWavelengths &lambda) const {
     auto phi = [&](auto ptr) { return ptr->Phi(lambda); };
     return DispatchCPU(phi);
 }
 
-void LightHandle::Preprocess(const Bounds3f &sceneBounds) {
+void Light::Preprocess(const Bounds3f &sceneBounds) {
     auto preprocess = [&](auto ptr) { return ptr->Preprocess(sceneBounds); };
     return DispatchCPU(preprocess);
 }
 
-pstd::optional<LightLeSample> LightHandle::SampleLe(Point2f u1, Point2f u2,
-                                                    SampledWavelengths &lambda,
-                                                    Float time) const {
+pstd::optional<LightLeSample> Light::SampleLe(Point2f u1, Point2f u2,
+                                              SampledWavelengths &lambda,
+                                              Float time) const {
     auto sample = [&](auto ptr) { return ptr->SampleLe(u1, u2, lambda, time); };
     return Dispatch(sample);
 }
 
-void LightHandle::PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
+void Light::PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
     auto pdf = [&](auto ptr) { return ptr->PDF_Le(ray, pdfPos, pdfDir); };
     return Dispatch(pdf);
 }
 
-pstd::optional<LightBounds> LightHandle::Bounds() const {
+pstd::optional<LightBounds> Light::Bounds() const {
     auto bounds = [](auto ptr) { return ptr->Bounds(); };
     return DispatchCPU(bounds);
 }
 
-std::string LightHandle::ToString() const {
+std::string Light::ToString() const {
     if (ptr() == nullptr)
         return "(nullptr)";
 
@@ -1405,19 +1400,17 @@ std::string LightHandle::ToString() const {
     return DispatchCPU(str);
 }
 
-void LightHandle::PDF_Le(const Interaction &intr, Vector3f &w, Float *pdfPos,
-                         Float *pdfDir) const {
+void Light::PDF_Le(const Interaction &intr, Vector3f &w, Float *pdfPos,
+                   Float *pdfDir) const {
     auto pdf = [&](auto ptr) { return ptr->PDF_Le(intr, w, pdfPos, pdfDir); };
     return Dispatch(pdf);
 }
 
-LightHandle LightHandle::Create(const std::string &name,
-                                const ParameterDictionary &parameters,
-                                const Transform &renderFromLight,
-                                const CameraTransform &cameraTransform,
-                                MediumHandle outsideMedium, const FileLoc *loc,
-                                Allocator alloc) {
-    LightHandle light = nullptr;
+Light Light::Create(const std::string &name, const ParameterDictionary &parameters,
+                    const Transform &renderFromLight,
+                    const CameraTransform &cameraTransform, Medium outsideMedium,
+                    const FileLoc *loc, Allocator alloc) {
+    Light light = nullptr;
     if (name == "point")
         light = PointLight::Create(renderFromLight, outsideMedium, parameters,
                                    parameters.ColorSpace(), loc, alloc);
@@ -1435,7 +1428,7 @@ LightHandle LightHandle::Create(const std::string &name,
                                      loc, alloc);
     else if (name == "infinite") {
         const RGBColorSpace *colorSpace = parameters.ColorSpace();
-        std::vector<SpectrumHandle> L =
+        std::vector<Spectrum> L =
             parameters.GetSpectrumArray("L", SpectrumType::Illuminant, alloc);
         Float scale = parameters.GetOneFloat("scale", 1);
         std::vector<Point3f> portal = parameters.GetPoint3fArray("portal");
@@ -1547,13 +1540,11 @@ LightHandle LightHandle::Create(const std::string &name,
     return light;
 }
 
-LightHandle LightHandle::CreateArea(const std::string &name,
-                                    const ParameterDictionary &parameters,
-                                    const Transform &renderFromLight,
-                                    const MediumInterface &mediumInterface,
-                                    const ShapeHandle shape, const FileLoc *loc,
-                                    Allocator alloc) {
-    LightHandle area = nullptr;
+Light Light::CreateArea(const std::string &name, const ParameterDictionary &parameters,
+                        const Transform &renderFromLight,
+                        const MediumInterface &mediumInterface, const Shape shape,
+                        const FileLoc *loc, Allocator alloc) {
+    Light area = nullptr;
     if (name == "diffuse")
         area =
             DiffuseAreaLight::Create(renderFromLight, mediumInterface.outside, parameters,

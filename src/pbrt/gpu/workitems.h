@@ -160,7 +160,7 @@ using EscapedRayQueue = WorkQueue<EscapedRayWorkItem>;
 // HitAreaLightWorkItem Definition
 struct HitAreaLightWorkItem {
     // HitAreaLightWorkItem Public Members
-    LightHandle areaLight;
+    Light areaLight;
     Point3f p;
     Normal3f n;
     Point2f uv;
@@ -198,7 +198,7 @@ struct GetBSSRDFAndProbeRayWorkItem {
         return ctx;
     }
 
-    MaterialHandle material;
+    Material material;
     SampledWavelengths lambda;
     SampledSpectrum T_hat, uniPathPDF;
     Point3f p;
@@ -214,7 +214,7 @@ struct GetBSSRDFAndProbeRayWorkItem {
 // SubsurfaceScatterWorkItem Definition
 struct SubsurfaceScatterWorkItem {
     Point3f p0, p1;
-    MaterialHandle material;
+    Material material;
     TabulatedBSSRDF bssrdf;
     SampledWavelengths lambda;
     SampledSpectrum T_hat, uniPathPDF;
@@ -242,12 +242,12 @@ struct MediumSampleWorkItem {
     Float etaScale;
 
     // Have a hit material as well
-    LightHandle areaLight;
+    Light areaLight;
     Point3fi pi;
     Normal3f n;
     Vector3f wo;
     Point2f uv;
-    MaterialHandle material;
+    Material material;
     Normal3f ns;
     Vector3f dpdus;
     Vector3f dpdvs;
@@ -264,7 +264,7 @@ struct MediumScatterWorkItem {
     HGPhaseFunction phase;
     Vector3f wo;
     Float etaScale;
-    MediumHandle medium;
+    Medium medium;
     int pixelIndex;
 };
 
@@ -390,7 +390,7 @@ class GetBSSRDFAndProbeRayQueue : public WorkQueue<GetBSSRDFAndProbeRayWorkItem>
     using WorkQueue::WorkQueue;
 
     PBRT_CPU_GPU
-    int Push(MaterialHandle material, SampledWavelengths lambda, SampledSpectrum T_hat,
+    int Push(Material material, SampledWavelengths lambda, SampledSpectrum T_hat,
              SampledSpectrum uniPathPDF, Point3f p, Vector3f wo, Normal3f n, Normal3f ns,
              Vector3f dpdus, Point2f uv, MediumInterface mediumInterface, Float etaScale,
              int pixelIndex) {
@@ -418,7 +418,7 @@ class SubsurfaceScatterQueue : public WorkQueue<SubsurfaceScatterWorkItem> {
     using WorkQueue::WorkQueue;
 
     PBRT_CPU_GPU
-    int Push(Point3f p0, Point3f p1, MaterialHandle material, TabulatedBSSRDF bssrdf,
+    int Push(Point3f p0, Point3f p1, Material material, TabulatedBSSRDF bssrdf,
              SampledWavelengths lambda, SampledSpectrum T_hat, SampledSpectrum uniPathPDF,
              MediumInterface mediumInterface, Float etaScale, int pixelIndex) {
         int index = AllocateEntry();
@@ -469,7 +469,7 @@ using MediumScatterQueue = WorkQueue<MediumScatterWorkItem>;
 
 // MaterialEvalQueue Definition
 using MaterialEvalQueue = MultiWorkQueue<
-    typename MapType<MaterialEvalWorkItem, typename MaterialHandle::Types>::type>;
+    typename MapType<MaterialEvalWorkItem, typename Material::Types>::type>;
 
 }  // namespace pbrt
 

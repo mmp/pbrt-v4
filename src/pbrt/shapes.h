@@ -825,8 +825,7 @@ pstd::optional<TriangleIntersection> IntersectTriangle(const Ray &ray, Float tMa
 class Triangle {
   public:
     // Triangle Public Methods
-    static pstd::vector<ShapeHandle> CreateTriangles(const TriangleMesh *mesh,
-                                                     Allocator alloc);
+    static pstd::vector<Shape> CreateTriangles(const TriangleMesh *mesh, Allocator alloc);
 
     Triangle() = default;
     Triangle(int meshIndex, int triIndex) : meshIndex(meshIndex), triIndex(triIndex) {}
@@ -1198,11 +1197,11 @@ struct CurveCommon {
 class Curve {
   public:
     // Curve Public Methods
-    static pstd::vector<ShapeHandle> Create(const Transform *renderFromObject,
-                                            const Transform *objectFromRender,
-                                            bool reverseOrientation,
-                                            const ParameterDictionary &parameters,
-                                            const FileLoc *loc, Allocator alloc);
+    static pstd::vector<Shape> Create(const Transform *renderFromObject,
+                                      const Transform *objectFromRender,
+                                      bool reverseOrientation,
+                                      const ParameterDictionary &parameters,
+                                      const FileLoc *loc, Allocator alloc);
 
     PBRT_CPU_GPU
     Bounds3f Bounds() const;
@@ -1334,8 +1333,8 @@ class BilinearPatch {
                                          const ParameterDictionary &parameters,
                                          const FileLoc *loc, Allocator alloc);
 
-    static pstd::vector<ShapeHandle> CreatePatches(const BilinearPatchMesh *mesh,
-                                                   Allocator alloc);
+    static pstd::vector<Shape> CreatePatches(const BilinearPatchMesh *mesh,
+                                             Allocator alloc);
 
     PBRT_CPU_GPU
     Bounds3f Bounds() const;
@@ -1516,49 +1515,49 @@ class BilinearPatch {
     static constexpr Float MinSphericalSampleArea = 1e-4;
 };
 
-inline Bounds3f ShapeHandle::Bounds() const {
+inline Bounds3f Shape::Bounds() const {
     auto bounds = [&](auto ptr) { return ptr->Bounds(); };
     return Dispatch(bounds);
 }
 
-inline pstd::optional<ShapeIntersection> ShapeHandle::Intersect(const Ray &ray,
-                                                                Float tMax) const {
+inline pstd::optional<ShapeIntersection> Shape::Intersect(const Ray &ray,
+                                                          Float tMax) const {
     auto intr = [&](auto ptr) { return ptr->Intersect(ray, tMax); };
     return Dispatch(intr);
 }
 
-inline bool ShapeHandle::IntersectP(const Ray &ray, Float tMax) const {
+inline bool Shape::IntersectP(const Ray &ray, Float tMax) const {
     auto intr = [&](auto ptr) { return ptr->IntersectP(ray, tMax); };
     return Dispatch(intr);
 }
 
-inline Float ShapeHandle::Area() const {
+inline Float Shape::Area() const {
     auto area = [&](auto ptr) { return ptr->Area(); };
     return Dispatch(area);
 }
 
-inline pstd::optional<ShapeSample> ShapeHandle::Sample(Point2f u) const {
+inline pstd::optional<ShapeSample> Shape::Sample(Point2f u) const {
     auto sample = [&](auto ptr) { return ptr->Sample(u); };
     return Dispatch(sample);
 }
 
-inline Float ShapeHandle::PDF(const Interaction &in) const {
+inline Float Shape::PDF(const Interaction &in) const {
     auto pdf = [&](auto ptr) { return ptr->PDF(in); };
     return Dispatch(pdf);
 }
 
-inline pstd::optional<ShapeSample> ShapeHandle::Sample(const ShapeSampleContext &ctx,
-                                                       Point2f u) const {
+inline pstd::optional<ShapeSample> Shape::Sample(const ShapeSampleContext &ctx,
+                                                 Point2f u) const {
     auto sample = [&](auto ptr) { return ptr->Sample(ctx, u); };
     return Dispatch(sample);
 }
 
-inline Float ShapeHandle::PDF(const ShapeSampleContext &ctx, Vector3f wi) const {
+inline Float Shape::PDF(const ShapeSampleContext &ctx, Vector3f wi) const {
     auto pdf = [&](auto ptr) { return ptr->PDF(ctx, wi); };
     return Dispatch(pdf);
 }
 
-inline DirectionCone ShapeHandle::NormalBounds() const {
+inline DirectionCone Shape::NormalBounds() const {
     auto nb = [&](auto ptr) { return ptr->NormalBounds(); };
     return Dispatch(nb);
 }

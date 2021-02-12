@@ -1169,9 +1169,9 @@ std::string NormalizedFresnelBxDF::ToString() const {
     return StringPrintf("[ NormalizedFresnelBxDF eta: %f ]", eta);
 }
 
-// BxDFHandle Method Definitions
-SampledSpectrum BxDFHandle::rho(Vector3f wo, pstd::span<const Float> uc,
-                                pstd::span<const Point2f> u2) const {
+// BxDF Method Definitions
+SampledSpectrum BxDF::rho(Vector3f wo, pstd::span<const Float> uc,
+                          pstd::span<const Point2f> u2) const {
     if (wo.z == 0)
         return {};
     SampledSpectrum r(0.);
@@ -1185,8 +1185,8 @@ SampledSpectrum BxDFHandle::rho(Vector3f wo, pstd::span<const Float> uc,
     return r / uc.size();
 }
 
-SampledSpectrum BxDFHandle::rho(pstd::span<const Point2f> u1, pstd::span<const Float> uc,
-                                pstd::span<const Point2f> u2) const {
+SampledSpectrum BxDF::rho(pstd::span<const Point2f> u1, pstd::span<const Float> uc,
+                          pstd::span<const Point2f> u2) const {
     DCHECK_EQ(uc.size(), u1.size());
     DCHECK_EQ(u1.size(), u2.size());
     SampledSpectrum r(0.f);
@@ -1203,7 +1203,7 @@ SampledSpectrum BxDFHandle::rho(pstd::span<const Point2f> u1, pstd::span<const F
     return r / (Pi * uc.size());
 }
 
-std::string BxDFHandle::ToString() const {
+std::string BxDF::ToString() const {
     auto toStr = [](auto ptr) { return ptr->ToString(); };
     return DispatchCPU(toStr);
 }

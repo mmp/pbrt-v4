@@ -24,11 +24,11 @@ void CPURender(ParsedScene &parsedScene) {
     Allocator alloc;
 
     // Create media first (so have them for the camera...)
-    std::map<std::string, MediumHandle> media = parsedScene.CreateMedia(alloc);
+    std::map<std::string, Medium> media = parsedScene.CreateMedia(alloc);
 
     bool haveScatteringMedia = false;
     auto findMedium = [&media, &haveScatteringMedia](const std::string &s,
-                                                     const FileLoc *loc) -> MediumHandle {
+                                                     const FileLoc *loc) -> Medium {
         if (s.empty())
             return nullptr;
 
@@ -40,14 +40,13 @@ void CPURender(ParsedScene &parsedScene) {
     };
 
     // Filter
-    FilterHandle filter =
-        FilterHandle::Create(parsedScene.filter.name, parsedScene.filter.parameters,
-                             &parsedScene.filter.loc, alloc);
+    Filter filter = Filter::Create(parsedScene.filter.name, parsedScene.filter.parameters,
+                                   &parsedScene.filter.loc, alloc);
 
     // Film
     // It's a little ugly to poke into the camera's parameters here, but we
-    // have this circular dependency that CameraHandle::Create() expects a
-    // FilmHandle, yet now the film needs to know the exposure time from
+    // have this circular dependency that Camera::Create() expects a
+    // Film, yet now the film needs to know the exposure time from
     // the camera....
     Float exposureTime = parsedScene.camera.parameters.GetOneFloat("shutterclose", 1.f) -
                          parsedScene.camera.parameters.GetOneFloat("shutteropen", 0.f);
@@ -55,29 +54,27 @@ void CPURender(ParsedScene &parsedScene) {
         ErrorExit(&parsedScene.camera.loc,
                   "The specified camera shutter times imply that the shutter "
                   "does not open.  A black image will result.");
-    FilmHandle film =
-        FilmHandle::Create(parsedScene.film.name, parsedScene.film.parameters,
-                           exposureTime, filter, &parsedScene.film.loc, alloc);
+    Film film = Film::Create(parsedScene.film.name, parsedScene.film.parameters,
+                             exposureTime, filter, &parsedScene.film.loc, alloc);
 
     // Camera
-    MediumHandle cameraMedium =
-        findMedium(parsedScene.camera.medium, &parsedScene.camera.loc);
-    CameraHandle camera = CameraHandle::Create(
-        parsedScene.camera.name, parsedScene.camera.parameters, cameraMedium,
-        parsedScene.camera.cameraTransform, film, &parsedScene.camera.loc, alloc);
+    Medium cameraMedium = findMedium(parsedScene.camera.medium, &parsedScene.camera.loc);
+    Camera camera = Camera::Create(parsedScene.camera.name, parsedScene.camera.parameters,
+                                   cameraMedium, parsedScene.camera.cameraTransform, film,
+                                   &parsedScene.camera.loc, alloc);
 
     // Create _Sampler_ for rendering
     Point2i fullImageResolution = camera.GetFilm().FullResolution();
-    SamplerHandle sampler =
-        SamplerHandle::Create(parsedScene.sampler.name, parsedScene.sampler.parameters,
-                              fullImageResolution, &parsedScene.sampler.loc, alloc);
+    Sampler sampler =
+        Sampler::Create(parsedScene.sampler.name, parsedScene.sampler.parameters,
+                        fullImageResolution, &parsedScene.sampler.loc, alloc);
 
     // Textures
     NamedTextures textures = parsedScene.CreateTextures(alloc, false);
 
     // Materials
-    std::map<std::string, MaterialHandle> namedMaterials;
-    std::vector<MaterialHandle> materials;
+    std::map<std::string, pbrt::Material> namedMaterials;
+    std::vector<pbrt::Material> materials;
     parsedScene.CreateMaterials(textures, alloc, &namedMaterials, &materials);
     bool haveSubsurface = false;
     for (const auto &mtl : parsedScene.materials)
@@ -88,15 +85,15 @@ void CPURender(ParsedScene &parsedScene) {
             haveSubsurface = true;
 
     // Lights (area lights will be done later, with shapes...)
-    std::vector<LightHandle> lights;
+    std::vector<Light> lights;
     std::mutex lightsMutex;
     lights.reserve(parsedScene.lights.size() + parsedScene.areaLights.size());
     for (const auto &light : parsedScene.lights) {
-        MediumHandle outsideMedium = findMedium(light.medium, &light.loc);
+        Medium outsideMedium = findMedium(light.medium, &light.loc);
         if (light.renderFromObject.IsAnimated())
             Warning(&light.loc,
                     "Animated lights aren't supported. Using the start transform.");
-        LightHandle l = LightHandle::Create(
+        Light l = Light::Create(
             light.name, light.parameters, light.renderFromObject.startTransform,
             parsedScene.camera.cameraTransform, outsideMedium, &light.loc, alloc);
         // No need to hold the mutex here
@@ -105,7 +102,7 @@ void CPURender(ParsedScene &parsedScene) {
 
     // Primitives
     auto getAlphaTexture = [&](const ParameterDictionary &parameters,
-                               const FileLoc *loc) -> FloatTextureHandle {
+                               const FileLoc *loc) -> FloatTexture {
         std::string alphaTexName = parameters.GetTexture("alpha");
         if (!alphaTexName.empty()) {
             if (textures.floatTextures.find(alphaTexName) != textures.floatTextures.end())
@@ -121,28 +118,28 @@ void CPURender(ParsedScene &parsedScene) {
 
     // Non-animated shapes
     auto CreatePrimitivesForShapes =
-        [&](const std::vector<ShapeSceneEntity> &shapes) -> std::vector<PrimitiveHandle> {
-        // Parallelize ShapeHandle::Create calls, which will in turn
+        [&](const std::vector<ShapeSceneEntity> &shapes) -> std::vector<Primitive> {
+        // Parallelize Shape::Create calls, which will in turn
         // parallelize PLY file loading, etc...
-        pstd::vector<pstd::vector<ShapeHandle>> shapeHandleVectors(shapes.size());
+        pstd::vector<pstd::vector<Shape>> shapeHandleVectors(shapes.size());
         ParallelFor(0, shapes.size(), [&](int64_t i) {
             const auto &sh = shapes[i];
             shapeHandleVectors[i] =
-                ShapeHandle::Create(sh.name, sh.renderFromObject, sh.objectFromRender,
-                                    sh.reverseOrientation, sh.parameters, &sh.loc, alloc);
+                Shape::Create(sh.name, sh.renderFromObject, sh.objectFromRender,
+                              sh.reverseOrientation, sh.parameters, &sh.loc, alloc);
         });
 
-        std::vector<PrimitiveHandle> primitives;
+        std::vector<Primitive> primitives;
         for (size_t i = 0; i < shapes.size(); ++i) {
             const auto &sh = shapes[i];
-            pstd::vector<ShapeHandle> &shapes = shapeHandleVectors[i];
+            pstd::vector<Shape> &shapes = shapeHandleVectors[i];
             if (shapes.empty())
                 continue;
 
-            FloatTextureHandle alphaTex = getAlphaTexture(sh.parameters, &sh.loc);
+            FloatTexture alphaTex = getAlphaTexture(sh.parameters, &sh.loc);
             sh.parameters.ReportUnused();  // do now so can grab alpha...
 
-            MaterialHandle mtl = nullptr;
+            Material mtl = nullptr;
             if (!sh.materialName.empty()) {
                 auto iter = namedMaterials.find(sh.materialName);
                 if (iter == namedMaterials.end())
@@ -158,12 +155,12 @@ void CPURender(ParsedScene &parsedScene) {
 
             for (auto &s : shapes) {
                 // Possibly create area light for shape
-                LightHandle areaHandle = nullptr;
+                Light areaHandle = nullptr;
                 if (sh.lightIndex != -1) {
                     CHECK_LT(sh.lightIndex, parsedScene.areaLights.size());
                     const auto &areaLightEntity = parsedScene.areaLights[sh.lightIndex];
 
-                    LightHandle area = LightHandle::CreateArea(
+                    Light area = Light::CreateArea(
                         areaLightEntity.name, areaLightEntity.parameters,
                         *sh.renderFromObject, mi, s, &areaLightEntity.loc, Allocator{});
                     areaHandle = area;
@@ -182,29 +179,28 @@ void CPURender(ParsedScene &parsedScene) {
         return primitives;
     };
 
-    std::vector<PrimitiveHandle> primitives =
-        CreatePrimitivesForShapes(parsedScene.shapes);
+    std::vector<Primitive> primitives = CreatePrimitivesForShapes(parsedScene.shapes);
 
     // Animated shapes
     auto CreatePrimitivesForAnimatedShapes =
         [&](const std::vector<AnimatedShapeSceneEntity> &shapes)
-        -> std::vector<PrimitiveHandle> {
-        std::vector<PrimitiveHandle> primitives;
+        -> std::vector<Primitive> {
+        std::vector<Primitive> primitives;
         primitives.reserve(shapes.size());
 
         for (const auto &sh : shapes) {
-            pstd::vector<ShapeHandle> shapes =
-                ShapeHandle::Create(sh.name, sh.identity, sh.identity,
-                                    sh.reverseOrientation, sh.parameters, &sh.loc, alloc);
+            pstd::vector<Shape> shapes =
+                Shape::Create(sh.name, sh.identity, sh.identity, sh.reverseOrientation,
+                              sh.parameters, &sh.loc, alloc);
             if (shapes.empty())
                 continue;
 
-            FloatTextureHandle alphaTex = getAlphaTexture(sh.parameters, &sh.loc);
+            FloatTexture alphaTex = getAlphaTexture(sh.parameters, &sh.loc);
             sh.parameters.ReportUnused();  // do now so can grab alpha...
 
             // Create initial shape or shapes for animated shape
 
-            MaterialHandle mtl = nullptr;
+            Material mtl = nullptr;
             if (!sh.materialName.empty()) {
                 auto iter = namedMaterials.find(sh.materialName);
                 if (iter == namedMaterials.end())
@@ -218,10 +214,10 @@ void CPURender(ParsedScene &parsedScene) {
             MediumInterface mi(findMedium(sh.insideMedium, &sh.loc),
                                findMedium(sh.outsideMedium, &sh.loc));
 
-            std::vector<PrimitiveHandle> prims;
+            std::vector<Primitive> prims;
             for (auto &s : shapes) {
                 // Possibly create area light for shape
-                LightHandle areaHandle = nullptr;
+                Light areaHandle = nullptr;
                 if (sh.lightIndex != -1) {
                     CHECK_LT(sh.lightIndex, parsedScene.areaLights.size());
                     const auto &areaLightEntity = parsedScene.areaLights[sh.lightIndex];
@@ -230,7 +226,7 @@ void CPURender(ParsedScene &parsedScene) {
                     if (sh.renderFromObject.IsAnimated())
                         ErrorExit(&sh.loc, "Animated area lights are not supported.");
 
-                    LightHandle area = LightHandle::CreateArea(
+                    Light area = Light::CreateArea(
                         areaLightEntity.name, areaLightEntity.parameters,
                         sh.renderFromObject.startTransform, mi, s, &sh.loc, Allocator{});
                     areaHandle = area;
@@ -249,7 +245,7 @@ void CPURender(ParsedScene &parsedScene) {
 
             // Create single _Primitive_ for _prims_
             if (prims.size() > 1) {
-                PrimitiveHandle bvh = new BVHAggregate(std::move(prims));
+                Primitive bvh = new BVHAggregate(std::move(prims));
                 prims.clear();
                 prims.push_back(bvh);
             }
@@ -257,13 +253,13 @@ void CPURender(ParsedScene &parsedScene) {
         }
         return primitives;
     };
-    std::vector<PrimitiveHandle> animatedPrimitives =
+    std::vector<Primitive> animatedPrimitives =
         CreatePrimitivesForAnimatedShapes(parsedScene.animatedShapes);
     primitives.insert(primitives.end(), animatedPrimitives.begin(),
                       animatedPrimitives.end());
 
     // Instance definitions
-    std::map<std::string, PrimitiveHandle> instanceDefinitions;
+    std::map<std::string, Primitive> instanceDefinitions;
     std::mutex instanceDefinitionsMutex;
     std::vector<std::map<std::string, InstanceDefinitionSceneEntity>::iterator>
         instanceDefinitionIterators;
@@ -273,16 +269,16 @@ void CPURender(ParsedScene &parsedScene) {
     ParallelFor(0, instanceDefinitionIterators.size(), [&](int64_t i) {
         const auto &inst = *instanceDefinitionIterators[i];
 
-        std::vector<PrimitiveHandle> instancePrimitives =
+        std::vector<Primitive> instancePrimitives =
             CreatePrimitivesForShapes(inst.second.shapes);
-        std::vector<PrimitiveHandle> movingInstancePrimitives =
+        std::vector<Primitive> movingInstancePrimitives =
             CreatePrimitivesForAnimatedShapes(inst.second.animatedShapes);
         instancePrimitives.insert(instancePrimitives.end(),
                                   movingInstancePrimitives.begin(),
                                   movingInstancePrimitives.end());
 
         if (instancePrimitives.size() > 1) {
-            PrimitiveHandle bvh = new BVHAggregate(std::move(instancePrimitives));
+            Primitive bvh = new BVHAggregate(std::move(instancePrimitives));
             instancePrimitives.clear();
             instancePrimitives.push_back(bvh);
         }
@@ -313,7 +309,7 @@ void CPURender(ParsedScene &parsedScene) {
     }
 
     // Accelerator
-    PrimitiveHandle accel = nullptr;
+    Primitive accel = nullptr;
     if (!primitives.empty())
         accel = CreateAccelerator(parsedScene.accelerator.name, std::move(primitives),
                                   parsedScene.accelerator.parameters);

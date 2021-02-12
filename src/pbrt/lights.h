@@ -162,13 +162,13 @@ class LightBase {
 class PointLight : public LightBase {
   public:
     // PointLight Public Methods
-    PointLight(Transform renderFromLight, MediumInterface mediumInterface,
-               SpectrumHandle I, Float scale, Allocator alloc)
+    PointLight(Transform renderFromLight, MediumInterface mediumInterface, Spectrum I,
+               Float scale, Allocator alloc)
         : LightBase(LightType::DeltaPosition, renderFromLight, mediumInterface),
           I(I, alloc),
           scale(scale) {}
 
-    static PointLight *Create(const Transform &renderFromLight, MediumHandle medium,
+    static PointLight *Create(const Transform &renderFromLight, Medium medium,
                               const ParameterDictionary &parameters,
                               const RGBColorSpace *colorSpace, const FileLoc *loc,
                               Allocator alloc);
@@ -213,7 +213,7 @@ class PointLight : public LightBase {
 class DistantLight : public LightBase {
   public:
     // DistantLight Public Methods
-    DistantLight(const Transform &renderFromLight, SpectrumHandle Lemit, Float scale,
+    DistantLight(const Transform &renderFromLight, Spectrum Lemit, Float scale,
                  Allocator alloc)
         : LightBase(LightType::DeltaDirection, renderFromLight, MediumInterface()),
           Lemit(Lemit, alloc),
@@ -274,7 +274,7 @@ class ProjectionLight : public LightBase {
                     const RGBColorSpace *colorSpace, Float scale, Float fov, Float power,
                     Allocator alloc);
 
-    static ProjectionLight *Create(const Transform &renderFromLight, MediumHandle medium,
+    static ProjectionLight *Create(const Transform &renderFromLight, Medium medium,
                                    const ParameterDictionary &parameters,
                                    const FileLoc *loc, Allocator alloc);
 
@@ -324,10 +324,10 @@ class GoniometricLight : public LightBase {
   public:
     // GoniometricLight Public Methods
     GoniometricLight(const Transform &renderFromLight,
-                     const MediumInterface &mediumInterface, SpectrumHandle I,
-                     Float scale, Image image, Allocator alloc);
+                     const MediumInterface &mediumInterface, Spectrum I, Float scale,
+                     Image image, Allocator alloc);
 
-    static GoniometricLight *Create(const Transform &renderFromLight, MediumHandle medium,
+    static GoniometricLight *Create(const Transform &renderFromLight, Medium medium,
                                     const ParameterDictionary &parameters,
                                     const RGBColorSpace *colorSpace, const FileLoc *loc,
                                     Allocator alloc);
@@ -378,15 +378,14 @@ class DiffuseAreaLight : public LightBase {
   public:
     // DiffuseAreaLight Public Methods
     DiffuseAreaLight(const Transform &renderFromLight,
-                     const MediumInterface &mediumInterface, SpectrumHandle Le,
-                     Float scale, const ShapeHandle shape, Image image,
-                     const RGBColorSpace *imageColorSpace, bool twoSided,
-                     Allocator alloc);
+                     const MediumInterface &mediumInterface, Spectrum Le, Float scale,
+                     const Shape shape, Image image, const RGBColorSpace *imageColorSpace,
+                     bool twoSided, Allocator alloc);
 
-    static DiffuseAreaLight *Create(const Transform &renderFromLight, MediumHandle medium,
+    static DiffuseAreaLight *Create(const Transform &renderFromLight, Medium medium,
                                     const ParameterDictionary &parameters,
                                     const RGBColorSpace *colorSpace, const FileLoc *loc,
-                                    Allocator alloc, const ShapeHandle shape);
+                                    Allocator alloc, const Shape shape);
 
     void Preprocess(const Bounds3f &sceneBounds) {}
 
@@ -436,7 +435,7 @@ class DiffuseAreaLight : public LightBase {
 
   private:
     // DiffuseAreaLight Private Members
-    ShapeHandle shape;
+    Shape shape;
     Float area;
     bool twoSided;
     DenselySampledSpectrum Lemit;
@@ -449,8 +448,8 @@ class DiffuseAreaLight : public LightBase {
 class UniformInfiniteLight : public LightBase {
   public:
     // UniformInfiniteLight Public Methods
-    UniformInfiniteLight(const Transform &renderFromLight, SpectrumHandle Lemit,
-                         Float scale, Allocator alloc);
+    UniformInfiniteLight(const Transform &renderFromLight, Spectrum Lemit, Float scale,
+                         Allocator alloc);
 
     void Preprocess(const Bounds3f &sceneBounds) {
         sceneBounds.BoundingSphere(&sceneCenter, &sceneRadius);
@@ -682,11 +681,10 @@ class PortalImageInfiniteLight : public LightBase {
 class SpotLight : public LightBase {
   public:
     // SpotLight Public Methods
-    SpotLight(const Transform &renderFromLight, const MediumInterface &m,
-              SpectrumHandle I, Float scale, Float totalWidth, Float falloffStart,
-              Allocator alloc);
+    SpotLight(const Transform &renderFromLight, const MediumInterface &m, Spectrum I,
+              Float scale, Float totalWidth, Float falloffStart, Allocator alloc);
 
-    static SpotLight *Create(const Transform &renderFromLight, MediumHandle medium,
+    static SpotLight *Create(const Transform &renderFromLight, Medium medium,
                              const ParameterDictionary &parameters,
                              const RGBColorSpace *colorSpace, const FileLoc *loc,
                              Allocator alloc);
@@ -737,34 +735,32 @@ class SpotLight : public LightBase {
     Float scale, cosFalloffStart, cosFalloffEnd;
 };
 
-inline pstd::optional<LightLiSample> LightHandle::SampleLi(LightSampleContext ctx,
-                                                           Point2f u,
-                                                           SampledWavelengths lambda,
-                                                           LightSamplingMode mode) const {
+inline pstd::optional<LightLiSample> Light::SampleLi(LightSampleContext ctx, Point2f u,
+                                                     SampledWavelengths lambda,
+                                                     LightSamplingMode mode) const {
     auto sample = [&](auto ptr) { return ptr->SampleLi(ctx, u, lambda, mode); };
     return Dispatch(sample);
 }
 
-inline Float LightHandle::PDF_Li(LightSampleContext ctx, Vector3f wi,
-                                 LightSamplingMode mode) const {
+inline Float Light::PDF_Li(LightSampleContext ctx, Vector3f wi,
+                           LightSamplingMode mode) const {
     auto pdf = [&](auto ptr) { return ptr->PDF_Li(ctx, wi, mode); };
     return Dispatch(pdf);
 }
 
-inline SampledSpectrum LightHandle::L(Point3f p, Normal3f n, Point2f uv, Vector3f w,
-                                      const SampledWavelengths &lambda) const {
+inline SampledSpectrum Light::L(Point3f p, Normal3f n, Point2f uv, Vector3f w,
+                                const SampledWavelengths &lambda) const {
     CHECK(Type() == LightType::Area);
     auto l = [&](auto ptr) { return ptr->L(p, n, uv, w, lambda); };
     return Dispatch(l);
 }
 
-inline SampledSpectrum LightHandle::Le(const Ray &ray,
-                                       const SampledWavelengths &lambda) const {
+inline SampledSpectrum Light::Le(const Ray &ray, const SampledWavelengths &lambda) const {
     auto le = [&](auto ptr) { return ptr->Le(ray, lambda); };
     return Dispatch(le);
 }
 
-inline LightType LightHandle::Type() const {
+inline LightType Light::Type() const {
     auto t = [&](auto ptr) { return ptr->Type(); };
     return Dispatch(t);
 }

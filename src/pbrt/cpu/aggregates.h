@@ -15,9 +15,8 @@
 
 namespace pbrt {
 
-PrimitiveHandle CreateAccelerator(const std::string &name,
-                                  std::vector<PrimitiveHandle> prims,
-                                  const ParameterDictionary &parameters);
+Primitive CreateAccelerator(const std::string &name, std::vector<Primitive> prims,
+                            const ParameterDictionary &parameters);
 
 struct BVHBuildNode;
 struct BVHPrimitive;
@@ -31,10 +30,10 @@ class BVHAggregate {
     enum class SplitMethod { SAH, HLBVH, Middle, EqualCounts };
 
     // BVHAggregate Public Methods
-    BVHAggregate(std::vector<PrimitiveHandle> p, int maxPrimsInNode = 1,
+    BVHAggregate(std::vector<Primitive> p, int maxPrimsInNode = 1,
                  SplitMethod splitMethod = SplitMethod::SAH);
 
-    static BVHAggregate *Create(std::vector<PrimitiveHandle> prims,
+    static BVHAggregate *Create(std::vector<Primitive> prims,
                                 const ParameterDictionary &parameters);
 
     Bounds3f Bounds() const;
@@ -47,15 +46,15 @@ class BVHAggregate {
                                  std::vector<BVHPrimitive> &primitiveInfo, int start,
                                  int end, std::atomic<int> *totalNodes,
                                  std::atomic<int> *orderedPrimsOffset,
-                                 std::vector<PrimitiveHandle> &orderedPrims);
+                                 std::vector<Primitive> &orderedPrims);
     BVHBuildNode *buildHLBVH(Allocator alloc,
                              const std::vector<BVHPrimitive> &primitiveInfo,
                              std::atomic<int> *totalNodes,
-                             std::vector<PrimitiveHandle> &orderedPrims);
+                             std::vector<Primitive> &orderedPrims);
     BVHBuildNode *emitLBVH(BVHBuildNode *&buildNodes,
                            const std::vector<BVHPrimitive> &primitiveInfo,
                            MortonPrimitive *mortonPrims, int nPrimitives, int *totalNodes,
-                           std::vector<PrimitiveHandle> &orderedPrims,
+                           std::vector<Primitive> &orderedPrims,
                            std::atomic<int> *orderedPrimsOffset, int bitIndex);
     BVHBuildNode *buildUpperSAH(Allocator alloc,
                                 std::vector<BVHBuildNode *> &treeletRoots, int start,
@@ -64,7 +63,7 @@ class BVHAggregate {
 
     // BVHAggregate Private Members
     int maxPrimsInNode;
-    std::vector<PrimitiveHandle> primitives;
+    std::vector<Primitive> primitives;
     SplitMethod splitMethod;
     LinearBVHNode *nodes = nullptr;
 };
@@ -76,10 +75,9 @@ struct BoundEdge;
 class KdTreeAggregate {
   public:
     // KdTreeAggregate Public Methods
-    KdTreeAggregate(std::vector<PrimitiveHandle> p, int isectCost = 5,
-                    int traversalCost = 1, Float emptyBonus = 0.5, int maxPrims = 1,
-                    int maxDepth = -1);
-    static KdTreeAggregate *Create(std::vector<PrimitiveHandle> prims,
+    KdTreeAggregate(std::vector<Primitive> p, int isectCost = 5, int traversalCost = 1,
+                    Float emptyBonus = 0.5, int maxPrims = 1, int maxDepth = -1);
+    static KdTreeAggregate *Create(std::vector<Primitive> prims,
                                    const ParameterDictionary &parameters);
     pstd::optional<ShapeIntersection> Intersect(const Ray &ray, Float tMax) const;
 
@@ -97,7 +95,7 @@ class KdTreeAggregate {
     // KdTreeAggregate Private Members
     int isectCost, traversalCost, maxPrims;
     Float emptyBonus;
-    std::vector<PrimitiveHandle> primitives;
+    std::vector<Primitive> primitives;
     std::vector<int> primitiveIndices;
     KdTreeNode *nodes;
     int nAllocedNodes, nextFreeNode;

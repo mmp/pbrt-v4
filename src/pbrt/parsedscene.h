@@ -329,10 +329,10 @@ class ParsedScene : public SceneRepresentation {
     NamedTextures CreateTextures(Allocator alloc, bool gpu) const;
 
     void CreateMaterials(/*const*/ NamedTextures &sceneTextures, Allocator alloc,
-                         std::map<std::string, MaterialHandle> *namedMaterials,
-                         std::vector<MaterialHandle> *materials) const;
+                         std::map<std::string, pbrt::Material> *namedMaterials,
+                         std::vector<pbrt::Material> *materials) const;
 
-    std::map<std::string, MediumHandle> CreateMedia(Allocator alloc) const;
+    std::map<std::string, Medium> CreateMedia(Allocator alloc) const;
 
     // ParsedScene Public Members
     SceneEntity film, sampler, integrator, filter, accelerator;

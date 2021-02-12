@@ -96,7 +96,7 @@ TEST(Triangle, Watertight) {
 
     Transform identity;
     TriangleMesh mesh(identity, false, indices, vertices, {}, {}, {}, {});
-    pstd::vector<ShapeHandle> tris = Triangle::CreateTriangles(&mesh, Allocator());
+    pstd::vector<Shape> tris = Triangle::CreateTriangles(&mesh, Allocator());
 
     for (int i = 0; i < 100000; ++i) {
         RNG rng(i);
@@ -147,7 +147,7 @@ Triangle *GetRandomTriangle(std::function<Float()> value) {
     // Leaks...
     TriangleMesh *mesh = new TriangleMesh(identity, false, {indices, indices + 3},
                                           {v, v + 3}, {}, {}, {}, {});
-    pstd::vector<ShapeHandle> triVec = Triangle::CreateTriangles(mesh, Allocator());
+    pstd::vector<Shape> triVec = Triangle::CreateTriangles(mesh, Allocator());
     EXPECT_EQ(1, triVec.size());
     return triVec[0].CastOrNullptr<Triangle>();
 }
@@ -155,7 +155,7 @@ Triangle *GetRandomTriangle(std::function<Float()> value) {
 TEST(Triangle, Reintersect) {
     for (int i = 0; i < 1000; ++i) {
         RNG rng(i);
-        ShapeHandle tri = GetRandomTriangle([&]() { return pExp(rng); });
+        Shape tri = GetRandomTriangle([&]() { return pExp(rng); });
         if (!tri)
             continue;
 
@@ -254,7 +254,7 @@ TEST(Triangle, SolidAngle) {
 // such that if the dot product of an outgoing ray and the surface normal
 // at a point is positive, then a ray leaving that point in that direction
 // should never intersect the shape.
-static int TestReintersectConvex(ShapeHandle shape, RNG &rng) {
+static int TestReintersectConvex(Shape shape, RNG &rng) {
     // Ray origin
     Point3f o;
     for (int c = 0; c < 3; ++c)

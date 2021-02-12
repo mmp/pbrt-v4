@@ -106,7 +106,7 @@ TEST(GoniometricLight, Power) {
         << " qmc: " << phiSampled << ", closed-form: " << phi[0];
 }
 
-static void testPhiVsSampled(LightHandle light, SampledWavelengths &lambda) {
+static void testPhiVsSampled(Light light, SampledWavelengths &lambda) {
     double sum = 0;
     int count = 100000;
     for (int i = 0; i < count; ++i) {
@@ -133,7 +133,7 @@ TEST(GoniometricLight, Sampling) {
     static Transform id;
     GoniometricLight light(id, MediumInterface(), &I, 1.f, std::move(image), Allocator());
     SampledWavelengths lambda = SampledWavelengths::SampleUniform(0.5);
-    testPhiVsSampled(LightHandle(&light), lambda);
+    testPhiVsSampled(Light(&light), lambda);
 }
 
 TEST(ProjectionLight, Power) {
@@ -169,7 +169,7 @@ TEST(ProjectionLight, Sampling) {
                               RGBColorSpace::sRGB, 10 /* scale */, 30 /* fov */,
                               -1 /* power */, Allocator());
 
-        testPhiVsSampled(LightHandle(&light), lambda);
+        testPhiVsSampled(Light(&light), lambda);
     }
 }
 

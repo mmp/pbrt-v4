@@ -259,8 +259,7 @@ pstd::optional<TriangleIntersection> IntersectTriangle(const Ray &ray, Float tMa
 }
 
 // Triangle Method Definitions
-pstd::vector<ShapeHandle> Triangle::CreateTriangles(const TriangleMesh *mesh,
-                                                    Allocator alloc) {
+pstd::vector<Shape> Triangle::CreateTriangles(const TriangleMesh *mesh, Allocator alloc) {
     static std::mutex allMeshesLock;
     allMeshesLock.lock();
     CHECK_LT(allMeshes->size(), 1 << 31);
@@ -268,7 +267,7 @@ pstd::vector<ShapeHandle> Triangle::CreateTriangles(const TriangleMesh *mesh,
     allMeshes->push_back(mesh);
     allMeshesLock.unlock();
 
-    pstd::vector<ShapeHandle> tris(mesh->nTriangles, alloc);
+    pstd::vector<Shape> tris(mesh->nTriangles, alloc);
     Triangle *t = alloc.allocate_object<Triangle>(mesh->nTriangles);
     for (int i = 0; i < mesh->nTriangles; ++i) {
         alloc.construct(&t[i], meshIndex, i);
@@ -482,17 +481,17 @@ std::string CurveCommon::ToString() const {
         reverseOrientation, transformSwapsHandedness);
 }
 
-pstd::vector<ShapeHandle> CreateCurve(const Transform *renderFromObject,
-                                      const Transform *objectFromRender,
-                                      bool reverseOrientation,
-                                      pstd::span<const Point3f> c, Float w0, Float w1,
-                                      CurveType type, pstd::span<const Normal3f> norm,
-                                      int splitDepth, Allocator alloc) {
+pstd::vector<Shape> CreateCurve(const Transform *renderFromObject,
+                                const Transform *objectFromRender,
+                                bool reverseOrientation, pstd::span<const Point3f> c,
+                                Float w0, Float w1, CurveType type,
+                                pstd::span<const Normal3f> norm, int splitDepth,
+                                Allocator alloc) {
     CurveCommon *common = alloc.new_object<CurveCommon>(
         c, w0, w1, type, norm, renderFromObject, objectFromRender, reverseOrientation);
 
     const int nSegments = 1 << splitDepth;
-    pstd::vector<ShapeHandle> segments(nSegments, alloc);
+    pstd::vector<Shape> segments(nSegments, alloc);
     Curve *curves = alloc.allocate_object<Curve>(nSegments);
     for (int i = 0; i < nSegments; ++i) {
         Float uMin = i / (Float)nSegments;
@@ -748,11 +747,11 @@ std::string Curve::ToString() const {
     return StringPrintf("[ Curve common: %s uMin: %f uMax: %f ]", *common, uMin, uMax);
 }
 
-pstd::vector<ShapeHandle> Curve::Create(const Transform *renderFromObject,
-                                        const Transform *objectFromRender,
-                                        bool reverseOrientation,
-                                        const ParameterDictionary &parameters,
-                                        const FileLoc *loc, Allocator alloc) {
+pstd::vector<Shape> Curve::Create(const Transform *renderFromObject,
+                                  const Transform *objectFromRender,
+                                  bool reverseOrientation,
+                                  const ParameterDictionary &parameters,
+                                  const FileLoc *loc, Allocator alloc) {
     Float width = parameters.GetOneFloat("width", 1.f);
     Float width0 = parameters.GetOneFloat("width0", width);
     Float width1 = parameters.GetOneFloat("width1", width);
@@ -838,7 +837,7 @@ pstd::vector<ShapeHandle> Curve::Create(const Transform *renderFromObject,
         return {};
     }
 
-    pstd::vector<ShapeHandle> curves(alloc);
+    pstd::vector<Shape> curves(alloc);
     // Pointer to the first control point for the current segment. This is
     // updated after each loop iteration depending on the current basis.
     int cpOffset = 0;
@@ -981,8 +980,8 @@ BilinearPatchMesh *BilinearPatch::CreateMesh(const Transform *renderFromObject,
         std::move(N), std::move(uv), std::move(faceIndices), imageDist);
 }
 
-pstd::vector<ShapeHandle> BilinearPatch::CreatePatches(const BilinearPatchMesh *mesh,
-                                                       Allocator alloc) {
+pstd::vector<Shape> BilinearPatch::CreatePatches(const BilinearPatchMesh *mesh,
+                                                 Allocator alloc) {
     static std::mutex allMeshesLock;
     allMeshesLock.lock();
     CHECK_LT(allMeshes->size(), 1 << 31);
@@ -990,7 +989,7 @@ pstd::vector<ShapeHandle> BilinearPatch::CreatePatches(const BilinearPatchMesh *
     allMeshes->push_back(mesh);
     allMeshesLock.unlock();
 
-    pstd::vector<ShapeHandle> blps(mesh->nPatches, alloc);
+    pstd::vector<Shape> blps(mesh->nPatches, alloc);
     BilinearPatch *patches = alloc.allocate_object<BilinearPatch>(mesh->nPatches);
     for (int i = 0; i < mesh->nPatches; ++i) {
         alloc.construct(&patches[i], mesh, meshIndex, i);
@@ -1356,13 +1355,13 @@ STAT_COUNTER("Geometry/Spheres", nSpheres);
 STAT_COUNTER("Geometry/Cylinders", nCylinders);
 STAT_COUNTER("Geometry/Disks", nDisks);
 
-pstd::vector<ShapeHandle> ShapeHandle::Create(const std::string &name,
-                                              const Transform *renderFromObject,
-                                              const Transform *objectFromRender,
-                                              bool reverseOrientation,
-                                              const ParameterDictionary &parameters,
-                                              const FileLoc *loc, Allocator alloc) {
-    pstd::vector<ShapeHandle> shapes(alloc);
+pstd::vector<Shape> Shape::Create(const std::string &name,
+                                  const Transform *renderFromObject,
+                                  const Transform *objectFromRender,
+                                  bool reverseOrientation,
+                                  const ParameterDictionary &parameters,
+                                  const FileLoc *loc, Allocator alloc) {
+    pstd::vector<Shape> shapes(alloc);
     if (name == "sphere") {
         shapes = {Sphere::Create(renderFromObject, objectFromRender, reverseOrientation,
                                  parameters, loc, alloc)};
@@ -1405,8 +1404,7 @@ pstd::vector<ShapeHandle> ShapeHandle::Create(const std::string &name,
             BilinearPatchMesh *mesh = alloc.new_object<BilinearPatchMesh>(
                 *renderFromObject, reverseOrientation, plyMesh.quadIndices, plyMesh.p,
                 plyMesh.n, plyMesh.uv, plyMesh.faceIndices, nullptr /* image dist */);
-            pstd::vector<ShapeHandle> quadMesh =
-                BilinearPatch::CreatePatches(mesh, alloc);
+            pstd::vector<Shape> quadMesh = BilinearPatch::CreatePatches(mesh, alloc);
             shapes.insert(shapes.end(), quadMesh.begin(), quadMesh.end());
         }
     } else if (name == "loopsubdiv") {
@@ -1436,7 +1434,7 @@ pstd::vector<ShapeHandle> ShapeHandle::Create(const std::string &name,
     return shapes;
 }
 
-std::string ShapeHandle::ToString() const {
+std::string Shape::ToString() const {
     if (ptr() == nullptr)
         return "(nullptr)";
 

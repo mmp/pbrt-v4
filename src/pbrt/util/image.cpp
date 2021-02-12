@@ -125,7 +125,7 @@ pstd::vector<Image> Image::GeneratePyramid(Image image, WrapMode2D wrapMode,
                                            Allocator alloc) {
     PixelFormat origFormat = image.format;
     int nChannels = image.NChannels();
-    ColorEncodingHandle origEncoding = image.encoding;
+    ColorEncoding origEncoding = image.encoding;
     // Prepare _image_ for building pyramid
     if (!IsPowerOf2(image.resolution[0]) || !IsPowerOf2(image.resolution[1]))
         image = image.FloatResizeUp(
@@ -347,7 +347,7 @@ Image Image::FloatResizeUp(Point2i newRes, WrapMode2D wrapMode) const {
 }
 
 Image::Image(PixelFormat format, Point2i resolution,
-             pstd::span<const std::string> channels, ColorEncodingHandle encoding,
+             pstd::span<const std::string> channels, ColorEncoding encoding,
              Allocator alloc)
     : format(format),
       resolution(resolution),
@@ -423,7 +423,7 @@ void Image::SetChannels(Point2i p, const ImageChannelDesc &desc,
 }
 
 Image::Image(pstd::vector<uint8_t> p8c, Point2i resolution,
-             pstd::span<const std::string> channels, ColorEncodingHandle encoding)
+             pstd::span<const std::string> channels, ColorEncoding encoding)
     : format(PixelFormat::U256),
       resolution(resolution),
       channelNames(channels.begin(), channels.end()),
@@ -452,7 +452,7 @@ Image::Image(pstd::vector<float> p32c, Point2i resolution,
     CHECK(Is32Bit(format));
 }
 
-Image Image::ConvertToFormat(PixelFormat newFormat, ColorEncodingHandle encoding) const {
+Image Image::ConvertToFormat(PixelFormat newFormat, ColorEncoding encoding) const {
     if (newFormat == format)
         return *this;
 
@@ -832,13 +832,13 @@ Image Image::JointBilateralFilter(const ImageChannelDesc &toFilterDesc, int half
 // ImageIO Local Declarations
 static ImageAndMetadata ReadEXR(const std::string &name, Allocator alloc);
 static ImageAndMetadata ReadPNG(const std::string &name, Allocator alloc,
-                                ColorEncodingHandle encoding);
+                                ColorEncoding encoding);
 static ImageAndMetadata ReadPFM(const std::string &filename, Allocator alloc);
 static ImageAndMetadata ReadHDR(const std::string &filename, Allocator alloc);
 
 // ImageIO Function Definitions
 ImageAndMetadata Image::Read(const std::string &name, Allocator alloc,
-                             ColorEncodingHandle encoding) {
+                             ColorEncoding encoding) {
     if (HasExtension(name, "exr"))
         return ReadEXR(name, alloc);
     else if (HasExtension(name, "png"))
@@ -856,21 +856,20 @@ ImageAndMetadata Image::Read(const std::string &name, Allocator alloc,
             switch (n) {
             case 1:
                 return ImageAndMetadata{
-                    Image(std::move(pixels), {x, y}, {"Y"}, ColorEncodingHandle::sRGB),
+                    Image(std::move(pixels), {x, y}, {"Y"}, ColorEncoding::sRGB),
                     ImageMetadata()};
             case 2: {
-                Image image(std::move(pixels), {x, y}, {"Y", "A"},
-                            ColorEncodingHandle::sRGB);
+                Image image(std::move(pixels), {x, y}, {"Y", "A"}, ColorEncoding::sRGB);
                 return ImageAndMetadata{image.SelectChannels(image.GetChannelDesc({"Y"})),
                                         ImageMetadata()};
             }
             case 3:
                 return ImageAndMetadata{Image(std::move(pixels), {x, y}, {"R", "G", "B"},
-                                              ColorEncodingHandle::sRGB),
+                                              ColorEncoding::sRGB),
                                         ImageMetadata()};
             case 4: {
                 Image image(std::move(pixels), {x, y}, {"R", "G", "B", "A"},
-                            ColorEncodingHandle::sRGB);
+                            ColorEncoding::sRGB);
                 return ImageAndMetadata{
                     image.SelectChannels(image.GetChannelDesc({"R", "G", "B"})),
                     ImageMetadata()};
@@ -1172,11 +1171,11 @@ bool Image::WriteEXR(const std::string &name, const ImageMetadata &metadata) con
 // PNG Function Definitions
 
 static ImageAndMetadata ReadPNG(const std::string &name, Allocator alloc,
-                                ColorEncodingHandle encoding) {
+                                ColorEncoding encoding) {
     std::string contents = ReadFileContents(name);
 
     if (encoding == nullptr)
-        encoding = ColorEncodingHandle::sRGB;
+        encoding = ColorEncoding::sRGB;
 
     unsigned width, height;
     LodePNGState state;

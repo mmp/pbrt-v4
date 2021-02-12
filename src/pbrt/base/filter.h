@@ -21,16 +21,15 @@ class MitchellFilter;
 class LanczosSincFilter;
 class TriangleFilter;
 
-// FilterHandle Definition
-class FilterHandle : public TaggedPointer<BoxFilter, GaussianFilter, MitchellFilter,
-                                          LanczosSincFilter, TriangleFilter> {
+// Filter Definition
+class Filter : public TaggedPointer<BoxFilter, GaussianFilter, MitchellFilter,
+                                    LanczosSincFilter, TriangleFilter> {
   public:
     // Filter Interface
     using TaggedPointer::TaggedPointer;
 
-    static FilterHandle Create(const std::string &name,
-                               const ParameterDictionary &parameters, const FileLoc *loc,
-                               Allocator alloc);
+    static Filter Create(const std::string &name, const ParameterDictionary &parameters,
+                         const FileLoc *loc, Allocator alloc);
 
     PBRT_CPU_GPU inline Vector2f Radius() const;
 

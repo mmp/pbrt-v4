@@ -26,19 +26,19 @@ struct ShapeSample;
 struct ShapeIntersection;
 struct ShapeSampleContext;
 
-// ShapeHandle Definition
-class ShapeHandle
+// Shape Definition
+class Shape
     : public TaggedPointer<Sphere, Cylinder, Disk, Triangle, BilinearPatch, Curve> {
   public:
     // Shape Interface
     using TaggedPointer::TaggedPointer;
 
-    static pstd::vector<ShapeHandle> Create(const std::string &name,
-                                            const Transform *renderFromObject,
-                                            const Transform *objectFromRender,
-                                            bool reverseOrientation,
-                                            const ParameterDictionary &parameters,
-                                            const FileLoc *loc, Allocator alloc);
+    static pstd::vector<Shape> Create(const std::string &name,
+                                      const Transform *renderFromObject,
+                                      const Transform *objectFromRender,
+                                      bool reverseOrientation,
+                                      const ParameterDictionary &parameters,
+                                      const FileLoc *loc, Allocator alloc);
     std::string ToString() const;
 
     PBRT_CPU_GPU inline Bounds3f Bounds() const;

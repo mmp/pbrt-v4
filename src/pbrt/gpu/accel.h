@@ -29,10 +29,10 @@ namespace pbrt {
 class GPUAccel {
   public:
     GPUAccel(const ParsedScene &scene, Allocator alloc, CUstream cudaStream,
-             const std::map<int, pstd::vector<LightHandle> *> &shapeIndexToAreaLights,
-             const std::map<std::string, MediumHandle> &media,
-             pstd::array<bool, MaterialHandle::NumTags()> *haveBasicEvalMaterial,
-             pstd::array<bool, MaterialHandle::NumTags()> *haveUniversalEvalMaterial,
+             const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
+             const std::map<std::string, Medium> &media,
+             pstd::array<bool, Material::NumTags()> *haveBasicEvalMaterial,
+             pstd::array<bool, Material::NumTags()> *haveUniversalEvalMaterial,
              bool *haveSubsurface);
 
     Bounds3f Bounds() const { return bounds; }
@@ -57,31 +57,31 @@ class GPUAccel {
     OptixTraversableHandle createGASForTriangles(
         const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
         const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
-        const std::map<std::string, FloatTextureHandle> &floatTextures,
-        const std::map<std::string, MaterialHandle> &namedMaterials,
-        const std::vector<MaterialHandle> &materials,
-        const std::map<std::string, MediumHandle> &media,
-        const std::map<int, pstd::vector<LightHandle> *> &shapeIndexToAreaLights,
+        const std::map<std::string, FloatTexture> &floatTextures,
+        const std::map<std::string, Material> &namedMaterials,
+        const std::vector<Material> &materials,
+        const std::map<std::string, Medium> &media,
+        const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
         Bounds3f *gasBounds);
 
     OptixTraversableHandle createGASForBLPs(
         const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
         const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
-        const std::map<std::string, FloatTextureHandle> &floatTextures,
-        const std::map<std::string, MaterialHandle> &namedMaterials,
-        const std::vector<MaterialHandle> &materials,
-        const std::map<std::string, MediumHandle> &media,
-        const std::map<int, pstd::vector<LightHandle> *> &shapeIndexToAreaLights,
+        const std::map<std::string, FloatTexture> &floatTextures,
+        const std::map<std::string, Material> &namedMaterials,
+        const std::vector<Material> &materials,
+        const std::map<std::string, Medium> &media,
+        const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
         Bounds3f *gasBounds);
 
     OptixTraversableHandle createGASForQuadrics(
         const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
         const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
-        const std::map<std::string, FloatTextureHandle> &floatTextures,
-        const std::map<std::string, MaterialHandle> &namedMaterials,
-        const std::vector<MaterialHandle> &materials,
-        const std::map<std::string, MediumHandle> &media,
-        const std::map<int, pstd::vector<LightHandle> *> &shapeIndexToAreaLights,
+        const std::map<std::string, FloatTexture> &floatTextures,
+        const std::map<std::string, Material> &namedMaterials,
+        const std::vector<Material> &materials,
+        const std::map<std::string, Medium> &media,
+        const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
         Bounds3f *gasBounds);
 
     OptixTraversableHandle buildBVH(const std::vector<OptixBuildInput> &buildInputs);

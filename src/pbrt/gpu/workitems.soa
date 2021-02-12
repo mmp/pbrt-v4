@@ -5,9 +5,9 @@
 
 flat Float;
 flat HGPhaseFunction;
-flat LightHandle;
-flat MaterialHandle;
-flat MediumHandle;
+flat Light;
+flat Material;
+flat Medium;
 flat int;
 
 soa BSDF;
@@ -59,7 +59,7 @@ soa EscapedRayWorkItem {
 };
 
 soa HitAreaLightWorkItem {
-    LightHandle areaLight;
+    Light areaLight;
     SampledWavelengths lambda;
     SampledSpectrum T_hat, uniPathPDF, lightPathPDF;
     Point3f p;
@@ -80,7 +80,7 @@ soa ShadowRayWorkItem {
 };
 
 soa GetBSSRDFAndProbeRayWorkItem {
-    MaterialHandle material;
+    Material material;
     SampledWavelengths lambda;
     SampledSpectrum T_hat, uniPathPDF;
     Point3f p;
@@ -96,7 +96,7 @@ soa GetBSSRDFAndProbeRayWorkItem {
 soa SubsurfaceScatterWorkItem {
     // Via eval/sample SSS kernel
     Point3f p0, p1;
-    MaterialHandle material;
+    Material material;
     TabulatedBSSRDF bssrdf;
     SampledWavelengths lambda;
     SampledSpectrum T_hat, uniPathPDF;
@@ -118,14 +118,14 @@ soa MediumSampleWorkItem {
     SampledSpectrum uniPathPDF;
     SampledSpectrum lightPathPDF;
     int pixelIndex;
-    LightHandle areaLight;
+    Light areaLight;
     Point3fi pi;
     Normal3f n;
     Vector3f wo;
     Point2f uv;
     LightSampleContext prevIntrCtx;
     int isSpecularBounce;
-    MaterialHandle material;
+    Material material;
     Normal3f ns;
     Vector3f dpdus;
     Vector3f dpdvs;
@@ -143,7 +143,7 @@ soa MediumScatterWorkItem {
     HGPhaseFunction phase;
     Vector3f wo;
     Float etaScale;
-    MediumHandle medium;
+    Medium medium;
     int pixelIndex;
 };
 

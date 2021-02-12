@@ -19,10 +19,10 @@ struct BSSRDFProbeSegment;
 struct SubsurfaceInteraction;
 struct BSSRDFTable;
 
-// BSSRDFHandle Definition
+// BSSRDF Definition
 class TabulatedBSSRDF;
 
-class BSSRDFHandle : public TaggedPointer<TabulatedBSSRDF> {
+class BSSRDF : public TaggedPointer<TabulatedBSSRDF> {
   public:
     // BSSRDF Interface
     using TaggedPointer::TaggedPointer;

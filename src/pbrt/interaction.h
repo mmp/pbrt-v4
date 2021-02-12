@@ -54,10 +54,10 @@ class Interaction {
 
     // used by medium ctor
     PBRT_CPU_GPU
-    Interaction(Point3f p, Vector3f wo, Float time, MediumHandle medium)
+    Interaction(Point3f p, Vector3f wo, Float time, Medium medium)
         : pi(p), time(time), wo(wo), medium(medium) {}
     PBRT_CPU_GPU
-    Interaction(Point3f p, Normal3f n, Float time, MediumHandle medium)
+    Interaction(Point3f p, Normal3f n, Float time, Medium medium)
         : pi(p), n(n), time(time), medium(medium) {}
     PBRT_CPU_GPU
     Interaction(const Point3fi &pi, Normal3f n, Float time = 0, Point2f uv = {})
@@ -65,7 +65,7 @@ class Interaction {
     PBRT_CPU_GPU
     Interaction(const Point3fi &pi, Normal3f n, Point2f uv) : pi(pi), n(n), uv(uv) {}
     PBRT_CPU_GPU
-    Interaction(Point3f p, Float time, MediumHandle medium)
+    Interaction(Point3f p, Float time, Medium medium)
         : pi(p), time(time), medium(medium) {}
     PBRT_CPU_GPU
     Interaction(Point3f p, const MediumInterface *mediumInterface)
@@ -114,14 +114,14 @@ class Interaction {
     }
 
     PBRT_CPU_GPU
-    MediumHandle GetMedium(const Vector3f &w) const {
+    Medium GetMedium(const Vector3f &w) const {
         if (mediumInterface != nullptr)
             return Dot(w, n) > 0 ? mediumInterface->outside : mediumInterface->inside;
         return medium;
     }
 
     PBRT_CPU_GPU
-    MediumHandle GetMedium() const {
+    Medium GetMedium() const {
         if (mediumInterface)
             DCHECK_EQ(mediumInterface->inside, mediumInterface->outside);
         return mediumInterface ? mediumInterface->inside : medium;
@@ -134,7 +134,7 @@ class Interaction {
     Normal3f n;
     Point2f uv;
     const MediumInterface *mediumInterface = nullptr;
-    MediumHandle medium = nullptr;
+    Medium medium = nullptr;
 };
 
 // MediumInteraction Definition
@@ -146,7 +146,7 @@ class MediumInteraction : public Interaction {
     PBRT_CPU_GPU
     MediumInteraction(Point3f p, Vector3f wo, Float time, SampledSpectrum sigma_a,
                       SampledSpectrum sigma_s, SampledSpectrum sigma_maj,
-                      SampledSpectrum Le, MediumHandle medium, PhaseFunctionHandle phase)
+                      SampledSpectrum Le, Medium medium, PhaseFunction phase)
         : Interaction(p, wo, time, medium),
           phase(phase),
           sigma_a(sigma_a),
@@ -165,7 +165,7 @@ class MediumInteraction : public Interaction {
     std::string ToString() const;
 
     // MediumInteraction Public Members
-    PhaseFunctionHandle phase;
+    PhaseFunction phase;
     SampledSpectrum sigma_a, sigma_s, sigma_maj, Le;
 };
 
@@ -230,9 +230,9 @@ class SurfaceInteraction : public Interaction {
 
     std::string ToString() const;
 
-    void SetIntersectionProperties(MaterialHandle mtl, LightHandle area,
+    void SetIntersectionProperties(Material mtl, Light area,
                                    const MediumInterface *primMediumInterface,
-                                   MediumHandle rayMedium) {
+                                   Medium rayMedium) {
         material = mtl;
         areaLight = area;
         CHECK_GE(Dot(n, shading.n), 0.);
@@ -244,7 +244,7 @@ class SurfaceInteraction : public Interaction {
     }
 
     PBRT_CPU_GPU
-    void ComputeDifferentials(const RayDifferential &r, CameraHandle camera,
+    void ComputeDifferentials(const RayDifferential &r, Camera camera,
                               int samplesPerPixel);
 
     PBRT_CPU_GPU
@@ -256,12 +256,11 @@ class SurfaceInteraction : public Interaction {
                              int /*BxDFFlags*/ flags, Float eta) const;
 
     PBRT_CPU_GPU
-    BSDF GetBSDF(const RayDifferential &ray, SampledWavelengths &lambda,
-                 CameraHandle camera, ScratchBuffer &scratchBuffer,
-                 SamplerHandle sampler);
+    BSDF GetBSDF(const RayDifferential &ray, SampledWavelengths &lambda, Camera camera,
+                 ScratchBuffer &scratchBuffer, Sampler sampler);
     PBRT_CPU_GPU
-    BSSRDFHandle GetBSSRDF(const RayDifferential &ray, SampledWavelengths &lambda,
-                           CameraHandle camera, ScratchBuffer &scratchBuffer);
+    BSSRDF GetBSSRDF(const RayDifferential &ray, SampledWavelengths &lambda,
+                     Camera camera, ScratchBuffer &scratchBuffer);
 
     PBRT_CPU_GPU
     SampledSpectrum Le(Vector3f w, const SampledWavelengths &lambda) const;
@@ -275,8 +274,8 @@ class SurfaceInteraction : public Interaction {
         Normal3f dndu, dndv;
     } shading;
     int faceIndex = 0;
-    MaterialHandle material;
-    LightHandle areaLight;
+    Material material;
+    Light areaLight;
     Vector3f dpdx, dpdy;
     Float dudx = 0, dvdx = 0, dudy = 0, dvdy = 0;
 };

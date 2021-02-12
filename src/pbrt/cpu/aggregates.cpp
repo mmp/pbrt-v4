@@ -138,7 +138,7 @@ struct alignas(32) LinearBVHNode {
 };
 
 // BVHAggregate Method Definitions
-BVHAggregate::BVHAggregate(std::vector<PrimitiveHandle> prims, int maxPrimsInNode,
+BVHAggregate::BVHAggregate(std::vector<Primitive> prims, int maxPrimsInNode,
                            SplitMethod splitMethod)
     : maxPrimsInNode(std::min(255, maxPrimsInNode)),
       primitives(std::move(prims)),
@@ -160,7 +160,7 @@ BVHAggregate::BVHAggregate(std::vector<PrimitiveHandle> prims, int maxPrimsInNod
     for (size_t i = 0; i < nThreads; ++i)
         threadAllocators.push_back(Allocator(&threadResources[i]));
 
-    std::vector<PrimitiveHandle> orderedPrims(primitives.size());
+    std::vector<Primitive> orderedPrims(primitives.size());
     BVHBuildNode *root;
     // Build BVH according to selected _splitMethod_
     std::atomic<int> totalNodes{0};
@@ -193,7 +193,7 @@ BVHBuildNode *BVHAggregate::buildRecursive(std::vector<Allocator> &threadAllocat
                                            int start, int end,
                                            std::atomic<int> *totalNodes,
                                            std::atomic<int> *orderedPrimsOffset,
-                                           std::vector<PrimitiveHandle> &orderedPrims) {
+                                           std::vector<Primitive> &orderedPrims) {
     DCHECK_NE(start, end);
     Allocator alloc = threadAllocators[ThreadIndex];
     BVHBuildNode *node = alloc.new_object<BVHBuildNode>();
@@ -397,7 +397,7 @@ BVHBuildNode *BVHAggregate::buildRecursive(std::vector<Allocator> &threadAllocat
 BVHBuildNode *BVHAggregate::buildHLBVH(Allocator alloc,
                                        const std::vector<BVHPrimitive> &bvhPrimitives,
                                        std::atomic<int> *totalNodes,
-                                       std::vector<PrimitiveHandle> &orderedPrims) {
+                                       std::vector<Primitive> &orderedPrims) {
     // Compute bounding box of all primitive centroids
     Bounds3f bounds;
     for (const BVHPrimitive &pi : bvhPrimitives)
@@ -460,7 +460,7 @@ BVHBuildNode *BVHAggregate::emitLBVH(BVHBuildNode *&buildNodes,
                                      const std::vector<BVHPrimitive> &bvhPrimitives,
                                      MortonPrimitive *mortonPrims, int nPrimitives,
                                      int *totalNodes,
-                                     std::vector<PrimitiveHandle> &orderedPrims,
+                                     std::vector<Primitive> &orderedPrims,
                                      std::atomic<int> *orderedPrimsOffset, int bitIndex) {
     CHECK_GT(nPrimitives, 0);
     if (bitIndex == -1 || nPrimitives < maxPrimsInNode) {
@@ -730,7 +730,7 @@ BVHBuildNode *BVHAggregate::buildUpperSAH(Allocator alloc,
     return node;
 }
 
-BVHAggregate *BVHAggregate::Create(std::vector<PrimitiveHandle> prims,
+BVHAggregate *BVHAggregate::Create(std::vector<Primitive> prims,
                                    const ParameterDictionary &parameters) {
     std::string splitMethodName = parameters.GetOneString("splitmethod", "sah");
     BVHAggregate::SplitMethod splitMethod;
@@ -808,7 +808,7 @@ struct BoundEdge {
 STAT_PIXEL_COUNTER("Kd-Tree/Nodes visited", kdNodesVisited);
 
 // KdTreeAggregate Method Definitions
-KdTreeAggregate::KdTreeAggregate(std::vector<PrimitiveHandle> p, int isectCost,
+KdTreeAggregate::KdTreeAggregate(std::vector<Primitive> p, int isectCost,
                                  int traversalCost, Float emptyBonus, int maxPrims,
                                  int maxDepth)
     : isectCost(isectCost),
@@ -823,7 +823,7 @@ KdTreeAggregate::KdTreeAggregate(std::vector<PrimitiveHandle> p, int isectCost,
     // Compute bounds for kd-tree construction
     std::vector<Bounds3f> primBounds;
     primBounds.reserve(primitives.size());
-    for (PrimitiveHandle &prim : primitives) {
+    for (Primitive &prim : primitives) {
         Bounds3f b = prim.Bounds();
         bounds = Union(bounds, b);
         primBounds.push_back(b);
@@ -1044,7 +1044,7 @@ pstd::optional<ShapeIntersection> KdTreeAggregate::Intersect(const Ray &ray,
             // Check for intersections inside leaf node
             int nPrimitives = node->nPrimitives();
             if (nPrimitives == 1) {
-                const PrimitiveHandle &p = primitives[node->onePrimitive];
+                const Primitive &p = primitives[node->onePrimitive];
                 // Check one primitive inside leaf node
                 pstd::optional<ShapeIntersection> primSi = p.Intersect(ray, rayTMax);
                 if (primSi) {
@@ -1055,7 +1055,7 @@ pstd::optional<ShapeIntersection> KdTreeAggregate::Intersect(const Ray &ray,
             } else {
                 for (int i = 0; i < nPrimitives; ++i) {
                     int index = primitiveIndices[node->primitiveIndicesOffset + i];
-                    const PrimitiveHandle &p = primitives[index];
+                    const Primitive &p = primitives[index];
                     // Check one primitive inside leaf node
                     pstd::optional<ShapeIntersection> primSi = p.Intersect(ray, rayTMax);
                     if (primSi) {
@@ -1098,7 +1098,7 @@ bool KdTreeAggregate::IntersectP(const Ray &ray, Float raytMax) const {
             // Check for shadow ray intersections inside leaf node
             int nPrimitives = node->nPrimitives();
             if (nPrimitives == 1) {
-                const PrimitiveHandle &p = primitives[node->onePrimitive];
+                const Primitive &p = primitives[node->onePrimitive];
                 if (p.IntersectP(ray, raytMax)) {
                     kdNodesVisited += nodesVisited;
                     return true;
@@ -1107,7 +1107,7 @@ bool KdTreeAggregate::IntersectP(const Ray &ray, Float raytMax) const {
                 for (int i = 0; i < nPrimitives; ++i) {
                     int primitiveIndex =
                         primitiveIndices[node->primitiveIndicesOffset + i];
-                    const PrimitiveHandle &prim = primitives[primitiveIndex];
+                    const Primitive &prim = primitives[primitiveIndex];
                     if (prim.IntersectP(ray, raytMax)) {
                         kdNodesVisited += nodesVisited;
                         return true;
@@ -1162,7 +1162,7 @@ bool KdTreeAggregate::IntersectP(const Ray &ray, Float raytMax) const {
     return false;
 }
 
-KdTreeAggregate *KdTreeAggregate::Create(std::vector<PrimitiveHandle> prims,
+KdTreeAggregate *KdTreeAggregate::Create(std::vector<Primitive> prims,
                                          const ParameterDictionary &parameters) {
     int isectCost = parameters.GetOneInt("intersectcost", 5);
     int travCost = parameters.GetOneInt("traversalcost", 1);
@@ -1173,10 +1173,9 @@ KdTreeAggregate *KdTreeAggregate::Create(std::vector<PrimitiveHandle> prims,
                                maxPrims, maxDepth);
 }
 
-PrimitiveHandle CreateAccelerator(const std::string &name,
-                                  std::vector<PrimitiveHandle> prims,
-                                  const ParameterDictionary &parameters) {
-    PrimitiveHandle accel = nullptr;
+Primitive CreateAccelerator(const std::string &name, std::vector<Primitive> prims,
+                            const ParameterDictionary &parameters) {
+    Primitive accel = nullptr;
     if (name == "bvh")
         accel = BVHAggregate::Create(std::move(prims), parameters);
     else if (name == "kdtree")
