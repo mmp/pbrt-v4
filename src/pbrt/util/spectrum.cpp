@@ -122,8 +122,7 @@ pstd::optional<Spectrum> PiecewiseLinearSpectrum::Read(const std::string &fn,
             lambda.push_back(vals[2 * i]);
             v.push_back(vals[2 * i + 1]);
         }
-        Spectrum handle = alloc.new_object<PiecewiseLinearSpectrum>(lambda, v, alloc);
-        return handle;
+        return Spectrum(alloc.new_object<PiecewiseLinearSpectrum>(lambda, v, alloc));
     }
 }
 

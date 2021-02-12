@@ -121,10 +121,10 @@ void CPURender(ParsedScene &parsedScene) {
         [&](const std::vector<ShapeSceneEntity> &shapes) -> std::vector<Primitive> {
         // Parallelize Shape::Create calls, which will in turn
         // parallelize PLY file loading, etc...
-        pstd::vector<pstd::vector<Shape>> shapeHandleVectors(shapes.size());
+        pstd::vector<pstd::vector<Shape>> shapeVectors(shapes.size());
         ParallelFor(0, shapes.size(), [&](int64_t i) {
             const auto &sh = shapes[i];
-            shapeHandleVectors[i] =
+            shapeVectors[i] =
                 Shape::Create(sh.name, sh.renderFromObject, sh.objectFromRender,
                               sh.reverseOrientation, sh.parameters, &sh.loc, alloc);
         });
@@ -132,7 +132,7 @@ void CPURender(ParsedScene &parsedScene) {
         std::vector<Primitive> primitives;
         for (size_t i = 0; i < shapes.size(); ++i) {
             const auto &sh = shapes[i];
-            pstd::vector<Shape> &shapes = shapeHandleVectors[i];
+            pstd::vector<Shape> &shapes = shapeVectors[i];
             if (shapes.empty())
                 continue;
 
@@ -155,25 +155,24 @@ void CPURender(ParsedScene &parsedScene) {
 
             for (auto &s : shapes) {
                 // Possibly create area light for shape
-                Light areaHandle = nullptr;
+                Light area = nullptr;
                 if (sh.lightIndex != -1) {
                     CHECK_LT(sh.lightIndex, parsedScene.areaLights.size());
                     const auto &areaLightEntity = parsedScene.areaLights[sh.lightIndex];
 
-                    Light area = Light::CreateArea(
+                    area = Light::CreateArea(
                         areaLightEntity.name, areaLightEntity.parameters,
                         *sh.renderFromObject, mi, s, &areaLightEntity.loc, Allocator{});
-                    areaHandle = area;
                     if (area) {
                         std::lock_guard<std::mutex> lock(lightsMutex);
                         lights.push_back(area);
                     }
                 }
-                if (areaHandle == nullptr && !mi.IsMediumTransition() && !alphaTex)
+                if (area == nullptr && !mi.IsMediumTransition() && !alphaTex)
                     primitives.push_back(new SimplePrimitive(s, mtl));
                 else
                     primitives.push_back(
-                        new GeometricPrimitive(s, mtl, areaHandle, mi, alphaTex));
+                        new GeometricPrimitive(s, mtl, area, mi, alphaTex));
             }
         }
         return primitives;
@@ -217,7 +216,7 @@ void CPURender(ParsedScene &parsedScene) {
             std::vector<Primitive> prims;
             for (auto &s : shapes) {
                 // Possibly create area light for shape
-                Light areaHandle = nullptr;
+                Light area = nullptr;
                 if (sh.lightIndex != -1) {
                     CHECK_LT(sh.lightIndex, parsedScene.areaLights.size());
                     const auto &areaLightEntity = parsedScene.areaLights[sh.lightIndex];
@@ -226,18 +225,16 @@ void CPURender(ParsedScene &parsedScene) {
                     if (sh.renderFromObject.IsAnimated())
                         ErrorExit(&sh.loc, "Animated area lights are not supported.");
 
-                    Light area = Light::CreateArea(
+                    area = Light::CreateArea(
                         areaLightEntity.name, areaLightEntity.parameters,
                         sh.renderFromObject.startTransform, mi, s, &sh.loc, Allocator{});
-                    areaHandle = area;
                     if (area)
                         lights.push_back(area);
                 }
-                if (areaHandle == nullptr && !mi.IsMediumTransition() && !alphaTex)
+                if (area == nullptr && !mi.IsMediumTransition() && !alphaTex)
                     prims.push_back(new SimplePrimitive(s, mtl));
                 else
-                    prims.push_back(
-                        new GeometricPrimitive(s, mtl, areaHandle, mi, alphaTex));
+                    prims.push_back(new GeometricPrimitive(s, mtl, area, mi, alphaTex));
             }
 
             // TODO: could try to be greedy or even segment them according

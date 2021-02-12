@@ -146,12 +146,12 @@ static FloatTexture getAlphaTexture(
     const ShapeSceneEntity &shape,
     const std::map<std::string, FloatTexture> &floatTextures,
     Allocator alloc) {
-    FloatTexture alphaTextureHandle;
+    FloatTexture alphaTexture;
 
     std::string alphaTexName = shape.parameters.GetTexture("alpha");
     if (alphaTexName.empty()) {
         if (Float alpha = shape.parameters.GetOneFloat("alpha", 1.f); alpha < 1.f)
-            alphaTextureHandle = alloc.new_object<FloatConstantTexture>(alpha);
+            alphaTexture = alloc.new_object<FloatConstantTexture>(alpha);
         else
             return nullptr;
     } else {
@@ -159,28 +159,28 @@ static FloatTexture getAlphaTexture(
         if (iter == floatTextures.end())
             ErrorExit(&shape.loc, "%s: alpha texture not defined.", alphaTexName);
 
-        alphaTextureHandle = iter->second;
+        alphaTexture = iter->second;
     }
 
-    if (!BasicTextureEvaluator().CanEvaluate({alphaTextureHandle}, {})) {
+    if (!BasicTextureEvaluator().CanEvaluate({alphaTexture}, {})) {
         // It would be nice to just use the UniversalTextureEvaluator (maybe
         // always), but optix complains "Error: Found call graph recursion"...
         Warning(&shape.loc,
                 "%s: alpha texture too complex for BasicTextureEvaluator "
                 "(need fallback path). Ignoring for now.",
                 alphaTexName);
-        alphaTextureHandle = nullptr;
+        alphaTexture = nullptr;
     }
 
-    return alphaTextureHandle;
+    return alphaTexture;
 }
 
-static int getOptixGeometryFlags(bool isTriangle, FloatTexture alphaTextureHandle,
-                                 Material materialHandle) {
-    if (materialHandle && materialHandle.HasSubsurfaceScattering())
+static int getOptixGeometryFlags(bool isTriangle, FloatTexture alphaTexture,
+                                 Material material) {
+    if (material && material.HasSubsurfaceScattering())
         return OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL;
-    else if ((alphaTextureHandle && isTriangle) ||
-             (materialHandle && materialHandle.IsTransparent()))
+    else if ((alphaTexture && isTriangle) ||
+             (material && material.IsTransparent()))
         // Need anyhit
         return OPTIX_GEOMETRY_FLAG_NONE;
     else
@@ -312,8 +312,8 @@ OptixTraversableHandle GPUAccel::createGASForTriangles(
 
         const auto &shape = shapes[shapeIndex];
 
-        FloatTexture alphaTextureHandle = getAlphaTexture(shape, floatTextures, alloc);
-        Material materialHandle = getMaterial(shape, namedMaterials, materials);
+        FloatTexture alphaTexture = getAlphaTexture(shape, floatTextures, alloc);
+        Material material = getMaterial(shape, namedMaterials, materials);
 
         OptixBuildInput input = {};
 
@@ -331,7 +331,7 @@ OptixTraversableHandle GPUAccel::createGASForTriangles(
         input.triangleArray.indexBuffer = CUdeviceptr(mesh->vertexIndices);
 
         triangleInputFlags[buildIndex] =
-            getOptixGeometryFlags(true, alphaTextureHandle, materialHandle);
+            getOptixGeometryFlags(true, alphaTexture, material);
         input.triangleArray.flags = &triangleInputFlags[buildIndex];
 
         input.triangleArray.numSbtRecords = 1;
@@ -344,8 +344,8 @@ OptixTraversableHandle GPUAccel::createGASForTriangles(
         HitgroupRecord hgRecord;
         OPTIX_CHECK(optixSbtRecordPackHeader(intersectPG, &hgRecord));
         hgRecord.triRec.mesh = mesh;
-        hgRecord.triRec.material = materialHandle;
-        hgRecord.triRec.alphaTexture = alphaTextureHandle;
+        hgRecord.triRec.material = material;
+        hgRecord.triRec.alphaTexture = alphaTexture;
         hgRecord.triRec.areaLights = {};
         if (shape.lightIndex != -1) {
             // Note: this will hit if we try to have an instance as an area
@@ -417,16 +417,16 @@ OptixTraversableHandle GPUAccel::createGASForBLPs(
 
         *gasBounds = Union(*gasBounds, shapeBounds);
 
-        Material materialHandle = getMaterial(shape, namedMaterials, materials);
-        FloatTexture alphaTextureHandle = getAlphaTexture(shape, floatTextures, alloc);
+        Material material = getMaterial(shape, namedMaterials, materials);
+        FloatTexture alphaTexture = getAlphaTexture(shape, floatTextures, alloc);
 
-        flags.push_back(getOptixGeometryFlags(false, alphaTextureHandle, materialHandle));
+        flags.push_back(getOptixGeometryFlags(false, alphaTexture, material));
 
         HitgroupRecord hgRecord;
         OPTIX_CHECK(optixSbtRecordPackHeader(intersectPG, &hgRecord));
         hgRecord.bilinearRec.mesh = mesh;
-        hgRecord.bilinearRec.material = materialHandle;
-        hgRecord.bilinearRec.alphaTexture = alphaTextureHandle;
+        hgRecord.bilinearRec.material = material;
+        hgRecord.bilinearRec.alphaTexture = alphaTexture;
         hgRecord.bilinearRec.areaLights = {};
         if (shape.lightIndex != -1) {
             auto iter = shapeIndexToAreaLights.find(shapeIndex);
@@ -477,17 +477,17 @@ OptixTraversableHandle GPUAccel::createGASForQuadrics(
     std::vector<unsigned int> flags;
 
     for (size_t shapeIndex = 0; shapeIndex < shapes.size(); ++shapeIndex) {
-        const auto &shape = shapes[shapeIndex];
-        if (shape.name != "sphere" && shape.name != "cylinder" && shape.name != "disk")
+        const auto &s = shapes[shapeIndex];
+        if (s.name != "sphere" && s.name != "cylinder" && s.name != "disk")
             continue;
 
-        pstd::vector<Shape> shapeHandles = Shape::Create(
-            shape.name, shape.renderFromObject, shape.objectFromRender,
-            shape.reverseOrientation, shape.parameters, &shape.loc, alloc);
-        if (shapeHandles.empty())
+        pstd::vector<Shape> shapes = Shape::Create(
+            s.name, s.renderFromObject, s.objectFromRender,
+            s.reverseOrientation, s.parameters, &s.loc, alloc);
+        if (shapes.empty())
             continue;
-        CHECK_EQ(1, shapeHandles.size());
-        Shape shapeHandle = shapeHandles[0];
+        CHECK_EQ(1, shapes.size());
+        Shape shape = shapes[0];
 
         OptixBuildInput buildInput = {};
         memset(&buildInput, 0, sizeof(buildInput));
@@ -499,7 +499,7 @@ OptixTraversableHandle GPUAccel::createGASForQuadrics(
 
         buildInputs.push_back(buildInput);
 
-        Bounds3f shapeBounds = shapeHandle.Bounds();
+        Bounds3f shapeBounds = shape.Bounds();
         OptixAabb aabb = {shapeBounds.pMin.x, shapeBounds.pMin.y, shapeBounds.pMin.z,
                           shapeBounds.pMax.x, shapeBounds.pMax.y, shapeBounds.pMax.z};
         shapeAABBs.push_back(aabb);
@@ -507,17 +507,17 @@ OptixTraversableHandle GPUAccel::createGASForQuadrics(
         *gasBounds = Union(*gasBounds, shapeBounds);
 
         // Find alpha texture, if present.
-        Material materialHandle = getMaterial(shape, namedMaterials, materials);
-        FloatTexture alphaTextureHandle = getAlphaTexture(shape, floatTextures, alloc);
-        flags.push_back(getOptixGeometryFlags(false, alphaTextureHandle, materialHandle));
+        Material material = getMaterial(s, namedMaterials, materials);
+        FloatTexture alphaTexture = getAlphaTexture(s, floatTextures, alloc);
+        flags.push_back(getOptixGeometryFlags(false, alphaTexture, material));
 
         HitgroupRecord hgRecord;
         OPTIX_CHECK(optixSbtRecordPackHeader(intersectPG, &hgRecord));
-        hgRecord.quadricRec.shape = shapeHandle;
-        hgRecord.quadricRec.material = materialHandle;
-        hgRecord.quadricRec.alphaTexture = alphaTextureHandle;
+        hgRecord.quadricRec.shape = shape;
+        hgRecord.quadricRec.material = material;
+        hgRecord.quadricRec.alphaTexture = alphaTexture;
         hgRecord.quadricRec.areaLight = nullptr;
-        if (shape.lightIndex != -1) {
+        if (s.lightIndex != -1) {
             auto iter = shapeIndexToAreaLights.find(shapeIndex);
             // Note: this will hit if we try to have an instance as an area
             // light.
@@ -525,7 +525,7 @@ OptixTraversableHandle GPUAccel::createGASForQuadrics(
             CHECK_EQ(iter->second->size(), 1);
             hgRecord.quadricRec.areaLight = (*iter->second)[0];
         }
-        hgRecord.quadricRec.mediumInterface = getMediumInterface(shape, media, alloc);
+        hgRecord.quadricRec.mediumInterface = getMediumInterface(s, media, alloc);
 
         intersectHGRecords.push_back(hgRecord);
 

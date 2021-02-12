@@ -124,18 +124,18 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
         const auto &areaLightEntity = scene.areaLights[shape.lightIndex];
         AnimatedTransform renderFromLight(*shape.renderFromObject);
 
-        pstd::vector<Shape> shapeHandles =
+        pstd::vector<Shape> shapes =
             Shape::Create(shape.name, shape.renderFromObject, shape.objectFromRender,
                           shape.reverseOrientation, shape.parameters, &shape.loc, alloc);
 
-        if (shapeHandles.empty())
+        if (shapes.empty())
             continue;
 
         Medium outsideMedium = findMedium(shape.outsideMedium, &shape.loc);
 
         pstd::vector<Light> *lightsForShape =
             alloc.new_object<pstd::vector<Light>>(alloc);
-        for (Shape sh : shapeHandles) {
+        for (Shape sh : shapes) {
             if (renderFromLight.IsAnimated())
                 ErrorExit(&shape.loc, "Animated lights are not supported.");
             DiffuseAreaLight *area = DiffuseAreaLight::Create(

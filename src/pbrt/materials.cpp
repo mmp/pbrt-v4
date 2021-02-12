@@ -538,19 +538,19 @@ Material Material::Create(const std::string &name,
     else if (name == "subsurface")
         material = SubsurfaceMaterial::Create(parameters, normalMap, loc, alloc);
     else if (name == "mix") {
-        std::vector<std::string> materials = parameters.GetStringArray("materials");
-        if (materials.size() != 2)
+        std::vector<std::string> materialNames = parameters.GetStringArray("materials");
+        if (materialNames.size() != 2)
             ErrorExit(
                 "Must provide two values for \"string materials\" for mix material.");
 
-        Material materialHandles[2];
+        Material materials[2];
         for (int i = 0; i < 2; ++i) {
-            auto iter = namedMaterials.find(materials[i]);
+            auto iter = namedMaterials.find(materialNames[i]);
             if (iter == namedMaterials.end())
-                ErrorExit("%s: named material not found.", materials[i]);
-            materialHandles[i] = iter->second;
+                ErrorExit("%s: named material not found.", materialNames[i]);
+            materials[i] = iter->second;
         }
-        material = MixMaterial::Create(materialHandles, parameters, loc, alloc);
+        material = MixMaterial::Create(materials, parameters, loc, alloc);
     } else
         ErrorExit(loc, "%s: material type unknown.", name);
 

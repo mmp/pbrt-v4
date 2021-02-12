@@ -24,7 +24,7 @@ namespace pbrt {
 // LightHash Definition
 struct LightHash {
     PBRT_CPU_GPU
-    size_t operator()(Light lightHandle) const { return Hash(lightHandle.ptr()); }
+    size_t operator()(Light light) const { return Hash(light.ptr()); }
 };
 
 // UniformLightSampler Definition
