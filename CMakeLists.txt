@@ -193,9 +193,15 @@ if (CMAKE_CUDA_COMPILER)
             # Get CUDA compute capability
             set (CHECK_CUDA_OUTPUT_EXE ${CMAKE_BINARY_DIR}/checkcuda)
             if (MSVC)
-                execute_process (COMMAND nvcc -lcuda ${CMAKE_SOURCE_DIR}/cmake/checkcuda.cu -ccbin ${CMAKE_CXX_COMPILER} -o ${CHECK_CUDA_OUTPUT_EXE})
+                execute_process (COMMAND ${CMAKE_CUDA_COMPILER} -lcuda ${CMAKE_SOURCE_DIR}/cmake/checkcuda.cu -ccbin ${CMAKE_CXX_COMPILER} -o ${CHECK_CUDA_OUTPUT_EXE}
+                                 RESULT_VARIABLE BUILD_CHECK_CUDA_RETURN_CODE)
             else  ()
-                execute_process (COMMAND nvcc -lcuda ${CMAKE_SOURCE_DIR}/cmake/checkcuda.cu -o ${CHECK_CUDA_OUTPUT_EXE})
+                execute_process (COMMAND ${CMAKE_CUDA_COMPILER} -lcuda ${CMAKE_SOURCE_DIR}/cmake/checkcuda.cu -o ${CHECK_CUDA_OUTPUT_EXE}
+                                 RESULT_VARIABLE BUILD_CHECK_CUDA_RETURN_CODE)
+            endif ()
+
+            if (NOT ${BUILD_CHECK_CUDA_RETURN_CODE} EQUAL 0)
+                message (SEND_ERROR "Was unable to build checkcuda, consider manually setting PBRT_GPU_SHADER_MODEL")
             endif ()
 
             execute_process (COMMAND ${CHECK_CUDA_OUTPUT_EXE}
