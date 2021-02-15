@@ -230,17 +230,6 @@ PBRT_CPU_GPU inline Float BlueNoiseSample(Point2i p, int instance) {
     return ReverseBits32(sampleIndex) * 0x1p-32f;
 }
 
-// CranleyPattersonRotator Definition
-struct CranleyPattersonRotator {
-    PBRT_CPU_GPU
-    CranleyPattersonRotator(Float v) : delta(v * (1ull << 32)) {}
-    PBRT_CPU_GPU
-    CranleyPattersonRotator(uint32_t delta) : delta(delta) {}
-    PBRT_CPU_GPU
-    uint32_t operator()(uint32_t v) const { return v + delta; }
-    uint32_t delta;
-};
-
 // BinaryPermuteScrambler Definition
 struct BinaryPermuteScrambler {
     PBRT_CPU_GPU
@@ -269,7 +258,7 @@ struct OwenScrambler {
 };
 
 // RandomizeStrategy Definition
-enum class RandomizeStrategy { None, CranleyPatterson, PermuteDigits, FastOwen, Owen };
+enum class RandomizeStrategy { None, PermuteDigits, FastOwen, Owen };
 
 std::string ToString(RandomizeStrategy r);
 

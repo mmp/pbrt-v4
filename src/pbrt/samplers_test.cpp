@@ -23,20 +23,16 @@ TEST(Sampler, ConsistentValues) {
     samplers.push_back(new HaltonSampler(spp, resolution));
     samplers.push_back(new RandomSampler(spp));
     samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::None));
-    samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::CranleyPatterson));
     samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::PermuteDigits));
     samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::FastOwen));
     samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::Owen));
     samplers.push_back(new ZSobolSampler(spp, resolution, RandomizeStrategy::None));
-    samplers.push_back(new ZSobolSampler(spp, resolution, RandomizeStrategy::CranleyPatterson));
     samplers.push_back(new ZSobolSampler(spp, resolution, RandomizeStrategy::PermuteDigits));
     samplers.push_back(new ZSobolSampler(spp, resolution, RandomizeStrategy::FastOwen));
     samplers.push_back(new ZSobolSampler(spp, resolution, RandomizeStrategy::Owen));
     samplers.push_back(new PMJ02BNSampler(spp));
     samplers.push_back(new StratifiedSampler(rootSpp, rootSpp, true));
     samplers.push_back(new SobolSampler(spp, resolution, RandomizeStrategy::None));
-    samplers.push_back(
-        new SobolSampler(spp, resolution, RandomizeStrategy::CranleyPatterson));
     samplers.push_back(new SobolSampler(spp, resolution, RandomizeStrategy::PermuteDigits));
     samplers.push_back(new SobolSampler(spp, resolution, RandomizeStrategy::Owen));
     samplers.push_back(new SobolSampler(spp, resolution, RandomizeStrategy::FastOwen));

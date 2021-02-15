@@ -3454,15 +3454,6 @@ void FunctionIntegrator::Render() {
                         u = Point2f(RadicalInverse(0, sampleIndex),
                                     RadicalInverse(1, sampleIndex));
                         break;
-                    case RandomizeStrategy::CranleyPatterson:
-                        u = Point2f(RadicalInverse(0, sampleIndex),
-                                    RadicalInverse(1, sampleIndex)) +
-                            Vector2f(cpRot[0][pixelIndex], cpRot[1][pixelIndex]);
-                        if (u.x >= 1)
-                            u.x -= 1;
-                        if (u.y >= 1)
-                            u.y -= 1;
-                        break;
                     case RandomizeStrategy::PermuteDigits:
                         u = Point2f(
                             ScrambledRadicalInverse(0, sampleIndex,

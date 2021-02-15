@@ -119,13 +119,6 @@ class HaltonSampler {
         switch (randomize) {
         case RandomizeStrategy::None:
             return RadicalInverse(dimension, haltonIndex);
-        case RandomizeStrategy::CranleyPatterson: {
-            Float u = uint32_t(MixBits(1 + (uint64_t(dimension) << 32))) * 0x1p-32f;
-            Float s = RadicalInverse(dimension, haltonIndex) + u;
-            if (s >= 1)
-                s -= 1;
-            return s;
-        }
         case RandomizeStrategy::PermuteDigits:
             return ScrambledRadicalInverse(dimension, haltonIndex,
                                            (*digitPermutations)[dimension]);
@@ -185,12 +178,7 @@ class PaddedSobolSampler {
 
         int dim = dimension++;
         // Return randomized 1D van der Corput sample for dimension _dim_
-        if (randomize == RandomizeStrategy::CranleyPatterson)
-            // Return 1D sample randomized with Cranley-Patterson rotation
-            return SobolSample(index, 0, CranleyPattersonRotator(BlueNoise(dim, pixel)));
-
-        else
-            return SampleDimension(0, index, hash >> 32);
+        return SampleDimension(0, index, hash >> 32);
     }
 
     PBRT_CPU_GPU
@@ -203,15 +191,8 @@ class PaddedSobolSampler {
         int dim = dimension;
         dimension += 2;
         // Return randomized 2D Sobol' sample
-        if (randomize == RandomizeStrategy::CranleyPatterson) {
-            // Return 2D sample randomized with Cranley-Patterson rotation
-            return {SobolSample(index, 0, CranleyPattersonRotator(BlueNoise(dim, pixel))),
-                    SobolSample(index, 1,
-                                CranleyPattersonRotator(BlueNoise(dim + 1, pixel)))};
-
-        } else
-            return {SampleDimension(0, index, hash >> 8),
-                    SampleDimension(1, index, hash >> 32)};
+        return {SampleDimension(0, index, hash >> 8),
+                SampleDimension(1, index, hash >> 32)};
     }
 
     PBRT_CPU_GPU
@@ -295,8 +276,6 @@ class ZSobolSampler {
 
         if (randomize == RandomizeStrategy::None)
             return SobolSample(sampleIndex, 0, NoRandomizer());
-        else if (randomize == RandomizeStrategy::CranleyPatterson)
-            return SobolSample(sampleIndex, 0, CranleyPattersonRotator(sampleHash));
         else if (randomize == RandomizeStrategy::PermuteDigits)
             return SobolSample(sampleIndex, 0, BinaryPermuteScrambler(sampleHash));
         else if (randomize == RandomizeStrategy::FastOwen)
@@ -316,9 +295,6 @@ class ZSobolSampler {
         if (randomize == RandomizeStrategy::None)
             return {SobolSample(sampleIndex, 0, NoRandomizer()),
                     SobolSample(sampleIndex, 1, NoRandomizer())};
-        else if (randomize == RandomizeStrategy::CranleyPatterson)
-            return {SobolSample(sampleIndex, 0, CranleyPattersonRotator(sampleHash[0])),
-                    SobolSample(sampleIndex, 1, CranleyPattersonRotator(sampleHash[1]))};
         else if (randomize == RandomizeStrategy::PermuteDigits)
             return {SobolSample(sampleIndex, 0, BinaryPermuteScrambler(sampleHash[0])),
                     SobolSample(sampleIndex, 1, BinaryPermuteScrambler(sampleHash[1]))};
@@ -562,9 +538,7 @@ class SobolSampler {
 
         // Return randomized Sobol sample using _randomize_
         uint32_t hash = MixBits((uint64_t(dimension) << 32) ^ GetOptions().seed);
-        if (randomize == RandomizeStrategy::CranleyPatterson)
-            return SobolSample(sobolIndex, dimension, CranleyPattersonRotator(hash));
-        else if (randomize == RandomizeStrategy::PermuteDigits)
+        if (randomize == RandomizeStrategy::PermuteDigits)
             return SobolSample(sobolIndex, dimension, BinaryPermuteScrambler(hash));
         else if (randomize == RandomizeStrategy::FastOwen)
             return SobolSample(sobolIndex, dimension, FastOwenScrambler(hash));

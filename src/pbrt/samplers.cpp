@@ -84,8 +84,6 @@ HaltonSampler *HaltonSampler::Create(const ParameterDictionary &parameters,
     std::string s = parameters.GetOneString("randomization", "permutedigits");
     if (s == "none")
         randomizer = RandomizeStrategy::None;
-    else if (s == "cranleypatterson")
-        randomizer = RandomizeStrategy::CranleyPatterson;
     else if (s == "permutedigits")
         randomizer = RandomizeStrategy::PermuteDigits;
     else if (s == "fastowen")
@@ -136,12 +134,9 @@ PaddedSobolSampler *PaddedSobolSampler::Create(const ParameterDictionary &parame
         nsamp = 1;
 
     RandomizeStrategy randomizer;
-    std::string s = parameters.GetOneString("randomization",
-                                            nsamp <= 2 ? "cranleypatterson" : "fastowen");
+    std::string s = parameters.GetOneString("randomization", "fastowen");
     if (s == "none")
         randomizer = RandomizeStrategy::None;
-    else if (s == "cranleypatterson")
-        randomizer = RandomizeStrategy::CranleyPatterson;
     else if (s == "permutedigits")
         randomizer = RandomizeStrategy::PermuteDigits;
     else if (s == "fastowen")
@@ -187,8 +182,6 @@ ZSobolSampler *ZSobolSampler::Create(const ParameterDictionary &parameters,
     std::string s = parameters.GetOneString("randomization", "fastowen");
     if (s == "none")
         randomizer = RandomizeStrategy::None;
-    else if (s == "cranleypatterson")
-        randomizer = RandomizeStrategy::CranleyPatterson;
     else if (s == "permutedigits")
         randomizer = RandomizeStrategy::PermuteDigits;
     else if (s == "fastowen")
@@ -312,8 +305,6 @@ SobolSampler *SobolSampler::Create(const ParameterDictionary &parameters,
     std::string s = parameters.GetOneString("randomization", "fastowen");
     if (s == "none")
         randomizer = RandomizeStrategy::None;
-    else if (s == "cranleypatterson")
-        randomizer = RandomizeStrategy::CranleyPatterson;
     else if (s == "permutedigits")
         randomizer = RandomizeStrategy::PermuteDigits;
     else if (s == "fastowen")
