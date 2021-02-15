@@ -30,10 +30,9 @@ std::string Sampler::ToString() const {
 
 // HaltonSampler Method Definitions
 HaltonSampler::HaltonSampler(int samplesPerPixel, const Point2i &fullRes,
-                             RandomizeStrategy randomizeStrategy, int seed,
-                             Allocator alloc)
-    : samplesPerPixel(samplesPerPixel), randomizeStrategy(randomizeStrategy) {
-    if (randomizeStrategy == RandomizeStrategy::PermuteDigits)
+                             RandomizeStrategy randomize, int seed, Allocator alloc)
+    : samplesPerPixel(samplesPerPixel), randomize(randomize) {
+    if (randomize == RandomizeStrategy::PermuteDigits)
         digitPermutations = ComputeRadicalInversePermutations(seed, alloc);
     // Find radical inverse base scales and exponents that cover sampling area
     for (int i = 0; i < 2; ++i) {
@@ -63,10 +62,10 @@ std::vector<Sampler> HaltonSampler::Clone(int n, Allocator alloc) {
 }
 
 std::string HaltonSampler::ToString() const {
-    return StringPrintf("[ HaltonSampler randomizeStrategy: %s digitPermutations: %p "
+    return StringPrintf("[ HaltonSampler randomize: %s digitPermutations: %p "
                         "haltonIndex: %d dimension: %d samplesPerPixel: %d "
                         "baseScales: %s baseExponents: %s multInverse: [ %d %d ] ]",
-                        randomizeStrategy, digitPermutations, haltonIndex, dimension,
+                        randomize, digitPermutations, haltonIndex, dimension,
                         samplesPerPixel, baseScales, baseExponents, multInverse[0],
                         multInverse[1]);
 }
@@ -113,9 +112,8 @@ std::vector<Sampler> SobolSampler::Clone(int n, Allocator alloc) {
 
 std::string PaddedSobolSampler::ToString() const {
     return StringPrintf("[ PaddedSobolSampler pixel: %s sampleIndex: %d dimension: %d "
-                        "samplesPerPixel: %d randomizeStrategy: %s ]",
-                        pixel, sampleIndex, dimension, samplesPerPixel,
-                        randomizeStrategy);
+                        "samplesPerPixel: %d randomize: %s ]",
+                        pixel, sampleIndex, dimension, samplesPerPixel, randomize);
 }
 
 std::vector<Sampler> PaddedSobolSampler::Clone(int n, Allocator alloc) {
@@ -169,10 +167,10 @@ std::vector<Sampler> ZSobolSampler::Clone(int n, Allocator alloc) {
 }
 
 std::string ZSobolSampler::ToString() const {
-    return StringPrintf("[ ZSobolSampler randomizeStrategy: %s log2SamplesPerPixel: %d "
+    return StringPrintf("[ ZSobolSampler randomize: %s log2SamplesPerPixel: %d "
                         " seed: %d nBase4Digits: %d mortonIndex: %d dimension: %d ]",
-                        randomizeStrategy, log2SamplesPerPixel, seed, nBase4Digits,
-                        mortonIndex, dimension);
+                        randomize, log2SamplesPerPixel, seed, nBase4Digits, mortonIndex,
+                        dimension);
 }
 
 ZSobolSampler *ZSobolSampler::Create(const ParameterDictionary &parameters,
@@ -297,9 +295,8 @@ RandomSampler *RandomSampler::Create(const ParameterDictionary &parameters,
 std::string SobolSampler::ToString() const {
     return StringPrintf("[ SobolSampler pixel: %s dimension: %d "
                         "samplesPerPixel: %d scale: %d sobolIndex: %d "
-                        "randomizeStrategy: %s ]",
-                        pixel, dimension, samplesPerPixel, scale, sobolIndex,
-                        randomizeStrategy);
+                        "randomize: %s ]",
+                        pixel, dimension, samplesPerPixel, scale, sobolIndex, randomize);
 }
 
 SobolSampler *SobolSampler::Create(const ParameterDictionary &parameters,

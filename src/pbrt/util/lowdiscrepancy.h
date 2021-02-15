@@ -30,15 +30,15 @@ class DigitPermutation {
         CHECK_LT(base, 65536);  // uint16_t
         // Compute number of digits needed for _base_
         nDigits = 0;
-        Float invBase = (Float)1 / (Float)base, invBaseN = 1;
-        while (1 - invBaseN < 1) {
+        Float invBase = (Float)1 / (Float)base, invBaseM = 1;
+        while (1 - invBaseM < 1) {
             ++nDigits;
-            invBaseN *= invBase;
+            invBaseM *= invBase;
         }
 
         permutations = alloc.allocate_object<uint16_t>(nDigits * base);
+        // Compute random permutations for all digits
         for (int digitIndex = 0; digitIndex < nDigits; ++digitIndex) {
-            // Compute random permutation for _digitIndex_
             uint32_t digitSeed = MixBits(((base << 8) + digitIndex) ^ seed);
             for (int digitValue = 0; digitValue < base; ++digitValue) {
                 int index = digitIndex * base + digitValue;
@@ -97,8 +97,8 @@ PBRT_CPU_GPU inline Float RadicalInverse(int baseIndex, uint64_t a) {
     return std::min(reversedDigits * invBaseN, OneMinusEpsilon);
 }
 
-PBRT_CPU_GPU
-inline uint64_t InverseRadicalInverse(uint64_t inverse, int base, int nDigits) {
+PBRT_CPU_GPU inline uint64_t InverseRadicalInverse(uint64_t inverse, int base,
+                                                   int nDigits) {
     uint64_t index = 0;
     for (int i = 0; i < nDigits; ++i) {
         uint64_t digit = inverse % base;
@@ -111,38 +111,39 @@ inline uint64_t InverseRadicalInverse(uint64_t inverse, int base, int nDigits) {
 PBRT_CPU_GPU inline Float ScrambledRadicalInverse(int baseIndex, uint64_t a,
                                                   const DigitPermutation &perm) {
     int base = Primes[baseIndex];
-    Float invBase = (Float)1 / (Float)base, invBaseN = 1;
+    Float invBase = (Float)1 / (Float)base, invBaseM = 1;
     uint64_t reversedDigits = 0;
     int digitIndex = 0;
-    while (1 - invBaseN < 1) {
+    while (1 - invBaseM < 1) {
         // Permute least significant digit from _a_ and update _reversedDigits_
         uint64_t next = a / base;
         int digitValue = a - next * base;
         reversedDigits = reversedDigits * base + perm.Permute(digitIndex, digitValue);
-        invBaseN *= invBase;
+        invBaseM *= invBase;
         ++digitIndex;
         a = next;
     }
-    return std::min(invBaseN * reversedDigits, OneMinusEpsilon);
+    return std::min(invBaseM * reversedDigits, OneMinusEpsilon);
 }
 
 PBRT_CPU_GPU inline Float OwenScrambledRadicalInverse(int baseIndex, uint64_t a,
                                                       uint32_t hash) {
     int base = Primes[baseIndex];
-    Float invBase = (Float)1 / (Float)base, invBaseN = 1;
+    Float invBase = (Float)1 / (Float)base, invBaseM = 1;
     uint64_t reversedDigits = 0;
     int digitIndex = 0;
-    while (1 - invBaseN < 1) {
+    while (1 - invBaseM < 1) {
+        // Compute Owen-scrambled digit for _digitIndex_
         uint64_t next = a / base;
         int digitValue = a - next * base;
         uint32_t digitHash = MixBits(hash ^ reversedDigits);
         digitValue = PermutationElement(digitValue, base, digitHash);
         reversedDigits = reversedDigits * base + digitValue;
-        invBaseN *= invBase;
+        invBaseM *= invBase;
         ++digitIndex;
         a = next;
     }
-    return std::min(invBaseN * reversedDigits, OneMinusEpsilon);
+    return std::min(invBaseM * reversedDigits, OneMinusEpsilon);
 }
 
 PBRT_CPU_GPU inline uint32_t MultiplyGenerator(pstd::span<const uint32_t> C, uint32_t a) {
