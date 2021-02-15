@@ -7,11 +7,18 @@
 
 #include <pbrt/pbrt.h>
 
+#include <pbrt/util/check.h>
+
+#include <string.h>
+#include <cstdint>
+
 namespace pbrt {
 
 // https://github.com/explosion/murmurhash/blob/master/murmurhash/MurmurHash2.cpp
 PBRT_CPU_GPU
 inline uint64_t MurmurHash64A(const void *key, int len, uint64_t seed) {
+    DCHECK(((uintptr_t)key & 7) == 0);
+
     const uint64_t m = 0xc6a4a7935bd1e995ull;
     const int r = 47;
 
@@ -58,19 +65,6 @@ inline uint64_t MurmurHash64A(const void *key, int len, uint64_t seed) {
     return h;
 }
 
-template <typename... Args>
-PBRT_CPU_GPU inline uint64_t hashInternal(uint64_t hash, Args...);
-
-template <>
-PBRT_CPU_GPU inline uint64_t hashInternal(uint64_t hash) {
-    return hash;
-}
-
-template <typename T, typename... Args>
-PBRT_CPU_GPU inline uint64_t hashInternal(uint64_t hash, T v, Args... args) {
-    return MurmurHash64A(&v, sizeof(v), hashInternal(hash, args...));
-}
-
 // Hashing Inline Functions
 PBRT_CPU_GPU inline uint64_t HashBuffer(const void *ptr, size_t size, uint64_t seed = 0) {
     return MurmurHash64A(ptr, size, seed);
@@ -85,8 +79,25 @@ template <typename... Args>
 PBRT_CPU_GPU inline uint64_t Hash(Args... args);
 
 template <typename... Args>
+PBRT_CPU_GPU inline void hashRecursiveCopy(char *buf, Args...);
+
+template <>
+PBRT_CPU_GPU inline void hashRecursiveCopy(char *buf) {}
+
+template <typename T, typename... Args>
+PBRT_CPU_GPU inline void hashRecursiveCopy(char *buf, T v, Args... args) {
+    memcpy(buf, &v, sizeof(T));
+    hashRecursiveCopy(buf + sizeof(T), args...);
+}
+
+template <typename... Args>
 PBRT_CPU_GPU inline uint64_t Hash(Args... args) {
-    return hashInternal(0, args...);
+    // C++, you never cease to amaze: https://stackoverflow.com/a/57246704
+    constexpr size_t sz = (sizeof(Args) + ... + 0);
+    constexpr size_t n = (sz + 7) / 8;
+    uint64_t buf[n];
+    hashRecursiveCopy((char *)buf, args...);
+    return MurmurHash64A(buf, sz, 0);
 }
 
 template <typename... Args>
