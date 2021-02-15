@@ -70,12 +70,11 @@ std::vector<std::string> SplitString(std::string_view str, char ch) {
             ++end;
 
         strings.push_back(std::string(begin, end));
-        begin = end;
 
-        if (*begin == ch)
-            ++begin;
-        else
+        if (end == str.end())
             break;
+
+        begin = end + 1;
     }
 
     return strings;
