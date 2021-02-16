@@ -63,8 +63,8 @@ class DigitPermutation {
 };
 
 // Low Discrepancy Declarations
-inline PBRT_CPU_GPU uint64_t SobolIntervalToIndex(const uint32_t log2Scale,
-                                                  uint64_t sampleIndex, const Point2i &p);
+inline PBRT_CPU_GPU uint64_t SobolIntervalToIndex(uint32_t log2Scale,
+                                                  uint64_t sampleIndex, Point2i p);
 
 PBRT_CPU_GPU inline Float BlueNoiseSample(Point2i p, int instance);
 
@@ -154,41 +154,8 @@ PBRT_CPU_GPU inline uint32_t MultiplyGenerator(pstd::span<const uint32_t> C, uin
     return v;
 }
 
-// Laine et al., Stratified Sampling for Stochastic Transparency, Sec 3.1...
-PBRT_CPU_GPU inline uint32_t FastOwenBinaryScramble(uint32_t v, uint32_t hash) {
-    v = ReverseBits32(v);
-    v += hash;
-    v ^= v * 0x6c50b47cu;
-    v ^= v * 0xb82f1e52u;
-    v ^= v * 0xc7afe638u;
-    v ^= v * 0x8d22f6e6u;
-    return ReverseBits32(v);
-}
-
-PBRT_CPU_GPU inline uint32_t OwenScrambleBinaryFull(uint32_t v, uint32_t hash) {
-    if (hash & 1)
-        v ^= 1u << 31;
-
-    for (int b = 1; b < 32; ++b) {
-        uint32_t mask = (~0u) << (32 - b);
-        if (MixBits((v & mask) ^ hash) & (1u << b))
-            v ^= 1u << (31 - b);
-    }
-
-    return v;
-}
-
 template <typename R>
-PBRT_CPU_GPU inline Float SobolSample(int64_t index, int dimension, R randomizer) {
-#ifdef PBRT_FLOAT_AS_DOUBLE
-    return SobolSampleDouble(index, dimension, randomizer);
-#else
-    return SobolSampleFloat(index, dimension, randomizer);
-#endif
-}
-
-template <typename R>
-PBRT_CPU_GPU inline float SobolSampleFloat(int64_t a, int dimension, R randomizer) {
+PBRT_CPU_GPU inline Float SobolSample(int64_t a, int dimension, R randomizer) {
     DCHECK_LT(dimension, NSobolDimensions);
     DCHECK(a >= 0 && a < (1ull << SobolMatrixSize));
     // Compute initial Sobol sample _v_ using generator matrices
@@ -197,6 +164,7 @@ PBRT_CPU_GPU inline float SobolSampleFloat(int64_t a, int dimension, R randomize
         if (a & 1)
             v ^= SobolMatrices32[i];
 
+    // Randomize Sobol sample and return floating-point value
     v = randomizer(v);
     return std::min(v * 0x1p-32f, FloatOneMinusEpsilon);
 }
@@ -233,7 +201,7 @@ PBRT_CPU_GPU inline Float BlueNoiseSample(Point2i p, int instance) {
 // BinaryPermuteScrambler Definition
 struct BinaryPermuteScrambler {
     PBRT_CPU_GPU
-    BinaryPermuteScrambler(uint32_t permutation) : permutation(permutation) {}
+    BinaryPermuteScrambler(uint32_t perm) : permutation(perm) {}
     PBRT_CPU_GPU
     uint32_t operator()(uint32_t v) const { return permutation ^ v; }
     uint32_t permutation;
@@ -243,8 +211,19 @@ struct BinaryPermuteScrambler {
 struct FastOwenScrambler {
     PBRT_CPU_GPU
     FastOwenScrambler(uint32_t seed) : seed(seed) {}
+    // FastOwenScrambler Public Methods
+    // Laine et al., Stratified Sampling for Stochastic Transparency, Sec 3.1...
     PBRT_CPU_GPU
-    uint32_t operator()(uint32_t v) const { return FastOwenBinaryScramble(v, seed); }
+    uint32_t operator()(uint32_t v) const {
+        v = ReverseBits32(v);
+        v += seed;
+        v ^= v * 0x6c50b47cu;
+        v ^= v * 0xb82f1e52u;
+        v ^= v * 0xc7afe638u;
+        v ^= v * 0x8d22f6e6u;
+        return ReverseBits32(v);
+    }
+
     uint32_t seed;
 };
 
@@ -252,8 +231,20 @@ struct FastOwenScrambler {
 struct OwenScrambler {
     PBRT_CPU_GPU
     OwenScrambler(uint32_t seed) : seed(seed) {}
+    // OwenScrambler Public Methods
     PBRT_CPU_GPU
-    uint32_t operator()(uint32_t v) const { return OwenScrambleBinaryFull(v, seed); }
+    uint32_t operator()(uint32_t v) const {
+        if (seed & 1)
+            v ^= 1u << 31;
+        for (int b = 1; b < 32; ++b) {
+            // Apply Owen scrambling to binary digit _b_ in _v_
+            uint32_t mask = (~0u) << (32 - b);
+            if (MixBits((v & mask) ^ seed) & (1u << b))
+                v ^= 1u << (31 - b);
+        }
+        return v;
+    }
+
     uint32_t seed;
 };
 
@@ -263,7 +254,7 @@ enum class RandomizeStrategy { None, PermuteDigits, FastOwen, Owen };
 std::string ToString(RandomizeStrategy r);
 
 PBRT_CPU_GPU
-inline uint64_t SobolIntervalToIndex(uint32_t m, uint64_t frame, const Point2i &p) {
+inline uint64_t SobolIntervalToIndex(uint32_t m, uint64_t frame, Point2i p) {
     if (m == 0)
         return frame;
 
@@ -283,26 +274,6 @@ inline uint64_t SobolIntervalToIndex(uint32_t m, uint64_t frame, const Point2i &
             index ^= VdCSobolMatricesInv[m - 1][c];
 
     return index;
-}
-
-PBRT_CPU_GPU
-inline uint64_t SobolSampleBits64(int64_t a, int dimension) {
-    CHECK_LT(dimension, NSobolDimensions);
-    DCHECK(a >= 0 && a < (1ull << SobolMatrixSize));
-    uint64_t v = 0;
-    for (int i = dimension * SobolMatrixSize; a != 0; a >>= 1, i++)
-        if (a & 1)
-            v ^= SobolMatrices64[i];
-    return v;
-}
-
-template <typename R>
-PBRT_CPU_GPU inline double SobolSampleDouble(int64_t a, int dimension, R randomizer) {
-    uint64_t v = SobolSampleBits64(a, dimension);
-    // FIXME? We just scramble the high bits here...
-    uint32_t vs = randomizer(v >> 32);
-    v = (uint64_t(vs) << 32) | (v & 0xffffffff);
-    return std::min(v * (1.0 / (1ULL << SobolMatrixSize)), DoubleOneMinusEpsilon);
 }
 
 }  // namespace pbrt

@@ -77,18 +77,18 @@ class HaltonSampler {
     }
 
     PBRT_CPU_GPU
-    Point2f GetPixel2D() {
-        return {RadicalInverse(0, haltonIndex >> baseExponents[0]),
-                RadicalInverse(1, haltonIndex / baseScales[1])};
-    }
-
-    PBRT_CPU_GPU
     Point2f Get2D() {
         if (dimension + 1 >= PrimeTableSize)
             dimension = 2;
         int dim = dimension;
         dimension += 2;
         return {SampleDimension(dim), SampleDimension(dim + 1)};
+    }
+
+    PBRT_CPU_GPU
+    Point2f GetPixel2D() {
+        return {RadicalInverse(0, haltonIndex >> baseExponents[0]),
+                RadicalInverse(1, haltonIndex / baseScales[1])};
     }
 
     std::vector<Sampler> Clone(int n, Allocator alloc);
@@ -116,18 +116,15 @@ class HaltonSampler {
 
     PBRT_CPU_GPU
     Float SampleDimension(int dimension) const {
-        switch (randomize) {
-        case RandomizeStrategy::None:
+        if (randomize == RandomizeStrategy::None)
             return RadicalInverse(dimension, haltonIndex);
-        case RandomizeStrategy::PermuteDigits:
+        else if (randomize == RandomizeStrategy::PermuteDigits)
             return ScrambledRadicalInverse(dimension, haltonIndex,
                                            (*digitPermutations)[dimension]);
-        case RandomizeStrategy::Owen:
+        else {
+            DCHECK_EQ(randomize, RandomizeStrategy::Owen);
             return OwenScrambledRadicalInverse(dimension, haltonIndex,
-                                               MixBits(1 + (uint64_t(dimension) << 32)));
-        default:
-            LOG_FATAL("Unhandled randomization strategy");
-            return {};
+                                               MixBits(1 + (dimension << 4)));
         }
     }
 
@@ -205,19 +202,14 @@ class PaddedSobolSampler {
     // PaddedSobolSampler Private Methods
     PBRT_CPU_GPU
     Float SampleDimension(int dimension, uint32_t a, uint32_t hash) const {
-        switch (randomize) {
-        case RandomizeStrategy::None:
+        if (randomize == RandomizeStrategy::None)
             return SobolSample(a, dimension, NoRandomizer());
-        case RandomizeStrategy::PermuteDigits:
+        else if (randomize == RandomizeStrategy::PermuteDigits)
             return SobolSample(a, dimension, BinaryPermuteScrambler(hash));
-        case RandomizeStrategy::FastOwen:
+        else if (randomize == RandomizeStrategy::FastOwen)
             return SobolSample(a, dimension, FastOwenScrambler(hash));
-        case RandomizeStrategy::Owen:
+        else
             return SobolSample(a, dimension, OwenScrambler(hash));
-        default:
-            LOG_FATAL("Unhandled randomization strategy");
-            return {};
-        }
     }
 
     // PaddedSobolSampler Private Members
@@ -230,6 +222,7 @@ class PaddedSobolSampler {
 // ZSobolSampler Definition
 class ZSobolSampler {
   public:
+    // ZSobolSampler Public Methods
     ZSobolSampler(int samplesPerPixel, Point2i fullResolution,
                   RandomizeStrategy randomize = RandomizeStrategy::PermuteDigits,
                   int seed = 0)
@@ -315,36 +308,62 @@ class ZSobolSampler {
     PBRT_CPU_GPU
     uint64_t GetSampleIndex() const {
         static const uint8_t permutations[24][4] = {
-            {0, 1, 2, 3}, {0, 1, 3, 2}, {0, 2, 1, 3}, {0, 2, 3, 1}, {0, 3, 2, 1},
-            {0, 3, 1, 2}, {1, 0, 2, 3}, {1, 0, 3, 2}, {1, 2, 0, 3}, {1, 2, 3, 0},
-            {1, 3, 2, 0}, {1, 3, 0, 2}, {2, 1, 0, 3}, {2, 1, 3, 0}, {2, 0, 1, 3},
-            {2, 0, 3, 1}, {2, 3, 0, 1}, {2, 3, 1, 0}, {3, 1, 2, 0}, {3, 1, 0, 2},
-            {3, 2, 1, 0}, {3, 2, 0, 1}, {3, 0, 2, 1}, {3, 0, 1, 2}};
+            {0, 1, 2, 3},
+            {0, 1, 3, 2},
+            {0, 2, 1, 3},
+            {0, 2, 3, 1},
+            // Define remaining 20 4-way permutations
+            {0, 3, 2, 1},
+            {0, 3, 1, 2},
+            {1, 0, 2, 3},
+            {1, 0, 3, 2},
+            {1, 2, 0, 3},
+            {1, 2, 3, 0},
+            {1, 3, 2, 0},
+            {1, 3, 0, 2},
+            {2, 1, 0, 3},
+            {2, 1, 3, 0},
+            {2, 0, 1, 3},
+            {2, 0, 3, 1},
+            {2, 3, 0, 1},
+            {2, 3, 1, 0},
+            {3, 1, 2, 0},
+            {3, 1, 0, 2},
+            {3, 2, 1, 0},
+            {3, 2, 0, 1},
+            {3, 0, 2, 1},
+            {3, 0, 1, 2}
 
+        };
         uint64_t sampleIndex = 0;
         bool pow2Samples = log2SamplesPerPixel & 1;
         int lastDigit = pow2Samples ? 1 : 0;
         for (int i = nBase4Digits - 1; i >= lastDigit; --i) {
+            // Randomly permute $i$th base 4 digit in _mortonIndex_
             int digitShift = 2 * i;
             int digit = (mortonIndex >> digitShift) & 3;
             int p = HashPerm(mortonIndex >> (digitShift + 2));
             digit = permutations[p][digit];
             sampleIndex |= uint64_t(digit) << digitShift;
         }
+        // Handle power-of-2 (but not 4) sample count
         if (pow2Samples) {
             sampleIndex |= (mortonIndex & 3);
             sampleIndex >>= 1;
             sampleIndex ^= MixBits((mortonIndex >> 2) ^ (0x55555555 * dimension)) & 1;
         }
+
         return sampleIndex;
     }
 
   private:
+    // ZSobolSampler Private Methods
     PBRT_CPU_GPU
     int HashPerm(uint64_t index) const {
         return uint32_t(MixBits(index ^ (0x55555555 * dimension)) >> 24) % 24;
     }
 
+    // ZSobolSampler Private Members
     RandomizeStrategy randomize;
     int log2SamplesPerPixel, seed, nBase4Digits;
     uint64_t mortonIndex;
@@ -504,24 +523,25 @@ class SobolSampler {
     }
 
     PBRT_CPU_GPU
-    Point2f GetPixel2D() {
-        Point2f u(SampleDimension(0), SampleDimension(1));
-        // Remap Sobol$'$ dimensions used for pixel samples
-        for (int dim = 0; dim < 2; ++dim) {
-            CHECK_RARE(1e-7, u[dim] * scale - pixel[dim] < 0);
-            CHECK_RARE(1e-7, u[dim] * scale - pixel[dim] > 1);
-            u[dim] = Clamp(u[dim] * scale - pixel[dim], 0, OneMinusEpsilon);
-        }
-
-        return u;
-    }
-
-    PBRT_CPU_GPU
     Point2f Get2D() {
         if (dimension + 1 >= NSobolDimensions)
             dimension = 2;
         Point2f u(SampleDimension(dimension), SampleDimension(dimension + 1));
         dimension += 2;
+        return u;
+    }
+
+    PBRT_CPU_GPU
+    Point2f GetPixel2D() {
+        Point2f u(SobolSample(sobolIndex, 0, NoRandomizer()),
+                  SobolSample(sobolIndex, 1, NoRandomizer()));
+        // Remap Sobol$'$ dimensions used for pixel samples
+        for (int dim = 0; dim < 2; ++dim) {
+            DCHECK_RARE(1e-7, u[dim] * scale - pixel[dim] < 0);
+            DCHECK_RARE(1e-7, u[dim] * scale - pixel[dim] > 1);
+            u[dim] = Clamp(u[dim] * scale - pixel[dim], 0, OneMinusEpsilon);
+        }
+
         return u;
     }
 
@@ -532,11 +552,11 @@ class SobolSampler {
     // SobolSampler Private Methods
     PBRT_CPU_GPU
     Float SampleDimension(int dimension) const {
-        // Return un-randomized Sobol sample if appropriate
-        if (dimension < 2 || randomize == RandomizeStrategy::None)
+        // Return un-randomized Sobol$'$ sample if appropriate
+        if (randomize == RandomizeStrategy::None)
             return SobolSample(sobolIndex, dimension, NoRandomizer());
 
-        // Return randomized Sobol sample using _randomize_
+        // Return randomized Sobol$'$ sample using _randomize_
         uint32_t hash = MixBits((uint64_t(dimension) << 32) ^ GetOptions().seed);
         if (randomize == RandomizeStrategy::PermuteDigits)
             return SobolSample(sobolIndex, dimension, BinaryPermuteScrambler(hash));

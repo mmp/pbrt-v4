@@ -144,18 +144,10 @@ TEST(LowDiscrepancy, RadicalInverse) {
     }
 }
 
-TEST(LowDiscrepancy, Sobol) {
-    // Check that float and double variants match (as float values).
-    for (int i = 0; i < 256; ++i) {
-        for (int dim = 0; dim < 100; ++dim) {
-            EXPECT_EQ(SobolSampleFloat(i, dim, NoRandomizer()),
-                      (float)SobolSampleDouble(i, dim, NoRandomizer()));
-        }
-    }
-
+TEST(LowDiscrepancy, SobolFirstDimension) {
     // Make sure first dimension is the regular base 2 radical inverse
     for (int i = 0; i < 8192; ++i) {
-        EXPECT_EQ(SobolSampleFloat(i, 0, NoRandomizer()),
+        EXPECT_EQ(SobolSample(i, 0, NoRandomizer()),
                   ReverseBits32(i) * 2.3283064365386963e-10f);
     }
 }

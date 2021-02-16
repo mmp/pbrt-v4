@@ -195,14 +195,9 @@ GenerateSamples(std::string samplerName, int nPoints, int iter) {
         RNG rng(Options->seed, iter);
         uint32_t r[2] = {rng.Uniform<uint32_t>(), rng.Uniform<uint32_t>()};
 
-        for (int i = 0; i < nPoints; ++i) {
-            Float u2 = SobolSample(i, 0, NoRandomizer());
-            uint32_t uu = OwenScrambleBinaryFull(uint32_t(u2 * 0x1p32), r[0]);
-            u2 = uu * 0x1p-32;
-
-            points.push_back(
-                Point2f(u2, OwenScrambledRadicalInverse(1, i, r[1])));
-        }
+        for (int i = 0; i < nPoints; ++i)
+            points.push_back(Point2f(SobolSample(i, 0, OwenScrambler(r[0])),
+                                     OwenScrambledRadicalInverse(1, i, r[1])));
     } else {
         Sampler sampler = [&]() -> Sampler {
             if (samplerName == "random")
