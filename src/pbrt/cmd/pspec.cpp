@@ -73,6 +73,8 @@ Where <sampler> is one of:
     sobol.permutedigits:
                      The first two dimensions of the Sobol' sequence, randomized
                      with bitwise permutations.
+    sobol.z:         Randomized Morton z-curve Sobol' corresponding to the
+                     ZSobolSampler.
     stdin.binary:    Sample values are read from standard input as binary 32-bit
                      floats. Multiple point sets may be provided by providing
                      successive point sets one after the previous.
@@ -198,6 +200,22 @@ GenerateSamples(std::string samplerName, int nPoints, int iter) {
         for (int i = 0; i < nPoints; ++i)
             points.push_back(Point2f(SobolSample(i, 0, OwenScrambler(r[0])),
                                      OwenScrambledRadicalInverse(1, i, r[1])));
+    } else if (samplerName == "sobol.z") {
+        if (!IsPowerOf2(nPoints))
+            ErrorExit("Must use power of 2 points for \"sobol.z\".");
+
+        int n = 1 << (Log2Int(nPoints) / 2);
+        int spp = nPoints / Sqr(n);
+        ZSobolSampler sampler(spp, {n, n}, RandomizeStrategy::Owen, Options->seed);
+
+        for (int y = 0; y < n; ++y)
+            for (int x = 0; x < n; ++x) {
+                sampler.StartPixelSample({x, y}, 0, 0);
+                for (int s = 0; s < spp; ++s) {
+                    Point2f u = sampler.Get2D();
+                    points.push_back(Point2f((x + u[0]) / n, (y + u[1]) / n));
+                }
+            }
     } else {
         Sampler sampler = [&]() -> Sampler {
             if (samplerName == "random")
