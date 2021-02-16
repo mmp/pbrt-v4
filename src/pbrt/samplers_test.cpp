@@ -168,7 +168,7 @@ TEST(ZSobolSampler, ValidIndices) {
     Point2i res(16, 9);
     for (int logSamples = 0; logSamples <= 10; ++logSamples) {
         int spp = 1 << logSamples;
-        ZSobolSampler sampler(spp, res);
+        ZSobolSampler sampler(spp, res, RandomizeStrategy::PermuteDigits);
 
         for (int dim = 0; dim < 7; dim += 3) {
             std::set<uint64_t> returnedIndices;

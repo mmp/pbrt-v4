@@ -188,7 +188,7 @@ class PaddedSobolSampler {
         int dim = dimension;
         dimension += 2;
         // Return randomized 2D Sobol' sample
-        return {SampleDimension(0, index, hash >> 8),
+        return {SampleDimension(0, index, uint32_t(hash)),
                 SampleDimension(1, index, hash >> 32)};
     }
 
@@ -224,8 +224,7 @@ class ZSobolSampler {
   public:
     // ZSobolSampler Public Methods
     ZSobolSampler(int samplesPerPixel, Point2i fullResolution,
-                  RandomizeStrategy randomize = RandomizeStrategy::PermuteDigits,
-                  int seed = 0)
+                  RandomizeStrategy randomize, int seed = 0)
         : randomize(randomize), seed(seed) {
         if (!IsPowerOf2(samplesPerPixel)) {
             Warning("Rounding %d up to the next power of two for \"zsobol\" sampler "
@@ -264,9 +263,8 @@ class ZSobolSampler {
     Float Get1D() {
         uint64_t sampleIndex = GetSampleIndex();
         uint32_t sampleHash = MixBits(dimension ^ seed);
-
         ++dimension;
-
+        // Generate 1D Sobol sample at _sampleIndex_
         if (randomize == RandomizeStrategy::None)
             return SobolSample(sampleIndex, 0, NoRandomizer());
         else if (randomize == RandomizeStrategy::PermuteDigits)
@@ -282,9 +280,8 @@ class ZSobolSampler {
         uint64_t sampleIndex = GetSampleIndex();
         uint64_t bits = MixBits(dimension ^ seed);
         uint32_t sampleHash[2] = {uint32_t(bits), uint32_t(bits >> 32)};
-
         dimension += 2;
-
+        // Generate 2D Sobol sample at _sampleIndex_
         if (randomize == RandomizeStrategy::None)
             return {SobolSample(sampleIndex, 0, NoRandomizer()),
                     SobolSample(sampleIndex, 1, NoRandomizer())};

@@ -114,7 +114,7 @@ STAT_COUNTER("Scene/Object instances used", nObjectInstancesUsed);
 ParsedScene::ParsedScene() {
     // Set scene defaults
     camera.name = "perspective";
-    sampler.name = "pmj02bn";
+    sampler.name = "zsobol";
     filter.name = "gaussian";
     integrator.name = "volpath";
 
