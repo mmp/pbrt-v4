@@ -11,9 +11,9 @@
 using namespace pbrt;
 
 TEST(Hash, VarArgs) {
-    int buf[] = {1, -12511, 31415821, 37};
+    int64_t buf[] = {1, -12511, 31415821, 37};
     for (int i = 0; i < 4; ++i)
-        EXPECT_EQ(HashBuffer(buf + i, sizeof(int)), Hash(buf[i]));
+        EXPECT_EQ(HashBuffer(buf + i, sizeof(int64_t)), Hash(buf[i]));
 }
 
 TEST(Hash, Collisions) {

@@ -25,31 +25,34 @@ TEST(RNG, Reseed) {
 }
 
 TEST(RNG, Advance) {
+    // Note: must use float not Float, since doubles consume two 32-bit
+    // values from the stream, so the advance tests (as written)
+    // consequently fail.
     RNG rng;
     rng.SetSequence(1234, 6502);
-    std::vector<Float> v;
+    std::vector<float> v;
     for (int i = 0; i < 1000; ++i)
-        v.push_back(rng.Uniform<Float>());
+        v.push_back(rng.Uniform<float>());
 
     rng.SetSequence(1234, 6502);
     rng.Advance(16);
-    EXPECT_EQ(rng.Uniform<Float>(), v[16]);
+    EXPECT_EQ(rng.Uniform<float>(), v[16]);
 
     for (int i = v.size() - 1; i >= 0; --i) {
         rng.SetSequence(1234, 6502);
         rng.Advance(i);
-        EXPECT_EQ(rng.Uniform<Float>(), v[i]);
+        EXPECT_EQ(rng.Uniform<float>(), v[i]);
     }
 
     // Switch to another sequence
     rng.SetSequence(32);
-    rng.Uniform<Float>();
+    rng.Uniform<float>();
 
     // Go back and check one last time
     for (int i : {5, 998, 552, 37, 16}) {
         rng.SetSequence(1234, 6502);
         rng.Advance(i);
-        EXPECT_EQ(rng.Uniform<Float>(), v[i]);
+        EXPECT_EQ(rng.Uniform<float>(), v[i]);
     }
 }
 

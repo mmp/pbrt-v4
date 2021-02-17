@@ -36,6 +36,13 @@ TEST(BVHLightSampling, OneSpot) {
         Point3f p{Lerp(rng.Uniform<Float>(), -5, 5), Lerp(rng.Uniform<Float>(), -5, 5),
                   Lerp(rng.Uniform<Float>(), -5, 5)};
 
+        // Avoid possibly ambiguous cases right at the edge.
+        Float angle = Degrees(std::acos(Normalize(Vector3f(p)).z));
+        if (44.75f < angle && angle < 45.25f) {
+            --i;
+            continue;
+        }
+
         Interaction in(p, 0., (Medium) nullptr);
         Point2f u{rng.Uniform<Float>(), rng.Uniform<Float>()};
         SampledWavelengths lambda = SampledWavelengths::SampleUniform(0.5);

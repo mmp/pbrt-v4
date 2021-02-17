@@ -243,6 +243,8 @@ TEST(Math, ErfInv) {
     }
 }
 
+#ifndef PBRT_FLOAT_AS_DOUBLE
+// The next two expect a higher-precision option to verify with.
 TEST(Math, DifferenceOfProducts) {
     for (int i = 0; i < 100000; ++i) {
         RNG rng(i);
@@ -281,6 +283,7 @@ TEST(Math, SumOfProducts) {
         EXPECT_LT(err, 2 * ulp);
     }
 }
+#endif // !PBRT_FLOAT_AS_DOUBLE
 
 TEST(FastExp, Accuracy) {
     EXPECT_EQ(1, FastExp(0));
@@ -873,6 +876,8 @@ TEST(Math, TwoSum) {
     }
 }
 
+// This depends on having a higher precision option to compare to.
+#ifndef PBRT_FLOAT_AS_DOUBLE
 TEST(Math, InnerProduct) {
     for (int i = 0; i < 100000; ++i) {
         RNG rng(i);
@@ -891,6 +896,7 @@ TEST(Math, InnerProduct) {
         EXPECT_EQ(ab, dab);
     }
 }
+#endif  // !PBRT_FLOAT_AS_DOUBLE
 
 // Make sure that the permute function is in fact a valid permutation.
 TEST(PermutationElement, Valid) {
