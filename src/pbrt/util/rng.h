@@ -105,7 +105,7 @@ inline int32_t RNG::Uniform<int32_t>() {
 
 template <>
 inline int64_t RNG::Uniform<int64_t>() {
-    // https://stackoverflow.com/a/16408789
+    // https://stackoverflow.com/a/13208789
     uint64_t v = Uniform<uint64_t>();
     if (v <= (uint64_t)std::numeric_limits<int64_t>::max())
         // Safe to type convert directly.
