@@ -231,7 +231,8 @@ if (CMAKE_CUDA_COMPILER)
         find_program (BIN2C
                       NAMES bin2c
                       PATHS ${cuda_compiler_bin}
-                      DOC "Path to the CUDA SDK bin2c executable.")
+                      DOC "Path to the CUDA SDK bin2c executable."
+                      NO_DEFAULT_PATH)
         if (NOT BIN2C)
             message (FATAL_ERROR
                      "bin2c not found:\n"
