@@ -639,8 +639,8 @@ void Image::CopyRectOut(const Bounds2i &extent, pstd::span<float> buf,
                 }
 #else
                 encoding.ToLinear({&p8[offset], count}, {&*bufIter, count});
-#endif
                 bufIter += count;
+#endif
             }
         } else {
             ForExtent(extent, wrapMode, *this, [&bufIter, this](int offset) {
