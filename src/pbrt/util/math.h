@@ -118,15 +118,16 @@ inline PBRT_CPU_GPU typename std::enable_if_t<std::is_integral<T>::value, T> FMA
     return a * b + c;
 }
 
-PBRT_CPU_GPU inline Float Sinc(Float x) {
-    return SinXOverX(Pi * x);
-}
-
+PBRT_CPU_GPU inline Float Sinc(Float);
 PBRT_CPU_GPU
 inline Float WindowedSinc(Float x, Float radius, Float tau) {
     if (std::abs(x) > radius)
         return 0;
     return Sinc(x) * Sinc(x / tau);
+}
+
+PBRT_CPU_GPU inline Float Sinc(Float x) {
+    return SinXOverX(Pi * x);
 }
 
 PBRT_CPU_GPU inline Float Lerp(Float x, Float a, Float b) {

@@ -48,8 +48,8 @@ GaussianFilter *GaussianFilter::Create(const ParameterDictionary &parameters,
 
 // Mitchell Filter Method Definitions
 std::string MitchellFilter::ToString() const {
-    return StringPrintf("[ MitchellFilter radius: %s B: %f C: %f sampler: %s ]", radius,
-                        B, C, sampler);
+    return StringPrintf("[ MitchellFilter radius: %s b: %f c: %f sampler: %s ]", radius,
+                        b, c, sampler);
 }
 
 MitchellFilter *MitchellFilter::Create(const ParameterDictionary &parameters,
