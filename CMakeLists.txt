@@ -226,8 +226,19 @@ if (CMAKE_CUDA_COMPILER)
         # FIXME
         include_directories (${PBRT_OPTIX7_PATH}/include)
 
-        # from Ingo's configure_optix.cmake (Apache licensed)
-        find_program (BIN2C bin2c DOC "Path to the CUDA SDK bin2c executable.")
+        # find CUDA's bin2c executable
+        get_filename_component (cuda_compiler_bin "${CMAKE_CUDA_COMPILER}" DIRECTORY)
+        find_program (BIN2C
+                      NAMES bin2c
+                      PATHS ${cuda_compiler_bin}
+                      DOC "Path to the CUDA SDK bin2c executable.")
+        if (NOT BIN2C)
+            message (FATAL_ERROR
+                     "bin2c not found:\n"
+                     "  CMAKE_CUDA_COMPILER='${CMAKE_CUDA_COMPILER}'\n"
+                     "  cuda_compiler_bin='${cuda_compiler_bin}'\n"
+            )
+        endif ()
 
         # this macro defines cmake rules that execute the following four steps:
         # 1) compile the given cuda file ${cuda_file} to an intermediary PTX file
