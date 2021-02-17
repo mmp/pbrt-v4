@@ -160,7 +160,7 @@ class Sphere {
 
         // Compute sphere quadratic discriminant _discrim_
         Vector3fi v(oi - b / (2 * a) * di);
-        Interval length = Sqrt(Dot(v, v));
+        Interval length = Length(v);
         Interval discrim =
             4 * a * (Interval(radius) + length) * (Interval(radius) - length);
         if (discrim.LowerBound() < 0)
