@@ -411,8 +411,8 @@ OptixTraversableHandle GPUAccel::createGASForBLPs(
         for (size_t i = 0; i < mesh->nVertices; ++i)
             shapeBounds = Union(shapeBounds, mesh->p[i]);
 
-        OptixAabb aabb = {shapeBounds.pMin.x, shapeBounds.pMin.y, shapeBounds.pMin.z,
-                          shapeBounds.pMax.x, shapeBounds.pMax.y, shapeBounds.pMax.z};
+        OptixAabb aabb = {float(shapeBounds.pMin.x), float(shapeBounds.pMin.y), float(shapeBounds.pMin.z),
+                          float(shapeBounds.pMax.x), float(shapeBounds.pMax.y), float(shapeBounds.pMax.z)};
         shapeAABBs.push_back(aabb);
 
         *gasBounds = Union(*gasBounds, shapeBounds);
@@ -500,8 +500,8 @@ OptixTraversableHandle GPUAccel::createGASForQuadrics(
         buildInputs.push_back(buildInput);
 
         Bounds3f shapeBounds = shape.Bounds();
-        OptixAabb aabb = {shapeBounds.pMin.x, shapeBounds.pMin.y, shapeBounds.pMin.z,
-                          shapeBounds.pMax.x, shapeBounds.pMax.y, shapeBounds.pMax.z};
+        OptixAabb aabb = {float(shapeBounds.pMin.x), float(shapeBounds.pMin.y), float(shapeBounds.pMin.z),
+                          float(shapeBounds.pMax.x), float(shapeBounds.pMax.y), float(shapeBounds.pMax.z)};
         shapeAABBs.push_back(aabb);
 
         *gasBounds = Union(*gasBounds, shapeBounds);

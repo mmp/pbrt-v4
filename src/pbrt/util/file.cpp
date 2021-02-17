@@ -110,7 +110,7 @@ std::string ReadFileContents(const std::string &filename) {
                        (std::istreambuf_iterator<char>()));
 }
 
-std::vector<float> ReadFloatFile(const std::string &filename) {
+std::vector<Float> ReadFloatFile(const std::string &filename) {
     FILE *f = fopen(filename.c_str(), "r");
     if (f == nullptr) {
         Error("%s: unable to open file", filename);
@@ -122,7 +122,7 @@ std::vector<float> ReadFloatFile(const std::string &filename) {
     char curNumber[32];
     int curNumberPos = 0;
     int lineNumber = 1;
-    std::vector<float> values;
+    std::vector<Float> values;
     while ((c = getc(f)) != EOF) {
         if (c == '\n')
             ++lineNumber;
@@ -139,7 +139,7 @@ std::vector<float> ReadFloatFile(const std::string &filename) {
                 curNumber[curNumberPos++] = c;
             } else {
                 curNumber[curNumberPos++] = '\0';
-                float v;
+                Float v;
                 if (!Atof(curNumber, &v))
                     ErrorExit("%s: unable to parse float value \"%s\"", filename,
                               curNumber);

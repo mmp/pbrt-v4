@@ -27,7 +27,7 @@ bool Atof(std::string_view str, float *ptr) {
     return true;
 }
 
-bool Atod(std::string_view str, double *ptr) {
+bool Atof(std::string_view str, double *ptr) {
     try {
         *ptr = std::stod(std::string(str.begin(), str.end()));
     } catch (...) {
@@ -105,7 +105,7 @@ std::vector<double> SplitStringToDoubles(std::string_view str, char ch) {
     std::vector<double> doubles(strs.size());
 
     for (size_t i = 0; i < strs.size(); ++i)
-        if (!Atod(strs[i], &doubles[i]))
+        if (!Atof(strs[i], &doubles[i]))
             return {};
     return doubles;
 }

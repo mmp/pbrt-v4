@@ -578,7 +578,7 @@ class NanoVDBMediumProvider {
         densityFloatGrid = densityGrid.grid<float>();
         if (temperatureGrid) {
             temperatureFloatGrid = temperatureGrid.grid<float>();
-            Float minTemperature, maxTemperature;
+            float minTemperature, maxTemperature;
             temperatureFloatGrid->tree().extrema(minTemperature, maxTemperature);
             LOG_VERBOSE("Max temperature: %f", maxTemperature);
         }
@@ -647,7 +647,7 @@ class NanoVDBMediumProvider {
             int nz0 = std::max(int(i0[2] - delta), bbox.min()[2]);
             int nz1 = std::min(int(i1[2] + delta), bbox.max()[2]);
 
-            Float maxValue = 0;
+            float maxValue = 0;
             auto accessor = densityFloatGrid->getAccessor();
             // Apparently nanovdb integer bounding boxes are inclusive on
             // the upper end...

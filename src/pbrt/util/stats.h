@@ -48,7 +48,7 @@ class StatsAccumulator {
     void ReportMemoryCounter(const char *name, int64_t val);
     void ReportPercentage(const char *name, int64_t num, int64_t denom);
     void ReportRatio(const char *name, int64_t num, int64_t denom);
-    void ReportRareCheck(const char *condition, float maxFrequency, int64_t numTrue,
+    void ReportRareCheck(const char *condition, Float maxFrequency, int64_t numTrue,
                          int64_t total);
 
     void ReportIntDistribution(const char *name, int64_t sum, int64_t count, int64_t min,

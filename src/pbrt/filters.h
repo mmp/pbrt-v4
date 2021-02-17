@@ -70,7 +70,7 @@ class BoxFilter {
     PBRT_CPU_GPU
     FilterSample Sample(Point2f u) const {
         Point2f p(Lerp(u[0], -radius.x, radius.x), Lerp(u[1], -radius.y, radius.y));
-        return {p, 1.f};
+        return {p, Float(1)};
     }
 
     PBRT_CPU_GPU
@@ -225,8 +225,9 @@ class TriangleFilter {
     }
 
     PBRT_CPU_GPU
-    FilterSample Sample(const Point2f &u) const {
-        return {Point2f(SampleTent(u[0], radius.x), SampleTent(u[1], radius.y)), 1.f};
+    FilterSample Sample(Point2f u) const {
+        return {Point2f(SampleTent(u[0], radius.x), SampleTent(u[1], radius.y)),
+                Float(1)};
     }
 
     PBRT_CPU_GPU

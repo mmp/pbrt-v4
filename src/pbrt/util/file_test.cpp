@@ -52,9 +52,9 @@ TEST(File, Success) {
 6
 )"));
 
-    std::vector<float> floats = ReadFloatFile(fn);
+    std::vector<Float> floats = ReadFloatFile(fn);
     EXPECT_EQ(6, floats.size());
-    const float expected[] = {1.f, -2.5f, 300.f, -.475f, 5.25f, 6.f};
+    const Float expected[] = {1.f, -2.5f, 300.f, -.475f, 5.25f, 6.f};
     for (int i = 0; i < PBRT_ARRAYSIZE(expected); ++i)
         EXPECT_EQ(expected[i], floats[i]);
 
@@ -62,7 +62,7 @@ TEST(File, Success) {
 }
 
 TEST(File, Failures) {
-    std::vector<float> floats = ReadFloatFile("NO_SUCH_FILE_64622");
+    std::vector<Float> floats = ReadFloatFile("NO_SUCH_FILE_64622");
     EXPECT_EQ(0, floats.size());
 
     std::string fn = inTestDir("malformed.txt");

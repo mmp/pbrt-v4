@@ -18,7 +18,7 @@ namespace pbrt {
 std::string ReadFileContents(const std::string &filename);
 bool WriteFile(const std::string &filename, const std::string &contents);
 
-std::vector<float> ReadFloatFile(const std::string &filename);
+std::vector<Float> ReadFloatFile(const std::string &filename);
 
 bool FileExists(const std::string &filename);
 std::string ResolveFilename(const std::string &filename);

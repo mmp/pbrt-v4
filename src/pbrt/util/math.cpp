@@ -142,7 +142,7 @@ int NextPrime(int x) {
 }
 
 #ifndef PBRT_IS_GPU_CODE
-#ifdef PBRT_FLOAT_IS_DOUBLE
+#ifdef PBRT_FLOAT_AS_DOUBLE
 const Interval Interval::Pi(3.1415926535897931, 3.1415926535897936);
 #else
 const Interval Interval::Pi = Interval(3.1415925f, 3.14159274f);

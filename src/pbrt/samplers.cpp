@@ -449,11 +449,7 @@ DebugMLTSampler DebugMLTSampler::Create(pstd::span<const std::string> state,
     DebugMLTSampler ds(nSampleStreams);
     ds.u.resize(state.size());
     for (size_t i = 0; i < state.size(); ++i) {
-#ifdef PBRT_FLOAT_AS_DOUBLE
-        if (!Atod(state[i], &ds.u[i]))
-#else
         if (!Atof(state[i], &ds.u[i]))
-#endif
             ErrorExit("Invalid value in --debugstate: %s", state[i]);
     }
     return ds;

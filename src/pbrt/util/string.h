@@ -15,7 +15,7 @@ namespace pbrt {
 
 bool Atoi(std::string_view str, int *);
 bool Atof(std::string_view str, float *);
-bool Atod(std::string_view str, double *);
+bool Atof(std::string_view str, double *);
 
 std::vector<std::string> SplitStringsFromWhitespace(std::string_view str);
 

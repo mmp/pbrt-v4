@@ -1477,7 +1477,7 @@ class PiecewiseLinear2D {
 
     struct PLSample {
         Vector2f p;
-        float pdf;
+        Float pdf;
     };
 
     /**
@@ -1506,10 +1506,10 @@ class PiecewiseLinear2D {
                 return m_param_values[dim].data()[idx] <= param[dim];
             });
 
-            float p0 = m_param_values[dim][param_index],
+            Float p0 = m_param_values[dim][param_index],
                   p1 = m_param_values[dim][param_index + 1];
 
-            param_weight[2 * dim + 1] = Clamp((param[dim] - p0) / (p1 - p0), 0.f, 1.f);
+            param_weight[2 * dim + 1] = Clamp((param[dim] - p0) / (p1 - p0), 0, 1);
             param_weight[2 * dim] = 1.f - param_weight[2 * dim + 1];
             slice_offset += m_param_strides[dim] * param_index;
         }
@@ -1534,7 +1534,7 @@ class PiecewiseLinear2D {
         if (Dimension != 0)
             offset += slice_offset * slice_size;
 
-        float r0 = lookup<Dimension>(m_conditional_cdf.data(), offset + m_size.x - 1,
+        Float r0 = lookup<Dimension>(m_conditional_cdf.data(), offset + m_size.x - 1,
                                      slice_size, param_weight),
               r1 =
                   lookup<Dimension>(m_conditional_cdf.data(), offset + (m_size.x * 2 - 1),
@@ -1564,7 +1564,7 @@ class PiecewiseLinear2D {
 
         offset += col;
 
-        float v00 = lookup<Dimension>(m_data.data(), offset, slice_size, param_weight),
+        Float v00 = lookup<Dimension>(m_data.data(), offset, slice_size, param_weight),
               v10 =
                   lookup<Dimension>(m_data.data() + 1, offset, slice_size, param_weight),
               v01 = lookup<Dimension>(m_data.data() + m_size.x, offset, slice_size,
@@ -1621,7 +1621,7 @@ class PiecewiseLinear2D {
             offset += slice_offset * slice_size;
 
         /* Invert the X component */
-        float v00 = lookup<Dimension>(m_data.data(), offset, slice_size, param_weight),
+        Float v00 = lookup<Dimension>(m_data.data(), offset, slice_size, param_weight),
               v10 =
                   lookup<Dimension>(m_data.data() + 1, offset, slice_size, param_weight),
               v01 = lookup<Dimension>(m_data.data() + m_size.x, offset, slice_size,
@@ -1631,12 +1631,12 @@ class PiecewiseLinear2D {
 
         Vector2f w1 = sample, w0 = Vector2f(1, 1) - w1;
 
-        float c0 = FMA(w0.y, v00, w1.y * v01), c1 = FMA(w0.y, v10, w1.y * v11),
+        Float c0 = FMA(w0.y, v00, w1.y * v01), c1 = FMA(w0.y, v10, w1.y * v11),
               pdf = FMA(w0.x, c0, w1.x * c1);
 
         sample.x *= c0 + .5f * sample.x * (c1 - c0);
 
-        float v0 = lookup<Dimension>(m_conditional_cdf.data(), offset, slice_size,
+        Float v0 = lookup<Dimension>(m_conditional_cdf.data(), offset, slice_size,
                                      param_weight),
               v1 = lookup<Dimension>(m_conditional_cdf.data() + m_size.x, offset,
                                      slice_size, param_weight);
@@ -1647,7 +1647,7 @@ class PiecewiseLinear2D {
         if (Dimension != 0)
             offset += slice_offset * slice_size;
 
-        float r0 = lookup<Dimension>(m_conditional_cdf.data(), offset + m_size.x - 1,
+        Float r0 = lookup<Dimension>(m_conditional_cdf.data(), offset + m_size.x - 1,
                                      slice_size, param_weight),
               r1 =
                   lookup<Dimension>(m_conditional_cdf.data(), offset + (m_size.x * 2 - 1),
@@ -1710,7 +1710,7 @@ class PiecewiseLinear2D {
         if (Dimension != 0)
             index += slice_offset * size;
 
-        float v00 = lookup<Dimension>(m_data.data(), index, size, param_weight),
+        Float v00 = lookup<Dimension>(m_data.data(), index, size, param_weight),
               v10 = lookup<Dimension>(m_data.data() + 1, index, size, param_weight),
               v01 =
                   lookup<Dimension>(m_data.data() + m_size.x, index, size, param_weight),
@@ -1732,11 +1732,11 @@ class PiecewiseLinear2D {
 
   private:
     template <size_t Dim, std::enable_if_t<Dim != 0, int> = 0>
-    PBRT_CPU_GPU float lookup(const float *data, uint32_t i0, uint32_t size,
+    PBRT_CPU_GPU Float lookup(const float *data, uint32_t i0, uint32_t size,
                               const float *param_weight) const {
         uint32_t i1 = i0 + m_param_strides[Dim - 1] * size;
 
-        float w0 = param_weight[2 * Dim - 2], w1 = param_weight[2 * Dim - 1],
+        Float w0 = param_weight[2 * Dim - 2], w1 = param_weight[2 * Dim - 1],
               v0 = lookup<Dim - 1>(data, i0, size, param_weight),
               v1 = lookup<Dim - 1>(data, i1, size, param_weight);
 
@@ -1744,7 +1744,7 @@ class PiecewiseLinear2D {
     }
 
     template <size_t Dim, std::enable_if_t<Dim == 0, int> = 0>
-    PBRT_CPU_GPU float lookup(const float *data, uint32_t index, uint32_t,
+    PBRT_CPU_GPU Float lookup(const float *data, uint32_t index, uint32_t,
                               const float *) const {
         return data[index];
     }

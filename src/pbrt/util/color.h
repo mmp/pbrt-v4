@@ -494,11 +494,11 @@ inline Float LinearToSRGB(Float value) {
     if (value <= 0.0031308f)
         return 12.92f * value;
     // Minimax polynomial approximation from enoki's color.h.
-    Float sqrtValue = SafeSqrt(value);
-    Float p = EvaluatePolynomial(sqrtValue, -0.0016829072605308378f, 0.03453868659826638f,
+    float sqrtValue = SafeSqrt(value);
+    float p = EvaluatePolynomial(sqrtValue, -0.0016829072605308378f, 0.03453868659826638f,
                                  0.7642611304733891f, 2.0041169284241644f,
                                  0.7551545191665577f, -0.016202083165206348f);
-    Float q = EvaluatePolynomial(sqrtValue, 4.178892964897981e-7f,
+    float q = EvaluatePolynomial(sqrtValue, 4.178892964897981e-7f,
                                  -0.00004375359692957097f, 0.03467195408529984f,
                                  0.6085338522168684f, 1.8970238036421054f, 1.f);
     return p / q * value;
@@ -514,14 +514,14 @@ inline uint8_t LinearToSRGB8(Float value, Float dither = 0) {
 }
 
 PBRT_CPU_GPU
-inline Float SRGBToLinear(Float value) {
+inline Float SRGBToLinear(float value) {
     if (value <= 0.04045f)
         return value * (1 / 12.92f);
     // Minimax polynomial approximation from enoki's color.h.
-    Float p = EvaluatePolynomial(value, -0.0163933279112946f, -0.7386328024653209f,
+    float p = EvaluatePolynomial(value, -0.0163933279112946f, -0.7386328024653209f,
                                  -11.199318357635072f, -47.46726633009393f,
                                  -36.04572663838034f);
-    Float q = EvaluatePolynomial(value, -0.004261480793199332f, -19.140923959601675f,
+    float q = EvaluatePolynomial(value, -0.004261480793199332f, -19.140923959601675f,
                                  -59.096406619244426f, -18.225745396846637f, 1.f);
     return p / q * value;
 }
