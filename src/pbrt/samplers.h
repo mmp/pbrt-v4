@@ -445,17 +445,17 @@ class PMJ02BNSampler {
     int sampleIndex, dimension;
 };
 
-// RandomSampler Definition
-class RandomSampler {
+// IndependentSampler Definition
+class IndependentSampler {
   public:
-    // RandomSampler Public Methods
-    RandomSampler(int samplesPerPixel, int seed = 0)
+    // IndependentSampler Public Methods
+    IndependentSampler(int samplesPerPixel, int seed = 0)
         : samplesPerPixel(samplesPerPixel), seed(seed) {}
 
-    static RandomSampler *Create(const ParameterDictionary &parameters,
-                                 const FileLoc *loc, Allocator alloc);
+    static IndependentSampler *Create(const ParameterDictionary &parameters,
+                                      const FileLoc *loc, Allocator alloc);
     PBRT_CPU_GPU
-    static constexpr const char *Name() { return "RandomSampler"; }
+    static constexpr const char *Name() { return "IndependentSampler"; }
 
     PBRT_CPU_GPU
     int SamplesPerPixel() const { return samplesPerPixel; }
@@ -477,7 +477,7 @@ class RandomSampler {
     std::string ToString() const;
 
   private:
-    // RandomSampler Private Members
+    // IndependentSampler Private Members
     int samplesPerPixel, seed;
     RNG rng;
 };
@@ -802,8 +802,8 @@ inline Point2f Sampler::GetPixel2D() {
 }
 
 // Sampler Inline Functions
-template <typename Sampler>
-inline PBRT_CPU_GPU CameraSample GetCameraSample(Sampler sampler, const Point2i &pPixel,
+template <typename S>
+inline PBRT_CPU_GPU CameraSample GetCameraSample(S sampler, Point2i pPixel,
                                                  Filter filter) {
     FilterSample fs = filter.Sample(sampler.GetPixel2D());
     if (GetOptions().disablePixelJitter) {
@@ -812,10 +812,12 @@ inline PBRT_CPU_GPU CameraSample GetCameraSample(Sampler sampler, const Point2i 
     }
 
     CameraSample cs;
-    cs.pFilm = pPixel + fs.p + Vector2f(0.5, 0.5);
+    // Initialize _CameraSample_ member variables
+    cs.pFilm = pPixel + fs.p + Vector2f(0.5f, 0.5f);
     cs.time = sampler.Get1D();
     cs.pLens = sampler.Get2D();
-    cs.weight = fs.weight;
+    cs.filterWeight = fs.weight;
+
     return cs;
 }
 

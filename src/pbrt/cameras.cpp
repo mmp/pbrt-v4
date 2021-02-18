@@ -248,8 +248,8 @@ std::string CameraBase::ToString() const {
 }
 
 std::string CameraSample::ToString() const {
-    return StringPrintf("[ pFilm: %s pLens: %s time: %f weight: %f ]", pFilm, pLens, time,
-                        weight);
+    return StringPrintf("[ CameraSample pFilm: %s pLens: %s time: %f filterWeight: %f ]",
+                        pFilm, pLens, time, filterWeight);
 }
 
 // ProjectiveCamera Method Definitions

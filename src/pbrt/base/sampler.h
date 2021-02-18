@@ -20,7 +20,7 @@ struct CameraSample {
     Point2f pFilm;
     Point2f pLens;
     Float time = 0;
-    Float weight = 1;
+    Float filterWeight = 1;
     std::string ToString() const;
 };
 
@@ -28,7 +28,7 @@ struct CameraSample {
 class HaltonSampler;
 class PaddedSobolSampler;
 class PMJ02BNSampler;
-class RandomSampler;
+class IndependentSampler;
 class SobolSampler;
 class StratifiedSampler;
 class ZSobolSampler;
@@ -36,7 +36,7 @@ class MLTSampler;
 class DebugMLTSampler;
 
 // Sampler Definition
-class Sampler : public TaggedPointer<RandomSampler, StratifiedSampler, HaltonSampler,
+class Sampler : public TaggedPointer<IndependentSampler, StratifiedSampler, HaltonSampler,
                                      PaddedSobolSampler, SobolSampler, ZSobolSampler,
                                      PMJ02BNSampler, MLTSampler, DebugMLTSampler> {
   public:

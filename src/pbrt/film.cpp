@@ -156,16 +156,16 @@ FilmBaseParameters::FilmBaseParameters(const ParameterDictionary &parameters,
 }
 
 // FilmBase Method Definitions
-std::string FilmBase::BaseToString() const {
-    return StringPrintf("fullResolution: %s diagonal: %f filter: %s filename: %s "
-                        "pixelBounds: %s",
-                        fullResolution, diagonal, filter, filename, pixelBounds);
-}
-
 Bounds2f FilmBase::SampleBounds() const {
     Vector2f radius = filter.Radius();
     return Bounds2f(pixelBounds.pMin - radius + Vector2f(0.5f, 0.5f),
                     pixelBounds.pMax + radius - Vector2f(0.5f, 0.5f));
+}
+
+std::string FilmBase::BaseToString() const {
+    return StringPrintf("fullResolution: %s diagonal: %f filter: %s filename: %s "
+                        "pixelBounds: %s",
+                        fullResolution, diagonal, filter, filename, pixelBounds);
 }
 
 // VisibleSurface Method Definitions

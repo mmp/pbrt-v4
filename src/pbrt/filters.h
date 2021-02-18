@@ -31,20 +31,17 @@ class FilterSampler {
 
     PBRT_CPU_GPU
     FilterSample Sample(Point2f u) const {
-        Point2f p = distrib.Sample(u);
+        Float pdf;
+        Point2i pi;
+        Point2f p = distrib.Sample(u, &pdf, &pi);
         Point2f p01 = Point2f(domain.Offset(p));
-        Point2i pi(Clamp(p01.x * values.xSize() + 0.5f, 0, values.xSize() - 1),
-                   Clamp(p01.y * values.ySize() + 0.5f, 0, values.ySize() - 1));
-        return {p, values[pi] < 0 ? -1.f : 1.f};
+        return {p, f[pi] / pdf};
     }
-
-    PBRT_CPU_GPU
-    Float Integral() const { return distrib.Integral(); }
 
   private:
     // FilterSampler Private Members
     Bounds2f domain;
-    Array2D<Float> values;
+    Array2D<Float> f;
     PiecewiseConstant2D distrib;
 };
 

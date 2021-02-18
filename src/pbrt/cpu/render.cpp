@@ -356,7 +356,7 @@ void CPURender(ParsedScene &parsedScene) {
         cs.pFilm = *Options->pixelMaterial + Vector2f(0.5f, 0.5f);
         cs.time = 0.5f;
         cs.pLens = Point2f(0.5f, 0.5f);
-        cs.weight = 1;
+        cs.filterWeight = 1;
         pstd::optional<CameraRay> cr = camera.GenerateRay(cs, lambda);
         if (!cr)
             ErrorExit("Unable to generate camera ray for specified pixel.");

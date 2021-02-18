@@ -35,9 +35,9 @@ class Filter : public TaggedPointer<BoxFilter, GaussianFilter, MitchellFilter,
 
     PBRT_CPU_GPU inline Float Evaluate(Point2f p) const;
 
-    PBRT_CPU_GPU inline FilterSample Sample(Point2f u) const;
-
     PBRT_CPU_GPU inline Float Integral() const;
+
+    PBRT_CPU_GPU inline FilterSample Sample(Point2f u) const;
 
     std::string ToString() const;
 };

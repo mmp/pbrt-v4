@@ -258,7 +258,7 @@ std::vector<std::pair<Sampler, std::string>> GetSamplers(
     samplers.push_back(
         std::make_pair(new SobolSampler(256, resolution, RandomizeStrategy::Owen),
                        "Sobol 256 Owen Scramble"));
-    samplers.push_back(std::make_pair(new RandomSampler(256), "Random 256"));
+    samplers.push_back(std::make_pair(new IndependentSampler(256), "Independent 256"));
     samplers.push_back(
         std::make_pair(new StratifiedSampler(16, 16, true), "Stratified 16x16"));
     samplers.push_back(std::make_pair(new PMJ02BNSampler(256), "PMJ02bn 256"));

@@ -97,19 +97,17 @@ inline Point2f InvertUniformTriangleSample(const pstd::array<Float, 3> &b) {
     }
 }
 
-PBRT_CPU_GPU
-inline Float TentPDF(Float x, Float radius) {
-    if (std::abs(x) >= radius)
-        return 0;
-    return 1 / radius - std::abs(x) / Sqr(radius);
-}
-
-PBRT_CPU_GPU
-inline Float SampleTent(Float u, Float radius) {
+PBRT_CPU_GPU inline Float SampleTent(Float u, Float radius) {
     if (SampleDiscrete({0.5f, 0.5f}, u, nullptr, &u) == 0)
         return -radius + radius * SampleLinear(u, 0, 1);
     else
         return radius * SampleLinear(u, 1, 0);
+}
+
+PBRT_CPU_GPU inline Float TentPDF(Float x, Float radius) {
+    if (std::abs(x) >= radius)
+        return 0;
+    return 1 / radius - std::abs(x) / Sqr(radius);
 }
 
 PBRT_CPU_GPU
@@ -799,13 +797,16 @@ class PiecewiseConstant2D {
     Float Integral() const { return pMarginal.Integral(); }
 
     PBRT_CPU_GPU
-    Point2f Sample(const Point2f &u, Float *pdf = nullptr) const {
+    Point2f Sample(const Point2f &u, Float *pdf = nullptr,
+                   Point2i *offset = nullptr) const {
         Float pdfs[2];
-        int v;
-        Float d1 = pMarginal.Sample(u[1], &pdfs[1], &v);
-        Float d0 = pConditionalV[v].Sample(u[0], &pdfs[0]);
+        Point2i uv;
+        Float d1 = pMarginal.Sample(u[1], &pdfs[1], &uv[1]);
+        Float d0 = pConditionalV[uv[1]].Sample(u[0], &pdfs[0], &uv[0]);
         if (pdf != nullptr)
             *pdf = pdfs[0] * pdfs[1];
+        if (offset != nullptr)
+            *offset = uv;
         return Point2f(d0, d1);
     }
 

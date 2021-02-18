@@ -59,11 +59,11 @@ Where <sampler> is one of:
     halton.permutedigits:
                      The first two dimensions of the Halton sequence, randomized
                      using random digit permutations.
+    independent:     Independent uniform random samples.
     lhs:             Latin hypercube sampling.
     pmj02bn:         Progressive multi-jittered (0,2) blue noise points. (Note:
                      pbrt uses precomputed tables for these and only has five,
                      so nsets > 5 does not make sense in this case.)
-    random:          Uniform random samples.
     sobol:           The first two dimensions of the Sobol' sequence.
     sobol.fastowen:  The first two dimensions of the Sobol' sequence, randomized
                      using a fast hashing approach that operates on all bits in
@@ -218,8 +218,8 @@ GenerateSamples(std::string samplerName, int nPoints, int iter) {
             }
     } else {
         Sampler sampler = [&]() -> Sampler {
-            if (samplerName == "random")
-                return new RandomSampler(nPoints, Options->seed);
+            if (samplerName == "independent")
+                return new IndependentSampler(nPoints, Options->seed);
             else if (samplerName == "stratified") {
                 int sqrtSamples = std::sqrt(nPoints);
                 nPoints = Sqr(sqrtSamples);

@@ -286,7 +286,8 @@ void RayIntegrator::EvaluatePixelSample(Point2i pPixel, int sampleIndex, Sampler
     }
 
     // Add camera ray's contribution to image
-    camera.GetFilm().AddSample(pPixel, L, lambda, &visibleSurface, cameraSample.weight);
+    camera.GetFilm().AddSample(pPixel, L, lambda, &visibleSurface,
+                               cameraSample.filterWeight);
 }
 
 // Integrator Utility Functions

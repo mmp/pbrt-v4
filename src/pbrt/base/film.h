@@ -29,6 +29,8 @@ class Film : public TaggedPointer<RGBFilm, GBufferFilm> {
                                        const VisibleSurface *visibleSurface,
                                        Float weight);
 
+    PBRT_CPU_GPU inline Bounds2f SampleBounds() const;
+
     PBRT_CPU_GPU
     bool UsesVisibleSurface() const;
 
@@ -61,8 +63,6 @@ class Film : public TaggedPointer<RGBFilm, GBufferFilm> {
                        Allocator alloc);
 
     std::string ToString() const;
-
-    PBRT_CPU_GPU inline Bounds2f SampleBounds() const;
 };
 
 }  // namespace pbrt

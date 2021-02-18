@@ -213,10 +213,10 @@ class FilmBase {
         return SampledWavelengths::SampleXYZ(u);
     }
 
-    std::string BaseToString() const;
-
     PBRT_CPU_GPU
     Bounds2f SampleBounds() const;
+
+    std::string BaseToString() const;
 
   protected:
     // FilmBase Protected Members

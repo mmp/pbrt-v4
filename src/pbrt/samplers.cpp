@@ -260,14 +260,15 @@ std::string PMJ02BNSampler::ToString() const {
                         pixelSamples);
 }
 
-std::string RandomSampler::ToString() const {
-    return StringPrintf("[ RandomSampler samplesPerPixel: %d seed: %d rng: %s ]",
+std::string IndependentSampler::ToString() const {
+    return StringPrintf("[ IndependentSampler samplesPerPixel: %d seed: %d rng: %s ]",
                         samplesPerPixel, seed, rng);
 }
 
-std::vector<Sampler> RandomSampler::Clone(int n, Allocator alloc) {
+std::vector<Sampler> IndependentSampler::Clone(int n, Allocator alloc) {
     std::vector<Sampler> samplers(n);
-    RandomSampler *samplerMem = (RandomSampler *)alloc.allocate_object<RandomSampler>(n);
+    IndependentSampler *samplerMem =
+        (IndependentSampler *)alloc.allocate_object<IndependentSampler>(n);
     for (int i = 0; i < n; ++i) {
         alloc.construct(&samplerMem[i], *this);
         samplers[i] = &samplerMem[i];
@@ -275,13 +276,13 @@ std::vector<Sampler> RandomSampler::Clone(int n, Allocator alloc) {
     return samplers;
 }
 
-RandomSampler *RandomSampler::Create(const ParameterDictionary &parameters,
-                                     const FileLoc *loc, Allocator alloc) {
+IndependentSampler *IndependentSampler::Create(const ParameterDictionary &parameters,
+                                               const FileLoc *loc, Allocator alloc) {
     int ns = parameters.GetOneInt("pixelsamples", 4);
     if (Options->pixelSamples)
         ns = *Options->pixelSamples;
     int seed = parameters.GetOneInt("seed", Options->seed);
-    return alloc.new_object<RandomSampler>(ns, seed);
+    return alloc.new_object<IndependentSampler>(ns, seed);
 }
 
 // SobolSampler Method Definitions
@@ -470,8 +471,8 @@ Sampler Sampler::Create(const std::string &name, const ParameterDictionary &para
         sampler = SobolSampler::Create(parameters, fullResolution, loc, alloc);
     else if (name == "zsobol")
         sampler = ZSobolSampler::Create(parameters, fullResolution, loc, alloc);
-    else if (name == "random")
-        sampler = RandomSampler::Create(parameters, loc, alloc);
+    else if (name == "independent")
+        sampler = IndependentSampler::Create(parameters, loc, alloc);
     else if (name == "stratified")
         sampler = StratifiedSampler::Create(parameters, loc, alloc);
     else

@@ -63,7 +63,7 @@ void GPUPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
             // Initialize remainder of _PixelSampleState_ for ray
             pixelSampleState.L[pixelIndex] = SampledSpectrum(0.f);
             pixelSampleState.lambda[pixelIndex] = lambda;
-            pixelSampleState.filterWeight[pixelIndex] = cameraSample.weight;
+            pixelSampleState.filterWeight[pixelIndex] = cameraSample.filterWeight;
             if (initializeVisibleSurface)
                 pixelSampleState.visibleSurface[pixelIndex] = VisibleSurface();
 

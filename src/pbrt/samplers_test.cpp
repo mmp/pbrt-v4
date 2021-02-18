@@ -21,7 +21,7 @@ TEST(Sampler, ConsistentValues) {
 
     std::vector<Sampler> samplers;
     samplers.push_back(new HaltonSampler(spp, resolution));
-    samplers.push_back(new RandomSampler(spp));
+    samplers.push_back(new IndependentSampler(spp));
     samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::None));
     samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::PermuteDigits));
     samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::FastOwen));
