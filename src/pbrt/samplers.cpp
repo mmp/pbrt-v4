@@ -110,8 +110,8 @@ std::vector<Sampler> SobolSampler::Clone(int n, Allocator alloc) {
 
 std::string PaddedSobolSampler::ToString() const {
     return StringPrintf("[ PaddedSobolSampler pixel: %s sampleIndex: %d dimension: %d "
-                        "samplesPerPixel: %d randomize: %s ]",
-                        pixel, sampleIndex, dimension, samplesPerPixel, randomize);
+                        "samplesPerPixel: %d seed: %d randomize: %s ]",
+                        pixel, sampleIndex, dimension, samplesPerPixel, seed, randomize);
 }
 
 std::vector<Sampler> PaddedSobolSampler::Clone(int n, Allocator alloc) {
@@ -132,6 +132,7 @@ PaddedSobolSampler *PaddedSobolSampler::Create(const ParameterDictionary &parame
         nsamp = *Options->pixelSamples;
     if (Options->quickRender)
         nsamp = 1;
+    int seed = parameters.GetOneInt("seed", Options->seed);
 
     RandomizeStrategy randomizer;
     std::string s = parameters.GetOneString("randomization", "fastowen");
@@ -147,7 +148,7 @@ PaddedSobolSampler *PaddedSobolSampler::Create(const ParameterDictionary &parame
         ErrorExit(loc, "%s: unknown randomization strategy given to PaddedSobolSampler",
                   s);
 
-    return alloc.new_object<PaddedSobolSampler>(nsamp, randomizer);
+    return alloc.new_object<PaddedSobolSampler>(nsamp, randomizer, seed);
 }
 
 // ZSobolSampler Method Definitions

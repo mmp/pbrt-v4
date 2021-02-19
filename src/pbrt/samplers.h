@@ -148,8 +148,8 @@ class PaddedSobolSampler {
     static PaddedSobolSampler *Create(const ParameterDictionary &parameters,
                                       const FileLoc *loc, Allocator alloc);
 
-    PaddedSobolSampler(int samplesPerPixel, RandomizeStrategy randomizer)
-        : samplesPerPixel(samplesPerPixel), randomize(randomizer) {
+    PaddedSobolSampler(int samplesPerPixel, RandomizeStrategy randomizer, int seed = 0)
+        : samplesPerPixel(samplesPerPixel), randomize(randomizer), seed(seed) {
         if (!IsPowerOf2(samplesPerPixel))
             Warning("Sobol samplers with non power-of-two sample counts (%d) are "
                     "sub-optimal.",
@@ -170,7 +170,7 @@ class PaddedSobolSampler {
     Float Get1D() {
         // Get permuted index for current pixel sample
         uint64_t hash = MixBits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
-                                ((uint64_t)dimension << 16) ^ GetOptions().seed);
+                                ((uint64_t)dimension << 16) ^ seed);
         int index = PermutationElement(sampleIndex, samplesPerPixel, hash);
 
         int dim = dimension++;
@@ -182,7 +182,7 @@ class PaddedSobolSampler {
     Point2f Get2D() {
         // Get permuted index for current pixel sample
         uint64_t hash = MixBits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
-                                ((uint64_t)dimension << 16) ^ GetOptions().seed);
+                                ((uint64_t)dimension << 16) ^ seed);
         int index = PermutationElement(sampleIndex, samplesPerPixel, hash);
 
         int dim = dimension;
@@ -213,7 +213,7 @@ class PaddedSobolSampler {
     }
 
     // PaddedSobolSampler Private Members
-    int samplesPerPixel;
+    int samplesPerPixel, seed;
     RandomizeStrategy randomize;
     Point2i pixel;
     int sampleIndex, dimension;
@@ -226,14 +226,11 @@ class ZSobolSampler {
     ZSobolSampler(int samplesPerPixel, Point2i fullResolution,
                   RandomizeStrategy randomize, int seed = 0)
         : randomize(randomize), seed(seed) {
-        if (!IsPowerOf2(samplesPerPixel)) {
-            Warning("Rounding %d up to the next power of two for \"zsobol\" sampler "
-                    "samples per pixel.",
+        if (!IsPowerOf2(samplesPerPixel))
+            Warning("Sobol samplers with non power-of-two sample counts (%d) are "
+                    "sub-optimal.",
                     samplesPerPixel);
-            samplesPerPixel = RoundUpPow2(samplesPerPixel);
-        }
         log2SamplesPerPixel = Log2Int(samplesPerPixel);
-
         int res = RoundUpPow2(std::max(fullResolution.x, fullResolution.y));
         int log4SamplesPerPixel = (log2SamplesPerPixel + 1) / 2;
         nBase4Digits = Log2Int(res) + log4SamplesPerPixel;
@@ -252,11 +249,7 @@ class ZSobolSampler {
     PBRT_CPU_GPU
     void StartPixelSample(const Point2i &p, int index, int dim) {
         dimension = dim;
-        bool pow2Samples = log2SamplesPerPixel & 1;
-        if (pow2Samples)
-            index <<= 1;
-        mortonIndex =
-            (EncodeMorton2(p.x, p.y) << ((log2SamplesPerPixel + 1) & ~1)) | index;
+        mortonIndex = (EncodeMorton2(p.x, p.y) << log2SamplesPerPixel) | index;
     }
 
     PBRT_CPU_GPU
@@ -304,6 +297,7 @@ class ZSobolSampler {
 
     PBRT_CPU_GPU
     uint64_t GetSampleIndex() const {
+        // Define the full set of 4-way permutations in _permutations_
         static const uint8_t permutations[24][4] = {
             {0, 1, 2, 3},
             {0, 1, 3, 2},
@@ -332,22 +326,24 @@ class ZSobolSampler {
             {3, 0, 1, 2}
 
         };
+
         uint64_t sampleIndex = 0;
+        // Apply random permutations to full base-4 digits
         bool pow2Samples = log2SamplesPerPixel & 1;
         int lastDigit = pow2Samples ? 1 : 0;
         for (int i = nBase4Digits - 1; i >= lastDigit; --i) {
             // Randomly permute $i$th base 4 digit in _mortonIndex_
-            int digitShift = 2 * i;
+            int digitShift = 2 * i - (pow2Samples ? 1 : 0);
             int digit = (mortonIndex >> digitShift) & 3;
             int p = HashPerm(mortonIndex >> (digitShift + 2));
             digit = permutations[p][digit];
             sampleIndex |= uint64_t(digit) << digitShift;
         }
+
         // Handle power-of-2 (but not 4) sample count
         if (pow2Samples) {
-            sampleIndex |= (mortonIndex & 3);
-            sampleIndex >>= 1;
-            sampleIndex ^= MixBits((mortonIndex >> 2) ^ (0x55555555 * dimension)) & 1;
+            sampleIndex |= mortonIndex & 1;
+            sampleIndex ^= MixBits((mortonIndex >> 1) ^ (0x55555555 * dimension)) & 1;
         }
 
         return sampleIndex;
@@ -362,7 +358,7 @@ class ZSobolSampler {
 
     // ZSobolSampler Private Members
     RandomizeStrategy randomize;
-    int log2SamplesPerPixel, seed, nBase4Digits;
+    int seed, log2SamplesPerPixel, nBase4Digits;
     uint64_t mortonIndex;
     int dimension;
 };
