@@ -10,7 +10,6 @@
 #include <pbrt/media.h>
 #include <pbrt/paramdict.h>
 #include <pbrt/textures.h>
-#include <pbrt/util/bits.h>
 #include <pbrt/util/color.h>
 #include <pbrt/util/colorspace.h>
 #include <pbrt/util/error.h>

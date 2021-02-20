@@ -539,7 +539,6 @@ SET (PBRT_UTIL_SOURCE
 
 SET (PBRT_UTIL_SOURCE_HEADERS
   src/pbrt/util/args.h
-  src/pbrt/util/bits.h
   src/pbrt/util/bluenoise.h
   src/pbrt/util/buffercache.h
   src/pbrt/util/check.h
@@ -892,7 +891,6 @@ set (PBRT_TEST_SOURCE
   src/pbrt/cpu/integrators_test.cpp
 
   src/pbrt/util/args_test.cpp
-  src/pbrt/util/bits_test.cpp
   src/pbrt/util/buffercache_test.cpp
   src/pbrt/util/color_test.cpp
   src/pbrt/util/containers_test.cpp

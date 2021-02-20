@@ -6,7 +6,6 @@
 
 #include <pbrt/interaction.h>
 #include <pbrt/lights.h>
-#include <pbrt/util/bits.h>
 #include <pbrt/util/check.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/lowdiscrepancy.h>

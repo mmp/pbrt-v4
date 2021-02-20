@@ -7,9 +7,9 @@
 #include <pbrt/interaction.h>
 #include <pbrt/paramdict.h>
 #include <pbrt/shapes.h>
-#include <pbrt/util/bits.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/log.h>
+#include <pbrt/util/math.h>
 #include <pbrt/util/memory.h>
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/print.h>

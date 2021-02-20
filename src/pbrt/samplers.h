@@ -10,7 +10,6 @@
 #include <pbrt/base/sampler.h>
 #include <pbrt/filters.h>
 #include <pbrt/options.h>
-#include <pbrt/util/bits.h>
 #include <pbrt/util/bluenoise.h>
 #include <pbrt/util/check.h>
 #include <pbrt/util/error.h>
@@ -255,9 +254,9 @@ class ZSobolSampler {
     PBRT_CPU_GPU
     Float Get1D() {
         uint64_t sampleIndex = GetSampleIndex();
-        uint32_t sampleHash = MixBits(dimension ^ seed);
         ++dimension;
         // Generate 1D Sobol sample at _sampleIndex_
+        uint32_t sampleHash = MixBits(dimension ^ seed);
         if (randomize == RandomizeStrategy::None)
             return SobolSample(sampleIndex, 0, NoRandomizer());
         else if (randomize == RandomizeStrategy::PermuteDigits)
@@ -271,10 +270,10 @@ class ZSobolSampler {
     PBRT_CPU_GPU
     Point2f Get2D() {
         uint64_t sampleIndex = GetSampleIndex();
-        uint64_t bits = MixBits(dimension ^ seed);
-        uint32_t sampleHash[2] = {uint32_t(bits), uint32_t(bits >> 32)};
         dimension += 2;
         // Generate 2D Sobol sample at _sampleIndex_
+        uint64_t bits = MixBits(dimension ^ seed);
+        uint32_t sampleHash[2] = {uint32_t(bits), uint32_t(bits >> 32)};
         if (randomize == RandomizeStrategy::None)
             return {SobolSample(sampleIndex, 0, NoRandomizer()),
                     SobolSample(sampleIndex, 1, NoRandomizer())};
@@ -335,27 +334,25 @@ class ZSobolSampler {
             // Randomly permute $i$th base 4 digit in _mortonIndex_
             int digitShift = 2 * i - (pow2Samples ? 1 : 0);
             int digit = (mortonIndex >> digitShift) & 3;
-            int p = HashPerm(mortonIndex >> (digitShift + 2));
+            // Choose permutation _p_ to use for _digit_
+            uint64_t higherDigits = mortonIndex >> (digitShift + 2);
+            int p = (MixBits(higherDigits ^ (0x55555555 * dimension)) >> 24) % 24;
+
             digit = permutations[p][digit];
             sampleIndex |= uint64_t(digit) << digitShift;
         }
 
         // Handle power-of-2 (but not 4) sample count
         if (pow2Samples) {
-            sampleIndex |= mortonIndex & 1;
-            sampleIndex ^= MixBits((mortonIndex >> 1) ^ (0x55555555 * dimension)) & 1;
+            int digit = mortonIndex & 1;
+            sampleIndex |=
+                digit ^ (MixBits((mortonIndex >> 1) ^ (0x55555555 * dimension)) & 1);
         }
 
         return sampleIndex;
     }
 
   private:
-    // ZSobolSampler Private Methods
-    PBRT_CPU_GPU
-    int HashPerm(uint64_t index) const {
-        return uint32_t(MixBits(index ^ (0x55555555 * dimension)) >> 24) % 24;
-    }
-
     // ZSobolSampler Private Members
     RandomizeStrategy randomize;
     int seed, log2SamplesPerPixel, nBase4Digits;
