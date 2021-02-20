@@ -9,6 +9,7 @@
 
 #include <pbrt/util/check.h>
 #include <pbrt/util/float.h>
+#include <pbrt/util/hash.h>
 #include <pbrt/util/math.h>
 #include <pbrt/util/pstd.h>
 

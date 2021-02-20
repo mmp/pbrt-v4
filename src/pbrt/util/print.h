@@ -280,10 +280,9 @@ done:
 
 // Printing Function Declarations
 template <typename... Args>
-inline std::string StringPrintf(const char *fmt, Args &&... args);
-
-template <typename... Args>
 void Printf(const char *fmt, Args &&... args);
+template <typename... Args>
+inline std::string StringPrintf(const char *fmt, Args &&... args);
 
 template <typename... Args>
 inline std::string StringPrintf(const char *fmt, Args &&... args) {

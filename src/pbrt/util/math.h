@@ -111,8 +111,7 @@ inline uint32_t LeftShift3(uint32_t x) {
     return x;
 }
 
-PBRT_CPU_GPU
-inline uint32_t EncodeMorton3(float x, float y, float z) {
+PBRT_CPU_GPU inline uint32_t EncodeMorton3(float x, float y, float z) {
     DCHECK_GE(x, 0);
     DCHECK_GE(y, 0);
     DCHECK_GE(z, 0);
@@ -152,18 +151,6 @@ inline uint32_t Compact1By2(uint32_t x) {
     x = (x ^ (x >> 8)) & 0xff0000ff;   // x = ---- --98 ---- ---- ---- ---- 7654 3210
     x = (x ^ (x >> 16)) & 0x000003ff;  // x = ---- ---- ---- ---- ---- --98 7654 3210
     return x;
-}
-
-// http://zimbry.blogspot.ch/2011/09/better-bit-mixing-improving-on.html
-PBRT_CPU_GPU inline uint64_t MixBits(uint64_t v);
-
-inline uint64_t MixBits(uint64_t v) {
-    v ^= (v >> 31);
-    v *= 0x7fb5d329728ea185;
-    v ^= (v >> 27);
-    v *= 0x81dadef4bc2dd44d;
-    v ^= (v >> 33);
-    return v;
 }
 
 // CompensatedSum Definition
@@ -638,6 +625,8 @@ InnerProduct(T... terms) {
 PBRT_CPU_GPU inline bool Quadratic(float a, float b, float c, float *t0, float *t1) {
     // Handle case of $a=0$ for quadratic solution
     if (a == 0) {
+        if (b == 0)
+            return false;
         *t0 = *t1 = -c / b;
         return true;
     }

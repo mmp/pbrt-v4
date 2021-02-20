@@ -26,12 +26,12 @@ void DisconnectFromDisplayServer();
 void DisplayStatic(
     const std::string &title, const Point2i &resolution,
     std::vector<std::string> channelNames,
-    std::function<void(Bounds2i, pstd::span<pstd::span<Float>>)> getTileValues);
+    std::function<void(Bounds2i, pstd::span<pstd::span<Float>>)> getValues);
 
 void DisplayDynamic(
     const std::string &title, const Point2i &resolution,
     std::vector<std::string> channelNames,
-    std::function<void(Bounds2i, pstd::span<pstd::span<Float>>)> getTileValues);
+    std::function<void(Bounds2i, pstd::span<pstd::span<Float>>)> getValues);
 
 void DisplayStatic(const std::string &title, const Image &image,
                    pstd::optional<ImageChannelDesc> channelDesc = {});

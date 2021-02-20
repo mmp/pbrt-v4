@@ -13,7 +13,7 @@
 
 namespace pbrt {
 
-// Bezier Spline Inline Functions
+// Bezier Inline Functions
 template <typename P>
 PBRT_CPU_GPU inline P BlossomCubicBezier(pstd::span<const P> p, Float u0, Float u1,
                                          Float u2) {
