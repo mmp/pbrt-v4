@@ -115,17 +115,26 @@ class PixelStatsAccumulator {
         var = 0;                                                       \
     });
 
-#define STAT_INT_DISTRIBUTION(title, var)                                             \
-    static thread_local int64_t var##sum;                                             \
-    static thread_local int64_t var##count;                                           \
-    static thread_local int64_t var##min(std::numeric_limits<int64_t>::max());        \
-    static thread_local int64_t var##max(std::numeric_limits<int64_t>::lowest());     \
-    static StatRegisterer STATS_REG##var([](StatsAccumulator &accum) {                \
-        accum.ReportIntDistribution(title, var##sum, var##count, var##min, var##max); \
-        var##sum = 0;                                                                 \
-        var##count = 0;                                                               \
-        var##min = int64_t(std::numeric_limits<int64_t>::max());                      \
-        var##max = int64_t(std::numeric_limits<int64_t>::lowest());                   \
+struct StatIntDistribution {
+    int64_t sum = 0, count = 0;
+    int64_t min = std::numeric_limits<int64_t>::max();
+    int64_t max = std::numeric_limits<int64_t>::lowest();
+    void operator<<(int64_t value) {
+        sum += value;
+        count += 1;
+        min = (value < min) ? value : min;
+        max = (value > max) ? value : max;
+    }
+};
+
+#define STAT_INT_DISTRIBUTION(title, var)                                         \
+    static thread_local StatIntDistribution var;                                  \
+    static StatRegisterer STATS_REG##var([](StatsAccumulator &accum) {            \
+        accum.ReportIntDistribution(title, var.sum, var.count, var.min, var.max); \
+        var.sum = 0;                                                              \
+        var.count = 0;                                                            \
+        var.min = int64_t(std::numeric_limits<int64_t>::max());                   \
+        var.max = int64_t(std::numeric_limits<int64_t>::lowest());                \
     });
 
 #define STAT_FLOAT_DISTRIBUTION(title, var)                                             \
@@ -177,14 +186,6 @@ class PixelStatsAccumulator {
             numVar = 0;                                                               \
             denomVar = 0;                                                             \
         });
-
-#define ReportValue(var, value)                           \
-    do {                                                  \
-        var##sum += value;                                \
-        var##count += 1;                                  \
-        var##min = (value < var##min) ? value : var##min; \
-        var##max = (value > var##max) ? value : var##max; \
-    } while (0)
 
 }  // namespace pbrt
 

@@ -248,11 +248,6 @@ class TaggedPointer {
         return DispatchSplitCPU<n>()(func, *this, Tag(), Types());
     }
 
-    template <typename F>
-    static void ForEachType(F func) {
-        pbrt::ForEachType(func, Types());
-    }
-
   private:
     static_assert(sizeof(uintptr_t) == 8, "Expected uintptr_t to be 64 bits");
     // TaggedPointer Private Members

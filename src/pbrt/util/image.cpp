@@ -837,8 +837,7 @@ static ImageAndMetadata ReadPFM(const std::string &filename, Allocator alloc);
 static ImageAndMetadata ReadHDR(const std::string &filename, Allocator alloc);
 
 // ImageIO Function Definitions
-ImageAndMetadata Image::Read(const std::string &name, Allocator alloc,
-                             ColorEncoding encoding) {
+ImageAndMetadata Image::Read(std::string name, Allocator alloc, ColorEncoding encoding) {
     if (HasExtension(name, "exr"))
         return ReadEXR(name, alloc);
     else if (HasExtension(name, "png"))

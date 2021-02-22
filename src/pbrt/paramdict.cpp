@@ -785,7 +785,7 @@ std::vector<std::string> TextureParameterDictionary::GetStringArray(
     return dict->GetStringArray(name);
 }
 
-SpectrumTexture TextureParameterDictionary::GetSpectrumTexture(const std::string &name,
+SpectrumTexture TextureParameterDictionary::GetSpectrumTexture(std::string name,
                                                                Spectrum defaultValue,
                                                                SpectrumType spectrumType,
                                                                Allocator alloc) const {
@@ -799,7 +799,7 @@ SpectrumTexture TextureParameterDictionary::GetSpectrumTexture(const std::string
 }
 
 SpectrumTexture TextureParameterDictionary::GetSpectrumTextureOrNull(
-    const std::string &name, SpectrumType spectrumType, Allocator alloc) const {
+    std::string name, SpectrumType spectrumType, Allocator alloc) const {
     const auto &spectrumTextures = (spectrumType == SpectrumType::Unbounded)
                                        ? textures->unboundedSpectrumTextures
                                        : ((spectrumType == SpectrumType::Albedo)

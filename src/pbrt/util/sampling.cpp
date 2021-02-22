@@ -392,7 +392,7 @@ Float SampleCatmullRom(pstd::span<const Float> nodes, pstd::span<const Float> f,
     Float d1 = (i + 2 < nodes.size()) ? width * (f[i + 2] - f0) / (nodes[i + 2] - x0)
                                       : (f1 - f0);
 
-    // Re-scale _u_ for continous spline sampling step
+    // Re-scale _u_ for continuous spline sampling step
     u = (u - F[i]) / width;
 
     // Invert definite integral over spline segment

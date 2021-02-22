@@ -140,7 +140,7 @@ void ThreadPool::WorkOrWait(std::unique_lock<std::mutex> *lock) {
     DCHECK(lock->owns_lock());
 
     ParallelJob *job = jobList;
-    while ((job != nullptr) && !job->HaveWork())
+    while (job != nullptr && !job->HaveWork())
         job = job->next;
     if (job != nullptr) {
         // Execute work for _job_
@@ -304,7 +304,7 @@ void ParallelForLoop2D::RunStep(std::unique_lock<std::mutex> *lock) {
     func(b);
 }
 
-// Parallel Function Defintions
+// Parallel Function Definitions
 void ParallelFor(int64_t start, int64_t end, std::function<void(int64_t, int64_t)> func) {
     CHECK(threadPool);
     // Compute chunk size and possibly run entire loop on current thread

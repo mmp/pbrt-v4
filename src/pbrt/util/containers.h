@@ -814,9 +814,7 @@ class SampledGrid {
                         Lookup(pi + Vector3i(1, 0, 1), convert));
         auto d11 = Lerp(d.x, Lookup(pi + Vector3i(0, 1, 1), convert),
                         Lookup(pi + Vector3i(1, 1, 1), convert));
-        auto d0 = Lerp(d.y, d00, d10);
-        auto d1 = Lerp(d.y, d01, d11);
-        return Lerp(d.z, d0, d1);
+        return Lerp(d.z, Lerp(d.y, d00, d10), Lerp(d.y, d01, d11));
     }
 
     PBRT_CPU_GPU

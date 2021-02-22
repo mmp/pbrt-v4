@@ -755,7 +755,7 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
             DCHECK(!IsInf(beta.y(lambda)));
         }
     }
-    ReportValue(pathLength, depth);
+    pathLength << depth;
     return L;
 }
 
@@ -2386,7 +2386,7 @@ SampledSpectrum ConnectBDPT(const Integrator &integrator, SampledWavelengths &la
     ++totalPaths;
     if (!L)
         ++zeroRadiancePaths;
-    ReportValue(pathLength, s + t - 2);
+    pathLength << s + t - 2;
     // Compute MIS weight for connection strategy
     Float misWeight = L ? MISWeight(integrator, lightVertices, cameraVertices, sampled, s,
                                     t, lightSampler)
@@ -3009,9 +3009,9 @@ void SPPMIntegrator::Render() {
                                 while (!grid[h].compare_exchange_weak(node->next, node))
                                     ;
                             }
-                    ReportValue(gridCellsPerVisiblePoint, (1 + pMax.x - pMin.x) *
-                                                              (1 + pMax.y - pMin.y) *
-                                                              (1 + pMax.z - pMin.z));
+                    gridCellsPerVisiblePoint << (1 + pMax.x - pMin.x) *
+                                                    (1 + pMax.y - pMin.y) *
+                                                    (1 + pMax.z - pMin.z);
                 }
             }
         });

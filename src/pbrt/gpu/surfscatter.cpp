@@ -54,7 +54,7 @@ struct EvaluateMaterialCallback {
 
 // GPUPathIntegrator Surface Scattering Methods
 void GPUPathIntegrator::EvaluateMaterialsAndBSDFs(int depth) {
-    Material::ForEachType(EvaluateMaterialCallback{depth, this});
+    ForEachType(EvaluateMaterialCallback{depth, this}, Material::Types());
 }
 
 template <typename Mtl>

@@ -35,8 +35,8 @@ struct SceneEntity {
     }
 
     std::string name;
-    ParameterDictionary parameters;
     FileLoc loc;
+    ParameterDictionary parameters;
 };
 
 struct TransformedSceneEntity : public SceneEntity {

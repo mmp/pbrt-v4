@@ -197,10 +197,9 @@ class TextureParameterDictionary {
 
     void ReportUnused() const;
 
-    SpectrumTexture GetSpectrumTexture(const std::string &name, Spectrum defaultValue,
+    SpectrumTexture GetSpectrumTexture(std::string name, Spectrum defaultValue,
                                        SpectrumType spectrumType, Allocator alloc) const;
-    SpectrumTexture GetSpectrumTextureOrNull(const std::string &name,
-                                             SpectrumType spectrumType,
+    SpectrumTexture GetSpectrumTextureOrNull(std::string name, SpectrumType spectrumType,
                                              Allocator alloc) const;
 
   private:

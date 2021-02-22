@@ -459,19 +459,19 @@ DebugMLTSampler DebugMLTSampler::Create(pstd::span<const std::string> state,
 
 // Sampler Method Definitions
 Sampler Sampler::Create(const std::string &name, const ParameterDictionary &parameters,
-                        Point2i fullResolution, const FileLoc *loc, Allocator alloc) {
+                        Point2i fullRes, const FileLoc *loc, Allocator alloc) {
     Sampler sampler = nullptr;
-    if (name == "pmj02bn")
-        sampler = PMJ02BNSampler::Create(parameters, loc, alloc);
+    if (name == "zsobol")
+        sampler = ZSobolSampler::Create(parameters, fullRes, loc, alloc);
     // Create remainder of _Sampler_ types
     else if (name == "paddedsobol")
         sampler = PaddedSobolSampler::Create(parameters, loc, alloc);
     else if (name == "halton")
-        sampler = HaltonSampler::Create(parameters, fullResolution, loc, alloc);
+        sampler = HaltonSampler::Create(parameters, fullRes, loc, alloc);
     else if (name == "sobol")
-        sampler = SobolSampler::Create(parameters, fullResolution, loc, alloc);
-    else if (name == "zsobol")
-        sampler = ZSobolSampler::Create(parameters, fullResolution, loc, alloc);
+        sampler = SobolSampler::Create(parameters, fullRes, loc, alloc);
+    else if (name == "pmj02bn")
+        sampler = PMJ02BNSampler::Create(parameters, loc, alloc);
     else if (name == "independent")
         sampler = IndependentSampler::Create(parameters, loc, alloc);
     else if (name == "stratified")

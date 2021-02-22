@@ -236,11 +236,12 @@ class Image {
     PBRT_CPU_GPU
     Point2i Resolution() const { return resolution; }
     PBRT_CPU_GPU
-    operator bool() const { return resolution.x > 0 && resolution.y > 0; }
-    PBRT_CPU_GPU
     int NChannels() const { return channelNames.size(); }
     std::vector<std::string> ChannelNames() const;
     const ColorEncoding Encoding() const { return encoding; }
+
+    PBRT_CPU_GPU
+    operator bool() const { return resolution.x > 0 && resolution.y > 0; }
 
     PBRT_CPU_GPU
     size_t PixelOffset(Point2i p) const {
@@ -333,7 +334,7 @@ class Image {
         return GetSamplingDistribution([](Point2f) { return Float(1); });
     }
 
-    static ImageAndMetadata Read(const std::string &filename, Allocator alloc = {},
+    static ImageAndMetadata Read(std::string filename, Allocator alloc = {},
                                  ColorEncoding encoding = nullptr);
 
     bool Write(std::string name, const ImageMetadata &metadata = {}) const;
@@ -444,11 +445,11 @@ inline Array2D<Float> Image::GetSamplingDistribution(F dxdA, const Bounds2f &dom
     ParallelFor(0, resolution[1], [&](int64_t y0, int64_t y1) {
         for (int y = y0; y < y1; ++y) {
             for (int x = 0; x < resolution[0]; ++x) {
-                // This is noticably better than MaxValue: discuss / show
+                // This is noticeably better than MaxValue: discuss / show
                 // example..
                 Float value = GetChannels({x, y}).Average();
 
-                // Assume jacobian term is basically constant over the
+                // Assume Jacobian term is basically constant over the
                 // region.
                 Point2f p = domain.Lerp(
                     Point2f((x + .5f) / resolution[0], (y + .5f) / resolution[1]));

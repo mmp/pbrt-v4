@@ -27,7 +27,7 @@ struct BasicPBRTOptions {
     RenderingCoordinateSystem renderingSpace = RenderingCoordinateSystem::CameraWorld;
 };
 
-// PBRTOptions Definiton
+// PBRTOptions Definition
 struct PBRTOptions : BasicPBRTOptions {
     int nThreads = 0;
     LogLevel logLevel = LogLevel::Error;
