@@ -251,7 +251,7 @@ class TaggedPointer {
   private:
     static_assert(sizeof(uintptr_t) == 8, "Expected uintptr_t to be 64 bits");
     // TaggedPointer Private Members
-    static constexpr int tagShift = 48;
+    static constexpr int tagShift = 57;
     static constexpr int tagBits = 64 - tagShift;
     static constexpr uint64_t tagMask = ((1ull << tagBits) - 1) << tagShift;
     static constexpr uint64_t ptrMask = ~tagMask;
