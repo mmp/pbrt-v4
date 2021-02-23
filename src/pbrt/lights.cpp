@@ -960,6 +960,8 @@ ImageInfiniteLight::ImageInfiniteLight(Transform renderFromLight, Image im,
     Float average = std::accumulate(d.begin(), d.end(), 0.) / d.size();
     for (Float &v : d)
         v = std::max<Float>(v - average, 0);
+    if (std::all_of(d.begin(), d.end(), [](Float v) { return v == 0; }))
+        std::fill(d.begin(), d.end(), Float(1));
     compensatedDistribution = PiecewiseConstant2D(d, domain, alloc);
 }
 
