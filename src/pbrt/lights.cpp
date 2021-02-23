@@ -959,7 +959,7 @@ ImageInfiniteLight::ImageInfiniteLight(Transform renderFromLight, Image im,
     // Initialize compensated PDF for image infinite area light
     Float average = std::accumulate(d.begin(), d.end(), 0.) / d.size();
     for (Float &v : d)
-        v = std::max<Float>(v - average, std::min<Float>(.001f * average, v));
+        v = std::max<Float>(v - average, 0);
     compensatedDistribution = PiecewiseConstant2D(d, domain, alloc);
 }
 
