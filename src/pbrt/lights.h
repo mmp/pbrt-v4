@@ -145,6 +145,7 @@ class LightBase {
                       const SampledWavelengths &lambda) const {
         return SampledSpectrum(0.f);
     }
+
     PBRT_CPU_GPU
     SampledSpectrum Le(const Ray &, const SampledWavelengths &) const {
         return SampledSpectrum(0.f);
@@ -172,7 +173,7 @@ class PointLight : public LightBase {
                               const ParameterDictionary &parameters,
                               const RGBColorSpace *colorSpace, const FileLoc *loc,
                               Allocator alloc);
-    SampledSpectrum Phi(const SampledWavelengths &lambda) const;
+    SampledSpectrum Phi(SampledWavelengths lambda) const;
     void Preprocess(const Bounds3f &sceneBounds) {}
 
     PBRT_CPU_GPU
@@ -224,7 +225,7 @@ class DistantLight : public LightBase {
                                 const RGBColorSpace *colorSpace, const FileLoc *loc,
                                 Allocator alloc);
 
-    SampledSpectrum Phi(const SampledWavelengths &lambda) const;
+    SampledSpectrum Phi(SampledWavelengths lambda) const;
 
     PBRT_CPU_GPU
     Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const { return 0; }
@@ -271,7 +272,7 @@ class ProjectionLight : public LightBase {
   public:
     // ProjectionLight Public Methods
     ProjectionLight(Transform renderFromLight, MediumInterface medium, Image image,
-                    const RGBColorSpace *colorSpace, Float scale, Float fov, Float power,
+                    const RGBColorSpace *colorSpace, Float scale, Float fov,
                     Allocator alloc);
 
     static ProjectionLight *Create(const Transform &renderFromLight, Medium medium,
@@ -287,7 +288,7 @@ class ProjectionLight : public LightBase {
     PBRT_CPU_GPU
     SampledSpectrum I(Vector3f w, const SampledWavelengths &lambda) const;
 
-    SampledSpectrum Phi(const SampledWavelengths &lambda) const;
+    SampledSpectrum Phi(SampledWavelengths lambda) const;
 
     PBRT_CPU_GPU
     Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
@@ -339,7 +340,7 @@ class GoniometricLight : public LightBase {
                                            SampledWavelengths lambda,
                                            LightSamplingMode mode) const;
 
-    SampledSpectrum Phi(const SampledWavelengths &lambda) const;
+    SampledSpectrum Phi(SampledWavelengths lambda) const;
 
     PBRT_CPU_GPU
     Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
@@ -360,8 +361,8 @@ class GoniometricLight : public LightBase {
     std::string ToString() const;
 
     PBRT_CPU_GPU
-    SampledSpectrum I(Vector3f wl, const SampledWavelengths &lambda) const {
-        Point2f uv = EqualAreaSphereToSquare(wl);
+    SampledSpectrum I(Vector3f w, const SampledWavelengths &lambda) const {
+        Point2f uv = EqualAreaSphereToSquare(w);
         return scale * Iemit.Sample(lambda) * image.LookupNearestChannel(uv, 0);
     }
 
@@ -389,7 +390,7 @@ class DiffuseAreaLight : public LightBase {
 
     void Preprocess(const Bounds3f &sceneBounds) {}
 
-    SampledSpectrum Phi(const SampledWavelengths &lambda) const;
+    SampledSpectrum Phi(SampledWavelengths lambda) const;
 
     PBRT_CPU_GPU
     pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
@@ -414,10 +415,9 @@ class DiffuseAreaLight : public LightBase {
         if (image) {
             // Return _DiffuseAreaLight_ emission using image
             RGB rgb;
-            Point2f st = uv;
-            st[1] = 1 - st[1];
+            uv[1] = 1 - uv[1];
             for (int c = 0; c < 3; ++c)
-                rgb[c] = image.BilerpChannel(st, c);
+                rgb[c] = image.BilerpChannel(uv, c);
             return scale *
                    RGBIlluminantSpectrum(*imageColorSpace, ClampZero(rgb)).Sample(lambda);
 
@@ -455,7 +455,7 @@ class UniformInfiniteLight : public LightBase {
         sceneBounds.BoundingSphere(&sceneCenter, &sceneRadius);
     }
 
-    SampledSpectrum Phi(const SampledWavelengths &lambda) const;
+    SampledSpectrum Phi(SampledWavelengths lambda) const;
 
     PBRT_CPU_GPU
     SampledSpectrum Le(const Ray &ray, const SampledWavelengths &lambda) const;
@@ -501,7 +501,7 @@ class ImageInfiniteLight : public LightBase {
         sceneBounds.BoundingSphere(&sceneCenter, &sceneRadius);
     }
 
-    SampledSpectrum Phi(const SampledWavelengths &lambda) const;
+    SampledSpectrum Phi(SampledWavelengths lambda) const;
 
     PBRT_CPU_GPU
     Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
@@ -521,8 +521,8 @@ class ImageInfiniteLight : public LightBase {
 
     PBRT_CPU_GPU
     SampledSpectrum Le(const Ray &ray, const SampledWavelengths &lambda) const {
-        Vector3f wl = Normalize(renderFromLight.ApplyInverse(ray.d));
-        Point2f uv = EqualAreaSphereToSquare(wl);
+        Vector3f wLight = Normalize(renderFromLight.ApplyInverse(ray.d));
+        Point2f uv = EqualAreaSphereToSquare(wLight);
         return Le(uv, lambda);
     }
 
@@ -531,16 +531,18 @@ class ImageInfiniteLight : public LightBase {
                                            SampledWavelengths lambda,
                                            LightSamplingMode mode) const {
         // Find $(u,v)$ sample coordinates in infinite light texture
-        Float mapPDF;
-        Point2f uv = (mode == LightSamplingMode::WithMIS)
-                         ? compensatedDistribution.Sample(u, &mapPDF)
-                         : distribution.Sample(u, &mapPDF);
+        Float mapPDF = 0;
+        Point2f uv;
+        if (mode == LightSamplingMode::WithMIS)
+            uv = compensatedDistribution.Sample(u, &mapPDF);
+        else
+            uv = distribution.Sample(u, &mapPDF);
         if (mapPDF == 0)
             return {};
 
         // Convert infinite light sample point to direction
-        Vector3f wl = EqualAreaSquareToSphere(uv);
-        Vector3f wi = renderFromLight(wl);
+        Vector3f wLight = EqualAreaSquareToSphere(uv);
+        Vector3f wi = renderFromLight(wLight);
 
         // Compute PDF for sampled infinite light direction
         Float pdf = mapPDF / (4 * Pi);
@@ -560,8 +562,8 @@ class ImageInfiniteLight : public LightBase {
         RGB rgb;
         for (int c = 0; c < 3; ++c)
             rgb[c] = image.LookupNearestChannel(uv, c, WrapMode::OctahedralSphere);
-        return scale *
-               RGBIlluminantSpectrum(*imageColorSpace, ClampZero(rgb)).Sample(lambda);
+        RGBIlluminantSpectrum spec(*imageColorSpace, ClampZero(rgb));
+        return scale * spec.Sample(lambda);
     }
 
     // ImageInfiniteLight Private Members
@@ -587,7 +589,7 @@ class PortalImageInfiniteLight : public LightBase {
         sceneBounds.BoundingSphere(&sceneCenter, &sceneRadius);
     }
 
-    SampledSpectrum Phi(const SampledWavelengths &lambda) const;
+    SampledSpectrum Phi(SampledWavelengths lambda) const;
 
     PBRT_CPU_GPU
     SampledSpectrum Le(const Ray &ray, const SampledWavelengths &lambda) const;
@@ -692,9 +694,9 @@ class SpotLight : public LightBase {
     void Preprocess(const Bounds3f &sceneBounds) {}
 
     PBRT_CPU_GPU
-    SampledSpectrum I(Vector3f w, const SampledWavelengths &) const;
+    SampledSpectrum I(Vector3f w, SampledWavelengths) const;
 
-    SampledSpectrum Phi(const SampledWavelengths &lambda) const;
+    SampledSpectrum Phi(SampledWavelengths lambda) const;
 
     PBRT_CPU_GPU
     Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
@@ -721,8 +723,8 @@ class SpotLight : public LightBase {
         Point3f p = renderFromLight(Point3f(0, 0, 0));
         Vector3f wi = Normalize(p - ctx.p());
         // Compute incident radiance _Li_ for _SpotLight_
-        Vector3f wl = Normalize(renderFromLight.ApplyInverse(-wi));
-        SampledSpectrum Li = I(wl, lambda) / DistanceSquared(p, ctx.p());
+        Vector3f wLight = Normalize(renderFromLight.ApplyInverse(-wi));
+        SampledSpectrum Li = I(wLight, lambda) / DistanceSquared(p, ctx.p());
 
         if (!Li)
             return {};

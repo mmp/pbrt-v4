@@ -85,7 +85,7 @@ PowerLightSampler::PowerLightSampler(pstd::span<const Light> lights, Allocator a
 
     // Compute lights' power and initialize alias table
     std::vector<Float> lightPower;
-    SampledWavelengths lambda = SampledWavelengths::SampleXYZ(0.5);
+    SampledWavelengths lambda = SampledWavelengths::SampleXYZ(0.5f);
     for (const auto &light : lights) {
         SampledSpectrum phi = SafeDiv(light.Phi(lambda), lambda.PDF());
         lightPower.push_back(phi.Average());

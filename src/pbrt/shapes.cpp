@@ -184,7 +184,7 @@ pstd::optional<TriangleIntersection> IntersectTriangle(const Ray &ray, Float tMa
     // Apply shear transformation to translated vertex positions
     Float Sx = -d.x / d.z;
     Float Sy = -d.y / d.z;
-    Float Sz = 1.f / d.z;
+    Float Sz = 1 / d.z;
     p0t.x += Sx * p0t.z;
     p0t.y += Sy * p0t.z;
     p1t.x += Sx * p1t.z;
@@ -663,7 +663,7 @@ bool Curve::RecursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Poin
         Point3f pc =
             EvaluateCubicBezier(pstd::span<const Point3f>(cp), Clamp(w, 0, 1), &dpcdw);
         Float ptCurveDist2 = Sqr(pc.x) + Sqr(pc.y);
-        if (ptCurveDist2 > Sqr(hitWidth) * .25f)
+        if (ptCurveDist2 > Sqr(hitWidth) * 0.25f)
             return false;
         if (pc.z < 0 || pc.z > rayLength * tMax)
             return false;

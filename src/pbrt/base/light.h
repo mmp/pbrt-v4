@@ -59,7 +59,7 @@ class Light : public TaggedPointer<  // Light Source Types
                             const MediumInterface &mediumInterface, const Shape shape,
                             const FileLoc *loc, Allocator alloc);
 
-    SampledSpectrum Phi(const SampledWavelengths &lambda) const;
+    SampledSpectrum Phi(SampledWavelengths lambda) const;
 
     PBRT_CPU_GPU inline LightType Type() const;
 

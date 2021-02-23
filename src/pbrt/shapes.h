@@ -1266,7 +1266,7 @@ PBRT_CPU_GPU inline pstd::optional<BilinearIntersection> IntersectBilinearPatch(
     if (!Quadratic(a, b, c, &u1, &u2))
         return {};
 
-    // Compute $v$ and $t$ for to first $u$ intersection
+    // Compute $v$ and $t$ for the first $u$ intersection
     Float t = tMax, u, v;
     if (0 <= u1 && u1 <= 1) {
         // Precompute common terms for $v$ and $t$ computation
@@ -1292,7 +1292,7 @@ PBRT_CPU_GPU inline pstd::optional<BilinearIntersection> IntersectBilinearPatch(
         }
     }
 
-    // Compute $v$ and $t$ for to second $u$ intersection
+    // Compute $v$ and $t$ for the second $u$ intersection
     if (0 <= u2 && u2 <= 1 && u2 != u1) {
         Point3f uo = Lerp(u2, p00, p10);
         Vector3f ud = Lerp(u2, p01, p11) - uo;

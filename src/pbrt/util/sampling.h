@@ -987,7 +987,7 @@ class WindowedPiecewiseConstant2D {
     }
 
     PBRT_CPU_GPU
-    Float PDF(const Point2f &p, const Bounds2f &b) const {
+    Float PDF(Point2f p, const Bounds2f &b) const {
         if (sat.Integral(b) == 0)
             return 0;
         return Eval(p) / sat.Integral(b);
@@ -1015,7 +1015,7 @@ class WindowedPiecewiseConstant2D {
     }
 
     PBRT_CPU_GPU
-    Float Eval(const Point2f &p) const {
+    Float Eval(Point2f p) const {
         Point2i pi(std::min<int>(p[0] * func.xSize(), func.xSize() - 1),
                    std::min<int>(p[1] * func.ySize(), func.ySize() - 1));
         return func[pi];

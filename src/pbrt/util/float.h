@@ -152,7 +152,7 @@ inline double BitsToFloat(uint64_t ui) {
 PBRT_CPU_GPU
 inline float NextFloatUp(float v) {
     // Handle infinity and negative zero for _NextFloatUp()_
-    if (IsInf(v) && v > 0.)
+    if (IsInf(v) && v > 0.f)
         return v;
     if (v == -0.f)
         v = 0.f;
