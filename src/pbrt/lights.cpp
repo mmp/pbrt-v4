@@ -736,7 +736,7 @@ pstd::optional<LightBounds> DiffuseAreaLight::Bounds() const {
 
     } else
         phi = Lemit.MaxValue();
-    phi *= scale * (twoSided ? 2 : 1) * area * Pi;
+    phi *= scale * area * Pi;
 
     DirectionCone nb = shape.NormalBounds();
     return LightBounds(shape.Bounds(), nb.w, phi, nb.cosTheta, std::cos(Pi / 2),
