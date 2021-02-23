@@ -704,7 +704,7 @@ bool Curve::RecursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Poin
             }
 
             // Compute error bounds for curve intersection
-            Vector3f pError(2 * hitWidth, 2 * hitWidth, 2 * hitWidth);
+            Vector3f pError(hitWidth, hitWidth, hitWidth);
 
             bool flipNormal =
                 common->reverseOrientation ^ common->transformSwapsHandedness;
