@@ -344,7 +344,24 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
-        printf("    }\n\n");
+        printf("    }\n");
+        printf("    SOA &operator=(const SOA& s) {\n");
+        printf("        nAlloc = s.nAlloc;\n");
+        for (const auto &member : soa.members) {
+            for (int i = 0; i < member.names.size(); ++i) {
+                std::string name = member.names[i];
+                if (!member.arraySizes[i].empty()) {
+                    printf("        for (int i = 0; i < %s; ++i)\n",
+                           member.arraySizes[i].c_str());
+                    printf("            this->%s[i] = s.%s[i];\n", name.c_str(),
+                           name.c_str());
+                } else {
+                    printf("        this->%s = s.%s;\n", name.c_str(), name.c_str());
+                }
+            }
+        }
+        printf("        return *this;\n");
+        printf("    }\n");
 
         // operator[] madness...
         printf("    struct GetSetIndirector {\n");
