@@ -271,7 +271,7 @@ class BVHLightSampler {
     pstd::optional<SampledLight> Sample(const LightSampleContext &ctx, Float u) const {
         // Compute infinite light sampling probability _pInfinite_
         Float pInfinite = Float(infiniteLights.size()) /
-                          Float(infiniteLights.size() + (!nodes.empty() ? 1 : 0));
+                          Float(infiniteLights.size() + (nodes.empty() ? 0 : 1));
 
         if (u < pInfinite) {
             // Sample infinite lights with uniform probability
@@ -290,7 +290,7 @@ class BVHLightSampler {
             Normal3f n = ctx.ns;
             u = std::min<Float>((u - pInfinite) / (1 - pInfinite), OneMinusEpsilon);
             int nodeIndex = 0;
-            Float pdf = (1 - pInfinite);
+            Float pdf = 1 - pInfinite;
 
             while (true) {
                 // Process light BVH node for light sampling
@@ -328,7 +328,7 @@ class BVHLightSampler {
     Float PDF(const LightSampleContext &ctx, Light light) const {
         // Handle infinite _light_ PDF computation
         if (!lightToBitTrail.HasKey(light))
-            return 1.f / (infiniteLights.size() + (!nodes.empty() ? 1 : 0));
+            return 1.f / (infiniteLights.size() + (nodes.empty() ? 0 : 1));
 
         // Initialize local variables for BVH traversal for PDF computation
         uint32_t bitTrail = lightToBitTrail[light];
@@ -360,7 +360,7 @@ class BVHLightSampler {
         // Return final PDF accounting for infinite light sampling probability
         // Compute infinite light sampling probability _pInfinite_
         Float pInfinite = Float(infiniteLights.size()) /
-                          Float(infiniteLights.size() + (!nodes.empty() ? 1 : 0));
+                          Float(infiniteLights.size() + (nodes.empty() ? 0 : 1));
 
         return pdf * (1 - pInfinite);
     }
@@ -393,14 +393,14 @@ class BVHLightSampler {
         Float theta_o = std::acos(b.cosTheta_o), theta_e = std::acos(b.cosTheta_e);
         Float theta_w = std::min(theta_o + theta_e, Pi);
         Float sinTheta_o = SafeSqrt(1 - Sqr(b.cosTheta_o));
-        Float Momega = 2 * Pi * (1 - b.cosTheta_o) +
-                       Pi / 2 *
-                           (2 * theta_w * sinTheta_o - std::cos(theta_o - 2 * theta_w) -
-                            2 * theta_o * sinTheta_o + b.cosTheta_o);
+        Float M_omega = 2 * Pi * (1 - b.cosTheta_o) +
+                        Pi / 2 *
+                            (2 * theta_w * sinTheta_o - std::cos(theta_o - 2 * theta_w) -
+                             2 * theta_o * sinTheta_o + b.cosTheta_o);
 
         // Return complete cost estimate for _LightBounds_
         Float Kr = MaxComponentValue(bounds.Diagonal()) / bounds.Diagonal()[dim];
-        return b.phi * Momega * Kr * b.bounds.SurfaceArea();
+        return b.phi * M_omega * Kr * b.bounds.SurfaceArea();
     }
 
     // BVHLightSampler Private Members

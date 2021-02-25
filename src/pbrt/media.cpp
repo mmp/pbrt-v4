@@ -41,7 +41,7 @@ std::string PhaseFunction::ToString() const {
 }
 
 std::string MediumSample::ToString() const {
-    return StringPrintf("[ MediumSample intr: %s Tmaj: %s ]", intr, Tmaj);
+    return StringPrintf("[ MediumSample intr: %s T_maj: %s ]", intr, T_maj);
 }
 
 // HenyeyGreenstein Method Definitions

@@ -347,15 +347,14 @@ Point2f InvertSphericalRectangleSample(Point3f pRef, Point3f s, Vector3f ex, Vec
 Vector3f SampleHenyeyGreenstein(Vector3f wo, Float g, Point2f u, Float *pdf) {
     // Compute $\cos \theta$ for Henyey--Greenstein sample
     Float cosTheta;
-    if (std::abs(g) < 1e-3)
+    if (std::abs(g) < 1e-3f)
         cosTheta = 1 - 2 * u[0];
-    else {
-        Float sqrTerm = (1 - g * g) / (1 + g - 2 * g * u[0]);
-        cosTheta = -(1 + g * g - sqrTerm * sqrTerm) / (2 * g);
-    }
+    else
+        cosTheta =
+            -1 / (2 * g) * (1 + Sqr(g) - Sqr((1 - Sqr(g)) / (1 + g - 2 * g * u[0])));
 
     // Compute direction _wi_ for Henyey--Greenstein sample
-    Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
+    Float sinTheta = SafeSqrt(1 - Sqr(cosTheta));
     Float phi = 2 * Pi * u[1];
     Frame wFrame = Frame::FromZ(wo);
     Vector3f wi = wFrame.FromLocal(SphericalDirection(sinTheta, cosTheta, phi));

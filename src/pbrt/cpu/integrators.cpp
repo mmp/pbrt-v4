@@ -341,23 +341,23 @@ SampledSpectrum Integrator::Tr(const Interaction &p0, const Interaction &p1,
             Point3f pExit = ray(si ? si->tHit : (1 - ShadowEpsilon));
             ray.d = pExit - ray.o;
 
-            ray.medium.SampleTmaj(ray, 1.f, rng.Uniform<Float>(), rng, lambda,
-                                  [&](const MediumSample &ms) -> bool {
-                                      const SampledSpectrum &Tmaj = ms.Tmaj;
+            ray.medium.SampleT_maj(ray, 1.f, rng.Uniform<Float>(), rng, lambda,
+                                   [&](const MediumSample &ms) -> bool {
+                                       const SampledSpectrum &T_maj = ms.T_maj;
 
-                                      const MediumInteraction &intr = ms.intr;
-                                      SampledSpectrum sigma_n = intr.sigma_n();
+                                       const MediumInteraction &intr = ms.intr;
+                                       SampledSpectrum sigma_n = intr.sigma_n();
 
-                                      // ratio-tracking: only evaluate null scattering
-                                      Tr *= Tmaj * sigma_n;
-                                      pdf *= Tmaj * intr.sigma_maj;
+                                       // ratio-tracking: only evaluate null scattering
+                                       Tr *= T_maj * sigma_n;
+                                       pdf *= T_maj * intr.sigma_maj;
 
-                                      if (!Tr)
-                                          return false;
+                                       if (!Tr)
+                                           return false;
 
-                                      rescale(Tr, pdf);
-                                      return true;
-                                  });
+                                       rescale(Tr, pdf);
+                                       return true;
+                                   });
         }
 
         // Generate next ray segment or return final transmittance
@@ -848,49 +848,50 @@ SampledSpectrum SimpleVolPathIntegrator::Li(RayDifferential ray,
             Float tMax = si ? si->tHit : Infinity;
             Float u = sampler.Get1D();
             Float uMode = sampler.Get1D();
-            ray.medium.SampleTmaj(ray, tMax, u, rng, lambda, [&](const MediumSample &ms) {
-                const MediumInteraction &intr = ms.intr;
-                // Compute medium event probabilities for interaction
-                Float pAbsorb = intr.sigma_a[0] / intr.sigma_maj[0];
-                Float pScatter = intr.sigma_s[0] / intr.sigma_maj[0];
-                Float pNull = std::max<Float>(0, 1 - pAbsorb - pScatter);
+            ray.medium.SampleT_maj(
+                ray, tMax, u, rng, lambda, [&](const MediumSample &ms) {
+                    const MediumInteraction &intr = ms.intr;
+                    // Compute medium event probabilities for interaction
+                    Float pAbsorb = intr.sigma_a[0] / intr.sigma_maj[0];
+                    Float pScatter = intr.sigma_s[0] / intr.sigma_maj[0];
+                    Float pNull = std::max<Float>(0, 1 - pAbsorb - pScatter);
 
-                // Randomly sample medium scattering event for delta tracking
-                int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, uMode);
-                if (mode == 0) {
-                    // Handle absorption event for delta tracking
-                    L += SafeDiv(beta * intr.Le, lambda.PDF());
-                    terminated = true;
-                    return false;
-
-                } else if (mode == 1) {
-                    // Handle regular scattering event for delta tracking
-                    // Stop path sampling if maximum depth has been reached
-                    if (numScatters++ >= maxDepth) {
+                    // Randomly sample medium scattering event for delta tracking
+                    int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, uMode);
+                    if (mode == 0) {
+                        // Handle absorption event for delta tracking
+                        L += SafeDiv(beta * intr.Le, lambda.PDF());
                         terminated = true;
                         return false;
-                    }
 
-                    // Sample phase function for delta tracking scattering event
-                    pstd::optional<PhaseFunctionSample> ps =
-                        intr.phase.Sample_p(-ray.d, sampler.Get2D());
-                    if (!ps) {
-                        terminated = true;
+                    } else if (mode == 1) {
+                        // Handle regular scattering event for delta tracking
+                        // Stop path sampling if maximum depth has been reached
+                        if (numScatters++ >= maxDepth) {
+                            terminated = true;
+                            return false;
+                        }
+
+                        // Sample phase function for delta tracking scattering event
+                        pstd::optional<PhaseFunctionSample> ps =
+                            intr.phase.Sample_p(-ray.d, sampler.Get2D());
+                        if (!ps) {
+                            terminated = true;
+                            return false;
+                        }
+
+                        // Update state for recursive $L_\roman{i}$ evaluation
+                        beta *= ps->p / ps->pdf;
+                        ray = intr.SpawnRay(ps->wi);
+                        scattered = true;
                         return false;
+
+                    } else {
+                        // Handle null scattering event for delta tracking
+                        uMode = rng.Uniform<Float>();
+                        return true;
                     }
-
-                    // Update state for recursive $L_\roman{i}$ evaluation
-                    beta *= ps->p / ps->pdf;
-                    ray = intr.SpawnRay(ps->wi);
-                    scattered = true;
-                    return false;
-
-                } else {
-                    // Handle null scattering event for delta tracking
-                    uMode = rng.Uniform<Float>();
-                    return true;
-                }
-            });
+                });
         }
         // Handle terminated and unscattered rays after medium sampling
         if (terminated)
@@ -964,7 +965,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             uint64_t hash0 = Hash(sampler.Get1D());
             uint64_t hash1 = Hash(sampler.Get1D());
             RNG rng(hash0, hash1);
-            SampledSpectrum Tmaj = ray.medium.SampleTmaj(
+            SampledSpectrum T_maj = ray.medium.SampleT_maj(
                 ray, tMax, sampler.Get1D(), rng, lambda,
                 [&](const MediumSample &mediumSample) {
                     // Handle medium scattering event for ray
@@ -976,17 +977,17 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                     const MediumInteraction &intr = mediumSample.intr;
                     const SampledSpectrum &sigma_a = intr.sigma_a,
                                           &sigma_s = intr.sigma_s;
-                    const SampledSpectrum &Tmaj = mediumSample.Tmaj;
+                    const SampledSpectrum &T_maj = mediumSample.T_maj;
                     // Rescale path throughput and PDFs if necessary
                     Rescale(T_hat, uniPathPDF, lightPathPDF);
 
                     // Add emission from medium scattering event
                     if (depth < maxDepth && intr.Le) {
                         // Compute $\hat{P}$ at new path vertex
-                        SampledSpectrum P_hat = T_hat * Tmaj * sigma_a * intr.Le;
+                        SampledSpectrum P_hat = T_hat * T_maj * sigma_a * intr.Le;
 
                         // Compute PDF for absorption event at path vertex
-                        SampledSpectrum emitPDF = uniPathPDF * intr.sigma_maj * Tmaj;
+                        SampledSpectrum emitPDF = uniPathPDF * intr.sigma_maj * T_maj;
 
                         // Update _L_ for medium emission
                         L += SafeDiv(P_hat, emitPDF.Average() * lambda.PDF());
@@ -1012,8 +1013,8 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                             terminated = true;
                             return false;
                         }
-                        T_hat *= Tmaj * sigma_s;
-                        uniPathPDF *= Tmaj * sigma_s;
+                        T_hat *= T_maj * sigma_s;
+                        uniPathPDF *= T_maj * sigma_s;
                         // Sample direct lighting at volume scattering event
                         L += SafeDiv(
                             SampleLd(intr, nullptr, lambda, sampler, T_hat, uniPathPDF),
@@ -1042,9 +1043,9 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                     } else {
                         // Handle null scattering along ray path
                         SampledSpectrum sigma_n = intr.sigma_n();
-                        T_hat *= Tmaj * sigma_n;
-                        uniPathPDF *= Tmaj * sigma_n;
-                        lightPathPDF *= Tmaj * intr.sigma_maj;
+                        T_hat *= T_maj * sigma_n;
+                        uniPathPDF *= T_maj * sigma_n;
+                        lightPathPDF *= T_maj * intr.sigma_maj;
                         Rescale(T_hat, uniPathPDF, lightPathPDF);
                         return true;
                     }
@@ -1054,9 +1055,9 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                 return L;
             if (scattered)
                 continue;
-            T_hat *= Tmaj;
-            uniPathPDF *= Tmaj;
-            lightPathPDF *= Tmaj;
+            T_hat *= T_maj;
+            uniPathPDF *= T_maj;
+            lightPathPDF *= T_maj;
         }
         // Handle surviving unscattered rays
         // Add emitted light at volume path vertex or from the environment
@@ -1324,16 +1325,16 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
         // Update transmittance for current ray segment
         if (lightRay.medium != nullptr) {
             Float tMax = si ? si->tHit : (1 - ShadowEpsilon);
-            SampledSpectrum Tmaj = lightRay.medium.SampleTmaj(
+            SampledSpectrum T_maj = lightRay.medium.SampleT_maj(
                 lightRay, tMax, rng.Uniform<Float>(), rng, lambda,
                 [&](const MediumSample &mediumSample) {
                     // Update ray transmittance estimate at sampled point
                     // Update _T_ray_ and PDFs using ratio-tracking estimator
                     const MediumInteraction &intr = mediumSample.intr;
-                    SampledSpectrum Tmaj = mediumSample.Tmaj, sigma_n = intr.sigma_n();
-                    T_ray *= Tmaj * sigma_n;
-                    lightPathPDF *= Tmaj * intr.sigma_maj;
-                    uniPathPDF *= Tmaj * sigma_n;
+                    SampledSpectrum T_maj = mediumSample.T_maj, sigma_n = intr.sigma_n();
+                    T_ray *= T_maj * sigma_n;
+                    lightPathPDF *= T_maj * intr.sigma_maj;
+                    uniPathPDF *= T_maj * sigma_n;
 
                     // Possibly terminate transmittance computation using Russian roulette
                     SampledSpectrum Tr = T_ray / (lightPathPDF + uniPathPDF).Average();
@@ -1353,9 +1354,9 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
                     return true;
                 });
             // Update transmittance estimate for final unsampled segment
-            T_ray *= Tmaj;
-            lightPathPDF *= Tmaj;
-            uniPathPDF *= Tmaj;
+            T_ray *= T_maj;
+            lightPathPDF *= T_maj;
+            uniPathPDF *= T_maj;
         }
 
         // Generate next ray segment or return final transmittance
@@ -1977,7 +1978,7 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
             Float tMax = si ? si->tHit : Infinity;
             RNG rng(Hash(ray.d.x), Hash(ray.d.y));
             Float u = sampler.Get1D();
-            SampledSpectrum Tmaj = ray.medium.SampleTmaj(
+            SampledSpectrum T_maj = ray.medium.SampleT_maj(
                 ray, tMax, u, rng, lambda, [&](const MediumSample &ms) {
                     const MediumInteraction &intr = ms.intr;
                     // Compute medium event probabilities for interaction
@@ -1995,7 +1996,7 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
 
                     } else if (mode == 1) {
                         // Handle scattering for _RandomWalk()_ ray
-                        beta *= ms.Tmaj * intr.sigma_s / (ms.Tmaj[0] * intr.sigma_s[0]);
+                        beta *= ms.T_maj * intr.sigma_s / (ms.T_maj[0] * intr.sigma_s[0]);
                         // Record medium interaction in _path_ and compute forward density
                         vertex = Vertex::CreateMedium(intr, beta, pdfFwd, prev);
                         if (++bounces >= maxDepth) {
@@ -2025,13 +2026,13 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
                     } else {
                         // Handle null scattering for _RandomWalk()_ ray
                         SampledSpectrum sigma_n = intr.sigma_n();
-                        beta *= ms.Tmaj * sigma_n / (ms.Tmaj[0] * sigma_n[0]);
+                        beta *= ms.T_maj * sigma_n / (ms.T_maj[0] * sigma_n[0]);
                         return true;
                     }
                 });
             // Update _beta_ for medium transmittance
             if (!scattered)
-                beta *= Tmaj / Tmaj[0];
+                beta *= T_maj / T_maj[0];
         }
 
         if (terminated)

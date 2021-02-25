@@ -38,6 +38,7 @@ class PhaseFunction : public TaggedPointer<HGPhaseFunction> {
 
     PBRT_CPU_GPU inline pstd::optional<PhaseFunctionSample> Sample_p(Vector3f wo,
                                                                      Point2f u) const;
+
     PBRT_CPU_GPU inline Float PDF(Vector3f wo, Vector3f wi) const;
 };
 
@@ -74,9 +75,9 @@ class Medium : public TaggedPointer<HomogeneousMedium, UniformGridMedium, CloudM
     bool IsEmissive() const;
 
     template <typename F>
-    PBRT_CPU_GPU SampledSpectrum SampleTmaj(Ray ray, Float tMax, Float u, RNG &rng,
-                                            const SampledWavelengths &lambda,
-                                            F callback) const;
+    PBRT_CPU_GPU SampledSpectrum SampleT_maj(Ray ray, Float tMax, Float u, RNG &rng,
+                                             const SampledWavelengths &lambda,
+                                             F callback) const;
 };
 
 // MediumInterface Definition

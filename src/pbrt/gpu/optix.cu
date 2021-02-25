@@ -435,17 +435,17 @@ extern "C" __global__ void __raygen__shadow_Tr() {
 
             Float tEnd =
                 missed ? tMax : (Distance(ray.o, Point3f(ctx.piHit)) / Length(ray.d));
-            SampledSpectrum Tmaj =
-                ray.medium.SampleTmaj(ray, tEnd, rng.Uniform<Float>(), rng, lambda,
+            SampledSpectrum T_maj =
+                ray.medium.SampleT_maj(ray, tEnd, rng.Uniform<Float>(), rng, lambda,
                                   [&](const MediumSample &mediumSample) {
-                                      const SampledSpectrum &Tmaj = mediumSample.Tmaj;
+                                      const SampledSpectrum &T_maj = mediumSample.T_maj;
                                       const MediumInteraction &intr = mediumSample.intr;
                                       SampledSpectrum sigma_n = intr.sigma_n();
 
                                       // ratio-tracking: only evaluate null scattering
-                                      T_ray *= Tmaj * sigma_n;
-                                      lightPathPDF *= Tmaj * intr.sigma_maj;
-                                      uniPathPDF *= Tmaj * sigma_n;
+                                      T_ray *= T_maj * sigma_n;
+                                      lightPathPDF *= T_maj * intr.sigma_maj;
+                                      uniPathPDF *= T_maj * sigma_n;
 
                                       // Possibly terminate transmittance computation using Russian roulette
                                       SampledSpectrum Tr = T_ray / (lightPathPDF + uniPathPDF).Average();
@@ -459,8 +459,8 @@ extern "C" __global__ void __raygen__shadow_Tr() {
                                           }
                                       }
 
-                                      PBRT_DBG("Tmaj %f %f %f %f sigma_n %f %f %f %f sigma_maj %f %f %f %f\n",
-                                               Tmaj[0], Tmaj[1], Tmaj[2], Tmaj[3],
+                                      PBRT_DBG("T_maj %f %f %f %f sigma_n %f %f %f %f sigma_maj %f %f %f %f\n",
+                                               T_maj[0], T_maj[1], T_maj[2], T_maj[3],
                                                sigma_n[0], sigma_n[1], sigma_n[2], sigma_n[3],
                                                intr.sigma_maj[0], intr.sigma_maj[1], intr.sigma_maj[2],
                                                intr.sigma_maj[3]);
@@ -476,9 +476,9 @@ extern "C" __global__ void __raygen__shadow_Tr() {
 
                                       return true;
                                   });
-            T_ray *= Tmaj;
-            lightPathPDF *= Tmaj;
-            uniPathPDF *= Tmaj;
+            T_ray *= T_maj;
+            lightPathPDF *= T_maj;
+            uniPathPDF *= T_maj;
         }
 
         if (missed || !T_ray)
