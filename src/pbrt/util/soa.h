@@ -52,7 +52,11 @@ class SOA<SampledSpectrum> {
         nAlloc = n4 * size;
         ptr = alloc.allocate_object<Float4>(nAlloc);
     }
-
+    SOA &operator=(const SOA& s) {
+        nAlloc = s.nAlloc;
+        ptr = s.ptr;
+        return *this;
+    }
     PBRT_CPU_GPU
     SampledSpectrum operator[](int i) const {
         int offset = n4 * i;
@@ -109,6 +113,12 @@ class SOA<SampledWavelengths> {
         nAlloc = n4 * size;
         lambda = alloc.allocate_object<Float4>(nAlloc);
         pdf = alloc.allocate_object<Float4>(nAlloc);
+    }
+    SOA &operator=(const SOA& s) {
+        nAlloc = s.nAlloc;
+        lambda = s.lambda;
+        pdf = s.pdf;
+        return *this;
     }
 
     PBRT_CPU_GPU
