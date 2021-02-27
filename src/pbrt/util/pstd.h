@@ -976,6 +976,67 @@ class vector {
     size_t nAlloc = 0, nStored = 0;
 };
 
+template <typename... Ts>
+struct tuple;
+template <>
+struct tuple<> {
+    template <size_t>
+    using type = void;
+};
+
+template <typename T, typename... Ts>
+struct tuple<T, Ts...> : tuple<Ts...> {
+    using Base = tuple<Ts...>;
+
+    tuple() = default;
+    tuple(const tuple &) = default;
+    tuple(tuple &&) = default;
+    tuple &operator=(tuple &&) = default;
+    tuple &operator=(const tuple &) = default;
+
+    tuple(const T &value, const Ts &... values) : Base(values...), value(value) {}
+
+    tuple(T &&value, Ts &&... values)
+        : Base(std::move(values)...), value(std::move(value)) {}
+
+    T value;
+};
+
+template <typename... Ts>
+tuple(Ts &&...)->tuple<std::decay_t<Ts>...>;
+
+template <size_t I, typename T, typename... Ts>
+PBRT_CPU_GPU auto &get(tuple<T, Ts...> &tuple) {
+    if constexpr (I == 0)
+        return tuple.value;
+    else
+        return get<I - 1, Ts...>(tuple);
+}
+
+template <size_t I, typename T, typename... Ts>
+PBRT_CPU_GPU const auto &get(const tuple<T, Ts...> &tuple) {
+    if constexpr (I == 0)
+        return tuple.value;
+    else
+        return get<I - 1, Ts...>(tuple);
+}
+
+template <typename Req, typename T, typename... Ts>
+PBRT_CPU_GPU auto &get(tuple<T, Ts...> &tuple) {
+    if constexpr (std::is_same_v<Req, T>)
+        return tuple.value;
+    else
+        return get<Req, Ts...>(tuple);
+}
+
+template <typename Req, typename T, typename... Ts>
+PBRT_CPU_GPU const auto &get(const tuple<T, Ts...> &tuple) {
+    if constexpr (std::is_same_v<Req, T>)
+        return tuple.value;
+    else
+        return get<Req, Ts...>(tuple);
+}
+
 }  // namespace pstd
 
 #endif  // PBRT_UTIL_PSTD_H

@@ -33,7 +33,17 @@ template <typename WorkItem>
 class WorkQueue : public SOA<WorkItem> {
   public:
     // WorkQueue Public Methods
+    WorkQueue() = default;
     WorkQueue(int n, Allocator alloc) : SOA<WorkItem>(n, alloc) {}
+    WorkQueue &operator=(const WorkQueue &w) {
+        SOA<WorkItem>::operator=(w);
+#ifdef PBRT_HAVE_CUDA_ATOMICS
+        size.store(w.size.load());
+#else
+        size = w.size;
+#endif
+        return *this;
+    }
 
     PBRT_CPU_GPU
     int Size() const {
@@ -102,54 +112,34 @@ void ForAllQueued(const char *desc, WorkQueue<WorkItem> *q, int maxQueued, F fun
 template <typename T>
 class MultiWorkQueue;
 
-template <>
-class MultiWorkQueue<TypePack<>> {
-  public:
-    MultiWorkQueue(int, Allocator, pstd::span<const bool>) {}
-};
-
-template <typename T, typename... Ts>
-class MultiWorkQueue<TypePack<T, Ts...>> : public MultiWorkQueue<TypePack<Ts...>> {
+template <typename... Ts>
+class MultiWorkQueue<TypePack<Ts...>> {
   public:
     // MultiWorkQueue Public Methods
-    MultiWorkQueue(int n, Allocator alloc, pstd::span<const bool> haveType)
-        : MultiWorkQueue<TypePack<Ts...>>(n, alloc, haveType.subspan(1, haveType.size())),
-          q(haveType.front() ? n : 1, alloc) {}
+    template <typename T>
+    PBRT_CPU_GPU WorkQueue<T> *Get() {
+        return &pstd::get<WorkQueue<T>>(queues);
+    }
 
-    template <typename Tsz>
+    MultiWorkQueue(int n, Allocator alloc, pstd::span<const bool> haveType) {
+        int index = 0;
+        ((*Get<Ts>() = WorkQueue<Ts>(haveType[index++] ? n : 1, alloc)), ...);
+    }
+
+    template <typename T>
     PBRT_CPU_GPU int Size() const {
-        if constexpr (std::is_same_v<Tsz, T>)
-            return q.Size();
-        else
-            return MultiWorkQueue<TypePack<Ts...>>::template Size<Tsz>();
+        return Get<T>()->Size();
     }
-
+    template <typename T>
+    PBRT_CPU_GPU int Push(const T &value) {
+        return Get<T>()->Push(value);
+    }
     PBRT_CPU_GPU
-    void Reset() {
-        q.Reset();
-        if constexpr (sizeof...(Ts) > 0)
-            MultiWorkQueue<TypePack<Ts...>>::Reset();
-    }
-
-    template <typename Tg>
-    PBRT_CPU_GPU WorkQueue<Tg> *Get() {
-        if constexpr (std::is_same_v<Tg, T>)
-            return &q;
-        else
-            return MultiWorkQueue<TypePack<Ts...>>::template Get<Tg>();
-    }
-
-    template <typename Tp>
-    PBRT_CPU_GPU int Push(Tp item) {
-        if constexpr (std::is_same_v<Tp, T>)
-            return q.Push(item);
-        else
-            return MultiWorkQueue<TypePack<Ts...>>::template Push(item);
-    }
+    void Reset() { (Get<Ts>()->Reset(), ...); }
 
   private:
     // MultiWorkQueue Private Members
-    WorkQueue<T> q;
+    pstd::tuple<WorkQueue<Ts>...> queues;
 };
 
 }  // namespace pbrt
