@@ -275,7 +275,6 @@ class RGBFilm : public FilmBase {
         return rgb;
     }
 
-    RGBFilm() = default;
     RGBFilm(FilmBaseParameters p, const RGBColorSpace *colorSpace,
             Float maxComponentValue = Infinity, bool writeFP16 = true,
             Allocator alloc = {});

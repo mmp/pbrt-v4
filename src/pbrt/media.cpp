@@ -189,13 +189,11 @@ STAT_MEMORY_COUNTER("Memory/Volume grids", volumeGridBytes);
 // UniformGridMediumProvider Method Definitions
 UniformGridMediumProvider::UniformGridMediumProvider(
     const Bounds3f &bounds, pstd::optional<SampledGrid<Float>> dgrid,
-    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbgrid,
-    const RGBColorSpace *colorSpace, Spectrum Le, SampledGrid<Float> Legrid,
-    Allocator alloc)
+    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbgrid, Spectrum Le,
+    SampledGrid<Float> Legrid, Allocator alloc)
     : bounds(bounds),
       densityGrid(std::move(dgrid)),
       rgbDensityGrid(std::move(rgbgrid)),
-      colorSpace(colorSpace),
       Le_spec(Le, alloc),
       LeScaleGrid(std::move(Legrid)) {
     volumeGridBytes += LeScaleGrid.BytesAllocated();
@@ -221,13 +219,12 @@ UniformGridMediumProvider *UniformGridMediumProvider::Create(
                   "Uniform grid medium has %d density values; expected nx*ny*nz = %d",
                   nDensity, nx * ny * nz);
 
-    const RGBColorSpace *colorSpace = parameters.ColorSpace();
-
     pstd::optional<SampledGrid<Float>> densityGrid;
     pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbDensityGrid;
     if (density.size())
         densityGrid = SampledGrid<Float>(density, nx, ny, nz, alloc);
     else {
+        const RGBColorSpace *colorSpace = parameters.ColorSpace();
         std::vector<RGBUnboundedSpectrum> rgbSpectrumDensity;
         for (RGB rgb : rgbDensity)
             rgbSpectrumDensity.push_back(RGBUnboundedSpectrum(*colorSpace, rgb));
@@ -261,14 +258,13 @@ UniformGridMediumProvider *UniformGridMediumProvider::Create(
     Point3f p1 = parameters.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
 
     return alloc.new_object<UniformGridMediumProvider>(
-        Bounds3f(p0, p1), std::move(densityGrid), std::move(rgbDensityGrid), colorSpace,
-        Le, std::move(LeGrid), alloc);
+        Bounds3f(p0, p1), std::move(densityGrid), std::move(rgbDensityGrid), Le,
+        std::move(LeGrid), alloc);
 }
 
 std::string UniformGridMediumProvider::ToString() const {
-    return StringPrintf(
-        "[ UniformGridMediumProvider Le_spec: %s colorSpace: %s (grids elided) ]",
-        Le_spec, *colorSpace);
+    return StringPrintf("[ UniformGridMediumProvider Le_spec: %s (grids elided) ]",
+                        Le_spec);
 }
 
 // CloudMediumProvider Method Definitions

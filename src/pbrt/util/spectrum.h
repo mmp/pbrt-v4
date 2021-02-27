@@ -66,9 +66,9 @@ class Spectrum : public TaggedPointer<ConstantSpectrum, DenselySampledSpectrum,
 PBRT_CPU_GPU inline Float Blackbody(Float lambda, Float T) {
     if (T <= 0)
         return 0;
-    const Float c = 299792458;
-    const Float h = 6.62606957e-34;
-    const Float kb = 1.3806488e-23;
+    const Float c = 299792458.f;
+    const Float h = 6.62606957e-34f;
+    const Float kb = 1.3806488e-23f;
     // Return emitted radiance for blackbody at wavelength _lambda_
     Float l = lambda * 1e-9f;
     Float Le = (2 * h * c * c) / (Pow<5>(l) * (FastExp((h * c) / (l * kb * T)) - 1));
@@ -388,6 +388,12 @@ class DenselySampledSpectrum {
                 s[i] = values[offset];
         }
         return s;
+    }
+
+    PBRT_CPU_GPU
+    void Scale(Float s) {
+        for (Float &v : values)
+            v *= s;
     }
 
     PBRT_CPU_GPU
