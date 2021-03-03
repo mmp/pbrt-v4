@@ -325,9 +325,6 @@ extern "C" __global__ void __anyhit__triangle() {
 extern "C" __global__ void __anyhit__shadowTriangle() {
     const TriangleMeshRecord &rec = *(const TriangleMeshRecord *)optixGetSbtDataPointer();
 
-    if (rec.material && rec.material.IsTransparent())
-        optixIgnoreIntersection();
-
     if (alphaKilled(rec))
         optixIgnoreIntersection();
 }
@@ -561,10 +558,6 @@ extern "C" __global__ void __closesthit__quadric() {
 }
 
 extern "C" __global__ void __anyhit__shadowQuadric() {
-    QuadricRecord &rec = *((QuadricRecord *)optixGetSbtDataPointer());
-
-    if (rec.material && rec.material.IsTransparent())
-        optixIgnoreIntersection();
 }
 
 extern "C" __global__ void __intersection__quadric() {
@@ -640,10 +633,6 @@ extern "C" __global__ void __closesthit__bilinearPatch() {
 }
 
 extern "C" __global__ void __anyhit__shadowBilinearPatch() {
-    BilinearMeshRecord &rec = *((BilinearMeshRecord *)optixGetSbtDataPointer());
-
-    if (rec.material && rec.material.IsTransparent())
-        optixIgnoreIntersection();
 }
 
 extern "C" __global__ void __intersection__bilinearPatch() {

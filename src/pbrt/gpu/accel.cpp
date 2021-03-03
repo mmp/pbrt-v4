@@ -179,8 +179,7 @@ static int getOptixGeometryFlags(bool isTriangle, FloatTexture alphaTexture,
                                  Material material) {
     if (material && material.HasSubsurfaceScattering())
         return OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL;
-    else if ((alphaTexture && isTriangle) ||
-             (material && material.IsTransparent()))
+    else if (alphaTexture && isTriangle)
         // Need anyhit
         return OPTIX_GEOMETRY_FLAG_NONE;
     else

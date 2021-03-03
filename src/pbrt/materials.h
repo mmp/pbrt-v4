@@ -176,7 +176,6 @@ class DielectricMaterial {
     PBRT_CPU_GPU void GetBSSRDF(TextureEvaluator texEval, MaterialEvalContext ctx,
                                 SampledWavelengths &lambda, void *) const {}
 
-    PBRT_CPU_GPU bool IsTransparent() const { return false; }
     PBRT_CPU_GPU static constexpr bool HasSubsurfaceScattering() { return false; }
 
     template <typename TextureEvaluator>
@@ -244,9 +243,6 @@ class ThinDielectricMaterial {
         *bxdf = ThinDielectricBxDF(eta);
         return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf);
     }
-
-    PBRT_CPU_GPU
-    bool IsTransparent() const { return true; }
 
     ThinDielectricMaterial(FloatTexture etaF, SpectrumTexture etaS,
                            FloatTexture displacement, Image *normalMap)
@@ -358,15 +354,6 @@ class MixMaterial {
         return {};
     }
 
-    PBRT_CPU_GPU
-    bool IsTransparent() const {
-#ifdef PBRT_IS_GPU_CODE
-        return false;
-#else
-        return materials[0].IsTransparent() || materials[1].IsTransparent();
-#endif
-    }
-
   private:
     // MixMaterial Private Members
     FloatTexture amount;
@@ -440,7 +427,6 @@ class HairMaterial {
     PBRT_CPU_GPU void GetBSSRDF(TextureEvaluator texEval, MaterialEvalContext ctx,
                                 SampledWavelengths &lambda, void *) const {}
 
-    PBRT_CPU_GPU bool IsTransparent() const { return false; }
     PBRT_CPU_GPU static constexpr bool HasSubsurfaceScattering() { return false; }
 
     std::string ToString() const;
@@ -474,7 +460,6 @@ class DiffuseMaterial {
     PBRT_CPU_GPU void GetBSSRDF(TextureEvaluator texEval, MaterialEvalContext ctx,
                                 SampledWavelengths &lambda, void *) const {}
 
-    PBRT_CPU_GPU bool IsTransparent() const { return false; }
     PBRT_CPU_GPU static constexpr bool HasSubsurfaceScattering() { return false; }
 
     std::string ToString() const;
@@ -570,7 +555,6 @@ class ConductorMaterial {
     PBRT_CPU_GPU void GetBSSRDF(TextureEvaluator texEval, MaterialEvalContext ctx,
                                 SampledWavelengths &lambda, void *) const {}
 
-    PBRT_CPU_GPU bool IsTransparent() const { return false; }
     PBRT_CPU_GPU static constexpr bool HasSubsurfaceScattering() { return false; }
 
     std::string ToString() const;
@@ -654,7 +638,6 @@ class CoatedDiffuseMaterial {
     PBRT_CPU_GPU void GetBSSRDF(TextureEvaluator texEval, const MaterialEvalContext &ctx,
                                 SampledWavelengths &lambda, void *) const {}
 
-    PBRT_CPU_GPU bool IsTransparent() const { return false; }
     PBRT_CPU_GPU static constexpr bool HasSubsurfaceScattering() { return false; }
 
     std::string ToString() const;
@@ -765,7 +748,6 @@ class CoatedConductorMaterial {
     PBRT_CPU_GPU void GetBSSRDF(TextureEvaluator texEval, const MaterialEvalContext &ctx,
                                 SampledWavelengths &lambda, void *) const {}
 
-    PBRT_CPU_GPU bool IsTransparent() const { return false; }
     PBRT_CPU_GPU static constexpr bool HasSubsurfaceScattering() { return false; }
 
     std::string ToString() const;
@@ -861,8 +843,6 @@ class SubsurfaceMaterial {
     PBRT_CPU_GPU
     const Image *GetNormalMap() const { return normalMap; }
 
-    PBRT_CPU_GPU bool IsTransparent() const { return false; }
-
     PBRT_CPU_GPU
     static constexpr bool HasSubsurfaceScattering() { return true; }
 
@@ -929,7 +909,6 @@ class DiffuseTransmissionMaterial {
     PBRT_CPU_GPU void GetBSSRDF(TextureEvaluator texEval, MaterialEvalContext ctx,
                                 SampledWavelengths &lambda, void *) const {}
 
-    PBRT_CPU_GPU bool IsTransparent() const { return false; }
     PBRT_CPU_GPU static constexpr bool HasSubsurfaceScattering() { return false; }
 
     std::string ToString() const;
@@ -979,7 +958,6 @@ class MeasuredMaterial {
     PBRT_CPU_GPU void GetBSSRDF(TextureEvaluator texEval, MaterialEvalContext ctx,
                                 SampledWavelengths &lambda, void *) const {}
 
-    PBRT_CPU_GPU bool IsTransparent() const { return false; }
     PBRT_CPU_GPU static constexpr bool HasSubsurfaceScattering() { return false; }
 
     std::string ToString() const;
@@ -1030,11 +1008,6 @@ inline BSSRDF Material::GetBSSRDF(TextureEvaluator texEval, MaterialEvalContext 
         }
     };
     return Dispatch(get);
-}
-
-inline bool Material::IsTransparent() const {
-    auto transp = [&](auto ptr) { return ptr->IsTransparent(); };
-    return Dispatch(transp);
 }
 
 inline bool Material::HasSubsurfaceScattering() const {

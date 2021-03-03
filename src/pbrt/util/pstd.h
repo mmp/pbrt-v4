@@ -1003,7 +1003,7 @@ struct tuple<T, Ts...> : tuple<Ts...> {
 };
 
 template <typename... Ts>
-tuple(Ts &&...)->tuple<std::decay_t<Ts>...>;
+tuple(Ts &&...) -> tuple<std::decay_t<Ts>...>;
 
 template <size_t I, typename T, typename... Ts>
 PBRT_CPU_GPU auto &get(tuple<T, Ts...> &tuple) {

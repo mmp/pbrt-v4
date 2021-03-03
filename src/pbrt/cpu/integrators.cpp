@@ -1321,7 +1321,7 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
         // Trace ray through media to estimate transmittance
         pstd::optional<ShapeIntersection> si = Intersect(lightRay, 1 - ShadowEpsilon);
         // Handle opaque surface along ray's path
-        if (si && si->intr.material && !si->intr.material.IsTransparent())
+        if (si && si->intr.material)
             return SampledSpectrum(0.f);
 
         // Update transmittance for current ray segment
