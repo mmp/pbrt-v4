@@ -272,7 +272,7 @@ class CuboidMedium {
                                                rRender.time, sigmap_a, sigmap_s,
                                                sigma_maj, Le, this, &phase);
                         if (!callback(MediumSample(intr, T_maj)))
-                            return T_majAccum;
+                            return SampledSpectrum(1.f);
                     }
                     // Update _t0_ after medium interaction
                     t0 = t;

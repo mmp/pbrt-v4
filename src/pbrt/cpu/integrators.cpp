@@ -399,7 +399,7 @@ SampledSpectrum SimplePathIntegrator::Li(RayDifferential ray, SampledWavelengths
     bool specularBounce = true;
     int depth = 0;
     while (beta) {
-        // Find next _SimplePathIntegrator_ path vertex and accumulate contribution
+        // Find next _SimplePathIntegrator_ vertex and accumulate contribution
         // Intersect _ray_ with scene
         pstd::optional<ShapeIntersection> si = Intersect(ray);
 
@@ -411,7 +411,7 @@ SampledSpectrum SimplePathIntegrator::Li(RayDifferential ray, SampledWavelengths
             break;
         }
 
-        // Account for emsisive surface if light wasn't sampled
+        // Account for emsisive surface if light was not sampled
         SurfaceInteraction &isect = si->intr;
         if (!sampleLights || specularBounce)
             L += SafeDiv(beta * isect.Le(-ray.d, lambda), lambda.PDF());
@@ -638,8 +638,9 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
     bool specularBounce = false, anyNonSpecularBounces = false;
     LightSampleContext prevIntrCtx;
 
+    // Sample path from camera and accumulate radiance estimate
     while (true) {
-        // Find next path vertex and accumulate contribution
+        // Trace ray and find closest path vertex and its BSDF
         pstd::optional<ShapeIntersection> si = Intersect(ray);
         // Add emitted light at path vertex or from the environment
         if (!si) {
@@ -704,12 +705,8 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
             SampledSpectrum albedo = rho / nRhoSamples;
 
             *visibleSurf =
-                VisibleSurface(si->intr, camera.GetCameraTransform(), albedo, lambda);
+                VisibleSurface(isect, camera.GetCameraTransform(), albedo, lambda);
         }
-
-        // End path if maximum depth reached
-        if (depth++ == maxDepth)
-            break;
 
         // Possibly regularize the BSDF
         if (regularize && anyNonSpecularBounces) {
@@ -718,6 +715,11 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
         }
 
         ++totalBSDFs;
+
+        // End path if maximum depth reached
+        if (depth++ == maxDepth)
+            break;
+
         // Sample direct illumination from the light sources
         if (bsdf.IsNonSpecular()) {
             ++totalPaths;
@@ -1123,7 +1125,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             SampledSpectrum albedo = rho / nRhoSamples;
 
             *visibleSurf =
-                VisibleSurface(si->intr, camera.GetCameraTransform(), albedo, lambda);
+                VisibleSurface(isect, camera.GetCameraTransform(), albedo, lambda);
         }
 
         // Terminate path if maximum depth reached
