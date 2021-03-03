@@ -2195,7 +2195,7 @@ int denoise_optix(int argc, char *argv[]) {
     }
 
     OptixDenoiserOptions options = {};
-    options.inputKind = (nLayers = 3) ? OPTIX_DENOISER_INPUT_RGB_ALBEDO_NORMAL :
+    options.inputKind = (nLayers == 3) ? OPTIX_DENOISER_INPUT_RGB_ALBEDO_NORMAL :
         OPTIX_DENOISER_INPUT_RGB;
 
     OptixDenoiser denoiserHandle;
