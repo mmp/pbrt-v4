@@ -588,7 +588,7 @@ class NanoVDBMediumProvider {
         if (!temperatureFloatGrid)
             return SampledSpectrum(0.f);
         nanovdb::Vec3<float> pIndex =
-            densityFloatGrid->worldToIndexF(nanovdb::Vec3<float>(p.x, p.y, p.z));
+            temperatureFloatGrid->worldToIndexF(nanovdb::Vec3<float>(p.x, p.y, p.z));
         using Sampler = nanovdb::SampleFromVoxels<nanovdb::FloatGrid::TreeType, 1, false>;
         Float temp = Sampler(temperatureFloatGrid->tree())(pIndex);
         temp = (temp - temperatureCutoff) * temperatureScale;
