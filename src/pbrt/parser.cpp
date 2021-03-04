@@ -37,6 +37,8 @@
 
 namespace pbrt {
 
+STAT_MEMORY_COUNTER("Memory/Parsed Parameters", parsedParameterBytes);
+
 ///////////////////////////////////////////////////////////////////////////
 // ParsedParameter
 
@@ -877,6 +879,8 @@ static void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
             syntaxError(*tok);
         }
     }
+
+    parsedParameterBytes += memoryResource.CurrentAllocatedBytes();
 }
 
 void ParseFiles(SceneRepresentation *scene, pstd::span<const std::string> filenames) {
