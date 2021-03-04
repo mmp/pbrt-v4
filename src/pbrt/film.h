@@ -94,7 +94,8 @@ class PixelSensor {
     }
 
     PBRT_CPU_GPU
-    RGB ToSensorRGB(const SampledSpectrum &L, const SampledWavelengths &lambda) const {
+    RGB ToSensorRGB(SampledSpectrum L, const SampledWavelengths &lambda) const {
+        L = SafeDiv(L, lambda.PDF());
         return imagingRatio * RGB((r_bar.Sample(lambda) * L).Average(),
                                   (g_bar.Sample(lambda) * L).Average(),
                                   (b_bar.Sample(lambda) * L).Average());

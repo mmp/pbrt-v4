@@ -482,8 +482,6 @@ void GPUPathIntegrator::HandleEscapedRays(int depth) {
                 }
             }
             if (L) {
-                L = SafeDiv(L, w.lambda.PDF());
-
                 PBRT_DBG("Added L %f %f %f %f for escaped ray pixel index %d\n", L[0],
                          L[1], L[2], L[3], w.pixelIndex);
 
@@ -520,7 +518,6 @@ void GPUPathIntegrator::HandleRayFoundEmission(int depth) {
                 SampledSpectrum lightPathPDF = w.lightPathPDF * lightPDF;
                 L = w.T_hat * Le / (uniPathPDF + lightPathPDF).Average();
             }
-            L = SafeDiv(L, w.lambda.PDF());
 
             PBRT_DBG("Added L %f %f %f %f for pixel index %d\n", L[0], L[1], L[2], L[3],
                      w.pixelIndex);

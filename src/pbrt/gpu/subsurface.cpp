@@ -180,7 +180,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                 SampledSpectrum uniPathPDF = w.uniPathPDF * bsdfPDF;
                 SampledSpectrum lightPathPDF = w.uniPathPDF * lightPDF;
 
-                SampledSpectrum Ld = SafeDiv(T_hat * ls->L, lambda.PDF());
+                SampledSpectrum Ld = T_hat * ls->L;
 
                 PBRT_DBG(
                     "depth %d Ld %f %f %f %f "

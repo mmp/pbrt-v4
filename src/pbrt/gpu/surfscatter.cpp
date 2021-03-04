@@ -259,7 +259,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 SampledSpectrum lightPathPDF = w.uniPathPDF * lightPDF;
 
                 // Enqueue shadow ray with tentative radiance contribution
-                SampledSpectrum Ld = SafeDiv(T_hat * ls->L, lambda.PDF());
+                SampledSpectrum Ld = T_hat * ls->L;
                 Ray ray = SpawnRayTo(w.pi, w.n, w.time, ls->pLight.pi, ls->pLight.n);
                 // Initialize _ray_ medium if media are present
                 if (haveMedia)

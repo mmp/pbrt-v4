@@ -407,14 +407,14 @@ SampledSpectrum SimplePathIntegrator::Li(RayDifferential ray, SampledWavelengths
         if (!si) {
             if (!sampleLights || specularBounce)
                 for (const auto &light : infiniteLights)
-                    L += SafeDiv(beta * light.Le(ray, lambda), lambda.PDF());
+                    L += beta * light.Le(ray, lambda);
             break;
         }
 
         // Account for emsisive surface if light was not sampled
         SurfaceInteraction &isect = si->intr;
         if (!sampleLights || specularBounce)
-            L += SafeDiv(beta * isect.Le(-ray.d, lambda), lambda.PDF());
+            L += beta * isect.Le(-ray.d, lambda);
 
         // End path if maximum depth reached
         if (depth++ == maxDepth)
@@ -442,8 +442,7 @@ SampledSpectrum SimplePathIntegrator::Li(RayDifferential ray, SampledWavelengths
                     Vector3f wi = ls->wi;
                     SampledSpectrum f = bsdf.f(wo, wi) * AbsDot(wi, isect.shading.n);
                     if (f && Unoccluded(isect, ls->pLight))
-                        L += SafeDiv(beta * f * ls->L,
-                                     sampledLight->pdf * ls->pdf * lambda.PDF());
+                        L += beta * f * ls->L / (sampledLight->pdf * ls->pdf);
                 }
             }
         }
@@ -546,7 +545,6 @@ void LightPathIntegrator::EvaluatePixelSample(Point2i pPixel, int sampleIndex,
                     // Compute visible light's path contribution and add to film
                     SampledSpectrum L = Le * les->AbsCosTheta(cs->wi) * cs->Wi /
                                         (lightPDF * pdf * cs->pdf);
-                    L = SafeDiv(L, lambda.PDF());
                     camera.GetFilm().AddSplat(cs->pRaster, L, lambda);
                 }
             }
@@ -585,7 +583,6 @@ void LightPathIntegrator::EvaluatePixelSample(Point2i pPixel, int sampleIndex,
         if (cs && cs->pdf != 0) {
             SampledSpectrum L = beta * bsdf.f(wo, cs->wi, TransportMode::Importance) *
                                 AbsDot(cs->wi, isect.shading.n) * cs->Wi / cs->pdf;
-            L = SafeDiv(L, lambda.PDF());
             if (L && Unoccluded(cs->pRef, cs->pLens))
                 camera.GetFilm().AddSplat(cs->pRaster, L, lambda);
         }
@@ -648,7 +645,7 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
             for (const auto &light : infiniteLights) {
                 SampledSpectrum Le = light.Le(ray, lambda);
                 if (depth == 0 || specularBounce)
-                    L += SafeDiv(beta * Le, lambda.PDF());
+                    L += beta * Le;
                 else {
                     // Compute MIS weight for infinite light
                     Float lightPDF =
@@ -656,7 +653,7 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
                         light.PDF_Li(prevIntrCtx, ray.d, LightSamplingMode::WithMIS);
                     Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
 
-                    L += SafeDiv(beta * weight * Le, lambda.PDF());
+                    L += beta * weight * Le;
                 }
             }
 
@@ -666,7 +663,7 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
         SampledSpectrum Le = si->intr.Le(-ray.d, lambda);
         if (Le) {
             if (depth == 0 || specularBounce)
-                L += SafeDiv(beta * Le, lambda.PDF());
+                L += beta * Le;
             else {
                 // Compute MIS weight for area light
                 Light areaLight(si->intr.areaLight);
@@ -675,7 +672,7 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
                     areaLight.PDF_Li(prevIntrCtx, ray.d, LightSamplingMode::WithMIS);
                 Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
 
-                L += SafeDiv(beta * weight * Le, lambda.PDF());
+                L += beta * weight * Le;
             }
         }
 
@@ -726,7 +723,7 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
             SampledSpectrum Ld = SampleLd(isect, &bsdf, lambda, sampler);
             if (!Ld)
                 ++zeroRadiancePaths;
-            L += SafeDiv(beta * Ld, lambda.PDF());
+            L += beta * Ld;
         }
 
         // Sample BSDF to get new path direction
@@ -862,7 +859,7 @@ SampledSpectrum SimpleVolPathIntegrator::Li(RayDifferential ray,
                     int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, uMode);
                     if (mode == 0) {
                         // Handle absorption event for delta tracking
-                        L += SafeDiv(beta * intr.Le, lambda.PDF());
+                        L += beta * intr.Le;
                         terminated = true;
                         return false;
 
@@ -902,10 +899,10 @@ SampledSpectrum SimpleVolPathIntegrator::Li(RayDifferential ray,
             continue;
         // Add emission to un-scattered ray
         if (si)
-            L += SafeDiv(beta * si->intr.Le(-ray.d, lambda), lambda.PDF());
+            L += beta * si->intr.Le(-ray.d, lambda);
         else {
             for (const auto &light : infiniteLights)
-                L += SafeDiv(beta * light.Le(ray, lambda), lambda.PDF());
+                L += beta * light.Le(ray, lambda);
             return L;
         }
 
@@ -992,7 +989,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                         SampledSpectrum emitPDF = uniPathPDF * intr.sigma_maj * T_maj;
 
                         // Update _L_ for medium emission
-                        L += SafeDiv(P_hat, emitPDF.Average() * lambda.PDF());
+                        L += P_hat / emitPDF.Average();
                     }
 
                     // Compute medium event probabilities for interaction
@@ -1018,9 +1015,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                         T_hat *= T_maj * sigma_s;
                         uniPathPDF *= T_maj * sigma_s;
                         // Sample direct lighting at volume scattering event
-                        L += SafeDiv(
-                            SampleLd(intr, nullptr, lambda, sampler, T_hat, uniPathPDF),
-                            lambda.PDF());
+                        L += SampleLd(intr, nullptr, lambda, sampler, T_hat, uniPathPDF);
 
                         // Sample new direction at real scattering event
                         Point2f u = sampler.Get2D();
@@ -1068,15 +1063,14 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             for (const auto &light : infiniteLights) {
                 if (SampledSpectrum Le = light.Le(ray, lambda); Le) {
                     if (depth == 0 || specularBounce)
-                        L += SafeDiv(T_hat * Le, uniPathPDF.Average() * lambda.PDF());
+                        L += T_hat * Le / uniPathPDF.Average();
                     else {
                         // Add infinite light contribution using both PDFs with MIS
                         Float lightPDF = lightSampler.PDF(prevIntrContext, light) *
                                          light.PDF_Li(prevIntrContext, ray.d,
                                                       LightSamplingMode::WithMIS);
                         lightPathPDF *= lightPDF;
-                        L += SafeDiv(T_hat * Le, (uniPathPDF + lightPathPDF).Average() *
-                                                     lambda.PDF());
+                        L += T_hat * Le / (uniPathPDF + lightPathPDF).Average();
                     }
                 }
             }
@@ -1087,7 +1081,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
         if (SampledSpectrum Le = isect.Le(-ray.d, lambda); Le) {
             // Add contribution of emission from intersected surface
             if (depth == 0 || specularBounce)
-                L += SafeDiv(T_hat * Le, uniPathPDF.Average() * lambda.PDF());
+                L += T_hat * Le / uniPathPDF.Average();
             else {
                 // Add surface light contribution using both PDFs with MIS
                 Light areaLight(isect.areaLight);
@@ -1095,8 +1089,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                     lightSampler.PDF(prevIntrContext, areaLight) *
                     areaLight.PDF_Li(prevIntrContext, ray.d, LightSamplingMode::WithMIS);
                 lightPathPDF *= lightPDF;
-                L += SafeDiv(T_hat * Le,
-                             (uniPathPDF + lightPathPDF).Average() * lambda.PDF());
+                L += T_hat * Le / (uniPathPDF + lightPathPDF).Average();
             }
         }
 
@@ -1141,8 +1134,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
 
         // Sample illumination from lights to find attenuated path contribution
         if (bsdf.IsNonSpecular()) {
-            L += SafeDiv(SampleLd(isect, &bsdf, lambda, sampler, T_hat, uniPathPDF),
-                         lambda.PDF());
+            L += SampleLd(isect, &bsdf, lambda, sampler, T_hat, uniPathPDF);
             DCHECK(IsInf(L.y(lambda)) == false);
         }
         prevIntrContext = LightSampleContext(isect);
@@ -1225,8 +1217,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             prevIntrContext = LightSampleContext(pi);
 
             // Account for attenuated direct subsurface scattering
-            L += SafeDiv(SampleLd(pi, &Sw, lambda, sampler, T_hat, uniPathPDF),
-                         lambda.PDF());
+            L += SampleLd(pi, &Sw, lambda, sampler, T_hat, uniPathPDF);
 
             // Sample ray for indirect subsurface scattering
             Float u = sampler.Get1D();
@@ -1445,9 +1436,8 @@ retry:
         // Divide by pi so that fully visible is one.
         Ray r = isect.SpawnRay(wi);
         if (!IntersectP(r, maxDist)) {
-            SampledSpectrum L = illumScale * illuminant.Sample(lambda) *
-                                SampledSpectrum(Dot(wi, n) / (Pi * pdf));
-            return SafeDiv(L, lambda.PDF());
+            return illumScale * illuminant.Sample(lambda) *
+                   SampledSpectrum(Dot(wi, n) / (Pi * pdf));
         }
     }
     return SampledSpectrum(0.);
@@ -2400,7 +2390,7 @@ SampledSpectrum ConnectBDPT(const Integrator &integrator, SampledWavelengths &la
     if (misWeightPtr != nullptr)
         *misWeightPtr = misWeight;
 
-    return SafeDiv(L, lambda.PDF());
+    return L;
 }
 
 std::string BDPTIntegrator::ToString() const {
@@ -2868,7 +2858,7 @@ void SPPMIntegrator::Render() {
                         for (const auto &light : infiniteLights) {
                             SampledSpectrum Le = light.Le(ray, lambda);
                             if (depth == 0 || specularBounce)
-                                L += SafeDiv(beta * Le, lambda.PDF());
+                                L += beta * Le;
                             else {
                                 // Compute MIS weight for infinite light
                                 Float lightPDF = lightSampler.PDF(prevIntrCtx, light) *
@@ -2876,7 +2866,7 @@ void SPPMIntegrator::Render() {
                                                               LightSamplingMode::WithMIS);
                                 Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
 
-                                L += SafeDiv(beta * weight * Le, lambda.PDF());
+                                L += beta * weight * Le;
                             }
                         }
 
@@ -2902,7 +2892,7 @@ void SPPMIntegrator::Render() {
                     SampledSpectrum Le = si->intr.Le(-ray.d, lambda);
                     if (Le) {
                         if (depth == 0 || specularBounce)
-                            L += SafeDiv(beta * Le, lambda.PDF());
+                            L += beta * Le;
                         else {
                             // Compute MIS weight for area light
                             Light areaLight(si->intr.areaLight);
@@ -2911,7 +2901,7 @@ void SPPMIntegrator::Render() {
                                                               LightSamplingMode::WithMIS);
                             Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
 
-                            L += SafeDiv(beta * weight * Le, lambda.PDF());
+                            L += beta * weight * Le;
                         }
                     }
 
@@ -2924,8 +2914,7 @@ void SPPMIntegrator::Render() {
                     // Accumulate direct illumination at SPPM camera ray intersection
                     SampledSpectrum Ld =
                         SampleLd(isect, &bsdf, lambda, sampler, &lightSampler);
-                    pixel.Ld +=
-                        film.ToOutputRGB(SafeDiv(beta * Ld, lambda.PDF()), lambda);
+                    pixel.Ld += film.ToOutputRGB(beta * Ld, lambda);
 
                     // Possibly create visible point and end camera path
                     if (bsdf.IsDiffuse() || (bsdf.IsGlossy() && depth == maxDepth)) {
@@ -3107,11 +3096,12 @@ void SPPMIntegrator::Render() {
                                 SampledSpectrum Phi =
                                     beta * pixel.vp.bsdf.f(pixel.vp.wo, wi);
                                 // Compute _phiLambda_ for photon contribution
-                                SampledWavelengths phiLambda = lambda;
-                                if (pixel.vp.secondaryLambdaTerminated)
-                                    phiLambda.TerminateSecondary();
+                                if (lambda.SecondaryTerminated()) {
+                                    Phi[0] *= NSpectrumSamples;
+                                    for (int i = 1; i < NSpectrumSamples; ++i)
+                                        Phi[i] = 0;
+                                }
 
-                                Phi = SafeDiv(Phi, phiLambda.PDF());
                                 for (int i = 0; i < NSpectrumSamples; ++i)
                                     pixel.Phi[i].Add(Phi[i]);
                                 ++pixel.m;

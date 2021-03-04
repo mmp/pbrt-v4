@@ -128,8 +128,7 @@ class RandomWalkIntegrator : public RayIntegrator {
     SampledSpectrum Li(RayDifferential ray, SampledWavelengths &lambda, Sampler sampler,
                        ScratchBuffer &scratchBuffer,
                        VisibleSurface *visibleSurface) const {
-        SampledSpectrum L = LiRandomWalk(ray, lambda, sampler, scratchBuffer, 0);
-        return SafeDiv(L, lambda.PDF());
+        return LiRandomWalk(ray, lambda, sampler, scratchBuffer, 0);
     }
 
   private:
