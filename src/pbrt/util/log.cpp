@@ -31,20 +31,18 @@ namespace pbrt {
 
 namespace {
 
-std::string TimeNow() {
-    std::time_t t = std::time(NULL);
-    std::tm tm = *std::localtime(&t);
-    std::stringstream ss;
-    ss << std::put_time(&tm, "%Y%m%d.%H%M%S");
-    return ss.str();
+float ElapsedSeconds() {
+    using clock = std::chrono::steady_clock;
+    static clock::time_point start = clock::now();
+
+    clock::time_point now = clock::now();
+    int64_t elapseduS =
+        std::chrono::duration_cast<std::chrono::microseconds>(now - start).count();
+    return elapseduS / 1000000.;
 }
 
-#define LOG_BASE_FMT "%d.%03d %s"
-#ifdef PBRT_IS_WINDOWS
-#define LOG_BASE_ARGS GetCurrentThreadId(), ThreadIndex, TimeNow().c_str()
-#else
-#define LOG_BASE_ARGS getpid(), ThreadIndex, TimeNow().c_str()
-#endif
+#define LOG_BASE_FMT "tid %03d @ %9.3fs"
+#define LOG_BASE_ARGS ThreadIndex, ElapsedSeconds()
 
 }  // namespace
 
