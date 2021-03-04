@@ -28,25 +28,20 @@ namespace pbrt {
 // DielectricMaterial Method Definitions
 std::string DielectricMaterial::ToString() const {
     return StringPrintf("[ DielectricMaterial displacement: %s uRoughness: %s "
-                        "vRoughness: %s etaF: %s "
-                        "etaS: %s tint: %s remapRoughness: %s ]",
-                        displacement, uRoughness, vRoughness, etaF, etaS, tint,
-                        remapRoughness);
+                        "vRoughness: %s eta: %s tint: %s remapRoughness: %s ]",
+                        displacement, uRoughness, vRoughness, eta, tint, remapRoughness);
 }
 
 DielectricMaterial *DielectricMaterial::Create(
     const TextureParameterDictionary &parameters, Image *normalMap, const FileLoc *loc,
     Allocator alloc) {
-    FloatTexture etaF = parameters.GetFloatTextureOrNull("eta", alloc);
-    SpectrumTexture etaS =
-        parameters.GetSpectrumTextureOrNull("eta", SpectrumType::Unbounded, alloc);
-    if (etaF && etaS) {
-        Warning(loc, "Both \"float\" and \"spectrum\" variants of \"eta\" parameter "
-                     "were provided. Ignoring the \"float\" one.");
-        etaF = nullptr;
-    }
-    if (!etaF && !etaS)
-        etaF = alloc.new_object<FloatConstantTexture>(1.5);
+    Spectrum eta;
+    if (!parameters.GetFloatArray("eta").empty())
+        eta = alloc.new_object<ConstantSpectrum>(parameters.GetFloatArray("eta")[0]);
+    else
+        eta = parameters.GetOneSpectrum("eta", nullptr, SpectrumType::Unbounded, alloc);
+    if (!eta)
+        eta = alloc.new_object<ConstantSpectrum>(1.5f);
 
     FloatTexture uRoughness = parameters.GetFloatTextureOrNull("uroughness", alloc);
     FloatTexture vRoughness = parameters.GetFloatTextureOrNull("vroughness", alloc);
@@ -60,34 +55,30 @@ DielectricMaterial *DielectricMaterial::Create(
 
     SpectrumTexture tint =
         parameters.GetSpectrumTextureOrNull("tint", SpectrumType::Albedo, alloc);
-    return alloc.new_object<DielectricMaterial>(uRoughness, vRoughness, etaF, etaS,
-                                                displacement, normalMap, tint,
-                                                remapRoughness);
+    return alloc.new_object<DielectricMaterial>(uRoughness, vRoughness, eta, displacement,
+                                                normalMap, tint, remapRoughness);
 }
 
 // ThinDielectricMaterial Method Definitions
 std::string ThinDielectricMaterial::ToString() const {
-    return StringPrintf("[ ThinDielectricMaterial displacement: %s etaF: %s etaS: %s ]",
-                        displacement, etaF, etaS);
+    return StringPrintf("[ ThinDielectricMaterial displacement: %s eta: %s ]",
+                        displacement, eta);
 }
 
 ThinDielectricMaterial *ThinDielectricMaterial::Create(
     const TextureParameterDictionary &parameters, Image *normalMap, const FileLoc *loc,
     Allocator alloc) {
-    FloatTexture etaF = parameters.GetFloatTextureOrNull("eta", alloc);
-    SpectrumTexture etaS =
-        parameters.GetSpectrumTextureOrNull("eta", SpectrumType::Unbounded, alloc);
-    if (etaF && etaS) {
-        Warning(loc, "Both \"float\" and \"spectrum\" variants of \"eta\" parameter "
-                     "were provided. Ignoring the \"float\" one.");
-        etaF = nullptr;
-    }
-    if (!etaF && !etaS)
-        etaF = alloc.new_object<FloatConstantTexture>(1.5);
+    Spectrum eta;
+    if (!parameters.GetFloatArray("eta").empty())
+        eta = alloc.new_object<ConstantSpectrum>(parameters.GetFloatArray("eta")[0]);
+    else
+        eta = parameters.GetOneSpectrum("eta", nullptr, SpectrumType::Unbounded, alloc);
+    if (!eta)
+        eta = alloc.new_object<ConstantSpectrum>(1.5f);
 
     FloatTexture displacement = parameters.GetFloatTextureOrNull("displacement", alloc);
 
-    return alloc.new_object<ThinDielectricMaterial>(etaF, etaS, displacement, normalMap);
+    return alloc.new_object<ThinDielectricMaterial>(eta, displacement, normalMap);
 }
 
 // MixMaterial Method Definitions
@@ -262,7 +253,14 @@ CoatedDiffuseMaterial *CoatedDiffuseMaterial::Create(
         vRoughness = parameters.GetFloatTexture("roughness", 0.f, alloc);
 
     FloatTexture thickness = parameters.GetFloatTexture("thickness", .01, alloc);
-    FloatTexture eta = parameters.GetFloatTexture("eta", 1.5, alloc);
+
+    Spectrum eta;
+    if (!parameters.GetFloatArray("eta").empty())
+        eta = alloc.new_object<ConstantSpectrum>(parameters.GetFloatArray("eta")[0]);
+    else
+        eta = parameters.GetOneSpectrum("eta", nullptr, SpectrumType::Unbounded, alloc);
+    if (!eta)
+        eta = alloc.new_object<ConstantSpectrum>(1.5f);
 
     LayeredBxDFConfig config;
     config.maxDepth = parameters.GetOneInt("maxdepth", config.maxDepth);
@@ -312,7 +310,16 @@ CoatedConductorMaterial *CoatedConductorMaterial::Create(
             parameters.GetFloatTexture("interface.roughness", 0.f, alloc);
 
     FloatTexture thickness = parameters.GetFloatTexture("thickness", .01, alloc);
-    FloatTexture interfaceEta = parameters.GetFloatTexture("interface.eta", 1.5, alloc);
+
+    Spectrum interfaceEta;
+    if (!parameters.GetFloatArray("interface.eta").empty())
+        interfaceEta = alloc.new_object<ConstantSpectrum>(
+            parameters.GetFloatArray("interface.eta")[0]);
+    else
+        interfaceEta = parameters.GetOneSpectrum("interface.eta", nullptr,
+                                                 SpectrumType::Unbounded, alloc);
+    if (!interfaceEta)
+        interfaceEta = alloc.new_object<ConstantSpectrum>(1.5f);
 
     // conductor
     FloatTexture conductorURoughness =
