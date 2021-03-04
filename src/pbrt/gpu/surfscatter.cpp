@@ -101,6 +101,8 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
             using BxDF = typename Mtl::BxDF;
             BxDF bxdf;
             BSDF bsdf = w.material->GetBSDF(texEval, ctx, lambda, &bxdf);
+            if (lambda.SecondaryTerminated())
+                pixelSampleState.lambda[w.pixelIndex] = lambda;
 
             // Regularize BSDF, if appropriate
             if (regularize && w.anyNonSpecularBounces)
