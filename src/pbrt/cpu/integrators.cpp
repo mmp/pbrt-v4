@@ -687,19 +687,23 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
         // Initialize _visibleSurf_ at first intersection
         if (depth == 0 && visibleSurf != nullptr) {
             // Estimate BSDF's albedo
+            // Define sample arrays _ucRho_ and _uRho_ for reflectance estimate
             constexpr int nRhoSamples = 16;
-            SampledSpectrum rho(0.f);
-            for (int i = 0; i < nRhoSamples; ++i) {
-                // Generate sample for hemispherical-directional reflectance
-                Float uc = RadicalInverse(0, i + 1);
-                Point2f u(RadicalInverse(1, i + 1), RadicalInverse(2, i + 1));
+            const Float ucRho[nRhoSamples] = {
+                0.75741637, 0.37870818, 0.7083487, 0.18935409, 0.9149363, 0.35417435,
+                0.5990858,  0.09467703, 0.8578725, 0.45746812, 0.686759,  0.17708716,
+                0.9674518,  0.2995429,  0.5083201, 0.047338516};
+            const Point2f uRho[nRhoSamples] = {
+                Point2f(0.855985, 0.570367), Point2f(0.381823, 0.851844),
+                Point2f(0.285328, 0.764262), Point2f(0.733380, 0.114073),
+                Point2f(0.542663, 0.344465), Point2f(0.127274, 0.414848),
+                Point2f(0.964700, 0.947162), Point2f(0.594089, 0.643463),
+                Point2f(0.095109, 0.170369), Point2f(0.825444, 0.263359),
+                Point2f(0.429467, 0.454469), Point2f(0.244460, 0.816459),
+                Point2f(0.756135, 0.731258), Point2f(0.516165, 0.152852),
+                Point2f(0.180888, 0.214174), Point2f(0.898579, 0.503897)};
 
-                // Estimate one term of $\rho_\roman{hd}$
-                pstd::optional<BSDFSample> bs = bsdf.Sample_f(si->intr.wo, uc, u);
-                if (bs)
-                    rho += bs->f * AbsDot(bs->wi, si->intr.shading.n) / bs->pdf;
-            }
-            SampledSpectrum albedo = rho / nRhoSamples;
+            SampledSpectrum albedo = bsdf.rho(isect.wo, ucRho, uRho);
 
             *visibleSurf =
                 VisibleSurface(isect, camera.GetCameraTransform(), albedo, lambda);
@@ -1104,19 +1108,23 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
         // Initialize _visibleSurf_ at first intersection
         if (depth == 0 && visibleSurf != nullptr) {
             // Estimate BSDF's albedo
+            // Define sample arrays _ucRho_ and _uRho_ for reflectance estimate
             constexpr int nRhoSamples = 16;
-            SampledSpectrum rho(0.f);
-            for (int i = 0; i < nRhoSamples; ++i) {
-                // Generate sample for hemispherical-directional reflectance
-                Float uc = RadicalInverse(0, i + 1);
-                Point2f u(RadicalInverse(1, i + 1), RadicalInverse(2, i + 1));
+            const Float ucRho[nRhoSamples] = {
+                0.75741637, 0.37870818, 0.7083487, 0.18935409, 0.9149363, 0.35417435,
+                0.5990858,  0.09467703, 0.8578725, 0.45746812, 0.686759,  0.17708716,
+                0.9674518,  0.2995429,  0.5083201, 0.047338516};
+            const Point2f uRho[nRhoSamples] = {
+                Point2f(0.855985, 0.570367), Point2f(0.381823, 0.851844),
+                Point2f(0.285328, 0.764262), Point2f(0.733380, 0.114073),
+                Point2f(0.542663, 0.344465), Point2f(0.127274, 0.414848),
+                Point2f(0.964700, 0.947162), Point2f(0.594089, 0.643463),
+                Point2f(0.095109, 0.170369), Point2f(0.825444, 0.263359),
+                Point2f(0.429467, 0.454469), Point2f(0.244460, 0.816459),
+                Point2f(0.756135, 0.731258), Point2f(0.516165, 0.152852),
+                Point2f(0.180888, 0.214174), Point2f(0.898579, 0.503897)};
 
-                // Estimate one term of $\rho_\roman{hd}$
-                pstd::optional<BSDFSample> bs = bsdf.Sample_f(si->intr.wo, uc, u);
-                if (bs)
-                    rho += bs->f * AbsDot(bs->wi, si->intr.shading.n) / bs->pdf;
-            }
-            SampledSpectrum albedo = rho / nRhoSamples;
+            SampledSpectrum albedo = bsdf.rho(isect.wo, ucRho, uRho);
 
             *visibleSurf =
                 VisibleSurface(isect, camera.GetCameraTransform(), albedo, lambda);
