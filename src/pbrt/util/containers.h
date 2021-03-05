@@ -560,12 +560,12 @@ class InlinedVector {
     }
 
     template <class... Args>
-    iterator emplace(const_iterator pos, Args &&... args) {
+    iterator emplace(const_iterator pos, Args &&...args) {
         // TODO
         LOG_FATAL("TODO");
     }
     template <class... Args>
-    void emplace_back(Args &&... args) {
+    void emplace_back(Args &&...args) {
         // TODO
         LOG_FATAL("TODO");
     }

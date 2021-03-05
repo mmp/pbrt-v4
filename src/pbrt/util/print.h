@@ -12,7 +12,7 @@
 // Hack: make util/log.h happy
 namespace pbrt {
 template <typename... Args>
-inline std::string StringPrintf(const char *fmt, Args &&... args);
+inline std::string StringPrintf(const char *fmt, Args &&...args);
 }
 
 #include <pbrt/util/log.h>
@@ -180,13 +180,12 @@ inline
 }
 
 template <typename T, typename... Args>
-inline void stringPrintfRecursive(std::string *s, const char *fmt, T &&v,
-                                  Args &&... args);
+inline void stringPrintfRecursive(std::string *s, const char *fmt, T &&v, Args &&...args);
 
 template <typename T, typename... Args>
 inline void stringPrintfRecursiveWithPrecision(std::string *s, const char *fmt,
                                                const std::string &nextFmt, T &&v,
-                                               Args &&... args) {
+                                               Args &&...args) {
     LOG_FATAL("MEH");
 }
 
@@ -194,7 +193,7 @@ template <typename T, typename... Args>
 inline typename std::enable_if_t<!std::is_class<typename std::decay_t<T>>::value, void>
 stringPrintfRecursiveWithPrecision(std::string *s, const char *fmt,
                                    const std::string &nextFmt, int precision, T &&v,
-                                   Args &&... args) {
+                                   Args &&...args) {
     size_t size = snprintf(nullptr, 0, nextFmt.c_str(), precision, v) + 1;
     std::string str;
     str.resize(size);
@@ -215,7 +214,7 @@ stringPrintfRecursiveWithPrecision(std::string *s, const char *fmt,
 // in *s.
 template <typename T, typename... Args>
 inline void stringPrintfRecursive(std::string *s, const char *fmt, T &&v,
-                                  Args &&... args) {
+                                  Args &&...args) {
     std::string nextFmt = copyToFormatString(&fmt, s);
     bool precisionViaArg = nextFmt.find('*') != std::string::npos;
 
@@ -280,19 +279,19 @@ done:
 
 // Printing Function Declarations
 template <typename... Args>
-void Printf(const char *fmt, Args &&... args);
+void Printf(const char *fmt, Args &&...args);
 template <typename... Args>
-inline std::string StringPrintf(const char *fmt, Args &&... args);
+inline std::string StringPrintf(const char *fmt, Args &&...args);
 
 template <typename... Args>
-inline std::string StringPrintf(const char *fmt, Args &&... args) {
+inline std::string StringPrintf(const char *fmt, Args &&...args) {
     std::string ret;
     detail::stringPrintfRecursive(&ret, fmt, std::forward<Args>(args)...);
     return ret;
 }
 
 template <typename... Args>
-void Printf(const char *fmt, Args &&... args) {
+void Printf(const char *fmt, Args &&...args) {
     std::string s = StringPrintf(fmt, std::forward<Args>(args)...);
     fputs(s.c_str(), stdout);
 }

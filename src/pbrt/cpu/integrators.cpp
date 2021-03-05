@@ -411,7 +411,7 @@ SampledSpectrum SimplePathIntegrator::Li(RayDifferential ray, SampledWavelengths
             break;
         }
 
-        // Account for emsisive surface if light was not sampled
+        // Account for emissive surface if light was not sampled
         SurfaceInteraction &isect = si->intr;
         if (!sampleLights || specularBounce)
             L += beta * isect.Le(-ray.d, lambda);
@@ -447,7 +447,7 @@ SampledSpectrum SimplePathIntegrator::Li(RayDifferential ray, SampledWavelengths
             }
         }
 
-        // Sample outoing direction at intersection to continue path
+        // Sample outgoing direction at intersection to continue path
         if (sampleBSDF) {
             // Sample BSDF for new path direction
             Float u = sampler.Get1D();
@@ -770,7 +770,8 @@ SampledSpectrum PathIntegrator::SampleLd(const SurfaceInteraction &intr, const B
         ctx.pi = intr.OffsetRayOrigin(-intr.wo);
 
     // Choose a light source for the direct lighting calculation
-    pstd::optional<SampledLight> sampledLight = lightSampler.Sample(ctx, sampler.Get1D());
+    Float u = sampler.Get1D();
+    pstd::optional<SampledLight> sampledLight = lightSampler.Sample(ctx, u);
     Point2f uLight = sampler.Get2D();
     if (!sampledLight)
         return {};
@@ -3248,7 +3249,8 @@ SampledSpectrum SPPMIntegrator::SampleLd(const SurfaceInteraction &intr, const B
         ctx.pi = intr.OffsetRayOrigin(-intr.wo);
 
     // Choose a light source for the direct lighting calculation
-    pstd::optional<SampledLight> sampledLight = lightSampler.Sample(ctx, sampler.Get1D());
+    Float u = sampler.Get1D();
+    pstd::optional<SampledLight> sampledLight = lightSampler.Sample(ctx, u);
     Point2f uLight = sampler.Get2D();
     if (!sampledLight)
         return {};

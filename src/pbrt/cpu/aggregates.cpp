@@ -971,7 +971,7 @@ retrySplit:
         if (edges[bestAxis][i].type == EdgeType::End)
             prims1[n1++] = edges[bestAxis][i].primNum;
 
-    // Recursively initialize children nodes
+    // Recursively initialize kd-tree node's children
     Float tSplit = edges[bestAxis][bestOffset].t;
     Bounds3f bounds0 = nodeBounds, bounds1 = nodeBounds;
     bounds0.pMax[bestAxis] = bounds1.pMin[bestAxis] = tSplit;
@@ -1012,7 +1012,7 @@ pstd::optional<ShapeIntersection> KdTreeAggregate::Intersect(const Ray &ray,
             int axis = node->SplitAxis();
             Float tSplit = (node->SplitPos() - ray.o[axis]) * invDir[axis];
 
-            // Get node children pointers for ray
+            // Get node child pointers for ray
             const KdTreeNode *firstChild, *secondChild;
             int belowFirst = (ray.o[axis] < node->SplitPos()) ||
                              (ray.o[axis] == node->SplitPos() && ray.d[axis] <= 0);
