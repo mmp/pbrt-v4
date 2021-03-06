@@ -1209,10 +1209,10 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             SubsurfaceInteraction ssi = interactionSampler.GetSample();
             BSSRDFSample bssrdfSample =
                 bssrdf.ProbeIntersectionToSample(ssi, scratchBuffer);
-            if (!bssrdfSample.Sp || bssrdfSample.pdf == 0)
+            if (!bssrdfSample.Sp || !bssrdfSample.pdf)
                 break;
-            T_hat *=
-                bssrdfSample.Sp / (interactionSampler.SamplePDF() * bssrdfSample.pdf);
+            T_hat *= bssrdfSample.Sp;
+            uniPathPDF *= interactionSampler.SamplePDF() * bssrdfSample.pdf;
             SurfaceInteraction pi = ssi;
             BSDF &Sw = bssrdfSample.Sw;
             pi.wo = bssrdfSample.wo;

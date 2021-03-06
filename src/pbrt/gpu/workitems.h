@@ -218,7 +218,7 @@ struct SubsurfaceScatterWorkItem {
     TabulatedBSSRDF bssrdf;
     SampledWavelengths lambda;
     SampledSpectrum T_hat, uniPathPDF;
-    Float weight;
+    Float reservoirPDF;
     Float uLight;
     SubsurfaceInteraction ssi;
     MediumInterface mediumInterface;

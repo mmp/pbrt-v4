@@ -47,7 +47,7 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
     ForAllQueued(
         "Handle out-scattering after SSS", subsurfaceScatterQueue, maxQueueSize,
         PBRT_GPU_LAMBDA(SubsurfaceScatterWorkItem w) {
-            if (w.weight == 0)
+            if (w.reservoirPDF == 0)
                 return;
 
             using BSSRDF = TabulatedBSSRDF;
@@ -58,11 +58,11 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
             SubsurfaceInteraction &intr = w.ssi;
             BSSRDFSample bssrdfSample = bssrdf.ProbeIntersectionToSample(intr, &bxdf);
 
-            if (!bssrdfSample.Sp || bssrdfSample.pdf == 0)
+            if (!bssrdfSample.Sp || !bssrdfSample.pdf)
                 return;
 
-            SampledSpectrum T_hatp =
-                w.T_hat * bssrdfSample.Sp * w.weight / bssrdfSample.pdf;
+            SampledSpectrum T_hatp = w.T_hat * bssrdfSample.Sp;
+            SampledSpectrum uniPathPDF = w.uniPathPDF * w.reservoirPDF * bssrdfSample.pdf;
             SampledWavelengths lambda = w.lambda;
             RaySamples raySamples = pixelSampleState.samples[w.pixelIndex];
             Vector3f wo = bssrdfSample.wo;
@@ -81,7 +81,8 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                 if (bsdfSample) {
                     Vector3f wi = bsdfSample->wi;
                     SampledSpectrum T_hat = T_hatp * bsdfSample->f * AbsDot(wi, intr.ns);
-                    SampledSpectrum uniPathPDF = w.uniPathPDF, lightPathPDF = uniPathPDF;
+                    SampledSpectrum indirUniPathPDF = uniPathPDF,
+                                    lightPathPDF = uniPathPDF;
 
                     PBRT_DBG("%s f*cos[0] %f bsdfSample->pdf %f f*cos/pdf %f\n",
                              BxDF::Name(), bsdfSample->f[0] * AbsDot(wi, intr.ns),
@@ -91,24 +92,24 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                     if (bsdfSample->pdfIsProportional) {
                         Float pdf = bsdf.PDF(wo, wi);
                         T_hat *= pdf / bsdfSample->pdf;
-                        uniPathPDF *= pdf;
+                        indirUniPathPDF *= pdf;
                         PBRT_DBG("Sampled PDF is proportional: pdf %f\n", pdf);
                     } else
-                        uniPathPDF *= bsdfSample->pdf;
+                        indirUniPathPDF *= bsdfSample->pdf;
 
                     Float etaScale = w.etaScale;
                     if (bsdfSample->IsTransmission())
                         etaScale *= Sqr(bsdfSample->eta);
 
                     // Russian roulette
-                    SampledSpectrum rrBeta = T_hat * etaScale / uniPathPDF.Average();
+                    SampledSpectrum rrBeta = T_hat * etaScale / indirUniPathPDF.Average();
                     if (rrBeta.MaxComponentValue() < 1 && depth > 1) {
                         Float q = std::max<Float>(0, 1 - rrBeta.MaxComponentValue());
                         if (raySamples.indirect.rr < q) {
                             T_hat = SampledSpectrum(0.f);
                             PBRT_DBG("Path terminated with RR\n");
                         }
-                        uniPathPDF *= 1 - q;
+                        indirUniPathPDF *= 1 - q;
                         lightPathPDF *= 1 - q;
                     }
 
@@ -126,22 +127,24 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
 
                         LightSampleContext ctx(intr.pi, intr.n, intr.ns);
                         nextRayQueue->PushIndirectRay(
-                            ray, ctx, T_hat, uniPathPDF, lightPathPDF, lambda, etaScale,
-                            bsdfSample->IsSpecular(), anyNonSpecularBounces,
+                            ray, ctx, T_hat, indirUniPathPDF, lightPathPDF, lambda,
+                            etaScale, bsdfSample->IsSpecular(), anyNonSpecularBounces,
                             w.pixelIndex);
 
-                        PBRT_DBG(
-                            "Spawned indirect ray at depth %d. "
-                            "Specular %d T_Hat %f %f %f %f uniPathPDF %f %f %f %f "
-                            "lightPathPDF %f "
-                            "%f %f %f "
-                            "T_hat/uniPathPDF %f %f %f %f\n",
-                            depth + 1, int(bsdfSample->IsSpecular()), T_hat[0], T_hat[1],
-                            T_hat[2], T_hat[3], uniPathPDF[0], uniPathPDF[1],
-                            uniPathPDF[2], uniPathPDF[3], lightPathPDF[0],
-                            lightPathPDF[1], lightPathPDF[2], lightPathPDF[3],
-                            SafeDiv(T_hat, uniPathPDF)[0], SafeDiv(T_hat, uniPathPDF)[1],
-                            SafeDiv(T_hat, uniPathPDF)[2], SafeDiv(T_hat, uniPathPDF)[3]);
+                        PBRT_DBG("Spawned indirect ray at depth %d. "
+                                 "Specular %d T_Hat %f %f %f %f indirUniPathPDF %f %f %f "
+                                 "%f lightPathPDF %f "
+                                 "%f %f %f "
+                                 "T_hat/indirUniPathPDF %f %f %f %f\n",
+                                 depth + 1, int(bsdfSample->IsSpecular()), T_hat[0],
+                                 T_hat[1], T_hat[2], T_hat[3], indirUniPathPDF[0],
+                                 indirUniPathPDF[1], indirUniPathPDF[2],
+                                 indirUniPathPDF[3], lightPathPDF[0], lightPathPDF[1],
+                                 lightPathPDF[2], lightPathPDF[3],
+                                 SafeDiv(T_hat, indirUniPathPDF)[0],
+                                 SafeDiv(T_hat, indirUniPathPDF)[1],
+                                 SafeDiv(T_hat, indirUniPathPDF)[2],
+                                 SafeDiv(T_hat, indirUniPathPDF)[3]);
                     }
                 }
             }
@@ -177,8 +180,8 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                 // This causes uniPathPDF to be zero for the shadow ray, so that
                 // part of MIS just becomes a no-op.
                 Float bsdfPDF = IsDeltaLight(light.Type()) ? 0.f : bsdf.PDF<BxDF>(wo, wi);
-                SampledSpectrum uniPathPDF = w.uniPathPDF * bsdfPDF;
-                SampledSpectrum lightPathPDF = w.uniPathPDF * lightPDF;
+                SampledSpectrum lightPathPDF = uniPathPDF * lightPDF;
+                uniPathPDF *= bsdfPDF;
 
                 SampledSpectrum Ld = T_hat * ls->L;
 

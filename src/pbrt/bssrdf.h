@@ -23,8 +23,7 @@ namespace pbrt {
 
 // BSSRDFSample Definition
 struct BSSRDFSample {
-    SampledSpectrum Sp;
-    Float pdf;
+    SampledSpectrum Sp, pdf;
     BSDF Sw;
     Vector3f wo;
 };
@@ -233,7 +232,7 @@ class TabulatedBSSRDF {
     }
 
     PBRT_CPU_GPU
-    Float PDF_Sp(const Point3f &pi, const Normal3f &ni) const {
+    SampledSpectrum PDF_Sp(const Point3f &pi, const Normal3f &ni) const {
         // Express $\pti-\pto$ and $\bold{n}_i$ with respect to local coordinates at
         // $\pto$
         Vector3f d = pi - po;
@@ -251,7 +250,7 @@ class TabulatedBSSRDF {
         Float axisProb[3] = {.25f, .25f, .5f};
         for (int axis = 0; axis < 3; ++axis)
             pdf += PDF_Sr(rProj[axis]) * std::abs(nLocal[axis]) * axisProb[axis];
-        return pdf.Average();
+        return pdf;
     }
 
     PBRT_CPU_GPU
