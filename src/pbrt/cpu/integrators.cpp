@@ -1189,7 +1189,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             uint64_t seed = MixBits(FloatToBits(sampler.Get1D()));
             WeightedReservoirSampler<SubsurfaceInteraction> interactionSampler(seed);
             // Intersect BSSRDF sampling ray against the scene geometry
-            Interaction base(probeSeg->p0, ray.time, (Medium) nullptr);
+            Interaction base(probeSeg->p0, ray.time, Medium());
             while (true) {
                 Ray r = base.SpawnRayTo(probeSeg->p1);
                 if (r.d == Vector3f(0, 0, 0))
@@ -1211,7 +1211,8 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                 bssrdf.ProbeIntersectionToSample(ssi, scratchBuffer);
             if (!bssrdfSample.Sp || bssrdfSample.pdf == 0)
                 break;
-            T_hat *= bssrdfSample.Sp * interactionSampler.WeightSum() / bssrdfSample.pdf;
+            T_hat *=
+                bssrdfSample.Sp / (interactionSampler.SamplePDF() * bssrdfSample.pdf);
             SurfaceInteraction pi = ssi;
             BSDF &Sw = bssrdfSample.Sw;
             pi.wo = bssrdfSample.wo;

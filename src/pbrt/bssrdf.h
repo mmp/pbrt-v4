@@ -125,77 +125,81 @@ class TabulatedBSSRDF {
     PBRT_CPU_GPU
     SampledSpectrum Sr(Float r) const {
         SampledSpectrum Sr(0.f);
-        for (int ch = 0; ch < NSpectrumSamples; ++ch) {
+        for (int i = 0; i < NSpectrumSamples; ++i) {
             // Convert $r$ into unitless optical radius $r_{\roman{optical}}$
-            Float rOptical = r * sigma_t[ch];
+            Float rOptical = r * sigma_t[i];
 
-            // Compute spline weights to interpolate BSSRDF on channel _ch_
+            // Compute spline weights to interpolate BSSRDF at _i_th wavelength
             int rhoOffset, radiusOffset;
             Float rhoWeights[4], radiusWeights[4];
-            if (!CatmullRomWeights(table->rhoSamples, rho[ch], &rhoOffset, rhoWeights) ||
+            if (!CatmullRomWeights(table->rhoSamples, rho[i], &rhoOffset, rhoWeights) ||
                 !CatmullRomWeights(table->radiusSamples, rOptical, &radiusOffset,
                                    radiusWeights))
                 continue;
 
-            // Set BSSRDF value _Sr[ch]_ using tensor spline interpolation
+            // Set BSSRDF value _Sr[i]_ using tensor spline interpolation
             Float sr = 0;
-            for (int i = 0; i < 4; ++i)
-                for (int j = 0; j < 4; ++j) {
-                    // Accumulate contribution of $(i,j)$ table sample
-                    if (Float weight = rhoWeights[i] * radiusWeights[j]; weight != 0)
+            for (int j = 0; j < 4; ++j)
+                for (int k = 0; k < 4; ++k) {
+                    // Accumulate contribution of $(j,k)$ table sample
+                    if (Float weight = rhoWeights[j] * radiusWeights[k]; weight != 0)
                         sr +=
-                            weight * table->EvalProfile(rhoOffset + i, radiusOffset + j);
+                            weight * table->EvalProfile(rhoOffset + j, radiusOffset + k);
                 }
             // Cancel marginal PDF factor from tabulated BSSRDF profile
             if (rOptical != 0)
                 sr /= 2 * Pi * rOptical;
 
-            Sr[ch] = sr;
+            Sr[i] = sr;
         }
         // Transform BSSRDF value into world space units
-        Sr *= sigma_t * sigma_t;
+        Sr *= Sqr(sigma_t);
 
         return ClampZero(Sr);
     }
 
     PBRT_CPU_GPU
-    Float SampleSr(Float u) const {
+    pstd::optional<Float> SampleSr(Float u) const {
         if (sigma_t[0] == 0)
-            return -1;
+            return {};
         return SampleCatmullRom2D(table->rhoSamples, table->radiusSamples, table->profile,
                                   table->profileCDF, rho[0], u) /
                sigma_t[0];
     }
 
     PBRT_CPU_GPU
-    Float PDF_Sr(int ch, Float r) const {
-        // Convert $r$ into unitless optical radius $r_{\roman{optical}}$
-        Float rOptical = r * sigma_t[ch];
+    SampledSpectrum PDF_Sr(Float r) const {
+        SampledSpectrum pdf(0.f);
+        for (int i = 0; i < NSpectrumSamples; ++i) {
+            // Convert $r$ into unitless optical radius $r_{\roman{optical}}$
+            Float rOptical = r * sigma_t[i];
 
-        // Compute spline weights to interpolate BSSRDF density on channel _ch_
-        int rhoOffset, radiusOffset;
-        Float rhoWeights[4], radiusWeights[4];
-        if (!CatmullRomWeights(table->rhoSamples, rho[ch], &rhoOffset, rhoWeights) ||
-            !CatmullRomWeights(table->radiusSamples, rOptical, &radiusOffset,
-                               radiusWeights))
-            return 0;
+            // Compute spline weights to interpolate BSSRDF at _i_th wavelength
+            int rhoOffset, radiusOffset;
+            Float rhoWeights[4], radiusWeights[4];
+            if (!CatmullRomWeights(table->rhoSamples, rho[i], &rhoOffset, rhoWeights) ||
+                !CatmullRomWeights(table->radiusSamples, rOptical, &radiusOffset,
+                                   radiusWeights))
+                continue;
 
-        // Return BSSRDF profile density for channel _ch_
-        Float sr = 0, rhoEff = 0;
-        for (int i = 0; i < 4; ++i)
-            if (rhoWeights[i] != 0) {
-                // Update _rhoEff_ and _sr_ for channel _ch_
-                rhoEff += table->rhoEff[rhoOffset + i] * rhoWeights[i];
-                for (int j = 0; j < 4; ++j)
-                    if (radiusWeights[j] != 0)
-                        sr += table->EvalProfile(rhoOffset + i, radiusOffset + j) *
-                              rhoWeights[i] * radiusWeights[j];
-            }
-        // Cancel marginal PDF factor from tabulated BSSRDF profile
-        if (rOptical != 0)
-            sr /= 2 * Pi * rOptical;
+            // Set BSSRDF profile probability density for wavelength
+            Float sr = 0, rhoEff = 0;
+            for (int j = 0; j < 4; ++j)
+                if (rhoWeights[j] != 0) {
+                    // Update _rhoEff_ and _sr_ for wavelength
+                    rhoEff += table->rhoEff[rhoOffset + j] * rhoWeights[j];
+                    for (int k = 0; k < 4; ++k)
+                        if (radiusWeights[k] != 0)
+                            sr += table->EvalProfile(rhoOffset + j, radiusOffset + k) *
+                                  rhoWeights[j] * radiusWeights[k];
+                }
+            // Cancel marginal PDF factor from tabulated BSSRDF profile
+            if (rOptical != 0)
+                sr /= 2 * Pi * rOptical;
 
-        return std::max<Float>(0, sr * sigma_t[ch] * sigma_t[ch] / rhoEff);
+            pdf[i] = sr * Sqr(sigma_t[i]) / rhoEff;
+        }
+        return ClampZero(pdf);
     }
 
     PBRT_CPU_GPU
@@ -210,20 +214,20 @@ class TabulatedBSSRDF {
             f = Frame::FromZ(ns);
 
         // Sample BSSRDF profile in polar coordinates
-        Float r = SampleSr(u2[0]);
-        if (r < 0)
+        pstd::optional<Float> r = SampleSr(u2[0]);
+        if (!r)
             return {};
         Float phi = 2 * Pi * u2[1];
 
         // Compute BSSRDF profile bounds and intersection height
-        Float r_max = SampleSr(0.999f);
-        if (r >= r_max)
+        pstd::optional<Float> r_max = SampleSr(0.999f);
+        if (!r_max || *r >= *r_max)
             return {};
-        Float l = 2 * std::sqrt(Sqr(r_max) - Sqr(r));
+        Float l = 2 * std::sqrt(Sqr(*r_max) - Sqr(*r));
 
         // Return BSSRDF sampling ray segment
         Point3f pStart =
-            po + r * (f.x * std::cos(phi) + f.y * std::sin(phi)) - l * f.z * 0.5f;
+            po + *r * (f.x * std::cos(phi) + f.y * std::sin(phi)) - l * f.z / 2;
         Point3f pTarget = pStart + l * f.z;
         return BSSRDFProbeSegment{pStart, pTarget};
     }
@@ -243,13 +247,11 @@ class TabulatedBSSRDF {
                           std::sqrt(Sqr(dLocal.x) + Sqr(dLocal.y))};
 
         // Return combined probability from all BSSRDF sampling strategies
-        Float pdf = 0, axisProb[3] = {.25f, .25f, .5f};
-        Float chProb = 1 / (Float)NSpectrumSamples;
+        SampledSpectrum pdf(0.f);
+        Float axisProb[3] = {.25f, .25f, .5f};
         for (int axis = 0; axis < 3; ++axis)
-            for (int ch = 0; ch < NSpectrumSamples; ++ch)
-                pdf += PDF_Sr(ch, rProj[axis]) * std::abs(nLocal[axis]) * chProb *
-                       axisProb[axis];
-        return pdf;
+            pdf += PDF_Sr(rProj[axis]) * std::abs(nLocal[axis]) * axisProb[axis];
+        return pdf.Average();
     }
 
     PBRT_CPU_GPU
