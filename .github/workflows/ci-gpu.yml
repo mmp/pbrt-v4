@@ -47,18 +47,7 @@ jobs:
     - name: Install OpenEXR
       run: sudo apt-get -y install libopenexr-dev
 
-    - name: Make /usr/local world writable
-      run: sudo chmod 777 /usr/local
-
-    - name: Try to restore CUDA install from cache
-      id: cache-cuda
-      uses: actions/cache@v2
-      with:
-        path: /usr/local/cuda-${{ matrix.cuda }}
-        key: cuda-usr-local-${{ matrix.cuda }}
-
     - name: Install CUDA
-      if: steps.cache-cuda.outputs.cache-hit != 'true'
       run: |
         wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin
         sudo mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600
