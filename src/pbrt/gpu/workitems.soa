@@ -105,7 +105,7 @@ soa SubsurfaceScatterWorkItem {
     int pixelIndex;
 
     // OptiX code initializes these.
-    Float weight;
+    Float reservoirPDF;
     Float uLight;
     SubsurfaceInteraction ssi;
 };

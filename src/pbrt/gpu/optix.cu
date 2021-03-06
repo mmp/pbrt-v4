@@ -712,10 +712,10 @@ extern "C" __global__ void __raygen__randomHit() {
         PBRT_DBG("optix si p %f %f %f n %f %f %f\n", si.p().x, si.p().y, si.p().z, si.n.x,
             si.n.y, si.n.z);
 
-        params.subsurfaceScatterQueue->weight[index] = payload.wrs.WeightSum();
+        params.subsurfaceScatterQueue->reservoirPDF[index] = payload.wrs.SamplePDF();
         params.subsurfaceScatterQueue->ssi[index] = payload.wrs.GetSample();
     } else
-        params.subsurfaceScatterQueue->weight[index] = 0;
+        params.subsurfaceScatterQueue->reservoirPDF[index] = 0;
 }
 
 extern "C" __global__ void __anyhit__randomHitTriangle() {
