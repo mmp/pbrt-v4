@@ -337,12 +337,11 @@ inline Normal3<T> Transform::operator()(const Normal3<T> &n) const {
 }
 
 inline Ray Transform::operator()(const Ray &r, Float *tMax) const {
-    Vector3f oError;
     Point3fi o = (*this)(Point3fi(r.o));
     Vector3f d = (*this)(r.d);
     // Offset ray origin to edge of error bounds and compute _tMax_
     if (Float lengthSquared = LengthSquared(d); lengthSquared > 0) {
-        Float dt = Dot(Abs(d), oError) / lengthSquared;
+        Float dt = Dot(Abs(d), o.Error()) / lengthSquared;
         o += d * dt;
         if (tMax)
             *tMax -= dt;
