@@ -835,20 +835,26 @@ SimpleVolPathIntegrator::SimpleVolPathIntegrator(int maxDepth, Camera camera,
 SampledSpectrum SimpleVolPathIntegrator::Li(RayDifferential ray,
                                             SampledWavelengths &lambda, Sampler sampler,
                                             ScratchBuffer &buf, VisibleSurface *) const {
-    SampledSpectrum L(0.f), beta(1.f);
-    int numScatters = 0;
+    // Declare local variables for delta tracking integration
+    SampledSpectrum L(0.f);
+    Float beta = 1.f;
+    int depth = 0;
+
+    bool scattered = false, terminated = false;
+
     // Terminate secondary wavelengths before starting random walk
     lambda.TerminateSecondary();
 
     while (true) {
         // Estimate radiance for ray path using delta tracking
         pstd::optional<ShapeIntersection> si = Intersect(ray);
-        bool scattered = false, terminated = false;
         if (ray.medium) {
-            // Sample medium scattering using delta tracking
+            // Initialize RNG for delta tracking
             uint64_t hash0 = Hash(sampler.Get1D());
             uint64_t hash1 = Hash(sampler.Get1D());
             RNG rng(hash0, hash1);
+
+            // Sample medium scattering using delta tracking
             Float tMax = si ? si->tHit : Infinity;
             Float u = sampler.Get1D();
             Float uMode = sampler.Get1D();
@@ -871,14 +877,15 @@ SampledSpectrum SimpleVolPathIntegrator::Li(RayDifferential ray,
                     } else if (mode == 1) {
                         // Handle regular scattering event for delta tracking
                         // Stop path sampling if maximum depth has been reached
-                        if (numScatters++ >= maxDepth) {
+                        if (depth++ >= maxDepth) {
                             terminated = true;
                             return false;
                         }
 
                         // Sample phase function for delta tracking scattering event
+                        Point2f u{rng.Uniform<Float>(), rng.Uniform<Float>()};
                         pstd::optional<PhaseFunctionSample> ps =
-                            intr.phase.Sample_p(-ray.d, sampler.Get2D());
+                            intr.phase.Sample_p(-ray.d, u);
                         if (!ps) {
                             terminated = true;
                             return false;
@@ -916,6 +923,7 @@ SampledSpectrum SimpleVolPathIntegrator::Li(RayDifferential ray,
         if (!bsdf)
             si->intr.SkipIntersection(&ray, si->tHit);
         else {
+            // Report error if BSDF returns a valid sample
             Float uc = sampler.Get1D();
             Point2f u = sampler.Get2D();
             if (bsdf.Sample_f(-ray.d, uc, u))
@@ -1205,7 +1213,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             if (!interactionSampler.HasSample())
                 break;
 
-            // Convert probe intersection to _BSSRDFSample_ and update _beta_
+            // Convert probe intersection to _BSSRDFSample_ and update path state
             SubsurfaceInteraction ssi = interactionSampler.GetSample();
             BSSRDFSample bssrdfSample =
                 bssrdf.ProbeIntersectionToSample(ssi, scratchBuffer);
@@ -1214,17 +1222,17 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             T_hat *= bssrdfSample.Sp;
             uniPathPDF *= interactionSampler.SamplePDF() * bssrdfSample.pdf;
             SurfaceInteraction pi = ssi;
-            BSDF &Sw = bssrdfSample.Sw;
             pi.wo = bssrdfSample.wo;
+            prevIntrContext = LightSampleContext(pi);
 
-            // Possibly regularize subsurface BSDF and update _prevIntrContext_
+            // Possibly regularize subsurface BSDF
+            BSDF &Sw = bssrdfSample.Sw;
             anyNonSpecularBounces = true;
             if (regularize) {
                 ++regularizedBSDFs;
                 Sw.Regularize();
             } else
                 ++totalBSDFs;
-            prevIntrContext = LightSampleContext(pi);
 
             // Account for attenuated direct subsurface scattering
             L += SampleLd(pi, &Sw, lambda, sampler, T_hat, uniPathPDF);

@@ -46,15 +46,15 @@ Float BeamDiffusionMS(Float sigma_s, Float sigma_a, Float g, Float eta, Float r)
 
     // Determine exitance scale factors using Equations $(\ref{eq:kp-exitance-phi})$ and
     // $(\ref{eq:kp-exitance-e})$
-    Float cPhi = .25f * (1 - 2 * fm1), cE = .5f * (1 - 3 * fm2);
+    Float cPhi = 0.25f * (1 - 2 * fm1), cE = 0.5f * (1 - 3 * fm2);
 
     for (int i = 0; i < nSamples; ++i) {
         // Sample real point source depth $\depthreal$
-        Float zr = -std::log(1 - (i + .5f) / nSamples) / sigmap_t;
+        Float zr = -std::log(1 - (i + 0.5f) / nSamples) / sigmap_t;
 
         // Evaluate dipole integrand $E_{\roman{d}}$ at $\depthreal$ and add to _Ed_
         Float zv = -zr + 2 * ze;
-        Float dr = std::sqrt(r * r + zr * zr), dv = std::sqrt(r * r + zv * zv);
+        Float dr = std::sqrt(Sqr(r) + Sqr(zr)), dv = std::sqrt(Sqr(r) + Sqr(zv));
         // Compute dipole fluence rate $\dipole(r)$ using Equation
         // $(\ref{eq:diffusion-dipole})$
         Float phiD =
@@ -62,9 +62,9 @@ Float BeamDiffusionMS(Float sigma_s, Float sigma_a, Float g, Float eta, Float r)
 
         // Compute dipole vector irradiance $-\N{}\cdot\dipoleE(r)$ using Equation
         // $(\ref{eq:diffusion-dipole-vector-irradiance-normal})$
-        Float EDn = Inv4Pi *
-                    (zr * (1 + sigma_tr * dr) * FastExp(-sigma_tr * dr) / (dr * dr * dr) -
-                     zv * (1 + sigma_tr * dv) * FastExp(-sigma_tr * dv) / (dv * dv * dv));
+        Float EDn =
+            Inv4Pi * (zr * (1 + sigma_tr * dr) * FastExp(-sigma_tr * dr) / (Pow<3>(dr)) -
+                      zv * (1 + sigma_tr * dv) * FastExp(-sigma_tr * dv) / (Pow<3>(dv)));
 
         // Add contribution from dipole for depth $\depthreal$ to _Ed_
         Float E = phiD * cPhi + EDn * cE;
@@ -77,19 +77,19 @@ Float BeamDiffusionMS(Float sigma_s, Float sigma_a, Float g, Float eta, Float r)
 Float BeamDiffusionSS(Float sigma_s, Float sigma_a, Float g, Float eta, Float r) {
     // Compute material parameters and minimum $t$ below the critical angle
     Float sigma_t = sigma_a + sigma_s, rho = sigma_s / sigma_t;
-    Float tCrit = r * SafeSqrt(eta * eta - 1);
+    Float tCrit = r * SafeSqrt(Sqr(eta) - 1);
 
     Float Ess = 0;
     const int nSamples = 100;
     for (int i = 0; i < nSamples; ++i) {
         // Evaluate single-scattering integrand and add to _Ess_
-        Float ti = tCrit - std::log(1 - (i + .5f) / nSamples) / sigma_t;
+        Float ti = tCrit - std::log(1 - (i + 0.5f) / nSamples) / sigma_t;
         // Determine length $d$ of connecting segment and $\cos\theta_\roman{o}$
-        Float d = std::sqrt(r * r + ti * ti);
+        Float d = std::sqrt(Sqr(r) + Sqr(ti));
         Float cosTheta_o = ti / d;
 
         // Add contribution of single scattering at depth $t$
-        Ess += rho * FastExp(-sigma_t * (d + tCrit)) / (d * d) *
+        Ess += rho * FastExp(-sigma_t * (d + tCrit)) / Sqr(d) *
                HenyeyGreenstein(cosTheta_o, g) * (1 - FrDielectric(-cosTheta_o, eta)) *
                std::abs(cosTheta_o);
     }
