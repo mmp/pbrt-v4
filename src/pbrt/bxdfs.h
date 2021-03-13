@@ -417,7 +417,6 @@ class ConductorBxDF {
 struct LayeredBxDFConfig {
     uint8_t maxDepth = 10;
     uint8_t nSamples = 1;
-    uint8_t twoSided = true;
     std::string ToString() const;
 };
 
@@ -475,7 +474,7 @@ class TopOrBottomBxDF {
 };
 
 // LayeredBxDF Definition
-template <typename TopBxDF, typename BottomBxDF>
+template <typename TopBxDF, typename BottomBxDF, bool twoSided>
 class LayeredBxDF {
   public:
     // LayeredBxDF Public Methods
@@ -524,14 +523,14 @@ class LayeredBxDF {
         SampledSpectrum f(0.);
         // Estimate _LayeredBxDF_ value _f_ using random sampling
         // Set _wi_ and _wi_ for layered BSDF evaluation
-        if (config.twoSided && wo.z < 0) {
+        if (twoSided && wo.z < 0) {
             wo = -wo;
             wi = -wi;
         }
 
         // Determine entrance interface for layered BSDF
         TopOrBottomBxDF<TopBxDF, BottomBxDF> enterInterface;
-        bool enteredTop = wo.z > 0;
+        bool enteredTop = twoSided || wo.z > 0;
         if (enteredTop)
             enterInterface = &top;
         else
@@ -703,13 +702,13 @@ class LayeredBxDF {
         CHECK(sampleFlags == BxDFReflTransFlags::All);  // for now
         // Set _wo_ for layered BSDF sampling
         bool flipWi = false;
-        if (config.twoSided && wo.z < 0) {
+        if (twoSided && wo.z < 0) {
             wo = -wo;
             flipWi = true;
         }
 
         // Sample BSDF at entrance interface to get initial direction _w_
-        bool enteredTop = wo.z > 0;
+        bool enteredTop = twoSided || wo.z > 0;
         pstd::optional<BSDFSample> bs =
             enteredTop ? top.Sample_f(wo, uc, u, mode) : bottom.Sample_f(wo, uc, u, mode);
         if (!bs || !bs->f || bs->pdf == 0 || bs->wi.z == 0)
@@ -816,7 +815,7 @@ class LayeredBxDF {
         CHECK(sampleFlags == BxDFReflTransFlags::All);  // for now
         // Return approximate PDF for layered BSDF
         // Set _wi_ and _wi_ for layered BSDF evaluation
-        if (config.twoSided && wo.z < 0) {
+        if (twoSided && wo.z < 0) {
             wo = -wo;
             wi = -wi;
         }
@@ -828,7 +827,7 @@ class LayeredBxDF {
         };
 
         // Update _pdfSum_ for reflection at the entrance layer
-        bool enteredTop = wo.z > 0;
+        bool enteredTop = twoSided || wo.z > 0;
         Float pdfSum = 0;
         if (SameHemisphere(wo, wi)) {
             auto reflFlag = BxDFReflTransFlags::Reflection;
@@ -920,15 +919,15 @@ class LayeredBxDF {
     }
 
   protected:
-    // LayeredBxDF Protected Methods
+    // LayeredBxDF Private Methods
     PBRT_CPU_GPU
-    static Float Tr(Float dz, const Vector3f &w) {
+    static Float Tr(Float dz, Vector3f w) {
         if (std::abs(dz) <= std::numeric_limits<Float>::min())
             return 1;
         return FastExp(-std::abs(dz / w.z));
     }
 
-    // LayeredBxDF Protected Members
+    // LayeredBxDF Private Members
     TopBxDF top;
     BottomBxDF bottom;
     Float thickness, g;
@@ -937,7 +936,8 @@ class LayeredBxDF {
 };
 
 // CoatedDiffuseBxDF Definition
-class CoatedDiffuseBxDF : public LayeredBxDF<DielectricInterfaceBxDF, IdealDiffuseBxDF> {
+class CoatedDiffuseBxDF
+    : public LayeredBxDF<DielectricInterfaceBxDF, IdealDiffuseBxDF, true> {
   public:
     // CoatedDiffuseBxDF Public Methods
     using LayeredBxDF::LayeredBxDF;
@@ -946,7 +946,8 @@ class CoatedDiffuseBxDF : public LayeredBxDF<DielectricInterfaceBxDF, IdealDiffu
 };
 
 // CoatedConductorBxDF Definition
-class CoatedConductorBxDF : public LayeredBxDF<DielectricInterfaceBxDF, ConductorBxDF> {
+class CoatedConductorBxDF
+    : public LayeredBxDF<DielectricInterfaceBxDF, ConductorBxDF, true> {
   public:
     // CoatedConductorBxDF Public Methods
     PBRT_CPU_GPU
@@ -1200,8 +1201,8 @@ inline void BxDF::Regularize() {
     return Dispatch(regularize);
 }
 
-extern template class LayeredBxDF<DielectricInterfaceBxDF, IdealDiffuseBxDF>;
-extern template class LayeredBxDF<DielectricInterfaceBxDF, ConductorBxDF>;
+extern template class LayeredBxDF<DielectricInterfaceBxDF, IdealDiffuseBxDF, true>;
+extern template class LayeredBxDF<DielectricInterfaceBxDF, ConductorBxDF, true>;
 
 }  // namespace pbrt
 

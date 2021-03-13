@@ -265,7 +265,6 @@ CoatedDiffuseMaterial *CoatedDiffuseMaterial::Create(
     LayeredBxDFConfig config;
     config.maxDepth = parameters.GetOneInt("maxdepth", config.maxDepth);
     config.nSamples = parameters.GetOneInt("nsamples", config.nSamples);
-    config.twoSided = parameters.GetOneBool("twosided", config.twoSided);
 
     FloatTexture g = parameters.GetFloatTexture("g", 0.f, alloc);
     SpectrumTexture albedo =

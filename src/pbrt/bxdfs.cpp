@@ -65,8 +65,8 @@ std::string DiffuseBxDF::ToString() const {
     return StringPrintf("[ DiffuseBxDF R: %s T: %s A: %f B: %f ]", R, T, A, B);
 }
 
-template <typename TopBxDF, typename BottomBxDF>
-std::string LayeredBxDF<TopBxDF, BottomBxDF>::ToString() const {
+template <typename TopBxDF, typename BottomBxDF, bool twoSided>
+std::string LayeredBxDF<TopBxDF, BottomBxDF, twoSided>::ToString() const {
     return StringPrintf(
         "[ LayeredBxDF top: %s bottom: %s thickness: %f albedo: %s g: %f ]", top, bottom,
         thickness, albedo, g);
@@ -596,8 +596,8 @@ std::string HairBxDF::ToString() const {
 }
 
 std::string LayeredBxDFConfig::ToString() const {
-    return StringPrintf("[ LayeredBxDFConfig maxDepth: %d nSamples: %d twoSided: %d",
-                        maxDepth, nSamples, twoSided);
+    return StringPrintf("[ LayeredBxDFConfig maxDepth: %d nSamples: %d ]", maxDepth,
+                        nSamples);
 }
 
 // *****************************************************************************
@@ -1208,7 +1208,7 @@ std::string BxDF::ToString() const {
     return DispatchCPU(toStr);
 }
 
-template class LayeredBxDF<DielectricInterfaceBxDF, IdealDiffuseBxDF>;
-template class LayeredBxDF<DielectricInterfaceBxDF, ConductorBxDF>;
+template class LayeredBxDF<DielectricInterfaceBxDF, IdealDiffuseBxDF, true>;
+template class LayeredBxDF<DielectricInterfaceBxDF, ConductorBxDF, true>;
 
 }  // namespace pbrt
