@@ -840,14 +840,13 @@ SampledSpectrum SimpleVolPathIntegrator::Li(RayDifferential ray,
     Float beta = 1.f;
     int depth = 0;
 
-    bool scattered = false, terminated = false;
-
     // Terminate secondary wavelengths before starting random walk
     lambda.TerminateSecondary();
 
     while (true) {
         // Estimate radiance for ray path using delta tracking
         pstd::optional<ShapeIntersection> si = Intersect(ray);
+        bool scattered = false, terminated = false;
         if (ray.medium) {
             // Initialize RNG for delta tracking
             uint64_t hash0 = Hash(sampler.Get1D());
