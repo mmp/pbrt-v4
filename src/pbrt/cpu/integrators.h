@@ -284,8 +284,7 @@ class VolPathIntegrator : public RayIntegrator {
     // VolPathIntegrator Private Methods
     SampledSpectrum SampleLd(const Interaction &intr, const BSDF *bsdf,
                              SampledWavelengths &lambda, Sampler sampler,
-                             const SampledSpectrum &beta,
-                             const SampledSpectrum &pathPDF) const;
+                             SampledSpectrum beta, SampledSpectrum pathPDF) const;
 
     static void Rescale(SampledSpectrum &T_hat, SampledSpectrum &uniPathPDF,
                         SampledSpectrum &lightPathPDF) {
