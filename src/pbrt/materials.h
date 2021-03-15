@@ -567,7 +567,7 @@ class CoatedDiffuseMaterial {
                           FloatTexture vRoughness, FloatTexture thickness,
                           SpectrumTexture albedo, FloatTexture g, Spectrum eta,
                           FloatTexture displacement, Image *normalMap,
-                          bool remapRoughness, LayeredBxDFConfig config)
+                          bool remapRoughness, int maxDepth, int nSamples)
         : displacement(displacement),
           normalMap(normalMap),
           reflectance(reflectance),
@@ -578,7 +578,8 @@ class CoatedDiffuseMaterial {
           g(g),
           eta(eta),
           remapRoughness(remapRoughness),
-          config(config) {}
+          maxDepth(maxDepth),
+          nSamples(nSamples) {}
 
     static const char *Name() { return "CoatedDiffuseMaterial"; }
 
@@ -616,7 +617,7 @@ class CoatedDiffuseMaterial {
 
         *bxdf = CoatedDiffuseBxDF(
             DielectricInterfaceBxDF(sampledEta, SampledSpectrum(1.f), distrib),
-            IdealDiffuseBxDF(r), thick, a, gg, config);
+            IdealDiffuseBxDF(r), thick, a, gg, maxDepth, nSamples);
         return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf);
     }
 
@@ -645,7 +646,7 @@ class CoatedDiffuseMaterial {
     FloatTexture uRoughness, vRoughness, thickness, g;
     Spectrum eta;
     bool remapRoughness;
-    LayeredBxDFConfig config;
+    int maxDepth, nSamples;
 };
 
 // CoatedConductorMaterial Definition
@@ -661,8 +662,8 @@ class CoatedConductorMaterial {
                             FloatTexture conductorVRoughness,
                             SpectrumTexture conductorEta, SpectrumTexture k,
                             SpectrumTexture reflectance, FloatTexture displacement,
-                            Image *normalMap, bool remapRoughness,
-                            LayeredBxDFConfig config)
+                            Image *normalMap, bool remapRoughness, int maxDepth,
+                            int nSamples)
         : displacement(displacement),
           normalMap(normalMap),
           interfaceURoughness(interfaceURoughness),
@@ -677,7 +678,8 @@ class CoatedConductorMaterial {
           k(k),
           reflectance(reflectance),
           remapRoughness(remapRoughness),
-          config(config) {}
+          maxDepth(maxDepth),
+          nSamples(nSamples) {}
 
     static const char *Name() { return "CoatedConductorMaterial"; }
 
@@ -731,7 +733,7 @@ class CoatedConductorMaterial {
 
         *bxdf = CoatedConductorBxDF(
             DielectricInterfaceBxDF(ieta, SampledSpectrum(1.f), interfaceDistrib),
-            ConductorBxDF(conductorDistrib, ce, ck), thick, a, gg, config);
+            ConductorBxDF(conductorDistrib, ce, ck), thick, a, gg, maxDepth, nSamples);
         return BSDF(ctx.wo, ctx.n, ctx.ns, ctx.dpdus, bxdf);
     }
 
@@ -763,7 +765,7 @@ class CoatedConductorMaterial {
     FloatTexture conductorURoughness, conductorVRoughness;
     SpectrumTexture conductorEta, k, reflectance;
     bool remapRoughness;
-    LayeredBxDFConfig config;
+    int maxDepth, nSamples;
 };
 
 // SubsurfaceMaterial Definition

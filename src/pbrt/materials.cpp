@@ -262,9 +262,8 @@ CoatedDiffuseMaterial *CoatedDiffuseMaterial::Create(
     if (!eta)
         eta = alloc.new_object<ConstantSpectrum>(1.5f);
 
-    LayeredBxDFConfig config;
-    config.maxDepth = parameters.GetOneInt("maxdepth", config.maxDepth);
-    config.nSamples = parameters.GetOneInt("nsamples", config.nSamples);
+    int maxDepth = parameters.GetOneInt("maxdepth", 10);
+    int nSamples = parameters.GetOneInt("nsamples", 1);
 
     FloatTexture g = parameters.GetFloatTexture("g", 0.f, alloc);
     SpectrumTexture albedo =
@@ -278,19 +277,19 @@ CoatedDiffuseMaterial *CoatedDiffuseMaterial::Create(
 
     return alloc.new_object<CoatedDiffuseMaterial>(
         reflectance, uRoughness, vRoughness, thickness, albedo, g, eta, displacement,
-        normalMap, remapRoughness, config);
+        normalMap, remapRoughness, maxDepth, nSamples);
 }
 
 std::string CoatedConductorMaterial::ToString() const {
-    return StringPrintf(
-        "[ CoatedConductorMaterial displacement: %f interfaceURoughness: %f "
-        "interfaceVRoughness: %f thickness: %f "
-        "interfaceEta: %f g: %s albedo: %s conductorURoughness: %s conductorVRoughness: "
-        "%s "
-        "conductorEta: %s k: %s conductorReflectance: %s remapRoughness: %s config: %s",
-        displacement, interfaceURoughness, interfaceVRoughness, thickness, interfaceEta,
-        g, albedo, conductorURoughness, conductorVRoughness, conductorEta, k, reflectance,
-        remapRoughness, config);
+    return StringPrintf("[ CoatedConductorMaterial displacement: %f interfaceURoughness: "
+                        "%f interfaceVRoughness: %f thickness: %f "
+                        "interfaceEta: %f g: %s albedo: %s conductorURoughness: %s "
+                        "conductorVRoughness: %s "
+                        "conductorEta: %s k: %s conductorReflectance: %s remapRoughness: "
+                        "%s maxDepth: %d nSamples: %d ]",
+                        displacement, interfaceURoughness, interfaceVRoughness, thickness,
+                        interfaceEta, g, albedo, conductorURoughness, conductorVRoughness,
+                        conductorEta, k, reflectance, remapRoughness, maxDepth, nSamples);
 }
 
 CoatedConductorMaterial *CoatedConductorMaterial::Create(
@@ -349,9 +348,8 @@ CoatedConductorMaterial *CoatedConductorMaterial::Create(
             k = alloc.new_object<SpectrumConstantTexture>(GetNamedSpectrum("metal-Cu-k"));
     }
 
-    LayeredBxDFConfig config;
-    config.maxDepth = parameters.GetOneInt("maxdepth", config.maxDepth);
-    config.nSamples = parameters.GetOneInt("nsamples", config.nSamples);
+    int maxDepth = parameters.GetOneInt("maxdepth", 10);
+    int nSamples = parameters.GetOneInt("nsamples", 1);
 
     FloatTexture g = parameters.GetFloatTexture("g", 0.f, alloc);
     SpectrumTexture albedo =
@@ -366,7 +364,7 @@ CoatedConductorMaterial *CoatedConductorMaterial::Create(
     return alloc.new_object<CoatedConductorMaterial>(
         interfaceURoughness, interfaceVRoughness, thickness, interfaceEta, g, albedo,
         conductorURoughness, conductorVRoughness, conductorEta, k, reflectance,
-        displacement, normalMap, remapRoughness, config);
+        displacement, normalMap, remapRoughness, maxDepth, nSamples);
 }
 
 // SubsurfaceMaterial Method Definitions
