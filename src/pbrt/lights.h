@@ -64,7 +64,7 @@ struct LightLeSample {
     }
 
     PBRT_CPU_GPU
-    Float AbsCosTheta(const Vector3f &w) const { return intr ? AbsDot(w, intr->n) : 1; }
+    Float AbsCosTheta(Vector3f w) const { return intr ? AbsDot(w, intr->n) : 1; }
 
     // LightLeSample Public Members
     SampledSpectrum L;
@@ -183,7 +183,7 @@ class PointLight : public LightBase {
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
     PBRT_CPU_GPU
-    void PDF_Le(const Interaction &, Vector3f &w, Float *pdfPos, Float *pdfDir) const {
+    void PDF_Le(const Interaction &, Vector3f w, Float *pdfPos, Float *pdfDir) const {
         LOG_FATAL("Shouldn't be called for non-area lights");
     }
 
@@ -237,7 +237,7 @@ class DistantLight : public LightBase {
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
     PBRT_CPU_GPU
-    void PDF_Le(const Interaction &, Vector3f &w, Float *pdfPos, Float *pdfDir) const {
+    void PDF_Le(const Interaction &, Vector3f w, Float *pdfPos, Float *pdfDir) const {
         LOG_FATAL("Shouldn't be called for non-area lights");
     }
 
@@ -300,7 +300,7 @@ class ProjectionLight : public LightBase {
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
     PBRT_CPU_GPU
-    void PDF_Le(const Interaction &, Vector3f &w, Float *pdfPos, Float *pdfDir) const {
+    void PDF_Le(const Interaction &, Vector3f w, Float *pdfPos, Float *pdfDir) const {
         LOG_FATAL("Shouldn't be called for non-area lights");
     }
 
@@ -352,7 +352,7 @@ class GoniometricLight : public LightBase {
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
     PBRT_CPU_GPU
-    void PDF_Le(const Interaction &, Vector3f &w, Float *pdfPos, Float *pdfDir) const {
+    void PDF_Le(const Interaction &, Vector3f w, Float *pdfPos, Float *pdfDir) const {
         LOG_FATAL("Shouldn't be called for non-area lights");
     }
 
@@ -396,7 +396,7 @@ class DiffuseAreaLight : public LightBase {
     pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
                                            SampledWavelengths &lambda, Float time) const;
     PBRT_CPU_GPU
-    void PDF_Le(const Interaction &, Vector3f &w, Float *pdfPos, Float *pdfDir) const;
+    void PDF_Le(const Interaction &, Vector3f w, Float *pdfPos, Float *pdfDir) const;
 
     pstd::optional<LightBounds> Bounds() const;
 
@@ -473,7 +473,7 @@ class UniformInfiniteLight : public LightBase {
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
     PBRT_CPU_GPU
-    void PDF_Le(const Interaction &, Vector3f &w, Float *pdfPos, Float *pdfDir) const {
+    void PDF_Le(const Interaction &, Vector3f w, Float *pdfPos, Float *pdfDir) const {
         LOG_FATAL("Shouldn't be called for non-area lights");
     }
 
@@ -513,7 +513,7 @@ class ImageInfiniteLight : public LightBase {
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
     PBRT_CPU_GPU
-    void PDF_Le(const Interaction &, Vector3f &w, Float *pdfPos, Float *pdfDir) const {
+    void PDF_Le(const Interaction &, Vector3f w, Float *pdfPos, Float *pdfDir) const {
         LOG_FATAL("Shouldn't be called for non-area lights");
     }
 
@@ -609,7 +609,7 @@ class PortalImageInfiniteLight : public LightBase {
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
     PBRT_CPU_GPU
-    void PDF_Le(const Interaction &, Vector3f &w, Float *pdfPos, Float *pdfDir) const {
+    void PDF_Le(const Interaction &, Vector3f w, Float *pdfPos, Float *pdfDir) const {
         LOG_FATAL("Shouldn't be called for non-area lights");
     }
 
@@ -708,7 +708,7 @@ class SpotLight : public LightBase {
     void PDF_Le(const Ray &, Float *pdfPos, Float *pdfDir) const;
 
     PBRT_CPU_GPU
-    void PDF_Le(const Interaction &, Vector3f &w, Float *pdfPos, Float *pdfDir) const {
+    void PDF_Le(const Interaction &, Vector3f w, Float *pdfPos, Float *pdfDir) const {
         LOG_FATAL("Shouldn't be called for non-area lights");
     }
 

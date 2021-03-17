@@ -908,7 +908,7 @@ SampledSpectrum SimpleVolPathIntegrator::Li(RayDifferential ray,
             return L;
         if (scattered)
             continue;
-        // Add emission to un-scattered ray
+        // Add emission to unscattered ray
         if (si)
             L += beta * si->intr.Le(-ray.d, lambda);
         else {

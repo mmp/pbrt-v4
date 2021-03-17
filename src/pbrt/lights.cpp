@@ -285,7 +285,7 @@ ProjectionLight::ProjectionLight(Transform renderFromLight,
     // Compute sampling distribution for _ProjectionLight_
     ImageChannelDesc channelDesc = image.GetChannelDesc({"R", "G", "B"});
     if (!channelDesc)
-        ErrorExit("Image used for ProjectionLight doesn't have R, G, B channels.");
+        ErrorExit("Image used for ProjectionLight does not have R, G, B channels.");
     CHECK_EQ(3, channelDesc.size());
     CHECK(channelDesc.IsIdentity());
     auto dwdA = [&](const Point2f &p) {
@@ -783,7 +783,7 @@ pstd::optional<LightLeSample> DiffuseAreaLight::SampleLe(Point2f u1, Point2f u2,
                          ss->pdf, pdfDir);
 }
 
-void DiffuseAreaLight::PDF_Le(const Interaction &intr, Vector3f &w, Float *pdfPos,
+void DiffuseAreaLight::PDF_Le(const Interaction &intr, Vector3f w, Float *pdfPos,
                               Float *pdfDir) const {
     CHECK_NE(intr.n, Normal3f(0, 0, 0));
     *pdfPos = shape.PDF(intr);
@@ -1311,6 +1311,7 @@ pstd::optional<LightLeSample> SpotLight::SampleLe(Point2f u1, Point2f u2,
     Float sectionPDF;
     int section = SampleDiscrete(p, u2[0], &sectionPDF);
 
+    // Sample chosen region of spotlight cone
     Vector3f wl;
     Float pdfDir;
     if (section == 0) {
@@ -1322,12 +1323,13 @@ pstd::optional<LightLeSample> SpotLight::SampleLe(Point2f u1, Point2f u2,
         // Sample spotlight falloff region
         Float cosTheta = SampleSmoothStep(u1[0], cosFalloffEnd, cosFalloffStart);
         DCHECK(cosTheta >= cosFalloffEnd && cosTheta <= cosFalloffStart);
-        Float sinTheta = SafeSqrt(1 - cosTheta * cosTheta);
+        Float sinTheta = SafeSqrt(1 - Sqr(cosTheta));
         Float phi = u1[1] * 2 * Pi;
         wl = SphericalDirection(sinTheta, cosTheta, phi);
         pdfDir = SmoothStepPDF(cosTheta, cosFalloffEnd, cosFalloffStart) * sectionPDF /
                  (2 * Pi);
     }
+
     // Return sampled spotlight ray
     Ray ray = renderFromLight(Ray(Point3f(0, 0, 0), wl, time, mediumInterface.outside));
     return LightLeSample(I(wl, lambda), ray, 1, pdfDir);
@@ -1419,7 +1421,7 @@ std::string Light::ToString() const {
     return DispatchCPU(str);
 }
 
-void Light::PDF_Le(const Interaction &intr, Vector3f &w, Float *pdfPos,
+void Light::PDF_Le(const Interaction &intr, Vector3f w, Float *pdfPos,
                    Float *pdfDir) const {
     auto pdf = [&](auto ptr) { return ptr->PDF_Le(intr, w, pdfPos, pdfDir); };
     return Dispatch(pdf);

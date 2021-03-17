@@ -599,7 +599,7 @@ class LayeredBxDF {
                     Float sigma_t = 1;
                     Float dz = SampleExponential(r(), sigma_t / std::abs(w.z));
                     Float zp = w.z > 0 ? (z + dz) : (z - dz);
-                    CHECK_RARE(1e-5, z == zp);
+                    DCHECK_RARE(1e-5, z == zp);
                     if (z == zp)
                         continue;
                     if (0 < zp && zp < thickness) {
@@ -620,8 +620,10 @@ class LayeredBxDF {
                         w = ps->wi;
                         z = zp;
 
-                        if (!IsSpecular(exitInterface.Flags())) {
-                            // Account for scattering through _exitInterface_ from new _w_
+                        // Possibly account for scattering through _exitInterface_
+                        if (((z < exitZ && w.z > 0) || (z > exitZ && w.z < 0)) &&
+                            !IsSpecular(exitInterface.Flags())) {
+                            // Account for scattering through _exitInterface_
                             SampledSpectrum fExit = exitInterface.f(-w, wi, mode);
                             if (fExit) {
                                 Float exitPDF = exitInterface.PDF(
@@ -650,7 +652,7 @@ class LayeredBxDF {
                 } else {
                     // Account for scattering at _nonExitInterface_
                     if (!IsSpecular(nonExitInterface.Flags())) {
-                        // Add NEE contribution along pre-sampled _wis_ direction
+                        // Add NEE contribution along presampled _wis_ direction
                         Float wt = 1;
                         if (!IsSpecular(exitInterface.Flags()))
                             wt = PowerHeuristic(1, wis->pdf, 1,
@@ -807,15 +809,14 @@ class LayeredBxDF {
     Float PDF(Vector3f wo, Vector3f wi, TransportMode mode,
               BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
         CHECK(sampleFlags == BxDFReflTransFlags::All);  // for now
-        // Return approximate PDF for layered BSDF
         // Set _wi_ and _wi_ for layered BSDF evaluation
         if (twoSided && wo.z < 0) {
             wo = -wo;
             wi = -wi;
         }
 
-        // Declare _RNG_ for layered BSDF evaluation
-        RNG rng(Hash(GetOptions().seed, wo), Hash(wi));
+        // Declare _RNG_ for layered PDF evaluation
+        RNG rng(Hash(GetOptions().seed, wi), Hash(wo));
         auto r = [&rng]() {
             return std::min<Float>(rng.Uniform<Float>(), OneMinusEpsilon);
         };
@@ -855,20 +856,20 @@ class LayeredBxDF {
                         // Use multiple importance sampling to estimate PDF product
                         pstd::optional<BSDFSample> rs =
                             rInterface.Sample_f(-wos->wi, r(), {r(), r()}, mode);
-                        if (!rs || !rs->f || rs->pdf == 0)
-                            ;
-                        else if (!rInterface.IsNonSpecular())
-                            pdfSum += tInterface.PDF(-rs->wi, wi, mode);
-                        else {
-                            // Actual MIS here
-                            // first, sample r -> r cancels
-                            Float tPDF = tInterface.PDF(-rs->wi, wi, mode);
-                            Float wt = PowerHeuristic(1, rs->pdf, 1, tPDF);
-                            pdfSum += wt * tPDF;
+                        if (rs && rs->f && rs->pdf > 0) {
+                            if (!rInterface.IsNonSpecular())
+                                pdfSum += tInterface.PDF(-rs->wi, wi, mode);
+                            else {
+                                // Compute MIS-weighted estimate of Equation
+                                // (\ref{eq:pdf-triple-canceled-one})
+                                Float rPDF = rInterface.PDF(-wos->wi, -wis->wi, mode);
+                                Float wt = PowerHeuristic(1, wis->pdf, 1, rPDF);
+                                pdfSum += wt * rPDF;
 
-                            Float rPDF = rInterface.PDF(-wos->wi, -wis->wi, mode);
-                            wt = PowerHeuristic(1, wis->pdf, 1, rPDF);
-                            pdfSum += wt * rPDF;
+                                Float tPDF = tInterface.PDF(-rs->wi, wi, mode);
+                                wt = PowerHeuristic(1, rs->pdf, 1, tPDF);
+                                pdfSum += wt * tPDF;
+                            }
                         }
                     }
                 }

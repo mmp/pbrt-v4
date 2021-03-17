@@ -94,7 +94,7 @@ class Light : public TaggedPointer<  // Light Source Types
 
     // AreaLights only
     PBRT_CPU_GPU
-    void PDF_Le(const Interaction &intr, Vector3f &w, Float *pdfPos, Float *pdfDir) const;
+    void PDF_Le(const Interaction &intr, Vector3f w, Float *pdfPos, Float *pdfDir) const;
 };
 
 }  // namespace pbrt

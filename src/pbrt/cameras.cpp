@@ -573,7 +573,7 @@ SampledSpectrum PerspectiveCamera::We(const Ray &ray, SampledWavelengths &lambda
         return SampledSpectrum(0.);
 
     // Compute lens area of perspective camera
-    Float lensArea = lensRadius != 0 ? (Pi * lensRadius * lensRadius) : 1;
+    Float lensArea = lensRadius != 0 ? (Pi * Sqr(lensRadius)) : 1;
 
     // Return importance for point on image plane
     return SampledSpectrum(1 / (A * lensArea * Pow<4>(cosTheta)));
@@ -600,7 +600,7 @@ void PerspectiveCamera::PDF_We(const Ray &ray, Float *pdfPos, Float *pdfDir) con
     }
 
     // Compute lens area  and return perspective camera probabilities
-    Float lensArea = lensRadius != 0 ? (Pi * lensRadius * lensRadius) : 1;
+    Float lensArea = lensRadius != 0 ? (Pi * Sqr(lensRadius)) : 1;
     *pdfPos = 1 / lensArea;
     *pdfDir = 1 / (A * Pow<3>(cosTheta));
 }
@@ -613,8 +613,7 @@ pstd::optional<CameraWiSample> PerspectiveCamera::SampleWi(
     Normal3f n = Normal3f(RenderFromCamera(Vector3f(0, 0, 1), ref.time));
     Interaction lensIntr(pLensRender, n, ref.time, medium);
 
-    // Populate arguments and compute the importance value
-    // Compute incident direction to camera _wi_ at _ref_
+    // Find incident direction to camera _wi_ at _ref_
     Vector3f wi = lensIntr.p() - ref.p();
     Float dist = Length(wi);
     wi /= dist;
@@ -623,6 +622,7 @@ pstd::optional<CameraWiSample> PerspectiveCamera::SampleWi(
     Float lensArea = lensRadius != 0 ? (Pi * lensRadius * lensRadius) : 1;
     Float pdf = (dist * dist) / (AbsDot(lensIntr.n, wi) * lensArea);
 
+    // Compute importance and return _CameraWiSample_
     Point2f pRaster;
     SampledSpectrum Wi = We(lensIntr.SpawnRay(-wi), lambda, &pRaster);
     if (!Wi)
