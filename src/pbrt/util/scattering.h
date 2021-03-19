@@ -41,31 +41,27 @@ PBRT_CPU_GPU inline Float HenyeyGreenstein(Float cosTheta, Float g) {
 }
 
 // Fresnel Inline Functions
-// https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/
 PBRT_CPU_GPU
-inline SampledSpectrum FrConductor(Float cosTheta_i, const SampledSpectrum &eta,
-                                   const SampledSpectrum &k) {
-    cosTheta_i = Clamp(cosTheta_i, -1, 1);
-    SampledSpectrum etak = k;
+inline Float FrConductor2(Float cosTheta_i, pstd::complex<Float> eta) {
+    cosTheta_i = Clamp(cosTheta_i, 0, 1);
+    using Complex = pstd::complex<Float>;
 
-    Float cos2Theta_i = cosTheta_i * cosTheta_i;
-    Float sin2Theta_i = 1 - cos2Theta_i;
-    SampledSpectrum eta2 = eta * eta;
-    SampledSpectrum etak2 = etak * etak;
+    // Compute _cosTheta_t_ using Snell's law
+    Complex sinTheta_i = pstd::sqrt(1.f - cosTheta_i * cosTheta_i);
+    Complex sinTheta_t = sinTheta_i / eta;
+    Complex cosTheta_t = pstd::sqrt(1.f - sinTheta_t * sinTheta_t);
+    Complex r_parl = (eta * cosTheta_i - cosTheta_t) / (eta * cosTheta_i + cosTheta_t);
+    Complex r_perp = (eta * cosTheta_t - cosTheta_i) / (eta * cosTheta_t + cosTheta_i);
+    return (pstd::norm(r_parl) + pstd::norm(r_perp)) * .5f;
+}
 
-    SampledSpectrum t0 = eta2 - etak2 - SampledSpectrum(sin2Theta_i);
-    SampledSpectrum a2plusb2 = Sqrt(t0 * t0 + 4 * eta2 * etak2);
-    SampledSpectrum t1 = a2plusb2 + SampledSpectrum(cos2Theta_i);
-    SampledSpectrum a = SafeSqrt(0.5f * (a2plusb2 + t0));
-    SampledSpectrum t2 = (Float)2 * cosTheta_i * a;
-    SampledSpectrum Rs = (t1 - t2) / (t1 + t2);
-
-    SampledSpectrum t3 =
-        cos2Theta_i * a2plusb2 + SampledSpectrum(sin2Theta_i * sin2Theta_i);
-    SampledSpectrum t4 = t2 * sin2Theta_i;
-    SampledSpectrum Rp = Rs * (t3 - t4) / (t3 + t4);
-
-    return 0.5f * (Rp + Rs);
+PBRT_CPU_GPU
+inline SampledSpectrum FrConductor(Float cosTheta_i, SampledSpectrum eta,
+                                   SampledSpectrum k) {
+    SampledSpectrum result;
+    for (int i = 0; i < NSpectrumSamples; ++i)
+        result[i] = FrConductor2(cosTheta_i, pstd::complex<Float>(eta[i], k[i]));
+    return result;
 }
 
 PBRT_CPU_GPU

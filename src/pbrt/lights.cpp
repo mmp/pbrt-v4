@@ -394,14 +394,13 @@ pstd::optional<LightLeSample> ProjectionLight::SampleLe(Point2f u1, Point2f u2,
     CHECK_GT(cosTheta, 0);
     Float pdfDir = pdf * screenBounds.Area() / (A * Pow<3>(cosTheta));
 
-    // Compute radiance for sampled projection light direction
+    // Compute radiance and return projection light sample
     Point2f p = Point2f(screenBounds.Offset(ps));
     RGB rgb;
     for (int c = 0; c < 3; ++c)
         rgb[c] = image.LookupNearestChannel(p, c);
     SampledSpectrum L =
         scale * RGBIlluminantSpectrum(*imageColorSpace, rgb).Sample(lambda);
-
     Ray ray = renderFromLight(
         Ray(Point3f(0, 0, 0), Normalize(w), time, mediumInterface.outside));
     return LightLeSample(L, ray, 1, pdfDir);
@@ -552,17 +551,18 @@ pstd::optional<LightLeSample> GoniometricLight::SampleLe(Point2f u1, Point2f u2,
     // Sample direction and PDF for ray leaving goniometric light
     Float pdf;
     Point2f uv = distrib.Sample(u1, &pdf);
-    Vector3f wl = EqualAreaSquareToSphere(uv);
+    Vector3f wLight = EqualAreaSquareToSphere(uv);
     Float pdfDir = pdf / (4 * Pi);
 
-    Ray ray = renderFromLight(Ray(Point3f(0, 0, 0), wl, time, mediumInterface.outside));
-    return LightLeSample(I(wl, lambda), ray, 1, pdfDir);
+    Ray ray =
+        renderFromLight(Ray(Point3f(0, 0, 0), wLight, time, mediumInterface.outside));
+    return LightLeSample(I(wLight, lambda), ray, 1, pdfDir);
 }
 
 void GoniometricLight::PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
     *pdfPos = 0.f;
-    Vector3f wl = Normalize(renderFromLight.ApplyInverse(ray.d));
-    Point2f uv = EqualAreaSphereToSquare(wl);
+    Vector3f wLight = Normalize(renderFromLight.ApplyInverse(ray.d));
+    Point2f uv = EqualAreaSphereToSquare(wLight);
     *pdfDir = distrib.PDF(uv) / (4 * Pi);
 }
 
@@ -766,7 +766,7 @@ pstd::optional<LightLeSample> DiffuseAreaLight::SampleLe(Point2f u1, Point2f u2,
             w = SampleCosineHemisphere(u2);
             w.z *= -1;
         }
-        pdfDir = 0.5f * CosineHemispherePDF(std::abs(w.z));
+        pdfDir = CosineHemispherePDF(std::abs(w.z)) / 2;
 
     } else {
         w = SampleCosineHemisphere(u2);
@@ -787,7 +787,7 @@ void DiffuseAreaLight::PDF_Le(const Interaction &intr, Vector3f w, Float *pdfPos
                               Float *pdfDir) const {
     CHECK_NE(intr.n, Normal3f(0, 0, 0));
     *pdfPos = shape.PDF(intr);
-    *pdfDir = twoSided ? (.5 * CosineHemispherePDF(AbsDot(intr.n, w)))
+    *pdfDir = twoSided ? (CosineHemispherePDF(AbsDot(intr.n, w)) / 2)
                        : CosineHemispherePDF(Dot(intr.n, w));
 }
 
@@ -1002,8 +1002,8 @@ pstd::optional<LightLeSample> ImageInfiniteLight::SampleLe(Point2f u1, Point2f u
     // Sample infinite light image and compute ray direction _w_
     Float mapPDF;
     Point2f uv = distribution.Sample(u1, &mapPDF);
-    Vector3f wl = EqualAreaSquareToSphere(uv);
-    Vector3f w = -renderFromLight(wl);
+    Vector3f wLight = EqualAreaSquareToSphere(uv);
+    Vector3f w = -renderFromLight(wLight);
 
     // Compute infinite light sample ray
     Frame wFrame = Frame::FromZ(-w);
@@ -1312,11 +1312,11 @@ pstd::optional<LightLeSample> SpotLight::SampleLe(Point2f u1, Point2f u2,
     int section = SampleDiscrete(p, u2[0], &sectionPDF);
 
     // Sample chosen region of spotlight cone
-    Vector3f wl;
+    Vector3f wLight;
     Float pdfDir;
     if (section == 0) {
         // Sample spotlight center cone
-        wl = SampleUniformCone(u1, cosFalloffStart);
+        wLight = SampleUniformCone(u1, cosFalloffStart);
         pdfDir = UniformConePDF(cosFalloffStart) * sectionPDF;
 
     } else {
@@ -1325,14 +1325,15 @@ pstd::optional<LightLeSample> SpotLight::SampleLe(Point2f u1, Point2f u2,
         DCHECK(cosTheta >= cosFalloffEnd && cosTheta <= cosFalloffStart);
         Float sinTheta = SafeSqrt(1 - Sqr(cosTheta));
         Float phi = u1[1] * 2 * Pi;
-        wl = SphericalDirection(sinTheta, cosTheta, phi);
+        wLight = SphericalDirection(sinTheta, cosTheta, phi);
         pdfDir = SmoothStepPDF(cosTheta, cosFalloffEnd, cosFalloffStart) * sectionPDF /
                  (2 * Pi);
     }
 
     // Return sampled spotlight ray
-    Ray ray = renderFromLight(Ray(Point3f(0, 0, 0), wl, time, mediumInterface.outside));
-    return LightLeSample(I(wl, lambda), ray, 1, pdfDir);
+    Ray ray =
+        renderFromLight(Ray(Point3f(0, 0, 0), wLight, time, mediumInterface.outside));
+    return LightLeSample(I(wLight, lambda), ray, 1, pdfDir);
 }
 
 void SpotLight::PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const {

@@ -10,6 +10,7 @@
 #include <float.h>
 #include <limits.h>
 #include <cassert>
+#include <cmath>
 #include <cstddef>
 #include <cstring>
 #include <initializer_list>
@@ -1035,6 +1036,92 @@ PBRT_CPU_GPU const auto &get(const tuple<T, Ts...> &tuple) {
         return tuple.value;
     else
         return get<Req, Ts...>(tuple);
+}
+
+template <typename T>
+struct complex {
+    PBRT_CPU_GPU complex(T re) : re(re), im(0) {}
+    PBRT_CPU_GPU complex(T re, T im) : re(re), im(im) {}
+
+    PBRT_CPU_GPU complex operator-() const { return {-re, -im}; }
+
+    PBRT_CPU_GPU complex operator+(complex z) const { return {re + z.re, im + z.im}; }
+
+    PBRT_CPU_GPU complex operator-(complex z) const { return {re - z.re, im - z.im}; }
+
+    PBRT_CPU_GPU complex operator*(complex z) const {
+        return {re * z.re - im * z.im, re * z.im + im * z.re};
+    }
+
+    PBRT_CPU_GPU complex operator/(complex z) const {
+        T scale = 1 / (z.re * z.re + z.im * z.im);
+        return {scale * (re * z.re + im * z.im), scale * (im * z.re - re * z.im)};
+    }
+
+    friend PBRT_CPU_GPU complex operator+(T value, complex z) {
+        return complex(value) + z;
+    }
+
+    friend PBRT_CPU_GPU complex operator-(T value, complex z) {
+        return complex(value) - z;
+    }
+
+    friend PBRT_CPU_GPU complex operator*(T value, complex z) {
+        return complex(value) * z;
+    }
+
+    friend PBRT_CPU_GPU complex operator/(T value, complex z) {
+        return complex(value) / z;
+    }
+
+    T re, im;
+};
+
+PBRT_CPU_GPU inline float sqrt(float f) {
+    return ::sqrtf(f);
+}
+PBRT_CPU_GPU inline double sqrt(double f) {
+    return ::sqrt(f);
+}
+PBRT_CPU_GPU inline float abs(float f) {
+    return ::fabsf(f);
+}
+PBRT_CPU_GPU inline double abs(double f) {
+    return ::fabs(f);
+}
+
+template <typename T>
+PBRT_CPU_GPU T real(const complex<T> &z) {
+    return z.re;
+}
+
+template <typename T>
+PBRT_CPU_GPU T imag(const complex<T> &z) {
+    return z.im;
+}
+
+template <typename T>
+PBRT_CPU_GPU T norm(const complex<T> &z) {
+    return z.re * z.re + z.im * z.im;
+}
+
+template <typename T>
+PBRT_CPU_GPU T abs(const complex<T> &z) {
+    return pstd::sqrt(pstd::norm(z));
+}
+
+template <typename T>
+PBRT_CPU_GPU complex<T> sqrt(const complex<T> &z) {
+    T n = pstd::abs(z), t1 = pstd::sqrt(T(.5) * (n + pstd::abs(z.re))),
+      t2 = T(.5) * z.im / t1;
+
+    if (n == 0)
+        return 0;
+
+    if (z.re >= 0)
+        return {t1, t2};
+    else
+        return {pstd::abs(t2), std::copysign(t1, z.im)};
 }
 
 }  // namespace pstd

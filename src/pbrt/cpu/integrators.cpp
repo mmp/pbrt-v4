@@ -504,9 +504,9 @@ std::unique_ptr<SimplePathIntegrator> SimplePathIntegrator::Create(
 // LightPathIntegrator Method Definitions
 LightPathIntegrator::LightPathIntegrator(int maxDepth, Camera camera, Sampler sampler,
                                          Primitive aggregate, std::vector<Light> lights)
-    : ImageTileIntegrator(camera, sampler, aggregate, lights), maxDepth(maxDepth) {
-    lightSampler = std::make_unique<PowerLightSampler>(lights, Allocator());
-}
+    : ImageTileIntegrator(camera, sampler, aggregate, lights),
+      maxDepth(maxDepth),
+      lightSampler(lights, Allocator()) {}
 
 void LightPathIntegrator::EvaluatePixelSample(Point2i pPixel, int sampleIndex,
                                               Sampler sampler,
@@ -518,7 +518,8 @@ void LightPathIntegrator::EvaluatePixelSample(Point2i pPixel, int sampleIndex,
     SampledWavelengths lambda = camera.GetFilm().SampleWavelengths(lu);
 
     // Sample light to start light path
-    pstd::optional<SampledLight> sampledLight = lightSampler->Sample(sampler.Get1D());
+    Float ul = sampler.Get1D();
+    pstd::optional<SampledLight> sampledLight = lightSampler.Sample(ul);
     if (!sampledLight)
         return;
     Light light = sampledLight->light;
@@ -577,20 +578,20 @@ void LightPathIntegrator::EvaluatePixelSample(Point2i pPixel, int sampleIndex,
             break;
 
         // Splat contribution into film if intersection point is visible to camera
-        Vector3f wo = isect.wo;
-        pstd::optional<CameraWiSample> cs =
-            camera.SampleWi(isect, sampler.Get2D(), lambda);
+        Point2f u = sampler.Get2D();
+        pstd::optional<CameraWiSample> cs = camera.SampleWi(isect, u, lambda);
         if (cs && cs->pdf != 0) {
-            SampledSpectrum L = beta * bsdf.f(wo, cs->wi, TransportMode::Importance) *
+            SampledSpectrum L = beta *
+                                bsdf.f(isect.wo, cs->wi, TransportMode::Importance) *
                                 AbsDot(cs->wi, isect.shading.n) * cs->Wi / cs->pdf;
             if (L && Unoccluded(cs->pRef, cs->pLens))
                 camera.GetFilm().AddSplat(cs->pRaster, L, lambda);
         }
 
         // Sample BSDF and update light path state
-        Float u = sampler.Get1D();
+        Float uc = sampler.Get1D();
         pstd::optional<BSDFSample> bs =
-            bsdf.Sample_f(wo, u, sampler.Get2D(), TransportMode::Importance);
+            bsdf.Sample_f(isect.wo, uc, sampler.Get2D(), TransportMode::Importance);
         if (!bs)
             break;
         beta *= bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
@@ -659,7 +660,7 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
 
             break;
         }
-        // Incorporate emission from emissive surface hit by ray
+        // Incorporate emission from surface hit by ray
         SampledSpectrum Le = si->intr.Le(-ray.d, lambda);
         if (Le) {
             if (depth == 0 || specularBounce)
@@ -2776,7 +2777,7 @@ static bool ToGrid(const Point3f &p, const Bounds3f &bounds, const int gridRes[3
     Vector3f pg = bounds.Offset(p);
     for (int i = 0; i < 3; ++i) {
         (*pi)[i] = (int)(gridRes[i] * pg[i]);
-        inBounds &= ((*pi)[i] >= 0 && (*pi)[i] < gridRes[i]);
+        inBounds &= (*pi)[i] >= 0 && (*pi)[i] < gridRes[i];
         (*pi)[i] = Clamp((*pi)[i], 0, gridRes[i] - 1);
     }
     return inBounds;
@@ -2909,7 +2910,7 @@ void SPPMIntegrator::Render() {
                     // Add emission from directly visible emissive surfaces to _pixel.Ld_
                     Vector3f wo = -ray.d;
                     SampledSpectrum L(0.f);
-                    // Incorporate emission from emissive surface hit by ray
+                    // Incorporate emission from surface hit by ray
                     SampledSpectrum Le = si->intr.Le(-ray.d, lambda);
                     if (Le) {
                         if (depth == 0 || specularBounce)
@@ -2934,8 +2935,9 @@ void SPPMIntegrator::Render() {
 
                     // Accumulate direct illumination at SPPM camera ray intersection
                     SampledSpectrum Ld =
-                        SampleLd(isect, &bsdf, lambda, sampler, &lightSampler);
-                    pixel.Ld += film.ToOutputRGB(beta * Ld, lambda);
+                        SampleLd(isect, bsdf, lambda, sampler, &lightSampler);
+                    if (Ld)
+                        pixel.Ld += film.ToOutputRGB(beta * Ld, lambda);
 
                     // Possibly create visible point and end camera path
                     if (bsdf.IsDiffuse() || (bsdf.IsGlossy() && depth == maxDepth)) {
@@ -2989,7 +2991,7 @@ void SPPMIntegrator::Render() {
         int gridRes[3];
         Vector3f diag = gridBounds.Diagonal();
         Float maxDiag = MaxComponentValue(diag);
-        int baseGridRes = (int)(maxDiag / maxRadius);
+        int baseGridRes = int(maxDiag / maxRadius);
         for (int i = 0; i < 3; ++i)
             gridRes[i] = std::max<int>(baseGridRes * diag[i] / maxDiag, 1);
 
@@ -3063,8 +3065,8 @@ void SPPMIntegrator::Render() {
                 };
 
                 // Choose light to shoot photon from
-                pstd::optional<SampledLight> sampledLight =
-                    shootLightSampler.Sample(Sample1D());
+                Float ul = Sample1D();
+                pstd::optional<SampledLight> sampledLight = shootLightSampler.Sample(ul);
                 if (!sampledLight)
                     continue;
                 Light light = sampledLight->light;
@@ -3116,7 +3118,7 @@ void SPPMIntegrator::Render() {
                                 Vector3f wi = -photonRay.d;
                                 SampledSpectrum Phi =
                                     beta * pixel.vp.bsdf.f(pixel.vp.wo, wi);
-                                // Compute _phiLambda_ for photon contribution
+                                // Update _Phi_ to account for terminated wavelengths
                                 if (lambda.SecondaryTerminated()) {
                                     Phi[0] *= NSpectrumSamples;
                                     for (int i = 1; i < NSpectrumSamples; ++i)
@@ -3257,9 +3259,10 @@ void SPPMIntegrator::Render() {
     DisconnectFromDisplayServer();
 }
 
-SampledSpectrum SPPMIntegrator::SampleLd(const SurfaceInteraction &intr, const BSDF *bsdf,
+SampledSpectrum SPPMIntegrator::SampleLd(const SurfaceInteraction &intr, const BSDF &b,
                                          SampledWavelengths &lambda, Sampler sampler,
                                          LightSampler lightSampler) const {
+    const BSDF *bsdf = &b;
     // Initialize _LightSampleContext_ for light sampling
     LightSampleContext ctx(intr);
     // Try to nudge the light sampling position to correct side of the surface
