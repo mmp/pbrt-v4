@@ -2758,7 +2758,7 @@ struct SPPMPixel {
         bool secondaryLambdaTerminated;
 
     } vp;
-    AtomicFloat Phi[NSpectrumSamples];
+    AtomicFloat Phi_i[3];
     std::atomic<int> m{0};
     RGB tau;
     Float n = 0;
@@ -3118,15 +3118,14 @@ void SPPMIntegrator::Render() {
                                 Vector3f wi = -photonRay.d;
                                 SampledSpectrum Phi =
                                     beta * pixel.vp.bsdf.f(pixel.vp.wo, wi);
-                                // Update _Phi_ to account for terminated wavelengths
-                                if (lambda.SecondaryTerminated()) {
-                                    Phi[0] *= NSpectrumSamples;
-                                    for (int i = 1; i < NSpectrumSamples; ++i)
-                                        Phi[i] = 0;
-                                }
+                                // Update _Phi_i_ for photon contribution
+                                SampledWavelengths l = lambda;
+                                if (pixel.vp.secondaryLambdaTerminated)
+                                    l.TerminateSecondary();
+                                RGB Phi_i = film.ToOutputRGB(pixel.vp.beta * Phi, l);
+                                for (int i = 0; i < 3; ++i)
+                                    pixel.Phi_i[i].Add(Phi_i[i]);
 
-                                for (int i = 0; i < NSpectrumSamples; ++i)
-                                    pixel.Phi[i].Add(Phi[i]);
                                 ++pixel.m;
                             }
                         }
@@ -3173,25 +3172,24 @@ void SPPMIntegrator::Render() {
         // Update pixel values from this pass's photons
         ParallelFor2D(pixelBounds, [&](Point2i pPixel) {
             SPPMPixel &p = pixels[pPixel];
-            if (int m = p.m.load(); m > 0) {
+            if (int m = p.m.load(std::memory_order_relaxed); m > 0) {
                 // Compute new photon count and search radius given photons
                 Float gamma = (Float)2 / (Float)3;
                 Float nNew = p.n + gamma * m;
                 Float rNew = p.radius * std::sqrt(nNew / (p.n + m));
 
                 // Update $\tau$ for pixel
-                SampledSpectrum Phi;
-                for (int i = 0; i < NSpectrumSamples; ++i)
-                    Phi[i] = p.Phi[i];
-                RGB rgb = film.ToOutputRGB(p.vp.beta * Phi, passLambda);
-                p.tau = (p.tau + rgb) * Sqr(rNew) / Sqr(p.radius);
+                RGB Phi_i;
+                for (int i = 0; i < 3; ++i)
+                    Phi_i[i] = p.Phi_i[i];
+                p.tau = (p.tau + Phi_i) * Sqr(rNew) / Sqr(p.radius);
 
                 // Set remaining pixel values for next photon pass
                 p.n = nNew;
                 p.radius = rNew;
                 p.m = 0;
-                for (int i = 0; i < NSpectrumSamples; ++i)
-                    p.Phi[i] = (Float)0;
+                for (int i = 0; i < 3; ++i)
+                    p.Phi_i[i] = (Float)0;
             }
             // Reset _VisiblePoint_ in pixel
             p.vp.beta = SampledSpectrum(0.);
