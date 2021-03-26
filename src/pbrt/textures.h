@@ -10,6 +10,7 @@
 #include <pbrt/base/texture.h>
 #include <pbrt/interaction.h>
 #include <pbrt/paramdict.h>
+#include <pbrt/util/colorspace.h>
 #include <pbrt/util/math.h>
 #include <pbrt/util/mipmap.h>
 #include <pbrt/util/noise.h>
@@ -849,8 +850,9 @@ class PtexTextureBase {
 
     static void ReportStats();
 
-  protected:
     int SampleTexture(TextureEvalContext ctx, float *result) const;
+
+  protected:
     std::string BaseToString() const;
 
   private:
@@ -890,6 +892,62 @@ class SpectrumPtexTexture : public PtexTextureBase {
 
   private:
     SpectrumType spectrumType;
+};
+
+class GPUFloatPtexTexture {
+  public:
+    GPUFloatPtexTexture(const std::string &filename, ColorEncoding encoding,
+                        Allocator alloc);
+
+    PBRT_CPU_GPU
+    Float Evaluate(TextureEvalContext ctx) const {
+        DCHECK(ctx.faceIndex >= 0 && ctx.faceIndex < faceValues.size());
+        return faceValues[ctx.faceIndex];
+    }
+
+    static GPUFloatPtexTexture *Create(const Transform &renderFromTexture,
+                                       const TextureParameterDictionary &parameters,
+                                       const FileLoc *loc, Allocator alloc);
+    std::string ToString() const;
+
+  private:
+    pstd::vector<Float> faceValues;
+};
+
+class GPUSpectrumPtexTexture {
+  public:
+    GPUSpectrumPtexTexture(const std::string &filename, ColorEncoding encoding,
+                           SpectrumType spectrumType, Allocator alloc);
+
+    PBRT_CPU_GPU
+    SampledSpectrum Evaluate(TextureEvalContext ctx, SampledWavelengths lambda) const {
+        CHECK(ctx.faceIndex >= 0 && ctx.faceIndex < faceValues.size());
+
+        RGB rgb = faceValues[ctx.faceIndex];
+        const RGBColorSpace *sRGB =
+#ifdef PBRT_IS_GPU_CODE
+            RGBColorSpace_sRGB;
+#else
+            RGBColorSpace::sRGB;
+#endif
+        if (spectrumType == SpectrumType::Unbounded)
+            return RGBUnboundedSpectrum(*sRGB, rgb).Sample(lambda);
+        else if (spectrumType == SpectrumType::Albedo)
+            return RGBAlbedoSpectrum(*sRGB, Clamp(rgb, 0, 1)).Sample(lambda);
+        else
+            return RGBIlluminantSpectrum(*sRGB, rgb).Sample(lambda);
+    }
+
+    static GPUSpectrumPtexTexture *Create(const Transform &renderFromTexture,
+                                          const TextureParameterDictionary &parameters,
+                                          SpectrumType spectrumType, const FileLoc *loc,
+                                          Allocator alloc);
+
+    std::string ToString() const;
+
+  private:
+    SpectrumType spectrumType;
+    pstd::vector<RGB> faceValues;
 };
 
 // FloatScaledTexture Definition
@@ -1031,11 +1089,13 @@ class BasicTextureEvaluator {
     bool CanEvaluate(std::initializer_list<FloatTexture> ftex,
                      std::initializer_list<SpectrumTexture> stex) const {
         for (auto f : ftex)
-            if (f && (!f.Is<FloatConstantTexture>() && !f.Is<GPUFloatImageTexture>()))
+            if (f && (!f.Is<FloatConstantTexture>() && !f.Is<GPUFloatPtexTexture>() &&
+                      !f.Is<GPUFloatImageTexture>()))
                 return false;
         for (auto s : stex)
             if (s &&
-                (!s.Is<SpectrumConstantTexture>() && !s.Is<GPUSpectrumImageTexture>()))
+                (!s.Is<SpectrumConstantTexture>() && !s.Is<GPUSpectrumPtexTexture>() &&
+                 !s.Is<GPUSpectrumImageTexture>()))
                 return false;
         return true;
     }
@@ -1046,6 +1106,8 @@ class BasicTextureEvaluator {
             return fcTex->Evaluate(ctx);
         else if (GPUFloatImageTexture *fiTex = tex.CastOrNullptr<GPUFloatImageTexture>())
             return fiTex->Evaluate(ctx);
+        else if (GPUFloatPtexTexture *fPtex = tex.CastOrNullptr<GPUFloatPtexTexture>())
+            return fPtex->Evaluate(ctx);
         else
             return 0.f;
     }
@@ -1058,6 +1120,9 @@ class BasicTextureEvaluator {
         else if (GPUSpectrumImageTexture *sg =
                      tex.CastOrNullptr<GPUSpectrumImageTexture>())
             return sg->Evaluate(ctx, lambda);
+        else if (GPUSpectrumPtexTexture *sPtex =
+                     tex.CastOrNullptr<GPUSpectrumPtexTexture>())
+            return sPtex->Evaluate(ctx, lambda);
         else
             return SampledSpectrum(0.f);
     }
