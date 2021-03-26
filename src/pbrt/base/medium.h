@@ -61,7 +61,9 @@ struct MediumSample;
 
 // MediumDensity Definition
 struct MediumDensity {
+    PBRT_CPU_GPU
     MediumDensity(Float d) : sigma_a(d), sigma_s(d) {}
+    PBRT_CPU_GPU
     MediumDensity(SampledSpectrum sigma_a, SampledSpectrum sigma_s)
         : sigma_a(sigma_a), sigma_s(sigma_s) {}
     SampledSpectrum sigma_a, sigma_s;
