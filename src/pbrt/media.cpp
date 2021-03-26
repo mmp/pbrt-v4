@@ -188,42 +188,93 @@ STAT_MEMORY_COUNTER("Memory/Volume grids", volumeGridBytes);
 
 // UniformGridMediumProvider Method Definitions
 UniformGridMediumProvider::UniformGridMediumProvider(
-    const Bounds3f &bounds, pstd::optional<SampledGrid<Float>> dgrid,
-    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbgrid, Spectrum Le,
-    SampledGrid<Float> Legrid, Allocator alloc)
+    const Bounds3f &bounds, pstd::optional<SampledGrid<Float>> d,
+    pstd::optional<SampledGrid<Float>> sa, pstd::optional<SampledGrid<Float>> ss,
+    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbGrid, Spectrum Le,
+    SampledGrid<Float> LeGrid, Allocator alloc)
     : bounds(bounds),
-      densityGrid(std::move(dgrid)),
-      rgbDensityGrid(std::move(rgbgrid)),
+      density(std::move(d)),
+      sigma_a(std::move(sa)),
+      sigma_s(std::move(ss)),
+      rgb(std::move(rgbGrid)),
       Le_spec(Le, alloc),
-      LeScaleGrid(std::move(Legrid)) {
-    volumeGridBytes += LeScaleGrid.BytesAllocated();
-    volumeGridBytes +=
-        densityGrid ? densityGrid->BytesAllocated() : rgbDensityGrid->BytesAllocated();
+      LeScale(std::move(LeGrid)) {
+    if (density) {
+        CHECK(!sigma_a && !sigma_s && !rgb);
+    }
+    if (sigma_a) {
+        CHECK(sigma_s && !density && !rgb);
+    }
+    if (sigma_s) {
+        CHECK(sigma_a);
+    }
+    if (rgb) {
+        CHECK(!density && !sigma_a && !sigma_s);
+    }
+    volumeGridBytes += LeScale.BytesAllocated();
+    if (density)
+        volumeGridBytes += density->BytesAllocated();
+    if (sigma_a)
+        volumeGridBytes += sigma_a->BytesAllocated();
+    if (sigma_s)
+        volumeGridBytes += sigma_s->BytesAllocated();
+    if (rgb)
+        volumeGridBytes += rgb->BytesAllocated();
 }
 
 UniformGridMediumProvider *UniformGridMediumProvider::Create(
     const ParameterDictionary &parameters, const FileLoc *loc, Allocator alloc) {
     std::vector<Float> density = parameters.GetFloatArray("density");
-    std::vector<RGB> rgbDensity = parameters.GetRGBArray("density");
-    if (density.empty() && rgbDensity.empty())
+    std::vector<Float> sigma_a = parameters.GetFloatArray("density.sigma_a");
+    std::vector<Float> sigma_s = parameters.GetFloatArray("density.sigma_s");
+    std::vector<RGB> rgbDensity = parameters.GetRGBArray("density.rgb");
+
+    size_t nDensity;
+    if (!density.empty()) {
+        nDensity = density.size();
+        if (!sigma_a.empty())
+            ErrorExit(loc,
+                      "Both \"density\" and \"density.sigma_a\" values were provided.");
+        if (!sigma_s.empty())
+            ErrorExit(loc,
+                      "Both \"density\" and \"density.sigma_s\" values were provided.");
+        if (!rgbDensity.empty())
+            ErrorExit(loc, "Both \"density\" and \"density.rgb\" values were provided.");
+    } else if (!sigma_a.empty()) {
+        if (sigma_s.empty())
+            ErrorExit(loc,
+                      "No \"density.sigma_s\" was provided with \"density.sigma_a\".");
+        if (!rgbDensity.empty())
+            ErrorExit(loc, "Both \"density.sigma_a/sigma_s\" and \"density.rgb\" values "
+                           "were provided.");
+        nDensity = sigma_a.size();
+        if (sigma_s.size() != sigma_a.size())
+            ErrorExit(loc,
+                      "Different number of samples (%d vs %d) provided for "
+                      "\"density.sigma_a\" and \"density.sigma_s\".",
+                      sigma_a.size(), sigma_s.size());
+    } else if (!rgbDensity.empty())
+        nDensity = rgbDensity.size();
+    else
         ErrorExit(loc, "No \"density\" values provided for uniform grid medium.");
-    if (!density.empty() && !rgbDensity.empty())
-        ErrorExit(loc, "Both \"float\" and \"rgb\" \"density\" values were provided.");
 
     int nx = parameters.GetOneInt("nx", 1);
     int ny = parameters.GetOneInt("ny", 1);
     int nz = parameters.GetOneInt("nz", 1);
-    size_t nDensity = !density.empty() ? density.size() : rgbDensity.size();
     if (nDensity != nx * ny * nz)
         ErrorExit(loc,
                   "Uniform grid medium has %d density values; expected nx*ny*nz = %d",
                   nDensity, nx * ny * nz);
 
     pstd::optional<SampledGrid<Float>> densityGrid;
+    pstd::optional<SampledGrid<Float>> sigma_aGrid, sigma_sGrid;
     pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbDensityGrid;
     if (density.size())
         densityGrid = SampledGrid<Float>(density, nx, ny, nz, alloc);
-    else {
+    else if (sigma_a.size()) {
+        sigma_aGrid = SampledGrid<Float>(sigma_a, nx, ny, nz, alloc);
+        sigma_sGrid = SampledGrid<Float>(sigma_s, nx, ny, nz, alloc);
+    } else {
         const RGBColorSpace *colorSpace = parameters.ColorSpace();
         std::vector<RGBUnboundedSpectrum> rgbSpectrumDensity;
         for (RGB rgb : rgbDensity)
@@ -258,8 +309,8 @@ UniformGridMediumProvider *UniformGridMediumProvider::Create(
     Point3f p1 = parameters.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
 
     return alloc.new_object<UniformGridMediumProvider>(
-        Bounds3f(p0, p1), std::move(densityGrid), std::move(rgbDensityGrid), Le,
-        std::move(LeGrid), alloc);
+        Bounds3f(p0, p1), std::move(densityGrid), std::move(sigma_aGrid),
+        std::move(sigma_sGrid), std::move(rgbDensityGrid), Le, std::move(LeGrid), alloc);
 }
 
 std::string UniformGridMediumProvider::ToString() const {

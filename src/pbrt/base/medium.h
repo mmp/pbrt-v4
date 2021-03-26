@@ -59,6 +59,14 @@ using NanoVDBMedium = CuboidMedium<NanoVDBMediumProvider>;
 
 struct MediumSample;
 
+// MediumDensity Definition
+struct MediumDensity {
+    MediumDensity(Float d) : sigma_a(d), sigma_s(d) {}
+    MediumDensity(SampledSpectrum sigma_a, SampledSpectrum sigma_s)
+        : sigma_a(sigma_a), sigma_s(sigma_s) {}
+    SampledSpectrum sigma_a, sigma_s;
+};
+
 // Medium Definition
 class Medium : public TaggedPointer<HomogeneousMedium, UniformGridMedium, CloudMedium,
                                     NanoVDBMedium> {

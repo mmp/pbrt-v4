@@ -262,8 +262,9 @@ class CuboidMedium {
                             FastExp(-sigma_maj * (t - t0)) * T_majAccum;
                         T_majAccum = SampledSpectrum(1.f);
                         Point3f p = ray(t);
-                        SampledSpectrum d = provider->Density(p, lambda);
-                        SampledSpectrum sigmap_a = sigma_a * d, sigmap_s = sigma_s * d;
+                        MediumDensity d = provider->Density(p, lambda);
+                        SampledSpectrum sigmap_a = sigma_a * d.sigma_a,
+                                        sigmap_s = sigma_s * d.sigma_s;
                         SampledSpectrum Le = provider->Le(p, lambda);
 
                         // Report scattering event in grid to callback function
@@ -339,10 +340,12 @@ class CuboidMedium {
 class UniformGridMediumProvider {
   public:
     // UniformGridMediumProvider Public Methods
-    UniformGridMediumProvider(
-        const Bounds3f &bounds, pstd::optional<SampledGrid<Float>> densityGrid,
-        pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbDensityGrid, Spectrum Le,
-        SampledGrid<Float> LeScaleGrid, Allocator alloc);
+    UniformGridMediumProvider(const Bounds3f &bounds,
+                              pstd::optional<SampledGrid<Float>> density,
+                              pstd::optional<SampledGrid<Float>> sigma_a,
+                              pstd::optional<SampledGrid<Float>> sigma_s,
+                              pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgb,
+                              Spectrum Le, SampledGrid<Float> LeScale, Allocator alloc);
 
     static UniformGridMediumProvider *Create(const ParameterDictionary &parameters,
                                              const FileLoc *loc, Allocator alloc);
@@ -357,20 +360,24 @@ class UniformGridMediumProvider {
     PBRT_CPU_GPU
     SampledSpectrum Le(Point3f p, const SampledWavelengths &lambda) const {
         Point3f pp = Point3f(bounds.Offset(p));
-        return Le_spec.Sample(lambda) * LeScaleGrid.Lookup(pp);
+        return Le_spec.Sample(lambda) * LeScale.Lookup(pp);
     }
 
     PBRT_CPU_GPU
-    SampledSpectrum Density(Point3f p, const SampledWavelengths &lambda) const {
+    MediumDensity Density(Point3f p, const SampledWavelengths &lambda) const {
         Point3f pp = Point3f(bounds.Offset(p));
-        if (densityGrid)
-            return SampledSpectrum(densityGrid->Lookup(pp));
+        if (density)
+            return MediumDensity(density->Lookup(pp));
+        else if (sigma_a)
+            return MediumDensity(SampledSpectrum(sigma_a->Lookup(pp)),
+                                 SampledSpectrum(sigma_s->Lookup(pp)));
         else {
-            // Return _SampledSpectrum_ density from _rgbDensityGrid_
+            // Return _SampledSpectrum_ density from _rgb_
             auto convert = [=] PBRT_CPU_GPU(RGBUnboundedSpectrum s) {
                 return s.Sample(lambda);
             };
-            return rgbDensityGrid->Lookup(pp, convert);
+            SampledSpectrum d = rgb->Lookup(pp, convert);
+            return MediumDensity(d, d);
         }
     }
 
@@ -386,13 +393,16 @@ class UniformGridMediumProvider {
                         Point3f(x / res->x, y / res->y, z / res->z),
                         Point3f((x + 1) / res->x, (y + 1) / res->y, (z + 1) / res->z));
                     // Set current _maxGrid_ entry for maximum density over _bounds_
-                    if (densityGrid)
-                        maxGrid[offset++] = densityGrid->MaxValue(bounds);
+                    if (density)
+                        maxGrid[offset++] = density->MaxValue(bounds);
+                    else if (sigma_a)
+                        maxGrid[offset++] =
+                            sigma_a->MaxValue(bounds) + sigma_s->MaxValue(bounds);
                     else {
                         auto max = [] PBRT_CPU_GPU(RGBUnboundedSpectrum s) {
                             return s.MaxValue();
                         };
-                        maxGrid[offset++] = rgbDensityGrid->MaxValue(bounds, max);
+                        maxGrid[offset++] = rgb->MaxValue(bounds, max);
                     }
                 }
 
@@ -402,10 +412,11 @@ class UniformGridMediumProvider {
   private:
     // UniformGridMediumProvider Private Members
     Bounds3f bounds;
-    pstd::optional<SampledGrid<Float>> densityGrid;
-    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbDensityGrid;
+    pstd::optional<SampledGrid<Float>> density;
+    pstd::optional<SampledGrid<Float>> sigma_a, sigma_s;
+    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgb;
     DenselySampledSpectrum Le_spec;
-    SampledGrid<Float> LeScaleGrid;
+    SampledGrid<Float> LeScale;
 };
 
 // CloudMediumProvider Definition
@@ -437,7 +448,7 @@ class CloudMediumProvider {
     }
 
     PBRT_CPU_GPU
-    SampledSpectrum Density(Point3f p, const SampledWavelengths &) const {
+    MediumDensity Density(Point3f p, const SampledWavelengths &) const {
         Point3f pp = frequency * p;
         if (wispiness > 0) {
             // Perturb cloud lookup point _pp_ using noise
@@ -460,7 +471,7 @@ class CloudMediumProvider {
         // Model decrease in density with altitude and return final cloud density
         d = Clamp((1 - p.y) * 4.5f * density * d, 0, 1);
         d += 2 * std::max<Float>(0, 0.5f - p.y);
-        return SampledSpectrum(Clamp(d, 0, 1));
+        return MediumDensity(Clamp(d, 0, 1));
     }
 
     pstd::vector<Float> GetMaxDensityGrid(Allocator alloc, Point3i *res) const {
@@ -661,12 +672,12 @@ class NanoVDBMediumProvider {
     }
 
     PBRT_CPU_GPU
-    SampledSpectrum Density(const Point3f &p, const SampledWavelengths &lambda) const {
+    MediumDensity Density(const Point3f &p, const SampledWavelengths &lambda) const {
         nanovdb::Vec3<float> pIndex =
             densityFloatGrid->worldToIndexF(nanovdb::Vec3<float>(p.x, p.y, p.z));
         using Sampler = nanovdb::SampleFromVoxels<nanovdb::FloatGrid::TreeType, 1, false>;
         Float density = Sampler(densityFloatGrid->tree())(pIndex);
-        return SampledSpectrum(density);
+        return MediumDensity(density);
     }
 
   private:
