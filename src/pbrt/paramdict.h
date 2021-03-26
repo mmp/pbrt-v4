@@ -42,6 +42,19 @@ enum class ParameterType {
 // SpectrumType Definition
 enum class SpectrumType { Albedo, Unbounded, Illuminant };
 
+inline std::string ToString(SpectrumType t) {
+    switch (t) {
+    case SpectrumType::Albedo:
+        return "Albedo";
+    case SpectrumType::Unbounded:
+        return "Unbounded";
+    case SpectrumType::Illuminant:
+        return "Illuminant";
+    default:
+        LOG_FATAL("Unhandled SpectrumType");
+    }
+}
+
 // NamedTextures Definition
 struct NamedTextures {
     std::map<std::string, FloatTexture> floatTextures;
