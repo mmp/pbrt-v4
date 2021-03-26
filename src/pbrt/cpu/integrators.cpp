@@ -2579,7 +2579,7 @@ void MLTIntegrator::Render() {
         ErrorExit("No light carrying paths found during bootstrap sampling! "
                   "Are you trying to render a black image?");
     AliasTable bootstrapTable(bootstrapWeights);
-    Float b = (maxDepth + 1) / bootstrapWeights.size() *
+    Float b = Float(maxDepth + 1) / bootstrapWeights.size() *
               std::accumulate(bootstrapWeights.begin(), bootstrapWeights.end(), 0.);
 
     // Set up connection to display server, if enabled
