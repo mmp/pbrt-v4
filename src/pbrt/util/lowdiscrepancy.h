@@ -213,15 +213,15 @@ struct FastOwenScrambler {
     PBRT_CPU_GPU
     FastOwenScrambler(uint32_t seed) : seed(seed) {}
     // FastOwenScrambler Public Methods
-    // https://psychopath.io/post/2021_01_30_building_a_better_lk_hash
+    // Laine et al., Stratified Sampling for Stochastic Transparency, Sec 3.1...
     PBRT_CPU_GPU
     uint32_t operator()(uint32_t v) const {
         v = ReverseBits32(v);
-        v *= 0x788aeeed;
-        v ^= v * 0x41506a02;
         v += seed;
-        v *= seed | 1;
-        v ^= v * 0x7483dc64;
+        v ^= v * 0x6c50b47cu;
+        v ^= v * 0xb82f1e52u;
+        v ^= v * 0xc7afe638u;
+        v ^= v * 0x8d22f6e6u;
         return ReverseBits32(v);
     }
 
