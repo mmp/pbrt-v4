@@ -315,7 +315,9 @@ bool Integrator::IntersectP(const Ray &ray, Float tMax) const {
 }
 
 SampledSpectrum Integrator::Tr(const Interaction &p0, const Interaction &p1,
-                               const SampledWavelengths &lambda, RNG &rng) const {
+                               const SampledWavelengths &lambda) const {
+    RNG rng(Hash(p0.p()), Hash(p1.p()));
+
     auto rescale = [](SampledSpectrum &Tr, SampledSpectrum &pdf) {
         if (Tr.MaxComponentValue() > 0x1p24f || pdf.MaxComponentValue() > 0x1p24f) {
             Tr /= 0x1p24f;
@@ -1494,7 +1496,7 @@ SampledSpectrum ConnectBDPT(const Integrator &integrator, SampledWavelengths &la
                             Float *misWeightPtr = nullptr);
 
 Float InfiniteLightDensity(const std::vector<Light> &infiniteLights,
-                           LightSampler lightSampler, const Vector3f &w);
+                           LightSampler lightSampler, Vector3f w);
 
 // VertexType Definition
 enum class VertexType { Camera, Light, Surface, Medium };
@@ -1658,7 +1660,7 @@ struct Vertex {
         case VertexType::Surface:
             return bsdf.IsNonSpecular();
         }
-        LOG_FATAL("Unhandled vertex type in IsConnectable()");
+        LOG_FATAL("Unhandled vertex type in IsConnectible()");
     }
 
     bool IsLight() const {
@@ -1825,11 +1827,11 @@ struct Vertex {
             return 0.;
         w = Normalize(w);
         if (IsInfiniteLight()) {
-            // Return solid angle density for infinite light sources
+            // Return sampling density for infinite light sources
             return InfiniteLightDensity(infiniteLights, lightSampler, w);
 
         } else {
-            // Return solid angle density for non-infinite light source
+            // Return sampling density for non-infinite light source
             Light light = (type == VertexType::Light) ? ei.light : si.areaLight;
             Float pdfPos, pdfDir, pdfChoice = lightSampler.PDF(light);
             if (IsOnSurface())
@@ -2026,7 +2028,7 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
                             terminated = true;
                             return false;
                         }
-                        // Update path state and previous path verex after medium
+                        // Update path state and previous path vertex after medium
                         // scattering
                         pdfFwd = ps->pdf;
                         beta *= ps->p / ps->pdf;
@@ -2121,8 +2123,7 @@ SampledSpectrum G(const Integrator &integrator, Sampler sampler, const Vertex &v
         g *= AbsDot(v0.ns(), d);
     if (v1.IsOnSurface())
         g *= AbsDot(v1.ns(), d);
-    RNG rng(Hash(v0.p()), Hash(v1.p()));
-    return g * integrator.Tr(v0.GetInteraction(), v1.GetInteraction(), lambda, rng);
+    return g * integrator.Tr(v0.GetInteraction(), v1.GetInteraction(), lambda);
 }
 
 Float MISWeight(const Integrator &integrator, Vertex *lightVertices,
@@ -2198,7 +2199,7 @@ Float MISWeight(const Integrator &integrator, Vertex *lightVertices,
 }
 
 Float InfiniteLightDensity(const std::vector<Light> &infiniteLights,
-                           LightSampler lightSampler, const Vector3f &w) {
+                           LightSampler lightSampler, Vector3f w) {
     Float pdf = 0;
     for (const auto &light : infiniteLights)
         pdf += light.PDF_Li(Interaction(), -w) * lightSampler.PDF(light);
@@ -2327,10 +2328,8 @@ SampledSpectrum ConnectBDPT(const Integrator &integrator, SampledWavelengths &la
                 if (qs.IsOnSurface())
                     L *= AbsDot(cs->wi, qs.ns());
                 DCHECK(!L.HasNaNs());
-                if (L) {
-                    RNG rng(Hash(cs->pRaster), Hash(cs->pLens));
-                    L *= integrator.Tr(cs->pRef, cs->pLens, lambda, rng);
-                }
+                if (L)
+                    L *= integrator.Tr(cs->pRef, cs->pLens, lambda);
             }
         }
 
@@ -2369,11 +2368,9 @@ SampledSpectrum ConnectBDPT(const Integrator &integrator, SampledWavelengths &la
                     if (pt.IsOnSurface())
                         L *= AbsDot(lightWeight->wi, pt.ns());
                     // Only check visibility if the path would carry radiance.
-                    if (L) {
-                        RNG rng(Hash(ctx.p()), Hash(ctx.n));
+                    if (L)
                         L *= integrator.Tr(pt.GetInteraction(), lightWeight->pLight,
-                                           lambda, rng);
-                    }
+                                           lambda);
                 }
             }
         }
@@ -2447,6 +2444,8 @@ STAT_PERCENT("Integrator/Acceptance rate", acceptedMutations, totalMutations);
 SampledSpectrum MLTIntegrator::L(ScratchBuffer &scratchBuffer, MLTSampler &sampler,
                                  int depth, Point2f *pRaster,
                                  SampledWavelengths *lambda) {
+    if (lights.empty())
+        return SampledSpectrum(0.f);
     sampler.StartStream(cameraStreamIndex);
     // Determine the number of available strategies and pick a specific one
     int s, t, nStrategies;
@@ -2470,7 +2469,7 @@ SampledSpectrum MLTIntegrator::L(ScratchBuffer &scratchBuffer, MLTSampler &sampl
     Vertex *cameraVertices = scratchBuffer.Alloc<Vertex[]>(t);
     // Compute camera sample for MLT camera path
     Bounds2f sampleBounds = camera.GetFilm().SampleBounds();
-    *pRaster = sampleBounds.Lerp(sampler.Get2D());
+    *pRaster = sampleBounds.Lerp(sampler.GetPixel2D());
     CameraSample cameraSample;
     cameraSample.pFilm = *pRaster;
     cameraSample.time = sampler.Get1D();
@@ -2546,42 +2545,42 @@ void MLTIntegrator::Render() {
     Timer timer;
     int nBootstrapSamples = nBootstrap * (maxDepth + 1);
     std::vector<Float> bootstrapWeights(nBootstrapSamples, 0);
-    if (!lights.empty()) {
-        // Allocate scratch buffers for MLT samples
-        std::vector<ScratchBuffer> threadScratchBuffers;
-        for (int i = 0; i < MaxThreadIndex(); ++i)
-            threadScratchBuffers.push_back(ScratchBuffer(65536));
+    // Allocate scratch buffers for MLT samples
+    std::vector<ScratchBuffer> threadScratchBuffers;
+    for (int i = 0; i < MaxThreadIndex(); ++i)
+        threadScratchBuffers.push_back(ScratchBuffer(65536));
 
-        // Generate bootstrap samples in parallel
-        ProgressReporter progress(nBootstrap, "Generating bootstrap paths",
-                                  Options->quiet);
-        ParallelFor(0, nBootstrap, [&](int64_t start, int64_t end) {
-            ScratchBuffer &scratchBuffer = threadScratchBuffers[ThreadIndex];
-            for (int64_t i = start; i < end; ++i) {
-                // Generate _i_th bootstrap sample
-                for (int depth = 0; depth <= maxDepth; ++depth) {
-                    int rngIndex = i * (maxDepth + 1) + depth;
-                    MLTSampler sampler(mutationsPerPixel, rngIndex, sigma,
-                                       largeStepProbability, nSampleStreams);
-                    threadSampler = &sampler;
-                    threadDepth = depth;
-                    Point2f pRaster;
-                    SampledWavelengths lambda;
-                    bootstrapWeights[rngIndex] =
-                        C(L(scratchBuffer, sampler, depth, &pRaster, &lambda), lambda);
-                    scratchBuffer.Reset();
-                }
+    // Generate bootstrap samples in parallel
+    ProgressReporter progress(nBootstrap, "Generating bootstrap paths", Options->quiet);
+    ParallelFor(0, nBootstrap, [&](int64_t start, int64_t end) {
+        ScratchBuffer &buf = threadScratchBuffers[ThreadIndex];
+        for (int64_t i = start; i < end; ++i) {
+            // Generate _i_th bootstrap sample
+            for (int depth = 0; depth <= maxDepth; ++depth) {
+                int rngIndex = i * (maxDepth + 1) + depth;
+                MLTSampler sampler(mutationsPerPixel, rngIndex, sigma,
+                                   largeStepProbability, nSampleStreams);
+                threadSampler = &sampler;
+                threadDepth = depth;
+                // Evaluate path radiance using _sampler_ and update _bootstrapWeights_
+                Point2f pRaster;
+                SampledWavelengths lambda;
+                SampledSpectrum L_i = L(buf, sampler, depth, &pRaster, &lambda);
+                bootstrapWeights[rngIndex] = c(L_i, lambda);
+
+                buf.Reset();
             }
-            progress.Update(end - start);
-        });
-        progress.Done();
-    }
+        }
+        progress.Update(end - start);
+    });
+    progress.Done();
+
     if (std::accumulate(bootstrapWeights.begin(), bootstrapWeights.end(), 0.) == 0.)
         ErrorExit("No light carrying paths found during bootstrap sampling! "
                   "Are you trying to render a black image?");
     AliasTable bootstrapTable(bootstrapWeights);
-    Float b = std::accumulate(bootstrapWeights.begin(), bootstrapWeights.end(), 0.) /
-              bootstrapWeights.size() * (maxDepth + 1);
+    Float b = (maxDepth + 1) / bootstrapWeights.size() *
+              std::accumulate(bootstrapWeights.begin(), bootstrapWeights.end(), 0.);
 
     // Set up connection to display server, if enabled
     std::atomic<int> finishedChains(0);
@@ -2609,83 +2608,73 @@ void MLTIntegrator::Render() {
     // Follow _nChains_ Markov chains to render image
     Film film = camera.GetFilm();
     int64_t nTotalMutations =
-        (int64_t)mutationsPerPixel * (int64_t)film.SampleBounds().Area();
-    if (!lights.empty()) {
-        // Allocate scratch buffers for MLT samples
-        std::vector<ScratchBuffer> threadScratchBuffers;
-        for (int i = 0; i < MaxThreadIndex(); ++i)
-            threadScratchBuffers.push_back(ScratchBuffer(65536));
+        (int64_t)film.SampleBounds().Area() * (int64_t)mutationsPerPixel;
+    ProgressReporter progressRender(nChains, "Rendering", Options->quiet);
+    // Run _nChains_ Markov chains in parallel
+    ParallelFor(0, nChains, [&](int i) {
+        ScratchBuffer &scratchBuffer = threadScratchBuffers[ThreadIndex];
+        // Compute number of mutations to apply in current Markov chain
+        int64_t nChainMutations =
+            std::min((i + 1) * nTotalMutations / nChains, nTotalMutations) -
+            i * nTotalMutations / nChains;
 
-        ProgressReporter progress(nChains, "Rendering", Options->quiet);
-        // Run _nChains_ Markov chains in parallel
-        ParallelFor(0, nChains, [&](int i) {
-            ScratchBuffer &scratchBuffer = threadScratchBuffers[ThreadIndex];
-            // Compute number of mutations to apply in current Markov chain
-            int64_t nChainMutations =
-                std::min((i + 1) * nTotalMutations / nChains, nTotalMutations) -
-                i * nTotalMutations / nChains;
+        // Select initial state from the set of bootstrap samples
+        RNG rng(i);
+        int bootstrapIndex = bootstrapTable.Sample(rng.Uniform<Float>());
+        int depth = bootstrapIndex % (maxDepth + 1);
+        threadDepth = depth;
 
-            // Select initial state from the set of bootstrap samples
-            RNG rng(i);
-            int bootstrapIndex = bootstrapTable.Sample(rng.Uniform<Float>());
-            int depth = bootstrapIndex % (maxDepth + 1);
-            threadDepth = depth;
+        // Initialize local variables for selected state
+        MLTSampler sampler(mutationsPerPixel, bootstrapIndex, sigma, largeStepProbability,
+                           nSampleStreams);
+        threadSampler = &sampler;
+        Point2f pCurrent;
+        SampledWavelengths lambdaCurrent;
+        SampledSpectrum LCurrent =
+            L(scratchBuffer, sampler, depth, &pCurrent, &lambdaCurrent);
 
-            // Initialize local variables for selected state
-            MLTSampler sampler(mutationsPerPixel, bootstrapIndex, sigma,
-                               largeStepProbability, nSampleStreams);
-            threadSampler = &sampler;
-            Point2f pCurrent;
-            SampledWavelengths lambdaCurrent;
-            SampledSpectrum LCurrent =
-                L(scratchBuffer, sampler, depth, &pCurrent, &lambdaCurrent);
+        // Run the Markov chain for _nChainMutations_ steps
+        for (int64_t j = 0; j < nChainMutations; ++j) {
+            StatsReportPixelStart(Point2i(pCurrent));
+            sampler.StartIteration();
+            // Generate proposed sample and compute its radiance
+            Point2f pProposed;
+            SampledWavelengths lambdaProposed;
+            SampledSpectrum LProposed =
+                L(scratchBuffer, sampler, depth, &pProposed, &lambdaProposed);
 
-            // Run the Markov chain for _nChainMutations_ steps
-            for (int64_t j = 0; j < nChainMutations; ++j) {
-                StatsReportPixelStart(Point2i(pCurrent));
-                sampler.StartIteration();
-                // Generate proposed sample and compute its radiance
-                Point2f pProposed;
-                SampledWavelengths lambdaProposed;
-                SampledSpectrum LProposed =
-                    L(scratchBuffer, sampler, depth, &pProposed, &lambdaProposed);
+            // Compute acceptance probability for proposed sample
+            Float cProposed = c(LProposed, lambdaProposed);
+            Float cCurrent = c(LCurrent, lambdaCurrent);
+            Float accept = std::min<Float>(1, cProposed / cCurrent);
 
-                // Compute acceptance probability for proposed sample
-                Float accept = std::min<Float>(
-                    1, C(LProposed, lambdaProposed) / C(LCurrent, lambdaCurrent));
+            // Splat both current and proposed samples to _film_
+            if (accept > 0)
+                film.AddSplat(pProposed, LProposed * accept / cProposed, lambdaProposed);
+            film.AddSplat(pCurrent, LCurrent * (1 - accept) / cCurrent, lambdaCurrent);
 
-                // Splat both current and proposed samples to _film_
-                if (accept > 0)
-                    film.AddSplat(pProposed,
-                                  LProposed * accept / C(LProposed, lambdaProposed),
-                                  lambdaProposed);
-                film.AddSplat(pCurrent,
-                              LCurrent * (1 - accept) / C(LCurrent, lambdaCurrent),
-                              lambdaCurrent);
-
-                // Accept or reject the proposal
-                if (rng.Uniform<Float>() < accept) {
-                    StatsReportPixelEnd(Point2i(pCurrent));
-                    StatsReportPixelStart(Point2i(pProposed));
-                    pCurrent = pProposed;
-                    LCurrent = LProposed;
-                    lambdaCurrent = lambdaProposed;
-                    sampler.Accept();
-                    ++acceptedMutations;
-                } else
-                    sampler.Reject();
-
-                ++totalMutations;
-                scratchBuffer.Reset();
+            // Accept or reject the proposal
+            if (rng.Uniform<Float>() < accept) {
                 StatsReportPixelEnd(Point2i(pCurrent));
-            }
+                StatsReportPixelStart(Point2i(pProposed));
+                pCurrent = pProposed;
+                LCurrent = LProposed;
+                lambdaCurrent = lambdaProposed;
+                sampler.Accept();
+                ++acceptedMutations;
+            } else
+                sampler.Reject();
 
-            ++finishedChains;
-            progress.Update(1);
-        });
+            ++totalMutations;
+            scratchBuffer.Reset();
+            StatsReportPixelEnd(Point2i(pCurrent));
+        }
 
-        progress.Done();
-    }
+        ++finishedChains;
+        progressRender.Update(1);
+    });
+
+    progressRender.Done();
 
     // Store final image computed with MLT
     ImageMetadata metadata;

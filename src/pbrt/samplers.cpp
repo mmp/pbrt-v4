@@ -372,7 +372,6 @@ Float MLTSampler::Get1D() {
 Point2f MLTSampler::Get2D() {
     return {Get1D(), Get1D()};
 }
-
 Point2f MLTSampler::GetPixel2D() {
     return Get2D();
 }
@@ -400,35 +399,35 @@ void MLTSampler::EnsureReady(int index) {
     // Enlarge _MLTSampler::X_ if necessary and get current $\VEC{X}_i$
     if (index >= X.size())
         X.resize(index + 1);
-    PrimarySample &Xi = X[index];
+    PrimarySample &X_i = X[index];
 
     // Reset $\VEC{X}_i$ if a large step took place in the meantime
-    if (Xi.lastModificationIteration < lastLargeStepIteration) {
-        Xi.value = rng.Uniform<Float>();
-        Xi.lastModificationIteration = lastLargeStepIteration;
+    if (X_i.lastModificationIteration < lastLargeStepIteration) {
+        X_i.value = rng.Uniform<Float>();
+        X_i.lastModificationIteration = lastLargeStepIteration;
     }
 
     // Apply remaining sequence of mutations to _sample_
-    Xi.Backup();
-    if (largeStep) {
-        Xi.value = rng.Uniform<Float>();
-    } else {
-        int64_t nSmall = currentIteration - Xi.lastModificationIteration;
+    X_i.Backup();
+    if (largeStep)
+        X_i.value = rng.Uniform<Float>();
+    else {
+        int64_t nSmall = currentIteration - X_i.lastModificationIteration;
         // Apply _nSmall_ small step mutations to $\VEC{X}_i$
         Float effSigma = sigma * std::sqrt((Float)nSmall);
         Float delta = SampleNormal(rng.Uniform<Float>(), 0, effSigma);
-        Xi.value += delta;
-        Xi.value -= std::floor(Xi.value);
+        X_i.value += delta;
+        X_i.value -= std::floor(X_i.value);
     }
-    Xi.lastModificationIteration = currentIteration;
+    X_i.lastModificationIteration = currentIteration;
 
 #endif
 }
 
 void MLTSampler::Reject() {
-    for (auto &Xi : X)
-        if (Xi.lastModificationIteration == currentIteration)
-            Xi.Restore();
+    for (auto &X_i : X)
+        if (X_i.lastModificationIteration == currentIteration)
+            X_i.Restore();
     --currentIteration;
 }
 

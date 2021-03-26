@@ -54,7 +54,7 @@ class Integrator {
     }
 
     SampledSpectrum Tr(const Interaction &p0, const Interaction &p1,
-                       const SampledWavelengths &lambda, RNG &rng) const;
+                       const SampledWavelengths &lambda) const;
 
     // Integrator Public Members
     Primitive aggregate;
@@ -438,7 +438,7 @@ class MLTIntegrator : public Integrator {
     SampledSpectrum L(ScratchBuffer &scratchBuffer, MLTSampler &sampler, int k,
                       Point2f *pRaster, SampledWavelengths *lambda);
 
-    static Float C(const SampledSpectrum &L, const SampledWavelengths &lambda) {
+    static Float c(const SampledSpectrum &L, const SampledWavelengths &lambda) {
         return L.y(lambda);
     }
 
@@ -446,8 +446,7 @@ class MLTIntegrator : public Integrator {
     Camera camera;
     bool regularize;
     LightSampler lightSampler;
-    int maxDepth;
-    int nBootstrap;
+    int maxDepth, nBootstrap;
     int mutationsPerPixel;
     Float sigma, largeStepProbability;
     int nChains;
