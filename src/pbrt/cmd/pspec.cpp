@@ -228,13 +228,16 @@ GenerateSamples(std::string samplerName, int nPoints, int iter) {
             } else if (samplerName == "pmj02bn") {
                 return new PMJ02BNSampler(nPoints, Options->seed);
             } else if (samplerName == "sobol") {
-                return new PaddedSobolSampler(nPoints, RandomizeStrategy::None);
+                return new PaddedSobolSampler(nPoints, RandomizeStrategy::None, Options->seed);
             } else if (samplerName == "sobol.permutedigits") {
-                return new PaddedSobolSampler(nPoints, RandomizeStrategy::PermuteDigits);
+                return new PaddedSobolSampler(nPoints, RandomizeStrategy::PermuteDigits,
+                                              Options->seed);
             } else if (samplerName == "sobol.fastowen") {
-                return new PaddedSobolSampler(nPoints, RandomizeStrategy::FastOwen);
+                return new PaddedSobolSampler(nPoints, RandomizeStrategy::FastOwen,
+                                              Options->seed);
             } else if (samplerName == "sobol.owen") {
-                return new PaddedSobolSampler(nPoints, RandomizeStrategy::Owen);
+                return new PaddedSobolSampler(nPoints, RandomizeStrategy::Owen,
+                                              Options->seed);
             } else {
                 usage(StringPrintf("%s: sampler unknown", samplerName));
                 exit(1);
