@@ -966,11 +966,19 @@ GPUAccel::GPUAccel(
     for (const auto &m : namedMaterials)
         updateMaterialNeeds(m.second);
 
+    int nCurveWarnings = 0;
     for (const auto &shape : scene.shapes)
         if (shape.name != "sphere" && shape.name != "cylinder" && shape.name != "disk" &&
             shape.name != "trianglemesh" && shape.name != "plymesh" &&
-            shape.name != "loopsubdiv" && shape.name != "bilinearmesh")
-            ErrorExit(&shape.loc, "%s: unknown shape", shape.name);
+            shape.name != "loopsubdiv" && shape.name != "bilinearmesh") {
+            if (shape.name == "curve") {
+                if (++nCurveWarnings < 10)
+                    Warning(&shape.loc, "\"curve\" shape is not yet supported on the GPU.");
+                else if (nCurveWarnings == 10)
+                    Warning(&shape.loc, "\"curve\" shape is not yet supported on the GPU. (Silencing further warnings.) ");
+            } else
+                ErrorExit(&shape.loc, "%s: unknown shape", shape.name);
+        }
 
     OptixTraversableHandle triangleGASTraversable = createGASForTriangles(
         scene.shapes, hitPGTriangle, anyhitPGShadowTriangle, hitPGRandomHitTriangle,
