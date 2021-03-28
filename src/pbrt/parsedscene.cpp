@@ -763,7 +763,7 @@ NamedTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
                     "Animated world to texture transforms are not supported. "
                     "Using start transform.");
 
-        if (tex.second.texName != "imagemap") {
+        if (tex.second.texName != "imagemap" && tex.second.texName != "ptex") {
             serialFloatTextures.push_back(i);
             continue;
         }
@@ -791,7 +791,7 @@ NamedTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
                     "Animated world to texture transforms are not supported. "
                     "Using start transform.");
 
-        if (tex.second.texName != "imagemap") {
+        if (tex.second.texName != "imagemap" && tex.second.texName != "ptex") {
             serialSpectrumTextures.push_back(i);
             continue;
         }

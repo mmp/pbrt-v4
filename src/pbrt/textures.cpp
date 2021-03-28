@@ -533,6 +533,7 @@ STAT_COUNTER("Texture/Ptex lookups", nLookups);
 STAT_COUNTER("Texture/Ptex files accessed", nFilesAccessed);
 STAT_COUNTER("Texture/Ptex block reads", nBlockReads);
 STAT_MEMORY_COUNTER("Memory/Ptex peak memory used", peakMemoryUsed);
+STAT_MEMORY_COUNTER("Memory/GPU Ptex memory used", gpuPtexMemoryUsed);
 
 struct : public PtexErrorHandler {
     void reportError(const char *error) override { Error("%s", error); }
@@ -706,15 +707,39 @@ GPUFloatPtexTexture::GPUFloatPtexTexture(const std::string &filename,
                                filterWidth, filterWidth, filterWidth, filterWidth, i);
         faceValues[i] = Evaluate(ctx);
     }
+
+    gpuPtexMemoryUsed += nFaces * sizeof(faceValues[0]);
 }
+
+static std::mutex ptexCacheMutex;
+static std::map<std::pair<std::string, std::string>, GPUFloatPtexTexture *>
+    ptexFloatTextureCache;
 
 GPUFloatPtexTexture *GPUFloatPtexTexture::Create(
     const Transform &renderFromTexture, const TextureParameterDictionary &parameters,
     const FileLoc *loc, Allocator alloc) {
     std::string filename = ResolveFilename(parameters.GetOneString("filename", ""));
     std::string encodingString = parameters.GetOneString("encoding", "gamma 2.2");
-    ColorEncoding encoding = ColorEncoding::Get(encodingString, alloc);
-    return alloc.new_object<GPUFloatPtexTexture>(filename, encoding, alloc);
+
+    auto key = std::make_pair(filename, encodingString);
+    ptexCacheMutex.lock();
+    if (auto iter = ptexFloatTextureCache.find(key);
+        iter != ptexFloatTextureCache.end()) {
+        GPUFloatPtexTexture *tex = iter->second;
+        ptexCacheMutex.unlock();
+        return tex;
+    } else {
+        ptexCacheMutex.unlock();
+        ColorEncoding encoding = ColorEncoding::Get(encodingString, alloc);
+        GPUFloatPtexTexture *tex =
+            alloc.new_object<GPUFloatPtexTexture>(filename, encoding, alloc);
+
+        ptexCacheMutex.lock();
+        CHECK(ptexFloatTextureCache.find(key) == ptexFloatTextureCache.end());
+        ptexFloatTextureCache[key] = tex;
+        ptexCacheMutex.unlock();
+        return tex;
+    }
 }
 
 std::string GPUFloatPtexTexture::ToString() const {
@@ -748,16 +773,38 @@ GPUSpectrumPtexTexture::GPUSpectrumPtexTexture(const std::string &filename,
 
         faceValues[i] = RGB(result[0], result[1], result[2]);
     }
+
+    gpuPtexMemoryUsed += nFaces * sizeof(faceValues[0]);
 }
+
+static std::map<std::pair<std::string, std::string>, GPUSpectrumPtexTexture *>
+    ptexSpectrumTextureCache;
 
 GPUSpectrumPtexTexture *GPUSpectrumPtexTexture::Create(
     const Transform &renderFromTexture, const TextureParameterDictionary &parameters,
     SpectrumType spectrumType, const FileLoc *loc, Allocator alloc) {
     std::string filename = ResolveFilename(parameters.GetOneString("filename", ""));
     std::string encodingString = parameters.GetOneString("encoding", "gamma 2.2");
-    ColorEncoding encoding = ColorEncoding::Get(encodingString, alloc);
-    return alloc.new_object<GPUSpectrumPtexTexture>(filename, encoding, spectrumType,
-                                                    alloc);
+
+    auto key = std::make_pair(filename, encodingString);
+    ptexCacheMutex.lock();
+    if (auto iter = ptexSpectrumTextureCache.find(key);
+        iter != ptexSpectrumTextureCache.end()) {
+        GPUSpectrumPtexTexture *tex = iter->second;
+        ptexCacheMutex.unlock();
+        return tex;
+    } else {
+        ptexCacheMutex.unlock();
+        ColorEncoding encoding = ColorEncoding::Get(encodingString, alloc);
+        GPUSpectrumPtexTexture *tex = alloc.new_object<GPUSpectrumPtexTexture>(
+            filename, encoding, spectrumType, alloc);
+
+        ptexCacheMutex.lock();
+        CHECK(ptexSpectrumTextureCache.find(key) == ptexSpectrumTextureCache.end());
+        ptexSpectrumTextureCache[key] = tex;
+        ptexCacheMutex.unlock();
+        return tex;
+    }
 }
 
 std::string GPUSpectrumPtexTexture::ToString() const {
