@@ -532,14 +532,16 @@ static ParsedParameterVector parseParameters(
     return parameterVector;
 }
 
-static void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
+void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
     FormattingScene *formattingScene = dynamic_cast<FormattingScene *>(scene);
     bool formatting = formattingScene != nullptr;
 
     TrackedMemoryResource memoryResource;
     Allocator alloc(&memoryResource);
 
-    static bool warnedTransformBeginEndDeprecated = false;
+    static std::atomic<bool> warnedTransformBeginEndDeprecated{false};
+
+    std::vector<std::pair<std::thread, ParsedScene *>> imports;
 
     LOG_VERBOSE("Started parsing %s",
                 std::string(t->loc.filename.begin(), t->loc.filename.end()));
@@ -707,6 +709,35 @@ static void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
                                     std::string(tinc->loc.filename.begin(),
                                                 tinc->loc.filename.end()));
                         fileStack.push_back(std::move(tinc));
+                    }
+                }
+            } else if (tok->token == "Import") {
+                Token filenameToken = *nextToken(TokenRequired);
+                std::string filename = toString(dequoteString(filenameToken));
+                if (formatting)
+                    Printf("%sImport \"%s\"\n",
+                           dynamic_cast<FormattingScene *>(scene)->indent(), filename);
+                else {
+                    ParsedScene *parsedScene = dynamic_cast<ParsedScene *>(scene);
+                    CHECK(parsedScene != nullptr);
+
+                    if (parsedScene->currentBlock != ParsedScene::BlockState::WorldBlock)
+                        ErrorExit(&tok->loc, "Import statement only allowed inside world "
+                                             "definition block.");
+
+                    filename = ResolveFilename(filename);
+                    std::unique_ptr<Tokenizer> timport =
+                        Tokenizer::CreateFromFile(filename, parseError);
+                    if (timport) {
+                        ParsedScene *importScene = parsedScene->CopyForImport();
+
+                        std::thread importThread(
+                            [](ParsedScene *scene, std::unique_ptr<Tokenizer> timport) {
+                                parse(scene, std::move(timport));
+                            },
+                            importScene, std::move(timport));
+                        imports.push_back(
+                            std::make_pair(std::move(importThread), importScene));
                     }
                 }
             } else if (tok->token == "Identity")
@@ -888,6 +919,14 @@ static void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
         }
     }
 
+    for (auto &import : imports) {
+        import.first.join();
+
+        ParsedScene *parsedScene = dynamic_cast<ParsedScene *>(scene);
+        CHECK(parsedScene != nullptr);
+        parsedScene->MergeImported(import.second);
+        // HACK: let import.second leak so that its TransformCache isn't deallocated...
+    }
     parsedParameterBytes += memoryResource.CurrentAllocatedBytes();
 }
 

@@ -324,6 +324,9 @@ class ParsedScene : public SceneRepresentation {
 
     void EndOfFiles();
 
+    ParsedScene *CopyForImport();
+    void MergeImported(ParsedScene *);
+
     std::string ToString() const;
 
     NamedTextures CreateTextures(Allocator alloc, bool gpu) const;
@@ -377,6 +380,7 @@ class ParsedScene : public SceneRepresentation {
         Float transformStartTime = 0, transformEndTime = 1;
     };
 
+    friend void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t);
     // ParsedScene Private Methods
     class Transform RenderFromObject(int index) const {
         return pbrt::Transform((renderFromWorld * graphicsState.ctm[index]).GetMatrix());

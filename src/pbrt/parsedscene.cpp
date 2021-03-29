@@ -440,6 +440,63 @@ void ParsedScene::EndOfFiles() {
         LOG_VERBOSE("%s: spectrum texture unused in scene", s);
 }
 
+ParsedScene *ParsedScene::CopyForImport() {
+    ParsedScene *importScene = new ParsedScene;
+    importScene->renderFromWorld = renderFromWorld;
+    importScene->graphicsState = graphicsState;
+    importScene->currentBlock = currentBlock;
+    importScene->materials.pop_back();
+    return importScene;
+}
+
+void ParsedScene::MergeImported(ParsedScene *importScene) {
+    while (!importScene->pushedGraphicsStates.empty()) {
+        ErrorExitDeferred("Missing end to AttributeBegin");
+        importScene->pushedGraphicsStates.pop_back();
+    }
+
+    errorExit |= importScene->errorExit;
+
+    auto mergeMap = [this](auto &base, const auto &imported, const char *name) {
+        for (const auto &item : imported) {
+            if (base.find(item.first) != base.end())
+                ErrorExitDeferred(&item.second.loc, "%s: multiply-defined %s.",
+                                  item.first, name);
+            base[item.first] = item.second;
+        }
+    };
+    mergeMap(namedMaterials, importScene->namedMaterials, "named material");
+    mergeMap(floatTextures, importScene->floatTextures, "texture");
+    mergeMap(spectrumTextures, importScene->spectrumTextures, "texture");
+    mergeMap(instanceDefinitions, importScene->instanceDefinitions, "object instance");
+    // mergeMap(namedCoordinateSystems, importScene->namedCoordinateSystems, "named
+    // coordinate system");
+
+    // Reindex materials in shapes in importScene
+    size_t materialBase = materials.size(), lightBase = lights.size();
+    for (auto &shape : importScene->shapes) {
+        if (shape.materialName.empty())
+            shape.materialIndex += materialBase;
+        if (shape.lightIndex >= 0)
+            shape.lightIndex += lightBase;
+    }
+    for (auto &shape : importScene->animatedShapes) {
+        if (shape.materialName.empty())
+            shape.materialIndex += materialBase;
+        if (shape.lightIndex >= 0)
+            shape.lightIndex += lightBase;
+    }
+
+    materials.insert(materials.end(), importScene->materials.begin(),
+                     importScene->materials.end());
+    lights.insert(lights.end(), importScene->lights.begin(), importScene->lights.end());
+    shapes.insert(shapes.end(), importScene->shapes.begin(), importScene->shapes.end());
+    animatedShapes.insert(animatedShapes.end(), importScene->animatedShapes.begin(),
+                          importScene->animatedShapes.end());
+    instances.insert(instances.end(), importScene->instances.begin(),
+                     importScene->instances.end());
+}
+
 void ParsedScene::Option(const std::string &name, const std::string &value, FileLoc loc) {
     std::string nName = normalizeArg(name);
 
