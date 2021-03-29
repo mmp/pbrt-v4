@@ -534,6 +534,7 @@ STAT_COUNTER("Texture/Ptex files accessed", nFilesAccessed);
 STAT_COUNTER("Texture/Ptex block reads", nBlockReads);
 STAT_MEMORY_COUNTER("Memory/Ptex peak memory used", peakMemoryUsed);
 STAT_MEMORY_COUNTER("Memory/GPU Ptex memory used", gpuPtexMemoryUsed);
+STAT_RATIO("Texture/Ptex file cache hits", ptexCacheHits, ptexCacheLookups);
 
 struct : public PtexErrorHandler {
     void reportError(const char *error) override { Error("%s", error); }
@@ -566,10 +567,8 @@ PtexTextureBase::PtexTextureBase(const std::string &filename, ColorEncoding enco
     else {
         if (texture->numChannels() != 1 && texture->numChannels() != 3)
             Error("%s: only one and three channel ptex textures are supported", filename);
-        else {
+        else
             valid = true;
-            LOG_VERBOSE("%s: added ptex texture", filename);
-        }
         texture->release();
     }
 }
@@ -722,11 +721,13 @@ GPUFloatPtexTexture *GPUFloatPtexTexture::Create(
     std::string encodingString = parameters.GetOneString("encoding", "gamma 2.2");
 
     auto key = std::make_pair(filename, encodingString);
+    ++ptexCacheLookups;
     ptexCacheMutex.lock();
     if (auto iter = ptexFloatTextureCache.find(key);
         iter != ptexFloatTextureCache.end()) {
         GPUFloatPtexTexture *tex = iter->second;
         ptexCacheMutex.unlock();
+        ++ptexCacheHits;
         return tex;
     } else {
         ptexCacheMutex.unlock();
@@ -831,13 +832,11 @@ FloatTexture FloatScaledTexture::Create(const Transform &renderFromTexture,
         if (FloatConstantTexture *cscale = scale.CastOrNullptr<FloatConstantTexture>()) {
             Float cs = cscale->Evaluate({});
             if (cs == 1) {
-                LOG_VERBOSE("Dropping useless scale by 1");
                 return tex;
             } else if (FloatImageTexture *image =
                            tex.CastOrNullptr<FloatImageTexture>()) {
                 FloatImageTexture *imageCopy =
                     alloc.new_object<FloatImageTexture>(*image);
-                LOG_VERBOSE("Flattened scale %f * image texture", cs);
                 imageCopy->MultiplyScale(cs);
                 return imageCopy;
             }
@@ -846,7 +845,6 @@ FloatTexture FloatScaledTexture::Create(const Transform &renderFromTexture,
                          tex.CastOrNullptr<GPUFloatImageTexture>()) {
                 GPUFloatImageTexture *gimageCopy =
                     alloc.new_object<GPUFloatImageTexture>(*gimage);
-                LOG_VERBOSE("Flattened scale %f * gpu image texture", cs);
                 gimageCopy->MultiplyScale(cs);
                 return gimageCopy;
             }
@@ -869,13 +867,11 @@ SpectrumTexture SpectrumScaledTexture::Create(
     if (FloatConstantTexture *cscale = scale.CastOrNullptr<FloatConstantTexture>()) {
         Float cs = cscale->Evaluate({});
         if (cs == 1) {
-            LOG_VERBOSE("Dropping useless scale by 1");
             return tex;
         } else if (SpectrumImageTexture *image =
                        tex.CastOrNullptr<SpectrumImageTexture>()) {
             SpectrumImageTexture *imageCopy =
                 alloc.new_object<SpectrumImageTexture>(*image);
-            LOG_VERBOSE("Flattened scale %f * image texture", cs);
             imageCopy->MultiplyScale(cs);
             return imageCopy;
         }
@@ -884,7 +880,6 @@ SpectrumTexture SpectrumScaledTexture::Create(
                      tex.CastOrNullptr<GPUSpectrumImageTexture>()) {
             GPUSpectrumImageTexture *gimageCopy =
                 alloc.new_object<GPUSpectrumImageTexture>(*gimage);
-            LOG_VERBOSE("Flattened scale %f * gpu image texture", cs);
             gimageCopy->MultiplyScale(cs);
             return gimageCopy;
         }

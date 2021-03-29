@@ -120,7 +120,6 @@ static double_conversion::StringToDoubleConverter floatParser(
 std::unique_ptr<Tokenizer> Tokenizer::CreateFromFile(
     const std::string &filename,
     std::function<void(const char *, const FileLoc *)> errorCallback) {
-    LOG_VERBOSE("Creating Tokenizer for %s", filename);
     if (filename == "-") {
         // Handle stdin by slurping everything into a string.
         std::string str;
@@ -542,6 +541,8 @@ static void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
 
     static bool warnedTransformBeginEndDeprecated = false;
 
+    LOG_VERBOSE("Started parsing %s",
+                std::string(t->loc.filename.begin(), t->loc.filename.end()));
     std::vector<std::unique_ptr<Tokenizer>> fileStack;
     fileStack.push_back(std::move(t));
 
@@ -570,6 +571,9 @@ static void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
 
         if (!tok) {
             // We've reached EOF in the current file. Anything more to parse?
+            LOG_VERBOSE("Finished parsing %s",
+                        std::string(fileStack.back()->loc.filename.begin(),
+                                    fileStack.back()->loc.filename.end()));
             fileStack.pop_back();
             return nextToken(flags);
         } else if (tok->token[0] == '#') {
@@ -698,8 +702,12 @@ static void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
                     filename = ResolveFilename(filename);
                     std::unique_ptr<Tokenizer> tinc =
                         Tokenizer::CreateFromFile(filename, parseError);
-                    if (tinc)
+                    if (tinc) {
+                        LOG_VERBOSE("Started parsing %s",
+                                    std::string(tinc->loc.filename.begin(),
+                                                tinc->loc.filename.end()));
                         fileStack.push_back(std::move(tinc));
+                    }
                 }
             } else if (tok->token == "Identity")
                 scene->Identity(tok->loc);
