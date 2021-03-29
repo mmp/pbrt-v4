@@ -337,11 +337,11 @@ class ParsedScene : public SceneRepresentation {
     // ParsedScene Public Members
     SceneEntity film, sampler, integrator, filter, accelerator;
     CameraSceneEntity camera;
-    std::vector<std::pair<std::string, SceneEntity>> namedMaterials;
+    std::map<std::string, SceneEntity> namedMaterials;
     std::vector<SceneEntity> materials;
     std::map<std::string, TransformedSceneEntity> media;
-    std::vector<std::pair<std::string, TextureSceneEntity>> floatTextures;
-    std::vector<std::pair<std::string, TextureSceneEntity>> spectrumTextures;
+    std::map<std::string, TextureSceneEntity> floatTextures;
+    std::map<std::string, TextureSceneEntity> spectrumTextures;
     std::vector<LightSceneEntity> lights;
     std::vector<SceneEntity> areaLights;
     std::vector<ShapeSceneEntity> shapes;
