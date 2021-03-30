@@ -445,7 +445,6 @@ ParsedScene *ParsedScene::CopyForImport() {
     importScene->renderFromWorld = renderFromWorld;
     importScene->graphicsState = graphicsState;
     importScene->currentBlock = currentBlock;
-    importScene->materials.pop_back();
     return importScene;
 }
 
@@ -456,6 +455,23 @@ void ParsedScene::MergeImported(ParsedScene *importScene) {
     }
 
     errorExit |= importScene->errorExit;
+
+    // Reindex materials in shapes in importScene
+    size_t materialBase = materials.size(), lightBase = lights.size();
+    auto reindex = [materialBase, lightBase](auto &map) {
+        for (auto &shape : map) {
+            if (shape.materialName.empty())
+                shape.materialIndex += materialBase;
+            if (shape.lightIndex >= 0)
+                shape.lightIndex += lightBase;
+        }
+    };
+    reindex(importScene->shapes);
+    reindex(importScene->animatedShapes);
+    for (auto &inst : importScene->instanceDefinitions) {
+        reindex(inst.second.shapes);
+        reindex(inst.second.animatedShapes);
+    }
 
     auto mergeMap = [this](auto &base, const auto &imported, const char *name) {
         for (const auto &item : imported) {
@@ -471,21 +487,6 @@ void ParsedScene::MergeImported(ParsedScene *importScene) {
     mergeMap(instanceDefinitions, importScene->instanceDefinitions, "object instance");
     // mergeMap(namedCoordinateSystems, importScene->namedCoordinateSystems, "named
     // coordinate system");
-
-    // Reindex materials in shapes in importScene
-    size_t materialBase = materials.size(), lightBase = lights.size();
-    for (auto &shape : importScene->shapes) {
-        if (shape.materialName.empty())
-            shape.materialIndex += materialBase;
-        if (shape.lightIndex >= 0)
-            shape.lightIndex += lightBase;
-    }
-    for (auto &shape : importScene->animatedShapes) {
-        if (shape.materialName.empty())
-            shape.materialIndex += materialBase;
-        if (shape.lightIndex >= 0)
-            shape.lightIndex += lightBase;
-    }
 
     materials.insert(materials.end(), importScene->materials.begin(),
                      importScene->materials.end());
