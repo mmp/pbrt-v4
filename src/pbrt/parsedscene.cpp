@@ -364,14 +364,12 @@ void ParsedScene::ObjectInstance(const std::string &name, FileLoc loc) {
             RenderFromObject(0) * worldFromRender, graphicsState.transformStartTime,
             RenderFromObject(1) * worldFromRender, graphicsState.transformEndTime);
 
-        instances.push_back(
-            InstanceSceneEntity(name, loc, animatedRenderFromInstance, nullptr));
+        instances.push_back(InstanceSceneEntity(name, loc, animatedRenderFromInstance));
     } else {
         const class Transform *renderFromInstance =
             transformCache.Lookup(RenderFromObject(0) * worldFromRender);
 
-        instances.push_back(
-            InstanceSceneEntity(name, loc, AnimatedTransform(), renderFromInstance));
+        instances.push_back(InstanceSceneEntity(name, loc, renderFromInstance));
     }
 }
 

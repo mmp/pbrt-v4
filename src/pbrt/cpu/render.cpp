@@ -302,7 +302,7 @@ void CPURender(ParsedScene &parsedScene) {
                 new TransformedPrimitive(iter->second, inst.renderFromInstance));
         else
             primitives.push_back(
-                new AnimatedPrimitive(iter->second, inst.renderFromInstanceAnim));
+                new AnimatedPrimitive(iter->second, *inst.renderFromInstanceAnim));
     }
 
     // Accelerator

@@ -197,21 +197,24 @@ struct LightSceneEntity : public TransformedSceneEntity {
 struct InstanceSceneEntity : public SceneEntity {
     InstanceSceneEntity() = default;
     InstanceSceneEntity(const std::string &name, FileLoc loc,
-                        const AnimatedTransform &renderFromInstanceAnim,
-                        const Transform *renderFromInstance)
+                        const AnimatedTransform &renderFromInstanceAnim)
         : SceneEntity(name, {}, loc),
-          renderFromInstanceAnim(renderFromInstanceAnim),
-          renderFromInstance(renderFromInstance) {}
+          renderFromInstanceAnim(new AnimatedTransform(renderFromInstanceAnim)) {}
+    InstanceSceneEntity(const std::string &name, FileLoc loc,
+                        const Transform *renderFromInstance)
+        : SceneEntity(name, {}, loc), renderFromInstance(renderFromInstance) {}
 
     std::string ToString() const {
         return StringPrintf(
             "[ InstanceSeneEntity name: %s loc: %s "
             "renderFromInstanceAnim: %s renderFromInstance: %s ]",
-            name, loc, renderFromInstanceAnim,
+            name, loc,
+            renderFromInstanceAnim ? renderFromInstanceAnim->ToString()
+                                   : std::string("nullptr"),
             renderFromInstance ? renderFromInstance->ToString() : std::string("nullptr"));
     }
 
-    AnimatedTransform renderFromInstanceAnim;
+    AnimatedTransform *renderFromInstanceAnim;
     const Transform *renderFromInstance;
 };
 
