@@ -433,6 +433,13 @@ void ParsedScene::EndOfFiles() {
             checkVec(as.parameters.GetParameterVector());
     }
 
+    LOG_VERBOSE("Scene stats: %d shapes, %d animated shapes, %d instance definitions, "
+                "%d instance uses, %d lights, %d float textures, %d spectrum textures, "
+                "%d named materials, %d materials",
+                shapes.size(), animatedShapes.size(), instanceDefinitions.size(),
+                instances.size(), lights.size(), floatTextures.size(),
+                spectrumTextures.size(), namedMaterials.size(), materials.size());
+
     // And complain about what's left.
     for (const std::string &s : unusedFloatTextures)
         LOG_VERBOSE("%s: float texture unused in scene", s);
