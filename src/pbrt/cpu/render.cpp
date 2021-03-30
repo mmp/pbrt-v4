@@ -180,6 +180,9 @@ void CPURender(ParsedScene &parsedScene) {
 
     std::vector<Primitive> primitives = CreatePrimitivesForShapes(parsedScene.shapes);
 
+    parsedScene.shapes.clear();
+    parsedScene.shapes.shrink_to_fit();
+
     // Animated shapes
     auto CreatePrimitivesForAnimatedShapes =
         [&](const std::vector<AnimatedShapeSceneEntity> &shapes)
@@ -255,6 +258,9 @@ void CPURender(ParsedScene &parsedScene) {
     primitives.insert(primitives.end(), animatedPrimitives.begin(),
                       animatedPrimitives.end());
 
+    parsedScene.animatedShapes.clear();
+    parsedScene.animatedShapes.shrink_to_fit();
+
     // Instance definitions
     std::map<std::string, Primitive> instanceDefinitions;
     std::mutex instanceDefinitionsMutex;
@@ -287,6 +293,8 @@ void CPURender(ParsedScene &parsedScene) {
             instanceDefinitions[inst.first] = instancePrimitives[0];
     });
 
+    parsedScene.instanceDefinitions.clear();
+
     // Instances
     for (const auto &inst : parsedScene.instances) {
         auto iter = instanceDefinitions.find(inst.name);
@@ -304,6 +312,9 @@ void CPURender(ParsedScene &parsedScene) {
             primitives.push_back(
                 new AnimatedPrimitive(iter->second, *inst.renderFromInstanceAnim));
     }
+
+    parsedScene.instances.clear();
+    parsedScene.instances.shrink_to_fit();
 
     // Accelerator
     Primitive accel = nullptr;
