@@ -71,6 +71,8 @@ Rendering options:
   --outfile <filename>         Write the final image to the given filename.
   --pixel <x,y>                Render just the specified pixel.
   --pixelbounds <x0,x1,y0,y1>  Specify an image crop window w.r.t. pixel coordinates.
+  --pixelmaterial <x,y>        Print information about the material visible in the
+                               center of the pixel's extent.
   --pixelstats                 Record per-pixel statistics and write additional images
                                with their values.
   --quick                      Automatically reduce a number of quality settings
