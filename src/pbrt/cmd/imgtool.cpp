@@ -2281,7 +2281,9 @@ int denoise_optix(int argc, char *argv[]) {
 #endif  // PBRT_BUILD_GPU_RENDERER
 
 int main(int argc, char *argv[]) {
-    InitPBRT({});
+    PBRTOptions opt;
+    opt.quiet = true;
+    InitPBRT(opt);
 
     if (argc < 2) {
         help();
@@ -2402,7 +2404,7 @@ int main(int argc, char *argv[]) {
           GrayLevel[4 a]]]
         */
     } else {
-        fprintf(stderr, "imgtool: unknown command \"%s\"", argv[1]);
+        fprintf(stderr, "imgtool: unknown command \"%s\".\n", argv[1]);
         help();
         CleanupPBRT();
         return 1;
