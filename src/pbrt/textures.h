@@ -846,7 +846,7 @@ class SpectrumMixTexture {
 // PtexTexture Declarations
 class PtexTextureBase {
   public:
-    PtexTextureBase(const std::string &filename, ColorEncoding encoding);
+    PtexTextureBase(const std::string &filename, ColorEncoding encoding, Float scale);
 
     static void ReportStats();
 
@@ -859,12 +859,13 @@ class PtexTextureBase {
     bool valid;
     std::string filename;
     ColorEncoding encoding;
+    Float scale;
 };
 
 class FloatPtexTexture : public PtexTextureBase {
   public:
-    FloatPtexTexture(const std::string &filename, ColorEncoding encoding)
-        : PtexTextureBase(filename, encoding) {}
+    FloatPtexTexture(const std::string &filename, ColorEncoding encoding, Float scale)
+        : PtexTextureBase(filename, encoding, scale) {}
 
     PBRT_CPU_GPU
     Float Evaluate(TextureEvalContext ctx) const;
@@ -876,9 +877,9 @@ class FloatPtexTexture : public PtexTextureBase {
 
 class SpectrumPtexTexture : public PtexTextureBase {
   public:
-    SpectrumPtexTexture(const std::string &filename, ColorEncoding encoding,
+    SpectrumPtexTexture(const std::string &filename, ColorEncoding encoding, Float scale,
                         SpectrumType spectrumType)
-        : PtexTextureBase(filename, encoding), spectrumType(spectrumType) {}
+        : PtexTextureBase(filename, encoding, scale), spectrumType(spectrumType) {}
 
     PBRT_CPU_GPU
     SampledSpectrum Evaluate(TextureEvalContext ctx, SampledWavelengths lambda) const;
@@ -896,7 +897,7 @@ class SpectrumPtexTexture : public PtexTextureBase {
 
 class GPUFloatPtexTexture {
   public:
-    GPUFloatPtexTexture(const std::string &filename, ColorEncoding encoding,
+    GPUFloatPtexTexture(const std::string &filename, ColorEncoding encoding, Float scale,
                         Allocator alloc);
 
     PBRT_CPU_GPU
@@ -917,7 +918,7 @@ class GPUFloatPtexTexture {
 class GPUSpectrumPtexTexture {
   public:
     GPUSpectrumPtexTexture(const std::string &filename, ColorEncoding encoding,
-                           SpectrumType spectrumType, Allocator alloc);
+                           Float scale, SpectrumType spectrumType, Allocator alloc);
 
     PBRT_CPU_GPU
     SampledSpectrum Evaluate(TextureEvalContext ctx, SampledWavelengths lambda) const {

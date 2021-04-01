@@ -542,8 +542,9 @@ struct : public PtexErrorHandler {
 
 // PtexTexture Method Definitions
 
-PtexTextureBase::PtexTextureBase(const std::string &filename, ColorEncoding encoding)
-    : filename(filename), encoding(encoding) {
+PtexTextureBase::PtexTextureBase(const std::string &filename, ColorEncoding encoding,
+                                 Float scale)
+    : filename(filename), encoding(encoding), scale(scale) {
     std::mutex mutex;
     mutex.lock();
     if (cache == nullptr) {
@@ -620,11 +621,15 @@ int PtexTextureBase::SampleTexture(TextureEvalContext ctx, float result[3]) cons
             result[c] = fResult[c];
     }
 
+    for (int c = 0; c < nc; ++c)
+        result[c] *= scale;
+
     return nc;
 }
 
 std::string PtexTextureBase::BaseToString() const {
-    return StringPrintf("valid: %s filename: %s encoding: %s", valid, filename, encoding);
+    return StringPrintf("valid: %s filename: %s encoding: %s scale: %f", valid, filename,
+                        encoding, scale);
 }
 
 std::string FloatPtexTexture::ToString() const {
@@ -676,7 +681,8 @@ FloatPtexTexture *FloatPtexTexture::Create(const Transform &renderFromTexture,
     std::string filename = ResolveFilename(parameters.GetOneString("filename", ""));
     std::string encodingString = parameters.GetOneString("encoding", "gamma 2.2");
     ColorEncoding encoding = ColorEncoding::Get(encodingString, alloc);
-    return alloc.new_object<FloatPtexTexture>(filename, encoding);
+    Float scale = parameters.GetOneFloat("scale", 1.f);
+    return alloc.new_object<FloatPtexTexture>(filename, encoding, scale);
 }
 
 SpectrumPtexTexture *SpectrumPtexTexture::Create(
@@ -685,13 +691,15 @@ SpectrumPtexTexture *SpectrumPtexTexture::Create(
     std::string filename = ResolveFilename(parameters.GetOneString("filename", ""));
     std::string encodingString = parameters.GetOneString("encoding", "gamma 2.2");
     ColorEncoding encoding = ColorEncoding::Get(encodingString, alloc);
-    return alloc.new_object<SpectrumPtexTexture>(filename, encoding, spectrumType);
+    Float scale = parameters.GetOneFloat("scale", 1.f);
+    return alloc.new_object<SpectrumPtexTexture>(filename, encoding, scale, spectrumType);
 }
 
 GPUFloatPtexTexture::GPUFloatPtexTexture(const std::string &filename,
-                                         ColorEncoding encoding, Allocator alloc)
+                                         ColorEncoding encoding, Float scale,
+                                         Allocator alloc)
     : faceValues(alloc) {
-    FloatPtexTexture tex(filename, encoding);
+    FloatPtexTexture tex(filename, encoding, scale);
 
     Ptex::String error;
     Ptex::PtexTexture *texture = cache->get(filename.c_str(), error);
@@ -711,7 +719,7 @@ GPUFloatPtexTexture::GPUFloatPtexTexture(const std::string &filename,
 }
 
 static std::mutex ptexCacheMutex;
-static std::map<std::pair<std::string, std::string>, GPUFloatPtexTexture *>
+static std::map<std::tuple<std::string, std::string, Float>, GPUFloatPtexTexture *>
     ptexFloatTextureCache;
 
 GPUFloatPtexTexture *GPUFloatPtexTexture::Create(
@@ -719,8 +727,9 @@ GPUFloatPtexTexture *GPUFloatPtexTexture::Create(
     const FileLoc *loc, Allocator alloc) {
     std::string filename = ResolveFilename(parameters.GetOneString("filename", ""));
     std::string encodingString = parameters.GetOneString("encoding", "gamma 2.2");
+    Float scale = parameters.GetOneFloat("scale", 1.f);
 
-    auto key = std::make_pair(filename, encodingString);
+    auto key = std::make_tuple(filename, encodingString, scale);
     ++ptexCacheLookups;
     ptexCacheMutex.lock();
     if (auto iter = ptexFloatTextureCache.find(key);
@@ -733,7 +742,7 @@ GPUFloatPtexTexture *GPUFloatPtexTexture::Create(
         ptexCacheMutex.unlock();
         ColorEncoding encoding = ColorEncoding::Get(encodingString, alloc);
         GPUFloatPtexTexture *tex =
-            alloc.new_object<GPUFloatPtexTexture>(filename, encoding, alloc);
+            alloc.new_object<GPUFloatPtexTexture>(filename, encoding, scale, alloc);
 
         ptexCacheMutex.lock();
         CHECK(ptexFloatTextureCache.find(key) == ptexFloatTextureCache.end());
@@ -748,10 +757,10 @@ std::string GPUFloatPtexTexture::ToString() const {
 }
 
 GPUSpectrumPtexTexture::GPUSpectrumPtexTexture(const std::string &filename,
-                                               ColorEncoding encoding,
+                                               ColorEncoding encoding, Float scale,
                                                SpectrumType spectrumType, Allocator alloc)
     : spectrumType(spectrumType), faceValues(alloc) {
-    SpectrumPtexTexture tex(filename, encoding, spectrumType);
+    SpectrumPtexTexture tex(filename, encoding, scale, spectrumType);
 
     Ptex::String error;
     Ptex::PtexTexture *texture = cache->get(filename.c_str(), error);
@@ -778,7 +787,7 @@ GPUSpectrumPtexTexture::GPUSpectrumPtexTexture(const std::string &filename,
     gpuPtexMemoryUsed += nFaces * sizeof(faceValues[0]);
 }
 
-static std::map<std::pair<std::string, std::string>, GPUSpectrumPtexTexture *>
+static std::map<std::tuple<std::string, std::string, Float>, GPUSpectrumPtexTexture *>
     ptexSpectrumTextureCache;
 
 GPUSpectrumPtexTexture *GPUSpectrumPtexTexture::Create(
@@ -786,8 +795,9 @@ GPUSpectrumPtexTexture *GPUSpectrumPtexTexture::Create(
     SpectrumType spectrumType, const FileLoc *loc, Allocator alloc) {
     std::string filename = ResolveFilename(parameters.GetOneString("filename", ""));
     std::string encodingString = parameters.GetOneString("encoding", "gamma 2.2");
+    Float scale = parameters.GetOneFloat("scale", 1.f);
 
-    auto key = std::make_pair(filename, encodingString);
+    auto key = std::make_tuple(filename, encodingString, scale);
     ptexCacheMutex.lock();
     if (auto iter = ptexSpectrumTextureCache.find(key);
         iter != ptexSpectrumTextureCache.end()) {
@@ -798,7 +808,7 @@ GPUSpectrumPtexTexture *GPUSpectrumPtexTexture::Create(
         ptexCacheMutex.unlock();
         ColorEncoding encoding = ColorEncoding::Get(encodingString, alloc);
         GPUSpectrumPtexTexture *tex = alloc.new_object<GPUSpectrumPtexTexture>(
-            filename, encoding, spectrumType, alloc);
+            filename, encoding, scale, spectrumType, alloc);
 
         ptexCacheMutex.lock();
         CHECK(ptexSpectrumTextureCache.find(key) == ptexSpectrumTextureCache.end());
