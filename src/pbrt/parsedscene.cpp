@@ -486,21 +486,32 @@ void ParsedScene::MergeImported(ParsedScene *importScene) {
             base[item.first] = item.second;
         }
     };
-    mergeMap(namedMaterials, importScene->namedMaterials, "named material");
-    mergeMap(floatTextures, importScene->floatTextures, "texture");
-    mergeMap(spectrumTextures, importScene->spectrumTextures, "texture");
     mergeMap(instanceDefinitions, importScene->instanceDefinitions, "object instance");
     // mergeMap(namedCoordinateSystems, importScene->namedCoordinateSystems, "named
     // coordinate system");
 
-    materials.insert(materials.end(), importScene->materials.begin(),
-                     importScene->materials.end());
-    lights.insert(lights.end(), importScene->lights.begin(), importScene->lights.end());
-    shapes.insert(shapes.end(), importScene->shapes.begin(), importScene->shapes.end());
-    animatedShapes.insert(animatedShapes.end(), importScene->animatedShapes.begin(),
-                          importScene->animatedShapes.end());
-    instances.insert(instances.end(), importScene->instances.begin(),
-                     importScene->instances.end());
+    auto mergeSet = [this](auto &base, const auto &imported, const char *name) {
+        for (const auto &item : imported) {
+            if (base.find(item) != base.end())
+                ErrorExitDeferred("%s: multiply-defined %s.", item, name);
+            base.insert(item);
+        }
+    };
+    mergeSet(namedMaterialNames, importScene->namedMaterialNames, "named material");
+    mergeSet(floatTextureNames, importScene->floatTextureNames, "texture");
+    mergeSet(spectrumTextureNames, importScene->spectrumTextureNames, "texture");
+
+    auto mergeVector = [](auto &base, const auto &imported) {
+        base.insert(base.end(), imported.begin(), imported.end());
+    };
+    mergeVector(materials, importScene->materials);
+    mergeVector(namedMaterials, importScene->namedMaterials);
+    mergeVector(floatTextures, importScene->floatTextures);
+    mergeVector(spectrumTextures, importScene->spectrumTextures);
+    mergeVector(lights, importScene->lights);
+    mergeVector(shapes, importScene->shapes);
+    mergeVector(animatedShapes, importScene->animatedShapes);
+    mergeVector(instances, importScene->instances);
 }
 
 void ParsedScene::Option(const std::string &name, const std::string &value, FileLoc loc) {
@@ -670,16 +681,19 @@ void ParsedScene::Texture(const std::string &name, const std::string &type,
         return;
     }
 
-    std::map<std::string, TextureSceneEntity> &textures =
-        (type == "float") ? floatTextures : spectrumTextures;
-
-    if (textures.find(name) != textures.end()) {
+    std::set<std::string> &names =
+        (type == "float") ? floatTextureNames : spectrumTextureNames;
+    if (names.find(name) != names.end()) {
         ErrorExitDeferred(&loc, "Redefining texture \"%s\".", name);
         return;
     }
+    names.insert(name);
 
-    textures[name] =
-        TextureSceneEntity(texname, std::move(dict), loc, RenderFromObject());
+    std::vector<std::pair<std::string, TextureSceneEntity>> &textures =
+        (type == "float") ? floatTextures : spectrumTextures;
+
+    textures.push_back(std::make_pair(
+        name, TextureSceneEntity(texname, std::move(dict), loc, RenderFromObject())));
 }
 
 void ParsedScene::Material(const std::string &name, ParsedParameterVector params,
@@ -699,12 +713,13 @@ void ParsedScene::MakeNamedMaterial(const std::string &name, ParsedParameterVect
     ParameterDictionary dict(std::move(params), graphicsState.materialAttributes,
                              graphicsState.colorSpace);
 
-    if (namedMaterials.find(name) != namedMaterials.end()) {
+    if (namedMaterialNames.find(name) != namedMaterialNames.end()) {
         ErrorExitDeferred(&loc, "%s: named material redefined.", name);
         return;
     }
+    namedMaterialNames.insert(name);
 
-    namedMaterials[name] = SceneEntity("", std::move(dict), loc);
+    namedMaterials.push_back(std::make_pair(name, SceneEntity("", std::move(dict), loc)));
 }
 
 void ParsedScene::NamedMaterial(const std::string &name, FileLoc loc) {
@@ -768,7 +783,10 @@ void ParsedScene::CreateMaterials(
     for (const auto &nm : namedMaterials) {
         const std::string &name = nm.first;
         const SceneEntity &mtl = nm.second;
-        CHECK(namedMaterialsOut->find(name) == namedMaterialsOut->end());
+        if (namedMaterialsOut->find(name) != namedMaterialsOut->end()) {
+            ErrorExitDeferred(&mtl.loc, "%s: trying to redefine named material.", name);
+            continue;
+        }
 
         std::string type = mtl.parameters.GetOneString("type", "");
         if (type.empty()) {
@@ -779,7 +797,7 @@ void ParsedScene::CreateMaterials(
             continue;
         }
 
-        std::string fn = mtl.parameters.GetOneString("normalmap", "");
+        std::string fn = nm.second.parameters.GetOneString("normalmap", "");
         Image *normalMap = !fn.empty() ? normalMapCache[fn] : nullptr;
 
         TextureParameterDictionary texDict(&mtl.parameters, &textures);
@@ -805,69 +823,69 @@ NamedTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
     NamedTextures textures;
 
     std::set<std::string> seenFloatTextureFilenames, seenSpectrumTextureFilenames;
-    using iterator = std::map<std::string, TextureSceneEntity>::const_iterator;
-    std::vector<iterator> parallelFloatTextures, serialFloatTextures;
-    std::vector<iterator> parallelSpectrumTextures, serialSpectrumTextures;
+    std::vector<size_t> parallelFloatTextures, serialFloatTextures;
+    std::vector<size_t> parallelSpectrumTextures, serialSpectrumTextures;
 
     // Figure out which textures to load in parallel
     // Need to be careful since two textures can use the same image file;
     // we only want to load it once in that case...
     int nMissingTextures = 0;
-    for (iterator iter = floatTextures.begin(); iter != floatTextures.end(); ++iter) {
-        const auto &tex = iter->second;
+    for (size_t i = 0; i < floatTextures.size(); ++i) {
+        const auto &tex = floatTextures[i];
 
-        if (tex.renderFromObject.IsAnimated())
-            Warning(&tex.loc, "Animated world to texture transforms are not supported. "
-                              "Using start transform.");
+        if (tex.second.renderFromObject.IsAnimated())
+            Warning(&tex.second.loc,
+                    "Animated world to texture transforms are not supported. "
+                    "Using start transform.");
 
-        if (tex.texName != "imagemap" && tex.texName != "ptex") {
-            serialFloatTextures.push_back(iter);
+        if (tex.second.texName != "imagemap" && tex.second.texName != "ptex") {
+            serialFloatTextures.push_back(i);
             continue;
         }
 
         std::string filename =
-            ResolveFilename(tex.parameters.GetOneString("filename", ""));
+            ResolveFilename(tex.second.parameters.GetOneString("filename", ""));
         if (filename.empty())
             continue;
         if (!FileExists(filename)) {
-            Error(&tex.loc, "%s: file not found.", filename);
+            Error(&tex.second.loc, "%s: file not found.", filename);
             ++nMissingTextures;
         }
 
         if (seenFloatTextureFilenames.find(filename) == seenFloatTextureFilenames.end()) {
             seenFloatTextureFilenames.insert(filename);
-            parallelFloatTextures.push_back(iter);
+            parallelFloatTextures.push_back(i);
         } else
-            serialFloatTextures.push_back(iter);
+            serialFloatTextures.push_back(i);
     }
-    for (iterator iter = spectrumTextures.begin(); iter != spectrumTextures.end();
-         ++iter) {
-        const auto &tex = iter->second;
+    for (size_t i = 0; i < spectrumTextures.size(); ++i) {
+        const auto &tex = spectrumTextures[i];
 
-        if (tex.renderFromObject.IsAnimated())
-            Warning(&tex.loc, "Animated world to texture transforms are not supported. "
-                              "Using start transform.");
+        if (tex.second.renderFromObject.IsAnimated())
+            Warning(&tex.second.loc,
+                    "Animated world to texture transforms are not supported. "
+                    "Using start transform.");
 
-        if (tex.texName != "imagemap" && tex.texName != "ptex") {
-            serialSpectrumTextures.push_back(iter);
+        if (tex.second.texName != "imagemap" && tex.second.texName != "ptex") {
+            serialSpectrumTextures.push_back(i);
             continue;
         }
 
         std::string filename =
-            ResolveFilename(tex.parameters.GetOneString("filename", ""));
+            ResolveFilename(tex.second.parameters.GetOneString("filename", ""));
         if (filename.empty())
             continue;
         if (!FileExists(filename)) {
-            Error(&tex.loc, "%s: file not found.", filename);
+            Error(&tex.second.loc, "%s: file not found.", filename);
             ++nMissingTextures;
         }
 
         if (seenSpectrumTextureFilenames.find(filename) ==
             seenSpectrumTextureFilenames.end()) {
             seenSpectrumTextureFilenames.insert(filename);
-            parallelSpectrumTextures.push_back(iter);
+            parallelSpectrumTextures.push_back(i);
         } else
-            serialSpectrumTextures.push_back(iter);
+            serialSpectrumTextures.push_back(i);
     }
 
     if (nMissingTextures > 0)
@@ -881,77 +899,74 @@ NamedTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
     std::mutex mutex;
 
     ParallelFor(0, parallelFloatTextures.size(), [&](int64_t i) {
-        iterator iter = parallelFloatTextures[i];
-        const auto &tex = iter->second;
+        const auto &tex = floatTextures[parallelFloatTextures[i]];
 
-        pbrt::Transform renderFromTexture = tex.renderFromObject.startTransform;
+        pbrt::Transform renderFromTexture = tex.second.renderFromObject.startTransform;
         // Pass nullptr for the textures, since they shouldn't be accessed
         // anyway.
-        TextureParameterDictionary texDict(&tex.parameters, nullptr);
-        FloatTexture t = FloatTexture::Create(tex.texName, renderFromTexture, texDict,
-                                              &tex.loc, alloc, gpu);
+        TextureParameterDictionary texDict(&tex.second.parameters, nullptr);
+        FloatTexture t = FloatTexture::Create(tex.second.texName, renderFromTexture,
+                                              texDict, &tex.second.loc, alloc, gpu);
         std::lock_guard<std::mutex> lock(mutex);
-        textures.floatTextures[iter->first] = t;
+        textures.floatTextures[tex.first] = t;
     });
 
     ParallelFor(0, parallelSpectrumTextures.size(), [&](int64_t i) {
-        iterator iter = parallelSpectrumTextures[i];
-        const auto &tex = iter->second;
+        const auto &tex = spectrumTextures[parallelSpectrumTextures[i]];
 
-        pbrt::Transform renderFromTexture = tex.renderFromObject.startTransform;
+        pbrt::Transform renderFromTexture = tex.second.renderFromObject.startTransform;
         // nullptr for the textures, as above.
-        TextureParameterDictionary texDict(&tex.parameters, nullptr);
+        TextureParameterDictionary texDict(&tex.second.parameters, nullptr);
         SpectrumTexture albedoTex =
-            SpectrumTexture::Create(tex.texName, renderFromTexture, texDict,
-                                    SpectrumType::Albedo, &tex.loc, alloc, gpu);
+            SpectrumTexture::Create(tex.second.texName, renderFromTexture, texDict,
+                                    SpectrumType::Albedo, &tex.second.loc, alloc, gpu);
         // These should be fast since they should hit the texture cache
         SpectrumTexture unboundedTex =
-            SpectrumTexture::Create(tex.texName, renderFromTexture, texDict,
-                                    SpectrumType::Unbounded, &tex.loc, alloc, gpu);
-        SpectrumTexture illumTex =
-            SpectrumTexture::Create(tex.texName, renderFromTexture, texDict,
-                                    SpectrumType::Illuminant, &tex.loc, alloc, gpu);
+            SpectrumTexture::Create(tex.second.texName, renderFromTexture, texDict,
+                                    SpectrumType::Unbounded, &tex.second.loc, alloc, gpu);
+        SpectrumTexture illumTex = SpectrumTexture::Create(
+            tex.second.texName, renderFromTexture, texDict, SpectrumType::Illuminant,
+            &tex.second.loc, alloc, gpu);
 
         std::lock_guard<std::mutex> lock(mutex);
-        textures.albedoSpectrumTextures[iter->first] = albedoTex;
-        textures.unboundedSpectrumTextures[iter->first] = unboundedTex;
-        textures.illuminantSpectrumTextures[iter->first] = illumTex;
+        textures.albedoSpectrumTextures[tex.first] = albedoTex;
+        textures.unboundedSpectrumTextures[tex.first] = unboundedTex;
+        textures.illuminantSpectrumTextures[tex.first] = illumTex;
     });
 
     LOG_VERBOSE("Loading serial textures");
     // And do the rest serially
-    for (const auto iter : serialFloatTextures) {
-        const auto &tex = iter->second;
+    for (size_t index : serialFloatTextures) {
+        const auto &tex = floatTextures[index];
 
-        pbrt::Transform renderFromTexture = tex.renderFromObject.startTransform;
-        TextureParameterDictionary texDict(&tex.parameters, &textures);
-        FloatTexture t = FloatTexture::Create(tex.texName, renderFromTexture, texDict,
-                                              &tex.loc, alloc, gpu);
-        textures.floatTextures[iter->first] = t;
+        pbrt::Transform renderFromTexture = tex.second.renderFromObject.startTransform;
+        TextureParameterDictionary texDict(&tex.second.parameters, &textures);
+        FloatTexture t = FloatTexture::Create(tex.second.texName, renderFromTexture,
+                                              texDict, &tex.second.loc, alloc, gpu);
+        textures.floatTextures[tex.first] = t;
     }
+    for (size_t index : serialSpectrumTextures) {
+        const auto &tex = spectrumTextures[index];
 
-    for (const auto iter : serialSpectrumTextures) {
-        const auto &tex = iter->second;
+        if (tex.second.renderFromObject.IsAnimated())
+            Warning(&tex.second.loc, "Animated world to texture transform not supported. "
+                                     "Using start transform.");
 
-        if (tex.renderFromObject.IsAnimated())
-            Warning(&tex.loc, "Animated world to texture transform not supported. "
-                              "Using start transform.");
-
-        pbrt::Transform renderFromTexture = tex.renderFromObject.startTransform;
-        TextureParameterDictionary texDict(&tex.parameters, &textures);
+        pbrt::Transform renderFromTexture = tex.second.renderFromObject.startTransform;
+        TextureParameterDictionary texDict(&tex.second.parameters, &textures);
         SpectrumTexture albedoTex =
-            SpectrumTexture::Create(tex.texName, renderFromTexture, texDict,
-                                    SpectrumType::Albedo, &tex.loc, alloc, gpu);
+            SpectrumTexture::Create(tex.second.texName, renderFromTexture, texDict,
+                                    SpectrumType::Albedo, &tex.second.loc, alloc, gpu);
         SpectrumTexture unboundedTex =
-            SpectrumTexture::Create(tex.texName, renderFromTexture, texDict,
-                                    SpectrumType::Unbounded, &tex.loc, alloc, gpu);
-        SpectrumTexture illumTex =
-            SpectrumTexture::Create(tex.texName, renderFromTexture, texDict,
-                                    SpectrumType::Illuminant, &tex.loc, alloc, gpu);
+            SpectrumTexture::Create(tex.second.texName, renderFromTexture, texDict,
+                                    SpectrumType::Unbounded, &tex.second.loc, alloc, gpu);
+        SpectrumTexture illumTex = SpectrumTexture::Create(
+            tex.second.texName, renderFromTexture, texDict, SpectrumType::Illuminant,
+            &tex.second.loc, alloc, gpu);
 
-        textures.albedoSpectrumTextures[iter->first] = albedoTex;
-        textures.unboundedSpectrumTextures[iter->first] = unboundedTex;
-        textures.illuminantSpectrumTextures[iter->first] = illumTex;
+        textures.albedoSpectrumTextures[tex.first] = albedoTex;
+        textures.unboundedSpectrumTextures[tex.first] = unboundedTex;
+        textures.illuminantSpectrumTextures[tex.first] = illumTex;
     }
 
     LOG_VERBOSE("Done creating textures");
