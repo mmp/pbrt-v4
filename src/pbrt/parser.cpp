@@ -42,27 +42,35 @@ STAT_MEMORY_COUNTER("Memory/Parsed Parameters", parsedParameterBytes);
 ///////////////////////////////////////////////////////////////////////////
 // ParsedParameter
 
-void ParsedParameter::AddNumber(double d) {
-    CHECK(strings.empty() && bools.empty());
-    numbers.push_back(d);
+void ParsedParameter::AddFloat(Float v) {
+    CHECK(ints.empty() && strings.empty() && bools.empty());
+    floats.push_back(v);
+}
+
+void ParsedParameter::AddInt(int i) {
+    CHECK(floats.empty() && strings.empty() && bools.empty());
+    ints.push_back(i);
 }
 
 void ParsedParameter::AddString(std::string_view str) {
-    CHECK(numbers.empty() && bools.empty());
+    CHECK(floats.empty() && ints.empty() && bools.empty());
     strings.push_back({str.begin(), str.end()});
 }
 
 void ParsedParameter::AddBool(bool v) {
-    CHECK(numbers.empty() && strings.empty());
+    CHECK(floats.empty() && ints.empty() && strings.empty());
     bools.push_back(v);
 }
 
 std::string ParsedParameter::ToString() const {
     std::string str;
     str += std::string("\"") + type + " " + name + std::string("\" [ ");
-    if (!numbers.empty())
-        for (double d : numbers)
+    if (!floats.empty())
+        for (Float d : floats)
             str += StringPrintf("%f ", d);
+    if (!ints.empty())
+        for (int i : ints)
+            str += StringPrintf("%d ", i);
     else if (!strings.empty())
         for (const auto &s : strings)
             str += '\"' + s + "\" ";
@@ -313,7 +321,31 @@ pstd::optional<Token> Tokenizer::Next() {
     }
 }
 
-static double parseNumber(const Token &t) {
+static int parseInt(const Token &t) {
+    bool negate = t.token[0] == '-';
+
+    int index = 0;
+    if (t.token[0] == '+' || t.token[0] == '-')
+        ++index;
+
+    int64_t value = 0;
+    while (index < t.token.size()) {
+        if (!(t.token[index] >= '0' && t.token[index] <= '9'))
+            ErrorExit(&t.loc, "\"%c\": expected a number", t.token[index]);
+        value = 10 * value + (t.token[index] - '0');
+        ++index;
+
+        if (value > std::numeric_limits<int>::max())
+            ErrorExit(&t.loc,
+                      "Numeric value too large to represent as a 32-bit integer.");
+        else if (value < std::numeric_limits<int>::lowest())
+            Warning(&t.loc, "Numeric value %d too low to represent as a 32-bit integer.");
+    }
+
+    return negate ? -value : value;
+}
+
+static double parseFloat(const Token &t) {
     // Fast path for a single digit
     if (t.token.size() == 1) {
         if (!(t.token[0] >= '0' && t.token[0] <= '9'))
@@ -436,7 +468,10 @@ static ParsedParameterVector parseParameters(
         auto nameEnd = skipToSpace(nameBegin);
         param->name.assign(nameBegin, nameEnd);
 
-        enum ValType { Unknown, String, Bool, Number } valType = Unknown;
+        enum ValType { Unknown, String, Bool, Float, Int } valType = Unknown;
+
+        if (param->type == "integer")
+            valType = Int;
 
         auto addVal = [&](const Token &t) {
             if (isQuotedString(t.token)) {
@@ -446,10 +481,12 @@ static ParsedParameterVector parseParameters(
                     break;
                 case String:
                     break;
-                case Number:
-                    errorCallback(t, "expected number");
+                case Float:
+                    errorCallback(t, "expected floating-point value");
+                case Int:
+                    errorCallback(t, "expected integer value");
                 case Bool:
-                    errorCallback(t, "expected bool");
+                    errorCallback(t, "expected Boolean value");
                 }
 
                 param->AddString(dequoteString(t));
@@ -459,9 +496,11 @@ static ParsedParameterVector parseParameters(
                     valType = Bool;
                     break;
                 case String:
-                    errorCallback(t, "expected string");
-                case Number:
-                    errorCallback(t, "expected number");
+                    errorCallback(t, "expected string value");
+                case Float:
+                    errorCallback(t, "expected floating-point value");
+                case Int:
+                    errorCallback(t, "expected integer value");
                 case Bool:
                     break;
                 }
@@ -473,9 +512,11 @@ static ParsedParameterVector parseParameters(
                     valType = Bool;
                     break;
                 case String:
-                    errorCallback(t, "expected string");
-                case Number:
-                    errorCallback(t, "expected number");
+                    errorCallback(t, "expected string value");
+                case Float:
+                    errorCallback(t, "expected floating-point value");
+                case Int:
+                    errorCallback(t, "expected integer value");
                 case Bool:
                     break;
                 }
@@ -484,17 +525,22 @@ static ParsedParameterVector parseParameters(
             } else {
                 switch (valType) {
                 case Unknown:
-                    valType = Number;
+                    valType = Float;
                     break;
                 case String:
-                    errorCallback(t, "expected string");
-                case Number:
+                    errorCallback(t, "expected string value");
+                case Float:
+                    break;
+                case Int:
                     break;
                 case Bool:
-                    errorCallback(t, "expected bool");
+                    errorCallback(t, "expected Boolean value");
                 }
 
-                param->AddNumber(parseNumber(t));
+                if (valType == Int)
+                    param->AddInt(parseInt(t));
+                else
+                    param->AddFloat(parseFloat(t));
             }
         };
 
@@ -665,7 +711,7 @@ void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
                     syntaxError(*tok);
                 Float m[16];
                 for (int i = 0; i < 16; ++i)
-                    m[i] = parseNumber(*nextToken(TokenRequired));
+                    m[i] = parseFloat(*nextToken(TokenRequired));
                 if (nextToken(TokenRequired)->token != "]")
                     syntaxError(*tok);
                 scene->ConcatTransform(m, tok->loc);
@@ -752,7 +798,7 @@ void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
             else if (tok->token == "LookAt") {
                 Float v[9];
                 for (int i = 0; i < 9; ++i)
-                    v[i] = parseNumber(*nextToken(TokenRequired));
+                    v[i] = parseFloat(*nextToken(TokenRequired));
                 scene->LookAt(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8],
                               tok->loc);
             } else
@@ -827,7 +873,7 @@ void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
             else if (tok->token == "Rotate") {
                 Float v[4];
                 for (int i = 0; i < 4; ++i)
-                    v[i] = parseNumber(*nextToken(TokenRequired));
+                    v[i] = parseFloat(*nextToken(TokenRequired));
                 scene->Rotate(v[0], v[1], v[2], v[3], tok->loc);
             } else
                 syntaxError(*tok);
@@ -841,7 +887,7 @@ void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
             else if (tok->token == "Scale") {
                 Float v[3];
                 for (int i = 0; i < 3; ++i)
-                    v[i] = parseNumber(*nextToken(TokenRequired));
+                    v[i] = parseFloat(*nextToken(TokenRequired));
                 scene->Scale(v[0], v[1], v[2], tok->loc);
             } else
                 syntaxError(*tok);
@@ -869,19 +915,19 @@ void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
                     syntaxError(*tok);
                 Float m[16];
                 for (int i = 0; i < 16; ++i)
-                    m[i] = parseNumber(*nextToken(TokenRequired));
+                    m[i] = parseFloat(*nextToken(TokenRequired));
                 if (nextToken(TokenRequired)->token != "]")
                     syntaxError(*tok);
                 scene->Transform(m, tok->loc);
             } else if (tok->token == "Translate") {
                 Float v[3];
                 for (int i = 0; i < 3; ++i)
-                    v[i] = parseNumber(*nextToken(TokenRequired));
+                    v[i] = parseFloat(*nextToken(TokenRequired));
                 scene->Translate(v[0], v[1], v[2], tok->loc);
             } else if (tok->token == "TransformTimes") {
                 Float v[2];
                 for (int i = 0; i < 2; ++i)
-                    v[i] = parseNumber(*nextToken(TokenRequired));
+                    v[i] = parseFloat(*nextToken(TokenRequired));
                 scene->TransformTimes(v[0], v[1], tok->loc);
             } else if (tok->token == "Texture") {
                 std::string_view n = dequoteString(*nextToken(TokenRequired));

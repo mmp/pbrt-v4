@@ -1294,13 +1294,12 @@ void FormattingScene::Texture(const std::string &name, const std::string &type,
                             name);
                         return;
                     }
-                    if (p->numbers.size() != 3) {
+                    if (p->floats.size() != 3) {
                         ErrorExitDeferred(
                             &p->loc, "Didn't find 3 values for \"rgb\" \"%s\".", p->name);
                         return;
                     }
-                    if (p->numbers[0] != p->numbers[1] ||
-                        p->numbers[1] != p->numbers[2]) {
+                    if (p->floats[0] != p->floats[1] || p->floats[1] != p->floats[2]) {
                         ErrorExitDeferred(&p->loc,
                                           "Non-constant \"rgb\" value found for "
                                           "\"scale\" texture parameter \"%s\". Please "
@@ -1313,7 +1312,7 @@ void FormattingScene::Texture(const std::string &name, const std::string &type,
                     foundRGB = true;
                     p->type = "float";
                     p->name = "scale";
-                    p->numbers.resize(1);
+                    p->floats.resize(1);
                 } else {
                     if (foundTexture) {
                         ErrorExitDeferred(
