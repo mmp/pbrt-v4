@@ -174,6 +174,7 @@ void CPURender(ParsedScene &parsedScene) {
                     primitives.push_back(
                         new GeometricPrimitive(s, mtl, area, mi, alphaTex));
             }
+            sh.parameters.FreeParameters();
             sh = ShapeSceneEntity();
         }
         return primitives;
@@ -251,6 +252,7 @@ void CPURender(ParsedScene &parsedScene) {
             }
             primitives.push_back(new AnimatedPrimitive(prims[0], sh.renderFromObject));
 
+            sh.parameters.FreeParameters();
             sh = AnimatedShapeSceneEntity();
         }
         return primitives;
@@ -312,9 +314,11 @@ void CPURender(ParsedScene &parsedScene) {
         if (inst.renderFromInstance)
             primitives.push_back(
                 new TransformedPrimitive(iter->second, inst.renderFromInstance));
-        else
+        else {
             primitives.push_back(
                 new AnimatedPrimitive(iter->second, *inst.renderFromInstanceAnim));
+            delete inst.renderFromInstanceAnim;
+        }
     }
 
     parsedScene.instances.clear();

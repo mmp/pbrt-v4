@@ -110,6 +110,8 @@ class ParameterDictionary {
 
     const ParsedParameterVector &GetParameterVector() const { return params; }
 
+    void FreeParameters();
+
     Float GetOneFloat(const std::string &name, Float def) const;
     int GetOneInt(const std::string &name, int def) const;
     bool GetOneBool(const std::string &name, bool def) const;
@@ -168,6 +170,7 @@ class ParameterDictionary {
     // ParameterDictionary Private Members
     ParsedParameterVector params;
     const RGBColorSpace *colorSpace = nullptr;
+    int nOwnedParams;
 };
 
 // TextureParameterDictionary Definition

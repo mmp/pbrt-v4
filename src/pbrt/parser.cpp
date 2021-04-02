@@ -37,8 +37,6 @@
 
 namespace pbrt {
 
-STAT_MEMORY_COUNTER("Memory/Parsed Parameters", parsedParameterBytes);
-
 ///////////////////////////////////////////////////////////////////////////
 // ParsedParameter
 
@@ -412,7 +410,7 @@ constexpr int TokenRequired = 1;
 
 template <typename Next, typename Unget>
 static ParsedParameterVector parseParameters(
-    Next nextToken, Unget ungetToken, Allocator alloc, bool formatting,
+    Next nextToken, Unget ungetToken, bool formatting,
     const std::function<void(const Token &token, const char *)> &errorCallback) {
     ParsedParameterVector parameterVector;
 
@@ -426,7 +424,7 @@ static ParsedParameterVector parseParameters(
             return parameterVector;
         }
 
-        ParsedParameter *param = alloc.new_object<ParsedParameter>(alloc, t->loc);
+        ParsedParameter *param = new ParsedParameter(t->loc);
 
         std::string_view decl = dequoteString(*t);
 
@@ -582,9 +580,6 @@ void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
     FormattingScene *formattingScene = dynamic_cast<FormattingScene *>(scene);
     bool formatting = formattingScene != nullptr;
 
-    TrackedMemoryResource memoryResource;
-    Allocator alloc(&memoryResource);
-
     static std::atomic<bool> warnedTransformBeginEndDeprecated{false};
 
     std::vector<std::pair<std::thread, ParsedScene *>> imports;
@@ -645,21 +640,21 @@ void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
     // parameter and a ParameterVector (e.g. pbrtShape()).
     // using BasicEntrypoint = void (ParsedScene::*)(const std::string &,
     // ParsedParameterVector, FileLoc);
-    auto basicParamListEntrypoint = [&](void (SceneRepresentation::*apiFunc)(
-                                            const std::string &, ParsedParameterVector,
-                                            FileLoc),
-                                        FileLoc loc) {
-        Token t = *nextToken(TokenRequired);
-        std::string_view dequoted = dequoteString(t);
-        std::string n = toString(dequoted);
-        ParsedParameterVector parameterVector = parseParameters(
-            nextToken, unget, alloc, formatting, [&](const Token &t, const char *msg) {
-                std::string token = toString(t.token);
-                std::string str = StringPrintf("%s: %s", token, msg);
-                parseError(str.c_str(), &t.loc);
-            });
-        (scene->*apiFunc)(n, std::move(parameterVector), loc);
-    };
+    auto basicParamListEntrypoint =
+        [&](void (SceneRepresentation::*apiFunc)(const std::string &,
+                                                 ParsedParameterVector, FileLoc),
+            FileLoc loc) {
+            Token t = *nextToken(TokenRequired);
+            std::string_view dequoted = dequoteString(t);
+            std::string n = toString(dequoted);
+            ParsedParameterVector parameterVector = parseParameters(
+                nextToken, unget, formatting, [&](const Token &t, const char *msg) {
+                    std::string token = toString(t.token);
+                    std::string str = StringPrintf("%s: %s", token, msg);
+                    parseError(str.c_str(), &t.loc);
+                });
+            (scene->*apiFunc)(n, std::move(parameterVector), loc);
+        };
 
     auto syntaxError = [&](const Token &t) {
         ErrorExit(&t.loc, "Unknown directive: %s", toString(t.token));
@@ -939,8 +934,7 @@ void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
                 std::string_view dequoted = dequoteString(t);
                 std::string texName = toString(dequoted);
                 ParsedParameterVector params = parseParameters(
-                    nextToken, unget, alloc, formatting,
-                    [&](const Token &t, const char *msg) {
+                    nextToken, unget, formatting, [&](const Token &t, const char *msg) {
                         std::string token = toString(t.token);
                         std::string str = StringPrintf("%s: %s", token, msg);
                         parseError(str.c_str(), &t.loc);
@@ -973,7 +967,6 @@ void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
         parsedScene->MergeImported(import.second);
         // HACK: let import.second leak so that its TransformCache isn't deallocated...
     }
-    parsedParameterBytes += memoryResource.CurrentAllocatedBytes();
 }
 
 void ParseFiles(SceneRepresentation *scene, pstd::span<const std::string> filenames) {

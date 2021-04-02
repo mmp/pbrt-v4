@@ -23,8 +23,7 @@ namespace pbrt {
 class ParsedParameter {
   public:
     // ParsedParameter Public Methods
-    ParsedParameter(Allocator alloc, FileLoc loc)
-        : loc(loc), floats(alloc), ints(alloc), strings(alloc), bools(alloc) {}
+    ParsedParameter(FileLoc loc) : loc(loc) {}
 
     void AddFloat(Float v);
     void AddInt(int i);

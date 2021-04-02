@@ -141,6 +141,7 @@ constexpr char ParameterTypeTraits<ParameterType::String>::typeName[];
 ParameterDictionary::ParameterDictionary(ParsedParameterVector p,
                                          const RGBColorSpace *colorSpace)
     : params(std::move(p)), colorSpace(colorSpace) {
+    nOwnedParams = params.size();
     std::reverse(params.begin(), params.end());
     CHECK(colorSpace != nullptr);
     checkParameterTypes();
@@ -150,6 +151,7 @@ ParameterDictionary::ParameterDictionary(ParsedParameterVector p0,
                                          const ParsedParameterVector &params1,
                                          const RGBColorSpace *colorSpace)
     : params(std::move(p0)), colorSpace(colorSpace) {
+    nOwnedParams = params.size();
     std::reverse(params.begin(), params.end());
     CHECK(colorSpace != nullptr);
     params.insert(params.end(), params1.rbegin(), params1.rend());
@@ -203,6 +205,12 @@ typename ParameterTypeTraits<PT>::ReturnType ParameterDictionary::lookupSingle(
     }
 
     return defaultValue;
+}
+
+void ParameterDictionary::FreeParameters() {
+    for (int i = 0; i < nOwnedParams; ++i)
+        delete params[i];
+    params.clear();
 }
 
 Float ParameterDictionary::GetOneFloat(const std::string &name, Float def) const {
