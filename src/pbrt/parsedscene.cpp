@@ -478,31 +478,40 @@ void ParsedScene::MergeImported(ParsedScene *importScene) {
         reindex(inst.second.animatedShapes);
     }
 
-    auto mergeMap = [this](auto &base, const auto &imported, const char *name) {
+    auto mergeMap = [this](auto &base, auto &imported, const char *name) {
         for (const auto &item : imported) {
             if (base.find(item.first) != base.end())
                 ErrorExitDeferred(&item.second.loc, "%s: multiply-defined %s.",
                                   item.first, name);
-            base[item.first] = item.second;
+            base[item.first] = std::move(item.second);
         }
+        imported.clear();
     };
     mergeMap(instanceDefinitions, importScene->instanceDefinitions, "object instance");
     // mergeMap(namedCoordinateSystems, importScene->namedCoordinateSystems, "named
     // coordinate system");
 
-    auto mergeSet = [this](auto &base, const auto &imported, const char *name) {
+    auto mergeSet = [this](auto &base, auto &imported, const char *name) {
         for (const auto &item : imported) {
             if (base.find(item) != base.end())
                 ErrorExitDeferred("%s: multiply-defined %s.", item, name);
-            base.insert(item);
+            base.insert(std::move(item));
         }
+        imported.clear();
     };
     mergeSet(namedMaterialNames, importScene->namedMaterialNames, "named material");
     mergeSet(floatTextureNames, importScene->floatTextureNames, "texture");
     mergeSet(spectrumTextureNames, importScene->spectrumTextureNames, "texture");
 
-    auto mergeVector = [](auto &base, const auto &imported) {
-        base.insert(base.end(), imported.begin(), imported.end());
+    auto mergeVector = [](auto &base, auto &imported) {
+        if (base.empty())
+            base = std::move(imported);
+        else {
+            base.reserve(base.size() + imported.size());
+            std::move(std::begin(imported), std::end(imported), std::back_inserter(base));
+            imported.clear();
+            imported.shrink_to_fit();
+        }
     };
     mergeVector(materials, importScene->materials);
     mergeVector(namedMaterials, importScene->namedMaterials);
