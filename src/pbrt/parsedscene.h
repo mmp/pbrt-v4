@@ -214,8 +214,8 @@ struct InstanceSceneEntity : public SceneEntity {
             renderFromInstance ? renderFromInstance->ToString() : std::string("nullptr"));
     }
 
-    AnimatedTransform *renderFromInstanceAnim;
-    const Transform *renderFromInstance;
+    AnimatedTransform *renderFromInstanceAnim = nullptr;
+    const Transform *renderFromInstance = nullptr;
 };
 
 // TransformHash Definition
