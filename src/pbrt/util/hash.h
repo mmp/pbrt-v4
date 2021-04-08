@@ -15,20 +15,30 @@
 namespace pbrt {
 
 // https://github.com/explosion/murmurhash/blob/master/murmurhash/MurmurHash2.cpp
-PBRT_CPU_GPU
-inline uint64_t MurmurHash64A(const void *key, int len, uint64_t seed) {
-    DCHECK(((uintptr_t)key & 7) == 0);
+template <bool isAligned>
+PBRT_CPU_GPU inline uint64_t MurmurHash64AFlex(const void *key, size_t len,
+                                               uint64_t seed) {
+    if (isAligned)
+        DCHECK(((uintptr_t)key & 7) == 0);
 
     const uint64_t m = 0xc6a4a7935bd1e995ull;
     const int r = 47;
 
     uint64_t h = seed ^ (len * m);
 
+    auto load8 =
+        isAligned ? [](const void *key) -> uint64_t { return *(const uint64_t *)key; }
+                  : [](const void *key) {
+          uint64_t v;
+          std::memcpy(&v, key, sizeof(uint64_t));
+          return v;
+      };
+
     const uint64_t *data = (const uint64_t *)key;
     const uint64_t *end = data + (len / 8);
 
     while (data != end) {
-        uint64_t k = *data++;
+        uint64_t k = load8(data++);
 
         k *= m;
         k ^= k >> r;
@@ -65,6 +75,14 @@ inline uint64_t MurmurHash64A(const void *key, int len, uint64_t seed) {
     return h;
 }
 
+template <typename T>
+PBRT_CPU_GPU inline uint64_t MurmurHash64A(const T *key, size_t len, uint64_t seed) {
+    if (alignof(T) >= 8 || ((uintptr_t)key & 7) == 0)
+        return MurmurHash64AFlex<true>(key, len, seed);
+    else
+        return MurmurHash64AFlex<false>(key, len, seed);
+}
+
 // Hashing Inline Functions
 // http://zimbry.blogspot.ch/2011/09/better-bit-mixing-improving-on.html
 PBRT_CPU_GPU inline uint64_t MixBits(uint64_t v);
@@ -78,12 +96,13 @@ inline uint64_t MixBits(uint64_t v) {
     return v;
 }
 
-PBRT_CPU_GPU inline uint64_t HashBuffer(const void *ptr, size_t size, uint64_t seed = 0) {
+template <typename T>
+PBRT_CPU_GPU inline uint64_t HashBuffer(const T *ptr, size_t size, uint64_t seed = 0) {
     return MurmurHash64A(ptr, size, seed);
 }
 
-template <size_t size>
-PBRT_CPU_GPU inline uint64_t HashBuffer(const void *ptr, uint64_t seed = 0) {
+template <size_t size, typename T>
+PBRT_CPU_GPU inline uint64_t HashBuffer(const T *ptr, uint64_t seed = 0) {
     return MurmurHash64A(ptr, size, seed);
 }
 

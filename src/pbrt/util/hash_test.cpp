@@ -44,3 +44,12 @@ TEST(Hash, Collisions) {
     EXPECT_EQ(0, highCollisions);
     EXPECT_EQ(0, fullCollisions);
 }
+
+TEST(Hash, Unaligned) {
+    uint64_t buf[] = { 0xfacebeef, 0x65028088, 0x13372048 };
+    char cbuf[sizeof(buf) + 8];
+    for (int delta = 0; delta < 8; ++ delta) {
+        memcpy(cbuf + delta, buf, sizeof(buf));
+        EXPECT_EQ(HashBuffer(buf, sizeof(buf)), HashBuffer(cbuf + delta, sizeof(buf)));
+    }
+}
