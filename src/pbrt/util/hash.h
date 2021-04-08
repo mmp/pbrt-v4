@@ -27,19 +27,15 @@ PBRT_CPU_GPU inline uint64_t MurmurHash64AFlex(const void *key, size_t len,
 
     uint64_t h = seed ^ (len * m);
 
-    auto load8 =
-        isAligned ? [](const void *key) -> uint64_t { return *(const uint64_t *)key; }
-                  : [](const void *key) {
-          uint64_t v;
-          std::memcpy(&v, key, sizeof(uint64_t));
-          return v;
-      };
-
     const uint64_t *data = (const uint64_t *)key;
     const uint64_t *end = data + (len / 8);
 
     while (data != end) {
-        uint64_t k = load8(data++);
+        uint64_t k;
+        if constexpr (isAligned)
+            k = *data++;
+        else
+            std::memcpy(&k, data++, sizeof(uint64_t));
 
         k *= m;
         k ^= k >> r;
