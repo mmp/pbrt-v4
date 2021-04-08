@@ -11,6 +11,7 @@
 
 #include <string.h>
 #include <cstdint>
+#include <cstring>
 
 namespace pbrt {
 
