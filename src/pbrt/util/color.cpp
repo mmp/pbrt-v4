@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <iterator>
+#include <mutex>
 #include <vector>
 
 namespace pbrt {
@@ -249,6 +250,7 @@ const ColorEncoding ColorEncoding::Get(const std::string &name, Allocator alloc)
         return sRGB;
     else {
         static std::map<float, ColorEncoding> cache;
+        static std::mutex mutex;
 
         std::vector<std::string> params = SplitStringsFromWhitespace(name);
         if (params.size() != 2 || params[0] != "gamma")
@@ -257,6 +259,7 @@ const ColorEncoding ColorEncoding::Get(const std::string &name, Allocator alloc)
         if (gamma == 0)
             ErrorExit("%s: unable to parse gamma value", params[1]);
 
+        std::lock_guard<std::mutex> lock(mutex);
         auto iter = cache.find(gamma);
         if (iter != cache.end())
             return iter->second;
