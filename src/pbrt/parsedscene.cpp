@@ -450,6 +450,11 @@ ParsedScene *ParsedScene::CopyForImport() {
     importScene->renderFromWorld = renderFromWorld;
     importScene->graphicsState = graphicsState;
     importScene->currentBlock = currentBlock;
+    if (currentInstance) {
+        importScene->currentInstance = new InstanceDefinitionSceneEntity;
+        importScene->currentInstance->name = currentInstance->name;
+        importScene->currentInstance->loc = currentInstance->loc;
+    }
     return importScene;
 }
 
@@ -478,6 +483,35 @@ void ParsedScene::MergeImported(ParsedScene *importScene) {
         reindex(inst.second.animatedShapes);
     }
 
+    auto mergeVector = [](auto &base, auto &imported) {
+        if (base.empty())
+            base = std::move(imported);
+        else {
+            base.reserve(base.size() + imported.size());
+            std::move(std::begin(imported), std::end(imported), std::back_inserter(base));
+            imported.clear();
+            imported.shrink_to_fit();
+        }
+    };
+
+    if (importScene->currentInstance) {
+        reindex(importScene->currentInstance->shapes);
+        reindex(importScene->currentInstance->animatedShapes);
+        bool found = false;
+        for (auto &def : instanceDefinitions) {
+            if (def.second.name == importScene->currentInstance->name) {
+                found = true;
+                mergeVector(def.second.shapes, importScene->currentInstance->shapes);
+                mergeVector(def.second.animatedShapes,
+                            importScene->currentInstance->animatedShapes);
+                delete importScene->currentInstance;
+                importScene->currentInstance = nullptr;
+                break;
+            }
+        }
+        CHECK(found);
+    }
+
     auto mergeMap = [this](auto &base, auto &imported, const char *name) {
         for (const auto &item : imported) {
             if (base.find(item.first) != base.end())
@@ -503,16 +537,6 @@ void ParsedScene::MergeImported(ParsedScene *importScene) {
     mergeSet(floatTextureNames, importScene->floatTextureNames, "texture");
     mergeSet(spectrumTextureNames, importScene->spectrumTextureNames, "texture");
 
-    auto mergeVector = [](auto &base, auto &imported) {
-        if (base.empty())
-            base = std::move(imported);
-        else {
-            base.reserve(base.size() + imported.size());
-            std::move(std::begin(imported), std::end(imported), std::back_inserter(base));
-            imported.clear();
-            imported.shrink_to_fit();
-        }
-    };
     mergeVector(materials, importScene->materials);
     mergeVector(namedMaterials, importScene->namedMaterials);
     mergeVector(floatTextures, importScene->floatTextures);
