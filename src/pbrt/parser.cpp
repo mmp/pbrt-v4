@@ -661,13 +661,6 @@ void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
     };
 
     pstd::optional<Token> tok;
-    CheckCallbackScope _([&tok]() -> std::string {
-        if (!tok.has_value())
-            return "";
-        std::string filename(tok->loc.filename.begin(), tok->loc.filename.end());
-        return StringPrintf("Current parser location %s:%d:%d", filename, tok->loc.line,
-                            tok->loc.column);
-    });
 
     while (true) {
         tok = nextToken(TokenOptional);
