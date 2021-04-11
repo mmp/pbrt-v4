@@ -70,9 +70,12 @@ void CPURender(ParsedScene &parsedScene) {
                         fullImageResolution, &parsedScene.sampler.loc, alloc);
 
     // Textures
+    LOG_VERBOSE("Starting textures");
     NamedTextures textures = parsedScene.CreateTextures(alloc, false);
+    LOG_VERBOSE("Finished textures");
 
     // Materials
+    LOG_VERBOSE("Starting materials");
     std::map<std::string, pbrt::Material> namedMaterials;
     std::vector<pbrt::Material> materials;
     parsedScene.CreateMaterials(textures, alloc, &namedMaterials, &materials);
@@ -83,8 +86,10 @@ void CPURender(ParsedScene &parsedScene) {
     for (const auto &namedMtl : parsedScene.namedMaterials)
         if (namedMtl.second.name == "subsurface")
             haveSubsurface = true;
+    LOG_VERBOSE("Finished materials");
 
     // Lights (area lights will be done later, with shapes...)
+    LOG_VERBOSE("Starting lights");
     std::vector<Light> lights;
     std::mutex lightsMutex;
     lights.reserve(parsedScene.lights.size() + parsedScene.areaLights.size());
@@ -99,6 +104,7 @@ void CPURender(ParsedScene &parsedScene) {
         // No need to hold the mutex here
         lights.push_back(l);
     }
+    LOG_VERBOSE("Finished Lights");
 
     // Primitives
     auto getAlphaTexture = [&](const ParameterDictionary &parameters,
@@ -180,6 +186,7 @@ void CPURender(ParsedScene &parsedScene) {
         return primitives;
     };
 
+    LOG_VERBOSE("Starting shapes");
     std::vector<Primitive> primitives = CreatePrimitivesForShapes(parsedScene.shapes);
 
     parsedScene.shapes.clear();
@@ -264,8 +271,10 @@ void CPURender(ParsedScene &parsedScene) {
 
     parsedScene.animatedShapes.clear();
     parsedScene.animatedShapes.shrink_to_fit();
+    LOG_VERBOSE("Finished shapes");
 
     // Instance definitions
+    LOG_VERBOSE("Starting instances");
     std::map<std::string, Primitive> instanceDefinitions;
     std::mutex instanceDefinitionsMutex;
     std::vector<std::map<std::string, InstanceDefinitionSceneEntity>::iterator>
@@ -323,12 +332,15 @@ void CPURender(ParsedScene &parsedScene) {
 
     parsedScene.instances.clear();
     parsedScene.instances.shrink_to_fit();
+    LOG_VERBOSE("Finished instances");
 
     // Accelerator
+    LOG_VERBOSE("Starting top-level accelerator");
     Primitive accel = nullptr;
     if (!primitives.empty())
         accel = CreateAccelerator(parsedScene.accelerator.name, std::move(primitives),
                                   parsedScene.accelerator.parameters);
+    LOG_VERBOSE("Finished top-level accelerator");
 
     // Integrator
     const RGBColorSpace *integratorColorSpace = parsedScene.film.parameters.ColorSpace();
