@@ -12,6 +12,7 @@
 #include <pbrt/util/file.h>
 #include <pbrt/util/memory.h>
 #include <pbrt/util/print.h>
+#include <pbrt/util/progressreporter.h>
 #include <pbrt/util/stats.h>
 
 #include <double-conversion/double-conversion.h>
@@ -765,13 +766,38 @@ void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
                     if (timport) {
                         ParsedScene *importScene = parsedScene->CopyForImport();
 
-                        std::thread importThread(
-                            [](ParsedScene *scene, std::unique_ptr<Tokenizer> timport) {
-                                parse(scene, std::move(timport));
-                            },
-                            importScene, std::move(timport));
-                        imports.push_back(
-                            std::make_pair(std::move(importThread), importScene));
+                        static int maxThreads = MaxThreadIndex();
+                        if (maxThreads == 1) {
+                            parse(importScene, std::move(timport));
+                            parsedScene->MergeImported(importScene);
+                        } else {
+                            static std::mutex importThreadMutex;
+                            static std::condition_variable importThreadCV;
+                            static int nRunningImportThreads = 0;
+
+                            std::unique_lock<std::mutex> lock(importThreadMutex);
+                            while (nRunningImportThreads == maxThreads)
+                                importThreadCV.wait(lock);
+                            ++nRunningImportThreads;
+                            lock.unlock();
+
+                            std::thread importThread(
+                                [filename](ParsedScene *scene,
+                                           std::unique_ptr<Tokenizer> timport) {
+                                    Timer timer;
+                                    parse(scene, std::move(timport));
+                                    LOG_VERBOSE("Elapsed time to parse \"%s\": %.2fs",
+                                                filename, timer.ElapsedSeconds());
+
+                                    std::unique_lock<std::mutex> lock(importThreadMutex);
+                                    --nRunningImportThreads;
+                                    importThreadCV.notify_all();
+                                    lock.unlock();
+                                },
+                                importScene, std::move(timport));
+                            imports.push_back(
+                                std::make_pair(std::move(importThread), importScene));
+                        }
                     }
                 }
             } else if (tok->token == "Identity")
