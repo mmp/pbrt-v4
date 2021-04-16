@@ -449,6 +449,152 @@ int assemble(int argc, char *argv[]) {
     return 0;
 }
 
+int splitn(int argc, char *argv[]) {
+    if (argc == 0)
+        usage("splitn", "no filenames provided to \"splitn\"?");
+    std::string outfile;
+    std::vector<std::string> infiles;
+    std::vector<Bounds2i> crops;
+    int cropSize = 96;
+
+    std::string crop;
+    while (*argv != nullptr) {
+        auto onError = [](const std::string &err) {
+            usage("splitn", "%s", err.c_str());
+        };
+        if (ParseArg(&argv, "outfile", &outfile, onError) ||
+            ParseArg(&argv, "cropsize", &cropSize, onError))
+            ;  // success
+        else if (ParseArg(&argv, "crop", &crop, onError)) {
+            std::vector<int> c = SplitStringToInts(crop, ',');
+            if (c.size() != 2)
+                usage("splitn", "2 values not provided to --crop");
+            crops.push_back(Bounds2i({c[0], c[1]}, {c[0]+cropSize, c[1]+cropSize}));
+        }
+        else if (argv[0][0] == '-')
+            usage("splitn", "%s: unknown command flag", *argv);
+        else {
+            infiles.push_back(*argv);
+            ++argv;
+        }
+    }
+
+    if (outfile.empty())
+        usage("splitn", "--outfile not provided for \"splitn\"");
+
+    std::vector<Image> images;
+    const RGBColorSpace *colorSpace = nullptr;
+    for (const std::string &file : infiles) {
+        ImageAndMetadata im = Image::Read(file);
+        Image &image = im.image;
+        if (!images.empty()) {
+            if (image.Resolution() != images.front().Resolution()) {
+                fprintf(stderr, "%s: image resolution mismatch.\n", file.c_str());
+                return 1;
+            }
+            if (image.NChannels() != images.front().NChannels()) {
+                fprintf(stderr, "%s: image channel count mismatch.\n", file.c_str());
+                return 1;
+            }
+        }
+        images.push_back(image);
+    }
+
+    Image result(images.front().Format(), images.front().Resolution(),
+                 images.front().ChannelNames(), images.front().Encoding());
+    float m = 15.f;
+    int pad = 6;
+    for (int y = 0; y < result.Resolution().y; ++y) {
+        int x = 0;
+        for (int im = 0; im < images.size(); ++im) {
+            if (im == images.size() - 1)
+                for (; x < result.Resolution().x; ++x)
+                    for (int c = 0; c < result.NChannels(); ++c)
+                        result.SetChannel({x, y}, c, images[im].GetChannel({x, y}, c));
+            else {
+                int x1 = (float(im+1)/float(images.size()) * result.Resolution().x +
+                          (2 * (float(y) /  float(result.Resolution().y)) - 1) * result.Resolution().x / -m);
+
+                for (; x < x1 - pad / 2; ++x)
+                    for (int c = 0; c < result.NChannels(); ++c)
+                        result.SetChannel({x, y}, c, images[im].GetChannel({x, y}, c));
+                for (; x < x1 + pad / 2; ++x)
+                    for (int c = 0; c < result.NChannels(); ++c)
+                        result.SetChannel({x, y}, c, 0);
+            }
+        }
+    }
+
+    // Crops
+    RGB edges[] = { RGB(0.8, .15, .15), RGB(.15, 0.8, .15), RGB(.15, .15, 0.8) };
+    int borderWidth = 5;
+    int xCropRes = (cropSize + 2 * borderWidth) * images.size() +
+        pad * (images.size() - 1);
+    int yCropRes = (cropSize + 2 * borderWidth) * crops.size() +
+        pad * (crops.size() - 1);
+    if (xCropRes < 1) xCropRes = 1;
+    if (yCropRes < 1) yCropRes = 1;
+    Image cropsImage(PixelFormat::Float, {xCropRes, yCropRes}, {"R", "G", "B"});
+    for (int y = 0; y < yCropRes; ++y)
+        for (int x = 0; x < xCropRes; ++x)
+            for (int c = 0; c < 3; ++c)
+                cropsImage.SetChannel({x, y}, c, 1.f);
+
+    auto drawBox = [](Bounds2i b, int borderWidth, RGB rgb, Image &result) {
+        ImageChannelDesc desc = result.GetChannelDesc({"R", "G", "B"});
+        CHECK(bool(desc));
+
+        for (int y = b.pMin.y - borderWidth; y < b.pMin.y; ++y)
+            for (int x = b.pMin.x - borderWidth; x < b.pMax.x + borderWidth; ++x)
+                for (int ch = 0; ch < 3; ++ch)
+                    result.SetChannels({x, y}, desc, {rgb.r, rgb.g, rgb.b});
+        for (int y = b.pMax.y; y < b.pMax.y + borderWidth; ++y)
+            for (int x = b.pMin.x - borderWidth; x < b.pMax.x + borderWidth; ++x)
+                for (int ch = 0; ch < 3; ++ch)
+                    result.SetChannels({x, y}, desc, {rgb.r, rgb.g, rgb.b});
+        for (int x = b.pMin.x - borderWidth; x < b.pMin.x; ++x)
+            for (int y = b.pMin.y; y < b.pMax.y; ++y)
+                for (int ch = 0; ch < 3; ++ch)
+                    result.SetChannels({x, y}, desc, {rgb.r, rgb.g, rgb.b});
+        for (int x = b.pMax.x; x < b.pMax.x + borderWidth; ++x)
+            for (int y = b.pMin.y; y < b.pMax.y; ++y)
+                for (int ch = 0; ch < 3; ++ch)
+                    result.SetChannels({x, y}, desc, {rgb.r, rgb.g, rgb.b});
+    };
+
+    CHECK_LT(crops.size(), sizeof(edges) / sizeof(edges[0]));
+    ImageChannelDesc cropDesc = cropsImage.GetChannelDesc({"R", "G", "B"});
+    CHECK(bool(cropDesc));
+
+    for (int c = 0; c < crops.size(); ++c) {
+        Bounds2i crop = crops[c];
+        drawBox(crop, borderWidth, edges[c], result);
+
+        // extract crops from images
+        for (int i = 0; i < images.size(); ++i) {
+            // output start point
+            int y0 = c * (cropSize + 2 * borderWidth + pad);
+            int x0 = i * (cropSize + 2 * borderWidth + pad);
+            drawBox(Bounds2i({x0+borderWidth, y0+borderWidth},
+                             {x0+borderWidth+cropSize, y0+borderWidth+cropSize}),
+                    borderWidth, edges[c], cropsImage);
+
+            ImageChannelDesc imageDesc = images[i].GetChannelDesc({"R", "G", "B"});
+            CHECK(bool(imageDesc));
+            for (Point2i p : crop) {
+                Point2i pOut = Point2i(x0 + borderWidth, y0 + borderWidth) + (p - crop.pMin);
+                cropsImage.SetChannels(pOut, cropDesc, images[i].GetChannels(p, imageDesc));
+            }
+        }
+    }
+
+    result.Write(outfile);
+    if (crops.size())
+        cropsImage.Write(std::string("crops-") + outfile);
+
+    return 0;
+}
+
 int cat(int argc, char *argv[]) {
     if (argc == 0)
         usage("cat", "no filenames provided to \"cat\"?");
@@ -2325,6 +2471,8 @@ int main(int argc, char *argv[]) {
         return makesky(argc - 2, argv + 2);
     else if (strcmp(argv[1], "whitebalance") == 0)
         return whitebalance(argc - 2, argv + 2);
+    else if (strcmp(argv[1], "splitn") == 0)
+        return splitn(argc - 2, argv + 2);
     else if (strcmp(argv[1], "noisybit") == 0) {
         // hack for brute force comptuation of ideal filter weights.
 
