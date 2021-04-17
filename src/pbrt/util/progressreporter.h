@@ -71,7 +71,7 @@ class ProgressReporter {
 
 #ifdef PBRT_BUILD_GPU_RENDERER
     std::vector<cudaEvent_t> gpuEvents;
-    std::atomic<int> gpuEventsLaunchedOffset;
+    std::atomic<size_t> gpuEventsLaunchedOffset;
     int gpuEventsFinishedOffset;
 #endif
 };

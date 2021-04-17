@@ -243,9 +243,9 @@ PBRT_CPU_GPU inline Float Lerp(Float x, Float a, Float b) {
 template <typename T, typename U, typename V>
 PBRT_CPU_GPU inline constexpr T Clamp(T val, U low, V high) {
     if (val < low)
-        return low;
+        return T(low);
     else if (val > high)
-        return high;
+        return T(high);
     else
         return val;
 }

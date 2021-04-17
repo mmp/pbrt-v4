@@ -240,7 +240,7 @@ struct OwenScrambler {
         for (int b = 1; b < 32; ++b) {
             // Apply Owen scrambling to binary digit _b_ in _v_
             uint32_t mask = (~0u) << (32 - b);
-            if (MixBits((v & mask) ^ seed) & (1u << b))
+            if ((uint32_t)MixBits((v & mask) ^ seed) & (1u << b))
                 v ^= 1u << (31 - b);
         }
         return v;

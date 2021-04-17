@@ -76,7 +76,7 @@ static void checkElementary(const char *name, std::vector<Point2f> samples,
         // in each dimension.
         int nx = 1 << i, ny = 1 << (logSamples - i);
 
-        std::vector<int> count(1 << logSamples, 0);
+        std::vector<int> count(size_t(1 << logSamples), 0);
         for (const Point2f &s : samples) {
             // Map the sample to an interval
             Float x = nx * s.x, y = ny * s.y;

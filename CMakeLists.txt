@@ -860,7 +860,7 @@ add_executable (pbrt::pspec ALIAS pspec)
 target_compile_definitions (pspec PRIVATE ${PBRT_DEFINITIONS})
 target_compile_options (pspec PRIVATE ${PBRT_CXX_FLAGS})
 target_include_directories (pspec PRIVATE src src/ext)
-target_link_libraries (pspec PRIVATE ${ALL_PBRT_LIBS})
+target_link_libraries (pspec PRIVATE ${ALL_PBRT_LIBS} pbrt_warnings)
 
 add_sanitizers (pspec)
 
