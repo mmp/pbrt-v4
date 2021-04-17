@@ -249,6 +249,7 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
 // GPUPathIntegrator Method Definitions
 void GPUPathIntegrator::Render() {
     Vector2i resolution = film.PixelBounds().Diagonal();
+    Bounds2i pixelBounds = film.PixelBounds();
     int spp = sampler.SamplesPerPixel();
     // Launch thread to copy image for display server, if enabled
     RGB *displayRGB = nullptr, *displayRGBHost = nullptr;
@@ -335,7 +336,6 @@ void GPUPathIntegrator::Render() {
          ++sampleIndex) {
         // Render image for sample _sampleIndex_
         LOG_VERBOSE("Starting to submit work for sample %d", sampleIndex);
-        Bounds2i pixelBounds = film.PixelBounds();
         for (int y0 = pixelBounds.pMin.y; y0 < pixelBounds.pMax.y;
              y0 += scanlinesPerPass) {
             // Generate camera rays for current scanline range
