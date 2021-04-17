@@ -2341,6 +2341,15 @@ int denoise_optix(int argc, char *argv[]) {
     }
 
     OptixDenoiserOptions options = {};
+#if (OPTIX_VERSION >= 70300)
+    fprintf(stderr, "Warning: pbrt's support for the OptiX 7.3 denoiser is untested. YMMV.\n");
+    if (nLayers == 3)
+        options.guideAlbedo = options.guideNormal = 1;
+
+    OptixDenoiser denoiserHandle;
+    OPTIX_CHECK(optixDenoiserCreate(optixContext, OPTIX_DENOISER_MODEL_KIND_HDR,
+                                    &options, &denoiserHandle));
+#else
     options.inputKind = (nLayers == 3) ? OPTIX_DENOISER_INPUT_RGB_ALBEDO_NORMAL :
         OPTIX_DENOISER_INPUT_RGB;
 
@@ -2349,6 +2358,7 @@ int denoise_optix(int argc, char *argv[]) {
 
     OPTIX_CHECK(
         optixDenoiserSetModel(denoiserHandle, OPTIX_DENOISER_MODEL_KIND_HDR, nullptr, 0));
+#endif
 
     OptixDenoiserSizes memorySizes;
     OPTIX_CHECK(optixDenoiserComputeMemoryResources(denoiserHandle, image.Resolution().x,
@@ -2411,11 +2421,29 @@ int denoise_optix(int argc, char *argv[]) {
     params.hdrIntensity = CUdeviceptr(intensity);
     params.blendFactor = 0;  // TODO what should this be??
 
+#if (OPTIX_VERSION >= 70300)
+    OptixDenoiserGuideLayer guideLayer;
+    if (nLayers == 3) {
+        guideLayer.albedo = inputLayers[1];
+        guideLayer.normal = inputLayers[2];
+    }
+    OptixDenoiserLayer layers;
+    layers.input = inputLayers[0];
+    layers.output = *outputImage;
+
+    OPTIX_CHECK(optixDenoiserInvoke(
+        denoiserHandle, 0 /* stream */, &params, CUdeviceptr(denoiserState),
+        memorySizes.stateSizeInBytes, &guideLayer, &layers,
+        1 /* # layers to denoise */, 0 /* offset x */, 0 /* offset y */,
+        CUdeviceptr(scratchBuffer),
+        memorySizes.withoutOverlapScratchSizeInBytes));
+#else
     OPTIX_CHECK(optixDenoiserInvoke(
         denoiserHandle, 0 /* stream */, &params, CUdeviceptr(denoiserState),
         memorySizes.stateSizeInBytes, inputLayers, nLayers, 0 /* offset x */, 0 /* offset y */,
         outputImage, CUdeviceptr(scratchBuffer),
         memorySizes.withoutOverlapScratchSizeInBytes));
+#endif
 
     CUDA_CHECK(cudaDeviceSynchronize());
 
