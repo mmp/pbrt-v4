@@ -356,8 +356,8 @@ extern "C" __global__ void __raygen__shadow() {
                  sr.uniPathPDF[0], sr.uniPathPDF[1], sr.uniPathPDF[2], sr.uniPathPDF[3],
                  sr.lightPathPDF[0], sr.lightPathPDF[1], sr.lightPathPDF[2], sr.lightPathPDF[3]);
 
-        SampledSpectrum Lpixel = params.pixelSampleState->L[sr.pixelIndex];
-        params.pixelSampleState->L[sr.pixelIndex] = Lpixel + Ld;
+        SampledSpectrum Lpixel = params.pixelSampleState.L[sr.pixelIndex];
+        params.pixelSampleState.L[sr.pixelIndex] = Lpixel + Ld;
     } else {
         PBRT_DBG("Shadow ray was occluded\n");
     }
@@ -506,8 +506,8 @@ extern "C" __global__ void __raygen__shadow_Tr() {
         PBRT_DBG("Setting final Ld for shadow ray index %d pixel index %d = as %f %f %f %f\n",
                  index, sr.pixelIndex, Ld[0], Ld[1], Ld[2], Ld[3]);
 
-        SampledSpectrum Lpixel = params.pixelSampleState->L[sr.pixelIndex];
-        params.pixelSampleState->L[sr.pixelIndex] = Lpixel + Ld;
+        SampledSpectrum Lpixel = params.pixelSampleState.L[sr.pixelIndex];
+        params.pixelSampleState.L[sr.pixelIndex] = Lpixel + Ld;
     }
 }
 

@@ -1189,7 +1189,7 @@ void GPUAccel::IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue,
         RayIntersectParameters params;
         params.traversable = rootTraversable;
         params.shadowRayQueue = shadowRayQueue;
-        params.pixelSampleState = pixelSampleState;
+        params.pixelSampleState = *pixelSampleState;
 
         ParamBufferState &pbs = getParamBuffer(params);
 
@@ -1227,7 +1227,7 @@ void GPUAccel::IntersectShadowTr(int maxRays, ShadowRayQueue *shadowRayQueue,
         RayIntersectParameters params;
         params.traversable = rootTraversable;
         params.shadowRayQueue = shadowRayQueue;
-        params.pixelSampleState = pixelSampleState;
+        params.pixelSampleState = *pixelSampleState;
 
         ParamBufferState &pbs = getParamBuffer(params);
 
