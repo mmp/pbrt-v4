@@ -259,7 +259,7 @@ class SampledSpectrum {
     }
 
   private:
-    friend class SOA<SampledSpectrum>;
+    friend struct SOA<SampledSpectrum>;
     pstd::array<Float, NSpectrumSamples> values;
 };
 
@@ -342,7 +342,7 @@ class SampledWavelengths {
 
   private:
     // SampledWavelengths Private Members
-    friend class SOA<SampledWavelengths>;
+    friend struct SOA<SampledWavelengths>;
     pstd::array<Float, NSpectrumSamples> lambda, pdf;
 };
 

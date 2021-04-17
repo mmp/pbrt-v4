@@ -1162,7 +1162,6 @@ class NormalizedFresnelBxDF {
     }
 
   private:
-    friend class SOA<NormalizedFresnelBxDF>;
     Float eta;
 };
 

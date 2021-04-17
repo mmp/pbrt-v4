@@ -162,7 +162,7 @@ template <typename T>
 class Array2D;
 
 template <typename T>
-class SOA;
+struct SOA;
 class ScratchBuffer;
 
 // Define _Allocator_

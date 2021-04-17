@@ -943,7 +943,7 @@ class Interval {
 #endif
 
   private:
-    friend class SOA<Interval>;
+    friend struct SOA<Interval>;
     // Interval Private Members
     Float low, high;
 };
