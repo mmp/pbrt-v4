@@ -265,6 +265,7 @@ class TabulatedBSSRDF {
     std::string ToString() const;
 
   private:
+    friend struct SOA<TabulatedBSSRDF>;
     // TabulatedBSSRDF Private Members
     Point3f po;
     Vector3f wo;
