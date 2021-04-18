@@ -2342,7 +2342,6 @@ int denoise_optix(int argc, char *argv[]) {
 
     OptixDenoiserOptions options = {};
 #if (OPTIX_VERSION >= 70300)
-    fprintf(stderr, "Warning: pbrt's support for the OptiX 7.3 denoiser is untested. YMMV.\n");
     if (nLayers == 3)
         options.guideAlbedo = options.guideNormal = 1;
 
