@@ -118,6 +118,8 @@ static std::map<std::string, CommandUsage> commandUsage = {
                        photographic tone mapping operator)
 )")}},
     {"diff", {"diff [options] <filename>", std::string(R"(
+    --channels <names> Comma-separated list of channels to include in comparison.
+                       Default: R,G,B.
     --crop <x0,x1,y0,y1> Crop images before performing diff.
     --difftol <v>      Acceptable image difference percentage before differences
                        are reported. Default: 0
@@ -947,6 +949,7 @@ int error(int argc, char *argv[]) {
 
 int diff(int argc, char *argv[]) {
     std::string outFile, imageFile, referenceFile, metric = "MSE";
+    std::string channels = "R,G,B";
     std::array<int, 4> cropWindow = {-1, 0, -1, 0};
 
     while (*argv != nullptr) {
@@ -958,6 +961,7 @@ int diff(int argc, char *argv[]) {
         if (ParseArg(&argv, "outfile", &outFile, onError) ||
             ParseArg(&argv, "reference", &referenceFile, onError) ||
             ParseArg(&argv, "metric", &metric, onError) ||
+            ParseArg(&argv, "channels", &channels, onError) ||
             ParseArg(&argv, "crop", pstd::MakeSpan(cropWindow), onError)) {
             // success
         } else if (argv[0][0] == '-') {
@@ -996,6 +1000,24 @@ int diff(int argc, char *argv[]) {
     ImageAndMetadata im = Image::Read(imageFile);
     Image &image = im.image;
 
+    // Select channels
+    std::vector<std::string> splitChannels = SplitString(channels, ',');
+    ImageChannelDesc refDesc = refImage.GetChannelDesc(splitChannels);
+    ImageChannelDesc imgDesc = image.GetChannelDesc(splitChannels);
+    if (refDesc.size() != splitChannels.size()) {
+        fprintf(stderr, "%s: image does not have \"%s\" channels.\n",
+                referenceFile.c_str(), channels.c_str());
+        return 1;
+    }
+    refImage = refImage.SelectChannels(refDesc);
+
+    if (imgDesc.size() != splitChannels.size()) {
+        fprintf(stderr, "%s: image does not have \"%s\" channels.\n",
+                imageFile.c_str(), channels.c_str());
+        return 1;
+    }
+    image = image.SelectChannels(imgDesc);
+
     // Crop before comparing resolutions.
     if (cropWindow[0] >= 0 && cropWindow[2] >= 0)
         image = image.Crop(
@@ -1007,27 +1029,6 @@ int diff(int argc, char *argv[]) {
                 imageFile.c_str(), image.Resolution().x, image.Resolution().y,
                 refImage.Resolution().x, refImage.Resolution().y);
         return 1;
-    }
-    if (image.NChannels() != refImage.NChannels()) {
-        fprintf(stderr, "%s: image channel count %d doesn't match reference %d.\n",
-                imageFile.c_str(), image.NChannels(), refImage.NChannels());
-        return 1;
-    }
-
-    if (image.ChannelNames() != refImage.ChannelNames()) {
-        auto print = [](const std::vector<std::string> &n) {
-            std::string s = n[0];
-            for (size_t i = 1; i < n.size(); ++i) {
-                s += ", ";
-                s += n[i];
-            }
-            return s;
-        };
-        fprintf(stderr,
-                "Warning: image channel names don't match: %s has \"%s\" "
-                "but reference has \"%s\".\n",
-                imageFile.c_str(), print(image.ChannelNames()).c_str(),
-                print(refImage.ChannelNames()).c_str());
     }
 
     if (*im.metadata.GetColorSpace() != *refMetadata.GetColorSpace())
@@ -1054,6 +1055,10 @@ int diff(int argc, char *argv[]) {
     if (nRefClamped > 0)
         fprintf(stderr, "%s: clamped %d infinite pixel values.\n", referenceFile.c_str(),
                 nRefClamped);
+
+    // Image averages. Compute before FLIP potentially goes and clamps things...
+    Float refAverage = refImage.Average(refImage.AllChannelsDesc()).Average();
+    Float imageAverage = image.Average(image.AllChannelsDesc()).Average();
 
     Image errorImage;
     ImageChannelValues error(refImage.NChannels());
@@ -1103,10 +1108,6 @@ int diff(int argc, char *argv[]) {
     if (error.MaxValue() == 0)
         // Same same.
         return 0;
-
-    // Image averages
-    Float refAverage = refImage.Average(refImage.AllChannelsDesc()).Average();
-    Float imageAverage = image.Average(image.AllChannelsDesc()).Average();
 
     float delta = 100.f * (imageAverage - refAverage) / refAverage;
     std::string deltaString = StringPrintf("%f%% delta", delta);
