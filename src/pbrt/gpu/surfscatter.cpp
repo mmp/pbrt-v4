@@ -207,9 +207,9 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                             "Specular %d T_Hat %f %f %f %f uniPathPDF %f %f %f %f "
                             "lightPathPDF %f "
                             "%f %f %f T_hat/uniPathPDF %f %f %f %f\n",
-                            depth + 1, index, int(bsdfSample->IsSpecular()), T_hat[0],
-                            T_hat[1], T_hat[2], T_hat[3], uniPathPDF[0], uniPathPDF[1],
-                            uniPathPDF[2], uniPathPDF[3], lightPathPDF[0],
+                            depth + 1, w.pixelIndex, int(bsdfSample->IsSpecular()),
+                            T_hat[0], T_hat[1], T_hat[2], T_hat[3], uniPathPDF[0],
+                            uniPathPDF[1], uniPathPDF[2], uniPathPDF[3], lightPathPDF[0],
                             lightPathPDF[1], lightPathPDF[2], lightPathPDF[3],
                             SafeDiv(T_hat, uniPathPDF)[0], SafeDiv(T_hat, uniPathPDF)[1],
                             SafeDiv(T_hat, uniPathPDF)[2], SafeDiv(T_hat, uniPathPDF)[3]);
@@ -250,8 +250,8 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 PBRT_DBG(
                     "me index %d depth %d T_hat %f %f %f %f f %f %f %f %f ls.L %f %f %f "
                     "%f ls.pdf %f\n",
-                    index, depth, T_hat[0], T_hat[1], T_hat[2], T_hat[3], f[0], f[1],
-                    f[2], f[3], ls->L[0], ls->L[1], ls->L[2], ls->L[3], ls->pdf);
+                    w.pixelIndex, depth, T_hat[0], T_hat[1], T_hat[2], T_hat[3], f[0],
+                    f[1], f[2], f[3], ls->L[0], ls->L[1], ls->L[2], ls->L[3], ls->pdf);
 
                 Float lightPDF = ls->pdf * sampledLight->pdf;
                 // This causes uniPathPDF to be zero for the shadow ray, so that
@@ -274,7 +274,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 PBRT_DBG(
                     "w.index %d spawned shadow ray depth %d Ld %f %f %f %f "
                     "new T_hat %f %f %f %f T_hat/uni %f %f %f %f Ld/uni %f %f %f %f\n",
-                    index, depth, Ld[0], Ld[1], Ld[2], Ld[3], T_hat[0], T_hat[1],
+                    w.pixelIndex, depth, Ld[0], Ld[1], Ld[2], Ld[3], T_hat[0], T_hat[1],
                     T_hat[2], T_hat[3], SafeDiv(T_hat, uniPathPDF)[0],
                     SafeDiv(T_hat, uniPathPDF)[1], SafeDiv(T_hat, uniPathPDF)[2],
                     SafeDiv(T_hat, uniPathPDF)[3], SafeDiv(Ld, uniPathPDF)[0],
