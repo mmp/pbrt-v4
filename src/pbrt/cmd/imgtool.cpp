@@ -167,6 +167,13 @@ static std::map<std::string, CommandUsage> commandUsage = {
     --turbidity <t>    Atmospheric turbidity (range 1.7-10). Default: 3
     --resolution <r>   Resolution of generated environment map. Default: 2048
 )")}},
+    {"splitn", {"splitn [options] <filenames>", std::string(R"(
+    --crop <x,y>       Upper-left coordinate of one of the crops. May be specified
+                       multiple times.
+    --cropsize <n>     Pixel extent of crops in x and y. Default: 96
+    --outfile <name>   Filename to store final image in. Crop images are stored in
+                       the file "crop-<name>".
+)")}},
     {"whitebalance", {"whitebalance [options] <filename>", std::string(R"(
     --illuminant <n>   Apply white balance for the given standard illuminant
                        (e.g. D65, D50, A, F1, F2, ...)
