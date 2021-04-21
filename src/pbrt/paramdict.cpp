@@ -625,11 +625,10 @@ std::string ParameterDictionary::ToParameterDefinition(const ParsedParameter *p,
         s += val;
     };
 
-    for (double v : p->floats)
-        if (p->type == ParameterTypeTraits<ParameterType::Integer>::typeName)
-            printOne(StringPrintf("%d ", int(v)));
-        else
-            printOne(StringPrintf("%f ", Float(v)));
+    for (Float v : p->floats)
+        printOne(StringPrintf("%f ", v));
+    for (int i : p->ints)
+        printOne(StringPrintf("%i ", i));
     for (const auto &str : p->strings)
         printOne('"' + str + "\" ");
     for (bool b : p->bools)

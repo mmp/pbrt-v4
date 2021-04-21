@@ -67,7 +67,7 @@ std::string ParsedParameter::ToString() const {
     if (!floats.empty())
         for (Float d : floats)
             str += StringPrintf("%f ", d);
-    if (!ints.empty())
+    else if (!ints.empty())
         for (int i : ints)
             str += StringPrintf("%d ", i);
     else if (!strings.empty())
