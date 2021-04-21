@@ -31,6 +31,7 @@ using socket_t = int;
 #include <netinet/in.h>
 #include <signal.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
 #define SOCKET_ERROR (-1)
 #define INVALID_SOCKET (-1)
@@ -124,6 +125,16 @@ void IPCChannel::Connect() {
             LOG_VERBOSE("socket() failed: %s", ErrorString());
             continue;
         }
+
+#ifdef PBRT_IS_LINUX
+        struct timeval timeout;
+        timeout.tv_sec = 3;
+        timeout.tv_usec = 0;
+        if (setsockopt(socketFd, SOL_SOCKET, SO_SNDTIMEO, &timeout,
+                       sizeof(timeout)) == SOCKET_ERROR) {
+            LOG_VERBOSE("setsockopt() failed: %s", ErrorString());
+        }
+#endif // PBRT_IS_LINUX
 
         if (connect(socketFd, ptr->ai_addr, ptr->ai_addrlen) == SOCKET_ERROR) {
 #ifdef PBRT_IS_WINDOWS
