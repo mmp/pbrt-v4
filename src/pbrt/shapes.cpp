@@ -1169,34 +1169,11 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(Point2f u) const {
 
     // Compute $(s,t)$ texture coordinates at bilinear patch $(u,v)$
     Point2f st = uv;
-    Float duds = 1, dudt = 0, dvds = 0, dvdt = 1;
     if (mesh->uv != nullptr) {
         // Compute texture coordinates for bilinear patch intersection point
         Point2f uv00 = mesh->uv[v[0]], uv10 = mesh->uv[v[1]];
         Point2f uv01 = mesh->uv[v[2]], uv11 = mesh->uv[v[3]];
         st = Lerp(uv[0], Lerp(uv[1], uv00, uv01), Lerp(uv[1], uv10, uv11));
-        // Update bilinear patch $\dpdu$ and $\dpdv$ accounting for $(s,t)$
-        // Compute partial derivatives of $(u,v)$ with respect to $(s,t)$
-        Vector2f dstdu = Lerp(uv[1], uv10, uv11) - Lerp(uv[1], uv00, uv01);
-        Vector2f dstdv = Lerp(uv[0], uv01, uv11) - Lerp(uv[0], uv00, uv10);
-        duds = std::abs(dstdu[0]) < 1e-8f ? 0 : 1 / dstdu[0];
-        dvds = std::abs(dstdv[0]) < 1e-8f ? 0 : 1 / dstdv[0];
-        dudt = std::abs(dstdu[1]) < 1e-8f ? 0 : 1 / dstdu[1];
-        dvdt = std::abs(dstdv[1]) < 1e-8f ? 0 : 1 / dstdv[1];
-
-        // Compute partial derivatives of $\pt{}$ with respect to $(s,t)$
-        Vector3f dpds = dpdu * duds + dpdv * dvds;
-        Vector3f dpdt = dpdu * dudt + dpdv * dvdt;
-
-        // Set _dpdu_ and _dpdt_ to updated partial derivatives
-        if (Cross(dpds, dpdt) != Vector3f(0, 0, 0)) {
-            if (Dot(Cross(dpdu, dpdv), Cross(dpds, dpdt)) < 0)
-                dpdt = -dpdt;
-            DCHECK_GE(Dot(Normalize(Cross(dpdu, dpdv)), Normalize(Cross(dpds, dpdt))),
-                      -1e-3);
-            dpdu = dpds;
-            dpdv = dpdt;
-        }
     }
 
     // Compute surface normal for sampled bilinear patch $(u,v)$
