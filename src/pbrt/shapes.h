@@ -348,12 +348,20 @@ class Sphere {
         if (reverseOrientation)
             n *= -1;
 
+        // Compute $(u,v)$ coordinates for sampled point on sphere
+        Point3f pObj = (*objectFromRender)(p);
+        Float theta = SafeACos(pObj.z / radius);
+        Float spherePhi = std::atan2(pObj.y, pObj.x);
+        if (spherePhi < 0)
+            spherePhi += 2 * Pi;
+        Point2f uv(spherePhi / phiMax, (theta - thetaZMin) / (thetaZMax - thetaZMin));
+
         // Return _ShapeSample_ for sampled point on sphere
         // Compute _pError_ for sampled point on sphere
         Vector3f pError = gamma(5) * Abs((Vector3f)p);
 
         DCHECK_NE(oneMinusCosThetaMax, 0);  // very small far away sphere
-        return ShapeSample{Interaction(Point3fi(p, pError), n, ctx.time),
+        return ShapeSample{Interaction(Point3fi(p, pError), n, ctx.time, uv),
                            1 / (2 * Pi * oneMinusCosThetaMax)};
     }
 
@@ -510,7 +518,12 @@ class Disk {
         Normal3f n = Normalize((*renderFromObject)(Normal3f(0, 0, 1)));
         if (reverseOrientation)
             n *= -1;
-        return ShapeSample{Interaction(pi, n), 1 / Area()};
+        Float phi = std::atan2(pd.y, pd.x);
+        if (phi < 0)
+            phi += 2 * Pi;
+        Float radiusSample = std::sqrt(Sqr(pObj.x) + Sqr(pObj.y));
+        Point2f uv(phi / phiMax, (radius - radiusSample) / (radius - innerRadius));
+        return ShapeSample{Interaction(pi, n, uv), 1 / Area()};
     }
 
     PBRT_CPU_GPU
@@ -740,8 +753,9 @@ class Cylinder {
         Normal3f n = Normalize((*renderFromObject)(Normal3f(pObj.x, pObj.y, 0)));
         if (reverseOrientation)
             n *= -1;
+        Point2f uv(phi / phiMax, (pObj.z - zMin) / (zMax - zMin));
 
-        return ShapeSample{Interaction(pi, n), 1 / Area()};
+        return ShapeSample{Interaction(pi, n, uv), 1 / Area()};
     }
 
     PBRT_CPU_GPU
@@ -1027,11 +1041,19 @@ class Triangle {
         } else if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
             n *= -1;
 
+        // Get triangle texture coordinates in _uv_ array
+        pstd::array<Point2f, 3> uv =
+            mesh->uv
+                ? pstd::array<Point2f, 3>(
+                      {mesh->uv[v[0]], mesh->uv[v[1]], mesh->uv[v[2]]})
+                : pstd::array<Point2f, 3>({Point2f(0, 0), Point2f(1, 0), Point2f(1, 1)});
+        Point2f uvSample = b[0] * uv[0] + b[1] * uv[1] + b[2] * uv[2];
+
         // Compute error bounds _pError_ for sampled point on triangle
         Point3f pAbsSum = Abs(b[0] * p0) + Abs(b[1] * p1) + Abs((1 - b[0] - b[1]) * p2);
         Vector3f pError = Vector3f(gamma(6) * pAbsSum);
 
-        return ShapeSample{Interaction(Point3fi(p, pError), n), 1 / Area()};
+        return ShapeSample{Interaction(Point3fi(p, pError), n, uvSample), 1 / Area()};
     }
 
     PBRT_CPU_GPU
@@ -1104,7 +1126,15 @@ class Triangle {
         } else if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
             n *= -1;
 
-        return ShapeSample{Interaction(Point3fi(p, pError), n, ctx.time), pdf};
+        // Get triangle texture coordinates in _uv_ array
+        pstd::array<Point2f, 3> uv =
+            mesh->uv
+                ? pstd::array<Point2f, 3>(
+                      {mesh->uv[v[0]], mesh->uv[v[1]], mesh->uv[v[2]]})
+                : pstd::array<Point2f, 3>({Point2f(0, 0), Point2f(1, 0), Point2f(1, 1)});
+        Point2f uvSample = b[0] * uv[0] + b[1] * uv[1] + b[2] * uv[2];
+
+        return ShapeSample{Interaction(Point3fi(p, pError), n, ctx.time, uvSample), pdf};
     }
 
     PBRT_CPU_GPU
