@@ -966,13 +966,18 @@ BilinearPatchMesh *BilinearPatch::CreateMesh(const Transform *renderFromObject,
         ResolveFilename(parameters.GetOneString("emissionfilename", ""));
     PiecewiseConstant2D *imageDist = nullptr;
     if (!filename.empty()) {
-        ImageAndMetadata im = Image::Read(filename, alloc);
-        // Account for v inversion in DiffuseAreaLight lookup, which in turn is there to
-        // match ImageTexture...
-        im.image.FlipY();
-        Bounds2f domain = Bounds2f(Point2f(0, 0), Point2f(1, 1));
-        Array2D<Float> d = im.image.GetSamplingDistribution();
-        imageDist = alloc.new_object<PiecewiseConstant2D>(d, domain, alloc);
+        if (!uv.empty())
+            Error(loc, "\"emissionfilename\" is currently ignored for bilinear patches "
+                  "if \"uv\" coordinates have been provided--sorry!");
+        else {
+            ImageAndMetadata im = Image::Read(filename, alloc);
+            // Account for v inversion in DiffuseAreaLight lookup, which in turn is there to
+            // match ImageTexture...
+            im.image.FlipY();
+            Bounds2f domain = Bounds2f(Point2f(0, 0), Point2f(1, 1));
+            Array2D<Float> d = im.image.GetSamplingDistribution();
+            imageDist = alloc.new_object<PiecewiseConstant2D>(d, domain, alloc);
+        }
     }
 
     return alloc.new_object<BilinearPatchMesh>(
