@@ -71,6 +71,46 @@ TEST(Vector3, Basics) {
     EXPECT_EQ(Vector3f(10, 10, -1), Permute(vf, {1, 1, 0}));
 }
 
+TEST(Point2, InvertBilinear) {
+    auto bilerp = [](Point2f u, const Point2f *v) {
+        return Lerp(u[0], Lerp(u[1], v[0], v[2]), Lerp(u[1], v[1], v[3]));
+    };
+
+    RNG rng;
+    Point2f vRealSimple[4] = { Point2f(0, 0), Point2f(1, 0), Point2f(0, 1), Point2f(1, 1) };
+    for (int i = 0; i < 100; ++i) {
+        Point2f u{rng.Uniform<Float>(), rng.Uniform<Float>()};
+        Point2f up = bilerp(u, vRealSimple);
+        CHECK_LT(Distance(u, up), 1e-5f); // check bilerp
+        CHECK_LT(Distance(u, InvertBilinear(up, vRealSimple)), 1e-5f);
+    }
+
+    Point2f vSimple[4] = { Point2f(10, -4), Point2f(10, -9), Point2f(15, -4), Point2f(15, -9) };
+    for (int i = 0; i < 100; ++i) {
+        Point2f u{rng.Uniform<Float>(), rng.Uniform<Float>()};
+        Point2f up = bilerp(u, vSimple);
+        Point2f uinv = InvertBilinear(up, vSimple);
+        CHECK_LT(Distance(u, uinv), 1e-5f);
+    }
+
+    for (int i = 0; i < 100; ++i) {
+        Point2f vRandom[4] = { Point2f{Lerp(rng.Uniform<Float>(), -10, 10),
+                                       Lerp(rng.Uniform<Float>(), -10, 10)},
+                               Point2f{Lerp(rng.Uniform<Float>(), -10, 10),
+                                       Lerp(rng.Uniform<Float>(), -10, 10)},
+                               Point2f{Lerp(rng.Uniform<Float>(), -10, 10),
+                                       Lerp(rng.Uniform<Float>(), -10, 10)},
+                               Point2f{Lerp(rng.Uniform<Float>(), -10, 10),
+                                       Lerp(rng.Uniform<Float>(), -10, 10)} };
+        for (int j = 0; j < 100; ++j) {
+            Point2f u{rng.Uniform<Float>(), rng.Uniform<Float>()};
+            Point2f up = bilerp(u, vSimple);
+            Point2f uinv = InvertBilinear(up, vSimple);
+            CHECK_LT(Distance(u, uinv), 1e-5f);
+        }
+    }
+}
+
 TEST(Vector, AngleBetween) {
     EXPECT_EQ(0, AngleBetween(Vector3f(1, 0, 0), Vector3f(1, 0, 0)));
 
