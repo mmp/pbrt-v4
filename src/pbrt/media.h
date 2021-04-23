@@ -107,6 +107,7 @@ class HomogeneousMedium {
 
     bool IsEmissive() const { return Le_spec.MaxValue() > 0; }
 
+    PBRT_CPU_GPU
     MediumProperties Sample(Point3f p, const SampledWavelengths &lambda) const {
         SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
         SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
@@ -186,6 +187,7 @@ class CuboidMedium {
 
     bool IsEmissive() const { return provider->IsEmissive(); }
 
+    PBRT_CPU_GPU
     MediumProperties Sample(Point3f p, const SampledWavelengths &lambda) const {
         // Sample spectra for grid medium scattering
         SampledSpectrum sigma_a = sigScale * sigma_a_spec.Sample(lambda);
