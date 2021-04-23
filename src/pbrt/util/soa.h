@@ -45,8 +45,7 @@ inline void Store4(Float4 *p, Float4 v) {
 }
 
 template <>
-class SOA<SampledSpectrum> {
-  public:
+struct SOA<SampledSpectrum> {
     SOA() = default;
     SOA(int size, Allocator alloc) {
         nAlloc = n4 * size;
@@ -106,8 +105,7 @@ class SOA<SampledSpectrum> {
 };
 
 template <>
-class SOA<SampledWavelengths> {
-  public:
+struct SOA<SampledWavelengths> {
     SOA() = default;
     SOA(int size, Allocator alloc) {
         nAlloc = n4 * size;
