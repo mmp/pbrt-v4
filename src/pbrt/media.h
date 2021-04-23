@@ -80,6 +80,13 @@ struct MediumSample {
     SampledSpectrum T_maj;
 };
 
+// MediumProperties Definition
+struct MediumProperties {
+    SampledSpectrum sigma_a, sigma;
+    PhaseFunction phase;
+    SampledSpectrum Le;
+};
+
 // HomogeneousMedium Definition
 class HomogeneousMedium {
   public:
@@ -99,6 +106,13 @@ class HomogeneousMedium {
                                      const FileLoc *loc, Allocator alloc);
 
     bool IsEmissive() const { return Le_spec.MaxValue() > 0; }
+
+    MediumProperties Sample(Point3f p, const SampledWavelengths &lambda) const {
+        SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
+        SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
+        SampledSpectrum Le = Le_spec.Sample(lambda);
+        return MediumProperties{sigma_a, sigma_s, &phase, Le};
+    }
 
     template <typename F>
     PBRT_CPU_GPU SampledSpectrum SampleT_maj(Ray ray, Float tMax, Float u, RNG &rng,
@@ -171,6 +185,17 @@ class CuboidMedium {
     }
 
     bool IsEmissive() const { return provider->IsEmissive(); }
+
+    MediumProperties Sample(Point3f p, const SampledWavelengths &lambda) const {
+        // Sample spectra for grid medium scattering
+        SampledSpectrum sigma_a = sigScale * sigma_a_spec.Sample(lambda);
+        SampledSpectrum sigma_s = sigScale * sigma_s_spec.Sample(lambda);
+        SampledSpectrum sigma_t = sigma_a + sigma_s;
+
+        MediumDensity d = provider->Density(p, lambda);
+        SampledSpectrum Le = provider->Le(p, lambda);
+        return MediumProperties{sigma_a * d.sigma_a, sigma_s * d.sigma_s, &phase, Le};
+    }
 
     template <typename F>
     PBRT_CPU_GPU SampledSpectrum SampleT_maj(Ray rRender, Float raytMax, Float u,
@@ -702,6 +727,12 @@ inline pstd::optional<PhaseFunctionSample> PhaseFunction::Sample_p(Vector3f wo,
 inline Float PhaseFunction::PDF(Vector3f wo, Vector3f wi) const {
     auto pdf = [&](auto ptr) { return ptr->PDF(wo, wi); };
     return Dispatch(pdf);
+}
+
+inline MediumProperties Medium::Sample(Point3f p,
+                                       const SampledWavelengths &lambda) const {
+    auto sample = [&](auto ptr) { return ptr->Sample(p, lambda); };
+    return Dispatch(sample);
 }
 
 template <typename F>
