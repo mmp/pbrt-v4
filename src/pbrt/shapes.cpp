@@ -43,7 +43,7 @@ pstd::optional<ShapeSample> Sphere::Sample(Point2f u) const {
     Normal3f n = Normalize((*renderFromObject)(Normal3f(pObj.x, pObj.y, pObj.z)));
     if (reverseOrientation)
         n *= -1;
-
+    // Compute $(u, v)$ coordinates for sphere sample
     Float theta = SafeACos(pObj.z / radius);
     Float phi = std::atan2(pObj.y, pObj.x);
     if (phi < 0)
@@ -975,11 +975,11 @@ BilinearPatchMesh *BilinearPatch::CreateMesh(const Transform *renderFromObject,
     if (!filename.empty()) {
         if (!uv.empty())
             Error(loc, "\"emissionfilename\" is currently ignored for bilinear patches "
-                  "if \"uv\" coordinates have been provided--sorry!");
+                       "if \"uv\" coordinates have been provided--sorry!");
         else {
             ImageAndMetadata im = Image::Read(filename, alloc);
-            // Account for v inversion in DiffuseAreaLight lookup, which in turn is there to
-            // match ImageTexture...
+            // Account for v inversion in DiffuseAreaLight lookup, which in turn is there
+            // to match ImageTexture...
             im.image.FlipY();
             Bounds2f domain = Bounds2f(Point2f(0, 0), Point2f(1, 1));
             Array2D<Float> d = im.image.GetSamplingDistribution();
@@ -1179,7 +1179,6 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(Point2f u) const {
     if (LengthSquared(dpdu) == 0 || LengthSquared(dpdv) == 0)
         return {};
 
-    // Compute $(s,t)$ texture coordinates at bilinear patch $(u,v)$
     Point2f st = uv;
     if (mesh->uv != nullptr) {
         // Compute texture coordinates for bilinear patch intersection point
@@ -1187,7 +1186,6 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(Point2f u) const {
         Point2f uv01 = mesh->uv[v[2]], uv11 = mesh->uv[v[3]];
         st = Lerp(uv[0], Lerp(uv[1], uv00, uv01), Lerp(uv[1], uv10, uv11));
     }
-
     // Compute surface normal for sampled bilinear patch $(u,v)$
     Normal3f n = Normal3f(Normalize(Cross(dpdu, dpdv)));
     if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
@@ -1214,7 +1212,7 @@ Float BilinearPatch::PDF(const Interaction &intr) const {
     if (mesh->uv) {
         Point2f uv00 = mesh->uv[v[0]], uv10 = mesh->uv[v[1]];
         Point2f uv01 = mesh->uv[v[2]], uv11 = mesh->uv[v[3]];
-        uv = InvertBilinear(intr.uv, {uv00, uv10, uv01, uv11});
+        uv = InvertBilinear(uv, {uv00, uv10, uv01, uv11});
     }
 
     // Compute PDF for sampling the $(u,v)$ coordinates given by _intr.uv_
@@ -1297,8 +1295,9 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,
     Point2f uv(Dot(p - p00, eu) / DistanceSquared(p10, p00),
                Dot(p - p00, ev) / DistanceSquared(p01, p00));
 
+    // Compute $(s,t)$ texture coordinates for sampled $(u,v)$
     Point2f st = uv;
-    if (mesh->uv != nullptr) {
+    if (mesh->uv) {
         // Compute texture coordinates for bilinear patch intersection point
         Point2f uv00 = mesh->uv[v[0]], uv10 = mesh->uv[v[1]];
         Point2f uv01 = mesh->uv[v[2]], uv11 = mesh->uv[v[3]];

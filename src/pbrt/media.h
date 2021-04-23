@@ -532,7 +532,6 @@ class NanoVDBBuffer {
             return;
         bytesAllocated = size;
         ptr = (uint8_t *)alloc.allocate_bytes(bytesAllocated, 128);
-        LOG_VERBOSE("this %p alloc ptr %p bytes %d", this, ptr, bytesAllocated);
     }
 
     const uint8_t *data() const { return ptr; }
@@ -541,7 +540,6 @@ class NanoVDBBuffer {
     bool empty() const { return size() == 0; }
 
     void clear() {
-        LOG_VERBOSE("this %p clear ptr %p bytes %d", this, ptr, bytesAllocated);
         alloc.deallocate_bytes(ptr, bytesAllocated, 128);
         bytesAllocated = 0;
         ptr = nullptr;

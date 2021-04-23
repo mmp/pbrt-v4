@@ -619,6 +619,47 @@ class Point2 : public Tuple2<Point2, T> {
     }
 };
 
+// Point2 Inline Functions
+PBRT_CPU_GPU inline Point2f InvertBilinear(Point2f p, pstd::span<const Point2f> vert);
+
+// https://www.iquilezles.org/www/articles/ibilinear/ibilinear.htm,
+// with a fix for perfect quads
+PBRT_CPU_GPU inline Point2f InvertBilinear(Point2f p, pstd::span<const Point2f> vert) {
+    // The below assumes a quad (vs uv parametric layout) in v....
+    Point2f a = vert[0], b = vert[1], c = vert[3], d = vert[2];
+    Vector2f e = b - a, f = d - a, g = (a - b) + (c - d), h = p - a;
+
+    auto cross2d = [](Vector2f a, Vector2f b) { return a.x * b.y - a.y * b.x; };
+
+    Float k2 = cross2d(g, f);
+    Float k1 = cross2d(e, f) + cross2d(h, g);
+    Float k0 = cross2d(h, e);
+
+    // if edges are parallel, this is a linear equation
+    if (std::abs(k2) < 0.001f) {
+        if (std::abs(e.x * k1 - g.x * k0) < 1e-5f)
+            return Point2f((h.y * k1 + f.y * k0) / (e.y * k1 - g.y * k0), -k0 / k1);
+        else
+            return Point2f((h.x * k1 + f.x * k0) / (e.x * k1 - g.x * k0), -k0 / k1);
+    }
+
+    // otherwise, it's a quadratic
+    Float w = Sqr(k1) - 4 * k0 * k2;
+    if (w < 0)
+        return Point2f(0, 0);
+    w = std::sqrt(w);
+
+    Float ik2 = 0.5f / k2;
+    Float v = (-k1 - w) * ik2;
+    Float u = (h.x - f.x * v) / (e.x + g.x * v);
+
+    if (u < 0 || u > 1 || v < 0 || v > 1) {
+        v = (-k1 + w) * ik2;
+        u = (h.x - f.x * v) / (e.x + g.x * v);
+    }
+    return Point2f(u, v);
+}
+
 // Point3 Definition
 template <typename T>
 class Point3 : public Tuple3<Point3, T> {
@@ -687,44 +728,6 @@ class Point3 : public Tuple3<Point3, T> {
         return {x - p.x, y - p.y, z - p.z};
     }
 };
-
-// Point2 Inline Functions
-// https://www.iquilezles.org/www/articles/ibilinear/ibilinear.htm,
-// with a fix for perfect quads
-PBRT_CPU_GPU inline Point2f InvertBilinear(Point2f p, pstd::span<const Point2f> vert) {
-    // The below assumes a quad (vs uv parametric layout) in v....
-    Point2f a = vert[0], b = vert[1], c = vert[3], d = vert[2];
-    Vector2f e = b-a, f = d-a, g = (a-b) + (c-d), h = p-a;
-
-    auto cross2d = [](Vector2f a, Vector2f b) { return a.x * b.y - a.y * b.x; };
-
-    Float k2 = cross2d(g, f);
-    Float k1 = cross2d(e, f) + cross2d(h, g);
-    Float k0 = cross2d(h, e);
-
-    // if edges are parallel, this is a linear equation
-    if (std::abs(k2) < 0.001f) {
-        if (std::abs(e.x * k1 - g.x * k0) < 1e-5f)
-            return Point2f((h.y * k1 + f.y * k0) / (e.y * k1 - g.y * k0), -k0 / k1);
-        else
-            return Point2f((h.x * k1 + f.x * k0) / (e.x * k1 - g.x * k0), -k0 / k1);
-    }
-
-    // otherwise, it's a quadratic
-    Float w = Sqr(k1) - 4 * k0 * k2;
-    if (w < 0) return Point2f(0, 0);
-    w = std::sqrt(w);
-
-    Float ik2 = 0.5f / k2;
-    Float v = (-k1 - w) * ik2;
-    Float u = (h.x - f.x * v) / (e.x + g.x * v);
-
-    if (u < 0 || u > 1 || v < 0 || v > 1) {
-       v = (-k1 + w) * ik2;
-       u = (h.x - f.x * v) / (e.x + g.x * v);
-    }
-    return Point2f(u, v);
-}
 
 // Point2* Definitions
 using Point2f = Point2<Float>;
