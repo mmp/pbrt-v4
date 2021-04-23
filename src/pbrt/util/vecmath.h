@@ -629,7 +629,9 @@ PBRT_CPU_GPU inline Point2f InvertBilinear(Point2f p, pstd::span<const Point2f> 
     Point2f a = vert[0], b = vert[1], c = vert[3], d = vert[2];
     Vector2f e = b - a, f = d - a, g = (a - b) + (c - d), h = p - a;
 
-    auto cross2d = [](Vector2f a, Vector2f b) { return a.x * b.y - a.y * b.x; };
+    auto cross2d = [](Vector2f a, Vector2f b) {
+        return DifferenceOfProducts(a.x, b.y, a.y, b.x);
+    };
 
     Float k2 = cross2d(g, f);
     Float k1 = cross2d(e, f) + cross2d(h, g);
@@ -643,21 +645,14 @@ PBRT_CPU_GPU inline Point2f InvertBilinear(Point2f p, pstd::span<const Point2f> 
             return Point2f((h.x * k1 + f.x * k0) / (e.x * k1 - g.x * k0), -k0 / k1);
     }
 
-    // otherwise, it's a quadratic
-    Float w = Sqr(k1) - 4 * k0 * k2;
-    if (w < 0)
+    Float v0, v1;
+    if (!Quadratic(k2, k1, k0, &v0, &v1))
         return Point2f(0, 0);
-    w = std::sqrt(w);
 
-    Float ik2 = 0.5f / k2;
-    Float v = (-k1 - w) * ik2;
-    Float u = (h.x - f.x * v) / (e.x + g.x * v);
-
-    if (u < 0 || u > 1 || v < 0 || v > 1) {
-        v = (-k1 + w) * ik2;
-        u = (h.x - f.x * v) / (e.x + g.x * v);
-    }
-    return Point2f(u, v);
+    Float u = (h.x - f.x * v0) / (e.x + g.x * v0);
+    if (u < 0 || u > 1 || v0 < 0 || v0 > 1)
+        return Point2f((h.x - f.x * v1) / (e.x + g.x * v1), v1);
+    return Point2f(u, v0);
 }
 
 // Point3 Definition
