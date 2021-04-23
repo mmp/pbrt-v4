@@ -240,20 +240,7 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
     PBRT_DBG("Closest hit found intersection at t %f\n", optixGetRayTmax());
 }
 
-///////////////////////////////////////////////////////////////////////////
-// Triangles
-
-static __forceinline__ __device__ SurfaceInteraction
-getTriangleIntersection() {
-    const TriangleMeshRecord &rec = *(const TriangleMeshRecord *)optixGetSbtDataPointer();
-
-    float b1 = optixGetTriangleBarycentrics().x;
-    float b2 = optixGetTriangleBarycentrics().y;
-    float b0 = 1 - b1 - b2;
-
-    float3 rd = optixGetWorldRayDirection();
-    Vector3f wo = -Vector3f(rd.x, rd.y, rd.z);
-
+static __forceinline__ __device__ Transform getWorldFromInstance() {
     assert(optixGetTransformListSize() == 1);
     float worldFromObj[12], objFromWorld[12];
     optixGetObjectToWorldTransformMatrix(worldFromObj);
@@ -269,7 +256,24 @@ getTriangleIntersection() {
                                   objFromWorld[9], objFromWorld[10], objFromWorld[11],
                                   0.f, 0.f, 0.f, 1.f);
 
-    Transform worldFromInstance(worldFromObjM, objFromWorldM);
+    return Transform(worldFromObjM, objFromWorldM);
+}
+
+///////////////////////////////////////////////////////////////////////////
+// Triangles
+
+static __forceinline__ __device__ SurfaceInteraction
+getTriangleIntersection() {
+    const TriangleMeshRecord &rec = *(const TriangleMeshRecord *)optixGetSbtDataPointer();
+
+    float b1 = optixGetTriangleBarycentrics().x;
+    float b2 = optixGetTriangleBarycentrics().y;
+    float b0 = 1 - b1 - b2;
+
+    float3 rd = optixGetWorldRayDirection();
+    Vector3f wo = -Vector3f(rd.x, rd.y, rd.z);
+
+    Transform worldFromInstance = getWorldFromInstance();
 
     Float time = optixGetRayTime();
     wo = worldFromInstance.ApplyInverse(wo);
@@ -554,6 +558,9 @@ extern "C" __global__ void __closesthit__quadric() {
     if (rec.areaLight)
         intr.areaLight = rec.areaLight;
 
+    Transform worldFromInstance = getWorldFromInstance();
+    intr = worldFromInstance(intr);
+
     ProcessClosestIntersection(intr);
 }
 
@@ -628,6 +635,9 @@ extern "C" __global__ void __closesthit__bilinearPatch() {
     intr.material = rec.material;
     if (!rec.areaLights.empty())
         intr.areaLight = rec.areaLights[optixGetPrimitiveIndex()];
+
+    Transform worldFromInstance = getWorldFromInstance();
+    intr = worldFromInstance(intr);
 
     ProcessClosestIntersection(intr);
 }

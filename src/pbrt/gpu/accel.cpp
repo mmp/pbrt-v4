@@ -1027,27 +1027,53 @@ GPUAccel::GPUAccel(
     // TODO: better name here...
     struct Instance {
         OptixTraversableHandle handle;
-        Bounds3f bounds;
         int sbtOffset;
+        Bounds3f bounds;
     };
-    std::map<std::string, Instance> instanceMap;
+    std::multimap<std::string, Instance> instanceMap;
     for (const auto &def : scene.instanceDefinitions) {
         if (!def.second.animatedShapes.empty())
             Warning("Ignoring %d animated shapes in instance \"%s\".",
                     def.second.animatedShapes.size(), def.first);
 
-        Instance inst;
-        inst.sbtOffset = intersectHGRecords.size();
-        inst.handle = createGASForTriangles(
+        int triSBTOffset = intersectHGRecords.size();
+        Bounds3f triBounds;
+        OptixTraversableHandle triHandle = createGASForTriangles(
             def.second.shapes, hitPGTriangle, anyhitPGShadowTriangle,
             hitPGRandomHitTriangle, textures.floatTextures, namedMaterials, materials, media, {},
-            &inst.bounds);
-        instanceMap[def.first] = inst;
+            &triBounds);
+        if (triHandle)
+            instanceMap.insert({def.first, Instance{triHandle, triSBTOffset, triBounds}});
+
+        int bilinearSBTOffset = intersectHGRecords.size();
+        Bounds3f bilinearBounds;
+        OptixTraversableHandle bilinearHandle =
+            createGASForBLPs(def.second.shapes, hitPGBilinearPatch, anyhitPGShadowBilinearPatch,
+                             hitPGRandomHitBilinearPatch, textures.floatTextures, namedMaterials,
+                             materials, media, {}, &bilinearBounds);
+        if (bilinearHandle)
+            instanceMap.insert({def.first, Instance{bilinearHandle, bilinearSBTOffset, bilinearBounds}});
+
+        int quadricSBTOffset = intersectHGRecords.size();
+        Bounds3f quadricBounds;
+        OptixTraversableHandle quadricHandle =
+            createGASForQuadrics(def.second.shapes, hitPGQuadric, anyhitPGShadowQuadric,
+                                 hitPGRandomHitQuadric, textures.floatTextures, namedMaterials,
+                                 materials, media, {}, &quadricBounds);
+        if (quadricHandle)
+            instanceMap.insert({def.first, Instance{quadricHandle, quadricSBTOffset, quadricBounds}});
+
+        if (!triHandle && !bilinearHandle && !quadricHandle)
+            // empty instance definition... put something there so we can
+            // tell the difference between an empty definition and no
+            // definition below.
+            instanceMap.insert({def.first, Instance{{}, -1, {}}});
     }
 
     // Create OptixInstances for instances
     for (const auto &inst : scene.instances) {
-        if (instanceMap.find(inst.name) == instanceMap.end())
+        auto iterPair = instanceMap.equal_range(inst.name);
+        if (std::distance(iterPair.first, iterPair.second) == 0)
             ErrorExit(&inst.loc, "%s: object instance not defined.", inst.name);
 
         if (inst.renderFromInstance == nullptr) {
@@ -1056,27 +1082,27 @@ GPUAccel::GPUAccel(
             continue;
         }
 
-        const Instance &in = instanceMap[inst.name];
-        if (!in.handle) {
-            // Warning(&inst.loc, "Skipping instance of empty instance
-            // definition");
-            continue;
+        for (auto iter = iterPair.first; iter != iterPair.second; ++iter) {
+            const Instance &in = iter->second;
+            if (!in.handle)
+                // empty instance definition
+                continue;
+
+            bounds = Union(bounds, (*inst.renderFromInstance)(in.bounds));
+
+            OptixInstance optixInstance = {};
+            for (int i = 0; i < 3; ++i)
+                for (int j = 0; j < 4; ++j)
+                    optixInstance.transform[4 * i + j] =
+                        inst.renderFromInstance->GetMatrix()[i][j];
+            optixInstance.visibilityMask = 255;
+            optixInstance.sbtOffset = in.sbtOffset;
+            optixInstance.flags =
+                OPTIX_INSTANCE_FLAG_NONE;  // TODO:
+            // OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT
+            optixInstance.traversableHandle = in.handle;
+            iasInstances.push_back(optixInstance);
         }
-
-        bounds = Union(bounds, (*inst.renderFromInstance)(instanceMap[inst.name].bounds));
-
-        OptixInstance optixInstance = {};
-        for (int i = 0; i < 3; ++i)
-            for (int j = 0; j < 4; ++j)
-                optixInstance.transform[4 * i + j] =
-                    inst.renderFromInstance->GetMatrix()[i][j];
-        optixInstance.visibilityMask = 255;
-        optixInstance.sbtOffset = instanceMap[inst.name].sbtOffset;
-        optixInstance.flags =
-            OPTIX_INSTANCE_FLAG_NONE;  // TODO:
-                                       // OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT
-        optixInstance.traversableHandle = instanceMap[inst.name].handle;
-        iasInstances.push_back(optixInstance);
     }
 
     // Build the top-level IAS
