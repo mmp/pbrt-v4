@@ -774,7 +774,7 @@ inline Float ErfInv(Float a) {
     // https://stackoverflow.com/a/49743348
     float p;
     float t = std::log(std::max(FMA(a, -a, 1), std::numeric_limits<Float>::min()));
-    CHECK(!IsNaN(t) && !std::isinf(t));
+    CHECK(!IsNaN(t) && !IsInf(t));
     if (std::abs(t) > 6.125f) {          // maximum ulp error = 2.35793
         p = 3.03697567e-10f;             //  0x1.4deb44p-32
         p = FMA(p, t, 2.93243101e-8f);   //  0x1.f7c9aep-26

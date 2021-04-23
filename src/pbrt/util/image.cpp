@@ -522,7 +522,7 @@ ImageChannelValues Image::MAE(const ImageChannelDesc &desc, const Image &ref,
 
             for (int c = 0; c < desc.size(); ++c) {
                 Float error = v[c] - vref[c];
-                if (std::isinf(error))
+                if (IsInf(error))
                     continue;
                 sumError[c] += error;
                 if (errorImage)
@@ -556,7 +556,7 @@ ImageChannelValues Image::MSE(const ImageChannelDesc &desc, const Image &ref,
 
             for (int c = 0; c < desc.size(); ++c) {
                 Float se = Sqr(v[c] - vref[c]);
-                if (std::isinf(se))
+                if (IsInf(se))
                     continue;
                 sumSE[c] += se;
                 if (mseImage)
@@ -588,7 +588,7 @@ ImageChannelValues Image::MRSE(const ImageChannelDesc &desc, const Image &ref,
 
             for (int c = 0; c < desc.size(); ++c) {
                 Float rse = Sqr(v[c] - vref[c]) / Sqr(vref[c] + 0.01);
-                if (std::isinf(rse))
+                if (IsInf(rse))
                     continue;
                 sumRSE[c] += rse;
                 if (mrseImage)

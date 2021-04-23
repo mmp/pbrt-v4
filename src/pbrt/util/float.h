@@ -85,6 +85,21 @@ inline PBRT_CPU_GPU typename std::enable_if_t<std::is_integral<T>::value, bool> 
     return false;
 }
 
+template <typename T>
+inline PBRT_CPU_GPU typename std::enable_if_t<std::is_floating_point<T>::value, bool>
+IsFinite(T v) {
+#ifdef PBRT_IS_GPU_CODE
+    return isfinite(v);
+#else
+    return std::isfinite(v);
+#endif
+}
+template <typename T>
+inline PBRT_CPU_GPU typename std::enable_if_t<std::is_integral<T>::value, bool> IsFinite(
+    T v) {
+    return true;
+}
+
 PBRT_CPU_GPU
 inline float FMA(float a, float b, float c) {
     return std::fma(a, b, c);

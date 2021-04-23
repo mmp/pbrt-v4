@@ -115,7 +115,7 @@ class HomogeneousMedium {
         SampledSpectrum sigma_maj = sigma_t;
 
         // Sample exponential function to find _t_ for scattering event
-        if (std::isinf(tMax))
+        if (IsInf(tMax))
             tMax = std::numeric_limits<Float>::max();
         if (sigma_maj[0] == 0)
             return FastExp(-tMax * sigma_maj);

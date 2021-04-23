@@ -66,7 +66,7 @@ void SurfaceInteraction::ComputeDifferentials(const RayDifferential &ray, Camera
     Float b0y = Dot(dpdu, dpdy), b1y = Dot(dpdv, dpdy);
 
     /* Set the UV partials to zero if dpdu and/or dpdv == 0 */
-    invDet = std::isfinite(invDet) ? invDet : 0.f;
+    invDet = IsFinite(invDet) ? invDet : 0.f;
 
     dudx = DifferenceOfProducts(a11, b0x, a01, b1x) * invDet;
     dvdx = DifferenceOfProducts(a00, b1x, a01, b0x) * invDet;
@@ -74,10 +74,10 @@ void SurfaceInteraction::ComputeDifferentials(const RayDifferential &ray, Camera
     dudy = DifferenceOfProducts(a11, b0y, a01, b1y) * invDet;
     dvdy = DifferenceOfProducts(a00, b1y, a01, b0y) * invDet;
 
-    dudx = std::isfinite(dudx) ? Clamp(dudx, -1e8f, 1e8f) : 0.f;
-    dvdx = std::isfinite(dvdx) ? Clamp(dvdx, -1e8f, 1e8f) : 0.f;
-    dudy = std::isfinite(dudy) ? Clamp(dudy, -1e8f, 1e8f) : 0.f;
-    dvdy = std::isfinite(dvdy) ? Clamp(dvdy, -1e8f, 1e8f) : 0.f;
+    dudx = IsFinite(dudx) ? Clamp(dudx, -1e8f, 1e8f) : 0.f;
+    dvdx = IsFinite(dvdx) ? Clamp(dvdx, -1e8f, 1e8f) : 0.f;
+    dudy = IsFinite(dudy) ? Clamp(dudy, -1e8f, 1e8f) : 0.f;
+    dvdy = IsFinite(dvdy) ? Clamp(dvdy, -1e8f, 1e8f) : 0.f;
 }
 
 void SurfaceInteraction::SkipIntersection(RayDifferential *ray, Float t) const {
