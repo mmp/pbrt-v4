@@ -1579,7 +1579,8 @@ std::string FormattingScene::upgradeMaterial(std::string *name, ParameterDiction
     } else if (*name == "disney") {
         *name = "diffuse";
         dict->RenameParameter("color", "reflectance");
-    }
+    } else if (name->empty() || *name == "none")
+        *name = "interface";
 
     return extra;
 }

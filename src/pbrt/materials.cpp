@@ -518,7 +518,11 @@ Material Material::Create(const std::string &name,
                           /*const */ std::map<std::string, Material> &namedMaterials,
                           const FileLoc *loc, Allocator alloc) {
     Material material;
-    if (name.empty() || name == "none")
+    if (name.empty() || name == "none") {
+        Warning(loc, "Material \"%s\" is deprecated; use \"interface\" instead.",
+                name.c_str());
+        return nullptr;
+    } else if (name == "interface")
         return nullptr;
     else if (name == "diffuse")
         material = DiffuseMaterial::Create(parameters, normalMap, loc, alloc);
