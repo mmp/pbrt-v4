@@ -122,19 +122,18 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
             continue;
 
         auto isInterface = [&]() {
-            const SceneEntity *mtl = nullptr;
+            std::string materialName;
             if (shape.materialIndex != -1)
-                mtl = &scene.materials[shape.materialIndex];
+                materialName = scene.materials[shape.materialIndex].name;
             else {
                 for (auto iter = scene.namedMaterials.begin();
                      iter != scene.namedMaterials.end(); ++iter)
                     if (iter->first == shape.materialName) {
-                        mtl = &iter->second;
+                        materialName = iter->second.parameters.GetOneString("type", "");
                         break;
                     }
-                CHECK(mtl != nullptr);
             }
-            return (mtl->name == "interface" || mtl->name == "none" || mtl->name.empty());
+            return (materialName == "interface" || materialName == "none" || materialName.empty());
         };
         if (isInterface())
             continue;
