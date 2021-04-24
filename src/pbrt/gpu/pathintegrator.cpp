@@ -120,6 +120,25 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
         const auto &shape = scene.shapes[i];
         if (shape.lightIndex == -1)
             continue;
+
+        auto isInterface = [&]() {
+            const SceneEntity *mtl = nullptr;
+            if (shape.materialIndex != -1)
+                mtl = &scene.materials[shape.materialIndex];
+            else {
+                for (auto iter = scene.namedMaterials.begin();
+                     iter != scene.namedMaterials.end(); ++iter)
+                    if (iter->first == shape.materialName) {
+                        mtl = &iter->second;
+                        break;
+                    }
+                CHECK(mtl != nullptr);
+            }
+            return (mtl->name == "interface" || mtl->name == "none" || mtl->name.empty());
+        };
+        if (isInterface())
+            continue;
+
         CHECK_LT(shape.lightIndex, scene.areaLights.size());
         const auto &areaLightEntity = scene.areaLights[shape.lightIndex];
         AnimatedTransform renderFromLight(*shape.renderFromObject);

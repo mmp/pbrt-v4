@@ -164,14 +164,21 @@ void CPURender(ParsedScene &parsedScene) {
                 Light area = nullptr;
                 if (sh.lightIndex != -1) {
                     CHECK_LT(sh.lightIndex, parsedScene.areaLights.size());
-                    const auto &areaLightEntity = parsedScene.areaLights[sh.lightIndex];
+                    if (!mtl)
+                        Warning(&sh.loc, "Ignoring area light specification for shape "
+                                         "with \"interface\" material.");
+                    else {
+                        const auto &areaLightEntity =
+                            parsedScene.areaLights[sh.lightIndex];
 
-                    area = Light::CreateArea(
-                        areaLightEntity.name, areaLightEntity.parameters,
-                        *sh.renderFromObject, mi, s, &areaLightEntity.loc, Allocator{});
-                    if (area) {
-                        std::lock_guard<std::mutex> lock(lightsMutex);
-                        lights.push_back(area);
+                        area = Light::CreateArea(areaLightEntity.name,
+                                                 areaLightEntity.parameters,
+                                                 *sh.renderFromObject, mi, s,
+                                                 &areaLightEntity.loc, Allocator{});
+                        if (area) {
+                            std::lock_guard<std::mutex> lock(lightsMutex);
+                            lights.push_back(area);
+                        }
                     }
                 }
                 if (area == nullptr && !mi.IsMediumTransition() && !alphaTex)

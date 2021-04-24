@@ -347,12 +347,16 @@ OptixTraversableHandle GPUAccel::createGASForTriangles(
         hgRecord.triRec.alphaTexture = alphaTexture;
         hgRecord.triRec.areaLights = {};
         if (shape.lightIndex != -1) {
-            // Note: this will hit if we try to have an instance as an area
-            // light.
-            auto iter = shapeIndexToAreaLights.find(shapeIndex);
-            CHECK(iter != shapeIndexToAreaLights.end());
-            CHECK_EQ(iter->second->size(), mesh->nTriangles);
-            hgRecord.triRec.areaLights = pstd::MakeSpan(*iter->second);
+            if (!material)
+                Warning(&shape.loc, "Ignoring area light specification for shape with \"interface\" material.");
+            else {
+                // Note: this will hit if we try to have an instance as an area
+                // light.
+                auto iter = shapeIndexToAreaLights.find(shapeIndex);
+                CHECK(iter != shapeIndexToAreaLights.end());
+                CHECK_EQ(iter->second->size(), mesh->nTriangles);
+                hgRecord.triRec.areaLights = pstd::MakeSpan(*iter->second);
+            }
         }
         hgRecord.triRec.mediumInterface = getMediumInterface(shape, media, alloc);
 
@@ -428,12 +432,16 @@ OptixTraversableHandle GPUAccel::createGASForBLPs(
         hgRecord.bilinearRec.alphaTexture = alphaTexture;
         hgRecord.bilinearRec.areaLights = {};
         if (shape.lightIndex != -1) {
-            auto iter = shapeIndexToAreaLights.find(shapeIndex);
-            // Note: this will hit if we try to have an instance as an area
-            // light.
-            CHECK(iter != shapeIndexToAreaLights.end());
-            CHECK_EQ(iter->second->size(), mesh->nPatches);
-            hgRecord.bilinearRec.areaLights = pstd::MakeSpan(*iter->second);
+            if (!material)
+                Warning(&shape.loc, "Ignoring area light specification for shape with \"interface\" material.");
+            else {
+                auto iter = shapeIndexToAreaLights.find(shapeIndex);
+                // Note: this will hit if we try to have an instance as an area
+                // light.
+                CHECK(iter != shapeIndexToAreaLights.end());
+                CHECK_EQ(iter->second->size(), mesh->nPatches);
+                hgRecord.bilinearRec.areaLights = pstd::MakeSpan(*iter->second);
+            }
         }
         hgRecord.bilinearRec.mediumInterface = getMediumInterface(shape, media, alloc);
 
@@ -517,12 +525,16 @@ OptixTraversableHandle GPUAccel::createGASForQuadrics(
         hgRecord.quadricRec.alphaTexture = alphaTexture;
         hgRecord.quadricRec.areaLight = nullptr;
         if (s.lightIndex != -1) {
-            auto iter = shapeIndexToAreaLights.find(shapeIndex);
-            // Note: this will hit if we try to have an instance as an area
-            // light.
-            CHECK(iter != shapeIndexToAreaLights.end());
-            CHECK_EQ(iter->second->size(), 1);
-            hgRecord.quadricRec.areaLight = (*iter->second)[0];
+            if (!material)
+                Warning(&s.loc, "Ignoring area light specification for shape with \"interface\" material.");
+            else {
+                auto iter = shapeIndexToAreaLights.find(shapeIndex);
+                // Note: this will hit if we try to have an instance as an area
+                // light.
+                CHECK(iter != shapeIndexToAreaLights.end());
+                CHECK_EQ(iter->second->size(), 1);
+                hgRecord.quadricRec.areaLight = (*iter->second)[0];
+            }
         }
         hgRecord.quadricRec.mediumInterface = getMediumInterface(s, media, alloc);
 
