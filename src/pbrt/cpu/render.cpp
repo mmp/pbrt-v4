@@ -173,7 +173,7 @@ void CPURender(ParsedScene &parsedScene) {
 
                         area = Light::CreateArea(areaLightEntity.name,
                                                  areaLightEntity.parameters,
-                                                 *sh.renderFromObject, mi, s,
+                                                 *sh.renderFromObject, mi, s, alphaTex,
                                                  &areaLightEntity.loc, Allocator{});
                         if (area) {
                             std::lock_guard<std::mutex> lock(lightsMutex);
@@ -243,9 +243,10 @@ void CPURender(ParsedScene &parsedScene) {
                     if (sh.renderFromObject.IsAnimated())
                         ErrorExit(&sh.loc, "Animated area lights are not supported.");
 
-                    area = Light::CreateArea(
-                        areaLightEntity.name, areaLightEntity.parameters,
-                        sh.renderFromObject.startTransform, mi, s, &sh.loc, Allocator{});
+                    area = Light::CreateArea(areaLightEntity.name,
+                                             areaLightEntity.parameters,
+                                             sh.renderFromObject.startTransform, mi, s,
+                                             alphaTex, &sh.loc, Allocator{});
                     if (area)
                         lights.push_back(area);
                 }

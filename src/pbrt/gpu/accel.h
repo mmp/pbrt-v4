@@ -29,6 +29,7 @@ namespace pbrt {
 class GPUAccel {
   public:
     GPUAccel(const ParsedScene &scene, Allocator alloc, CUstream cudaStream,
+             NamedTextures &textures,
              const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
              const std::map<std::string, Medium> &media,
              pstd::array<bool, Material::NumTags()> *haveBasicEvalMaterial,

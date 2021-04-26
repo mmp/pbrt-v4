@@ -13,8 +13,10 @@
 
 #include <pbrt/base/light.h>
 #include <pbrt/base/medium.h>
+#include <pbrt/base/texture.h>
 #include <pbrt/interaction.h>
 #include <pbrt/shapes.h>
+#include <pbrt/textures.h>
 #include <pbrt/util/image.h>
 #include <pbrt/util/log.h>
 #include <pbrt/util/pstd.h>
@@ -380,13 +382,15 @@ class DiffuseAreaLight : public LightBase {
     // DiffuseAreaLight Public Methods
     DiffuseAreaLight(const Transform &renderFromLight,
                      const MediumInterface &mediumInterface, Spectrum Le, Float scale,
-                     const Shape shape, Image image, const RGBColorSpace *imageColorSpace,
-                     bool twoSided, Allocator alloc);
+                     const Shape shape, FloatTexture alpha, Image image,
+                     const RGBColorSpace *imageColorSpace, bool twoSided,
+                     Allocator alloc);
 
     static DiffuseAreaLight *Create(const Transform &renderFromLight, Medium medium,
                                     const ParameterDictionary &parameters,
                                     const RGBColorSpace *colorSpace, const FileLoc *loc,
-                                    Allocator alloc, const Shape shape);
+                                    Allocator alloc, const Shape shape,
+                                    FloatTexture alpha);
 
     void Preprocess(const Bounds3f &sceneBounds) {}
 
@@ -410,8 +414,12 @@ class DiffuseAreaLight : public LightBase {
     PBRT_CPU_GPU
     SampledSpectrum L(Point3f p, Normal3f n, Point2f uv, Vector3f w,
                       const SampledWavelengths &lambda) const {
+        // Check for zero emitted radiance from point on area light
         if (!twoSided && Dot(n, w) < 0)
             return SampledSpectrum(0.f);
+        if (AlphaMasked(Interaction(p, uv)))
+            return SampledSpectrum(0.f);
+
         if (image) {
             // Return _DiffuseAreaLight_ emission using image
             RGB rgb;
@@ -436,12 +444,30 @@ class DiffuseAreaLight : public LightBase {
   private:
     // DiffuseAreaLight Private Members
     Shape shape;
+    FloatTexture alpha;
     Float area;
     bool twoSided;
     DenselySampledSpectrum Lemit;
     Float scale;
     Image image;
     const RGBColorSpace *imageColorSpace;
+
+    // DiffuseAreaLight Private Methods
+    PBRT_CPU_GPU
+    bool AlphaMasked(const Interaction &intr) const {
+        if (!alpha)
+            return false;
+#ifdef PBRT_IS_GPU_CODE
+        Float a = BasicTextureEvaluator()(alpha, intr);
+#else
+        Float a = UniversalTextureEvaluator()(alpha, intr);
+#endif  // PBRT_IS_GPU_CODE
+        if (a >= 1)
+            return false;
+        if (a <= 0)
+            return true;
+        return HashFloat(intr.p()) > a;
+    }
 };
 
 // UniformInfiniteLight Definition

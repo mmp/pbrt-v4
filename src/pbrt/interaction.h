@@ -60,6 +60,8 @@ class Interaction {
     Interaction(Point3f p, Normal3f n, Float time, Medium medium)
         : pi(p), n(n), time(time), medium(medium) {}
     PBRT_CPU_GPU
+    Interaction(Point3f p, Point2f uv) : pi(p), uv(uv) {}
+    PBRT_CPU_GPU
     Interaction(const Point3fi &pi, Normal3f n, Float time = 0, Point2f uv = {})
         : pi(pi), n(n), uv(uv), time(time) {}
     PBRT_CPU_GPU

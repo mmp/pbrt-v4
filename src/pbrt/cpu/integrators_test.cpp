@@ -143,7 +143,7 @@ std::vector<TestScene> GetScenes() {
         ConstantSpectrum Le(1);
         Float scale = 0.5 / SpectrumToPhotometric(&Le);
         Light areaLight =
-            new DiffuseAreaLight(identity, MediumInterface(), &Le, scale, sphere, Image(),
+            new DiffuseAreaLight(identity, MediumInterface(), &Le, scale, sphere, nullptr, Image(),
                                  nullptr, false, Allocator());
 
         std::vector<Light> lights;
@@ -221,7 +221,7 @@ std::vector<TestScene> GetScenes() {
 
     static ConstantSpectrum Le(0.587);
     std::shared_ptr<AreaLight> areaLight = std::make_shared<DiffuseAreaLight>(
-        identity, nullptr, &Le, 8, sphere, true, false,
+        identity, nullptr, &Le, 8, sphere, nullptr, true, false,
         std::make_shared<ParameterDictionary>(std::initializer_list<const NamedValues *>{}, nullptr));
 
     MediumInterface mediumInterface;

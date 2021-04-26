@@ -9,6 +9,7 @@
 
 #include <pbrt/base/medium.h>
 #include <pbrt/base/shape.h>
+#include <pbrt/base/texture.h>
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/taggedptr.h>
 
@@ -57,7 +58,7 @@ class Light : public TaggedPointer<  // Light Source Types
                             const ParameterDictionary &parameters,
                             const Transform &renderFromLight,
                             const MediumInterface &mediumInterface, const Shape shape,
-                            const FileLoc *loc, Allocator alloc);
+                            FloatTexture alpha, const FileLoc *loc, Allocator alloc);
 
     SampledSpectrum Phi(SampledWavelengths lambda) const;
 

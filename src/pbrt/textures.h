@@ -31,6 +31,8 @@ struct TextureEvalContext {
     // TextureEvalContext Public Methods
     TextureEvalContext() = default;
     PBRT_CPU_GPU
+    TextureEvalContext(const Interaction &intr) : p(intr.p()), uv(intr.uv) {}
+    PBRT_CPU_GPU
     TextureEvalContext(const SurfaceInteraction &si)
         : p(si.p()),
           dpdx(si.dpdx),

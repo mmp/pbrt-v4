@@ -207,7 +207,7 @@ TEST(BVHLightSampling, OneTri) {
     std::vector<Light> lights;
     ConstantSpectrum one(1.f);
     lights.push_back(new DiffuseAreaLight(id, MediumInterface(), &one, 1.f, tris[0],
-                                          Image(), nullptr, false /* two sided */,
+                                          nullptr, Image(), nullptr, false /* two sided */,
                                           Allocator()));
 
     BVHLightSampler distrib(lights, Allocator());
@@ -257,7 +257,7 @@ static std::tuple<std::vector<Light>, std::vector<Shape>> randomLights(
             static Transform id;
             lights.push_back(alloc.new_object<DiffuseAreaLight>(
                 id, MediumInterface(), alloc.new_object<ConstantSpectrum>(r()), 1.f,
-                tris[0], Image(), nullptr, false /* two sided */, Allocator()));
+                tris[0], nullptr, Image(), nullptr, false /* two sided */, Allocator()));
             allTris.push_back(tris[0]);
         }
 

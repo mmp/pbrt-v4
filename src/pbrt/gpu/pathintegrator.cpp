@@ -94,6 +94,11 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
     camera = Camera::Create(scene.camera.name, scene.camera.parameters, cameraMedium,
                             scene.camera.cameraTransform, film, &scene.camera.loc, alloc);
 
+    // Textures
+    LOG_VERBOSE("Starting to create textures");
+    NamedTextures textures = scene.CreateTextures(alloc, true);
+    LOG_VERBOSE("Done creating textures");
+
     pstd::vector<Light> allLights;
 
     envLights = alloc.new_object<pstd::vector<Light>>(alloc);
@@ -133,7 +138,8 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
                         break;
                     }
             }
-            return (materialName == "interface" || materialName == "none" || materialName.empty());
+            return (materialName == "interface" || materialName == "none" ||
+                    materialName.empty());
         };
         if (isInterface())
             continue;
@@ -151,6 +157,22 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
 
         Medium outsideMedium = findMedium(shape.outsideMedium, &shape.loc);
 
+        FloatTexture alphaTex;
+        std::string alphaTexName = shape.parameters.GetTexture("alpha");
+        if (!alphaTexName.empty()) {
+            if (textures.floatTextures.find(alphaTexName) !=
+                textures.floatTextures.end()) {
+                alphaTex = textures.floatTextures[alphaTexName];
+                if (!BasicTextureEvaluator().CanEvaluate({alphaTex}, {}))
+                    // A warning will be issued elsewhere...
+                    alphaTex = nullptr;
+            } else
+                ErrorExit(&shape.loc,
+                          "%s: couldn't find float texture for \"alpha\" parameter.",
+                          alphaTexName);
+        } else if (Float alpha = shape.parameters.GetOneFloat("alpha", 1.f); alpha < 1.f)
+            alphaTex = alloc.new_object<FloatConstantTexture>(alpha);
+
         pstd::vector<Light> *lightsForShape =
             alloc.new_object<pstd::vector<Light>>(alloc);
         for (Shape sh : shapes) {
@@ -158,7 +180,8 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
                 ErrorExit(&shape.loc, "Animated lights are not supported.");
             DiffuseAreaLight *area = DiffuseAreaLight::Create(
                 renderFromLight.startTransform, outsideMedium, areaLightEntity.parameters,
-                areaLightEntity.parameters.ColorSpace(), &areaLightEntity.loc, alloc, sh);
+                areaLightEntity.parameters.ColorSpace(), &areaLightEntity.loc, alloc, sh,
+                alphaTex);
             allLights.push_back(area);
             lightsForShape->push_back(area);
         }
@@ -168,9 +191,9 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
     haveBasicEvalMaterial.fill(false);
     haveUniversalEvalMaterial.fill(false);
     haveSubsurface = false;
-    accel = new GPUAccel(scene, alloc, nullptr /* cuda stream */, shapeIndexToAreaLights,
-                         media, &haveBasicEvalMaterial, &haveUniversalEvalMaterial,
-                         &haveSubsurface);
+    accel = new GPUAccel(scene, alloc, nullptr /* cuda stream */, textures,
+                         shapeIndexToAreaLights, media, &haveBasicEvalMaterial,
+                         &haveUniversalEvalMaterial, &haveSubsurface);
 
     // Preprocess the light sources
     for (Light light : allLights)

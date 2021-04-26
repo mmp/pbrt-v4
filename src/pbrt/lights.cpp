@@ -643,11 +643,30 @@ GoniometricLight *GoniometricLight::Create(const Transform &renderFromLight,
 // DiffuseAreaLight Method Definitions
 DiffuseAreaLight::DiffuseAreaLight(const Transform &renderFromLight,
                                    const MediumInterface &mediumInterface, Spectrum Le,
-                                   Float scale, const Shape shape, Image im,
-                                   const RGBColorSpace *imageColorSpace, bool twoSided,
-                                   Allocator alloc)
-    : LightBase(LightType::Area, renderFromLight, mediumInterface),
+                                   Float scale, const Shape shape, FloatTexture alpha,
+                                   Image im, const RGBColorSpace *imageColorSpace,
+                                   bool twoSided, Allocator alloc)
+    : LightBase(
+          [](FloatTexture alpha) {
+              // Special case handling for area lights with constant zero-valued alpha
+              // textures to allow invisible area lights: we will null out the alpha
+              // texture below so that as far as the DiffuseAreaLight is concerned, there
+              // is no alpha texture and the light is fully emissive. However, such lights
+              // will never be intersected by rays (because their associated primitives
+              // still have the alpha texture), so we mark them as DeltaPosition lights
+              // here so that MIS isn't used for direct illumination. Thus, light sampling
+              // is the only strategy used and we get an unbiased (if potentially high
+              // variance) estimate.
+
+              const FloatConstantTexture *fc =
+                  alpha.CastOrNullptr<FloatConstantTexture>();
+              if (fc && fc->Evaluate(TextureEvalContext()) == 0)
+                  return LightType::DeltaPosition;
+              return LightType::Area;
+          }(alpha),
+          renderFromLight, mediumInterface),
       shape(shape),
+      alpha(type == LightType::Area ? alpha : nullptr),
       area(shape.Area()),
       twoSided(twoSided),
       Lemit(Le, alloc),
@@ -688,6 +707,10 @@ pstd::optional<LightLiSample> DiffuseAreaLight::SampleLi(LightSampleContext ctx,
         return {};
     DCHECK(!IsNaN(ss->pdf));
     ss->intr.mediumInterface = &mediumInterface;
+
+    // Check sampled point on shape against alpha texture, if present
+    if (AlphaMasked(ss->intr))
+        return {};
 
     // Return _LightLiSample_ for sampled point on shape
     Vector3f wi = Normalize(ss->intr.p() - ctx.p());
@@ -753,6 +776,10 @@ pstd::optional<LightLeSample> DiffuseAreaLight::SampleLe(Point2f u1, Point2f u2,
     ss->intr.time = time;
     ss->intr.mediumInterface = &mediumInterface;
 
+    // Check sampled point on shape against alpha texture, if present
+    if (AlphaMasked(ss->intr))
+        return {};
+
     // Sample a cosine-weighted outgoing direction _w_ for area light
     Vector3f w;
     Float pdfDir;
@@ -792,10 +819,10 @@ void DiffuseAreaLight::PDF_Le(const Interaction &intr, Vector3f w, Float *pdfPos
 }
 
 std::string DiffuseAreaLight::ToString() const {
-    return StringPrintf("[ DiffuseAreaLight %s Lemit: %s scale: %f shape: %s "
+    return StringPrintf("[ DiffuseAreaLight %s Lemit: %s scale: %f shape: %s alpha: %s "
                         "twoSided: %s area: %f image: %s ]",
-                        BaseToString(), Lemit, scale, shape, twoSided ? "true" : "false",
-                        area, image);
+                        BaseToString(), Lemit, scale, shape, alpha,
+                        twoSided ? "true" : "false", area, image);
 }
 
 DiffuseAreaLight *DiffuseAreaLight::Create(const Transform &renderFromLight,
@@ -803,7 +830,7 @@ DiffuseAreaLight *DiffuseAreaLight::Create(const Transform &renderFromLight,
                                            const ParameterDictionary &parameters,
                                            const RGBColorSpace *colorSpace,
                                            const FileLoc *loc, Allocator alloc,
-                                           const Shape shape) {
+                                           const Shape shape, FloatTexture alphaTex) {
     Spectrum L = parameters.GetOneSpectrum("L", nullptr, SpectrumType::Illuminant, alloc);
     Float scale = parameters.GetOneFloat("scale", 1);
     bool twoSided = parameters.GetOneBool("twosided", false);
@@ -862,8 +889,8 @@ DiffuseAreaLight *DiffuseAreaLight::Create(const Transform &renderFromLight,
     }
 
     return alloc.new_object<DiffuseAreaLight>(renderFromLight, medium, L, scale, shape,
-                                              std::move(image), imageColorSpace, twoSided,
-                                              alloc);
+                                              alphaTex, std::move(image), imageColorSpace,
+                                              twoSided, alloc);
 }
 
 // UniformInfiniteLight Method Definitions
@@ -1565,12 +1592,12 @@ Light Light::Create(const std::string &name, const ParameterDictionary &paramete
 Light Light::CreateArea(const std::string &name, const ParameterDictionary &parameters,
                         const Transform &renderFromLight,
                         const MediumInterface &mediumInterface, const Shape shape,
-                        const FileLoc *loc, Allocator alloc) {
+                        FloatTexture alpha, const FileLoc *loc, Allocator alloc) {
     Light area = nullptr;
     if (name == "diffuse")
         area =
             DiffuseAreaLight::Create(renderFromLight, mediumInterface.outside, parameters,
-                                     parameters.ColorSpace(), loc, alloc, shape);
+                                     parameters.ColorSpace(), loc, alloc, shape, alpha);
     else
         ErrorExit(loc, "%s: area light type unknown.", name);
 

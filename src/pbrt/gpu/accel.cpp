@@ -571,6 +571,7 @@ static void logCallback(unsigned int level, const char* tag, const char* message
 
 GPUAccel::GPUAccel(
     const ParsedScene &scene, Allocator alloc, CUstream cudaStream,
+    NamedTextures &textures,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
     const std::map<std::string, Medium> &media,
     pstd::array<bool, Material::NumTags()> *haveBasicEvalMaterial,
@@ -947,9 +948,7 @@ GPUAccel::GPUAccel(
 
     LOG_VERBOSE("Finished OptiX initialization");
 
-    LOG_VERBOSE("Starting to create textures and materials");
-    // Textures
-    NamedTextures textures = scene.CreateTextures(alloc, true);
+    LOG_VERBOSE("Starting to create materials");
 
     // Materials
     std::map<std::string, Material> namedMaterials;
@@ -981,7 +980,7 @@ GPUAccel::GPUAccel(
         updateMaterialNeeds(m);
     for (const auto &m : namedMaterials)
         updateMaterialNeeds(m.second);
-    LOG_VERBOSE("Finished creating textures and materials");
+    LOG_VERBOSE("Finished creating materials");
 
     LOG_VERBOSE("Starting to create shapes and acceleration structures");
     int nCurveWarnings = 0;
