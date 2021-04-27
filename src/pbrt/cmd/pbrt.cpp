@@ -209,7 +209,7 @@ int main(int argc, char *argv[]) {
         LOG_VERBOSE("Running debug build");
         printf("*** DEBUG BUILD ***\n");
 #endif
-        printf("Copyright (c)1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.\n");
+        printf("Copyright (c)1998-2021 Matt Pharr, Wenzel Jakob, and Greg Humphreys.\n");
         printf("The source code to pbrt (but *not* the book contents) is covered "
                "by the Apache 2.0 License.\n");
         printf("See the file LICENSE.txt for the conditions of the license.\n");
