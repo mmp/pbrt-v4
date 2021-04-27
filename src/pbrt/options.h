@@ -33,6 +33,7 @@ struct PBRTOptions : BasicPBRTOptions {
     LogLevel logLevel = LogLevel::Error;
     bool writePartialImages = false;
     bool recordPixelStatistics = false;
+    bool printStatistics = false;
     pstd::optional<int> pixelSamples;
     pstd::optional<int> gpuDevice;
     bool quickRender = false;

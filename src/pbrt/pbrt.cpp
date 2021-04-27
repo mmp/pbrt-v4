@@ -92,7 +92,7 @@ void CleanupPBRT() {
     if (Options->recordPixelStatistics)
         StatsWritePixelImages();
 
-    if (!Options->quiet) {
+    if (Options->printStatistics) {
         PrintStats(stdout);
         ClearStats();
     }

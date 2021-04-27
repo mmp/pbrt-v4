@@ -81,6 +81,7 @@ Rendering options:
   --render-coord-sys <name>    Coordinate system to use for the scene when rendering,
                                where name is "camera", "cameraworld", or "world".
   --seed <n>                   Set random number generator seed. Default: 0.
+  --stats                      Print various statistics after rendering completes.
   --spp <n>                    Override number of pixel samples specified in scene
                                description file.
   --write-partial-images       Periodically write the current image to disk, rather
@@ -187,6 +188,7 @@ int main(int argc, char *argv[]) {
             ParseArg(&argv, "render-coord-sys", &renderCoordSys, onError) ||
             ParseArg(&argv, "seed", &options.seed, onError) ||
             ParseArg(&argv, "spp", &options.pixelSamples, onError) ||
+            ParseArg(&argv, "stats", &options.printStatistics, onError) ||
             ParseArg(&argv, "toply", &toPly, onError) ||
             ParseArg(&argv, "write-partial-images", &options.writePartialImages,
                      onError) ||
