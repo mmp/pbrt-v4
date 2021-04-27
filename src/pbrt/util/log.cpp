@@ -75,7 +75,7 @@ void InitLogging(LogLevel level, std::string logFile, bool useGPU) {
 
 #ifdef PBRT_BUILD_GPU_RENDERER
     if (useGPU)
-        CUDA_CHECK(cudaMemcpyToSymbol(LOGGING_LogLevelGPU, &logging::LogLevel,
+        CUDA_CHECK(cudaMemcpyToSymbol(LOGGING_LogLevelGPU, &logging::logLevel,
                                       sizeof(logging::LogLevel)));
 #endif
 }
