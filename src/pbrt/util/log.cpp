@@ -46,7 +46,12 @@ float ElapsedSeconds() {
 
 }  // namespace
 
-LogLevel LOGGING_LogLevel;
+namespace logging {
+
+LogLevel logLevel;
+FILE *logFile;
+
+}  // namespace logging
 
 #ifdef PBRT_BUILD_GPU_RENDERER
 __constant__ LogLevel LOGGING_LogLevelGPU;
@@ -56,16 +61,22 @@ PBRT_GPU GPULogItem rawLogItems[MAX_LOG_ITEMS];
 PBRT_GPU int nRawLogItems;
 #endif  // PBRT_BUILD_GPU_RENDERER
 
-void InitLogging(LogLevel level, bool useGPU) {
-    LOGGING_LogLevel = level;
+void InitLogging(LogLevel level, std::string logFile, bool useGPU) {
+    logging::logLevel = level;
+    if (!logFile.empty()) {
+        logging::logFile = fopen(logFile.c_str(), "w");
+        if (!logging::logFile)
+            ErrorExit("%s: %s", logFile, ErrorString());
+        logging::logLevel = LogLevel::Verbose;
+    }
 
     if (level == LogLevel::Invalid)
         ErrorExit("Invalid --log-level specified.");
 
 #ifdef PBRT_BUILD_GPU_RENDERER
     if (useGPU)
-        CUDA_CHECK(cudaMemcpyToSymbol(LOGGING_LogLevelGPU, &LOGGING_LogLevel,
-                                      sizeof(LOGGING_LogLevel)));
+        CUDA_CHECK(cudaMemcpyToSymbol(LOGGING_LogLevelGPU, &logging::LogLevel,
+                                      sizeof(logging::LogLevel)));
 #endif
 }
 
@@ -154,8 +165,14 @@ void Log(LogLevel level, const char *file, int line, const char *s) {
     int len = strlen(s);
     if (len == 0)
         return;
-    fprintf(stderr, "[ " LOG_BASE_FMT " %s:%d ] %s %s\n", LOG_BASE_ARGS, file, line,
-            ToString(level).c_str(), s);
+    std::string levelString = (level == LogLevel::Verbose) ? "" : (ToString(level) + " ");
+    if (logging::logFile) {
+        fprintf(logging::logFile, "[ " LOG_BASE_FMT " %s:%d ] %s%s\n", LOG_BASE_ARGS,
+                file, line, levelString.c_str(), s);
+        fflush(logging::logFile);
+    } else
+        fprintf(stderr, "[ " LOG_BASE_FMT " %s:%d ] %s%s\n", LOG_BASE_ARGS, file, line,
+                levelString.c_str(), s);
 #endif
 }
 

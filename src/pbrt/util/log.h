@@ -18,7 +18,7 @@ enum class LogLevel { Verbose, Error, Fatal, Invalid };
 std::string ToString(LogLevel level);
 LogLevel LogLevelFromString(const std::string &s);
 
-void InitLogging(LogLevel level, bool useGPU);
+void InitLogging(LogLevel level, std::string logFile, bool useGPU);
 
 #ifdef PBRT_BUILD_GPU_RENDERER
 
@@ -34,7 +34,10 @@ std::vector<GPULogItem> ReadGPULogs();
 #endif
 
 // LogLevel Global Variable Declaration
-extern LogLevel LOGGING_LogLevel;
+namespace logging {
+extern LogLevel logLevel;
+extern FILE *logFile;
+}  // namespace logging
 
 // Logging Function Declarations
 PBRT_CPU_GPU
@@ -72,12 +75,12 @@ extern __constant__ LogLevel LOGGING_LogLevelGPU;
 #else
 
 // Logging Macros
-#define LOG_VERBOSE(...)                            \
-    (pbrt::LogLevel::Verbose >= LOGGING_LogLevel && \
+#define LOG_VERBOSE(...)                             \
+    (pbrt::LogLevel::Verbose >= logging::logLevel && \
      (pbrt::Log(LogLevel::Verbose, __FILE__, __LINE__, __VA_ARGS__), true))
 
-#define LOG_ERROR(...)                            \
-    (pbrt::LogLevel::Error >= LOGGING_LogLevel && \
+#define LOG_ERROR(...)                                   \
+    (pbrt::LogLevel::Error >= pbrt::logging::logLevel && \
      (pbrt::Log(LogLevel::Error, __FILE__, __LINE__, __VA_ARGS__), true))
 
 #define LOG_FATAL(...) \

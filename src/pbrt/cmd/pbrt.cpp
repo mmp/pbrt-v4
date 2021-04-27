@@ -88,6 +88,9 @@ Rendering options:
                                than waiting for the end of rendering. Default: disabled.
 
 Logging options:
+  --log-file <filename>        Filename to write logging messages to. Default: none;
+                               messages are printed to standard error. Implies
+                               --log-level verbose if specified.
   --log-level <level>          Log messages at or above this level, where <level>
                                is "verbose", "error", or "fatal". Default: "error".
 
@@ -178,6 +181,7 @@ int main(int argc, char *argv[]) {
             ParseArg(&argv, "force-diffuse", &options.forceDiffuse, onError) ||
             ParseArg(&argv, "format", &format, onError) ||
             ParseArg(&argv, "log-level", &logLevel, onError) ||
+            ParseArg(&argv, "log-file", &options.logFile, onError) ||
             ParseArg(&argv, "mse-reference-image", &options.mseReferenceImage, onError) ||
             ParseArg(&argv, "mse-reference-out", &options.mseReferenceOutput, onError) ||
             ParseArg(&argv, "nthreads", &options.nThreads, onError) ||
