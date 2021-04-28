@@ -639,7 +639,7 @@ void GPURender(ParsedScene &scene) {
 
     LOG_VERBOSE("Total rendering time: %.3f s", timer.ElapsedSeconds());
 
-    if (!Options->quiet) {
+    if (Options->printStatistics) {
         ReportKernelStats();
 
         Printf("GPU Statistics:\n");
