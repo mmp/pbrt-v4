@@ -1,11 +1,7 @@
-// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
-// The pbrt source code is licensed under the Apache License, Version 2.0.
-// SPDX: Apache-2.0
+#include <pbrt/gpu/aggregate.h>
 
-#include <pbrt/gpu/accel.h>
-
-#include <pbrt/gpu/launch.h>
 #include <pbrt/gpu/optix.h>
+#include <pbrt/gpu/util.h>
 #include <pbrt/lights.h>
 #include <pbrt/materials.h>
 #include <pbrt/parsedscene.h>
@@ -18,6 +14,7 @@
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/stats.h>
+#include <pbrt/wavefront/intersect.h>
 
 #include <atomic>
 #include <mutex>
@@ -48,6 +45,31 @@
 
 namespace pbrt {
 
+// FIXME: copied in wavefront/aggregate.cpp
+static void updateMaterialNeeds(Material m, pstd::array<bool, Material::NumTags()> *haveBasicEvalMaterial,
+                                pstd::array<bool, Material::NumTags()> *haveUniversalEvalMaterial,
+                                bool *haveSubsurface) {
+    if (!m)
+        return;
+
+    if (MixMaterial *mix = m.CastOrNullptr<MixMaterial>(); mix) {
+        updateMaterialNeeds(mix->GetMaterial(0), haveBasicEvalMaterial, haveUniversalEvalMaterial,
+                            haveSubsurface);
+        updateMaterialNeeds(mix->GetMaterial(1), haveBasicEvalMaterial, haveUniversalEvalMaterial,
+                            haveSubsurface);
+        return;
+    }
+
+    *haveSubsurface |= m.HasSubsurfaceScattering();
+
+    FloatTexture displace = m.GetDisplacement();
+    if (m.CanEvaluateTextures(BasicTextureEvaluator()) &&
+        (!displace || BasicTextureEvaluator().CanEvaluate({displace}, {})))
+        (*haveBasicEvalMaterial)[m.Tag()] = true;
+    else
+        (*haveUniversalEvalMaterial)[m.Tag()] = true;
+}
+
 struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) RaygenRecord {
     __align__(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
 };
@@ -56,7 +78,7 @@ struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) MissRecord {
     __align__(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
 };
 
-struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) GPUAccel::HitgroupRecord {
+struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) OptiXAggregate::HitgroupRecord {
     HitgroupRecord() {}
     HitgroupRecord(const HitgroupRecord &r) { memcpy(this, &r, sizeof(HitgroupRecord)); }
 
@@ -74,7 +96,7 @@ extern const unsigned char PBRT_EMBEDDED_PTX[];
 
 STAT_MEMORY_COUNTER("Memory/Acceleration structures", gpuBVHBytes);
 
-OptixTraversableHandle GPUAccel::buildBVH(
+OptixTraversableHandle OptiXAggregate::buildBVH(
     const std::vector<OptixBuildInput> &buildInputs) {
     // Figure out memory requirements.
     OptixAccelBuildOptions accelOptions = {};
@@ -206,7 +228,7 @@ static MediumInterface *getMediumInterface(
                                              getMedium(shape.outsideMedium));
 }
 
-OptixTraversableHandle GPUAccel::createGASForTriangles(
+OptixTraversableHandle OptiXAggregate::createGASForTriangles(
     const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
     const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
     const std::map<std::string, FloatTexture> &floatTextures,
@@ -379,7 +401,7 @@ OptixTraversableHandle GPUAccel::createGASForTriangles(
     return buildBVH(buildInputs);
 }
 
-OptixTraversableHandle GPUAccel::createGASForBLPs(
+OptixTraversableHandle OptiXAggregate::createGASForBLPs(
     const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
     const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
     const std::map<std::string, FloatTexture> &floatTextures,
@@ -469,7 +491,7 @@ OptixTraversableHandle GPUAccel::createGASForBLPs(
     return buildBVH(buildInputs);
 }
 
-OptixTraversableHandle GPUAccel::createGASForQuadrics(
+OptixTraversableHandle OptiXAggregate::createGASForQuadrics(
     const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
     const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
     const std::map<std::string, FloatTexture> &floatTextures,
@@ -569,16 +591,15 @@ static void logCallback(unsigned int level, const char* tag, const char* message
         LOG_VERBOSE("OptiX: %s: %s", tag, message);
 }
 
-GPUAccel::GPUAccel(
-    const ParsedScene &scene, Allocator alloc, CUstream cudaStream,
-    NamedTextures &textures,
+OptiXAggregate::OptiXAggregate(
+    const ParsedScene &scene, Allocator alloc, NamedTextures &textures,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
     const std::map<std::string, Medium> &media,
     pstd::array<bool, Material::NumTags()> *haveBasicEvalMaterial,
     pstd::array<bool, Material::NumTags()> *haveUniversalEvalMaterial,
     bool *haveSubsurface)
     : alloc(alloc),
-      cudaStream(cudaStream),
+      cudaStream(nullptr),
       intersectHGRecords(alloc),
       shadowHGRecords(alloc),
       randomHitHGRecords(alloc) {
@@ -956,30 +977,12 @@ GPUAccel::GPUAccel(
     scene.CreateMaterials(textures, alloc, &namedMaterials, &materials);
 
     // Report which Materials are actually present...
-    std::function<void(Material)> updateMaterialNeeds;
-    updateMaterialNeeds = [&](Material m) {
-        if (!m)
-            return;
-
-        if (MixMaterial *mix = m.CastOrNullptr<MixMaterial>(); mix) {
-            updateMaterialNeeds(mix->GetMaterial(0));
-            updateMaterialNeeds(mix->GetMaterial(1));
-            return;
-        }
-
-        *haveSubsurface |= m.HasSubsurfaceScattering();
-
-        FloatTexture displace = m.GetDisplacement();
-        if (m.CanEvaluateTextures(BasicTextureEvaluator()) &&
-            (!displace || BasicTextureEvaluator().CanEvaluate({displace}, {})))
-            (*haveBasicEvalMaterial)[m.Tag()] = true;
-        else
-            (*haveUniversalEvalMaterial)[m.Tag()] = true;
-    };
     for (Material m : materials)
-        updateMaterialNeeds(m);
+        updateMaterialNeeds(m, haveBasicEvalMaterial, haveUniversalEvalMaterial,
+                            haveSubsurface);
     for (const auto &m : namedMaterials)
-        updateMaterialNeeds(m.second);
+        updateMaterialNeeds(m.second, haveBasicEvalMaterial, haveUniversalEvalMaterial,
+                            haveSubsurface);
     LOG_VERBOSE("Finished creating materials");
 
     LOG_VERBOSE("Starting to create shapes and acceleration structures");
@@ -1148,7 +1151,7 @@ GPUAccel::GPUAccel(
     randomHitSBT.hitgroupRecordCount = randomHitHGRecords.size();
 }
 
-GPUAccel::ParamBufferState &GPUAccel::getParamBuffer(
+OptiXAggregate::ParamBufferState &OptiXAggregate::getParamBuffer(
     const RayIntersectParameters &params) const {
     CHECK(nextParamOffset < paramsPool.size());
 
@@ -1168,7 +1171,7 @@ GPUAccel::ParamBufferState &GPUAccel::getParamBuffer(
     return pbs;
 }
 
-void GPUAccel::IntersectClosest(
+void OptiXAggregate::IntersectClosest(
     int maxRays, EscapedRayQueue *escapedRayQueue, HitAreaLightQueue *hitAreaLightQueue,
     MaterialEvalQueue *basicEvalMaterialQueue,
     MaterialEvalQueue *universalEvalMaterialQueue,
@@ -1196,7 +1199,7 @@ void GPUAccel::IntersectClosest(
         LOG_VERBOSE("Launching intersect closest");
 #endif
 #ifdef NVTX
-        nvtxRangePush("GPUAccel::IntersectClosest");
+        nvtxRangePush("OptiXAggregate::IntersectClosest");
 #endif
 
         OPTIX_CHECK(optixLaunch(optixPipeline, cudaStream, pbs.ptr,
@@ -1216,7 +1219,7 @@ void GPUAccel::IntersectClosest(
     cudaEventRecord(events.second);
 };
 
-void GPUAccel::IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue,
+void OptiXAggregate::IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue,
                                SOA<PixelSampleState> *pixelSampleState) const {
     std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents("Tracing shadow rays");
 
@@ -1234,7 +1237,7 @@ void GPUAccel::IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue,
         LOG_VERBOSE("Launching intersect shadow");
 #endif
 #ifdef NVTX
-        nvtxRangePush("GPUAccel::IntersectShadow");
+        nvtxRangePush("OptiXAggregate::IntersectShadow");
 #endif
 
         OPTIX_CHECK(optixLaunch(optixPipeline, cudaStream, pbs.ptr,
@@ -1254,7 +1257,7 @@ void GPUAccel::IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue,
     cudaEventRecord(events.second);
 }
 
-void GPUAccel::IntersectShadowTr(int maxRays, ShadowRayQueue *shadowRayQueue,
+void OptiXAggregate::IntersectShadowTr(int maxRays, ShadowRayQueue *shadowRayQueue,
                                  SOA<PixelSampleState> *pixelSampleState) const {
     std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents("Tracing shadow Tr rays");
 
@@ -1272,7 +1275,7 @@ void GPUAccel::IntersectShadowTr(int maxRays, ShadowRayQueue *shadowRayQueue,
         LOG_VERBOSE("Launching intersect shadow Tr");
 #endif
 #ifdef NVTX
-        nvtxRangePush("GPUAccel::IntersectShadowTr");
+        nvtxRangePush("OptiXAggregate::IntersectShadowTr");
 #endif
 
         OPTIX_CHECK(optixLaunch(optixPipeline, cudaStream, pbs.ptr,
@@ -1292,7 +1295,7 @@ void GPUAccel::IntersectShadowTr(int maxRays, ShadowRayQueue *shadowRayQueue,
     cudaEventRecord(events.second);
 }
 
-void GPUAccel::IntersectOneRandom(int maxRays,
+void OptiXAggregate::IntersectOneRandom(int maxRays,
                                   SubsurfaceScatterQueue *subsurfaceScatterQueue) const {
     std::pair<cudaEvent_t, cudaEvent_t> events =
         GetProfilerEvents("Tracing subsurface scattering probe rays");
@@ -1310,7 +1313,7 @@ void GPUAccel::IntersectOneRandom(int maxRays,
         LOG_VERBOSE("Launching intersect random");
 #endif
 #ifdef NVTX
-        nvtxRangePush("GPUAccel::IntersectOneRandom");
+        nvtxRangePush("OptiXAggregate::IntersectOneRandom");
 #endif
 
         OPTIX_CHECK(optixLaunch(optixPipeline, cudaStream, pbs.ptr,
@@ -1323,11 +1326,11 @@ void GPUAccel::IntersectOneRandom(int maxRays,
 #endif
 #ifndef NDEBUG
         CUDA_CHECK(cudaDeviceSynchronize());
-        LOG_VERBOSE("Post-sync triangle intersect random");
+        LOG_VERBOSE("Post-sync intersect random");
 #endif
     }
 
     cudaEventRecord(events.second);
 }
 
-}  // namespace pbrt
+} // namespace pbrt

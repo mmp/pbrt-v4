@@ -7,7 +7,7 @@
 #include <pbrt/util/check.h>
 #include <pbrt/util/print.h>
 #ifdef PBRT_BUILD_GPU_RENDERER
-#include <pbrt/gpu/init.h>
+#include <pbrt/gpu/util.h>
 #endif  // PBRT_BUILD_GPU_RENDERER
 
 #include <iterator>

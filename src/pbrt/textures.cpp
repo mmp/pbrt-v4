@@ -4,6 +4,9 @@
 
 #include <pbrt/textures.h>
 
+#ifdef PBRT_BUILD_GPU_RENDERER
+#include <pbrt/gpu/util.h>
+#endif
 #include <pbrt/interaction.h>
 #include <pbrt/paramdict.h>
 #include <pbrt/util/color.h>

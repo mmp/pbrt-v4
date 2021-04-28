@@ -4,15 +4,15 @@
 
 #include <pbrt/pbrt.h>
 
-#include <pbrt/gpu/pathintegrator.h>
+#include <pbrt/wavefront/integrator.h>
 #include <pbrt/samplers.h>
 
 #include <type_traits>
 
 namespace pbrt {
 
-// GPUPathIntegrator Sampler Methods
-void GPUPathIntegrator::GenerateRaySamples(int depth, int sampleIndex) {
+// WavefrontPathIntegrator Sampler Methods
+void WavefrontPathIntegrator::GenerateRaySamples(int depth, int sampleIndex) {
     auto generateSamples = [=](auto sampler) {
         using Sampler = std::remove_reference_t<decltype(*sampler)>;
         if constexpr (!std::is_same_v<Sampler, MLTSampler> &&
@@ -23,13 +23,14 @@ void GPUPathIntegrator::GenerateRaySamples(int depth, int sampleIndex) {
 }
 
 template <typename Sampler>
-void GPUPathIntegrator::GenerateRaySamples(int depth, int sampleIndex) {
+void WavefrontPathIntegrator::GenerateRaySamples(int depth, int sampleIndex) {
     // Generate description string _desc_ for ray sample generation
     std::string desc = std::string("Generate ray samples - ") + Sampler::Name();
 
     RayQueue *rayQueue = CurrentRayQueue(depth);
     ForAllQueued(
-        desc.c_str(), rayQueue, maxQueueSize, PBRT_GPU_LAMBDA(const RayWorkItem w) {
+        desc.c_str(), rayQueue, maxQueueSize,
+        PBRT_CPU_GPU_LAMBDA(const RayWorkItem w) {
             // Generate samples for ray segment at current sample index
             // Find first sample dimension
             int dimension = 5 + 7 * depth;

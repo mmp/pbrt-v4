@@ -4,6 +4,9 @@
 
 #include <pbrt/util/log.h>
 
+#ifdef PBRT_BUILD_GPU_RENDERER
+#include <pbrt/gpu/util.h>
+#endif
 #include <pbrt/util/check.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/parallel.h>
@@ -48,7 +51,7 @@ float ElapsedSeconds() {
 
 namespace logging {
 
-LogLevel logLevel;
+LogLevel logLevel = LogLevel::Error;
 FILE *logFile;
 
 }  // namespace logging

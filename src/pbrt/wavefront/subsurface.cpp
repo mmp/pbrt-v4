@@ -5,25 +5,23 @@
 #include <pbrt/pbrt.h>
 
 #include <pbrt/bssrdf.h>
-#include <pbrt/gpu/accel.h>
-#include <pbrt/gpu/launch.h>
-#include <pbrt/gpu/pathintegrator.h>
 #include <pbrt/interaction.h>
 #include <pbrt/lightsamplers.h>
 #include <pbrt/samplers.h>
 #include <pbrt/util/sampling.h>
 #include <pbrt/util/spectrum.h>
+#include <pbrt/wavefront/integrator.h>
 
 namespace pbrt {
 
-// GPUPathIntegrator Subsurface Scattering Methods
-void GPUPathIntegrator::SampleSubsurface(int depth) {
+// WavefrontPathIntegrator Subsurface Scattering Methods
+void WavefrontPathIntegrator::SampleSubsurface(int depth) {
     RayQueue *rayQueue = CurrentRayQueue(depth);
     RayQueue *nextRayQueue = NextRayQueue(depth);
 
     ForAllQueued(
         "Get BSSRDF and enqueue probe ray", bssrdfEvalQueue, maxQueueSize,
-        PBRT_GPU_LAMBDA(const GetBSSRDFAndProbeRayWorkItem w) {
+        PBRT_CPU_GPU_LAMBDA(const GetBSSRDFAndProbeRayWorkItem w) {
             using BSSRDF = typename SubsurfaceMaterial::BSSRDF;
             BSSRDF bssrdf;
             const SubsurfaceMaterial *material = w.material.Cast<SubsurfaceMaterial>();
@@ -42,11 +40,11 @@ void GPUPathIntegrator::SampleSubsurface(int depth) {
                                              w.mediumInterface, w.etaScale, w.pixelIndex);
         });
 
-    accel->IntersectOneRandom(maxQueueSize, subsurfaceScatterQueue);
+    aggregate->IntersectOneRandom(maxQueueSize, subsurfaceScatterQueue);
 
     ForAllQueued(
         "Handle out-scattering after SSS", subsurfaceScatterQueue, maxQueueSize,
-        PBRT_GPU_LAMBDA(SubsurfaceScatterWorkItem w) {
+        PBRT_CPU_GPU_LAMBDA(SubsurfaceScatterWorkItem w) {
             if (w.reservoirPDF == 0)
                 return;
 

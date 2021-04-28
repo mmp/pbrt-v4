@@ -12,7 +12,7 @@
 
 #include <pbrt/pbrt.h>
 
-#include <pbrt/gpu/launch.h>
+#include <pbrt/gpu/util.h>
 #include <pbrt/util/image.h>
 #include <pbrt/util/vecmath.h>
 

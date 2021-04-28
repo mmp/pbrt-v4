@@ -5,15 +5,14 @@
 #include <pbrt/pbrt.h>
 
 #include <pbrt/film.h>
-#include <pbrt/gpu/launch.h>
-#include <pbrt/gpu/pathintegrator.h>
+#include <pbrt/wavefront/integrator.h>
 
 namespace pbrt {
 
-// GPUPathIntegrator Film Methods
-void GPUPathIntegrator::UpdateFilm() {
-    GPUParallelFor(
-        "Update Film", maxQueueSize, PBRT_GPU_LAMBDA(int pixelIndex) {
+// WavefrontPathIntegrator Film Methods
+void WavefrontPathIntegrator::UpdateFilm() {
+    ParallelFor(
+        "Update Film", maxQueueSize, PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
             // Check pixel against film bounds
             Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
             if (!InsideExclusive(pPixel, film.PixelBounds()))

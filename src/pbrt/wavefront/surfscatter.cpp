@@ -7,8 +7,7 @@
 #include <pbrt/base/bxdf.h>
 #include <pbrt/bxdfs.h>
 #include <pbrt/cameras.h>
-#include <pbrt/gpu/launch.h>
-#include <pbrt/gpu/pathintegrator.h>
+#include <pbrt/wavefront/integrator.h>
 #include <pbrt/interaction.h>
 #include <pbrt/materials.h>
 #include <pbrt/options.h>
@@ -43,7 +42,7 @@ static inline void rescale(SampledSpectrum &T_hat, SampledSpectrum &lightPathPDF
 // EvaluateMaterialCallback Definition
 struct EvaluateMaterialCallback {
     int depth;
-    GPUPathIntegrator *integrator;
+    WavefrontPathIntegrator *integrator;
     // EvaluateMaterialCallback Public Methods
     template <typename Mtl>
     void operator()() {
@@ -52,13 +51,13 @@ struct EvaluateMaterialCallback {
     }
 };
 
-// GPUPathIntegrator Surface Scattering Methods
-void GPUPathIntegrator::EvaluateMaterialsAndBSDFs(int depth) {
+// WavefrontPathIntegrator Surface Scattering Methods
+void WavefrontPathIntegrator::EvaluateMaterialsAndBSDFs(int depth) {
     ForEachType(EvaluateMaterialCallback{depth, this}, Material::Types());
 }
 
 template <typename Mtl>
-void GPUPathIntegrator::EvaluateMaterialAndBSDF(int depth) {
+void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(int depth) {
     if (haveBasicEvalMaterial[Material::TypeIndex<Mtl>()])
         EvaluateMaterialAndBSDF<Mtl>(BasicTextureEvaluator(), basicEvalMaterialQueue,
                                      depth);
@@ -68,7 +67,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(int depth) {
 }
 
 template <typename Mtl, typename TextureEvaluator>
-void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
+void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                                                 MaterialEvalQueue *evalQueue, int depth) {
     // Construct _name_ for material/texture evaluator kernel
     std::string name = StringPrintf(
@@ -78,7 +77,7 @@ void GPUPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
     RayQueue *nextRayQueue = NextRayQueue(depth);
     ForAllQueued(
         name.c_str(), evalQueue->Get<MaterialEvalWorkItem<Mtl>>(), maxQueueSize,
-        PBRT_GPU_LAMBDA(const MaterialEvalWorkItem<Mtl> w) {
+        PBRT_CPU_GPU_LAMBDA(const MaterialEvalWorkItem<Mtl> w) {
             // Evaluate material and BSDF for ray intersection
             // Apply bump mapping if material has a displacement texture
             Normal3f ns = w.ns;

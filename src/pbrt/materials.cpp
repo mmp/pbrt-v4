@@ -92,15 +92,19 @@ MixMaterial *MixMaterial::Create(Material materials[2],
                                  const FileLoc *loc, Allocator alloc) {
     FloatTexture amount = parameters.GetFloatTexture("amount", 0.5f, alloc);
 
-    if (Options->useGPU) {
-        // Check for this stuff here, where we can include the FileLoc in
-        // the error message. Note that both of these limitations could be
-        // relaxed if they were problematic; the issue is that we currently
-        // resolve MixMaterials in the closest hit shader...
-        if (!BasicTextureEvaluator().CanEvaluate({amount}, {}))
-            ErrorExit(loc, "The GPU renderer currently only supports basic textures "
+    // Check for this stuff here, where we can include the FileLoc in
+    // the error message. Note that both of these limitations could be
+    // relaxed if they were problematic; the issue is that we currently
+    // resolve MixMaterials in the closest hit shader...
+#ifdef PBRT_BUILD_GPU_RENDERER
+    if (Options->useGPU && !BasicTextureEvaluator().CanEvaluate({amount}, {}))
+        ErrorExit(loc, "The GPU renderer currently only supports basic textures "
+                  "for its \"amount\" parameter.");
+#else
+    if (Options->wavefront && !BasicTextureEvaluator().CanEvaluate({amount}, {}))
+            ErrorExit(loc, "The wavefront renderer currently only supports basic textures "
                            "for its \"amount\" parameter.");
-    }
+#endif
 
     return alloc.new_object<MixMaterial>(materials, amount);
 }

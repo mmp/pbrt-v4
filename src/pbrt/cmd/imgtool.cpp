@@ -40,6 +40,9 @@ extern "C" {
 
 #ifdef PBRT_BUILD_GPU_RENDERER
 
+#include <pbrt/gpu/memory.h>
+#include <pbrt/gpu/util.h>
+
 #include <cuda.h>
 #include <cuda_runtime.h>
 

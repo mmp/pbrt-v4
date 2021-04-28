@@ -17,29 +17,9 @@
 #include <pbrt/util/print.h>
 #include <pbrt/util/spectrum.h>
 #include <pbrt/util/string.h>
-
-#ifdef NVTX
-#ifdef PBRT_IS_WINDOWS
-#include <windows.h>
-#else
-#include <sys/syscall.h>
-#endif
-#include "nvtx3/nvToolsExt.h"
-#endif
+#include <pbrt/wavefront/wavefront.h>
 
 using namespace pbrt;
-
-#ifdef PBRT_BUILD_GPU_RENDERER
-namespace pbrt {
-extern void GPURender(ParsedScene &);
-}
-#else
-namespace pbrt {
-void GPURender(ParsedScene &) {
-    ErrorExit("GPU rendering is not supported on this system.");
-}
-}  // namespace pbrt
-#endif
 
 static void usage(const std::string &msg = {}) {
     if (!msg.empty())
@@ -84,6 +64,7 @@ Rendering options:
   --stats                      Print various statistics after rendering completes.
   --spp <n>                    Override number of pixel samples specified in scene
                                description file.
+  --wavefront                  Use wavefront volumetric path integrator.
   --write-partial-images       Periodically write the current image to disk, rather
                                than waiting for the end of rendering. Default: disabled.
 
@@ -108,15 +89,6 @@ Reformatting options:
 
 // main program
 int main(int argc, char *argv[]) {
-#ifdef NVTX
-#ifdef PBRT_IS_WINDOWS
-    nvtxNameOsThread(GetCurrentThreadId(), "MAIN_THREAD");
-#else
-    nvtxNameOsThread(syscall(SYS_gettid), "MAIN_THREAD");
-#endif
-#endif  // NVTX
-
-    // Declare variables for parsed command line
     PBRTOptions options;
     std::vector<std::string> filenames;
     std::string logLevel = "error";
@@ -172,6 +144,7 @@ int main(int argc, char *argv[]) {
             ParseArg(&argv, "gpu", &options.useGPU, onError) ||
             ParseArg(&argv, "gpu-device", &options.gpuDevice, onError) ||
 #endif
+            ParseArg(&argv, "wavefront", &options.wavefront, onError) ||
             ParseArg(&argv, "debugstart", &options.debugStart, onError) ||
             ParseArg(&argv, "disable-pixel-jitter", &options.disablePixelJitter,
                      onError) ||
@@ -243,6 +216,14 @@ int main(int argc, char *argv[]) {
         options.useGPU = false;
     }
 
+    if (options.useGPU && options.wavefront)
+        Warning("Both --gpu and --wavefront were specified; --gpu takes precidence.");
+
+    if (options.pixelMaterial && options.wavefront) {
+        Warning("Disabling --wavefront since --pixelmaterial was specified.");
+        options.wavefront = false;
+    }
+
     options.logLevel = LogLevelFromString(logLevel);
 
     // Initialize pbrt
@@ -257,8 +238,8 @@ int main(int argc, char *argv[]) {
         ParseFiles(&scene, filenames);
 
         // Render the scene
-        if (options.useGPU)
-            GPURender(scene);
+        if (options.useGPU || options.wavefront)
+            RenderWavefront(scene);
         else
             CPURender(scene);
 

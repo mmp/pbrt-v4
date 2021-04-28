@@ -7,6 +7,7 @@
 
 #include <pbrt/pbrt.h>
 
+#include <pbrt/cpu/primitive.h>
 #include <pbrt/cameras.h>
 #include <pbrt/paramdict.h>
 #include <pbrt/util/error.h>
@@ -227,10 +228,7 @@ struct TransformHash {
 class TransformCache {
   public:
     // TransformCache Public Methods
-    TransformCache()
-        : bufferResource(Options->useGPU ? gpuMemoryAllocator.resource()
-                                         : Allocator().resource()),
-          alloc(&bufferResource) {}
+    TransformCache();
     ~TransformCache();
 
     const Transform *Lookup(const Transform &t);
@@ -339,6 +337,15 @@ class ParsedScene : public SceneRepresentation {
                          std::vector<pbrt::Material> *materials) const;
 
     std::map<std::string, Medium> CreateMedia(Allocator alloc) const;
+
+    struct Scene {
+        std::vector<Light> lights;
+        Primitive aggregate;
+        std::vector<pbrt::Material> materials;
+        std::map<std::string, pbrt::Material> namedMaterials;
+    };
+    Scene CreateLightsAndAggregate(Allocator alloc,
+                                   const std::map<std::string, Medium> &media);
 
     // ParsedScene Public Members
     SceneEntity film, sampler, integrator, filter, accelerator;

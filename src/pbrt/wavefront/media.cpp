@@ -2,10 +2,8 @@
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
 
-#include <pbrt/gpu/pathintegrator.h>
+#include <pbrt/wavefront/integrator.h>
 
-#include <pbrt/gpu/accel.h>
-#include <pbrt/gpu/launch.h>
 #include <pbrt/media.h>
 
 namespace pbrt {
@@ -34,12 +32,12 @@ static inline void rescale(SampledSpectrum &T_hat, SampledSpectrum &lightPathPDF
     }
 }
 
-// GPUPathIntegrator Participating Media Methods
-void GPUPathIntegrator::SampleMediumInteraction(int depth) {
+// WavefrontPathIntegrator Participating Media Methods
+void WavefrontPathIntegrator::SampleMediumInteraction(int depth) {
     RayQueue *nextRayQueue = NextRayQueue(depth);
     ForAllQueued(
         "Sample medium interaction", mediumSampleQueue, maxQueueSize,
-        PBRT_GPU_LAMBDA(MediumSampleWorkItem w) {
+        PBRT_CPU_GPU_LAMBDA(MediumSampleWorkItem w) {
             Ray ray = w.ray;
             Float tMax = w.tMax;
 
@@ -177,9 +175,21 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
                         ray.o, ray.d, lambda, w.pixelIndex, (int)w.isSpecularBounce,
                         T_hat, uniPathPDF, lightPathPDF, w.prevIntrCtx});
                 }
+                return;
             }
 
             Material material = w.material;
+
+            const MixMaterial *mix = material.CastOrNullptr<MixMaterial>();
+            while (mix) {
+                SurfaceInteraction intr(w.pi, w.uv, w.wo, w.dpdus, w.dpdvs,
+                                        w.dndus, w.dndvs,
+                                        0. /* time */, false /* flip normal */);
+                MaterialEvalContext ctx(intr);
+                material = mix->ChooseMaterial(BasicTextureEvaluator(), ctx);
+                mix = material.CastOrNullptr<MixMaterial>();
+            }
+
             if (!material) {
                 Interaction intr(w.pi, w.n);
                 intr.mediumInterface = &w.mediumInterface;
@@ -203,6 +213,8 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
             }
 
             FloatTexture displacement = material.GetDisplacement();
+
+            CHECK(!material.Is<MixMaterial>());
 
             MaterialEvalQueue *q =
                 (material.CanEvaluateTextures(BasicTextureEvaluator()) &&
@@ -232,7 +244,7 @@ void GPUPathIntegrator::SampleMediumInteraction(int depth) {
     std::string desc = std::string("Sample direct/indirect - Henyey Greenstein");
     ForAllQueued(
         desc.c_str(), mediumScatterQueue, maxQueueSize,
-        PBRT_GPU_LAMBDA(MediumScatterWorkItem w) {
+        PBRT_CPU_GPU_LAMBDA(MediumScatterWorkItem w) {
             RaySamples raySamples = pixelSampleState.samples[w.pixelIndex];
             Float time = 0;  // TODO: FIXME
             Vector3f wo = w.wo;

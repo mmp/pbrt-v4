@@ -2,15 +2,16 @@
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
 
-#include <pbrt/gpu/pathintegrator.h>
+#include <pbrt/wavefront/integrator.h>
 
 #include <pbrt/base/medium.h>
 #include <pbrt/cameras.h>
 #include <pbrt/film.h>
 #include <pbrt/filters.h>
-#include <pbrt/gpu/accel.h>
-#include <pbrt/gpu/launch.h>
-#include <pbrt/gpu/optix.h>
+#ifdef PBRT_BUILD_GPU_RENDERER
+#include <pbrt/gpu/aggregate.h>
+#include <pbrt/gpu/memory.h>
+#endif // PBRT_BUILD_GPU_RENDERER
 #include <pbrt/lights.h>
 #include <pbrt/lightsamplers.h>
 #include <pbrt/util/color.h>
@@ -26,30 +27,23 @@
 #include <pbrt/util/stats.h>
 #include <pbrt/util/string.h>
 #include <pbrt/util/taggedptr.h>
+#include <pbrt/wavefront/aggregate.h>
 
 #include <atomic>
 #include <cstring>
 #include <iostream>
 #include <map>
 
+#ifdef PBRT_BUILD_GPU_RENDERER
 #include <cuda.h>
 #include <cuda_runtime.h>
-
-#ifdef NVTX
-#ifdef PBRT_IS_WINDOWS
-#include <windows.h>
-#else
-#include <sys/syscall.h>
-#endif  // PBRT_IS_WINDOWS
-#include "nvtx3/nvToolsExt.h"
-#include "nvtx3/nvToolsExtCuda.h"
-#endif
+#endif // PBRT_BUILD_GPU_RENDERER
 
 namespace pbrt {
 
-STAT_MEMORY_COUNTER("Memory/GPU path integrator pixel state", pathIntegratorBytes);
+STAT_MEMORY_COUNTER("Memory/Wavefront integrator pixel state", pathIntegratorBytes);
 
-GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) {
+WavefrontPathIntegrator::WavefrontPathIntegrator(Allocator alloc, ParsedScene &scene) {
     // Allocate all of the data structures that represent the scene...
     std::map<std::string, Medium> media = scene.CreateMedia(alloc);
 
@@ -96,7 +90,7 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
 
     // Textures
     LOG_VERBOSE("Starting to create textures");
-    NamedTextures textures = scene.CreateTextures(alloc, true);
+    NamedTextures textures = scene.CreateTextures(alloc, Options->useGPU);
     LOG_VERBOSE("Done creating textures");
 
     pstd::vector<Light> allLights;
@@ -191,13 +185,22 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
     haveBasicEvalMaterial.fill(false);
     haveUniversalEvalMaterial.fill(false);
     haveSubsurface = false;
-    accel = new GPUAccel(scene, alloc, nullptr /* cuda stream */, textures,
-                         shapeIndexToAreaLights, media, &haveBasicEvalMaterial,
-                         &haveUniversalEvalMaterial, &haveSubsurface);
+    if (Options->useGPU) {
+#ifdef PBRT_BUILD_GPU_RENDERER
+        aggregate = new OptiXAggregate(scene, alloc, textures,
+                                       shapeIndexToAreaLights, media, &haveBasicEvalMaterial,
+                                       &haveUniversalEvalMaterial, &haveSubsurface);
+#else
+        LOG_FATAL("Options->useGPU was set without PBRT_BUILD_GPU_RENDERER enabled");
+#endif
+    } else
+        aggregate = new CPUAggregate(scene, alloc, textures,
+                                     shapeIndexToAreaLights, media, &haveBasicEvalMaterial,
+                                     &haveUniversalEvalMaterial, &haveSubsurface);
 
     // Preprocess the light sources
     for (Light light : allLights)
-        light.Preprocess(accel->Bounds());
+        light.Preprocess(aggregate->Bounds());
 
     bool haveLights = !allLights.empty();
     for (const auto &m : media)
@@ -213,7 +216,8 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
 
     if (scene.integrator.name != "path" && scene.integrator.name != "volpath")
         Warning(&scene.integrator.loc,
-                "The GPU renderer always uses a \"volpath\" integrator.");
+                "Ignoring specified integrator \"%s\": the wavefront integrator "
+                "always uses a \"volpath\" integrator.", scene.integrator.name);
 
     // Integrator parameters
     regularize = scene.integrator.parameters.GetOneBool("regularize", false);
@@ -221,23 +225,25 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
 
     // Warn about unsupported stuff...
     if (Options->forceDiffuse)
-        Warning("The GPU rendering path does not support --force-diffuse.");
+        Warning("The wavefront integrator does not support --force-diffuse.");
     if (Options->writePartialImages)
-        Warning("The GPU rendering path does not support --write-partial-images.");
+        Warning("The wavefront integrator does not support --write-partial-images.");
     if (Options->recordPixelStatistics)
-        Warning("The GPU rendering path does not support --pixelstats.");
+        Warning("The wavefront integrator does not support --pixelstats.");
     if (!Options->mseReferenceImage.empty())
-        Warning("The GPU rendering path does not support --mse-reference-image.");
+        Warning("The wavefront integrator does not support --mse-reference-image.");
     if (!Options->mseReferenceOutput.empty())
-        Warning("The GPU rendering path does not support --mse-reference-out.");
+        Warning("The wavefront integrator does not support --mse-reference-out.");
 
     ///////////////////////////////////////////////////////////////////////////
     // Allocate storage for all of the queues/buffers...
 
+#ifdef PBRT_BUILD_GPU_RENDERER
     CUDATrackedMemoryResource *mr =
         dynamic_cast<CUDATrackedMemoryResource *>(gpuMemoryAllocator.resource());
     CHECK(mr != nullptr);
     size_t startSize = mr->BytesAllocated();
+#endif
 
     // Compute number of scanlines to render per pass
     Vector2i resolution = film.PixelBounds().Diagonal();
@@ -283,12 +289,53 @@ GPUPathIntegrator::GPUPathIntegrator(Allocator alloc, const ParsedScene &scene) 
 
     stats = alloc.new_object<Stats>(maxDepth, alloc);
 
+#ifdef PBRT_BUILD_GPU_RENDERER
     size_t endSize = mr->BytesAllocated();
     pathIntegratorBytes += endSize - startSize;
+#endif // PBRT_BUILD_GPU_RENDERER
 }
 
-// GPUPathIntegrator Method Definitions
-void GPUPathIntegrator::Render() {
+// WavefrontPathIntegrator Method Definitions
+Float WavefrontPathIntegrator::Render() {
+#ifdef PBRT_BUILD_GPU_RENDERER
+    if (Options->useGPU) {
+        int deviceIndex;
+        CUDA_CHECK(cudaGetDevice(&deviceIndex));
+        int hasConcurrentManagedAccess;
+        CUDA_CHECK(cudaDeviceGetAttribute(&hasConcurrentManagedAccess,
+                                          cudaDevAttrConcurrentManagedAccess, deviceIndex));
+
+        // Copy all of the scene data structures over to GPU memory.  This
+        // ensures that there isn't a big performance hitch for the first batch
+        // of rays as that stuff is copied over on demand.
+        if (hasConcurrentManagedAccess) {
+            // Set things up so that we can still have read from the
+            // WavefrontPathIntegrator struct on the CPU without hurting
+            // performance. (This makes it possible to use the values of things
+            // like WavefrontPathIntegrator::haveSubsurface to conditionally launch
+            // kernels according to what's in the scene...)
+            CUDA_CHECK(cudaMemAdvise(this, sizeof(*this),
+                                     cudaMemAdviseSetReadMostly, /* ignored argument */ 0));
+            CUDA_CHECK(cudaMemAdvise(this, sizeof(*this),
+                                     cudaMemAdviseSetPreferredLocation, deviceIndex));
+
+            // Copy all of the scene data structures over to GPU memory.  This
+            // ensures that there isn't a big performance hitch for the first batch
+            // of rays as that stuff is copied over on demand.
+            CUDATrackedMemoryResource *mr =
+                dynamic_cast<CUDATrackedMemoryResource *>(gpuMemoryAllocator.resource());
+            CHECK(mr != nullptr);
+            mr->PrefetchToGPU();
+        } else {
+            // TODO: on systems with basic unified memory, just launching a
+            // kernel should cause everything to be copied over. Is an empty
+            // kernel sufficient?
+        }
+    }
+#endif // PBRT_BUILD_GPU_RENDERER
+
+    Timer timer;
+
     Vector2i resolution = film.PixelBounds().Diagonal();
     Bounds2i pixelBounds = film.PixelBounds();
     int spp = sampler.SamplesPerPixel();
@@ -298,66 +345,74 @@ void GPUPathIntegrator::Render() {
     std::thread copyThread;
 
     if (!Options->displayServer.empty()) {
-        // Allocate staging memory on the GPU to store the current WIP
-        // image.
-        CUDA_CHECK(cudaMalloc(&displayRGB, resolution.x * resolution.y * sizeof(RGB)));
-        CUDA_CHECK(cudaMemset(displayRGB, 0, resolution.x * resolution.y * sizeof(RGB)));
+#ifdef PBRT_BUILD_GPU_RENDERER
+        if (Options->useGPU) {
+            // Allocate staging memory on the GPU to store the current WIP
+            // image.
+            CUDA_CHECK(cudaMalloc(&displayRGB, resolution.x * resolution.y * sizeof(RGB)));
+            CUDA_CHECK(cudaMemset(displayRGB, 0, resolution.x * resolution.y * sizeof(RGB)));
 
-        // Host-side memory for the WIP Image.  We'll just let this leak so
-        // that the lambda passed to DisplayDynamic below doesn't access
-        // freed memory after Render() returns...
-        displayRGBHost = new RGB[resolution.x * resolution.y];
+            // Host-side memory for the WIP Image.  We'll just let this leak so
+            // that the lambda passed to DisplayDynamic below doesn't access
+            // freed memory after Render() returns...
+            displayRGBHost = new RGB[resolution.x * resolution.y];
 
-        copyThread = std::thread([&]() {
-#ifdef NVTX
-#ifdef PBRT_IS_WINDOWS
-            nvtxNameOsThread(GetCurrentThreadId(), "DISPLAY_SERVER_COPY_THREAD");
-#else
-            nvtxNameOsThread(syscall(SYS_gettid), "DISPLAY_SERVER_COPY_THREAD");
-#endif
-#endif
-            // Copy back to the CPU using a separate stream so that we can
-            // periodically but asynchronously pick up the latest results
-            // from the GPU.
-            cudaStream_t memcpyStream;
-            CUDA_CHECK(cudaStreamCreate(&memcpyStream));
-#ifdef NVTX
-            nvtxNameCuStream(memcpyStream, "DISPLAY_SERVER_COPY_STREAM");
-#endif
+            copyThread = std::thread([&]() {
+                GPURegisterThread("DISPLAY_SERVER_COPY_THREAD");
 
-            // Copy back to the host from the GPU buffer, without any
-            // synthronization.
-            while (!exitCopyThread) {
-                CUDA_CHECK(cudaMemcpyAsync(displayRGBHost, displayRGB,
-                                           resolution.x * resolution.y * sizeof(RGB),
-                                           cudaMemcpyDeviceToHost, memcpyStream));
-                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                // Copy back to the CPU using a separate stream so that we can
+                // periodically but asynchronously pick up the latest results
+                // from the GPU.
+                cudaStream_t memcpyStream;
+                CUDA_CHECK(cudaStreamCreate(&memcpyStream));
+                GPUNameStream(memcpyStream, "DISPLAY_SERVER_COPY_STREAM");
 
-                CUDA_CHECK(cudaStreamSynchronize(memcpyStream));
-            }
+                // Copy back to the host from the GPU buffer, without any
+                // synthronization.
+                while (!exitCopyThread) {
+                    CUDA_CHECK(cudaMemcpyAsync(displayRGBHost, displayRGB,
+                                               resolution.x * resolution.y * sizeof(RGB),
+                                               cudaMemcpyDeviceToHost, memcpyStream));
+                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-            // Copy one more time to get the final image before exiting.
-            CUDA_CHECK(cudaMemcpy(displayRGBHost, displayRGB,
-                                  resolution.x * resolution.y * sizeof(RGB),
-                                  cudaMemcpyDeviceToHost));
-            CUDA_CHECK(cudaDeviceSynchronize());
-        });
+                    CUDA_CHECK(cudaStreamSynchronize(memcpyStream));
+                }
 
-        // Now on the CPU side, give the display system a lambda that
-        // copies values from |displayRGBHost| into its buffers used for
-        // sending messages to the display program (i.e., tev).
-        DisplayDynamic(film.GetFilename(), {resolution.x, resolution.y}, {"R", "G", "B"},
-                       [resolution, displayRGBHost](
-                           Bounds2i b, pstd::span<pstd::span<Float>> displayValue) {
-                           int index = 0;
-                           for (Point2i p : b) {
-                               RGB rgb = displayRGBHost[p.x + p.y * resolution.x];
-                               displayValue[0][index] = rgb.r;
-                               displayValue[1][index] = rgb.g;
-                               displayValue[2][index] = rgb.b;
-                               ++index;
-                           }
-                       });
+                // Copy one more time to get the final image before exiting.
+                CUDA_CHECK(cudaMemcpy(displayRGBHost, displayRGB,
+                                      resolution.x * resolution.y * sizeof(RGB),
+                                      cudaMemcpyDeviceToHost));
+                CUDA_CHECK(cudaDeviceSynchronize());
+            });
+
+            // Now on the CPU side, give the display system a lambda that
+            // copies values from |displayRGBHost| into its buffers used for
+            // sending messages to the display program (i.e., tev).
+            DisplayDynamic(film.GetFilename(), {resolution.x, resolution.y}, {"R", "G", "B"},
+                           [resolution, displayRGBHost](
+                                                        Bounds2i b, pstd::span<pstd::span<Float>> displayValue) {
+                               int index = 0;
+                               for (Point2i p : b) {
+                                   RGB rgb = displayRGBHost[p.x + p.y * resolution.x];
+                                   displayValue[0][index] = rgb.r;
+                                   displayValue[1][index] = rgb.g;
+                                   displayValue[2][index] = rgb.b;
+                                   ++index;
+                               }
+                           });
+        } else
+#endif // PBRT_BUILD_GPU_RENDERER
+            DisplayDynamic(film.GetFilename(), Point2i(pixelBounds.Diagonal()),
+                           {"R", "G", "B"},
+                           [pixelBounds,this](Bounds2i b, pstd::span<pstd::span<Float>> displayValue) {
+                               int index = 0;
+                               for (Point2i p : b) {
+                                   RGB rgb = film.GetPixelRGB(pixelBounds.pMin + p, 1.f /* splat scale */);
+                                   for (int c = 0; c < 3; ++c)
+                                       displayValue[c][index] = rgb[c];
+                                   ++index;
+                               }
+                           });
     }
 
     int firstSampleIndex = 0, lastSampleIndex = spp;
@@ -372,7 +427,8 @@ void GPUPathIntegrator::Render() {
     }
 
     ProgressReporter progress(lastSampleIndex - firstSampleIndex, "Rendering",
-                              Options->quiet, true /* GPU */);
+                              Options->quiet, Options->useGPU);
+
     for (int sampleIndex = firstSampleIndex; sampleIndex < lastSampleIndex;
          ++sampleIndex) {
         // Render image for sample _sampleIndex_
@@ -381,23 +437,23 @@ void GPUPathIntegrator::Render() {
              y0 += scanlinesPerPass) {
             // Generate camera rays for current scanline range
             RayQueue *cameraRayQueue = CurrentRayQueue(0);
-            GPUDo(
-                "Reset ray queue", PBRT_GPU_LAMBDA() {
+            Do(
+                "Reset ray queue", PBRT_CPU_GPU_LAMBDA() {
                     PBRT_DBG("Starting scanlines at y0 = %d, sample %d / %d\n", y0,
                              sampleIndex, spp);
                     cameraRayQueue->Reset();
                 });
             GenerateCameraRays(y0, sampleIndex);
-            GPUDo(
+            Do(
                 "Update camera ray stats",
-                PBRT_GPU_LAMBDA() { stats->cameraRays += cameraRayQueue->Size(); });
+                PBRT_CPU_GPU_LAMBDA() { stats->cameraRays += cameraRayQueue->Size(); });
 
             // Trace rays and estimate radiance up to maximum ray depth
             for (int depth = 0; true; ++depth) {
                 // Reset queues before tracing rays
                 RayQueue *nextQueue = NextRayQueue(depth);
-                GPUDo(
-                    "Reset queues before tracing rays", PBRT_GPU_LAMBDA() {
+                Do(
+                    "Reset queues before tracing rays", PBRT_CPU_GPU_LAMBDA() {
                         nextQueue->Reset();
                         // Reset queues before tracing next batch of rays
                         if (mediumSampleQueue)
@@ -429,8 +485,8 @@ void GPUPathIntegrator::Render() {
                 if (depth > 0) {
                     // As above, with the indexing...
                     RayQueue *statsQueue = CurrentRayQueue(depth);
-                    GPUDo(
-                        "Update indirect ray stats", PBRT_GPU_LAMBDA() {
+                    Do(
+                        "Update indirect ray stats", PBRT_CPU_GPU_LAMBDA() {
                             stats->indirectRays[depth] += statsQueue->Size();
                         });
                 }
@@ -449,11 +505,13 @@ void GPUPathIntegrator::Render() {
             }
 
             UpdateFilm();
+
+#ifdef PBRT_BUILD_GPU_RENDERER
             // Copy updated film pixels to buffer for display
-            if (!Options->displayServer.empty())
+            if (Options->useGPU && !Options->displayServer.empty())
                 GPUParallelFor(
                     "Update Display RGB Buffer", maxQueueSize,
-                    PBRT_GPU_LAMBDA(int pixelIndex) {
+                    PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
                         Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
                         if (!InsideExclusive(pPixel, film.PixelBounds()))
                             return;
@@ -461,41 +519,53 @@ void GPUPathIntegrator::Render() {
                         Point2i p(pPixel - film.PixelBounds().pMin);
                         displayRGB[p.x + p.y * resolution.x] = film.GetPixelRGB(pPixel);
                     });
+#endif //  PBRT_BUILD_GPU_RENDERER
         }
 
         progress.Update();
     }
     progress.Done();
-    GPUWait();
-    // Shut down display server thread, if active
-    // Wait until rendering is all done before we start to shut down the
-    // display stuff..
-    if (!Options->displayServer.empty()) {
-        exitCopyThread = true;
-        copyThread.join();
-    }
 
-    // Another synchronization to make sure no kernels are running on the
-    // GPU so that we can safely access unified memory from the CPU.
-    GPUWait();
+#ifdef PBRT_BUILD_GPU_RENDERER
+    if (Options->useGPU)
+        GPUWait();
+#endif
+
+    Float seconds = timer.ElapsedSeconds();
+
+#ifdef PBRT_BUILD_GPU_RENDERER
+    if (Options->useGPU) {
+        // Shut down display server thread, if active
+        // Wait until rendering is all done before we start to shut down the
+        // display stuff..
+        if (!Options->displayServer.empty()) {
+            exitCopyThread = true;
+            copyThread.join();
+        }
+        // Another synchronization to make sure no kernels are running on the
+        // GPU so that we can safely access unified memory from the CPU.
+        GPUWait();
+    }
+#endif // PBRT_BUILD_GPU_RENDERER
+
+    return seconds;
 }
 
-void GPUPathIntegrator::IntersectClosest(RayQueue *rayQueue,
+void WavefrontPathIntegrator::IntersectClosest(RayQueue *rayQueue,
                                          EscapedRayQueue *escapedRayQueue,
                                          HitAreaLightQueue *hitAreaLightQueue,
                                          MaterialEvalQueue *basicEvalMaterialQueue,
                                          MaterialEvalQueue *universalEvalMaterialQueue,
                                          MediumSampleQueue *mediumSampleQueue,
                                          RayQueue *nextRayQueue) const {
-    accel->IntersectClosest(maxQueueSize, escapedRayQueue, hitAreaLightQueue,
-                            basicEvalMaterialQueue, universalEvalMaterialQueue,
-                            mediumSampleQueue, rayQueue, nextRayQueue);
+    aggregate->IntersectClosest(maxQueueSize, escapedRayQueue, hitAreaLightQueue,
+                                basicEvalMaterialQueue, universalEvalMaterialQueue,
+                                mediumSampleQueue, rayQueue, nextRayQueue);
 }
 
-void GPUPathIntegrator::HandleEscapedRays(int depth) {
-    ForAllQueued(
-        "Handle escaped rays", escapedRayQueue, maxQueueSize,
-        PBRT_GPU_LAMBDA(const EscapedRayWorkItem w) {
+void WavefrontPathIntegrator::HandleEscapedRays(int depth) {
+    ForAllQueued("Handle escaped rays", escapedRayQueue, maxQueueSize,
+        PBRT_CPU_GPU_LAMBDA(const EscapedRayWorkItem w) {
             // Update pixel radiance for escaped ray
             SampledSpectrum L(0.f);
             for (const auto &light : *envLights) {
@@ -532,10 +602,10 @@ void GPUPathIntegrator::HandleEscapedRays(int depth) {
         });
 }
 
-void GPUPathIntegrator::HandleRayFoundEmission(int depth) {
+void WavefrontPathIntegrator::HandleRayFoundEmission(int depth) {
     ForAllQueued(
         "Handle emitters hit by indirect rays", hitAreaLightQueue, maxQueueSize,
-        PBRT_GPU_LAMBDA(const HitAreaLightWorkItem w) {
+        PBRT_CPU_GPU_LAMBDA(const HitAreaLightWorkItem w) {
             // Find emitted radiance from surface that ray hit
             SampledSpectrum Le = w.areaLight.L(w.p, w.n, w.uv, w.wo, w.lambda);
             if (!Le)
@@ -569,99 +639,23 @@ void GPUPathIntegrator::HandleRayFoundEmission(int depth) {
         });
 }
 
-void GPUPathIntegrator::TraceShadowRays(int depth) {
+void WavefrontPathIntegrator::TraceShadowRays(int depth) {
     if (haveMedia)
-        accel->IntersectShadowTr(maxQueueSize, shadowRayQueue, &pixelSampleState);
+        aggregate->IntersectShadowTr(maxQueueSize, shadowRayQueue, &pixelSampleState);
     else
-        accel->IntersectShadow(maxQueueSize, shadowRayQueue, &pixelSampleState);
-    // Reset shadow ray queue
-    GPUDo(
-        "Reset shadowRayQueue", PBRT_GPU_LAMBDA() {
+        aggregate->IntersectShadow(maxQueueSize, shadowRayQueue, &pixelSampleState);
+
+    Do(
+        "Reset shadowRayQueue", PBRT_CPU_GPU_LAMBDA() {
             stats->shadowRays[depth] += shadowRayQueue->Size();
             shadowRayQueue->Reset();
         });
 }
 
-void GPURender(ParsedScene &scene) {
-#ifdef PBRT_IS_WINDOWS
-    // NOTE: on Windows, where only basic unified memory is supported, the
-    // GPUPathIntegrator itself is *not* allocated using the unified memory
-    // allocator so that the CPU can access the values of its members
-    // (e.g. maxDepth) concurrently while the GPU is rendering.  In turn,
-    // the lambda capture for GPU kernels has to capture *this by value (see
-    // the definition of PBRT_GPU_LAMBDA in gpulaunch.h.).
-    GPUPathIntegrator *integrator = new GPUPathIntegrator(gpuMemoryAllocator, scene);
-#else
-    // With more capable unified memory, the GPUPathIntegrator can live in
-    // unified memory and some cudaMemAdvise calls, to come shortly, let us
-    // have fast read-only access to it on the CPU.
-    GPUPathIntegrator *integrator =
-        gpuMemoryAllocator.new_object<GPUPathIntegrator>(gpuMemoryAllocator, scene);
-#endif
-
-    int deviceIndex;
-    CUDA_CHECK(cudaGetDevice(&deviceIndex));
-    int hasConcurrentManagedAccess;
-    CUDA_CHECK(cudaDeviceGetAttribute(&hasConcurrentManagedAccess,
-                                      cudaDevAttrConcurrentManagedAccess, deviceIndex));
-
-    // Copy all of the scene data structures over to GPU memory.  This
-    // ensures that there isn't a big performance hitch for the first batch
-    // of rays as that stuff is copied over on demand.
-    if (hasConcurrentManagedAccess) {
-        // Set things up so that we can still have read from the
-        // GPUPathIntegrator struct on the CPU without hurting
-        // performance. (This makes it possible to use the values of things
-        // like GPUPathIntegrator::haveSubsurface to conditionally launch
-        // kernels according to what's in the scene...)
-        CUDA_CHECK(cudaMemAdvise(integrator, sizeof(*integrator),
-                                 cudaMemAdviseSetReadMostly, /* ignored argument */ 0));
-        CUDA_CHECK(cudaMemAdvise(integrator, sizeof(*integrator),
-                                 cudaMemAdviseSetPreferredLocation, deviceIndex));
-
-        // Copy all of the scene data structures over to GPU memory.  This
-        // ensures that there isn't a big performance hitch for the first batch
-        // of rays as that stuff is copied over on demand.
-        CUDATrackedMemoryResource *mr =
-            dynamic_cast<CUDATrackedMemoryResource *>(gpuMemoryAllocator.resource());
-        CHECK(mr != nullptr);
-        mr->PrefetchToGPU();
-    } else {
-        // TODO: on systems with basic unified memory, just launching a
-        // kernel should cause everything to be copied over. Is an empty
-        // kernel sufficient?
-    }
-
-    ///////////////////////////////////////////////////////////////////////////
-    // Render!
-    Timer timer;
-    integrator->Render();
-
-    LOG_VERBOSE("Total rendering time: %.3f s", timer.ElapsedSeconds());
-
-    if (Options->printStatistics) {
-        ReportKernelStats();
-
-        Printf("GPU Statistics:\n");
-        Printf("%s\n", integrator->stats->Print());
-    }
-
-    std::vector<GPULogItem> logs = ReadGPULogs();
-    for (const auto &item : logs)
-        Log(item.level, item.file, item.line, item.message);
-
-    ImageMetadata metadata;
-    metadata.samplesPerPixel = integrator->sampler.SamplesPerPixel();
-    integrator->camera.InitMetadata(&metadata);
-    metadata.renderTimeSeconds = timer.ElapsedSeconds();
-    metadata.samplesPerPixel = integrator->sampler.SamplesPerPixel();
-    integrator->film.WriteImage(metadata);
-}
-
-GPUPathIntegrator::Stats::Stats(int maxDepth, Allocator alloc)
+WavefrontPathIntegrator::Stats::Stats(int maxDepth, Allocator alloc)
     : indirectRays(maxDepth + 1, alloc), shadowRays(maxDepth, alloc) {}
 
-std::string GPUPathIntegrator::Stats::Print() const {
+std::string WavefrontPathIntegrator::Stats::Print() const {
     std::string s;
     s += StringPrintf("    %-42s               %12" PRIu64 "\n", "Camera rays",
                       cameraRays);

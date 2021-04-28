@@ -35,7 +35,7 @@ function (CHECK_EXT NAME DIR HASH)
 
   find_package(Git)
   if (GIT_FOUND)
-    execute_process(
+    execute_process (
       COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
       WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/ext/${DIR}"
       RESULT_VARIABLE "git_return"
@@ -46,13 +46,13 @@ function (CHECK_EXT NAME DIR HASH)
       message (FATAL_ERROR "The ${CMAKE_CURRENT_SOURCE_DIR}/src/ext/${DIR} "
         "submodule isn't up to date (${git_hash} vs ${HASH}). Please run:\n"
         "  \"git submodule update --recursive\"")
-    else()
-      message(STATUS "${NAME} at commit: ${git_hash}")
+    else ()
+      message (STATUS "${NAME} at commit: ${git_hash}")
     endif()
-  else(GIT_FOUND)
-    message(STATUS "git not found: unable to verify revisions in submodules")
-  endif(GIT_FOUND)
-endfunction()
+  else (GIT_FOUND)
+    message (STATUS "git not found: unable to verify revisions in submodules")
+  endif (GIT_FOUND)
+endfunction ()
 
 check_ext ("OpenEXR" "openexr/OpenEXR" 5cfb5dab6dfada731586b0281bdb15ee75e26782)
 check_ext ("Ptex" "ptex/src" 4cd8e9a6db2b06e478dfbbd8c26eb6df97f84483)
@@ -66,10 +66,10 @@ add_compile_definitions ("$<$<CONFIG:DEBUG>:PBRT_DEBUG_BUILD>")
 
 enable_testing ()
 
-find_package ( Sanitizers )
-find_package ( Threads )
+find_package (Sanitizers)
+find_package (Threads)
 
-set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+set_property (GLOBAL PROPERTY USE_FOLDERS ON)
 
 if (MSVC)
   list (APPEND PBRT_DEFINITIONS "PBRT_IS_MSVC" "_CRT_SECURE_NO_WARNINGS")
@@ -275,10 +275,10 @@ if (CMAKE_CUDA_COMPILER)
             foreach (arg ${PBRT_DEFINITIONS})
               list (APPEND cuda_definitions "--define-macro=${arg}")
             endforeach ()
-            target_compile_options("${lib_name}" PRIVATE ${cuda_definitions})
+            target_compile_options ("${lib_name}" PRIVATE ${cuda_definitions})
           else ()
-            target_compile_definitions("${lib_name}" PRIVATE ${PBRT_DEFINITIONS})
-          endif()
+            target_compile_definitions ("${lib_name}" PRIVATE ${PBRT_DEFINITIONS})
+          endif ()
           target_include_directories ("${lib_name}" PRIVATE src ${CMAKE_BINARY_DIR})
           target_include_directories ("${lib_name}" SYSTEM PRIVATE ${NANOVDB_INCLUDE})
           target_link_libraries ("${lib_name}" PRIVATE cuda_build_configuration pbrt_opt pbrt_warnings)
@@ -307,7 +307,7 @@ endif ()
 ###########################################################################
 # Annoying compiler-specific details
 
-INCLUDE(CheckCXXCompilerFlag)
+include (CheckCXXCompilerFlag)
 
 check_cxx_compiler_flag ("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
 if (COMPILER_SUPPORTS_MARCH_NATIVE AND PBRT_BUILD_NATIVE_EXECUTABLE)
@@ -318,22 +318,22 @@ endif ()
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   list (APPEND PBRT_CXX_FLAGS "-std=c++17")
 
-  FIND_PROGRAM(XIAR xiar)
-  IF(XIAR)
-    SET(CMAKE_AR "${XIAR}")
-  ENDIF(XIAR)
-  MARK_AS_ADVANCED(XIAR)
+  find_program (XIAR xiar)
+  if (XIAR)
+    set (CMAKE_AR "${XIAR}")
+  endif (XIAR)
+  mark_as_advanced (XIAR)
 
-  FIND_PROGRAM(XILD xild)
-  IF(XILD)
-    SET(CMAKE_LINKER "${XILD}")
-  ENDIF(XILD)
-  MARK_AS_ADVANCED(XILD)
+  find_program(XILD xild)
+  if (XILD)
+    set (CMAKE_LINKER "${XILD}")
+  endif (XILD)
+  mark_as_advanced (XILD)
 
   # ICC will default to -fp-model fast=1, which performs value-unsafe optimizations which will
   # cause pbrt_test to fail. For safety, -fp-model precise is explicitly set here by default.
-  set(FP_MODEL "precise" CACHE STRING "The floating point model to compile with.")
-  set_property(CACHE FP_MODEL PROPERTY STRINGS "precise" "fast=1" "fast=2")
+  set (FP_MODEL "precise" CACHE STRING "The floating point model to compile with.")
+  set_property (CACHE FP_MODEL PROPERTY STRINGS "precise" "fast=1" "fast=2")
 
   list (APPEND PBRT_CXX_FLAGS "-fp-model" "${FP_MODEL}")
 endif ()
@@ -437,10 +437,10 @@ int main() { }
 
 if (INT64_IS_OWN_TYPE)
   list (APPEND PBRT_DEFINITIONS "PBRT_INT64_IS_OWN_TYPE")
-
 endif ()
+
 if (PBRT_NVTX)
-  add_definitions( -D NVTX )
+  add_definitions (-D NVTX)
 endif()
 
 ###########################################################################
@@ -499,6 +499,28 @@ set (PBRT_SOURCE_HEADERS
   src/pbrt/shapes.h
   src/pbrt/textures.h
   )  
+
+SET (PBRT_WAVEFRONT_SOURCE
+  src/pbrt/wavefront/aggregate.cpp
+  src/pbrt/wavefront/camera.cpp
+  src/pbrt/wavefront/film.cpp
+  src/pbrt/wavefront/integrator.cpp
+  src/pbrt/wavefront/media.cpp
+  src/pbrt/wavefront/samples.cpp
+  src/pbrt/wavefront/surfscatter.cpp
+  src/pbrt/wavefront/subsurface.cpp
+  src/pbrt/wavefront/wavefront.cpp
+)
+
+SET (PBRT_WAVEFRONT_SOURCE_HEADERS
+  src/pbrt/wavefront/aggregate.h
+  src/pbrt/wavefront/integrator.h
+  src/pbrt/wavefront/intersect.h
+  src/pbrt/wavefront/wavefront.h
+  src/pbrt/wavefront/workitems.h
+  src/pbrt/wavefront/workitems.soa
+  src/pbrt/wavefront/workqueue.h
+)
 
 SET (PBRT_UTIL_SOURCE
   src/pbrt/util/bluenoise.cpp
@@ -581,26 +603,15 @@ SET (PBRT_UTIL_SOURCE_HEADERS
 
 if (PBRT_CUDA_ENABLED)
   set (PBRT_GPU_SOURCE
-     src/pbrt/gpu/accel.cpp
-     src/pbrt/gpu/camera.cpp
-     src/pbrt/gpu/film.cpp
-     src/pbrt/gpu/init.cpp
-     src/pbrt/gpu/launch.cpp
-     src/pbrt/gpu/media.cpp
-     src/pbrt/gpu/pathintegrator.cpp
-     src/pbrt/gpu/samples.cpp
-     src/pbrt/gpu/subsurface.cpp
-     src/pbrt/gpu/surfscatter.cpp
+    src/pbrt/gpu/aggregate.cpp
+    src/pbrt/gpu/memory.cpp
+    src/pbrt/gpu/util.cpp
   )
   set (PBRT_GPU_SOURCE_HEADERS
-     src/pbrt/gpu/accel.h
-     src/pbrt/gpu/init.h
-     src/pbrt/gpu/launch.h
-     src/pbrt/gpu/optix.h
-     src/pbrt/gpu/pathintegrator.h
-     src/pbrt/gpu/workitems.h
-     src/pbrt/gpu/workitems.soa
-     src/pbrt/gpu/workqueue.h
+    src/pbrt/gpu/aggregate.h
+    src/pbrt/gpu/memory.h
+    src/pbrt/gpu/optix.h
+    src/pbrt/gpu/util.h
   )
 
   set_source_files_properties (
@@ -657,6 +668,7 @@ if (PBRT_CUDA_ENABLED)
    src/pbrt/util/transform.cpp
    src/pbrt/util/vecmath.cpp
 
+    ${PBRT_WAVEFRONT_SOURCE}
     ${PBRT_GPU_SOURCE}
 
     src/pbrt/cmd/pspec_gpu.cpp
@@ -667,13 +679,15 @@ if (PBRT_CUDA_ENABLED)
   cuda_compile_and_embed (PBRT_EMBEDDED_PTX src/pbrt/gpu/optix.cu optix.cu)
 endif ()
 
-source_group("Source Files" FILES ${PBRT_SOURCE})
-source_group("Header Files" FILES ${PBRT_SOURCE_HEADERS})
-source_group("Source Files/util" FILES ${PBRT_UTIL_SOURCE})
-source_group("Header Files/util" FILES ${PBRT_UTIL_SOURCE_HEADERS})
+source_group ("Source Files" FILES ${PBRT_SOURCE})
+source_group ("Header Files" FILES ${PBRT_SOURCE_HEADERS})
+source_group ("Source Files/util" FILES ${PBRT_UTIL_SOURCE})
+source_group ("Header Files/util" FILES ${PBRT_UTIL_SOURCE_HEADERS})
+source_group ("Source Files/wavefront" FILES ${PBRT_WAVEFRONT_SOURCE})
+source_group ("Header Files/wavefront" FILES ${PBRT_WAVEFRONT_SOURCE_HEADERS})
 if (PBRT_CUDA_ENABLED)
-  source_group("Source Files/gpu" FILES ${PBRT_GPU_SOURCE})
-  source_group("Header Files/gpu" FILES ${PBRT_GPU_SOURCE_HEADERS})
+  source_group ("Source Files/gpu" FILES ${PBRT_GPU_SOURCE})
+  source_group ("Header Files/gpu" FILES ${PBRT_GPU_SOURCE_HEADERS})
 endif ()
 
 ###########################################################################
@@ -698,12 +712,10 @@ add_custom_command (OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/pbrt_soa.h
     DEPENDS soac ${CMAKE_SOURCE_DIR}/src/pbrt/pbrt.soa)
 set (PBRT_SOA_GENERATED ${CMAKE_CURRENT_BINARY_DIR}/pbrt_soa.h)
 
-if (PBRT_CUDA_ENABLED)
-  add_custom_command (OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/gpu_workitems_soa.h
-      COMMAND soac ${CMAKE_SOURCE_DIR}/src/pbrt/gpu/workitems.soa > ${CMAKE_CURRENT_BINARY_DIR}/gpu_workitems_soa.h
-      DEPENDS soac ${CMAKE_SOURCE_DIR}/src/pbrt/gpu/workitems.soa)
-  set (PBRT_SOA_GENERATED ${PBRT_SOA_GENERATED} ${CMAKE_CURRENT_BINARY_DIR}/gpu_workitems_soa.h)
-endif ()
+add_custom_command (OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/wavefront_workitems_soa.h
+    COMMAND soac ${CMAKE_SOURCE_DIR}/src/pbrt/wavefront/workitems.soa > ${CMAKE_CURRENT_BINARY_DIR}/wavefront_workitems_soa.h
+    DEPENDS soac ${CMAKE_SOURCE_DIR}/src/pbrt/wavefront/workitems.soa)
+set (PBRT_SOA_GENERATED ${PBRT_SOA_GENERATED} ${CMAKE_CURRENT_BINARY_DIR}/wavefront_workitems_soa.h)
 
 add_custom_target (pbrt_soa_generated DEPENDS ${PBRT_SOA_GENERATED})
 
@@ -720,6 +732,8 @@ add_library (pbrt_lib STATIC
   ${PBRT_SOURCE_HEADERS}
   ${PBRT_UTIL_SOURCE}
   ${PBRT_UTIL_SOURCE_HEADERS}
+  ${PBRT_WAVEFRONT_SOURCE}
+  ${PBRT_WAVEFRONT_SOURCE_HEADERS}
   ${PBRT_GPU_SOURCE}
   ${PBRT_GPU_SOURCE_HEADERS}
 
@@ -846,7 +860,7 @@ set_property (TARGET sky_lib PROPERTY FOLDER "ext")
 
 target_compile_definitions (imgtool PRIVATE ${PBRT_DEFINITIONS})
 target_compile_options (imgtool PRIVATE ${PBRT_CXX_FLAGS})
-target_include_directories (imgtool PRIVATE src src/ext ${FLIP_INCLUDE} )
+target_include_directories (imgtool PRIVATE src src/ext ${FLIP_INCLUDE})
 target_link_libraries (imgtool PRIVATE ${ALL_PBRT_LIBS} pbrt_opt pbrt_warnings sky_lib flip_lib)
 
 add_sanitizers (imgtool)
