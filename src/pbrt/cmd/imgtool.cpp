@@ -183,6 +183,8 @@ static std::map<std::string, CommandUsage> commandUsage = {
                        (Default: maximum pixel value in the image.)
     --outfile <name>   Filename for output image.
     --plusminus        Visualize green > 0, red < 0.
+    --ramp             Generate an image of the color ramp; <filename> is ignored
+                       if specified.
 )")}},
     {"makeequiarea", {"makeequiarea [options] <filename>",
                       "Convert a equirectangular environment map (as used in pbrt-v3)\n"
@@ -1407,7 +1409,7 @@ static const std::vector<RGB> falseColorValues = {
 
 int falsecolor(int argc, char *argv[]) {
     std::string outFile, inFile;
-    bool plusMinus = false;
+    bool plusMinus = false, ramp = false;
     Float maxValue = -Infinity;
 
     while (*argv != nullptr) {
@@ -1418,6 +1420,7 @@ int falsecolor(int argc, char *argv[]) {
 
         if (ParseArg(&argv, "outfile", &outFile, onError) ||
             ParseArg(&argv, "plusminus", &plusMinus, onError) ||
+            ParseArg(&argv, "ramp", &ramp, onError) ||
             ParseArg(&argv, "maxValue", &maxValue, onError)) {
             // success
         } else if (inFile.empty() && argv[0][0] != '-') {
@@ -1428,13 +1431,20 @@ int falsecolor(int argc, char *argv[]) {
         }
     }
 
-    if (inFile.empty())
+    if (!ramp && inFile.empty())
         usage("falsecolor", "expecting input image filename.");
     if (outFile.empty())
         usage("falsecolor", "expecting --outfile filename.");
 
-    ImageAndMetadata im = Image::Read(inFile);
-    const Image &image = im.image;
+    Image image;
+    if (ramp) {
+        int xres = 10, yres = 300;
+        image = Image(PixelFormat::Float, {xres, yres}, {"Y"});
+        for (int y = 0; y < yres; ++y)
+            for (int x = 0; x < xres; ++x)
+                image.SetChannel({x, y}, 0, Float(yres - 1 - y) / Float(yres - 1));
+    } else
+        image = Image::Read(inFile).image;
 
     if (maxValue == -Infinity)
         for (int y = 0; y < image.Resolution().y; ++y)
