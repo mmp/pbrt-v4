@@ -46,7 +46,7 @@ namespace pbrt {
 std::pair<cudaEvent_t, cudaEvent_t> GetProfilerEvents(const char *description);
 
 template <typename F>
-inline int GetBlockSize(const char *description, F &&kernel) {
+inline int GetBlockSize(const char *description, F kernel) {
     // Note: this isn't re-entrant, but that's fine for our purposes...
     static std::map<std::type_index, int> kernelBlockSizes;
 
@@ -77,10 +77,10 @@ __global__ void Kernel(F func, int nItems) {
 
 // GPU Launch Function Declarations
 template <typename F>
-void GPUParallelFor(const char *description, int nItems, F &&func);
+void GPUParallelFor(const char *description, int nItems, F func);
 
 template <typename F>
-void GPUParallelFor(const char *description, int nItems, F &&func) {
+void GPUParallelFor(const char *description, int nItems, F func) {
 #ifdef NVTX
     nvtxRangePush(description);
 #endif
