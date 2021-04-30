@@ -111,10 +111,10 @@ struct SOA<RaySamples> {
     GetSetIndirector operator[](int i) { return GetSetIndirector{this, i}; }
 
   private:
-    Float4 *__restrict__ direct;
-    Float4 *__restrict__ indirect;
-    Float4 *__restrict__ subsurface;
-    Float *__restrict__ mediaDist, *__restrict__ mediaMode;
+    Float4 * PBRT_RESTRICT direct;
+    Float4 * PBRT_RESTRICT indirect;
+    Float4 * PBRT_RESTRICT subsurface;
+    Float * PBRT_RESTRICT mediaDist, * PBRT_RESTRICT mediaMode;
 };
 
 // PixelSampleState Definition

@@ -403,6 +403,27 @@ else ()
 endif ()
 
 ########################################
+# restrict
+
+check_cxx_source_compiles (
+"int * __restrict__ ptr;
+int main() { }"
+HAVE_PRE_POST_BAR_RESTRICT)
+
+check_cxx_source_compiles (
+"int * __restrict ptr;
+int main() { }"
+HAVE_PRE_BAR_RESTRICT)
+
+if (HAVE_PRE_POST_BAR_RESTRICT)
+  list (APPEND PBRT_DEFINITIONS "PBRT_RESTRICT=__restrict__")
+elseif (HAVE_PRE_BAR_RESTRICT)
+  list (APPEND PBRT_DEFINITIONS "PBRT_RESTRICT=__restrict")
+else ()
+  list (APPEND PBRT_DEFINITIONS "PBRT_RESTRICT")
+endif ()
+
+########################################
 # Aligned memory allocation
 
 check_cxx_source_compiles ( "

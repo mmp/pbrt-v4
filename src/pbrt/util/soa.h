@@ -101,7 +101,7 @@ struct SOA<SampledSpectrum> {
     static constexpr int n4 = (NSpectrumSamples + 3) / 4;
 
     int nAlloc;
-    Float4 *__restrict__ ptr = nullptr;
+    Float4 * PBRT_RESTRICT ptr = nullptr;
 };
 
 template <>
@@ -167,8 +167,8 @@ struct SOA<SampledWavelengths> {
     static constexpr int n4 = (NSpectrumSamples + 3) / 4;
 
     int nAlloc;
-    Float4 *__restrict__ lambda = nullptr;
-    Float4 *__restrict__ pdf = nullptr;
+    Float4 * PBRT_RESTRICT lambda = nullptr;
+    Float4 * PBRT_RESTRICT pdf = nullptr;
 };
 
 #include "pbrt_soa.h"
