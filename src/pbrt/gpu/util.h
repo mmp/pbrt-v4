@@ -67,7 +67,7 @@ inline int GetBlockSize(const char *description, F &&kernel) {
 
 #ifdef __NVCC__
 template <typename F>
-__global__ void Kernel(F &&func, int nItems) {
+__global__ void Kernel(F func, int nItems) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid >= nItems)
         return;
