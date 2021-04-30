@@ -114,7 +114,7 @@ class WorkQueue : public SOA<WorkItem> {
 
 // WorkQueue Inline Functions
 template <typename F, typename WorkItem>
-void ForAllQueued(const char *desc, WorkQueue<WorkItem> *q, int maxQueued, F func) {
+void ForAllQueued(const char *desc, WorkQueue<WorkItem> *q, int maxQueued, F &&func) {
     if (Options->useGPU) {
 #ifdef PBRT_BUILD_GPU_RENDERER
         GPUParallelFor(desc, maxQueued, [=] PBRT_GPU(int index) mutable {
