@@ -147,6 +147,8 @@ if (CMAKE_CUDA_COMPILER)
     message (STATUS "Found CUDA: ${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR}")
     if (CUDA_VERSION_MAJOR LESS 11)
       message(SEND_ERROR "pbrt-v4 requires CUDA version 11.0 or later. If you have multiple versions installed, please update your PATH.")
+    elseif (CUDA_VERSION_MINOR EQUAL 3)
+      message(SEND_ERROR "Unfortunately, pbrt-v4 triggers an internal compiler error in CUDA 11.3. Please use CUDA 11.0-11.2 until the compiler is fixed.")
     endif ()
 
     if ("${PBRT_OPTIX7_PATH}" STREQUAL "")
