@@ -4,6 +4,9 @@
 
 #include <pbrt/util/colorspace.h>
 
+#ifdef PBRT_BUILD_GPU_RENDERER
+#include <pbrt/gpu/util.h>
+#endif
 #include <pbrt/options.h>
 
 namespace pbrt {

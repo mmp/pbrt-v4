@@ -2,13 +2,15 @@
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
 
-#ifndef PBRT_GPU_LAUNCH_H
-#define PBRT_GPU_LAUNCH_H
+#ifndef PBRT_GPU_UTIL_H
+#define PBRT_GPU_UTIL_H
 
 #include <pbrt/pbrt.h>
 
 #include <pbrt/util/check.h>
 #include <pbrt/util/log.h>
+#include <pbrt/util/parallel.h>
+#include <pbrt/util/progressreporter.h>
 
 #include <map>
 #include <typeindex>
@@ -22,6 +24,22 @@
 #ifdef NVTX
 #include <nvtx3/nvToolsExt.h>
 #endif
+
+#define CUDA_CHECK(EXPR)                                        \
+    if (EXPR != cudaSuccess) {                                  \
+        cudaError_t error = cudaGetLastError();                 \
+        LOG_FATAL("CUDA error: %s", cudaGetErrorString(error)); \
+    } else /* eat semicolon */
+
+#define CU_CHECK(EXPR)                                              \
+    do {                                                            \
+        CUresult result = EXPR;                                     \
+        if (result != CUDA_SUCCESS) {                               \
+            const char *str;                                        \
+            CHECK_EQ(CUDA_SUCCESS, cuGetErrorString(result, &str)); \
+            LOG_FATAL("CUDA error: %s", str);                       \
+        }                                                           \
+    } while (false) /* eat semicolon */
 
 namespace pbrt {
 
@@ -47,7 +65,7 @@ inline int GetBlockSize(const char *description, F kernel) {
     return blockSize;
 }
 
-#ifdef __CUDACC__
+#ifdef __NVCC__
 template <typename F>
 __global__ void Kernel(F func, int nItems) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -56,20 +74,11 @@ __global__ void Kernel(F func, int nItems) {
 
     func(tid);
 }
-#endif  // __CUDACC__
 
 // GPU Launch Function Declarations
 template <typename F>
 void GPUParallelFor(const char *description, int nItems, F func);
 
-template <typename F>
-void GPUDo(const char *description, F func) {
-    GPUParallelFor(description, 1, [=] PBRT_GPU(int) mutable { func(); });
-}
-
-void GPUWait();
-
-#ifdef __CUDACC__
 template <typename F>
 void GPUParallelFor(const char *description, int nItems, F func) {
 #ifdef NVTX
@@ -96,10 +105,18 @@ void GPUParallelFor(const char *description, int nItems, F func) {
     nvtxRangePop();
 #endif
 }
-#endif  // __CUDACC__
+#endif // __NVCC__
+
+void GPUWait();
 
 void ReportKernelStats();
 
+void GPUInit();
+void GPUThreadInit();
+
+void GPURegisterThread(const char *name);
+void GPUNameStream(cudaStream_t stream, const char *name);
+
 }  // namespace pbrt
 
-#endif  // PBRT_GPU_LAUNCH_H
+#endif  // PBRT_GPU_UTIL_H

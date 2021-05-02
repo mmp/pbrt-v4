@@ -2,14 +2,14 @@
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
 
-#ifndef PBRT_GPU_WORKITEMS_H
-#define PBRT_GPU_WORKITEMS_H
+#ifndef PBRT_WAVEFRONT_WORKITEMS_H
+#define PBRT_WAVEFRONT_WORKITEMS_H
 
 #include <pbrt/pbrt.h>
 
 #include <pbrt/base/sampler.h>
 #include <pbrt/film.h>
-#include <pbrt/gpu/workqueue.h>
+#include <pbrt/wavefront/workqueue.h>
 #include <pbrt/lightsamplers.h>
 #include <pbrt/materials.h>
 #include <pbrt/ray.h>
@@ -111,10 +111,10 @@ struct SOA<RaySamples> {
     GetSetIndirector operator[](int i) { return GetSetIndirector{this, i}; }
 
   private:
-    Float4 *__restrict__ direct;
-    Float4 *__restrict__ indirect;
-    Float4 *__restrict__ subsurface;
-    Float *__restrict__ mediaDist, *__restrict__ mediaMode;
+    Float4 * PBRT_RESTRICT direct;
+    Float4 * PBRT_RESTRICT indirect;
+    Float4 * PBRT_RESTRICT subsurface;
+    Float * PBRT_RESTRICT mediaDist, * PBRT_RESTRICT mediaMode;
 };
 
 // PixelSampleState Definition
@@ -314,7 +314,7 @@ struct MaterialEvalWorkItem {
     Float time;
 };
 
-#include "gpu_workitems_soa.h"
+#include "wavefront_workitems_soa.h"
 
 // RayQueue Definition
 class RayQueue : public WorkQueue<RayWorkItem> {
@@ -473,4 +473,4 @@ using MaterialEvalQueue = MultiWorkQueue<
 
 }  // namespace pbrt
 
-#endif  // PBRT_GPU_WORKITEMS_H
+#endif  // PBRT_WAVEFRONT_WORKITEMS_H

@@ -2,29 +2,36 @@
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
 
-#ifndef PBRT_GPU_WORKQUEUE_H
-#define PBRT_GPU_WORKQUEUE_H
+#ifndef PBRT_WAVEFRONT_WORKQUEUE_H
+#define PBRT_WAVEFRONT_WORKQUEUE_H
 
 #include <pbrt/pbrt.h>
 
-#include <pbrt/gpu/launch.h>
+#include <pbrt/options.h>
+#ifdef PBRT_BUILD_GPU_RENDERER
+#include <pbrt/gpu/util.h>
+#endif
+#include <pbrt/util/parallel.h>
 #include <pbrt/util/pstd.h>
 
+#include <atomic>
 #include <utility>
 
+#ifdef __CUDACC__
 #ifdef PBRT_IS_WINDOWS
-#if (__CUDA_ARCH__ >= 700)
-#define PBRT_HAVE_CUDA_ATOMICS
+#if (__CUDA_ARCH__ < 700)
+#define PBRT_USE_LEGACY_CUDA_ATOMICS
 #endif
 #else
-#if (__CUDA_ARCH__ >= 600)
-#define PBRT_HAVE_CUDA_ATOMICS
+#if (__CUDA_ARCH__ < 600)
+#define PBRT_USE_LEGACY_CUDA_ATOMICS
 #endif
 #endif  // PBRT_IS_WINDOWS
 
-#ifdef PBRT_HAVE_CUDA_ATOMICS
+#ifndef PBRT_USE_LEGACY_CUDA_ATOMICS
 #include <cuda/atomic>
-#endif  // PBRT_HAVE_CUDA_ATOMICS
+#endif
+#endif // __CUDA_CC__
 
 namespace pbrt {
 
@@ -37,30 +44,36 @@ class WorkQueue : public SOA<WorkItem> {
     WorkQueue(int n, Allocator alloc) : SOA<WorkItem>(n, alloc) {}
     WorkQueue &operator=(const WorkQueue &w) {
         SOA<WorkItem>::operator=(w);
-#ifdef PBRT_HAVE_CUDA_ATOMICS
-        size.store(w.size.load());
-#else
+#if defined(PBRT_IS_GPU_CODE) && defined(PBRT_USE_LEGACY_CUDA_ATOMICS)
         size = w.size;
+#else
+        size.store(w.size.load());
 #endif
         return *this;
     }
 
     PBRT_CPU_GPU
     int Size() const {
-#ifdef PBRT_HAVE_CUDA_ATOMICS
-        namespace std = cuda::std;
-        return size.load(std::memory_order_relaxed);
-#else
+#ifdef PBRT_IS_GPU_CODE
+#ifdef PBRT_USE_LEGACY_CUDA_ATOMICS
         return size;
+#else
+        return size.load(cuda::std::memory_order_relaxed);
+#endif
+#else
+        return size.load(std::memory_order_relaxed);
 #endif
     }
     PBRT_CPU_GPU
     void Reset() {
-#ifdef PBRT_HAVE_CUDA_ATOMICS
-        namespace std = cuda::std;
-        size.store(0, std::memory_order_relaxed);
-#else
+#ifdef PBRT_IS_GPU_CODE
+#ifdef PBRT_USE_LEGACY_CUDA_ATOMICS
         size = 0;
+#else
+        size.store(0, cuda::std::memory_order_relaxed);
+#endif
+#else
+        size.store(0, std::memory_order_relaxed);
 #endif
     }
 
@@ -75,37 +88,47 @@ class WorkQueue : public SOA<WorkItem> {
     // WorkQueue Protected Methods
     PBRT_CPU_GPU
     int AllocateEntry() {
-#ifdef PBRT_HAVE_CUDA_ATOMICS
-        namespace std = cuda::std;
-        return size.fetch_add(1, std::memory_order_relaxed);
-#else
 #ifdef PBRT_IS_GPU_CODE
+#ifdef PBRT_USE_LEGACY_CUDA_ATOMICS
         return atomicAdd(&size, 1);
 #else
-        assert(!"this shouldn't be called");
-        return 0;
+        return size.fetch_add(1, cuda::std::memory_order_relaxed);
 #endif
-#endif
+#else
+        return size.fetch_add(1, std::memory_order_relaxed);
+#endif // PBRT_IS_GPU_CODE
     }
 
   private:
     // WorkQueue Private Members
-#ifdef PBRT_HAVE_CUDA_ATOMICS
-    using GPUAtomicInt = cuda::atomic<int, cuda::thread_scope_device>;
-    GPUAtomicInt size{0};
-#else
+#ifdef PBRT_IS_GPU_CODE
+#ifdef PBRT_USE_LEGACY_CUDA_ATOMICS
     int size = 0;
+#else
+    cuda::atomic<int, cuda::thread_scope_device> size{0};
 #endif
+#else
+    std::atomic<int> size{0};
+#endif // PBRT_IS_GPU_CODE
 };
 
 // WorkQueue Inline Functions
 template <typename F, typename WorkItem>
-void ForAllQueued(const char *desc, WorkQueue<WorkItem> *q, int maxQueued, F func) {
-    GPUParallelFor(desc, maxQueued, [=] PBRT_GPU(int index) mutable {
-        if (index >= q->Size())
-            return;
-        func((*q)[index]);
-    });
+void ForAllQueued(const char *desc, WorkQueue<WorkItem> *q, int maxQueued, F &&func) {
+    if (Options->useGPU) {
+#ifdef PBRT_BUILD_GPU_RENDERER
+        GPUParallelFor(desc, maxQueued, [=] PBRT_GPU(int index) mutable {
+            if (index >= q->Size())
+                return;
+            func((*q)[index]);
+        });
+#else
+        LOG_FATAL("Options->useGPU was set without PBRT_BUILD_GPU_RENDERER enabled");
+#endif
+    } else
+        ParallelFor(0, q->Size(), [&](int index) {
+            func((*q)[index]);
+        });
 }
 
 // MultiWorkQueue Definition
@@ -144,4 +167,4 @@ class MultiWorkQueue<TypePack<Ts...>> {
 
 }  // namespace pbrt
 
-#endif  // PBRT_GPU_WORKQUEUE_H
+#endif  // PBRT_WAVEFRONT_WORKQUEUE_H

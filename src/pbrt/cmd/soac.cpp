@@ -451,7 +451,7 @@ int main(int argc, char *argv[]) {
                 std::string name = member.names[i];
                 if (!member.arraySizes[i].empty()) {
                     if (isFlatType(member.type) || member.numPointers > 0)
-                        printf("    %s * /*__restrict__*/ %s[%s];\n",
+                        printf("    %s * /*PBRT_RESTRICT*/ %s[%s];\n",
                                member.GetType().c_str(), name.c_str(),
                                member.arraySizes[i].c_str());
                     else
@@ -459,7 +459,7 @@ int main(int argc, char *argv[]) {
                                member.arraySizes[i].c_str());
                 } else {
                     if (isFlatType(member.type) || member.numPointers > 0)
-                        printf("    %s * __restrict__ %s;\n", member.GetType().c_str(),
+                        printf("    %s * PBRT_RESTRICT %s;\n", member.GetType().c_str(),
                                name.c_str());
                     else
                         printf("    SOA<%s> %s;\n", member.type.c_str(), name.c_str());

@@ -1007,35 +1007,35 @@ template <typename... Ts>
 tuple(Ts &&...) -> tuple<std::decay_t<Ts>...>;
 
 template <size_t I, typename T, typename... Ts>
-PBRT_CPU_GPU auto &get(tuple<T, Ts...> &tuple) {
+PBRT_CPU_GPU auto &get(tuple<T, Ts...> &t) {
     if constexpr (I == 0)
-        return tuple.value;
+        return t.value;
     else
-        return get<I - 1, Ts...>(tuple);
+        return get<I - 1>((tuple<Ts...> &) t);
 }
 
 template <size_t I, typename T, typename... Ts>
-PBRT_CPU_GPU const auto &get(const tuple<T, Ts...> &tuple) {
+PBRT_CPU_GPU const auto &get(const tuple<T, Ts...> &t) {
     if constexpr (I == 0)
-        return tuple.value;
+        return t.value;
     else
-        return get<I - 1, Ts...>(tuple);
+        return get<I - 1>((const tuple<Ts...> &) t);
 }
 
 template <typename Req, typename T, typename... Ts>
-PBRT_CPU_GPU auto &get(tuple<T, Ts...> &tuple) {
+PBRT_CPU_GPU auto &get(tuple<T, Ts...> &t) {
     if constexpr (std::is_same_v<Req, T>)
-        return tuple.value;
+        return t.value;
     else
-        return get<Req, Ts...>(tuple);
+        return get<Req>((tuple<Ts...> &) t);
 }
 
 template <typename Req, typename T, typename... Ts>
-PBRT_CPU_GPU const auto &get(const tuple<T, Ts...> &tuple) {
+PBRT_CPU_GPU const auto &get(const tuple<T, Ts...> &t) {
     if constexpr (std::is_same_v<Req, T>)
-        return tuple.value;
+        return t.value;
     else
-        return get<Req, Ts...>(tuple);
+        return get<Req>((const tuple<Ts...> &) t);
 }
 
 template <typename T>

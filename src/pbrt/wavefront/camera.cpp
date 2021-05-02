@@ -5,8 +5,7 @@
 #include <pbrt/pbrt.h>
 
 #include <pbrt/cameras.h>
-#include <pbrt/gpu/launch.h>
-#include <pbrt/gpu/pathintegrator.h>
+#include <pbrt/wavefront/integrator.h>
 #include <pbrt/options.h>
 #include <pbrt/samplers.h>
 #include <pbrt/util/bluenoise.h>
@@ -15,8 +14,8 @@
 
 namespace pbrt {
 
-// GPUPathIntegrator Camera Ray Methods
-void GPUPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
+// WavefrontPathIntegrator Camera Ray Methods
+void WavefrontPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
     // Define _generateRays_ lambda function
     auto generateRays = [=](auto sampler) {
         using Sampler = std::remove_reference_t<decltype(*sampler)>;
@@ -29,10 +28,10 @@ void GPUPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
 }
 
 template <typename Sampler>
-void GPUPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
+void WavefrontPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
     RayQueue *rayQueue = CurrentRayQueue(0);
-    GPUParallelFor(
-        "Generate Camera rays", maxQueueSize, PBRT_GPU_LAMBDA(int pixelIndex) {
+    ParallelFor(
+        "Generate Camera rays", maxQueueSize, PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
             // Enqueue camera ray and set pixel state for sample
             // Compute pixel coordinates for _pixelIndex_
             Bounds2i pixelBounds = film.PixelBounds();

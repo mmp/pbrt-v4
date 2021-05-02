@@ -2,8 +2,8 @@
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
 
-#ifndef PBRT_GPU_PATHINTEGRATOR_H
-#define PBRT_GPU_PATHINTEGRATOR_H
+#ifndef PBRT_WAVEFRONT_PATHINTEGRATOR_H
+#define PBRT_WAVEFRONT_PATHINTEGRATOR_H
 
 #include <pbrt/pbrt.h>
 
@@ -14,23 +14,46 @@
 #include <pbrt/base/light.h>
 #include <pbrt/base/lightsampler.h>
 #include <pbrt/base/sampler.h>
-#include <pbrt/gpu/workitems.h>
-#include <pbrt/gpu/workqueue.h>
+#ifdef PBRT_BUILD_GPU_RENDERER
+#include <pbrt/gpu/util.h>
+#endif // PBRT_BUILD_GPU_RENDERER
+#include <pbrt/options.h>
+#include <pbrt/wavefront/workitems.h>
+#include <pbrt/wavefront/workqueue.h>
+#include <pbrt/util/parallel.h>
 #include <pbrt/util/pstd.h>
 
 namespace pbrt {
 
 class ParsedScene;
-class GPUAccel;
 
-void GPUInit();
-void GPURender(ParsedScene &scene);
+class WavefrontAggregate {
+public:
+    virtual ~WavefrontAggregate() = default;
 
-// GPUPathIntegrator Definition
-class GPUPathIntegrator {
+    virtual Bounds3f Bounds() const = 0;
+
+    virtual void IntersectClosest(
+        int maxRays, EscapedRayQueue *escapedRayQueue,
+        HitAreaLightQueue *hitAreaLightQueue, MaterialEvalQueue *basicEvalMaterialQueue,
+        MaterialEvalQueue *universalEvalMaterialQueue,
+        MediumSampleQueue *mediumSampleQueue, RayQueue *rayQueue, RayQueue *nextRayQueue) const = 0;
+
+    virtual void IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue,
+                                 SOA<PixelSampleState> *pixelSampleState) const = 0;
+
+    virtual void IntersectShadowTr(int maxRays, ShadowRayQueue *shadowRayQueue,
+                                   SOA<PixelSampleState> *pixelSampleState) const = 0;
+
+    virtual void IntersectOneRandom(int maxRays,
+                                    SubsurfaceScatterQueue *subsurfaceScatterQueue) const = 0;
+};
+
+// WavefrontPathIntegrator Definition
+class WavefrontPathIntegrator {
   public:
-    // GPUPathIntegrator Public Methods
-    void Render();
+    // WavefrontPathIntegrator Public Methods
+    Float Render();
 
     void GenerateCameraRays(int y0, int sampleIndex);
     template <typename Sampler>
@@ -64,7 +87,7 @@ class GPUPathIntegrator {
 
     void UpdateFilm();
 
-    GPUPathIntegrator(Allocator alloc, const ParsedScene &scene);
+    WavefrontPathIntegrator(Allocator alloc, ParsedScene &scene);
 
     RayQueue *CurrentRayQueue(int depth) { return rayQueues[depth & 1]; }
     RayQueue *NextRayQueue(int depth) { return rayQueues[(depth + 1) & 1]; }
@@ -76,14 +99,37 @@ class GPUPathIntegrator {
                           MediumSampleQueue *mediumSampleQueue,
                           RayQueue *nextRayQueue) const;
 
-    // GPUPathIntegrator Member Variables
+    template <typename F>
+    void ParallelFor(const char *description, int nItems, F &&func) {
+        if (Options->useGPU) {
+#ifdef PBRT_BUILD_GPU_RENDERER
+            GPUParallelFor(description, nItems, func);
+#else
+            LOG_FATAL("Options->useGPU was set without PBRT_BUILD_GPU_RENDERER enabled");
+#endif
+        } else
+            pbrt::ParallelFor(0, nItems, func);
+    }
+    template <typename F>
+    void Do(const char *description, F &&func) {
+        if (Options->useGPU) {
+#ifdef PBRT_BUILD_GPU_RENDERER
+            GPUParallelFor(description, 1, [=] PBRT_GPU(int) mutable { func(); });
+#else
+            LOG_FATAL("Options->useGPU was set without PBRT_BUILD_GPU_RENDERER enabled");
+#endif
+        } else
+            func();
+    }
+
+    // WavefrontPathIntegrator Member Variables
     bool initializeVisibleSurface;
     bool haveSubsurface;
     bool haveMedia;
     pstd::array<bool, Material::NumTags()> haveBasicEvalMaterial;
     pstd::array<bool, Material::NumTags()> haveUniversalEvalMaterial;
 
-    GPUAccel *accel = nullptr;
+    WavefrontAggregate *aggregate = nullptr;
 
     struct Stats {
         Stats(int maxDepth, Allocator alloc);
@@ -130,4 +176,4 @@ class GPUPathIntegrator {
 
 }  // namespace pbrt
 
-#endif  // PBRT_GPU_PATHINTEGRATOR_H
+#endif  // PBRT_WAVEFRONT_PATHINTEGRATOR_H

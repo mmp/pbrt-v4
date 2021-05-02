@@ -137,22 +137,6 @@ class CheckCallbackScope {
     static std::vector<std::function<std::string(void)>> callbacks;
 };
 
-#define CUDA_CHECK(EXPR)                                        \
-    if (EXPR != cudaSuccess) {                                  \
-        cudaError_t error = cudaGetLastError();                 \
-        LOG_FATAL("CUDA error: %s", cudaGetErrorString(error)); \
-    } else /* eat semicolon */
-
-#define CU_CHECK(EXPR)                                              \
-    do {                                                            \
-        CUresult result = EXPR;                                     \
-        if (result != CUDA_SUCCESS) {                               \
-            const char *str;                                        \
-            CHECK_EQ(CUDA_SUCCESS, cuGetErrorString(result, &str)); \
-            LOG_FATAL("CUDA error: %s", str);                       \
-        }                                                           \
-    } while (false) /* eat semicolon */
-
 }  // namespace pbrt
 
 #endif  // PBRT_UTIL_CHECK_H

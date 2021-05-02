@@ -25,6 +25,7 @@ struct BasicPBRTOptions {
     bool disablePixelJitter = false, disableWavelengthJitter = false;
     bool forceDiffuse = false;
     bool useGPU = false;
+    bool wavefront = false;
     RenderingCoordinateSystem renderingSpace = RenderingCoordinateSystem::CameraWorld;
 };
 

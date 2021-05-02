@@ -31,9 +31,9 @@
 #endif
 
 #ifdef PBRT_IS_WINDOWS
-#define PBRT_GPU_LAMBDA(...) [ =, *this ] PBRT_GPU(__VA_ARGS__) mutable
+#define PBRT_CPU_GPU_LAMBDA(...) [ =, *this ] PBRT_CPU_GPU(__VA_ARGS__) mutable
 #else
-#define PBRT_GPU_LAMBDA(...) [=] PBRT_GPU(__VA_ARGS__)
+#define PBRT_CPU_GPU_LAMBDA(...) [=] PBRT_CPU_GPU(__VA_ARGS__)
 #endif
 
 #ifdef PBRT_BUILD_GPU_RENDERER

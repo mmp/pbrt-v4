@@ -26,6 +26,7 @@ void CPURender(ParsedScene &parsedScene) {
     // Create media first (so have them for the camera...)
     std::map<std::string, Medium> media = parsedScene.CreateMedia(alloc);
 
+    // FIXME: haveScatteringMedia isn't being set for shapes/prims
     bool haveScatteringMedia = false;
     auto findMedium = [&media, &haveScatteringMedia](const std::string &s,
                                                      const FileLoc *loc) -> Medium {
@@ -74,281 +75,16 @@ void CPURender(ParsedScene &parsedScene) {
     NamedTextures textures = parsedScene.CreateTextures(alloc, false);
     LOG_VERBOSE("Finished textures");
 
-    // Materials
-    LOG_VERBOSE("Starting materials");
-    std::map<std::string, pbrt::Material> namedMaterials;
-    std::vector<pbrt::Material> materials;
-    parsedScene.CreateMaterials(textures, alloc, &namedMaterials, &materials);
-    bool haveSubsurface = false;
-    for (const auto &mtl : parsedScene.materials)
-        if (mtl.name == "subsurface")
-            haveSubsurface = true;
-    for (const auto &namedMtl : parsedScene.namedMaterials)
-        if (namedMtl.second.name == "subsurface")
-            haveSubsurface = true;
-    LOG_VERBOSE("Finished materials");
+    // Lights
+    std::map<int, pstd::vector<Light> *> shapeIndexToAreaLights;
+    std::vector<Light> lights = parsedScene.CreateLights(alloc, media, textures,
+                                                         shapeIndexToAreaLights);
 
-    // Lights (area lights will be done later, with shapes...)
-    LOG_VERBOSE("Starting lights");
-    std::vector<Light> lights;
-    std::mutex lightsMutex;
-    lights.reserve(parsedScene.lights.size() + parsedScene.areaLights.size());
-    for (const auto &light : parsedScene.lights) {
-        Medium outsideMedium = findMedium(light.medium, &light.loc);
-        if (light.renderFromObject.IsAnimated())
-            Warning(&light.loc,
-                    "Animated lights aren't supported. Using the start transform.");
-        Light l = Light::Create(
-            light.name, light.parameters, light.renderFromObject.startTransform,
-            parsedScene.camera.cameraTransform, outsideMedium, &light.loc, alloc);
-        // No need to hold the mutex here
-        lights.push_back(l);
-    }
-    LOG_VERBOSE("Finished Lights");
+    ParsedScene::Scene scene = parsedScene.CreateAggregate(alloc, textures,
+                                                           shapeIndexToAreaLights,
+                                                           media);
 
-    // Primitives
-    auto getAlphaTexture = [&](const ParameterDictionary &parameters,
-                               const FileLoc *loc) -> FloatTexture {
-        std::string alphaTexName = parameters.GetTexture("alpha");
-        if (!alphaTexName.empty()) {
-            if (textures.floatTextures.find(alphaTexName) != textures.floatTextures.end())
-                return textures.floatTextures[alphaTexName];
-            else
-                ErrorExit(loc, "%s: couldn't find float texture for \"alpha\" parameter.",
-                          alphaTexName);
-        } else if (Float alpha = parameters.GetOneFloat("alpha", 1.f); alpha < 1.f)
-            return alloc.new_object<FloatConstantTexture>(alpha);
-        else
-            return nullptr;
-    };
-
-    // Non-animated shapes
-    auto CreatePrimitivesForShapes =
-        [&](std::vector<ShapeSceneEntity> &shapes) -> std::vector<Primitive> {
-        // Parallelize Shape::Create calls, which will in turn
-        // parallelize PLY file loading, etc...
-        pstd::vector<pstd::vector<Shape>> shapeVectors(shapes.size());
-        ParallelFor(0, shapes.size(), [&](int64_t i) {
-            const auto &sh = shapes[i];
-            shapeVectors[i] =
-                Shape::Create(sh.name, sh.renderFromObject, sh.objectFromRender,
-                              sh.reverseOrientation, sh.parameters, &sh.loc, alloc);
-        });
-
-        std::vector<Primitive> primitives;
-        for (size_t i = 0; i < shapes.size(); ++i) {
-            auto &sh = shapes[i];
-            pstd::vector<Shape> &shapes = shapeVectors[i];
-            if (shapes.empty())
-                continue;
-
-            FloatTexture alphaTex = getAlphaTexture(sh.parameters, &sh.loc);
-            sh.parameters.ReportUnused();  // do now so can grab alpha...
-
-            Material mtl = nullptr;
-            if (!sh.materialName.empty()) {
-                auto iter = namedMaterials.find(sh.materialName);
-                if (iter == namedMaterials.end())
-                    ErrorExit(&sh.loc, "%s: no named material defined.", sh.materialName);
-                mtl = iter->second;
-            } else {
-                CHECK_LT(sh.materialIndex, materials.size());
-                mtl = materials[sh.materialIndex];
-            }
-
-            MediumInterface mi(findMedium(sh.insideMedium, &sh.loc),
-                               findMedium(sh.outsideMedium, &sh.loc));
-
-            for (auto &s : shapes) {
-                // Possibly create area light for shape
-                Light area = nullptr;
-                if (sh.lightIndex != -1) {
-                    CHECK_LT(sh.lightIndex, parsedScene.areaLights.size());
-                    if (!mtl)
-                        Warning(&sh.loc, "Ignoring area light specification for shape "
-                                         "with \"interface\" material.");
-                    else {
-                        const auto &areaLightEntity =
-                            parsedScene.areaLights[sh.lightIndex];
-
-                        area = Light::CreateArea(areaLightEntity.name,
-                                                 areaLightEntity.parameters,
-                                                 *sh.renderFromObject, mi, s, alphaTex,
-                                                 &areaLightEntity.loc, Allocator{});
-                        if (area) {
-                            std::lock_guard<std::mutex> lock(lightsMutex);
-                            lights.push_back(area);
-                        }
-                    }
-                }
-                if (area == nullptr && !mi.IsMediumTransition() && !alphaTex)
-                    primitives.push_back(new SimplePrimitive(s, mtl));
-                else
-                    primitives.push_back(
-                        new GeometricPrimitive(s, mtl, area, mi, alphaTex));
-            }
-            sh.parameters.FreeParameters();
-            sh = ShapeSceneEntity();
-        }
-        return primitives;
-    };
-
-    LOG_VERBOSE("Starting shapes");
-    std::vector<Primitive> primitives = CreatePrimitivesForShapes(parsedScene.shapes);
-
-    parsedScene.shapes.clear();
-    parsedScene.shapes.shrink_to_fit();
-
-    // Animated shapes
-    auto CreatePrimitivesForAnimatedShapes =
-        [&](std::vector<AnimatedShapeSceneEntity> &shapes) -> std::vector<Primitive> {
-        std::vector<Primitive> primitives;
-        primitives.reserve(shapes.size());
-
-        for (auto &sh : shapes) {
-            pstd::vector<Shape> shapes =
-                Shape::Create(sh.name, sh.identity, sh.identity, sh.reverseOrientation,
-                              sh.parameters, &sh.loc, alloc);
-            if (shapes.empty())
-                continue;
-
-            FloatTexture alphaTex = getAlphaTexture(sh.parameters, &sh.loc);
-            sh.parameters.ReportUnused();  // do now so can grab alpha...
-
-            // Create initial shape or shapes for animated shape
-
-            Material mtl = nullptr;
-            if (!sh.materialName.empty()) {
-                auto iter = namedMaterials.find(sh.materialName);
-                if (iter == namedMaterials.end())
-                    ErrorExit(&sh.loc, "%s: no named material defined.", sh.materialName);
-                mtl = iter->second;
-            } else {
-                CHECK_LT(sh.materialIndex, materials.size());
-                mtl = materials[sh.materialIndex];
-            }
-
-            MediumInterface mi(findMedium(sh.insideMedium, &sh.loc),
-                               findMedium(sh.outsideMedium, &sh.loc));
-
-            std::vector<Primitive> prims;
-            for (auto &s : shapes) {
-                // Possibly create area light for shape
-                Light area = nullptr;
-                if (sh.lightIndex != -1) {
-                    CHECK_LT(sh.lightIndex, parsedScene.areaLights.size());
-                    const auto &areaLightEntity = parsedScene.areaLights[sh.lightIndex];
-
-                    // TODO: shouldn't this always be true if we got here?
-                    if (sh.renderFromObject.IsAnimated())
-                        ErrorExit(&sh.loc, "Animated area lights are not supported.");
-
-                    area = Light::CreateArea(areaLightEntity.name,
-                                             areaLightEntity.parameters,
-                                             sh.renderFromObject.startTransform, mi, s,
-                                             alphaTex, &sh.loc, Allocator{});
-                    if (area)
-                        lights.push_back(area);
-                }
-                if (area == nullptr && !mi.IsMediumTransition() && !alphaTex)
-                    prims.push_back(new SimplePrimitive(s, mtl));
-                else
-                    prims.push_back(new GeometricPrimitive(s, mtl, area, mi, alphaTex));
-            }
-
-            // TODO: could try to be greedy or even segment them according
-            // to same sh.renderFromObject...
-
-            // Create single _Primitive_ for _prims_
-            if (prims.size() > 1) {
-                Primitive bvh = new BVHAggregate(std::move(prims));
-                prims.clear();
-                prims.push_back(bvh);
-            }
-            primitives.push_back(new AnimatedPrimitive(prims[0], sh.renderFromObject));
-
-            sh.parameters.FreeParameters();
-            sh = AnimatedShapeSceneEntity();
-        }
-        return primitives;
-    };
-    std::vector<Primitive> animatedPrimitives =
-        CreatePrimitivesForAnimatedShapes(parsedScene.animatedShapes);
-    primitives.insert(primitives.end(), animatedPrimitives.begin(),
-                      animatedPrimitives.end());
-
-    parsedScene.animatedShapes.clear();
-    parsedScene.animatedShapes.shrink_to_fit();
-    LOG_VERBOSE("Finished shapes");
-
-    // Instance definitions
-    LOG_VERBOSE("Starting instances");
-    std::map<std::string, Primitive> instanceDefinitions;
-    std::mutex instanceDefinitionsMutex;
-    std::vector<std::map<std::string, InstanceDefinitionSceneEntity>::iterator>
-        instanceDefinitionIterators;
-    for (auto iter = parsedScene.instanceDefinitions.begin();
-         iter != parsedScene.instanceDefinitions.end(); ++iter)
-        instanceDefinitionIterators.push_back(iter);
-    ParallelFor(0, instanceDefinitionIterators.size(), [&](int64_t i) {
-        auto &inst = *instanceDefinitionIterators[i];
-
-        std::vector<Primitive> instancePrimitives =
-            CreatePrimitivesForShapes(inst.second.shapes);
-        std::vector<Primitive> movingInstancePrimitives =
-            CreatePrimitivesForAnimatedShapes(inst.second.animatedShapes);
-        instancePrimitives.insert(instancePrimitives.end(),
-                                  movingInstancePrimitives.begin(),
-                                  movingInstancePrimitives.end());
-
-        if (instancePrimitives.size() > 1) {
-            Primitive bvh = new BVHAggregate(std::move(instancePrimitives));
-            instancePrimitives.clear();
-            instancePrimitives.push_back(bvh);
-        }
-
-        std::lock_guard<std::mutex> lock(instanceDefinitionsMutex);
-        if (instancePrimitives.empty())
-            instanceDefinitions[inst.first] = nullptr;
-        else
-            instanceDefinitions[inst.first] = instancePrimitives[0];
-
-        inst.second = InstanceDefinitionSceneEntity();
-    });
-
-    parsedScene.instanceDefinitions.clear();
-
-    // Instances
-    for (const auto &inst : parsedScene.instances) {
-        auto iter = instanceDefinitions.find(inst.name);
-        if (iter == instanceDefinitions.end())
-            ErrorExit(&inst.loc, "%s: object instance not defined", inst.name);
-
-        if (iter->second == nullptr)
-            // empty instance
-            continue;
-
-        if (inst.renderFromInstance)
-            primitives.push_back(
-                new TransformedPrimitive(iter->second, inst.renderFromInstance));
-        else {
-            primitives.push_back(
-                new AnimatedPrimitive(iter->second, *inst.renderFromInstanceAnim));
-            delete inst.renderFromInstanceAnim;
-        }
-    }
-
-    parsedScene.instances.clear();
-    parsedScene.instances.shrink_to_fit();
-    LOG_VERBOSE("Finished instances");
-
-    // Accelerator
-    LOG_VERBOSE("Starting top-level accelerator");
-    Primitive accel = nullptr;
-    if (!primitives.empty())
-        accel = CreateAccelerator(parsedScene.accelerator.name, std::move(primitives),
-                                  parsedScene.accelerator.parameters);
-    LOG_VERBOSE("Finished top-level accelerator");
+    Primitive accel = scene.aggregate;
 
     // Integrator
     const RGBColorSpace *integratorColorSpace = parsedScene.film.parameters.ColorSpace();
@@ -379,6 +115,14 @@ void CPURender(ParsedScene &parsedScene) {
                 "GBufferFilm is not supported by the \"%s\" integrator. The channels "
                 "other than R, G, B will be zero.",
                 parsedScene.integrator.name);
+
+    bool haveSubsurface = false;
+    for (const auto &mtl : parsedScene.materials)
+        if (mtl.name == "subsurface")
+            haveSubsurface = true;
+    for (const auto &namedMtl : parsedScene.namedMaterials)
+        if (namedMtl.second.name == "subsurface")
+            haveSubsurface = true;
 
     if (haveSubsurface && parsedScene.integrator.name != "volpath")
         Warning("Some objects in the scene have subsurface scattering, which is "
@@ -413,7 +157,7 @@ void CPURender(ParsedScene &parsedScene) {
         Printf("World-space n: %s\n", worldFromRender(intr.n));
         Printf("World-space ns: %s\n", worldFromRender(intr.shading.n));
 
-        for (const auto &mtl : namedMaterials)
+        for (const auto &mtl : scene.namedMaterials)
             if (mtl.second == intr.material) {
                 Printf("Named material: %s\n", mtl.first);
                 return;

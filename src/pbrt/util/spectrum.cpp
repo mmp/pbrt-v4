@@ -8,6 +8,9 @@
 
 #include <pbrt/util/spectrum.h>
 
+#ifdef PBRT_BUILD_GPU_RENDERER
+#include <pbrt/gpu/util.h>
+#endif
 #include <pbrt/options.h>
 #include <pbrt/util/color.h>
 #include <pbrt/util/colorspace.h>

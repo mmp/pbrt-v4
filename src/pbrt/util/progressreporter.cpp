@@ -4,6 +4,9 @@
 
 #include <pbrt/util/progressreporter.h>
 
+#ifdef PBRT_BUILD_GPU_RENDERER
+#include <pbrt/gpu/util.h>
+#endif
 #include <pbrt/util/check.h>
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/print.h>
@@ -18,13 +21,6 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 #endif  // !PBRT_IS_WINDOWS
-
-#ifdef NVTX
-#ifndef PBRT_IS_WINDOWS
-#include <sys/syscall.h>
-#endif
-#include "nvtx3/nvToolsExtCuda.h"
-#endif
 
 namespace pbrt {
 
@@ -65,12 +61,8 @@ ProgressReporter::ProgressReporter(int64_t totalWork, const std::string &title,
 void ProgressReporter::launchThread() {
     Barrier *barrier = new Barrier(2);
     updateThread = std::thread([this, barrier]() {
-#if NVTX
-#ifdef PBRT_IS_WINDOWS
-        nvtxNameOsThread(GetCurrentThreadId(), "PBRT_PROGRESS_BAR");
-#else
-        nvtxNameOsThread(syscall(SYS_gettid), "PBRT_PROGRESS_BAR");
-#endif
+#ifdef PBRT_BUILD_GPU_RENDERER
+        GPURegisterThread("PBRT_PROGRESS_BAR");
 #endif
         if (barrier->Block())
             delete barrier;
