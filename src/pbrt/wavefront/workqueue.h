@@ -10,7 +10,7 @@
 #include <pbrt/options.h>
 #ifdef PBRT_BUILD_GPU_RENDERER
 #include <pbrt/gpu/util.h>
-#endif
+#endif  // PBRT_BUILD_GPU_RENDERER
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/pstd.h>
 
@@ -18,6 +18,7 @@
 #include <utility>
 
 #ifdef __CUDACC__
+
 #ifdef PBRT_IS_WINDOWS
 #if (__CUDA_ARCH__ < 700)
 #define PBRT_USE_LEGACY_CUDA_ATOMICS
@@ -31,7 +32,8 @@
 #ifndef PBRT_USE_LEGACY_CUDA_ATOMICS
 #include <cuda/atomic>
 #endif
-#endif // __CUDA_CC__
+
+#endif  // __CUDACC__
 
 namespace pbrt {
 
@@ -109,7 +111,7 @@ class WorkQueue : public SOA<WorkItem> {
 #endif
 #else
     std::atomic<int> size{0};
-#endif // PBRT_IS_GPU_CODE
+#endif  // PBRT_IS_GPU_CODE
 };
 
 // WorkQueue Inline Functions

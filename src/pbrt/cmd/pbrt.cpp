@@ -89,6 +89,7 @@ Reformatting options:
 
 // main program
 int main(int argc, char *argv[]) {
+    // Declare variables for parsed command line
     PBRTOptions options;
     std::vector<std::string> filenames;
     std::string logLevel = "error";
@@ -144,7 +145,6 @@ int main(int argc, char *argv[]) {
             ParseArg(&argv, "gpu", &options.useGPU, onError) ||
             ParseArg(&argv, "gpu-device", &options.gpuDevice, onError) ||
 #endif
-            ParseArg(&argv, "wavefront", &options.wavefront, onError) ||
             ParseArg(&argv, "debugstart", &options.debugStart, onError) ||
             ParseArg(&argv, "disable-pixel-jitter", &options.disablePixelJitter,
                      onError) ||
@@ -167,6 +167,7 @@ int main(int argc, char *argv[]) {
             ParseArg(&argv, "spp", &options.pixelSamples, onError) ||
             ParseArg(&argv, "stats", &options.printStatistics, onError) ||
             ParseArg(&argv, "toply", &toPly, onError) ||
+            ParseArg(&argv, "wavefront", &options.wavefront, onError) ||
             ParseArg(&argv, "write-partial-images", &options.writePartialImages,
                      onError) ||
             ParseArg(&argv, "upgrade", &options.upgrade, onError)) {

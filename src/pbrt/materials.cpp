@@ -99,11 +99,11 @@ MixMaterial *MixMaterial::Create(Material materials[2],
 #ifdef PBRT_BUILD_GPU_RENDERER
     if (Options->useGPU && !BasicTextureEvaluator().CanEvaluate({amount}, {}))
         ErrorExit(loc, "The GPU renderer currently only supports basic textures "
-                  "for its \"amount\" parameter.");
+                       "for its \"amount\" parameter.");
 #else
     if (Options->wavefront && !BasicTextureEvaluator().CanEvaluate({amount}, {}))
-            ErrorExit(loc, "The wavefront renderer currently only supports basic textures "
-                           "for its \"amount\" parameter.");
+        ErrorExit(loc, "The wavefront renderer currently only supports basic textures "
+                       "for its \"amount\" parameter.");
 #endif
 
     return alloc.new_object<MixMaterial>(materials, amount);

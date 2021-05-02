@@ -9,13 +9,13 @@
 
 #include <pbrt/base/sampler.h>
 #include <pbrt/film.h>
-#include <pbrt/wavefront/workqueue.h>
 #include <pbrt/lightsamplers.h>
 #include <pbrt/materials.h>
 #include <pbrt/ray.h>
 #include <pbrt/util/containers.h>
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/soa.h>
+#include <pbrt/wavefront/workqueue.h>
 
 namespace pbrt {
 
@@ -111,10 +111,10 @@ struct SOA<RaySamples> {
     GetSetIndirector operator[](int i) { return GetSetIndirector{this, i}; }
 
   private:
-    Float4 * PBRT_RESTRICT direct;
-    Float4 * PBRT_RESTRICT indirect;
-    Float4 * PBRT_RESTRICT subsurface;
-    Float * PBRT_RESTRICT mediaDist, * PBRT_RESTRICT mediaMode;
+    Float4 *PBRT_RESTRICT direct;
+    Float4 *PBRT_RESTRICT indirect;
+    Float4 *PBRT_RESTRICT subsurface;
+    Float *PBRT_RESTRICT mediaDist, *PBRT_RESTRICT mediaMode;
 };
 
 // PixelSampleState Definition

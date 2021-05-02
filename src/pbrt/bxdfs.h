@@ -343,7 +343,7 @@ class ConductorBxDF {
 
         // Evaluate Fresnel factor _F_ for conductor BRDF
         Float frCosTheta_i = AbsDot(wi, wh);
-        SampledSpectrum F = FrConductor(frCosTheta_i, eta, k);
+        SampledSpectrum F = FrComplex(frCosTheta_i, eta, k);
 
         return mfDistrib.D(wh) * mfDistrib.G(wo, wi) * F / (4 * cosTheta_i * cosTheta_o);
     }
@@ -357,7 +357,7 @@ class ConductorBxDF {
         if (mfDistrib.EffectivelySmooth()) {
             // Sample perfectly specular conductor BRDF
             Vector3f wi(-wo.x, -wo.y, wo.z);
-            SampledSpectrum f = FrConductor(AbsCosTheta(wi), eta, k) / AbsCosTheta(wi);
+            SampledSpectrum f = FrComplex(AbsCosTheta(wi), eta, k) / AbsCosTheta(wi);
             return BSDFSample(f, wi, 1, BxDFFlags::SpecularReflection);
         }
         // Sample Torrance--Sparow model for conductor BRDF
@@ -378,7 +378,7 @@ class ConductorBxDF {
             return {};
         // Evaluate Fresnel factor _F_ for conductor BRDF
         Float frCosTheta_i = AbsDot(wi, wh);
-        SampledSpectrum F = FrConductor(frCosTheta_i, eta, k);
+        SampledSpectrum F = FrComplex(frCosTheta_i, eta, k);
 
         SampledSpectrum f =
             mfDistrib.D(wh) * mfDistrib.G(wo, wi) * F / (4 * cosTheta_i * cosTheta_o);

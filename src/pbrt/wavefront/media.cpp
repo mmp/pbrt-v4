@@ -182,9 +182,8 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int depth) {
 
             const MixMaterial *mix = material.CastOrNullptr<MixMaterial>();
             while (mix) {
-                SurfaceInteraction intr(w.pi, w.uv, w.wo, w.dpdus, w.dpdvs,
-                                        w.dndus, w.dndvs,
-                                        0. /* time */, false /* flip normal */);
+                SurfaceInteraction intr(w.pi, w.uv, w.wo, w.dpdus, w.dpdvs, w.dndus,
+                                        w.dndvs, 0. /* time */, false /* flip normal */);
                 MaterialEvalContext ctx(intr);
                 material = mix->ChooseMaterial(BasicTextureEvaluator(), ctx);
                 mix = material.CastOrNullptr<MixMaterial>();
@@ -213,8 +212,6 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int depth) {
             }
 
             FloatTexture displacement = material.GetDisplacement();
-
-            CHECK(!material.Is<MixMaterial>());
 
             MaterialEvalQueue *q =
                 (material.CanEvaluateTextures(BasicTextureEvaluator()) &&

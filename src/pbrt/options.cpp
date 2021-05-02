@@ -28,17 +28,15 @@ std::string ToString(const RenderingCoordinateSystem &r) {
 std::string PBRTOptions::ToString() const {
     return StringPrintf(
         "[ PBRTOptions seed: %s quiet: %s disablePixelJitter: %s "
-        "disableWavelengthJitter: %s forceDiffuse: %s "
-        "useGPU: %s gpuDevice: %s wavefront: %s "
-        "renderingSpace: %s nThreads: %s "
+        "disableWavelengthJitter: %s "
+        "forceDiffuse: %s useGPU: %s wavefront: %s renderingSpace: %s nThreads: %s "
         "logLevel: %s logFile: %s writePartialImages: %s recordPixelStatistics: %s "
-        "printStatistics: %s pixelSamples: %s quickRender: %s upgrade: %s "
+        "printStatistics: %s pixelSamples: %s gpuDevice: %s quickRender: %s upgrade: %s "
         "imageFile: %s mseReferenceImage: %s mseReferenceOutput: %s debugStart: %s "
         "displayServer: %s cropWindow: %s pixelBounds: %s pixelMaterial: %s ]",
-        seed, quiet, disablePixelJitter, disableWavelengthJitter, forceDiffuse,
-        useGPU, gpuDevice, wavefront,
-        renderingSpace, nThreads, logLevel, logFile, writePartialImages,
-        recordPixelStatistics, printStatistics, pixelSamples, quickRender,
+        seed, quiet, disablePixelJitter, disableWavelengthJitter, forceDiffuse, useGPU,
+        wavefront, renderingSpace, nThreads, logLevel, logFile, writePartialImages,
+        recordPixelStatistics, printStatistics, pixelSamples, gpuDevice, quickRender,
         upgrade, imageFile, mseReferenceImage, mseReferenceOutput, debugStart,
         displayServer, cropWindow, pixelBounds, pixelMaterial);
 }

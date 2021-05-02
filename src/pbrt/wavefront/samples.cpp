@@ -4,8 +4,8 @@
 
 #include <pbrt/pbrt.h>
 
-#include <pbrt/wavefront/integrator.h>
 #include <pbrt/samplers.h>
+#include <pbrt/wavefront/integrator.h>
 
 #include <type_traits>
 
@@ -29,8 +29,7 @@ void WavefrontPathIntegrator::GenerateRaySamples(int depth, int sampleIndex) {
 
     RayQueue *rayQueue = CurrentRayQueue(depth);
     ForAllQueued(
-        desc.c_str(), rayQueue, maxQueueSize,
-        PBRT_CPU_GPU_LAMBDA(const RayWorkItem w) {
+        desc.c_str(), rayQueue, maxQueueSize, PBRT_CPU_GPU_LAMBDA(const RayWorkItem w) {
             // Generate samples for ray segment at current sample index
             // Find first sample dimension
             int dimension = 5 + 7 * depth;

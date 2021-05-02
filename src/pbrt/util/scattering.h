@@ -42,7 +42,7 @@ PBRT_CPU_GPU inline Float HenyeyGreenstein(Float cosTheta, Float g) {
 
 // Fresnel Inline Functions
 PBRT_CPU_GPU
-inline Float FrConductor2(Float cosTheta_i, pstd::complex<Float> eta) {
+inline Float FrComplex(Float cosTheta_i, pstd::complex<Float> eta) {
     cosTheta_i = Clamp(cosTheta_i, 0, 1);
     using Complex = pstd::complex<Float>;
 
@@ -56,11 +56,11 @@ inline Float FrConductor2(Float cosTheta_i, pstd::complex<Float> eta) {
 }
 
 PBRT_CPU_GPU
-inline SampledSpectrum FrConductor(Float cosTheta_i, SampledSpectrum eta,
-                                   SampledSpectrum k) {
+inline SampledSpectrum FrComplex(Float cosTheta_i, SampledSpectrum eta,
+                                 SampledSpectrum k) {
     SampledSpectrum result;
     for (int i = 0; i < NSpectrumSamples; ++i)
-        result[i] = FrConductor2(cosTheta_i, pstd::complex<Float>(eta[i], k[i]));
+        result[i] = FrComplex(cosTheta_i, pstd::complex<Float>(eta[i], k[i]));
     return result;
 }
 

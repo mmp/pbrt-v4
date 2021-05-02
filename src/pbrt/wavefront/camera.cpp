@@ -5,12 +5,12 @@
 #include <pbrt/pbrt.h>
 
 #include <pbrt/cameras.h>
-#include <pbrt/wavefront/integrator.h>
 #include <pbrt/options.h>
 #include <pbrt/samplers.h>
 #include <pbrt/util/bluenoise.h>
 #include <pbrt/util/spectrum.h>
 #include <pbrt/util/vecmath.h>
+#include <pbrt/wavefront/integrator.h>
 
 namespace pbrt {
 

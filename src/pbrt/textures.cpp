@@ -6,7 +6,7 @@
 
 #ifdef PBRT_BUILD_GPU_RENDERER
 #include <pbrt/gpu/util.h>
-#endif
+#endif  // PBRT_BUILD_GPU_RENDERER
 #include <pbrt/interaction.h>
 #include <pbrt/paramdict.h>
 #include <pbrt/util/color.h>

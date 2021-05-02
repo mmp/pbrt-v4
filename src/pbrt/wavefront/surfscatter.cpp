@@ -7,7 +7,6 @@
 #include <pbrt/base/bxdf.h>
 #include <pbrt/bxdfs.h>
 #include <pbrt/cameras.h>
-#include <pbrt/wavefront/integrator.h>
 #include <pbrt/interaction.h>
 #include <pbrt/materials.h>
 #include <pbrt/options.h>
@@ -16,6 +15,7 @@
 #include <pbrt/util/containers.h>
 #include <pbrt/util/spectrum.h>
 #include <pbrt/util/vecmath.h>
+#include <pbrt/wavefront/integrator.h>
 
 #include <type_traits>
 
@@ -68,7 +68,8 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(int depth) {
 
 template <typename Mtl, typename TextureEvaluator>
 void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
-                                                MaterialEvalQueue *evalQueue, int depth) {
+                                                      MaterialEvalQueue *evalQueue,
+                                                      int depth) {
     // Construct _name_ for material/texture evaluator kernel
     std::string name = StringPrintf(
         "%s + BxDF Eval (%s tex)", Mtl::Name(),
