@@ -338,14 +338,19 @@ class ParsedScene : public SceneRepresentation {
 
     std::map<std::string, Medium> CreateMedia(Allocator alloc) const;
 
+    std::vector<Light> CreateLights(Allocator alloc,
+                                    const std::map<std::string, Medium> &media,
+                                    const NamedTextures &textures,
+                                    std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights);
+
     struct Scene {
-        std::vector<Light> lights;
         Primitive aggregate;
         std::vector<pbrt::Material> materials;
         std::map<std::string, pbrt::Material> namedMaterials;
     };
-    Scene CreateLightsAndAggregate(Allocator alloc,
-                                   const std::map<std::string, Medium> &media);
+    Scene CreateAggregate(Allocator alloc, NamedTextures &textures,
+                          const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
+                          const std::map<std::string, Medium> &media);
 
     // ParsedScene Public Members
     SceneEntity film, sampler, integrator, filter, accelerator;

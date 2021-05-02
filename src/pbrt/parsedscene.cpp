@@ -1040,14 +1040,110 @@ std::map<std::string, Medium> ParsedScene::CreateMedia(Allocator alloc) const {
     return mediaMap;
 }
 
-ParsedScene::Scene
-ParsedScene::CreateLightsAndAggregate(Allocator alloc,
-                                      const std::map<std::string, Medium> &media) {
-    // Textures
-    LOG_VERBOSE("Starting textures");
-    NamedTextures textures = CreateTextures(alloc, false);
-    LOG_VERBOSE("Finished textures");
+std::vector<Light>
+ParsedScene::CreateLights(Allocator alloc,
+                          const std::map<std::string, Medium> &media, const NamedTextures &textures,
+                          std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights) {
+    auto findMedium = [&media](const std::string &s, const FileLoc *loc) -> Medium {
+        if (s.empty())
+            return nullptr;
 
+        auto iter = media.find(s);
+        if (iter == media.end())
+            ErrorExit(loc, "%s: medium not defined", s);
+        return iter->second;
+    };
+
+    auto getAlphaTexture = [&](const ParameterDictionary &parameters,
+                               const FileLoc *loc) -> FloatTexture {
+        std::string alphaTexName = parameters.GetTexture("alpha");
+        if (!alphaTexName.empty()) {
+            if (auto iter = textures.floatTextures.find(alphaTexName);
+                iter != textures.floatTextures.end())
+                return iter->second;
+            else
+                ErrorExit(loc, "%s: couldn't find float texture for \"alpha\" parameter.",
+                          alphaTexName);
+        } else if (Float alpha = parameters.GetOneFloat("alpha", 1.f); alpha < 1.f)
+            return alloc.new_object<FloatConstantTexture>(alpha);
+        else
+            return nullptr;
+    };
+
+    // Lights (area lights will be done later, with shapes...)
+    LOG_VERBOSE("Starting lights");
+    std::vector<Light> lights;
+    lights.reserve(lights.size() + areaLights.size());
+    for (const auto &light : this->lights) {
+        Medium outsideMedium = findMedium(light.medium, &light.loc);
+        if (light.renderFromObject.IsAnimated())
+            Warning(&light.loc,
+                    "Animated lights aren't supported. Using the start transform.");
+        Light l = Light::Create(
+            light.name, light.parameters, light.renderFromObject.startTransform,
+            camera.cameraTransform, outsideMedium, &light.loc, alloc);
+
+        lights.push_back(l);
+    }
+
+    // Area Lights
+    for (size_t i = 0; i < shapes.size(); ++i) {
+        const auto &sh = shapes[i];
+
+        if (sh.lightIndex == -1)
+            continue;
+
+        std::string materialName;
+        if (!sh.materialName.empty()) {
+            auto iter = std::find_if(namedMaterials.begin(), namedMaterials.end(),
+                                     [&](auto iter) { return iter.first == sh.materialName; });
+            if (iter == namedMaterials.end())
+                ErrorExit(&sh.loc, "%s: no named material defined.", sh.materialName);
+            CHECK(iter->second.parameters.GetStringArray("type").size() > 0);
+            materialName = iter->second.parameters.GetOneString("type", "");
+        } else {
+            CHECK_LT(sh.materialIndex, materials.size());
+            materialName = materials[sh.materialIndex].name;
+        }
+        if (materialName == "interface" || materialName == "none" || materialName == "") {
+            Warning(&sh.loc, "Ignoring area light specification for shape "
+                    "with \"interface\" material.");
+            continue;
+        }
+
+        pstd::vector<pbrt::Shape> shapeObjects =
+            Shape::Create(sh.name, sh.renderFromObject, sh.objectFromRender,
+                          sh.reverseOrientation, sh.parameters, &sh.loc, alloc);
+
+        FloatTexture alphaTex = getAlphaTexture(sh.parameters, &sh.loc);
+
+        pbrt::MediumInterface mi(findMedium(sh.insideMedium, &sh.loc),
+                                 findMedium(sh.outsideMedium, &sh.loc));
+
+        pstd::vector<Light> *shapeLights = new pstd::vector<Light>;
+        const auto &areaLightEntity = areaLights[sh.lightIndex];
+        for (pbrt::Shape ps : shapeObjects) {
+            Light area = Light::CreateArea(areaLightEntity.name,
+                                           areaLightEntity.parameters,
+                                           *sh.renderFromObject, mi, ps,
+                                           alphaTex, &areaLightEntity.loc, alloc);
+            if (area) {
+                lights.push_back(area);
+                shapeLights->push_back(area);
+            }
+        }
+
+        shapeIndexToAreaLights[i] = shapeLights;
+    }
+
+    LOG_VERBOSE("Finished Lights");
+    return lights;
+}
+
+ParsedScene::Scene
+ParsedScene::CreateAggregate(Allocator alloc, NamedTextures &textures,
+                             const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
+                             const std::map<std::string, Medium> &media) {
     // Materials
     LOG_VERBOSE("Starting materials");
     std::map<std::string, pbrt::Material> namedMaterials;
@@ -1064,24 +1160,6 @@ ParsedScene::CreateLightsAndAggregate(Allocator alloc,
             ErrorExit(loc, "%s: medium not defined", s);
         return iter->second;
     };
-
-    // Lights (area lights will be done later, with shapes...)
-    LOG_VERBOSE("Starting lights");
-    std::vector<Light> lights;
-    std::mutex lightsMutex;
-    lights.reserve(lights.size() + areaLights.size());
-    for (const auto &light : this->lights) {
-        Medium outsideMedium = findMedium(light.medium, &light.loc);
-        if (light.renderFromObject.IsAnimated())
-            Warning(&light.loc,
-                    "Animated lights aren't supported. Using the start transform.");
-        Light l = Light::Create(
-            light.name, light.parameters, light.renderFromObject.startTransform,
-            camera.cameraTransform, outsideMedium, &light.loc, alloc);
-        // No need to hold the mutex here
-        lights.push_back(l);
-    }
-    LOG_VERBOSE("Finished Lights");
 
     // Primitives
     auto getAlphaTexture = [&](const ParameterDictionary &parameters,
@@ -1136,33 +1214,20 @@ ParsedScene::CreateLightsAndAggregate(Allocator alloc,
             pbrt::MediumInterface mi(findMedium(sh.insideMedium, &sh.loc),
                                      findMedium(sh.outsideMedium, &sh.loc));
 
-            for (auto &s : shapes) {
+            auto iter = shapeIndexToAreaLights.find(i);
+            for (size_t j = 0; j < shapes.size(); ++j) {
                 // Possibly create area light for shape
                 Light area = nullptr;
-                if (sh.lightIndex != -1) {
-                    CHECK_LT(sh.lightIndex, areaLights.size());
-                    if (!mtl)
-                        Warning(&sh.loc, "Ignoring area light specification for shape "
-                                         "with \"interface\" material.");
-                    else {
-                        const auto &areaLightEntity =
-                            areaLights[sh.lightIndex];
+                // Will not be present in the map if it has an "interface"
+                // material...
+                if (sh.lightIndex != -1 && iter != shapeIndexToAreaLights.end())
+                    area = (*iter->second)[j];
 
-                        area = Light::CreateArea(areaLightEntity.name,
-                                                 areaLightEntity.parameters,
-                                                 *sh.renderFromObject, mi, s, alphaTex,
-                                                 &areaLightEntity.loc, Allocator{});
-                        if (area) {
-                            std::lock_guard<std::mutex> lock(lightsMutex);
-                            lights.push_back(area);
-                        }
-                    }
-                }
                 if (area == nullptr && !mi.IsMediumTransition() && !alphaTex)
-                    primitives.push_back(new SimplePrimitive(s, mtl));
+                    primitives.push_back(new SimplePrimitive(shapes[j], mtl));
                 else
                     primitives.push_back(
-                        new GeometricPrimitive(s, mtl, area, mi, alphaTex));
+                        new GeometricPrimitive(shapes[j], mtl, area, mi, alphaTex));
             }
             sh.parameters.FreeParameters();
             sh = ShapeSceneEntity();
@@ -1210,27 +1275,15 @@ ParsedScene::CreateLightsAndAggregate(Allocator alloc,
 
             std::vector<Primitive> prims;
             for (auto &s : shapes) {
-                // Possibly create area light for shape
-                Light area = nullptr;
                 if (sh.lightIndex != -1) {
-                    CHECK_LT(sh.lightIndex, areaLights.size());
-                    const auto &areaLightEntity = areaLights[sh.lightIndex];
-
-                    // TODO: shouldn't this always be true if we got here?
-                    if (sh.renderFromObject.IsAnimated())
-                        ErrorExit(&sh.loc, "Animated area lights are not supported.");
-
-                    area = Light::CreateArea(areaLightEntity.name,
-                                             areaLightEntity.parameters,
-                                             sh.renderFromObject.startTransform, mi, s,
-                                             alphaTex, &sh.loc, Allocator{});
-                    if (area)
-                        lights.push_back(area);
+                    CHECK(sh.renderFromObject.IsAnimated());
+                    ErrorExit(&sh.loc, "Animated area lights are not supported.");
                 }
-                if (area == nullptr && !mi.IsMediumTransition() && !alphaTex)
+
+                if (!mi.IsMediumTransition() && !alphaTex)
                     prims.push_back(new SimplePrimitive(s, mtl));
                 else
-                    prims.push_back(new GeometricPrimitive(s, mtl, area, mi, alphaTex));
+                    prims.push_back(new GeometricPrimitive(s, mtl, nullptr /* area light */, mi, alphaTex));
             }
 
             // TODO: could try to be greedy or even segment them according
@@ -1327,7 +1380,7 @@ ParsedScene::CreateLightsAndAggregate(Allocator alloc,
                                   accelerator.parameters);
     LOG_VERBOSE("Finished top-level accelerator");
 
-    return Scene{lights, accel, materials, namedMaterials};
+    return Scene{accel, materials, namedMaterials};
 }
 
 // FormattingScene Method Definitions

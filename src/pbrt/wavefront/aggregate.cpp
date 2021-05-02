@@ -52,7 +52,7 @@ CPUAggregate::CPUAggregate(ParsedScene &scene, Allocator alloc,
          pstd::array<bool, Material::NumTags()> *haveBasicEvalMaterial,
          pstd::array<bool, Material::NumTags()> *haveUniversalEvalMaterial,
          bool *haveSubsurface) {
-    ParsedScene::Scene s = scene.CreateLightsAndAggregate(alloc, media);
+    ParsedScene::Scene s = scene.CreateAggregate(alloc, textures, shapeIndexToAreaLights, media);
 
     aggregate = s.aggregate;
 

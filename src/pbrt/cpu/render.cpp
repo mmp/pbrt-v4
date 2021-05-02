@@ -70,8 +70,20 @@ void CPURender(ParsedScene &parsedScene) {
         Sampler::Create(parsedScene.sampler.name, parsedScene.sampler.parameters,
                         fullImageResolution, &parsedScene.sampler.loc, alloc);
 
-    ParsedScene::Scene scene = parsedScene.CreateLightsAndAggregate(alloc, media);
-    std::vector<Light> lights = std::move(scene.lights);
+    // Textures
+    LOG_VERBOSE("Starting textures");
+    NamedTextures textures = parsedScene.CreateTextures(alloc, false);
+    LOG_VERBOSE("Finished textures");
+
+    // Lights
+    std::map<int, pstd::vector<Light> *> shapeIndexToAreaLights;
+    std::vector<Light> lights = parsedScene.CreateLights(alloc, media, textures,
+                                                         shapeIndexToAreaLights);
+
+    ParsedScene::Scene scene = parsedScene.CreateAggregate(alloc, textures,
+                                                           shapeIndexToAreaLights,
+                                                           media);
+
     Primitive accel = scene.aggregate;
 
     // Integrator
@@ -83,7 +95,6 @@ void CPURender(ParsedScene &parsedScene) {
     // Helpful warnings
     if (haveScatteringMedia && parsedScene.integrator.name != "volpath" &&
         parsedScene.integrator.name != "simplevolpath" &&
-        parsedScene.integrator.name != "reservoirvolpath" &&
         parsedScene.integrator.name != "bdpt" && parsedScene.integrator.name != "mlt")
         Warning("Scene has scattering media but \"%s\" integrator doesn't support "
                 "volume scattering. Consider using \"volpath\", \"simplevolpath\", "
