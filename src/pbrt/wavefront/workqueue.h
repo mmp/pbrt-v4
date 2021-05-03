@@ -128,7 +128,7 @@ void ForAllQueued(const char *desc, WorkQueue<WorkItem> *q, int maxQueued, F &&f
         LOG_FATAL("Options->useGPU was set without PBRT_BUILD_GPU_RENDERER enabled");
 #endif
     else
-        ParallelFor(0, q->Size(), [=](int index) { func((*q)[index]); });
+        ParallelFor(0, q->Size(), [&](int index) { func((*q)[index]); });
 }
 
 // MultiWorkQueue Definition
