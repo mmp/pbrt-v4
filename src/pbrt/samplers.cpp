@@ -417,7 +417,7 @@ void MLTSampler::EnsureReady(int index) {
         Float effSigma = sigma * std::sqrt((Float)nSmall);
         Float delta = SampleNormal(rng.Uniform<Float>(), 0, effSigma);
         X_i.value += delta;
-        X_i.value -= std::floor(X_i.value);
+        X_i.value -= pstd::floor(X_i.value);
     }
     X_i.lastModificationIteration = currentIteration;
 

@@ -1044,7 +1044,7 @@ SampledSpectrum MeasuredBxDF::f(Vector3f wo, Vector3f wi, TransportMode mode) co
     /* Spherical coordinates -> unit coordinate system */
     Vector2f u_wi(theta2u(theta_i), phi2u(phi_i));
     Vector2f u_wm(theta2u(theta_m), phi2u(brdf->isotropic ? (phi_m - phi_i) : phi_m));
-    u_wm.y = u_wm.y - std::floor(u_wm.y);
+    u_wm.y = u_wm.y - pstd::floor(u_wm.y);
 
     Float params[2] = {phi_i, theta_i};
     auto ui = brdf->vndf.Invert(u_wm, params);
@@ -1142,7 +1142,7 @@ Float MeasuredBxDF::PDF(Vector3f wo, Vector3f wi, TransportMode mode,
 
     /* Spherical coordinates -> unit coordinate system */
     Vector2f u_wm(theta2u(theta_m), phi2u(brdf->isotropic ? (phi_m - phi_i) : phi_m));
-    u_wm.y = u_wm.y - std::floor(u_wm.y);
+    u_wm.y = u_wm.y - pstd::floor(u_wm.y);
 
     Float params[2] = {phi_i, theta_i};
     auto ui = brdf->vndf.Invert(u_wm, params);

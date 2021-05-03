@@ -304,11 +304,11 @@ Vector3f EqualAreaSquareToSphere(Point2f p) {
     Float phi = (r == 0 ? 1 : (vp - up) / r + 1) * Pi / 4;
 
     // Find $z$ coordinate for spherical direction
-    Float z = std::copysign(1 - Sqr(r), signedDistance);
+    Float z = pstd::copysign(1 - Sqr(r), signedDistance);
 
     // Compute $\cos \phi$ and $\sin \phi$ for original quadrant and return vector
-    Float cosPhi = std::copysign(std::cos(phi), u);
-    Float sinPhi = std::copysign(std::sin(phi), v);
+    Float cosPhi = pstd::copysign(std::cos(phi), u);
+    Float sinPhi = pstd::copysign(std::sin(phi), v);
     return Vector3f(cosPhi * r * SafeSqrt(2 - Sqr(r)), sinPhi * r * SafeSqrt(2 - Sqr(r)),
                     z);
 }
@@ -353,8 +353,8 @@ Point2f EqualAreaSphereToSquare(Vector3f d) {
     }
 
     // Move (u,v) to the correct quadrant based on the signs of (x,y)
-    u = std::copysign(u, d.x);
-    v = std::copysign(v, d.y);
+    u = pstd::copysign(u, d.x);
+    v = pstd::copysign(v, d.y);
 
     // Transform (u,v) from [-1,1] to [0,1]
     return Point2f(0.5f * (u + 1), 0.5f * (v + 1));

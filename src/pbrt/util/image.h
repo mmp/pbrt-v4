@@ -277,7 +277,7 @@ class Image {
     Float BilerpChannel(Point2f p, int c, WrapMode2D wrapMode = WrapMode::Clamp) const {
         // Compute discrete pixel coordinates and offsets for _p_
         Float x = p[0] * resolution.x - 0.5f, y = p[1] * resolution.y - 0.5f;
-        int xi = std::floor(x), yi = std::floor(y);
+        int xi = pstd::floor(x), yi = pstd::floor(y);
         Float dx = x - xi, dy = y - yi;
 
         // Load pixel channel values and return bilinearly interpolated value

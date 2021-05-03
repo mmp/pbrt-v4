@@ -463,7 +463,7 @@ PBRT_CPU_GPU inline float FastExp(float x) {
     float xp = x * 1.442695041f;
 
     // Find integer and fractional components of $x'$
-    float fxp = std::floor(xp), f = xp - fxp;
+    float fxp = pstd::floor(xp), f = xp - fxp;
     int i = (int)fxp;
 
     // Evaluate polynomial approximation of $2^f$
@@ -638,7 +638,7 @@ PBRT_CPU_GPU inline bool Quadratic(float a, float b, float c, float *t0, float *
     float rootDiscrim = std::sqrt(discrim);
 
     // Compute quadratic _t_ values
-    float q = -0.5f * (b + std::copysign(rootDiscrim, b));
+    float q = -0.5f * (b + pstd::copysign(rootDiscrim, b));
     *t0 = q / a;
     *t1 = c / q;
     if (*t0 > *t1)
@@ -661,7 +661,7 @@ inline bool Quadratic(double a, double b, double c, double *t0, double *t1) {
     }
 
     // Compute quadratic _t_ values
-    double q = -0.5 * (b + std::copysign(rootDiscrim, b));
+    double q = -0.5 * (b + pstd::copysign(rootDiscrim, b));
     *t0 = q / a;
     *t1 = c / q;
     if (*t0 > *t1)
@@ -1015,11 +1015,11 @@ PBRT_CPU_GPU inline Interval operator/(Interval i, Float f) {
 }
 
 PBRT_CPU_GPU inline Float Floor(Interval i) {
-    return std::floor(i.LowerBound());
+    return pstd::floor(i.LowerBound());
 }
 
 PBRT_CPU_GPU inline Float Ceil(Interval i) {
-    return std::ceil(i.UpperBound());
+    return pstd::ceil(i.UpperBound());
 }
 
 PBRT_CPU_GPU inline Float floor(Interval i) {

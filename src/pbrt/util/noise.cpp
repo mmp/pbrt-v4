@@ -55,7 +55,7 @@ static PBRT_CONST int NoisePerm[2 * NoisePermSize] = {
 // Noise Function Definitions
 Float Noise(Float x, Float y, Float z) {
     // Compute noise cell coordinates and offsets
-    int ix = std::floor(x), iy = std::floor(y), iz = std::floor(z);
+    int ix = pstd::floor(x), iy = pstd::floor(y), iz = pstd::floor(z);
     Float dx = x - ix, dy = y - iy, dz = z - iz;
 
     // Compute gradient weights
@@ -110,7 +110,7 @@ Float FBm(Point3f p, Vector3f dpdx, Vector3f dpdy, Float omega, int maxOctaves) 
     // Compute number of octaves for antialiased FBm
     Float len2 = std::max(LengthSquared(dpdx), LengthSquared(dpdy));
     Float n = Clamp(-1 - .5f * Log2(len2), 0, maxOctaves);
-    int nInt = std::floor(n);
+    int nInt = pstd::floor(n);
 
     // Compute sum of octaves of noise for FBm
     Float sum = 0, lambda = 1, o = 1;
@@ -129,7 +129,7 @@ Float Turbulence(Point3f p, Vector3f dpdx, Vector3f dpdy, Float omega, int maxOc
     // Compute number of octaves for antialiased FBm
     Float len2 = std::max(LengthSquared(dpdx), LengthSquared(dpdy));
     Float n = Clamp(-1 - .5f * Log2(len2), 0, maxOctaves);
-    int nInt = std::floor(n);
+    int nInt = pstd::floor(n);
 
     // Compute sum of octaves of noise for turbulence
     Float sum = 0, lambda = 1, o = 1;

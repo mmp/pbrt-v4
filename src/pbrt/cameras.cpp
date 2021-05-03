@@ -1270,7 +1270,7 @@ void RealisticCamera::TestExitPupilBounds() const {
 
     Float r = pFilm.x / (filmDiagonal / 2);
     int pupilIndex = std::min<int>(exitPupilBounds.size() - 1,
-                                   std::floor(r * (exitPupilBounds.size() - 1)));
+                                   pstd::floor(r * (exitPupilBounds.size() - 1)));
     Bounds2f pupilBounds = exitPupilBounds[pupilIndex];
     if (pupilIndex + 1 < (int)exitPupilBounds.size())
         pupilBounds = Union(pupilBounds, exitPupilBounds[pupilIndex + 1]);

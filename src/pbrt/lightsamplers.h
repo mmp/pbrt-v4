@@ -119,9 +119,9 @@ class CompactLightBounds {
         // Quantize bounding box into _qb_
         for (int c = 0; c < 3; ++c) {
             qb[0][c] =
-                std::floor(QuantizeBounds(lb.bounds[0][c], allb.pMin[c], allb.pMax[c]));
+                pstd::floor(QuantizeBounds(lb.bounds[0][c], allb.pMin[c], allb.pMax[c]));
             qb[1][c] =
-                std::ceil(QuantizeBounds(lb.bounds[1][c], allb.pMin[c], allb.pMax[c]));
+                pstd::ceil(QuantizeBounds(lb.bounds[1][c], allb.pMin[c], allb.pMax[c]));
         }
     }
 
@@ -210,7 +210,7 @@ class CompactLightBounds {
     PBRT_CPU_GPU
     static unsigned int QuantizeCos(Float c) {
         CHECK(c >= -1 && c <= 1);
-        return std::floor(32767.f * ((c + 1) / 2));
+        return pstd::floor(32767.f * ((c + 1) / 2));
     }
 
     PBRT_CPU_GPU

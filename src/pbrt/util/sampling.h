@@ -390,7 +390,7 @@ inline Point2f InvertUniformDiskConcentricSample(const Point2f &p) {
     Point2f uo;
     // TODO: can we make this less branchy?
     if (std::abs(theta) < PiOver4 || std::abs(theta) > 3 * PiOver4) {
-        uo.x = r = std::copysign(r, p.x);
+        uo.x = r = pstd::copysign(r, p.x);
         if (p.x < 0) {
             if (p.y < 0) {
                 uo.y = (Pi + theta) * r / PiOver4;
@@ -401,7 +401,7 @@ inline Point2f InvertUniformDiskConcentricSample(const Point2f &p) {
             uo.y = (theta * r) / PiOver4;
         }
     } else {
-        uo.y = r = std::copysign(r, p.y);
+        uo.y = r = pstd::copysign(r, p.y);
         if (p.y < 0) {
             uo.x = -(PiOver2 + theta) * r / PiOver4;
         } else {
@@ -963,8 +963,8 @@ class WindowedPiecewiseConstant2D {
         // Sample conditional windowed function in $y$
         // Compute 2D bounds _bCond_ for conditional sampling
         int nx = func.xSize();
-        Bounds2f bCond(Point2f(std::floor(p.x * nx) / nx, b.pMin.y),
-                       Point2f(std::ceil(p.x * nx) / nx, b.pMax.y));
+        Bounds2f bCond(Point2f(pstd::floor(p.x * nx) / nx, b.pMin.y),
+                       Point2f(pstd::ceil(p.x * nx) / nx, b.pMax.y));
         if (bCond.pMin.x == bCond.pMax.x)
             bCond.pMax.x += 1.f / nx;
         if (sat.Integral(bCond) == 0) {
@@ -999,7 +999,7 @@ class WindowedPiecewiseConstant2D {
     PBRT_CPU_GPU static Float SampleBisection(CDF P, Float u, Float min, Float max,
                                               int n) {
         // Apply bisection to bracket _u_
-        while (std::ceil(n * max) - std::floor(n * min) > 1) {
+        while (pstd::ceil(n * max) - pstd::floor(n * min) > 1) {
             DCHECK_LE(P(min), u);
             DCHECK_GE(P(max), u);
             Float mid = (min + max) / 2;

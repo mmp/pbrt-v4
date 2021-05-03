@@ -1090,6 +1090,54 @@ PBRT_CPU_GPU inline double abs(double f) {
     return ::fabs(f);
 }
 
+PBRT_CPU_GPU inline float copysign(float mag, float sign) {
+#ifdef PBRT_IS_GPU_CODE
+    return ::copysignf(mag, sign);
+#else
+    return std::copysign(mag, sign);
+#endif
+}
+
+PBRT_CPU_GPU inline double copysign(double mag, double sign) {
+#ifdef PBRT_IS_GPU_CODE
+    return ::copysign(mag, sign);
+#else
+    return std::copysign(mag, sign);
+#endif
+}
+
+PBRT_CPU_GPU inline float floor(float arg) {
+#ifdef PBRT_IS_GPU_CODE
+    return ::floorf(arg);
+#else
+    return std::floor(arg);
+#endif
+}
+
+PBRT_CPU_GPU inline double floor(double arg) {
+#ifdef PBRT_IS_GPU_CODE
+    return ::floor(arg);
+#else
+    return std::floor(arg);
+#endif
+}
+
+PBRT_CPU_GPU inline float ceil(float arg) {
+#ifdef PBRT_IS_GPU_CODE
+    return ::ceilf(arg);
+#else
+    return std::ceil(arg);
+#endif
+}
+
+PBRT_CPU_GPU inline double ceil(double arg) {
+#ifdef PBRT_IS_GPU_CODE
+    return ::ceil(arg);
+#else
+    return std::ceil(arg);
+#endif
+}
+
 template <typename T>
 PBRT_CPU_GPU T real(const complex<T> &z) {
     return z.re;
@@ -1121,7 +1169,7 @@ PBRT_CPU_GPU complex<T> sqrt(const complex<T> &z) {
     if (z.re >= 0)
         return {t1, t2};
     else
-        return {pstd::abs(t2), std::copysign(t1, z.im)};
+        return {pstd::abs(t2), pstd::copysign(t1, z.im)};
 }
 
 }  // namespace pstd

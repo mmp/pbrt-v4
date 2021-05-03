@@ -231,7 +231,7 @@ T MIPMap::Filter(Point2f st, Vector2f dst0, Vector2f dst1) const {
         Float level = nLevels - 1 + Log2(std::max<Float>(width, 1e-8));
         if (level >= Levels() - 1)
             return Texel<T>(Levels() - 1, {0, 0});
-        int iLevel = std::max(0, int(std::floor(level)));
+        int iLevel = std::max(0, int(pstd::floor(level)));
 
         if (options.filter == FilterFunction::Point) {
             // Return point-sampled value at selected MIP level
@@ -272,7 +272,7 @@ T MIPMap::Filter(Point2f st, Vector2f dst0, Vector2f dst1) const {
 
     // Choose level of detail for EWA lookup and perform EWA filtering
     Float lod = std::max<Float>(0, Levels() - 1 + Log2(minorLength));
-    int ilod = std::floor(lod);
+    int ilod = pstd::floor(lod);
     return ((1 - (lod - ilod)) * EWA<T>(ilod, st, dst0, dst1) +
             (lod - ilod) * EWA<T>(ilod + 1, st, dst0, dst1));
 }
@@ -318,10 +318,10 @@ T MIPMap::EWA(int level, Point2f st, Vector2f dst0, Vector2f dst1) const {
     Float det = -B * B + 4 * A * C;
     Float invDet = 1 / det;
     Float uSqrt = SafeSqrt(det * C), vSqrt = SafeSqrt(A * det);
-    int s0 = std::ceil(st[0] - 2 * invDet * uSqrt);
-    int s1 = std::floor(st[0] + 2 * invDet * uSqrt);
-    int t0 = std::ceil(st[1] - 2 * invDet * vSqrt);
-    int t1 = std::floor(st[1] + 2 * invDet * vSqrt);
+    int s0 = pstd::ceil(st[0] - 2 * invDet * uSqrt);
+    int s1 = pstd::floor(st[0] + 2 * invDet * uSqrt);
+    int t0 = pstd::ceil(st[1] - 2 * invDet * vSqrt);
+    int t1 = pstd::floor(st[1] + 2 * invDet * vSqrt);
 
     // Scan over ellipse bound and evaluate quadratic equation to filter image
     T sum{};

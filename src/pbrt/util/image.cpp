@@ -248,7 +248,7 @@ std::vector<ResampleWeight> Image::ResampleWeights(int oldRes, int newRes) {
     for (int i = 0; i < newRes; ++i) {
         // Compute image resampling weights for _i_th pixel
         Float center = (i + .5f) * oldRes / newRes;
-        wt[i].firstPixel = std::floor((center - filterRadius) + 0.5f);
+        wt[i].firstPixel = pstd::floor((center - filterRadius) + 0.5f);
         for (int j = 0; j < 4; ++j) {
             Float pos = wt[i].firstPixel + j + .5f;
             wt[i].weight[j] = WindowedSinc(pos - center, filterRadius, tau);

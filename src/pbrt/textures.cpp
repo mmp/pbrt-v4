@@ -161,13 +161,13 @@ Float Checkerboard(TextureEvalContext ctx, TextureMapping2D map2D,
                    TextureMapping3D map3D) {
     // Define 1D checkerboard filtered integral functions
     auto d = [](Float x) {
-        Float y = x / 2 - std::floor(x / 2) - 0.5f;
+        Float y = x / 2 - pstd::floor(x / 2) - 0.5f;
         return x / 2 + y * (1 - 2 * std::abs(y));
     };
 
     auto bf = [&](Float x, Float w) -> Float {
-        if (std::floor(x - w) == std::floor(x + w))
-            return 1 - 2 * (int(std::floor(x)) & 1);
+        if (pstd::floor(x - w) == pstd::floor(x + w))
+            return 1 - 2 * (int(pstd::floor(x)) & 1);
         return (d(x + w) - 2 * d(x) + d(x - w)) / Sqr(w);
     };
 
@@ -266,7 +266,7 @@ std::string SpectrumCheckerboardTexture::ToString() const {
 // InsidePolkaDot Function Definition
 bool InsidePolkaDot(Point2f st) {
     // Compute cell indices (_sCell_,_tCell_ for dots
-    int sCell = std::floor(st[0] + .5f), tCell = std::floor(st[1] + .5f);
+    int sCell = pstd::floor(st[0] + .5f), tCell = pstd::floor(st[1] + .5f);
 
     if (Noise(sCell + .5f, tCell + .5f) > 0) {
         // Determine dot position and test if _st_ is inside it
@@ -471,7 +471,7 @@ SampledSpectrum MarbleTexture::Evaluate(TextureEvalContext ctx,
         {.58f, .58f, .6f}, {.2f, .2f, .33f},  {.58f, .58f, .6f},
     };
     int nSeg = PBRT_ARRAYSIZE(c) - 3;
-    int first = std::min<int>(std::floor(t * nSeg), nSeg - 1);
+    int first = std::min<int>(pstd::floor(t * nSeg), nSeg - 1);
     t = t * nSeg - first;
     RGB rgb = 1.5f * EvaluateCubicBezier(pstd::span(c + first, 4), t);
 

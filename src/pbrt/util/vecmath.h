@@ -189,13 +189,13 @@ PBRT_CPU_GPU inline C<T> Abs(const Tuple2<C, T> &t) {
 
 template <template <class> class C, typename T>
 PBRT_CPU_GPU inline C<T> Ceil(const Tuple2<C, T> &t) {
-    using std::ceil;
+    using pstd::ceil;
     return {ceil(t.x), ceil(t.y)};
 }
 
 template <template <class> class C, typename T>
 PBRT_CPU_GPU inline C<T> Floor(const Tuple2<C, T> &t) {
-    using std::floor;
+    using pstd::floor;
     return {floor(t.x), floor(t.y)};
 }
 
@@ -396,13 +396,13 @@ PBRT_CPU_GPU inline C<T> Abs(const Tuple3<C, T> &t) {
 
 template <template <class> class C, typename T>
 PBRT_CPU_GPU inline C<T> Ceil(const Tuple3<C, T> &t) {
-    using std::ceil;
+    using pstd::ceil;
     return {ceil(t.x), ceil(t.y), ceil(t.z)};
 }
 
 template <template <class> class C, typename T>
 PBRT_CPU_GPU inline C<T> Floor(const Tuple3<C, T> &t) {
-    using std::floor;
+    using pstd::floor;
     return {floor(t.x), floor(t.y), floor(t.z)};
 }
 
@@ -1016,7 +1016,7 @@ PBRT_CPU_GPU inline Vector3<T> Cross(const Vector3<T> &v, const Vector3<T> &w) {
 template <typename T>
 PBRT_CPU_GPU inline void CoordinateSystem(const Vector3<T> &v1, Vector3<T> *v2,
                                           Vector3<T> *v3) {
-    Float sign = std::copysign(Float(1), v1.z);
+    Float sign = pstd::copysign(Float(1), v1.z);
     Float a = -1 / (sign + v1.z);
     Float b = v1.x * v1.y * a;
     *v2 = Vector3<T>(1 + sign * v1.x * v1.x * a, sign * b, -sign * v1.x);
@@ -1026,7 +1026,7 @@ PBRT_CPU_GPU inline void CoordinateSystem(const Vector3<T> &v1, Vector3<T> *v2,
 template <typename T>
 PBRT_CPU_GPU inline void CoordinateSystem(const Normal3<T> &v1, Vector3<T> *v2,
                                           Vector3<T> *v3) {
-    Float sign = std::copysign(Float(1), v1.z);
+    Float sign = pstd::copysign(Float(1), v1.z);
     Float a = -1 / (sign + v1.z);
     Float b = v1.x * v1.y * a;
     *v2 = Vector3<T>(1 + sign * v1.x * v1.x * a, sign * b, -sign * v1.x);

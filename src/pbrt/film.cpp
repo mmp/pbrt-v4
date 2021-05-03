@@ -112,10 +112,10 @@ FilmBaseParameters::FilmBaseParameters(const ParameterDictionary &parameters,
     if (Options->cropWindow) {
         Bounds2f crop = *Options->cropWindow;
         // Compute film image bounds
-        pixelBounds = Bounds2i(Point2i(std::ceil(fullResolution.x * crop.pMin.x),
-                                       std::ceil(fullResolution.y * crop.pMin.y)),
-                               Point2i(std::ceil(fullResolution.x * crop.pMax.x),
-                                       std::ceil(fullResolution.y * crop.pMax.y)));
+        pixelBounds = Bounds2i(Point2i(pstd::ceil(fullResolution.x * crop.pMin.x),
+                                       pstd::ceil(fullResolution.y * crop.pMin.y)),
+                               Point2i(pstd::ceil(fullResolution.x * crop.pMax.x),
+                                       pstd::ceil(fullResolution.y * crop.pMax.y)));
 
         if (!cr.empty())
             Warning(loc, "Crop window supplied on command line will override "
@@ -140,10 +140,10 @@ FilmBaseParameters::FilmBaseParameters(const ParameterDictionary &parameters,
             crop.pMax.y = Clamp(std::max(cr[2], cr[3]), 0.f, 1.f);
 
             // Compute film image bounds
-            pixelBounds = Bounds2i(Point2i(std::ceil(fullResolution.x * crop.pMin.x),
-                                           std::ceil(fullResolution.y * crop.pMin.y)),
-                                   Point2i(std::ceil(fullResolution.x * crop.pMax.x),
-                                           std::ceil(fullResolution.y * crop.pMax.y)));
+            pixelBounds = Bounds2i(Point2i(pstd::ceil(fullResolution.x * crop.pMin.x),
+                                           pstd::ceil(fullResolution.y * crop.pMin.y)),
+                                   Point2i(pstd::ceil(fullResolution.x * crop.pMax.x),
+                                           pstd::ceil(fullResolution.y * crop.pMax.y)));
         } else
             Error(loc, "%d values supplied for \"cropwindow\". Expected 4.",
                   (int)cr.size());

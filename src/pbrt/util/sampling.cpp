@@ -201,7 +201,7 @@ Point3f SampleSphericalRectangle(Point3f pRef, Point3f s, Vector3f ex, Vector3f 
     Float b0 = n0.z, b1 = n2.z;
     Float au = u[0] * (g0 + g1 - 2 * Pi) + (u[0] - 1) * (g2 + g3);
     Float fu = (std::cos(au) * b0 - b1) / std::sin(au);
-    Float cu = std::copysign(1 / std::sqrt(Sqr(fu) + Sqr(b0)), fu);
+    Float cu = pstd::copysign(1 / std::sqrt(Sqr(fu) + Sqr(b0)), fu);
     cu = Clamp(cu, -OneMinusEpsilon, OneMinusEpsilon);  // avoid NaNs
 
     // Find _xu_ along $x$ edge for spherical rectangle sample
@@ -285,10 +285,10 @@ Point2f InvertSphericalRectangleSample(Point3f pRef, Point3f s, Vector3f ex, Vec
     // Float fusq = 1 / Sqr(cu) - b0sq;  // more stable
     Float invcusq = 1 + z0sq / Sqr(xu);
     Float fusq = invcusq - b0sq;  // the winner so far
-    Float fu = std::copysign(std::sqrt(fusq), xu);
+    Float fu = pstd::copysign(std::sqrt(fusq), xu);
     // Note, though have 1 + z^2/x^2 - b0^2, which isn't great if b0 \approx 1
     // double fusq = 1. - Sqr(double(b0)) + Sqr(double(z0) / double(xu));  //
-    // this is worse?? double fu = std::copysign(std::sqrt(fusq), cu);
+    // this is worse?? double fu = pstd::copysign(std::sqrt(fusq), cu);
     CHECK_RARE(1e-6, fu == 0);
 
     // State of the floating point world: in the bad cases, about half the
@@ -308,7 +308,7 @@ Point2f InvertSphericalRectangleSample(Point3f pRef, Point3f s, Vector3f ex, Vec
 
     Float sqrt = SafeSqrt(DifferenceOfProducts(b0, b0, b1, b1) + fusq);
     // No benefit to difference of products here...
-    Float au = std::atan2(-(b1 * fu) - std::copysign(b0 * sqrt, fu * b0),
+    Float au = std::atan2(-(b1 * fu) - pstd::copysign(b0 * sqrt, fu * b0),
                           b0 * b1 - sqrt * std::abs(fu));
     if (au > 0)
         au -= 2 * Pi;
