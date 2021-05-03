@@ -105,8 +105,10 @@ void GPUParallelFor(const char *description, int nItems, F func) {
     nvtxRangePop();
 #endif
 }
-#endif // __NVCC__
 
+#endif  // __NVCC__
+
+// GPU Synchronization Function Declarations
 void GPUWait();
 
 void ReportKernelStats();

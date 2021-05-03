@@ -26,7 +26,6 @@ void CPURender(ParsedScene &parsedScene) {
     // Create media first (so have them for the camera...)
     std::map<std::string, Medium> media = parsedScene.CreateMedia(alloc);
 
-    // FIXME: haveScatteringMedia isn't being set for shapes/prims
     bool haveScatteringMedia = false;
     auto findMedium = [&media, &haveScatteringMedia](const std::string &s,
                                                      const FileLoc *loc) -> Medium {
@@ -77,13 +76,11 @@ void CPURender(ParsedScene &parsedScene) {
 
     // Lights
     std::map<int, pstd::vector<Light> *> shapeIndexToAreaLights;
-    std::vector<Light> lights = parsedScene.CreateLights(alloc, media, textures,
-                                                         shapeIndexToAreaLights);
+    std::vector<Light> lights =
+        parsedScene.CreateLights(alloc, media, textures, shapeIndexToAreaLights);
 
-    ParsedScene::Scene scene = parsedScene.CreateAggregate(alloc, textures,
-                                                           shapeIndexToAreaLights,
-                                                           media);
-
+    ParsedScene::Scene scene =
+        parsedScene.CreateAggregate(alloc, textures, shapeIndexToAreaLights, media);
     Primitive accel = scene.aggregate;
 
     // Integrator

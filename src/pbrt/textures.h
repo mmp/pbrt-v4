@@ -1092,12 +1092,12 @@ class BasicTextureEvaluator {
     bool CanEvaluate(std::initializer_list<FloatTexture> ftex,
                      std::initializer_list<SpectrumTexture> stex) const {
         for (auto f : ftex)
-            if (f && !f.Is<FloatConstantTexture>() && !f.Is<GPUFloatPtexTexture>() &&
-                !f.Is<FloatImageTexture>() && !f.Is<GPUFloatImageTexture>())
+            if (f && !f.Is<FloatConstantTexture>() && !f.Is<FloatImageTexture>() &&
+                !f.Is<GPUFloatPtexTexture>() && !f.Is<GPUFloatImageTexture>())
                 return false;
         for (auto s : stex)
-            if (s && !s.Is<SpectrumConstantTexture>() && !s.Is<GPUSpectrumPtexTexture>() &&
-                !s.Is<SpectrumImageTexture>() && !s.Is<GPUSpectrumImageTexture>())
+            if (s && !s.Is<SpectrumConstantTexture>() && !s.Is<SpectrumImageTexture>() &&
+                !s.Is<GPUSpectrumPtexTexture>() && !s.Is<GPUSpectrumImageTexture>())
                 return false;
         return true;
     }
@@ -1113,7 +1113,8 @@ class BasicTextureEvaluator {
         else if (GPUFloatPtexTexture *fPtex = tex.CastOrNullptr<GPUFloatPtexTexture>())
             return fPtex->Evaluate(ctx);
         else {
-            if (tex) LOG_FATAL("BasicTextureEvaluator::operator() called with %s", tex);
+            if (tex)
+                LOG_FATAL("BasicTextureEvaluator::operator() called with %s", tex);
             return 0.f;
         }
     }
@@ -1125,13 +1126,15 @@ class BasicTextureEvaluator {
             return sc->Evaluate(ctx, lambda);
         else if (SpectrumImageTexture *siTex = tex.CastOrNullptr<SpectrumImageTexture>())
             return siTex->Evaluate(ctx, lambda);
-        else if (GPUSpectrumImageTexture *gsiTex = tex.CastOrNullptr<GPUSpectrumImageTexture>())
+        else if (GPUSpectrumImageTexture *gsiTex =
+                     tex.CastOrNullptr<GPUSpectrumImageTexture>())
             return gsiTex->Evaluate(ctx, lambda);
         else if (GPUSpectrumPtexTexture *sPtex =
                      tex.CastOrNullptr<GPUSpectrumPtexTexture>())
             return sPtex->Evaluate(ctx, lambda);
         else {
-            if (tex) LOG_FATAL("BasicTextureEvaluator::operator() called with %s", tex);
+            if (tex)
+                LOG_FATAL("BasicTextureEvaluator::operator() called with %s", tex);
             return SampledSpectrum(0.f);
         }
     }

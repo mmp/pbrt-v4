@@ -2,8 +2,8 @@
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
 
-#ifndef PBRT_WAVEFRONT_PATHINTEGRATOR_H
-#define PBRT_WAVEFRONT_PATHINTEGRATOR_H
+#ifndef PBRT_WAVEFRONT_INTEGRATOR_H
+#define PBRT_WAVEFRONT_INTEGRATOR_H
 
 #include <pbrt/pbrt.h>
 
@@ -16,28 +16,30 @@
 #include <pbrt/base/sampler.h>
 #ifdef PBRT_BUILD_GPU_RENDERER
 #include <pbrt/gpu/util.h>
-#endif // PBRT_BUILD_GPU_RENDERER
+#endif  // PBRT_BUILD_GPU_RENDERER
 #include <pbrt/options.h>
-#include <pbrt/wavefront/workitems.h>
-#include <pbrt/wavefront/workqueue.h>
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/pstd.h>
+#include <pbrt/wavefront/workitems.h>
+#include <pbrt/wavefront/workqueue.h>
 
 namespace pbrt {
 
 class ParsedScene;
 
+// WavefrontAggregate Definition
 class WavefrontAggregate {
-public:
+  public:
     virtual ~WavefrontAggregate() = default;
 
     virtual Bounds3f Bounds() const = 0;
 
-    virtual void IntersectClosest(
-        int maxRays, EscapedRayQueue *escapedRayQueue,
-        HitAreaLightQueue *hitAreaLightQueue, MaterialEvalQueue *basicEvalMaterialQueue,
-        MaterialEvalQueue *universalEvalMaterialQueue,
-        MediumSampleQueue *mediumSampleQueue, RayQueue *rayQueue, RayQueue *nextRayQueue) const = 0;
+    virtual void IntersectClosest(int maxRays, EscapedRayQueue *escapedRayQueue,
+                                  HitAreaLightQueue *hitAreaLightQueue,
+                                  MaterialEvalQueue *basicEvalMaterialQueue,
+                                  MaterialEvalQueue *universalEvalMaterialQueue,
+                                  MediumSampleQueue *mediumSampleQueue,
+                                  RayQueue *rayQueue, RayQueue *nextRayQueue) const = 0;
 
     virtual void IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue,
                                  SOA<PixelSampleState> *pixelSampleState) const = 0;
@@ -45,8 +47,8 @@ public:
     virtual void IntersectShadowTr(int maxRays, ShadowRayQueue *shadowRayQueue,
                                    SOA<PixelSampleState> *pixelSampleState) const = 0;
 
-    virtual void IntersectOneRandom(int maxRays,
-                                    SubsurfaceScatterQueue *subsurfaceScatterQueue) const = 0;
+    virtual void IntersectOneRandom(
+        int maxRays, SubsurfaceScatterQueue *subsurfaceScatterQueue) const = 0;
 };
 
 // WavefrontPathIntegrator Definition
@@ -87,18 +89,6 @@ class WavefrontPathIntegrator {
 
     void UpdateFilm();
 
-    WavefrontPathIntegrator(Allocator alloc, ParsedScene &scene);
-
-    RayQueue *CurrentRayQueue(int depth) { return rayQueues[depth & 1]; }
-    RayQueue *NextRayQueue(int depth) { return rayQueues[(depth + 1) & 1]; }
-
-    void IntersectClosest(RayQueue *rayQueue, EscapedRayQueue *escapedRayQueue,
-                          HitAreaLightQueue *hitAreaLightQueue,
-                          MaterialEvalQueue *basicEvalMaterialQueue,
-                          MaterialEvalQueue *universalEvalMaterialQueue,
-                          MediumSampleQueue *mediumSampleQueue,
-                          RayQueue *nextRayQueue) const;
-
     template <typename F>
     void ParallelFor(const char *description, int nItems, F &&func) {
         if (Options->useGPU) {
@@ -110,6 +100,7 @@ class WavefrontPathIntegrator {
         } else
             pbrt::ParallelFor(0, nItems, func);
     }
+
     template <typename F>
     void Do(const char *description, F &&func) {
         if (Options->useGPU) {
@@ -122,14 +113,24 @@ class WavefrontPathIntegrator {
             func();
     }
 
+    WavefrontPathIntegrator(Allocator alloc, ParsedScene &scene);
+
+    RayQueue *CurrentRayQueue(int depth) { return rayQueues[depth & 1]; }
+    RayQueue *NextRayQueue(int depth) { return rayQueues[(depth + 1) & 1]; }
+
+    void IntersectClosest(RayQueue *rayQueue, EscapedRayQueue *escapedRayQueue,
+                          HitAreaLightQueue *hitAreaLightQueue,
+                          MaterialEvalQueue *basicEvalMaterialQueue,
+                          MaterialEvalQueue *universalEvalMaterialQueue,
+                          MediumSampleQueue *mediumSampleQueue,
+                          RayQueue *nextRayQueue) const;
+
     // WavefrontPathIntegrator Member Variables
     bool initializeVisibleSurface;
     bool haveSubsurface;
     bool haveMedia;
     pstd::array<bool, Material::NumTags()> haveBasicEvalMaterial;
     pstd::array<bool, Material::NumTags()> haveUniversalEvalMaterial;
-
-    WavefrontAggregate *aggregate = nullptr;
 
     struct Stats {
         Stats(int maxDepth, Allocator alloc);
@@ -141,6 +142,8 @@ class WavefrontPathIntegrator {
         pstd::vector<uint64_t> indirectRays, shadowRays;
     };
     Stats *stats;
+
+    WavefrontAggregate *aggregate = nullptr;
 
     Filter filter;
     Film film;
@@ -176,4 +179,4 @@ class WavefrontPathIntegrator {
 
 }  // namespace pbrt
 
-#endif  // PBRT_WAVEFRONT_PATHINTEGRATOR_H
+#endif  // PBRT_WAVEFRONT_INTEGRATOR_H

@@ -7,8 +7,8 @@
 
 #include <pbrt/pbrt.h>
 
-#include <pbrt/cpu/primitive.h>
 #include <pbrt/cameras.h>
+#include <pbrt/cpu/primitive.h>
 #include <pbrt/paramdict.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/memory.h>
@@ -338,19 +338,20 @@ class ParsedScene : public SceneRepresentation {
 
     std::map<std::string, Medium> CreateMedia(Allocator alloc) const;
 
-    std::vector<Light> CreateLights(Allocator alloc,
-                                    const std::map<std::string, Medium> &media,
-                                    const NamedTextures &textures,
-                                    std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights);
+    std::vector<Light> CreateLights(
+        Allocator alloc, const std::map<std::string, Medium> &media,
+        const NamedTextures &textures,
+        std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights);
 
     struct Scene {
         Primitive aggregate;
         std::vector<pbrt::Material> materials;
         std::map<std::string, pbrt::Material> namedMaterials;
     };
-    Scene CreateAggregate(Allocator alloc, NamedTextures &textures,
-                          const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-                          const std::map<std::string, Medium> &media);
+    Scene CreateAggregate(
+        Allocator alloc, NamedTextures &textures,
+        const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
+        const std::map<std::string, Medium> &media);
 
     // ParsedScene Public Members
     SceneEntity film, sampler, integrator, filter, accelerator;
