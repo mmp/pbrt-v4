@@ -9,8 +9,8 @@ pbrt, Version 4 (Early Release)
 This is an early release of pbrt-v4, the rendering system that will be
 described in the (eventually) forthcoming fourth edition of *Physically
 Based Rendering: From Theory to Implementation*.  (We hope to have an
-online version of the book posted a few months into 2021 and printed books available
-in Summer 2021.)
+online version of the book posted in Fall of 2021 and printed books
+available in 2022.)
 
 We are making this code available for hardy adventurers; it's not yet
 extensively documented, but if you're familiar with previous versions of
@@ -66,7 +66,7 @@ Major changes include:
     sampling ([Hart et al. 2019](https://onlinelibrary.wiley.com/doi/abs/10.1111/cgf.14060)).
   * An implementation of Bitterli et al's environment light [portal sampling](https://benedikt-bitterli.me/pmems.html)
     technique is included.
-* Rendering can now be performed in absolute physical units with modelling of real cameras as per [Langlands & Fascione 2020](https://github.com/wetadigital/physlight). Code contributed by Anders Langlands & Luca Fascione Copyright © 2020, Weta Digital, Ltd.
+* Rendering can now be performed in absolute physical units with modelling of real cameras as per [Langlands & Fascione 2020](https://github.com/wetadigital/physlight).
 * And also...
   * Various improvements have been made to the `Sampler` classes, including
     better randomization and a new sampler that implements pmj02bn sampling ([Christensen et
@@ -195,8 +195,7 @@ today, though we'd be happy to see pbrt running on any other GPUs that
 provided those capabilities.
 
 pbrt's GPU path currently requires CUDA 11.0 or later and OptiX 7.1 or
-later.  At the moment, only Linux is supported, but PRs to fix the GPU
-Windows build would be much appreciated.
+later.  Both Linux and Windows are supported.
 
 The build scripts automatically attempt to find a CUDA compiler, looking in
 the usual places; the cmake output will indicate whether it was successful.
