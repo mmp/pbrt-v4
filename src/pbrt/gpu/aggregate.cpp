@@ -626,7 +626,7 @@ OptiXAggregate::OptiXAggregate(
     ctxOptions.logCallbackLevel = 2;  // error
 #endif
     ctxOptions.logCallbackFunction = logCallback;
-#if (OPTIX_VERSION >= 70200)
+#if (OPTIX_VERSION >= 70200) && !defined(NDEBUG)
     ctxOptions.validationMode = OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_ALL;
 #endif
     OPTIX_CHECK(optixDeviceContextCreate(cudaContext, &ctxOptions, &optixContext));
