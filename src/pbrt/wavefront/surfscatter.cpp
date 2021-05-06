@@ -218,12 +218,13 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
             }
 
             // Sample light and enqueue shadow ray at intersection point
-            if (bsdf.IsNonSpecular()) {
+            BxDFFlags flags = bsdf.Flags();
+            if (IsNonSpecular(flags)) {
                 // Choose a light source using the _LightSampler_
                 LightSampleContext ctx(w.pi, w.n, ns);
-                if (bsdf.HasReflection() && !bsdf.HasTransmission())
+                if (IsReflective(flags) && !IsTransmissive(flags))
                     ctx.pi = OffsetRayOrigin(ctx.pi, w.n, wo);
-                else if (bsdf.HasTransmission() && !bsdf.HasReflection())
+                else if (IsTransmissive(flags) && IsReflective(flags))
                     ctx.pi = OffsetRayOrigin(ctx.pi, w.n, -wo);
                 pstd::optional<SampledLight> sampledLight =
                     lightSampler.Sample(ctx, raySamples.direct.uc);

@@ -100,6 +100,9 @@ PBRT_CPU_GPU inline bool IsGlossy(BxDFFlags f) {
 PBRT_CPU_GPU inline bool IsSpecular(BxDFFlags f) {
     return f & BxDFFlags::Specular;
 }
+PBRT_CPU_GPU inline bool IsNonSpecular(BxDFFlags f) {
+    return f & (BxDFFlags::Diffuse | BxDFFlags::Glossy);
+}
 
 std::string ToString(BxDFFlags flags);
 

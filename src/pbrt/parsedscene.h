@@ -332,7 +332,7 @@ class ParsedScene : public SceneRepresentation {
 
     NamedTextures CreateTextures(Allocator alloc, bool gpu) const;
 
-    void CreateMaterials(/*const*/ NamedTextures &sceneTextures, Allocator alloc,
+    void CreateMaterials(const NamedTextures &sceneTextures, Allocator alloc,
                          std::map<std::string, pbrt::Material> *namedMaterials,
                          std::vector<pbrt::Material> *materials) const;
 
@@ -341,17 +341,14 @@ class ParsedScene : public SceneRepresentation {
     std::vector<Light> CreateLights(
         Allocator alloc, const std::map<std::string, Medium> &media,
         const NamedTextures &textures,
-        std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights);
+        std::map<int, pstd::vector<Light> *> *shapeIndexToAreaLights);
 
-    struct Scene {
-        Primitive aggregate;
-        std::vector<pbrt::Material> materials;
-        std::map<std::string, pbrt::Material> namedMaterials;
-    };
-    Scene CreateAggregate(
-        Allocator alloc, NamedTextures &textures,
+    Primitive CreateAggregate(
+        Allocator alloc, const NamedTextures &textures,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-        const std::map<std::string, Medium> &media);
+        const std::map<std::string, Medium> &media,
+        const std::map<std::string, pbrt::Material> &namedMaterials,
+        const std::vector<pbrt::Material> &materials);
 
     // ParsedScene Public Members
     SceneEntity film, sampler, integrator, filter, accelerator;

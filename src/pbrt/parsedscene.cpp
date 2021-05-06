@@ -785,7 +785,7 @@ void ParsedScene::AreaLightSource(const std::string &name, ParsedParameterVector
 }
 
 void ParsedScene::CreateMaterials(
-    /*const*/ NamedTextures &textures, Allocator alloc,
+    const NamedTextures &textures, Allocator alloc,
     std::map<std::string, pbrt::Material> *namedMaterialsOut,
     std::vector<pbrt::Material> *materialsOut) const {
     // First, load all of the normal maps in parallel.
@@ -1044,7 +1044,7 @@ std::map<std::string, Medium> ParsedScene::CreateMedia(Allocator alloc) const {
 std::vector<Light> ParsedScene::CreateLights(
     Allocator alloc, const std::map<std::string, Medium> &media,
     const NamedTextures &textures,
-    std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights) {
+    std::map<int, pstd::vector<Light> *> *shapeIndexToAreaLights) {
     auto findMedium = [&media](const std::string &s, const FileLoc *loc) -> Medium {
         if (s.empty())
             return nullptr;
@@ -1134,24 +1134,19 @@ std::vector<Light> ParsedScene::CreateLights(
             }
         }
 
-        shapeIndexToAreaLights[i] = shapeLights;
+        (*shapeIndexToAreaLights)[i] = shapeLights;
     }
 
     LOG_VERBOSE("Finished Lights");
     return lights;
 }
 
-ParsedScene::Scene ParsedScene::CreateAggregate(
-    Allocator alloc, NamedTextures &textures,
+Primitive ParsedScene::CreateAggregate(
+    Allocator alloc, const NamedTextures &textures,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-    const std::map<std::string, Medium> &media) {
-    // Materials
-    LOG_VERBOSE("Starting materials");
-    std::map<std::string, pbrt::Material> namedMaterials;
-    std::vector<pbrt::Material> materials;
-    CreateMaterials(textures, alloc, &namedMaterials, &materials);
-    LOG_VERBOSE("Finished materials");
-
+    const std::map<std::string, Medium> &media,
+    const std::map<std::string, pbrt::Material> &namedMaterials,
+    const std::vector<pbrt::Material> &materials) {
     auto findMedium = [&media](const std::string &s, const FileLoc *loc) -> Medium {
         if (s.empty())
             return nullptr;
@@ -1167,8 +1162,9 @@ ParsedScene::Scene ParsedScene::CreateAggregate(
                                const FileLoc *loc) -> FloatTexture {
         std::string alphaTexName = parameters.GetTexture("alpha");
         if (!alphaTexName.empty()) {
-            if (textures.floatTextures.find(alphaTexName) != textures.floatTextures.end())
-                return textures.floatTextures[alphaTexName];
+            if (auto iter = textures.floatTextures.find(alphaTexName);
+                iter != textures.floatTextures.end())
+                return iter->second;
             else
                 ErrorExit(loc, "%s: couldn't find float texture for \"alpha\" parameter.",
                           alphaTexName);
@@ -1375,14 +1371,13 @@ ParsedScene::Scene ParsedScene::CreateAggregate(
     LOG_VERBOSE("Finished instances");
 
     // Accelerator
+    Primitive aggregate = nullptr;
     LOG_VERBOSE("Starting top-level accelerator");
-    Primitive accel = nullptr;
     if (!primitives.empty())
-        accel = CreateAccelerator(accelerator.name, std::move(primitives),
-                                  accelerator.parameters);
+        aggregate = CreateAccelerator(accelerator.name, std::move(primitives),
+                                      accelerator.parameters);
     LOG_VERBOSE("Finished top-level accelerator");
-
-    return Scene{accel, materials, namedMaterials};
+    return aggregate;
 }
 
 // FormattingScene Method Definitions

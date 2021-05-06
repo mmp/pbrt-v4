@@ -77,11 +77,16 @@ void CPURender(ParsedScene &parsedScene) {
     // Lights
     std::map<int, pstd::vector<Light> *> shapeIndexToAreaLights;
     std::vector<Light> lights =
-        parsedScene.CreateLights(alloc, media, textures, shapeIndexToAreaLights);
+        parsedScene.CreateLights(alloc, media, textures, &shapeIndexToAreaLights);
 
-    ParsedScene::Scene scene =
-        parsedScene.CreateAggregate(alloc, textures, shapeIndexToAreaLights, media);
-    Primitive accel = scene.aggregate;
+    LOG_VERBOSE("Starting materials");
+    std::map<std::string, pbrt::Material> namedMaterials;
+    std::vector<pbrt::Material> materials;
+    parsedScene.CreateMaterials(textures, alloc, &namedMaterials, &materials);
+    LOG_VERBOSE("Finished materials");
+
+    Primitive accel = parsedScene.CreateAggregate(alloc, textures, shapeIndexToAreaLights,
+                                                  media, namedMaterials, materials);
 
     // Integrator
     const RGBColorSpace *integratorColorSpace = parsedScene.film.parameters.ColorSpace();
@@ -154,7 +159,7 @@ void CPURender(ParsedScene &parsedScene) {
         Printf("World-space n: %s\n", worldFromRender(intr.n));
         Printf("World-space ns: %s\n", worldFromRender(intr.shading.n));
 
-        for (const auto &mtl : scene.namedMaterials)
+        for (const auto &mtl : namedMaterials)
             if (mtl.second == intr.material) {
                 Printf("Named material: %s\n", mtl.first);
                 return;

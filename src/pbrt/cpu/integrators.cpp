@@ -464,16 +464,16 @@ SampledSpectrum SimplePathIntegrator::Li(RayDifferential ray, SampledWavelengths
             // Uniformly sample sphere or hemisphere to get new path direction
             Float pdf;
             Vector3f wi;
-            if (bsdf.HasReflection() && bsdf.HasTransmission()) {
+            BxDFFlags flags = bsdf.Flags();
+            if (IsReflective(flags) && IsTransmissive(flags)) {
                 wi = SampleUniformSphere(sampler.Get2D());
                 pdf = UniformSpherePDF();
             } else {
                 wi = SampleUniformHemisphere(sampler.Get2D());
                 pdf = UniformHemispherePDF();
-                if (bsdf.HasReflection() && Dot(wo, isect.n) * Dot(wi, isect.n) < 0)
+                if (IsReflective(flags) && Dot(wo, isect.n) * Dot(wi, isect.n) < 0)
                     wi = -wi;
-                else if (bsdf.HasTransmission() &&
-                         Dot(wo, isect.n) * Dot(wi, isect.n) > 0)
+                else if (IsTransmissive(flags) && Dot(wo, isect.n) * Dot(wi, isect.n) > 0)
                     wi = -wi;
             }
             beta *= bsdf.f(wo, wi) * AbsDot(wi, isect.shading.n) / pdf;
@@ -725,7 +725,7 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
             break;
 
         // Sample direct illumination from the light sources
-        if (bsdf.IsNonSpecular()) {
+        if (IsNonSpecular(bsdf.Flags())) {
             ++totalPaths;
             SampledSpectrum Ld = SampleLd(isect, &bsdf, lambda, sampler);
             if (!Ld)
@@ -771,9 +771,10 @@ SampledSpectrum PathIntegrator::SampleLd(const SurfaceInteraction &intr, const B
     // Initialize _LightSampleContext_ for light sampling
     LightSampleContext ctx(intr);
     // Try to nudge the light sampling position to correct side of the surface
-    if (bsdf->HasReflection() && !bsdf->HasTransmission())
+    BxDFFlags flags = bsdf->Flags();
+    if (IsReflective(flags) && !IsTransmissive(flags))
         ctx.pi = intr.OffsetRayOrigin(intr.wo);
-    else if (bsdf->HasTransmission() && !bsdf->HasReflection())
+    else if (IsTransmissive(flags) && !IsReflective(flags))
         ctx.pi = intr.OffsetRayOrigin(-intr.wo);
 
     // Choose a light source for the direct lighting calculation
@@ -1155,7 +1156,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
         }
 
         // Sample illumination from lights to find attenuated path contribution
-        if (bsdf.IsNonSpecular()) {
+        if (IsNonSpecular(bsdf.Flags())) {
             L += SampleLd(isect, &bsdf, lambda, sampler, T_hat, uniPathPDF);
             DCHECK(IsInf(L.y(lambda)) == false);
         }
@@ -1284,9 +1285,10 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
     if (bsdf) {
         ctx = LightSampleContext(intr.AsSurface());
         // Try to nudge the light sampling position to correct side of the surface
-        if (bsdf->HasReflection() && !bsdf->HasTransmission())
+        BxDFFlags flags = bsdf->Flags();
+        if (IsReflective(flags) && !IsTransmissive(flags))
             ctx.pi = intr.OffsetRayOrigin(intr.wo);
-        else if (bsdf->HasTransmission() && !bsdf->HasReflection())
+        else if (IsTransmissive(flags) && !IsReflective(flags))
             ctx.pi = intr.OffsetRayOrigin(-intr.wo);
 
     } else
@@ -1658,7 +1660,7 @@ struct Vertex {
         case VertexType::Camera:
             return true;
         case VertexType::Surface:
-            return bsdf.IsNonSpecular();
+            return IsNonSpecular(bsdf.Flags());
         }
         LOG_FATAL("Unhandled vertex type in IsConnectible()");
     }
@@ -2350,9 +2352,10 @@ SampledSpectrum ConnectBDPT(const Integrator &integrator, SampledWavelengths &la
                     ctx = LightSampleContext(si);
                     // Try to nudge the light sampling position to correct side of the
                     // surface
-                    if (pt.bsdf.HasReflection() && !pt.bsdf.HasTransmission())
+                    BxDFFlags flags = pt.bsdf.Flags();
+                    if (IsReflective(flags) && !IsTransmissive(flags))
                         ctx.pi = si.OffsetRayOrigin(si.wo);
-                    else if (pt.bsdf.HasTransmission() && !pt.bsdf.HasReflection())
+                    else if (IsTransmissive(flags) && !IsReflective(flags))
                         ctx.pi = si.OffsetRayOrigin(-si.wo);
                 } else
                     ctx = LightSampleContext(pt.GetInteraction());
@@ -2930,7 +2933,8 @@ void SPPMIntegrator::Render() {
                         pixel.Ld += film.ToOutputRGB(beta * Ld, lambda);
 
                     // Possibly create visible point and end camera path
-                    if (bsdf.IsDiffuse() || (bsdf.IsGlossy() && depth == maxDepth)) {
+                    BxDFFlags flags = bsdf.Flags();
+                    if (IsDiffuse(flags) || (IsGlossy(flags) && depth == maxDepth)) {
                         pixel.vp = {isect.p(), wo, bsdf, beta,
                                     lambda.SecondaryTerminated()};
                         haveSetVisiblePoint = true;
@@ -3254,9 +3258,10 @@ SampledSpectrum SPPMIntegrator::SampleLd(const SurfaceInteraction &intr, const B
     // Initialize _LightSampleContext_ for light sampling
     LightSampleContext ctx(intr);
     // Try to nudge the light sampling position to correct side of the surface
-    if (bsdf->HasReflection() && !bsdf->HasTransmission())
+    BxDFFlags flags = bsdf->Flags();
+    if (IsReflective(flags) && !IsTransmissive(flags))
         ctx.pi = intr.OffsetRayOrigin(intr.wo);
-    else if (bsdf->HasTransmission() && !bsdf->HasReflection())
+    else if (IsTransmissive(flags) && !IsReflective(flags))
         ctx.pi = intr.OffsetRayOrigin(-intr.wo);
 
     // Choose a light source for the direct lighting calculation

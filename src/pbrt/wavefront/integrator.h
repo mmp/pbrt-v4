@@ -105,7 +105,8 @@ class WavefrontPathIntegrator {
     void Do(const char *description, F &&func) {
         if (Options->useGPU) {
 #ifdef PBRT_BUILD_GPU_RENDERER
-            GPUParallelFor(description, 1, [=] PBRT_GPU(int) mutable { func(); });
+            GPUParallelFor(
+                description, 1, PBRT_CPU_GPU_LAMBDA(int) { func(); });
 #else
             LOG_FATAL("Options->useGPU was set without PBRT_BUILD_GPU_RENDERER enabled");
 #endif
@@ -117,13 +118,6 @@ class WavefrontPathIntegrator {
 
     RayQueue *CurrentRayQueue(int depth) { return rayQueues[depth & 1]; }
     RayQueue *NextRayQueue(int depth) { return rayQueues[(depth + 1) & 1]; }
-
-    void IntersectClosest(RayQueue *rayQueue, EscapedRayQueue *escapedRayQueue,
-                          HitAreaLightQueue *hitAreaLightQueue,
-                          MaterialEvalQueue *basicEvalMaterialQueue,
-                          MaterialEvalQueue *universalEvalMaterialQueue,
-                          MediumSampleQueue *mediumSampleQueue,
-                          RayQueue *nextRayQueue) const;
 
     // WavefrontPathIntegrator Member Variables
     bool initializeVisibleSurface;

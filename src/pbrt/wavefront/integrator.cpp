@@ -483,10 +483,10 @@ Float WavefrontPathIntegrator::Render() {
                 // Follow active ray paths and accumulate radiance estimates
                 GenerateRaySamples(depth, sampleIndex);
                 // Find closest intersections along active rays
-                IntersectClosest(CurrentRayQueue(depth), escapedRayQueue,
-                                 hitAreaLightQueue, basicEvalMaterialQueue,
-                                 universalEvalMaterialQueue, mediumSampleQueue,
-                                 NextRayQueue(depth));
+                aggregate->IntersectClosest(maxQueueSize, escapedRayQueue,
+                                            hitAreaLightQueue, basicEvalMaterialQueue,
+                                            universalEvalMaterialQueue, mediumSampleQueue,
+                                            CurrentRayQueue(depth), NextRayQueue(depth));
 
                 if (depth > 0) {
                     // As above, with the indexing...
@@ -552,16 +552,6 @@ Float WavefrontPathIntegrator::Render() {
 #endif  // PBRT_BUILD_GPU_RENDERER
 
     return seconds;
-}
-
-void WavefrontPathIntegrator::IntersectClosest(
-    RayQueue *rayQueue, EscapedRayQueue *escapedRayQueue,
-    HitAreaLightQueue *hitAreaLightQueue, MaterialEvalQueue *basicEvalMaterialQueue,
-    MaterialEvalQueue *universalEvalMaterialQueue, MediumSampleQueue *mediumSampleQueue,
-    RayQueue *nextRayQueue) const {
-    aggregate->IntersectClosest(maxQueueSize, escapedRayQueue, hitAreaLightQueue,
-                                basicEvalMaterialQueue, universalEvalMaterialQueue,
-                                mediumSampleQueue, rayQueue, nextRayQueue);
 }
 
 void WavefrontPathIntegrator::HandleEscapedRays(int depth) {

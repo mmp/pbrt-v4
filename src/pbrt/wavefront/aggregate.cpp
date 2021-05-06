@@ -52,14 +52,17 @@ CPUAggregate::CPUAggregate(ParsedScene &scene, Allocator alloc,
          pstd::array<bool, Material::NumTags()> *haveBasicEvalMaterial,
          pstd::array<bool, Material::NumTags()> *haveUniversalEvalMaterial,
          bool *haveSubsurface) {
-    ParsedScene::Scene s = scene.CreateAggregate(alloc, textures, shapeIndexToAreaLights, media);
+    std::map<std::string, pbrt::Material> namedMaterials;
+    std::vector<pbrt::Material> materials;
+    scene.CreateMaterials(textures, alloc, &namedMaterials, &materials);
 
-    aggregate = s.aggregate;
+    aggregate = scene.CreateAggregate(alloc, textures, shapeIndexToAreaLights, media,
+                                      namedMaterials, materials);
 
-    for (Material m : s.materials)
+    for (Material m : materials)
         updateMaterialNeeds(m, haveBasicEvalMaterial, haveUniversalEvalMaterial,
                             haveSubsurface);
-    for (const auto &m : s.namedMaterials)
+    for (const auto &m : namedMaterials)
         updateMaterialNeeds(m.second, haveBasicEvalMaterial, haveUniversalEvalMaterial,
                             haveSubsurface);
 }
