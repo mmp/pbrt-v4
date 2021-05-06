@@ -213,15 +213,14 @@ struct FastOwenScrambler {
     PBRT_CPU_GPU
     FastOwenScrambler(uint32_t seed) : seed(seed) {}
     // FastOwenScrambler Public Methods
-    // Laine et al., Stratified Sampling for Stochastic Transparency, Sec 3.1...
     PBRT_CPU_GPU
     uint32_t operator()(uint32_t v) const {
         v = ReverseBits32(v);
+        v ^= v * 0x3d20adea;
         v += seed;
-        v ^= v * 0x6c50b47cu;
-        v ^= v * 0xb82f1e52u;
-        v ^= v * 0xc7afe638u;
-        v ^= v * 0x8d22f6e6u;
+        v *= (seed >> 16) | 1;
+        v ^= v * 0x05526c56;
+        v ^= v * 0x53a22864;
         return ReverseBits32(v);
     }
 
