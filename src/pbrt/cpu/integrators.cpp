@@ -1163,7 +1163,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
         prevIntrContext = LightSampleContext(isect);
 
         // Sample BSDF to get new volumetric path direction
-        Vector3f wo = -ray.d;
+        Vector3f wo = isect.wo;
         Float u = sampler.Get1D();
         pstd::optional<BSDFSample> bs = bsdf.Sample_f(wo, u, sampler.Get2D());
         if (!bs)
@@ -1262,11 +1262,12 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
         if (!T_hat)
             break;
         SampledSpectrum rrBeta = T_hat * etaScale / uniPathPDF.Average();
+        Float uRR = sampler.Get1D();
         PBRT_DBG("%s\n",
                  StringPrintf("etaScale %f -> rrBeta %s", etaScale, rrBeta).c_str());
         if (rrBeta.MaxComponentValue() < 1 && depth > 1) {
             Float q = std::max<Float>(0, 1 - rrBeta.MaxComponentValue());
-            if (sampler.Get1D() < q)
+            if (uRR < q)
                 break;
             uniPathPDF *= 1 - q;
             lightPathPDF *= 1 - q;

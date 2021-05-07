@@ -168,7 +168,9 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 // Apply Russian roulette to indirect ray based on weighted path
                 // throughput
                 SampledSpectrum rrBeta = T_hat * etaScale / uniPathPDF.Average();
-                if (rrBeta.MaxComponentValue() < 1 && depth > 1) {
+                // Note: depth >= 1 here to match VolPathIntegrator (which increments
+                // depth earlier).
+                if (rrBeta.MaxComponentValue() < 1 && depth >= 1) {
                     Float q = std::max<Float>(0, 1 - rrBeta.MaxComponentValue());
                     if (raySamples.indirect.rr < q) {
                         T_hat = SampledSpectrum(0.f);

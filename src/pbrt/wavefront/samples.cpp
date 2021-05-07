@@ -32,7 +32,7 @@ void WavefrontPathIntegrator::GenerateRaySamples(int depth, int sampleIndex) {
         desc.c_str(), rayQueue, maxQueueSize, PBRT_CPU_GPU_LAMBDA(const RayWorkItem w) {
             // Generate samples for ray segment at current sample index
             // Find first sample dimension
-            int dimension = 5 + 7 * depth;
+            int dimension = 6 + 7 * depth;
             if (haveSubsurface)
                 dimension += 3 * depth;
             if (haveMedia)
@@ -45,11 +45,11 @@ void WavefrontPathIntegrator::GenerateRaySamples(int depth, int sampleIndex) {
 
             // Initialize _RaySamples_ structure with sample values
             RaySamples rs;
-            rs.direct.u = pixelSampler.Get2D();
             rs.direct.uc = pixelSampler.Get1D();
+            rs.direct.u = pixelSampler.Get2D();
             // Initialize indirect and possibly subsurface samples in _rs_
-            rs.indirect.u = pixelSampler.Get2D();
             rs.indirect.uc = pixelSampler.Get1D();
+            rs.indirect.u = pixelSampler.Get2D();
             rs.indirect.rr = pixelSampler.Get1D();
             rs.haveSubsurface = haveSubsurface;
             if (haveSubsurface) {
