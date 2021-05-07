@@ -253,6 +253,7 @@ struct MediumSampleWorkItem {
     Vector3f dpdvs;
     Normal3f dndus;
     Normal3f dndvs;
+    int faceIndex;
     MediumInterface mediumInterface;
 };
 
@@ -282,6 +283,7 @@ struct MaterialEvalWorkItem {
         ctx.shading.dpdv = dpdvs;
         ctx.shading.dndu = dndus;
         ctx.shading.dndv = dndvs;
+        ctx.faceIndex = faceIndex;
         return ctx;
     }
 
@@ -294,6 +296,7 @@ struct MaterialEvalWorkItem {
         ctx.dpdus = dpdus;
         ctx.p = Point3f(pi);
         ctx.uv = uv;
+        ctx.faceIndex = faceIndex;
         return ctx;
     }
 
@@ -304,6 +307,7 @@ struct MaterialEvalWorkItem {
     Vector3f dpdus, dpdvs;
     Normal3f dndus, dndvs;
     Point2f uv;
+    int faceIndex;
     SampledWavelengths lambda;
     int anyNonSpecularBounces;
     Vector3f wo;

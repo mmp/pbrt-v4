@@ -63,6 +63,7 @@ EnqueueWorkAfterIntersection(RayWorkItem r, Medium rayMedium, float tMax, Surfac
                                  intr.shading.dpdv,
                                  intr.shading.dndu,
                                  intr.shading.dndv,
+                                 intr.faceIndex,
                                  mediumInterface});
         return;
     }
@@ -113,7 +114,7 @@ EnqueueWorkAfterIntersection(RayWorkItem r, Medium rayMedium, float tMax, Surfac
         q->Push(MaterialEvalWorkItem<Material>{
             ptr, intr.pi, intr.n, intr.shading.n,
             intr.shading.dpdu, intr.shading.dpdv, intr.shading.dndu, intr.shading.dndv,
-                intr.uv, r.lambda, r.anyNonSpecularBounces, intr.wo, r.pixelIndex,
+                intr.uv, intr.faceIndex, r.lambda, r.anyNonSpecularBounces, intr.wo, r.pixelIndex,
                 r.T_hat, r.uniPathPDF, r.etaScale,
                 mediumInterface, intr.time});
     };

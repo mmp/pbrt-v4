@@ -131,6 +131,7 @@ soa MediumSampleWorkItem {
     Vector3f dpdvs;
     Normal3f dndus;
     Normal3f dndvs;
+    int faceIndex;
     int anyNonSpecularBounces;
     Float etaScale;
     MediumInterface mediumInterface;
@@ -157,6 +158,7 @@ soa MaterialEvalWorkItem<Material> {
     Normal3f dndus, dndvs;
     Vector3f wo;
     Point2f uv;
+    int faceIndex;
     Float time;
     int anyNonSpecularBounces;
     Float etaScale;
