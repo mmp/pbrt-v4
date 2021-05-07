@@ -137,7 +137,7 @@ PiecewiseLinearSpectrum *PiecewiseLinearSpectrum::FromInterleaved(
 
     // Extend samples to cover range of visible wavelengths if needed.
     if (samples[0] > Lambda_min) {
-        lambda.push_back(Lambda_min);
+        lambda.push_back(Lambda_min - 1);
         v.push_back(samples[1]);
     }
     for (size_t i = 0; i < n; ++i) {
@@ -147,7 +147,7 @@ PiecewiseLinearSpectrum *PiecewiseLinearSpectrum::FromInterleaved(
             CHECK_GT(lambda.back(), lambda[lambda.size() - 2]);
     }
     if (lambda.back() < Lambda_max) {
-        lambda.push_back(Lambda_max);
+        lambda.push_back(Lambda_max + 1);
         v.push_back(v.back());
     }
 
