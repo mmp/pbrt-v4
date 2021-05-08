@@ -199,9 +199,7 @@ static FloatTexture getAlphaTexture(
 
 static int getOptixGeometryFlags(bool isTriangle, FloatTexture alphaTexture,
                                  Material material) {
-    if (material && material.HasSubsurfaceScattering())
-        return OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL;
-    else if (alphaTexture && isTriangle)
+    if (alphaTexture && isTriangle)
         // Need anyhit
         return OPTIX_GEOMETRY_FLAG_NONE;
     else
@@ -851,8 +849,8 @@ OptiXAggregate::OptiXAggregate(
     {
         OptixProgramGroupDesc desc = {};
         desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-        desc.hitgroup.moduleAH = optixModule;
-        desc.hitgroup.entryFunctionNameAH = "__anyhit__randomHitTriangle";
+        desc.hitgroup.moduleCH = optixModule;
+        desc.hitgroup.entryFunctionNameCH = "__closesthit__randomHitTriangle";
         OPTIX_CHECK_WITH_LOG(
             optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log, &logSize,
                                     &hitPGRandomHitTriangle),
@@ -866,8 +864,8 @@ OptiXAggregate::OptiXAggregate(
         desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
         desc.hitgroup.moduleIS = optixModule;
         desc.hitgroup.entryFunctionNameIS = "__intersection__bilinearPatch";
-        desc.hitgroup.moduleAH = optixModule;
-        desc.hitgroup.entryFunctionNameAH = "__anyhit__randomHitBilinearPatch";
+        desc.hitgroup.moduleCH = optixModule;
+        desc.hitgroup.entryFunctionNameCH = "__closesthit__randomHitBilinearPatch";
         OPTIX_CHECK_WITH_LOG(
             optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log, &logSize,
                                     &hitPGRandomHitBilinearPatch),
@@ -881,8 +879,8 @@ OptiXAggregate::OptiXAggregate(
         desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
         desc.hitgroup.moduleIS = optixModule;
         desc.hitgroup.entryFunctionNameIS = "__intersection__quadric";
-        desc.hitgroup.moduleAH = optixModule;
-        desc.hitgroup.entryFunctionNameAH = "__anyhit__randomHitQuadric";
+        desc.hitgroup.moduleCH = optixModule;
+        desc.hitgroup.entryFunctionNameCH = "__closesthit__randomHitQuadric";
         OPTIX_CHECK_WITH_LOG(
             optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log, &logSize,
                                     &hitPGRandomHitQuadric),

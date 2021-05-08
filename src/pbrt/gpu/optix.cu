@@ -470,6 +470,7 @@ extern "C" __global__ void __intersection__bilinearPatch() {
 struct RandomHitPayload {
     WeightedReservoirSampler<SubsurfaceInteraction> wrs;
     Material material;
+    pstd::optional<SurfaceInteraction> intr;
 };
 
 extern "C" __global__ void __raygen__randomHit() {
@@ -481,7 +482,6 @@ extern "C" __global__ void __raygen__randomHit() {
     SubsurfaceScatterWorkItem s = (*params.subsurfaceScatterQueue)[index];
 
     Ray ray(s.p0, s.p1 - s.p0);
-    Float tMax = 1.f;
 
     RandomHitPayload payload;
     payload.wrs.Seed(Hash(s.p0, s.p1));
@@ -492,7 +492,16 @@ extern "C" __global__ void __raygen__randomHit() {
     PBRT_DBG("Randomhit raygen ray.o %f %f %f ray.d %f %f %f tMax %f\n", ray.o.x, ray.o.y,
         ray.o.z, ray.d.x, ray.d.y, ray.d.z, tMax);
 
-    Trace(params.traversable, ray, 0.f /* tMin */, tMax, OPTIX_RAY_FLAG_NONE, ptr0, ptr1);
+    while (true) {
+        Trace(params.traversable, ray, 0.f /* tMin */, 1.f /* tMax */,
+              OPTIX_RAY_FLAG_NONE, ptr0, ptr1);
+
+        if (payload.intr) {
+            ray = payload.intr->SpawnRayTo(s.p1);
+            payload.intr.reset();
+        } else
+            break;
+    }
 
     if (payload.wrs.HasSample() &&
         payload.wrs.WeightSum() > 0) {  // TODO: latter check shouldn't be needed...
@@ -506,7 +515,7 @@ extern "C" __global__ void __raygen__randomHit() {
         params.subsurfaceScatterQueue->reservoirPDF[index] = 0;
 }
 
-extern "C" __global__ void __anyhit__randomHitTriangle() {
+extern "C" __global__ void __closesthit__randomHitTriangle() {
     const TriangleMeshRecord &rec = *(const TriangleMeshRecord *)optixGetSbtDataPointer();
 
     RandomHitPayload *p = getPayload<RandomHitPayload>();
@@ -514,13 +523,14 @@ extern "C" __global__ void __anyhit__randomHitTriangle() {
     PBRT_DBG("Anyhit triangle for random hit: rec.material %p params.materials %p\n",
         rec.material.ptr(), p->material.ptr());
 
-    if (rec.material == p->material)
-        p->wrs.Add([&] PBRT_CPU_GPU() { return getTriangleIntersection(); }, 1.f);
+    SurfaceInteraction intr = getTriangleIntersection();
+    p->intr = intr;
 
-    optixIgnoreIntersection();
+    if (rec.material == p->material)
+        p->wrs.Add([&] PBRT_CPU_GPU() { return intr; }, 1.f);
 }
 
-extern "C" __global__ void __anyhit__randomHitBilinearPatch() {
+extern "C" __global__ void __closesthit__randomHitBilinearPatch() {
     BilinearMeshRecord &rec = *(BilinearMeshRecord *)optixGetSbtDataPointer();
 
     RandomHitPayload *p = getPayload<RandomHitPayload>();
@@ -528,19 +538,16 @@ extern "C" __global__ void __anyhit__randomHitBilinearPatch() {
     PBRT_DBG("Anyhit blp for random hit: rec.material %p params.materials %p\n",
         rec.material.ptr(), p->material.ptr());
 
-    if (rec.material == p->material)
-        p->wrs.Add(
-            [&] PBRT_CPU_GPU() {
-                Point2f uv(BitsToFloat(optixGetAttribute_0()),
-                           BitsToFloat(optixGetAttribute_1()));
-                return getBilinearPatchIntersection(uv);
-            },
-            1.f);
+    Point2f uv(BitsToFloat(optixGetAttribute_0()),
+               BitsToFloat(optixGetAttribute_1()));
+    SurfaceInteraction intr = getBilinearPatchIntersection(uv);
+    p->intr = intr;
 
-    optixIgnoreIntersection();
+    if (rec.material == p->material)
+        p->wrs.Add([&] PBRT_CPU_GPU() { return intr; }, 1.f);
 }
 
-extern "C" __global__ void __anyhit__randomHitQuadric() {
+extern "C" __global__ void __closesthit__randomHitQuadric() {
     QuadricRecord &rec = *((QuadricRecord *)optixGetSbtDataPointer());
 
     RandomHitPayload *p = getPayload<RandomHitPayload>();
@@ -548,19 +555,15 @@ extern "C" __global__ void __anyhit__randomHitQuadric() {
     PBRT_DBG("Anyhit quadric for random hit: rec.material %p params.materials %p\n",
         rec.material.ptr(), p->material.ptr());
 
-    if (rec.material == p->material) {
-        p->wrs.Add(
-            [&] PBRT_CPU_GPU() {
-                QuadricIntersection qi;
-                qi.pObj = Point3f(BitsToFloat(optixGetAttribute_0()),
-                                  BitsToFloat(optixGetAttribute_1()),
-                                  BitsToFloat(optixGetAttribute_2()));
-                qi.phi = BitsToFloat(optixGetAttribute_3());
+    QuadricIntersection qi;
+    qi.pObj = Point3f(BitsToFloat(optixGetAttribute_0()),
+                      BitsToFloat(optixGetAttribute_1()),
+                      BitsToFloat(optixGetAttribute_2()));
+    qi.phi = BitsToFloat(optixGetAttribute_3());
 
-                return getQuadricIntersection(qi);
-            },
-            1.f);
-    }
+    SurfaceInteraction intr = getQuadricIntersection(qi);
+    p->intr = intr;
 
-    optixIgnoreIntersection();
+    if (rec.material == p->material)
+        p->wrs.Add([&] PBRT_CPU_GPU() { return intr; }, 1.f);
 }
