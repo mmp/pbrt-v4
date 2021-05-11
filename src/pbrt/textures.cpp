@@ -14,6 +14,7 @@
 #include <pbrt/util/error.h>
 #include <pbrt/util/file.h>
 #include <pbrt/util/float.h>
+#include <pbrt/util/print.h>
 #include <pbrt/util/splines.h>
 #include <pbrt/util/stats.h>
 
@@ -22,6 +23,13 @@
 #include <Ptexture.h>
 
 namespace pbrt {
+
+std::string TextureEvalContext::ToString() const {
+    return StringPrintf(
+        "[ TextureEvalContext p: %s dpdx: %s dpdy: %s uv: %s dudx: %f dudy: %f "
+        "dvdx: %f dvdy: %f faceIndex: %d ]",
+        p, dpdx, dpdy, uv, dudx, dudy, dvdx, dvdy, faceIndex);
+}
 
 TextureMapping2D TextureMapping2D::Create(const ParameterDictionary &parameters,
                                           const Transform &renderFromTexture,

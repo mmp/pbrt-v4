@@ -226,9 +226,9 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int depth) {
             auto enqueue = [=](auto ptr) {
                 using Material = typename std::remove_reference_t<decltype(*ptr)>;
                 q->Push<MaterialEvalWorkItem<Material>>(MaterialEvalWorkItem<Material>{
-                        ptr, w.pi, w.n, w.ns, w.dpdus, w.dpdvs, w.dndus, w.dndvs, w.uv, w.faceIndex,
-                    lambda, w.anyNonSpecularBounces, -ray.d, w.pixelIndex, T_hat,
-                    uniPathPDF, w.etaScale, w.mediumInterface, ray.time});
+                    ptr, w.pi, w.n, w.ns, w.dpdus, w.dpdvs, w.dndus, w.dndvs, w.uv,
+                    w.faceIndex, lambda, w.anyNonSpecularBounces, -ray.d, w.pixelIndex,
+                    T_hat, uniPathPDF, w.etaScale, w.mediumInterface, ray.time});
             };
             material.Dispatch(enqueue);
         });

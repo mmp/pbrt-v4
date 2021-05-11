@@ -26,6 +26,7 @@
 #include <pbrt/util/vecmath.h>
 
 #include <memory>
+#include <string>
 
 namespace pbrt {
 
@@ -44,6 +45,7 @@ struct LightLiSample {
     LightLiSample(const SampledSpectrum &L, Vector3f wi, Float pdf,
                   const Interaction &pLight)
         : L(L), wi(wi), pdf(pdf), pLight(pLight) {}
+    std::string ToString() const;
 
     SampledSpectrum L;
     Vector3f wi;
@@ -64,6 +66,7 @@ struct LightLeSample {
         : L(L), ray(ray), intr(intr), pdfPos(pdfPos), pdfDir(pdfDir) {
         CHECK(this->intr->n != Normal3f(0, 0, 0));
     }
+    std::string ToString() const;
 
     PBRT_CPU_GPU
     Float AbsCosTheta(Vector3f w) const { return intr ? AbsDot(w, intr->n) : 1; }

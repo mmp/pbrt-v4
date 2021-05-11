@@ -95,6 +95,13 @@ void CPURender(ParsedScene &parsedScene) {
         accel, lights, integratorColorSpace, &parsedScene.integrator.loc));
 
     // Helpful warnings
+    for (const auto &sh : parsedScene.shapes)
+        if (!sh.insideMedium.empty() || !sh.outsideMedium.empty())
+            haveScatteringMedia = true;
+    for (const auto &sh : parsedScene.animatedShapes)
+        if (!sh.insideMedium.empty() || !sh.outsideMedium.empty())
+            haveScatteringMedia = true;
+
     if (haveScatteringMedia && parsedScene.integrator.name != "volpath" &&
         parsedScene.integrator.name != "simplevolpath" &&
         parsedScene.integrator.name != "bdpt" && parsedScene.integrator.name != "mlt")

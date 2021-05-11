@@ -19,6 +19,7 @@
 #include <pbrt/util/transform.h>
 
 #include <memory>
+#include <string>
 #include <type_traits>
 
 namespace pbrt {
@@ -34,6 +35,7 @@ struct MaterialEvalContext : public TextureEvalContext {
           n(si.n),
           ns(si.shading.n),
           dpdus(si.shading.dpdu) {}
+    std::string ToString() const;
 
     Vector3f wo;
     Normal3f n, ns;
@@ -61,6 +63,7 @@ struct BumpEvalContext {
         shading.dndu = si.shading.dndu;
         shading.dndv = si.shading.dndv;
     }
+    std::string ToString() const;
 
     PBRT_CPU_GPU
     operator TextureEvalContext() const {

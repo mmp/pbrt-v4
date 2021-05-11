@@ -31,6 +31,16 @@ STAT_COUNTER("Scene/Lights", numLights);
 STAT_COUNTER("Scene/AreaLights", numAreaLights);
 
 // Light Method Definitions
+std::string LightLiSample::ToString() const {
+    return StringPrintf("[ LightLiSample L: %s wi: %s pdf: %f pLight: %s ]", L, wi, pdf,
+                        pLight);
+}
+
+std::string LightLeSample::ToString() const {
+    return StringPrintf("[ LightLeSample L: %s ray: %s intr: %s pdfPos: %f pdfDir: %f ]",
+                        L, ray, intr, pdfPos, pdfDir);
+}
+
 std::string ToString(LightType lf) {
     switch (lf) {
     case LightType::DeltaPosition:

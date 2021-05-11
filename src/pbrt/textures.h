@@ -57,6 +57,8 @@ struct TextureEvalContext {
           dvdy(dvdy),
           faceIndex(faceIndex) {}
 
+    std::string ToString() const;
+
     Point3f p;
     Vector3f dpdx, dpdy;
     Point2f uv;
