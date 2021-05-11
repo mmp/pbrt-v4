@@ -413,44 +413,44 @@ class span {
     size_t n;
 };
 
-template <int &...ExplicitArgumentBarrier, typename T>
+template <int &... ExplicitArgumentBarrier, typename T>
 PBRT_CPU_GPU inline constexpr span<T> MakeSpan(T *ptr, size_t size) noexcept {
     return span<T>(ptr, size);
 }
 
-template <int &...ExplicitArgumentBarrier, typename T>
+template <int &... ExplicitArgumentBarrier, typename T>
 PBRT_CPU_GPU inline span<T> MakeSpan(T *begin, T *end) noexcept {
     return span<T>(begin, end - begin);
 }
 
-template <int &...ExplicitArgumentBarrier, typename C>
+template <int &... ExplicitArgumentBarrier, typename C>
 PBRT_CPU_GPU inline constexpr auto MakeSpan(C &c) noexcept
     -> decltype(MakeSpan(span_internal::GetData(c), c.size())) {
     return MakeSpan(span_internal::GetData(c), c.size());
 }
 
-template <int &...ExplicitArgumentBarrier, typename T, size_t N>
+template <int &... ExplicitArgumentBarrier, typename T, size_t N>
 PBRT_CPU_GPU inline constexpr span<T> MakeSpan(T (&array)[N]) noexcept {
     return span<T>(array, N);
 }
 
-template <int &...ExplicitArgumentBarrier, typename T>
+template <int &... ExplicitArgumentBarrier, typename T>
 PBRT_CPU_GPU inline constexpr span<const T> MakeConstSpan(T *ptr, size_t size) noexcept {
     return span<const T>(ptr, size);
 }
 
-template <int &...ExplicitArgumentBarrier, typename T>
+template <int &... ExplicitArgumentBarrier, typename T>
 PBRT_CPU_GPU inline span<const T> MakeConstSpan(T *begin, T *end) noexcept {
     return span<const T>(begin, end - begin);
 }
 
-template <int &...ExplicitArgumentBarrier, typename C>
+template <int &... ExplicitArgumentBarrier, typename C>
 PBRT_CPU_GPU inline constexpr auto MakeConstSpan(const C &c) noexcept
     -> decltype(MakeSpan(c)) {
     return MakeSpan(c);
 }
 
-template <int &...ExplicitArgumentBarrier, typename T, size_t N>
+template <int &... ExplicitArgumentBarrier, typename T, size_t N>
 PBRT_CPU_GPU inline constexpr span<const T> MakeConstSpan(const T (&array)[N]) noexcept {
     return span<const T>(array, N);
 }
@@ -632,7 +632,7 @@ class polymorphic_allocator {
         deallocate_bytes(p, n * sizeof(T), alignof(T));
     }
     template <class T, class... Args>
-    T *new_object(Args &&...args) {
+    T *new_object(Args &&... args) {
         // NOTE: this doesn't handle constructors that throw exceptions...
         T *p = allocate_object<T>();
         construct(p, std::forward<Args>(args)...);
@@ -645,7 +645,7 @@ class polymorphic_allocator {
     }
 
     template <class T, class... Args>
-    void construct(T *p, Args &&...args) {
+    void construct(T *p, Args &&... args) {
         ::new ((void *)p) T(std::forward<Args>(args)...);
     }
 
@@ -903,12 +903,12 @@ class vector {
     }
 
     template <class... Args>
-    iterator emplace(const_iterator pos, Args &&...args) {
+    iterator emplace(const_iterator pos, Args &&... args) {
         // TODO
         LOG_FATAL("TODO");
     }
     template <class... Args>
-    void emplace_back(Args &&...args) {
+    void emplace_back(Args &&... args) {
         if (nAlloc == nStored)
             reserve(nAlloc == 0 ? 4 : 2 * nAlloc);
 
@@ -995,16 +995,16 @@ struct tuple<T, Ts...> : tuple<Ts...> {
     tuple &operator=(tuple &&) = default;
     tuple &operator=(const tuple &) = default;
 
-    tuple(const T &value, const Ts &...values) : Base(values...), value(value) {}
+    tuple(const T &value, const Ts &... values) : Base(values...), value(value) {}
 
-    tuple(T &&value, Ts &&...values)
+    tuple(T &&value, Ts &&... values)
         : Base(std::move(values)...), value(std::move(value)) {}
 
     T value;
 };
 
 template <typename... Ts>
-tuple(Ts &&...) -> tuple<std::decay_t<Ts>...>;
+tuple(Ts &&...)->tuple<std::decay_t<Ts>...>;
 
 template <size_t I, typename T, typename... Ts>
 PBRT_CPU_GPU auto &get(tuple<T, Ts...> &t) {

@@ -1186,7 +1186,7 @@ SampledSpectrum BxDF::rho(pstd::span<const Point2f> u1, pstd::span<const Float> 
     DCHECK_EQ(u1.size(), u2.size());
     SampledSpectrum r(0.f);
     for (size_t i = 0; i < uc.size(); ++i) {
-        // Compute estimate of of $\rho_\roman{hh}$
+        // Compute estimate of $\rho_\roman{hh}$
         Vector3f wo = SampleUniformHemisphere(u1[i]);
         if (wo.z == 0)
             continue;

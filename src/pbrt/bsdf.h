@@ -21,15 +21,13 @@ class BSDF {
     // BSDF Public Methods
     BSDF() = default;
     PBRT_CPU_GPU
-    BSDF(const Normal3f &n, const Normal3f &ns, const Vector3f &dpdus, BxDF bxdf)
-        : bxdf(bxdf),
-          ng(n),
-          shadingFrame(Frame::FromXZ(Normalize(dpdus), Vector3f(ns))) {}
+    BSDF(const Normal3f &ns, const Vector3f &dpdus, BxDF bxdf)
+        : bxdf(bxdf), shadingFrame(Frame::FromXZ(Normalize(dpdus), Vector3f(ns))) {}
 
     PBRT_CPU_GPU
     operator bool() const { return (bool)bxdf; }
-
-    PBRT_CPU_GPU BxDFFlags Flags() const { return bxdf.Flags(); }
+    PBRT_CPU_GPU
+    BxDFFlags Flags() const { return bxdf.Flags(); }
 
     PBRT_CPU_GPU
     Vector3f RenderToLocal(const Vector3f &v) const { return shadingFrame.ToLocal(v); }
@@ -53,18 +51,6 @@ class BSDF {
             return {};
         const BxDF *specificBxDF = bxdf.CastOrNullptr<BxDF>();
         return specificBxDF->f(wo, wi, mode);
-    }
-
-    PBRT_CPU_GPU
-    SampledSpectrum rho(pstd::span<const Point2f> u1, pstd::span<const Float> uc,
-                        pstd::span<const Point2f> u2) const {
-        return bxdf.rho(u1, uc, u2);
-    }
-    PBRT_CPU_GPU
-    SampledSpectrum rho(const Vector3f &woRender, pstd::span<const Float> uc,
-                        pstd::span<const Point2f> u) const {
-        Vector3f wo = RenderToLocal(woRender);
-        return bxdf.rho(wo, uc, u);
     }
 
     PBRT_CPU_GPU
@@ -147,12 +133,23 @@ class BSDF {
     std::string ToString() const;
 
     PBRT_CPU_GPU
+    SampledSpectrum rho(pstd::span<const Point2f> u1, pstd::span<const Float> uc,
+                        pstd::span<const Point2f> u2) const {
+        return bxdf.rho(u1, uc, u2);
+    }
+    PBRT_CPU_GPU
+    SampledSpectrum rho(const Vector3f &woRender, pstd::span<const Float> uc,
+                        pstd::span<const Point2f> u) const {
+        Vector3f wo = RenderToLocal(woRender);
+        return bxdf.rho(wo, uc, u);
+    }
+
+    PBRT_CPU_GPU
     void Regularize() { bxdf.Regularize(); }
 
   private:
     // BSDF Private Members
     BxDF bxdf;
-    Normal3f ng;
     Frame shadingFrame;
 };
 

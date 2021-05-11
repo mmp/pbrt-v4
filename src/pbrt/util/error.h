@@ -33,40 +33,40 @@ void Error(const FileLoc *loc, const char *message);
 [[noreturn]] void ErrorExit(const FileLoc *loc, const char *message);
 
 template <typename... Args>
-inline void Warning(const char *fmt, Args &&...args);
+inline void Warning(const char *fmt, Args &&... args);
 template <typename... Args>
-inline void Error(const char *fmt, Args &&...args);
+inline void Error(const char *fmt, Args &&... args);
 template <typename... Args>
-[[noreturn]] inline void ErrorExit(const char *fmt, Args &&...args);
+[[noreturn]] inline void ErrorExit(const char *fmt, Args &&... args);
 
 // Error Reporting Inline Functions
 template <typename... Args>
-inline void Warning(const FileLoc *loc, const char *fmt, Args &&...args) {
+inline void Warning(const FileLoc *loc, const char *fmt, Args &&... args) {
     Warning(loc, StringPrintf(fmt, std::forward<Args>(args)...).c_str());
 }
 
 template <typename... Args>
-inline void Warning(const char *fmt, Args &&...args) {
+inline void Warning(const char *fmt, Args &&... args) {
     Warning(nullptr, StringPrintf(fmt, std::forward<Args>(args)...).c_str());
 }
 
 template <typename... Args>
-inline void Error(const char *fmt, Args &&...args) {
+inline void Error(const char *fmt, Args &&... args) {
     Error(nullptr, StringPrintf(fmt, std::forward<Args>(args)...).c_str());
 }
 
 template <typename... Args>
-inline void Error(const FileLoc *loc, const char *fmt, Args &&...args) {
+inline void Error(const FileLoc *loc, const char *fmt, Args &&... args) {
     Error(loc, StringPrintf(fmt, std::forward<Args>(args)...).c_str());
 }
 
 template <typename... Args>
-[[noreturn]] inline void ErrorExit(const char *fmt, Args &&...args) {
+[[noreturn]] inline void ErrorExit(const char *fmt, Args &&... args) {
     ErrorExit(nullptr, StringPrintf(fmt, std::forward<Args>(args)...).c_str());
 }
 
 template <typename... Args>
-[[noreturn]] inline void ErrorExit(const FileLoc *loc, const char *fmt, Args &&...args) {
+[[noreturn]] inline void ErrorExit(const FileLoc *loc, const char *fmt, Args &&... args) {
     ErrorExit(loc, StringPrintf(fmt, std::forward<Args>(args)...).c_str());
 }
 

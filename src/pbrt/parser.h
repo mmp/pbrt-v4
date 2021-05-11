@@ -120,12 +120,12 @@ class SceneRepresentation {
   protected:
     // SceneRepresentation Protected Methods
     template <typename... Args>
-    void ErrorExitDeferred(const char *fmt, Args &&...args) const {
+    void ErrorExitDeferred(const char *fmt, Args &&... args) const {
         errorExit = true;
         Error(fmt, std::forward<Args>(args)...);
     }
     template <typename... Args>
-    void ErrorExitDeferred(const FileLoc *loc, const char *fmt, Args &&...args) const {
+    void ErrorExitDeferred(const FileLoc *loc, const char *fmt, Args &&... args) const {
         errorExit = true;
         Error(loc, fmt, std::forward<Args>(args)...);
     }

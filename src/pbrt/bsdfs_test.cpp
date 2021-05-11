@@ -431,7 +431,7 @@ void TestBSDF(std::function<BSDF*(const SurfaceInteraction&, Allocator)> createB
 BSDF* createLambertian(const SurfaceInteraction& si, Allocator alloc) {
     SampledSpectrum Kd(1.);
     return alloc.new_object<BSDF>(
-        si.n, si.shading.n, si.shading.dpdu,
+        si.shading.n, si.shading.dpdu,
         alloc.new_object<DiffuseBxDF>(Kd, SampledSpectrum(0.), 0));
 }
 
@@ -446,7 +446,7 @@ BSDF* createMicrofacet(const SurfaceInteraction& si, Allocator alloc, float roug
     Float alphay = TrowbridgeReitzDistribution::RoughnessToAlpha(roughy);
     TrowbridgeReitzDistribution distrib(alphax, alphay);
     FresnelHandle fresnel = alloc.new_object<FresnelDielectric>(1.5, true);
-    return alloc.new_object<BSDF>(si.n, si.shading.n, si.shading.dpdu,
+    return alloc.new_object<BSDF>(si.shading.n, si.shading.dpdu,
         alloc.new_object<MicrofacetReflectionBxDF>(distrib, fresnel));
     // CO    return alloc.new_object<BSDF>(si,
     // alloc.new_object<DielectricInterface>(1.5, distrib,
@@ -519,7 +519,7 @@ TEST(BSDFEnergyConservation, LambertianReflection) {
     TestEnergyConservation(
         [](const SurfaceInteraction& si, Allocator alloc) -> BSDF* {
             return alloc.new_object<BSDF>(
-                si.n, si.shading.n, si.shading.dpdu,
+                si.shading.n, si.shading.dpdu,
                 alloc.new_object<DiffuseBxDF>(SampledSpectrum(1.f), SampledSpectrum(0.),
                                               0));
         },
@@ -530,7 +530,7 @@ TEST(BSDFEnergyConservation, OrenNayar) {
     TestEnergyConservation(
         [](const SurfaceInteraction& si, Allocator alloc) -> BSDF* {
             return alloc.new_object<BSDF>(
-                si.n, si.shading.n, si.shading.dpdu,
+                si.shading.n, si.shading.dpdu,
                 alloc.new_object<DiffuseBxDF>(SampledSpectrum(1.f), SampledSpectrum(0.),
                                               20));
         },
@@ -544,7 +544,7 @@ TEST(BSDFEnergyConservation,
         [](const SurfaceInteraction& si, Allocator alloc) -> BSDF* {
             FresnelHandle fresnel = alloc.new_object<FresnelDielectric>(1.f, 1.5f);
             TrowbridgeReitzDistribution distrib(0.1, 0.1);
-            return alloc.new_object<BSDF>(si.n, si.shading.n, si.shading.dpdu,
+            return alloc.new_object<BSDF>(si.shading.n, si.shading.dpdu,
                 alloc.new_object<MicrofacetReflectionBxDF>(distrib, fresnel));
         },
         "MicrofacetReflectionBxDF, Fresnel dielectric, TrowbridgeReitz alpha "
@@ -557,7 +557,7 @@ TEST(BSDFEnergyConservation,
         [](const SurfaceInteraction& si, Allocator alloc) -> BSDF* {
             FresnelHandle fresnel = alloc.new_object<FresnelDielectric>(1.f, 1.5f);
             TrowbridgeReitzDistribution distrib(1.5, 1.5);
-            return alloc.new_object<BSDF>(si.n, si.shading.n, si.shading.dpdu,
+            return alloc.new_object<BSDF>(si.shading.n, si.shading.dpdu,
                 alloc.new_object<MicrofacetReflectionBxDF>(distrib, fresnel));
         },
         "MicrofacetReflectionBxDF, Fresnel dielectric, TrowbridgeReitz alpha "
@@ -570,7 +570,7 @@ TEST(BSDFEnergyConservation,
         [](const SurfaceInteraction& si, Allocator alloc) -> BSDF* {
             FresnelHandle fresnel = alloc.new_object<FresnelDielectric>(1.f, 1.5f);
             TrowbridgeReitzDistribution distrib(0.01, 0.01);
-            return alloc.new_object<BSDF>(si.n, si.shading.n, si.shading.dpdu,
+            return alloc.new_object<BSDF>(si.shading.n, si.shading.dpdu,
                 alloc.new_object<MicrofacetReflectionBxDF>(distrib, fresnel));
         },
         "MicrofacetReflectionBxDF, Fresnel dielectric, TrowbridgeReitz alpha "
@@ -585,7 +585,7 @@ TEST(BSDFEnergyConservation, MicrofacetReflectionBxDFTrowbridgeReitz_alpha0_1_co
             SampledSpectrum K = GetNamedSpectrum("metal-Al-k").Sample(lambda);
             FresnelHandle fresnel = alloc.new_object<FresnelConductor>(etaT, K);
             TrowbridgeReitzDistribution distrib(0.1, 0.1);
-            return alloc.new_object<BSDF>(si.n, si.shading.n, si.shading.dpdu,
+            return alloc.new_object<BSDF>(si.shading.n, si.shading.dpdu,
                 alloc.new_object<MicrofacetReflectionBxDF>(distrib, fresnel));
         },
         "MicrofacetReflectionBxDF, Fresnel conductor, TrowbridgeReitz alpha "
@@ -600,7 +600,7 @@ TEST(BSDFEnergyConservation, MicrofacetReflectionBxDFTrowbridgeReitz_alpha1_5_co
             SampledSpectrum K = GetNamedSpectrum("metal-Al-k").Sample(lambda);
             FresnelHandle fresnel = alloc.new_object<FresnelConductor>(etaT, K);
             TrowbridgeReitzDistribution distrib(1.5, 1.5);
-            return alloc.new_object<BSDF>(si.n, si.shading.n, si.shading.dpdu,
+            return alloc.new_object<BSDF>(si.shading.n, si.shading.dpdu,
                 alloc.new_object<MicrofacetReflectionBxDF>(distrib, fresnel));
         },
         "MicrofacetReflectionBxDF, Fresnel conductor, TrowbridgeReitz alpha "
@@ -617,7 +617,7 @@ TEST(BSDFEnergyConservation,
             FresnelHandle fresnel = alloc.new_object<FresnelConductor>(etaT, K);
 
             TrowbridgeReitzDistribution distrib(0.01, 0.01);
-            return alloc.new_object<BSDF>(si.n, si.shading.n, si.shading.dpdu,
+            return alloc.new_object<BSDF>(si.shading.n, si.shading.dpdu,
                 alloc.new_object<MicrofacetReflectionBxDF>(distrib, fresnel));
         },
         "MicrofacetReflectionBxDF, Fresnel conductor, TrowbridgeReitz alpha "

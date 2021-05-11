@@ -200,7 +200,7 @@ class DielectricMaterial {
         // Return BSDF for dielectric material
         SampledSpectrum t = tint ? texEval(tint, ctx, lambda) : SampledSpectrum(1.f);
         *bxdf = DielectricInterfaceBxDF(sampledEta, t, distrib);
-        return BSDF(ctx.n, ctx.ns, ctx.dpdus, bxdf);
+        return BSDF(ctx.ns, ctx.dpdus, bxdf);
     }
 
   private:
@@ -237,7 +237,7 @@ class ThinDielectricMaterial {
 
         // Return BSDF for _ThinDielectricMaterial_
         *bxdf = ThinDielectricBxDF(sampledEta);
-        return BSDF(ctx.n, ctx.ns, ctx.dpdus, bxdf);
+        return BSDF(ctx.ns, ctx.dpdus, bxdf);
     }
 
     ThinDielectricMaterial(Spectrum eta, FloatTexture displacement, Image *normalMap)
@@ -404,7 +404,7 @@ class HairMaterial {
         // Offset along width
         Float h = -1 + 2 * ctx.uv[1];
         *bxdf = HairBxDF(h, e, sig_a, bm, bn, a);
-        return BSDF(ctx.n, ctx.ns, ctx.dpdus, bxdf);
+        return BSDF(ctx.ns, ctx.dpdus, bxdf);
     }
 
     static HairMaterial *Create(const TextureParameterDictionary &parameters,
@@ -474,7 +474,7 @@ class DiffuseMaterial {
         SampledSpectrum r = Clamp(texEval(reflectance, ctx, lambda), 0, 1);
         Float sig = Clamp(texEval(sigma, ctx), 0, 90);
         *bxdf = DiffuseBxDF(r, SampledSpectrum(0), sig);
-        return BSDF(ctx.n, ctx.ns, ctx.dpdus, bxdf);
+        return BSDF(ctx.ns, ctx.dpdus, bxdf);
     }
 
   private:
@@ -517,7 +517,7 @@ class ConductorMaterial {
         }
         TrowbridgeReitzDistribution distrib(uRough, vRough);
         *bxdf = ConductorBxDF(distrib, etas, ks);
-        return BSDF(ctx.n, ctx.ns, ctx.dpdus, bxdf);
+        return BSDF(ctx.ns, ctx.dpdus, bxdf);
     }
 
     ConductorMaterial(SpectrumTexture eta, SpectrumTexture k, SpectrumTexture reflectance,
@@ -621,7 +621,7 @@ class CoatedDiffuseMaterial {
         *bxdf = CoatedDiffuseBxDF(
             DielectricInterfaceBxDF(sampledEta, SampledSpectrum(1.f), distrib),
             IdealDiffuseBxDF(r), thick, a, gg, maxDepth, nSamples);
-        return BSDF(ctx.n, ctx.ns, ctx.dpdus, bxdf);
+        return BSDF(ctx.ns, ctx.dpdus, bxdf);
     }
 
     PBRT_CPU_GPU
@@ -737,7 +737,7 @@ class CoatedConductorMaterial {
         *bxdf = CoatedConductorBxDF(
             DielectricInterfaceBxDF(ieta, SampledSpectrum(1.f), interfaceDistrib),
             ConductorBxDF(conductorDistrib, ce, ck), thick, a, gg, maxDepth, nSamples);
-        return BSDF(ctx.n, ctx.ns, ctx.dpdus, bxdf);
+        return BSDF(ctx.ns, ctx.dpdus, bxdf);
     }
 
     PBRT_CPU_GPU
@@ -821,7 +821,7 @@ class SubsurfaceMaterial {
 
         // Initialize _bsdf_ for smooth or rough dielectric
         *bxdf = DielectricInterfaceBxDF(eta, SampledSpectrum(1.f), distrib);
-        return BSDF(ctx.n, ctx.ns, ctx.dpdus, bxdf);
+        return BSDF(ctx.ns, ctx.dpdus, bxdf);
     }
 
     template <typename TextureEvaluator>
@@ -899,7 +899,7 @@ class DiffuseTransmissionMaterial {
         SampledSpectrum t = Clamp(scale * texEval(transmittance, ctx, lambda), 0, 1);
         Float s = texEval(sigma, ctx);
         *bxdf = DiffuseBxDF(r, t, s);
-        return BSDF(ctx.n, ctx.ns, ctx.dpdus, bxdf);
+        return BSDF(ctx.ns, ctx.dpdus, bxdf);
     }
 
     PBRT_CPU_GPU
@@ -938,7 +938,7 @@ class MeasuredMaterial {
     PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
                               SampledWavelengths &lambda, MeasuredBxDF *bxdf) const {
         *bxdf = MeasuredBxDF(brdf, lambda);
-        return BSDF(ctx.n, ctx.ns, ctx.dpdus, bxdf);
+        return BSDF(ctx.ns, ctx.dpdus, bxdf);
     }
 
     MeasuredMaterial(const std::string &filename, FloatTexture displacement,
