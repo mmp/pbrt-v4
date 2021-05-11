@@ -34,7 +34,6 @@ class FilterSampler {
         Float pdf;
         Point2i pi;
         Point2f p = distrib.Sample(u, &pdf, &pi);
-        Point2f p01 = Point2f(domain.Offset(p));
         return {p, f[pi] / pdf};
     }
 
