@@ -149,10 +149,40 @@ class CameraBase {
     PBRT_CPU_GPU
     Float SampleTime(Float u) const { return Lerp(u, shutterOpen, shutterClose); }
 
-    PBRT_CPU_GPU
-    void ApproximatedPdxy(SurfaceInteraction &si, int samplesPerPixel) const;
     void InitMetadata(ImageMetadata *metadata) const;
     std::string ToString() const;
+
+    PBRT_CPU_GPU
+    void Approximate_dp_dxy(Point3f p, Normal3f n, Float time, int samplesPerPixel,
+                            Vector3f *dpdx, Vector3f *dpdy) const {
+        // Compute tangent plane equation for ray differential intersections
+        Point3f pCamera = CameraFromRender(p, time);
+        Normal3f nCamera = CameraFromRender(n, time);
+        Transform DownZFromCamera =
+            RotateFromTo(Normalize(Vector3f(pCamera)), Vector3f(0, 0, 1));
+        Point3f pDownZ = DownZFromCamera(pCamera);
+        Normal3f nDownZ = DownZFromCamera(nCamera);
+        Float d = Dot(nDownZ, Vector3f(pDownZ));
+
+        // Find intersection points for approximated camera differential rays
+        Ray xRay(Point3f(0, 0, 0) + minPosDifferentialX,
+                 Vector3f(0, 0, 1) + minDirDifferentialX);
+        Float tx = -(Dot(nDownZ, Vector3f(xRay.o)) - d) / Dot(nDownZ, xRay.d);
+        Ray yRay(Point3f(0, 0, 0) + minPosDifferentialY,
+                 Vector3f(0, 0, 1) + minDirDifferentialY);
+        Float ty = -(Dot(nDownZ, Vector3f(yRay.o)) - d) / Dot(nDownZ, yRay.d);
+        Point3f px = xRay(tx), py = yRay(ty);
+
+        // Estimate $\dpdx$ and $\dpdy$ in tangent plane at intersection point
+        Float sppScale =
+            GetOptions().disablePixelJitter
+                ? 1
+                : std::max<Float>(.125, 1 / std::sqrt((Float)samplesPerPixel));
+        *dpdx =
+            sppScale * RenderFromCamera(DownZFromCamera.ApplyInverse(px - pDownZ), time);
+        *dpdy =
+            sppScale * RenderFromCamera(DownZFromCamera.ApplyInverse(py - pDownZ), time);
+    }
 
   protected:
     // CameraBase Protected Members
@@ -569,6 +599,20 @@ inline Float Camera::SampleTime(Float u) const {
 inline const CameraTransform &Camera::GetCameraTransform() const {
     auto gtc = [&](auto ptr) -> auto && { return ptr->GetCameraTransform(); };
     return DispatchCRef(gtc);
+}
+
+inline void Camera::Approximate_dp_dxy(Point3f p, Normal3f n, Float time,
+                                       int samplesPerPixel, Vector3f *dpdx,
+                                       Vector3f *dpdy) const {
+    if constexpr (AllInheritFrom<CameraBase>(Camera::Types())) {
+        return ((const CameraBase *)ptr())
+            ->Approximate_dp_dxy(p, n, time, samplesPerPixel, dpdx, dpdy);
+    } else {
+        auto approx = [&](auto ptr) {
+            return ptr->Approximate_dp_dxy(p, n, time, samplesPerPixel, dpdx, dpdy);
+        };
+        return Dispatch(approx);
+    }
 }
 
 }  // namespace pbrt

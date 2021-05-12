@@ -59,7 +59,8 @@ class Camera : public TaggedPointer<PerspectiveCamera, OrthographicCamera,
     PBRT_CPU_GPU inline const CameraTransform &GetCameraTransform() const;
 
     PBRT_CPU_GPU
-    void ApproximatedPdxy(SurfaceInteraction &si, int samplesPerPixel) const;
+    void Approximate_dp_dxy(Point3f p, Normal3f n, Float time, int samplesPerPixel,
+                            Vector3f *dpdx, Vector3f *dpdy) const;
 
     PBRT_CPU_GPU
     SampledSpectrum We(const Ray &ray, SampledWavelengths &lambda,

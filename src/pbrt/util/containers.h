@@ -149,6 +149,19 @@ struct FilterTypes<Pred, TypePack<T, Ts...>> {
                          TypePack<Ts...>>::type;
 };
 
+template <typename Base, typename... Ts>
+inline constexpr bool AllInheritFrom(TypePack<Ts...>);
+
+template <typename Base>
+inline constexpr bool AllInheritFrom(TypePack<>) {
+    return true;
+}
+
+template <typename Base, typename T, typename... Ts>
+inline constexpr bool AllInheritFrom(TypePack<T, Ts...>) {
+    return std::is_base_of_v<Base, T> && AllInheritFrom<Base>(TypePack<Ts...>());
+}
+
 template <typename F, typename... Ts>
 void ForEachType(F func, TypePack<Ts...>);
 template <typename F, typename T, typename... Ts>
