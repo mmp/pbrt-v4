@@ -148,7 +148,7 @@ class WavefrontPathIntegrator {
     pstd::vector<Light> *envLights;
     LightSampler lightSampler;
 
-    int maxDepth;
+    int maxDepth, samplesPerPixel;
     bool regularize;
 
     int scanlinesPerPass, maxQueueSize;
