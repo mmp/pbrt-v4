@@ -32,6 +32,16 @@ static inline void rescale(SampledSpectrum &T_hat, SampledSpectrum &lightPathPDF
     }
 }
 
+struct SampleMediumScatteringCallback {
+    int depth;
+    WavefrontPathIntegrator *integrator;
+    template <typename PhaseFunction>
+    void operator()() {
+        integrator->SampleMediumScattering<PhaseFunction>(depth);
+    }
+};
+
+
 // WavefrontPathIntegrator Participating Media Methods
 void WavefrontPathIntegrator::SampleMediumInteraction(int depth) {
     RayQueue *nextRayQueue = NextRayQueue(depth);
@@ -114,13 +124,16 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int depth) {
                         T_hat *= T_maj * sigma_s;
                         uniPathPDF *= T_maj * sigma_s;
 
-                        // TODO: don't hard code a phase function.
-                        const HGPhaseFunction *phase =
-                            intr.phase.CastOrNullptr<HGPhaseFunction>();
                         // Enqueue medium scattering work.
-                        mediumScatterQueue->Push(MediumScatterWorkItem{
-                            intr.p(), lambda, T_hat, uniPathPDF, *phase, -ray.d,
-                            w.etaScale, ray.medium, w.pixelIndex});
+                        auto enqueue = [=](auto ptr) {
+                            using PhaseFunction =
+                                typename std::remove_reference_t<decltype(*ptr)>;
+                            mediumScatterQueue->Push(MediumScatterWorkItem<PhaseFunction>{
+                                    intr.p(), lambda, T_hat, uniPathPDF, ptr, -ray.d,
+                                    ray.time, w.etaScale, ray.medium, w.pixelIndex});
+                        };
+                        intr.phase.Dispatch(enqueue);
+
                         scattered = true;
 
                         return false;
@@ -183,7 +196,7 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int depth) {
             const MixMaterial *mix = material.CastOrNullptr<MixMaterial>();
             while (mix) {
                 SurfaceInteraction intr(w.pi, w.uv, w.wo, w.dpdus, w.dpdvs, w.dndus,
-                                        w.dndvs, 0. /* time */, false /* flip normal */);
+                                        w.dndvs, ray.time, false /* flip normal */);
                 intr.faceIndex = w.faceIndex;
                 MaterialEvalContext ctx(intr);
                 material = mix->ChooseMaterial(BasicTextureEvaluator(), ctx);
@@ -236,15 +249,20 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int depth) {
     if (depth == maxDepth)
         return;
 
-    RayQueue *currentRayQueue = CurrentRayQueue(depth);
+    ForEachType(SampleMediumScatteringCallback{depth, this}, PhaseFunction::Types());
+}
 
-    using PhaseFunction = HGPhaseFunction;
-    std::string desc = std::string("Sample direct/indirect - Henyey Greenstein");
-    ForAllQueued(
-        desc.c_str(), mediumScatterQueue, maxQueueSize,
-        PBRT_CPU_GPU_LAMBDA(MediumScatterWorkItem w) {
+template <typename Phase>
+void WavefrontPathIntegrator::SampleMediumScattering(int depth) {
+    RayQueue *currentRayQueue = CurrentRayQueue(depth);
+    RayQueue *nextRayQueue = NextRayQueue(depth);
+
+    std::string desc = std::string("Sample direct/indirect - ") + Phase::Name();
+    ForAllQueued(desc.c_str(),
+                 mediumScatterQueue->Get<MediumScatterWorkItem<Phase>>(),
+                 maxQueueSize,
+        PBRT_CPU_GPU_LAMBDA(const MediumScatterWorkItem<Phase> w) {
             RaySamples raySamples = pixelSampleState.samples[w.pixelIndex];
-            Float time = 0;  // TODO: FIXME
             Vector3f wo = w.wo;
 
             // Sample direct lighting at medium scattering event.  First,
@@ -260,7 +278,7 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int depth) {
                     ctx, raySamples.direct.u, w.lambda, LightSamplingMode::WithMIS);
                 if (ls && ls->L && ls->pdf > 0) {
                     Vector3f wi = ls->wi;
-                    SampledSpectrum T_hat = w.T_hat * w.phase.p(wo, wi);
+                    SampledSpectrum T_hat = w.T_hat * w.phase->p(wo, wi);
 
                     PBRT_DBG("Phase phase T_hat %f %f %f %f\n", T_hat[0], T_hat[1],
                              T_hat[2], T_hat[3]);
@@ -268,12 +286,12 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int depth) {
                     // Compute PDFs for direct lighting MIS calculation.
                     Float lightPDF = ls->pdf * sampledLight->pdf;
                     Float phasePDF =
-                        IsDeltaLight(light.Type()) ? 0.f : w.phase.PDF(wo, wi);
+                        IsDeltaLight(light.Type()) ? 0.f : w.phase->PDF(wo, wi);
                     SampledSpectrum uniPathPDF = w.uniPathPDF * phasePDF;
                     SampledSpectrum lightPathPDF = w.uniPathPDF * lightPDF;
 
                     SampledSpectrum Ld = T_hat * ls->L;
-                    Ray ray(w.p, ls->pLight.p() - w.p, time, w.medium);
+                    Ray ray(w.p, ls->pLight.p() - w.p, w.time, w.medium);
 
                     // Enqueue shadow ray
                     shadowRayQueue->Push(ray, 1 - ShadowEpsilon, w.lambda, Ld, uniPathPDF,
@@ -291,7 +309,7 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int depth) {
 
             // Sample indirect lighting.
             pstd::optional<PhaseFunctionSample> phaseSample =
-                w.phase.Sample_p(wo, raySamples.indirect.u);
+                w.phase->Sample_p(wo, raySamples.indirect.u);
             if (!phaseSample || phaseSample->pdf == 0)
                 return;
 
@@ -315,7 +333,7 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int depth) {
                 lightPathPDF *= 1 - q;
             }
 
-            Ray ray(w.p, phaseSample->wi, time, w.medium);
+            Ray ray(w.p, phaseSample->wi, w.time, w.medium);
             bool isSpecularBounce = false;
             bool anyNonSpecularBounces = true;
 

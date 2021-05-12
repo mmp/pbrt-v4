@@ -285,7 +285,14 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(Allocator alloc, ParsedScene &s
 
     if (haveMedia) {
         mediumSampleQueue = alloc.new_object<MediumSampleQueue>(maxQueueSize, alloc);
-        mediumScatterQueue = alloc.new_object<MediumScatterQueue>(maxQueueSize, alloc);
+
+        // TODO: in the presence of multiple PhaseFunction implementations,
+        // it could be worthwhile to see which are present in the scene and
+        // then initialize havePhase accordingly...
+        pstd::array<bool, PhaseFunction::NumTags()> havePhase;
+        havePhase.fill(true);
+        mediumScatterQueue =
+            alloc.new_object<MediumScatterQueue>(maxQueueSize, alloc, havePhase);
     }
 
     stats = alloc.new_object<Stats>(maxDepth, alloc);

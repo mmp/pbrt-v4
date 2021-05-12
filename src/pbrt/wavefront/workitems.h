@@ -258,12 +258,14 @@ struct MediumSampleWorkItem {
 };
 
 // MediumScatterWorkItem Definition
+template <typename PhaseFunction>
 struct MediumScatterWorkItem {
     Point3f p;
     SampledWavelengths lambda;
     SampledSpectrum T_hat, uniPathPDF;
-    HGPhaseFunction phase;
+    const PhaseFunction *phase;
     Vector3f wo;
+    Float time;
     Float etaScale;
     Medium medium;
     int pixelIndex;
@@ -469,7 +471,8 @@ class MediumSampleQueue : public WorkQueue<MediumSampleWorkItem> {
 };
 
 // MediumScatterQueue Definition
-using MediumScatterQueue = WorkQueue<MediumScatterWorkItem>;
+using MediumScatterQueue = MultiWorkQueue<
+    typename MapType<MediumScatterWorkItem, typename PhaseFunction::Types>::type>;
 
 // MaterialEvalQueue Definition
 using MaterialEvalQueue = MultiWorkQueue<

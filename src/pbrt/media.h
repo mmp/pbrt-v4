@@ -59,6 +59,8 @@ class HGPhaseFunction {
     PBRT_CPU_GPU
     Float PDF(Vector3f wo, Vector3f wi) const { return p(wo, wi); }
 
+    static const char *Name() { return "Henyey-Greenstein"; }
+
     std::string ToString() const;
 
   private:

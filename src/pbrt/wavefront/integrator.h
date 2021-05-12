@@ -67,6 +67,8 @@ class WavefrontPathIntegrator {
 
     void TraceShadowRays(int depth);
     void SampleMediumInteraction(int depth);
+    template <typename PhaseFunction>
+    void SampleMediumScattering(int depth);
     void SampleSubsurface(int depth);
 
     void HandleEscapedRays(int depth);

@@ -4,7 +4,7 @@
 // SPDX: Apache-2.0
 
 flat Float;
-flat HGPhaseFunction;
+flat PhaseFunction;
 flat Light;
 flat Material;
 flat Medium;
@@ -137,12 +137,13 @@ soa MediumSampleWorkItem {
     MediumInterface mediumInterface;
 };
 
-soa MediumScatterWorkItem {
+soa MediumScatterWorkItem<PhaseFunction> {
     Point3f p;
     SampledWavelengths lambda;
     SampledSpectrum T_hat, uniPathPDF;
-    HGPhaseFunction phase;
+    const PhaseFunction *phase;
     Vector3f wo;
+    Float time;
     Float etaScale;
     Medium medium;
     int pixelIndex;
