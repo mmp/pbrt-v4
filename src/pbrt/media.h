@@ -596,21 +596,30 @@ class NanoVDBMediumProvider {
                             bounds, LeScale, temperatureCutoff, temperatureScale);
     }
 
-    NanoVDBMediumProvider(const Bounds3f &bounds, nanovdb::GridHandle<NanoVDBBuffer> dg,
+    NanoVDBMediumProvider(nanovdb::GridHandle<NanoVDBBuffer> dg,
                           nanovdb::GridHandle<NanoVDBBuffer> tg, Float LeScale,
                           Float temperatureCutoff, Float temperatureScale)
-        : bounds(bounds),
-          densityGrid(std::move(dg)),
+        : densityGrid(std::move(dg)),
           temperatureGrid(std::move(tg)),
           LeScale(LeScale),
           temperatureCutoff(temperatureCutoff),
           temperatureScale(temperatureScale) {
         densityFloatGrid = densityGrid.grid<float>();
+
+        nanovdb::BBox<nanovdb::Vec3R> bbox = densityFloatGrid->worldBBox();
+        bounds = Bounds3f(Point3f(bbox.min()[0], bbox.min()[1], bbox.min()[2]),
+                          Point3f(bbox.max()[0], bbox.max()[1], bbox.max()[2]));
+
         if (temperatureGrid) {
             temperatureFloatGrid = temperatureGrid.grid<float>();
             float minTemperature, maxTemperature;
             temperatureFloatGrid->tree().extrema(minTemperature, maxTemperature);
             LOG_VERBOSE("Max temperature: %f", maxTemperature);
+
+            nanovdb::BBox<nanovdb::Vec3R> bbox = temperatureFloatGrid->worldBBox();
+            bounds = Union(bounds,
+                           Bounds3f(Point3f(bbox.min()[0], bbox.min()[1], bbox.min()[2]),
+                                    Point3f(bbox.max()[0], bbox.max()[1], bbox.max()[2])));
         }
     }
 

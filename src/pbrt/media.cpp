@@ -364,24 +364,18 @@ NanoVDBMediumProvider *NanoVDBMediumProvider::Create(
         ErrorExit(loc, "Must supply \"filename\" to \"nanovdb\" medium.");
 
     nanovdb::GridHandle<NanoVDBBuffer> densityGrid;
-    nanovdb::BBox<nanovdb::Vec3R> bbox;
     densityGrid = readGrid<NanoVDBBuffer>(filename, "density", loc, alloc);
     if (!densityGrid)
         ErrorExit(loc, "%s: didn't find \"density\" grid.", filename);
 
-    bbox = densityGrid.grid<float>()->worldBBox();
-
     nanovdb::GridHandle<NanoVDBBuffer> temperatureGrid;
     temperatureGrid = readGrid<NanoVDBBuffer>(filename, "temperature", loc, alloc);
-
-    Bounds3f bounds(Point3f(bbox.min()[0], bbox.min()[1], bbox.min()[2]),
-                    Point3f(bbox.max()[0], bbox.max()[1], bbox.max()[2]));
 
     Float LeScale = parameters.GetOneFloat("LeScale", 1.f);
     Float temperatureCutoff = parameters.GetOneFloat("temperaturecutoff", 0.f);
     Float temperatureScale = parameters.GetOneFloat("temperaturescale", 1.f);
 
-    return alloc.new_object<NanoVDBMediumProvider>(bounds, std::move(densityGrid),
+    return alloc.new_object<NanoVDBMediumProvider>(std::move(densityGrid),
                                                    std::move(temperatureGrid), LeScale,
                                                    temperatureCutoff, temperatureScale);
 }
