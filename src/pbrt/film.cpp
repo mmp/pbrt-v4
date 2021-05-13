@@ -111,6 +111,14 @@ FilmBaseParameters::FilmBaseParameters(const ParameterDictionary &parameters,
     std::vector<Float> cr = parameters.GetFloatArray("cropwindow");
     if (Options->cropWindow) {
         Bounds2f crop = *Options->cropWindow;
+        if (Intersect(crop, Bounds2f(Point2f(0, 0), Point2f(1, 1))) != crop) {
+            Error(loc,
+                  "Film crop window %s is not in [0,1] range; did you "
+                  "mean to use \"pixelbounds\"? Clamping to valid range.",
+                  crop);
+            crop = Intersect(crop, Bounds2f(Point2f(0, 0), Point2f(1, 1)));
+        }
+
         // Compute film image bounds
         pixelBounds = Bounds2i(Point2i(pstd::ceil(fullResolution.x * crop.pMin.x),
                                        pstd::ceil(fullResolution.y * crop.pMin.y)),
