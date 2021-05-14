@@ -24,8 +24,9 @@ EnqueueWorkAfterMiss(RayWorkItem r, MediumSampleQueue *mediumSampleQueue,
     } else if (escapedRayQueue) {
         PBRT_DBG("Adding ray to escapedRayQueue pixel index %d\n", r.pixelIndex);
         escapedRayQueue->Push(
-                              EscapedRayWorkItem{r.ray.o, r.ray.d, r.lambda, r.pixelIndex, (int)r.isSpecularBounce,
-                                                     r.T_hat, r.uniPathPDF, r.lightPathPDF, r.prevIntrCtx});
+                              EscapedRayWorkItem{r.ray.o, r.ray.d, r.depth,
+                                                 r.lambda, r.pixelIndex, (int)r.isSpecularBounce,
+                                                 r.T_hat, r.uniPathPDF, r.lightPathPDF, r.prevIntrCtx});
     }
 }
 
@@ -42,6 +43,7 @@ EnqueueWorkAfterIntersection(RayWorkItem r, Medium rayMedium, float tMax, Surfac
         PBRT_DBG("Enqueuing into medium sample queue\n");
         mediumSampleQueue->Push(
             MediumSampleWorkItem{r.ray,
+                                 r.depth,
                                  tMax,
                                  r.lambda,
                                  r.T_hat,
@@ -83,7 +85,7 @@ EnqueueWorkAfterIntersection(RayWorkItem r, Medium rayMedium, float tMax, Surfac
                  r.pixelIndex);
         Ray newRay = intr.SpawnRay(r.ray.d);
         nextRayQueue->PushIndirectRay(
-            newRay, r.prevIntrCtx, r.T_hat, r.uniPathPDF, r.lightPathPDF, r.lambda,
+            newRay, r.depth, r.prevIntrCtx, r.T_hat, r.uniPathPDF, r.lightPathPDF, r.lambda,
             r.etaScale, r.isSpecularBounce, r.anyNonSpecularBounces, r.pixelIndex);
         return;
     }
@@ -94,7 +96,7 @@ EnqueueWorkAfterIntersection(RayWorkItem r, Medium rayMedium, float tMax, Surfac
         Ray ray = r.ray;
         // TODO: intr.wo == -ray.d?
         hitAreaLightQueue->Push(HitAreaLightWorkItem{
-            intr.areaLight, intr.p(), intr.n, intr.uv, intr.wo, r.lambda,
+            intr.areaLight, intr.p(), intr.n, intr.uv, intr.wo, r.depth, r.lambda,
             r.T_hat, r.uniPathPDF, r.lightPathPDF, r.prevIntrCtx,
             (int)r.isSpecularBounce, r.pixelIndex});
     }
@@ -114,8 +116,8 @@ EnqueueWorkAfterIntersection(RayWorkItem r, Medium rayMedium, float tMax, Surfac
         q->Push(MaterialEvalWorkItem<Material>{
             ptr, intr.pi, intr.n, intr.shading.n,
             intr.shading.dpdu, intr.shading.dpdv, intr.shading.dndu, intr.shading.dndv,
-                intr.uv, intr.faceIndex, r.lambda, r.anyNonSpecularBounces, intr.wo, r.pixelIndex,
-                r.T_hat, r.uniPathPDF, r.etaScale,
+                intr.uv, r.depth, intr.faceIndex, r.lambda, r.anyNonSpecularBounces, intr.wo,
+                r.pixelIndex, r.T_hat, r.uniPathPDF, r.etaScale,
                 mediumInterface, intr.time});
     };
     material.Dispatch(enqueue);

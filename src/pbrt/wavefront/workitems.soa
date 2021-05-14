@@ -39,6 +39,7 @@ soa PixelSampleState {
 
 soa RayWorkItem {
     Ray ray;
+    int depth;
     int pixelIndex;
     SampledWavelengths lambda;
     SampledSpectrum T_hat, uniPathPDF, lightPathPDF;
@@ -49,10 +50,11 @@ soa RayWorkItem {
 };
 
 soa EscapedRayWorkItem {
-    SampledSpectrum T_hat, uniPathPDF, lightPathPDF;
-    SampledWavelengths lambda;
     Point3f rayo;
     Vector3f rayd;
+    int depth;
+    SampledSpectrum T_hat, uniPathPDF, lightPathPDF;
+    SampledWavelengths lambda;
     LightSampleContext prevIntrCtx;
     int specularBounce;
     int pixelIndex;
@@ -66,6 +68,7 @@ soa HitAreaLightWorkItem {
     Normal3f n;
     Point2f uv;
     Vector3f wo;
+    int depth;
     LightSampleContext prevIntrCtx;
     int isSpecularBounce;
     int pixelIndex;
@@ -88,6 +91,7 @@ soa GetBSSRDFAndProbeRayWorkItem {
     Normal3f n, ns;
     Vector3f dpdus;
     Point2f uv;
+    int depth;
     MediumInterface mediumInterface;
     Float etaScale;
     int pixelIndex;
@@ -96,6 +100,7 @@ soa GetBSSRDFAndProbeRayWorkItem {
 soa SubsurfaceScatterWorkItem {
     // Via eval/sample SSS kernel
     Point3f p0, p1;
+    int depth;
     Material material;
     TabulatedBSSRDF bssrdf;
     SampledWavelengths lambda;
@@ -112,6 +117,7 @@ soa SubsurfaceScatterWorkItem {
 
 soa MediumSampleWorkItem {
     Ray ray;
+    int depth;
     Float tMax;
     SampledWavelengths lambda;
     SampledSpectrum T_hat;
@@ -139,6 +145,7 @@ soa MediumSampleWorkItem {
 
 soa MediumScatterWorkItem<PhaseFunction> {
     Point3f p;
+    int depth;
     SampledWavelengths lambda;
     SampledSpectrum T_hat, uniPathPDF;
     const PhaseFunction *phase;
@@ -159,6 +166,7 @@ soa MaterialEvalWorkItem<Material> {
     Normal3f dndus, dndvs;
     Vector3f wo;
     Point2f uv;
+    int depth;
     int faceIndex;
     Float time;
     int anyNonSpecularBounces;

@@ -15,9 +15,9 @@
 namespace pbrt {
 
 // WavefrontPathIntegrator Subsurface Scattering Methods
-void WavefrontPathIntegrator::SampleSubsurface(int depth) {
-    RayQueue *rayQueue = CurrentRayQueue(depth);
-    RayQueue *nextRayQueue = NextRayQueue(depth);
+void WavefrontPathIntegrator::SampleSubsurface(int wavefrontDepth) {
+    RayQueue *rayQueue = CurrentRayQueue(wavefrontDepth);
+    RayQueue *nextRayQueue = NextRayQueue(wavefrontDepth);
 
     ForAllQueued(
         "Get BSSRDF and enqueue probe ray", bssrdfEvalQueue, maxQueueSize,
@@ -35,9 +35,9 @@ void WavefrontPathIntegrator::SampleSubsurface(int depth) {
 
             pstd::optional<BSSRDFProbeSegment> probeSeg = bssrdf.SampleSp(uc, u);
             if (probeSeg)
-                subsurfaceScatterQueue->Push(probeSeg->p0, probeSeg->p1, material, bssrdf,
-                                             lambda, w.T_hat, w.uniPathPDF,
-                                             w.mediumInterface, w.etaScale, w.pixelIndex);
+                subsurfaceScatterQueue->Push(
+                    probeSeg->p0, probeSeg->p1, w.depth, material, bssrdf, lambda,
+                    w.T_hat, w.uniPathPDF, w.mediumInterface, w.etaScale, w.pixelIndex);
         });
 
     aggregate->IntersectOneRandom(maxQueueSize, subsurfaceScatterQueue);
@@ -101,7 +101,7 @@ void WavefrontPathIntegrator::SampleSubsurface(int depth) {
 
                     // Russian roulette
                     SampledSpectrum rrBeta = T_hat * etaScale / indirUniPathPDF.Average();
-                    if (rrBeta.MaxComponentValue() < 1 && depth > 1) {
+                    if (rrBeta.MaxComponentValue() < 1 && w.depth > 1) {
                         Float q = std::max<Float>(0, 1 - rrBeta.MaxComponentValue());
                         if (raySamples.indirect.rr < q) {
                             T_hat = SampledSpectrum(0.f);
@@ -125,16 +125,16 @@ void WavefrontPathIntegrator::SampleSubsurface(int depth) {
 
                         LightSampleContext ctx(intr.pi, intr.n, intr.ns);
                         nextRayQueue->PushIndirectRay(
-                            ray, ctx, T_hat, indirUniPathPDF, lightPathPDF, lambda,
-                            etaScale, bsdfSample->IsSpecular(), anyNonSpecularBounces,
-                            w.pixelIndex);
+                            ray, w.depth + 1, ctx, T_hat, indirUniPathPDF, lightPathPDF,
+                            lambda, etaScale, bsdfSample->IsSpecular(),
+                            anyNonSpecularBounces, w.pixelIndex);
 
                         PBRT_DBG("Spawned indirect ray at depth %d. "
                                  "Specular %d T_Hat %f %f %f %f indirUniPathPDF %f %f %f "
                                  "%f lightPathPDF %f "
                                  "%f %f %f "
                                  "T_hat/indirUniPathPDF %f %f %f %f\n",
-                                 depth + 1, int(bsdfSample->IsSpecular()), T_hat[0],
+                                 w.depth + 1, int(bsdfSample->IsSpecular()), T_hat[0],
                                  T_hat[1], T_hat[2], T_hat[3], indirUniPathPDF[0],
                                  indirUniPathPDF[1], indirUniPathPDF[2],
                                  indirUniPathPDF[3], lightPathPDF[0], lightPathPDF[1],
@@ -171,8 +171,8 @@ void WavefrontPathIntegrator::SampleSubsurface(int depth) {
                 PBRT_DBG(
                     "depth %d T_hat %f %f %f %f f %f %f %f %f ls.L %f %f %f %f ls.pdf "
                     "%f\n",
-                    depth, T_hat[0], T_hat[1], T_hat[2], T_hat[3], f[0], f[1], f[2], f[3],
-                    ls->L[0], ls->L[1], ls->L[2], ls->L[3], ls->pdf);
+                    w.depth, T_hat[0], T_hat[1], T_hat[2], T_hat[3], f[0], f[1], f[2],
+                    f[3], ls->L[0], ls->L[1], ls->L[2], ls->L[3], ls->pdf);
 
                 Float lightPDF = ls->pdf * sampledLight->pdf;
                 // This causes uniPathPDF to be zero for the shadow ray, so that
@@ -186,7 +186,7 @@ void WavefrontPathIntegrator::SampleSubsurface(int depth) {
                 PBRT_DBG(
                     "depth %d Ld %f %f %f %f "
                     "new T_hat %f %f %f %f T_hat/uni %f %f %f %f Ld/uni %f %f %f %f\n",
-                    depth, Ld[0], Ld[1], Ld[2], Ld[3], T_hat[0], T_hat[1], T_hat[2],
+                    w.depth, Ld[0], Ld[1], Ld[2], Ld[3], T_hat[0], T_hat[1], T_hat[2],
                     T_hat[3], SafeDiv(T_hat, uniPathPDF)[0],
                     SafeDiv(T_hat, uniPathPDF)[1], SafeDiv(T_hat, uniPathPDF)[2],
                     SafeDiv(T_hat, uniPathPDF)[3], SafeDiv(Ld, uniPathPDF)[0],
@@ -204,7 +204,7 @@ void WavefrontPathIntegrator::SampleSubsurface(int depth) {
             }
         });
 
-    TraceShadowRays(depth);
+    TraceShadowRays(wavefrontDepth);
 }
 
 }  // namespace pbrt

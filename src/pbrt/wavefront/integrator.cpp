@@ -453,7 +453,7 @@ Float WavefrontPathIntegrator::Render() {
             Do(
                 "Reset ray queue", PBRT_CPU_GPU_LAMBDA() {
                     PBRT_DBG("Starting scanlines at y0 = %d, sample %d / %d\n", y0,
-                             sampleIndex, spp);
+                             sampleIndex, samplesPerPixel);
                     cameraRayQueue->Reset();
                 });
             GenerateCameraRays(y0, sampleIndex);
@@ -462,9 +462,9 @@ Float WavefrontPathIntegrator::Render() {
                 PBRT_CPU_GPU_LAMBDA() { stats->cameraRays += cameraRayQueue->Size(); });
 
             // Trace rays and estimate radiance up to maximum ray depth
-            for (int depth = 0; true; ++depth) {
+            for (int wavefrontDepth = 0; true; ++wavefrontDepth) {
                 // Reset queues before tracing rays
-                RayQueue *nextQueue = NextRayQueue(depth);
+                RayQueue *nextQueue = NextRayQueue(wavefrontDepth);
                 Do(
                     "Reset queues before tracing rays", PBRT_CPU_GPU_LAMBDA() {
                         nextQueue->Reset();
@@ -488,33 +488,33 @@ Float WavefrontPathIntegrator::Render() {
                     });
 
                 // Follow active ray paths and accumulate radiance estimates
-                GenerateRaySamples(depth, sampleIndex);
+                GenerateRaySamples(wavefrontDepth, sampleIndex);
                 // Find closest intersections along active rays
-                aggregate->IntersectClosest(maxQueueSize, escapedRayQueue,
-                                            hitAreaLightQueue, basicEvalMaterialQueue,
-                                            universalEvalMaterialQueue, mediumSampleQueue,
-                                            CurrentRayQueue(depth), NextRayQueue(depth));
+                aggregate->IntersectClosest(
+                    maxQueueSize, escapedRayQueue, hitAreaLightQueue,
+                    basicEvalMaterialQueue, universalEvalMaterialQueue, mediumSampleQueue,
+                    CurrentRayQueue(wavefrontDepth), NextRayQueue(wavefrontDepth));
 
-                if (depth > 0) {
+                if (wavefrontDepth > 0) {
                     // As above, with the indexing...
-                    RayQueue *statsQueue = CurrentRayQueue(depth);
+                    RayQueue *statsQueue = CurrentRayQueue(wavefrontDepth);
                     Do(
                         "Update indirect ray stats", PBRT_CPU_GPU_LAMBDA() {
-                            stats->indirectRays[depth] += statsQueue->Size();
+                            stats->indirectRays[wavefrontDepth] += statsQueue->Size();
                         });
                 }
                 if (haveMedia)
-                    SampleMediumInteraction(depth);
+                    SampleMediumInteraction(wavefrontDepth);
                 if (escapedRayQueue)
-                    HandleEscapedRays(depth);
-                HandleRayFoundEmission(depth);
-                if (depth == maxDepth)
+                    HandleEscapedRays();
+                HandleRayFoundEmission();
+                if (wavefrontDepth == maxDepth)
                     break;
-                EvaluateMaterialsAndBSDFs(depth);
+                EvaluateMaterialsAndBSDFs(wavefrontDepth);
                 // Do immediately so that we have space for shadow rays for subsurface..
-                TraceShadowRays(depth);
+                TraceShadowRays(wavefrontDepth);
                 if (haveSubsurface)
-                    SampleSubsurface(depth);
+                    SampleSubsurface(wavefrontDepth);
             }
 
             UpdateFilm();
@@ -561,7 +561,7 @@ Float WavefrontPathIntegrator::Render() {
     return seconds;
 }
 
-void WavefrontPathIntegrator::HandleEscapedRays(int depth) {
+void WavefrontPathIntegrator::HandleEscapedRays() {
     ForAllQueued(
         "Handle escaped rays", escapedRayQueue, maxQueueSize,
         PBRT_CPU_GPU_LAMBDA(const EscapedRayWorkItem w) {
@@ -578,7 +578,7 @@ void WavefrontPathIntegrator::HandleEscapedRays(int depth) {
                              w.lightPathPDF[0], w.lightPathPDF[1], w.lightPathPDF[2],
                              w.lightPathPDF[3]);
 
-                    if (depth == 0 || w.specularBounce) {
+                    if (w.depth == 0 || w.specularBounce) {
                         L += w.T_hat * Le / w.uniPathPDF.Average();
                     } else {
                         // Compute MIS-weighted radiance contribution from infinite light
@@ -601,7 +601,7 @@ void WavefrontPathIntegrator::HandleEscapedRays(int depth) {
         });
 }
 
-void WavefrontPathIntegrator::HandleRayFoundEmission(int depth) {
+void WavefrontPathIntegrator::HandleRayFoundEmission() {
     ForAllQueued(
         "Handle emitters hit by indirect rays", hitAreaLightQueue, maxQueueSize,
         PBRT_CPU_GPU_LAMBDA(const HitAreaLightWorkItem w) {
@@ -610,11 +610,11 @@ void WavefrontPathIntegrator::HandleRayFoundEmission(int depth) {
             if (!Le)
                 return;
             PBRT_DBG("Got Le %f %f %f %f from hit area light at depth %d\n", Le[0], Le[1],
-                     Le[2], Le[3], depth);
+                     Le[2], Le[3], w.depth);
 
             // Compute area light's weighted radiance contribution to the path
             SampledSpectrum L(0.f);
-            if (depth == 0 || w.isSpecularBounce) {
+            if (w.depth == 0 || w.isSpecularBounce) {
                 L = w.T_hat * Le / w.uniPathPDF.Average();
             } else {
                 // Compute MIS-weighted radiance contribution from area light
@@ -638,7 +638,7 @@ void WavefrontPathIntegrator::HandleRayFoundEmission(int depth) {
         });
 }
 
-void WavefrontPathIntegrator::TraceShadowRays(int depth) {
+void WavefrontPathIntegrator::TraceShadowRays(int wavefrontDepth) {
     if (haveMedia)
         aggregate->IntersectShadowTr(maxQueueSize, shadowRayQueue, &pixelSampleState);
     else
@@ -646,7 +646,7 @@ void WavefrontPathIntegrator::TraceShadowRays(int depth) {
     // Reset shadow ray queue
     Do(
         "Reset shadowRayQueue", PBRT_CPU_GPU_LAMBDA() {
-            stats->shadowRays[depth] += shadowRayQueue->Size();
+            stats->shadowRays[wavefrontDepth] += shadowRayQueue->Size();
             shadowRayQueue->Reset();
         });
 }

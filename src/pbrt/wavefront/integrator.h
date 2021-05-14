@@ -61,33 +61,33 @@ class WavefrontPathIntegrator {
     template <typename Sampler>
     void GenerateCameraRays(int y0, int sampleIndex);
 
-    void GenerateRaySamples(int depth, int sampleIndex);
+    void GenerateRaySamples(int wavefrontDepth, int sampleIndex);
     template <typename Sampler>
-    void GenerateRaySamples(int depth, int sampleIndex);
+    void GenerateRaySamples(int wavefrontDepth, int sampleIndex);
 
-    void TraceShadowRays(int depth);
-    void SampleMediumInteraction(int depth);
+    void TraceShadowRays(int wavefrontDepth);
+    void SampleMediumInteraction(int wavefrontDepth);
     template <typename PhaseFunction>
-    void SampleMediumScattering(int depth);
-    void SampleSubsurface(int depth);
+    void SampleMediumScattering(int wavefrontDepth);
+    void SampleSubsurface(int wavefrontDepth);
 
-    void HandleEscapedRays(int depth);
-    void HandleRayFoundEmission(int depth);
+    void HandleEscapedRays();
+    void HandleRayFoundEmission();
 
-    void EvaluateMaterialsAndBSDFs(int depth);
+    void EvaluateMaterialsAndBSDFs(int wavefrontDepth);
     template <typename Mtl>
-    void EvaluateMaterialAndBSDF(int depth);
+    void EvaluateMaterialAndBSDF(int wavefrontDepth);
     template <typename Mtl, typename TextureEvaluator>
     void EvaluateMaterialAndBSDF(TextureEvaluator texEval, MaterialEvalQueue *evalQueue,
-                                 int depth);
+                                 int wavefrontDepth);
 
-    void SampleDirect(int depth);
+    void SampleDirect(int wavefrontDepth);
     template <typename BxDF>
-    void SampleDirect(int depth);
+    void SampleDirect(int wavefrontDepth);
 
-    void SampleIndirect(int depth);
+    void SampleIndirect(int wavefrontDepth);
     template <typename BxDF>
-    void SampleIndirect(int depth);
+    void SampleIndirect(int wavefrontDepth);
 
     void UpdateFilm();
 
@@ -118,8 +118,12 @@ class WavefrontPathIntegrator {
 
     WavefrontPathIntegrator(Allocator alloc, ParsedScene &scene);
 
-    RayQueue *CurrentRayQueue(int depth) { return rayQueues[depth & 1]; }
-    RayQueue *NextRayQueue(int depth) { return rayQueues[(depth + 1) & 1]; }
+    RayQueue *CurrentRayQueue(int wavefrontDepth) {
+        return rayQueues[wavefrontDepth & 1];
+    }
+    RayQueue *NextRayQueue(int wavefrontDepth) {
+        return rayQueues[(wavefrontDepth + 1) & 1];
+    }
 
     // WavefrontPathIntegrator Member Variables
     bool initializeVisibleSurface;

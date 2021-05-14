@@ -12,31 +12,31 @@
 namespace pbrt {
 
 // WavefrontPathIntegrator Sampler Methods
-void WavefrontPathIntegrator::GenerateRaySamples(int depth, int sampleIndex) {
+void WavefrontPathIntegrator::GenerateRaySamples(int wavefrontDepth, int sampleIndex) {
     auto generateSamples = [=](auto sampler) {
         using Sampler = std::remove_reference_t<decltype(*sampler)>;
         if constexpr (!std::is_same_v<Sampler, MLTSampler> &&
                       !std::is_same_v<Sampler, DebugMLTSampler>)
-            GenerateRaySamples<Sampler>(depth, sampleIndex);
+            GenerateRaySamples<Sampler>(wavefrontDepth, sampleIndex);
     };
     sampler.DispatchCPU(generateSamples);
 }
 
 template <typename Sampler>
-void WavefrontPathIntegrator::GenerateRaySamples(int depth, int sampleIndex) {
+void WavefrontPathIntegrator::GenerateRaySamples(int wavefrontDepth, int sampleIndex) {
     // Generate description string _desc_ for ray sample generation
     std::string desc = std::string("Generate ray samples - ") + Sampler::Name();
 
-    RayQueue *rayQueue = CurrentRayQueue(depth);
+    RayQueue *rayQueue = CurrentRayQueue(wavefrontDepth);
     ForAllQueued(
         desc.c_str(), rayQueue, maxQueueSize, PBRT_CPU_GPU_LAMBDA(const RayWorkItem w) {
             // Generate samples for ray segment at current sample index
             // Find first sample dimension
-            int dimension = 6 + 7 * depth;
+            int dimension = 6 + 7 * w.depth;
             if (haveSubsurface)
-                dimension += 3 * depth;
+                dimension += 3 * w.depth;
             if (haveMedia)
-                dimension += 2 * depth;
+                dimension += 2 * w.depth;
 
             // Initialize _Sampler_ for pixel, sample index, and dimension
             Sampler pixelSampler = *sampler.Cast<Sampler>();
