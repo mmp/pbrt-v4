@@ -66,6 +66,7 @@ class MIPMap {
     }
     int Levels() const { return int(pyramid.size()); }
     const RGBColorSpace *GetRGBColorSpace() const { return colorSpace; }
+    const Image &GetLevel(int level) const { return pyramid[level]; }
 
   private:
     // MIPMap Private Methods

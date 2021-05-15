@@ -652,10 +652,14 @@ class GPUSpectrumImageTexture {
         Point2f st = mapping.Map(ctx, &dstdx, &dstdy);
         RGB rgb;
         if (isSingleChannel) {
-            float tex = scale * tex2D<float>(texObj, st[0], 1 - st[1]);
+            float tex = scale * tex2DGrad<float>(texObj, st[0], 1 - st[1],
+                                                 make_float2(dstdx[0], dstdy[0]),
+                                                 make_float2(dstdx[1], dstdy[1]));
             rgb = RGB(tex, tex, tex);
         } else {
-            float4 tex = tex2D<float4>(texObj, st[0], 1 - st[1]);
+            float4 tex = tex2DGrad<float4>(texObj, st[0], 1 - st[1],
+                                           make_float2(dstdx[0], dstdy[0]),
+                                           make_float2(dstdx[1], dstdy[1]));
             rgb = scale * RGB(tex.x, tex.y, tex.z);
         }
         if (invert)
@@ -703,7 +707,9 @@ class GPUFloatImageTexture {
         Point2f st = mapping.Map(ctx, &dstdx, &dstdy);
         // flip y coord since image has (0,0) at upper left, texture at lower
         // left
-        Float v = scale * tex2D<float>(texObj, st[0], 1 - st[1]);
+        Float v = scale * tex2DGrad<float>(texObj, st[0], 1 - st[1],
+                                           make_float2(dstdx[0], dstdy[0]),
+                                           make_float2(dstdx[1], dstdy[1]));
         return invert ? std::max<Float>(0, 1 - v) : v;
 #endif
     }
