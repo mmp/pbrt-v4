@@ -57,6 +57,7 @@ EnqueueWorkAfterIntersection(RayWorkItem r, Medium rayMedium, float tMax, Surfac
                                  intr.areaLight,
                                  intr.pi,
                                  intr.n,
+                                 intr.dpdu, intr.dpdv,
                                  -r.ray.d,
                                  intr.uv,
                                  intr.material,
@@ -114,11 +115,10 @@ EnqueueWorkAfterIntersection(RayWorkItem r, Medium rayMedium, float tMax, Surfac
     auto enqueue = [=](auto ptr) {
         using Material = typename std::remove_reference_t<decltype(*ptr)>;
         q->Push(MaterialEvalWorkItem<Material>{
-            ptr, intr.pi, intr.n, intr.shading.n,
-            intr.shading.dpdu, intr.shading.dpdv, intr.shading.dndu, intr.shading.dndv,
+                ptr, intr.pi, intr.n, intr.dpdu, intr.dpdv, intr.shading.n,
+                intr.shading.dpdu, intr.shading.dpdv, intr.shading.dndu, intr.shading.dndv,
                 intr.uv, r.depth, intr.faceIndex, r.lambda, r.anyNonSpecularBounces, intr.wo,
-                r.pixelIndex, r.T_hat, r.uniPathPDF, r.etaScale,
-                mediumInterface, intr.time});
+                r.pixelIndex, r.T_hat, r.uniPathPDF, r.etaScale, mediumInterface, intr.time});
     };
     material.Dispatch(enqueue);
 

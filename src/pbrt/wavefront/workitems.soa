@@ -127,16 +127,15 @@ soa MediumSampleWorkItem {
     Light areaLight;
     Point3fi pi;
     Normal3f n;
+    Vector3f dpdu, dpdv;
     Vector3f wo;
     Point2f uv;
     LightSampleContext prevIntrCtx;
     int isSpecularBounce;
     Material material;
     Normal3f ns;
-    Vector3f dpdus;
-    Vector3f dpdvs;
-    Normal3f dndus;
-    Normal3f dndvs;
+    Vector3f dpdus, dpdvs;
+    Normal3f dndus, dndvs;
     int faceIndex;
     int anyNonSpecularBounces;
     Float etaScale;
@@ -162,6 +161,7 @@ soa MaterialEvalWorkItem<Material> {
     SampledSpectrum T_hat, uniPathPDF;
     Point3fi pi;
     Normal3f n, ns;
+    Vector3f dpdu, dpdv;
     Vector3f dpdus, dpdvs;
     Normal3f dndus, dndvs;
     Vector3f wo;

@@ -80,6 +80,33 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
         name.c_str(), evalQueue->Get<MaterialEvalWorkItem<Mtl>>(), maxQueueSize,
         PBRT_CPU_GPU_LAMBDA(const MaterialEvalWorkItem<Mtl> w) {
             // Evaluate material and BSDF for ray intersection
+            // Compute differentials for position and $(u,v)$ at intersection point
+            Vector3f dpdx, dpdy;
+            Float dudx = 0, dudy = 0, dvdx = 0, dvdy = 0;
+            camera.Approximate_dp_dxy(Point3f(w.pi), w.n, w.time, samplesPerPixel, &dpdx,
+                                      &dpdy);
+            Vector3f dpdu = w.dpdu, dpdv = w.dpdv;
+            // Estimate screen-space change in $(u,v)$
+            Float a00 = Dot(dpdu, dpdu), a01 = Dot(dpdu, dpdv), a11 = Dot(dpdv, dpdv);
+            Float invDet = 1 / (DifferenceOfProducts(a00, a11, a01, a01));
+
+            Float b0x = Dot(dpdu, dpdx), b1x = Dot(dpdv, dpdx);
+            Float b0y = Dot(dpdu, dpdy), b1y = Dot(dpdv, dpdy);
+
+            /* Set the UV partials to zero if dpdu and/or dpdv == 0 */
+            invDet = IsFinite(invDet) ? invDet : 0.f;
+
+            dudx = DifferenceOfProducts(a11, b0x, a01, b1x) * invDet;
+            dvdx = DifferenceOfProducts(a00, b1x, a01, b0x) * invDet;
+
+            dudy = DifferenceOfProducts(a11, b0y, a01, b1y) * invDet;
+            dvdy = DifferenceOfProducts(a00, b1y, a01, b0y) * invDet;
+
+            dudx = IsFinite(dudx) ? Clamp(dudx, -1e8f, 1e8f) : 0.f;
+            dvdx = IsFinite(dvdx) ? Clamp(dvdx, -1e8f, 1e8f) : 0.f;
+            dudy = IsFinite(dudy) ? Clamp(dudy, -1e8f, 1e8f) : 0.f;
+            dvdy = IsFinite(dvdy) ? Clamp(dvdy, -1e8f, 1e8f) : 0.f;
+
             // Apply bump mapping if material has a displacement texture
             Normal3f ns = w.ns;
             Vector3f dpdus = w.dpdus;
@@ -88,7 +115,7 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
             if (displacement || normalMap) {
                 if (displacement)
                     DCHECK(texEval.CanEvaluate({displacement}, {}));
-                BumpEvalContext bctx = w.GetBumpEvalContext();
+                BumpEvalContext bctx = w.GetBumpEvalContext(dudx, dudy, dvdx, dvdy);
                 Vector3f dpdvs;
                 Bump(texEval, displacement, normalMap, bctx, &dpdus, &dpdvs);
                 ns = Normal3f(Normalize(Cross(dpdus, dpdvs)));
@@ -97,7 +124,8 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
 
             // Get BSDF at intersection point
             SampledWavelengths lambda = w.lambda;
-            MaterialEvalContext ctx = w.GetMaterialEvalContext(ns, dpdus);
+            MaterialEvalContext ctx =
+                w.GetMaterialEvalContext(dudx, dudy, dvdx, dvdy, ns, dpdus);
             using BxDF = typename Mtl::BxDF;
             BxDF bxdf;
             BSDF bsdf = w.material->GetBSDF(texEval, ctx, lambda, &bxdf);
@@ -116,9 +144,8 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 isect.shading.n = ns;
                 isect.wo = w.wo;
                 isect.time = w.time;
-
-                camera.Approximate_dp_dxy(isect.p(), isect.n, isect.time, samplesPerPixel,
-                                          &isect.dpdx, &isect.dpdy);
+                isect.dpdx = dpdx;
+                isect.dpdy = dpdy;
 
                 // Estimate BSDF's albedo
                 // Define sample arrays _ucRho_ and _uRho_ for reflectance estimate

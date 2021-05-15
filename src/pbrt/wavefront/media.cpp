@@ -239,27 +239,15 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
 
             auto enqueue = [=](auto ptr) {
                 using Material = typename std::remove_reference_t<decltype(*ptr)>;
-                q->Push<MaterialEvalWorkItem<Material>>(
-                    MaterialEvalWorkItem<Material>{ptr,
-                                                   w.pi,
-                                                   w.n,
-                                                   w.ns,
-                                                   w.dpdus,
-                                                   w.dpdvs,
-                                                   w.dndus,
-                                                   w.dndvs,
-                                                   w.uv,
-                                                   w.depth,
-                                                   w.faceIndex,
-                                                   lambda,
-                                                   w.anyNonSpecularBounces,
-                                                   -ray.d,
-                                                   w.pixelIndex,
-                                                   T_hat,
-                                                   uniPathPDF,
-                                                   w.etaScale,
-                                                   w.mediumInterface,
-                                                   ray.time});
+                q->Push<MaterialEvalWorkItem<Material>>(MaterialEvalWorkItem<Material>{
+                    ptr,         w.pi,         w.n,
+                    w.dpdu,      w.dpdv,       w.ns,
+                    w.dpdus,     w.dpdvs,      w.dndus,
+                    w.dndvs,     w.uv,         w.depth,
+                    w.faceIndex, lambda,       w.anyNonSpecularBounces,
+                    -ray.d,      w.pixelIndex, T_hat,
+                    uniPathPDF,  w.etaScale,   w.mediumInterface,
+                    ray.time});
             };
             material.Dispatch(enqueue);
         });

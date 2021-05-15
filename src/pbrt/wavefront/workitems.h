@@ -251,14 +251,13 @@ struct MediumSampleWorkItem {
     Light areaLight;
     Point3fi pi;
     Normal3f n;
+    Vector3f dpdu, dpdv;
     Vector3f wo;
     Point2f uv;
     Material material;
     Normal3f ns;
-    Vector3f dpdus;
-    Vector3f dpdvs;
-    Normal3f dndus;
-    Normal3f dndvs;
+    Vector3f dpdus, dpdvs;
+    Normal3f dndus, dndvs;
     int faceIndex;
     MediumInterface mediumInterface;
 };
@@ -283,10 +282,15 @@ template <typename Material>
 struct MaterialEvalWorkItem {
     // MaterialEvalWorkItem Public Methods
     PBRT_CPU_GPU
-    BumpEvalContext GetBumpEvalContext() const {
+    BumpEvalContext GetBumpEvalContext(Float dudx, Float dudy, Float dvdx,
+                                       Float dvdy) const {
         BumpEvalContext ctx;
         ctx.p = Point3f(pi);
         ctx.uv = uv;
+        ctx.dudx = dudx;
+        ctx.dudy = dudy;
+        ctx.dvdx = dvdx;
+        ctx.dvdy = dvdy;
         ctx.shading.n = ns;
         ctx.shading.dpdu = dpdus;
         ctx.shading.dpdv = dpdvs;
@@ -297,7 +301,9 @@ struct MaterialEvalWorkItem {
     }
 
     PBRT_CPU_GPU
-    MaterialEvalContext GetMaterialEvalContext(Normal3f ns, Vector3f dpdus) const {
+    MaterialEvalContext GetMaterialEvalContext(Float dudx, Float dudy, Float dvdx,
+                                               Float dvdy, Normal3f ns,
+                                               Vector3f dpdus) const {
         MaterialEvalContext ctx;
         ctx.wo = wo;
         ctx.n = n;
@@ -305,6 +311,10 @@ struct MaterialEvalWorkItem {
         ctx.dpdus = dpdus;
         ctx.p = Point3f(pi);
         ctx.uv = uv;
+        ctx.dudx = dudx;
+        ctx.dudy = dudy;
+        ctx.dvdx = dvdx;
+        ctx.dvdy = dvdy;
         ctx.faceIndex = faceIndex;
         return ctx;
     }
@@ -312,7 +322,9 @@ struct MaterialEvalWorkItem {
     // MaterialEvalWorkItem Public Members
     const Material *material;
     Point3fi pi;
-    Normal3f n, ns;
+    Normal3f n;
+    Vector3f dpdu, dpdv;
+    Normal3f ns;
     Vector3f dpdus, dpdvs;
     Normal3f dndus, dndvs;
     Point2f uv;
