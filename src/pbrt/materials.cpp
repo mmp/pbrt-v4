@@ -245,6 +245,50 @@ ConductorMaterial *ConductorMaterial::Create(const TextureParameterDictionary &p
 }
 
 // CoatedDiffuseMaterial Method Definitions
+template <typename TextureEvaluator>
+BSDF CoatedDiffuseMaterial::GetBSDF(TextureEvaluator texEval,
+                                    const MaterialEvalContext &ctx,
+                                    SampledWavelengths &lambda,
+                                    CoatedDiffuseBxDF *bxdf) const {
+    // Initialize diffuse component of plastic material
+    SampledSpectrum r = Clamp(texEval(reflectance, ctx, lambda), 0, 1);
+
+    // Create microfacet distribution _distrib_ for coated diffuse material
+    Float urough = texEval(uRoughness, ctx);
+    Float vrough = texEval(vRoughness, ctx);
+    if (remapRoughness) {
+        urough = TrowbridgeReitzDistribution::RoughnessToAlpha(urough);
+        vrough = TrowbridgeReitzDistribution::RoughnessToAlpha(vrough);
+    }
+    TrowbridgeReitzDistribution distrib(urough, vrough);
+
+    Float thick = texEval(thickness, ctx);
+
+    Float sampledEta = eta(lambda[0]);
+    if (!eta.template Is<ConstantSpectrum>())
+        lambda.TerminateSecondary();
+    if (sampledEta == 0)
+        sampledEta = 1;
+
+    SampledSpectrum a = Clamp(texEval(albedo, ctx, lambda), 0, 1);
+    Float gg = Clamp(texEval(g, ctx), -1, 1);
+
+    *bxdf = CoatedDiffuseBxDF(
+        DielectricInterfaceBxDF(sampledEta, SampledSpectrum(1.f), distrib),
+        IdealDiffuseBxDF(r), thick, a, gg, maxDepth, nSamples);
+    return BSDF(ctx.ns, ctx.dpdus, bxdf);
+}
+
+// Explicit template instantiation
+template BSDF CoatedDiffuseMaterial::GetBSDF(BasicTextureEvaluator,
+                                             const MaterialEvalContext &ctx,
+                                             SampledWavelengths &lambda,
+                                             CoatedDiffuseBxDF *bxdf) const;
+template BSDF CoatedDiffuseMaterial::GetBSDF(UniversalTextureEvaluator,
+                                             const MaterialEvalContext &ctx,
+                                             SampledWavelengths &lambda,
+                                             CoatedDiffuseBxDF *bxdf) const;
+
 std::string CoatedDiffuseMaterial::ToString() const {
     return StringPrintf(
         "[ CoatedDiffuseMaterial displacement: %s reflectance: %s uRoughness: %s "
@@ -296,6 +340,63 @@ CoatedDiffuseMaterial *CoatedDiffuseMaterial::Create(
         reflectance, uRoughness, vRoughness, thickness, albedo, g, eta, displacement,
         normalMap, remapRoughness, maxDepth, nSamples);
 }
+
+template <typename TextureEvaluator>
+BSDF CoatedConductorMaterial::GetBSDF(TextureEvaluator texEval,
+                                      const MaterialEvalContext &ctx,
+                                      SampledWavelengths &lambda,
+                                      CoatedConductorBxDF *bxdf) const {
+    Float iurough = texEval(interfaceURoughness, ctx);
+    Float ivrough = texEval(interfaceVRoughness, ctx);
+    if (remapRoughness) {
+        iurough = TrowbridgeReitzDistribution::RoughnessToAlpha(iurough);
+        ivrough = TrowbridgeReitzDistribution::RoughnessToAlpha(ivrough);
+    }
+    TrowbridgeReitzDistribution interfaceDistrib(iurough, ivrough);
+
+    Float thick = texEval(thickness, ctx);
+
+    Float ieta = interfaceEta(lambda[0]);
+    if (!interfaceEta.template Is<ConstantSpectrum>())
+        lambda.TerminateSecondary();
+    if (ieta == 0)
+        ieta = 1;
+
+    SampledSpectrum ce, ck;
+    if (conductorEta) {
+        ce = texEval(conductorEta, ctx, lambda);
+        ck = texEval(k, ctx, lambda);
+    } else {
+        SampledSpectrum r = texEval(reflectance, ctx, lambda);
+        ce = SampledSpectrum(1.f);
+        ck = 2 * Sqrt(r) / Sqrt(ClampZero(SampledSpectrum(1) - r));
+    }
+
+    Float curough = texEval(conductorURoughness, ctx);
+    Float cvrough = texEval(conductorVRoughness, ctx);
+    if (remapRoughness) {
+        curough = TrowbridgeReitzDistribution::RoughnessToAlpha(curough);
+        cvrough = TrowbridgeReitzDistribution::RoughnessToAlpha(cvrough);
+    }
+    TrowbridgeReitzDistribution conductorDistrib(curough, cvrough);
+
+    SampledSpectrum a = Clamp(texEval(albedo, ctx, lambda), 0, 1);
+    Float gg = Clamp(texEval(g, ctx), -1, 1);
+
+    *bxdf = CoatedConductorBxDF(
+        DielectricInterfaceBxDF(ieta, SampledSpectrum(1.f), interfaceDistrib),
+        ConductorBxDF(conductorDistrib, ce, ck), thick, a, gg, maxDepth, nSamples);
+    return BSDF(ctx.ns, ctx.dpdus, bxdf);
+}
+
+template BSDF CoatedConductorMaterial::GetBSDF(BasicTextureEvaluator,
+                                               const MaterialEvalContext &ctx,
+                                               SampledWavelengths &lambda,
+                                               CoatedConductorBxDF *bxdf) const;
+template BSDF CoatedConductorMaterial::GetBSDF(UniversalTextureEvaluator,
+                                               const MaterialEvalContext &ctx,
+                                               SampledWavelengths &lambda,
+                                               CoatedConductorBxDF *bxdf) const;
 
 std::string CoatedConductorMaterial::ToString() const {
     return StringPrintf("[ CoatedConductorMaterial displacement: %f interfaceURoughness: "
