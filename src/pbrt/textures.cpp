@@ -375,15 +375,15 @@ SampledSpectrum SpectrumImageTexture::Evaluate(TextureEvalContext ctx,
 }
 
 std::string SpectrumImageTexture::ToString() const {
-    return StringPrintf(
-        "[ SpectrumImageTexture mapping: %s scale: %f invert: %s mipmap: %s ]", mapping,
-        scale, invert, *mipmap);
+    return StringPrintf("[ SpectrumImageTexture filename: %s mapping: %s scale: %f "
+                        "invert: %s mipmap: %s ]",
+                        filename, mapping, scale, invert, *mipmap);
 }
 
 std::string FloatImageTexture::ToString() const {
     return StringPrintf(
-        "[ FloatImageTexture mapping: %s scale: %f invert: %s mipmap: %s ]", mapping,
-        scale, invert, *mipmap);
+        "[ FloatImageTexture filename: %s mapping: %s scale: %f invert: %s mipmap: %s ]",
+        filename, mapping, scale, invert, *mipmap);
 }
 
 std::string TexInfo::ToString() const {
@@ -1260,8 +1260,15 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
     Float scale = parameters.GetOneFloat("scale", 1.f);
     bool invert = parameters.GetOneBool("invert", false);
 
-    return alloc.new_object<GPUSpectrumImageTexture>(
-        mapping, texObj, scale, invert, isSingleChannel, colorSpace, spectrumType);
+    return alloc.new_object<GPUSpectrumImageTexture>(filename, mapping, texObj, scale,
+                                                     invert, isSingleChannel, colorSpace,
+                                                     spectrumType);
+}
+
+std::string GPUSpectrumImageTexture::ToString() const {
+    return StringPrintf(
+        "[ GPUSpectrumImageTexture filename: %s mapping: %s scale: %f invert: %s ]",
+        filename, mapping, scale, invert);
 }
 
 GPUFloatImageTexture *GPUFloatImageTexture::Create(
@@ -1366,7 +1373,14 @@ GPUFloatImageTexture *GPUFloatImageTexture::Create(
     Float scale = parameters.GetOneFloat("scale", 1.f);
     bool invert = parameters.GetOneBool("invert", false);
 
-    return alloc.new_object<GPUFloatImageTexture>(mapping, texObj, scale, invert);
+    return alloc.new_object<GPUFloatImageTexture>(filename, mapping, texObj, scale,
+                                                  invert);
+}
+
+std::string GPUFloatImageTexture::ToString() const {
+    return StringPrintf(
+        "[ GPUFloatImageTexture filename: %s mapping: %s scale: %f invert: %s ]",
+        filename, mapping, scale, invert);
 }
 
 #endif  // PBRT_BUILD_GPU_RENDERER

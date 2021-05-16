@@ -530,7 +530,7 @@ class ImageTextureBase {
     ImageTextureBase(TextureMapping2D mapping, std::string filename,
                      MIPMapFilterOptions filterOptions, WrapMode wrapMode, Float scale,
                      bool invert, ColorEncoding encoding, Allocator alloc)
-        : mapping(mapping), scale(scale), invert(invert) {
+        : mapping(mapping), filename(filename), scale(scale), invert(invert) {
         // Get _MIPMap_ from texture cache if present
         TexInfo texInfo(filename, filterOptions, wrapMode, encoding);
         std::unique_lock<std::mutex> lock(textureCacheMutex);
@@ -558,6 +558,7 @@ class ImageTextureBase {
   protected:
     // ImageTextureBase Protected Members
     TextureMapping2D mapping;
+    std::string filename;
     Float scale;
     bool invert;
     MIPMap *mipmap;
@@ -629,10 +630,12 @@ class SpectrumImageTexture : public ImageTextureBase {
 #if defined(PBRT_BUILD_GPU_RENDERER) && defined(__NVCC__)
 class GPUSpectrumImageTexture {
   public:
-    GPUSpectrumImageTexture(TextureMapping2D mapping, cudaTextureObject_t texObj,
-                            Float scale, bool invert, bool isSingleChannel,
-                            const RGBColorSpace *colorSpace, SpectrumType spectrumType)
+    GPUSpectrumImageTexture(std::string filename, TextureMapping2D mapping,
+                            cudaTextureObject_t texObj, Float scale, bool invert,
+                            bool isSingleChannel, const RGBColorSpace *colorSpace,
+                            SpectrumType spectrumType)
         : mapping(mapping),
+          filename(filename),
           texObj(texObj),
           scale(scale),
           invert(invert),
@@ -679,11 +682,12 @@ class GPUSpectrumImageTexture {
                                            SpectrumType spectrumType, const FileLoc *loc,
                                            Allocator alloc);
 
-    std::string ToString() const { return "GPUSpectrumImageTexture"; }
+    std::string ToString() const;
 
     void MultiplyScale(Float s) { scale *= s; }
 
     TextureMapping2D mapping;
+    std::string filename;
     cudaTextureObject_t texObj;
     Float scale;
     bool invert, isSingleChannel;
@@ -693,9 +697,13 @@ class GPUSpectrumImageTexture {
 
 class GPUFloatImageTexture {
   public:
-    GPUFloatImageTexture(TextureMapping2D mapping, cudaTextureObject_t texObj,
-                         Float scale, bool invert)
-        : mapping(mapping), texObj(texObj), scale(scale), invert(invert) {}
+    GPUFloatImageTexture(std::string filename, TextureMapping2D mapping,
+                         cudaTextureObject_t texObj, Float scale, bool invert)
+        : mapping(mapping),
+          filename(filename),
+          texObj(texObj),
+          scale(scale),
+          invert(invert) {}
 
     PBRT_CPU_GPU
     Float Evaluate(TextureEvalContext ctx) const {
@@ -718,11 +726,12 @@ class GPUFloatImageTexture {
                                         const TextureParameterDictionary &parameters,
                                         const FileLoc *loc, Allocator alloc);
 
-    std::string ToString() const { return "GPUFloatImageTexture"; }
+    std::string ToString() const;
 
     void MultiplyScale(Float s) { scale *= s; }
 
     TextureMapping2D mapping;
+    std::string filename;
     cudaTextureObject_t texObj;
     Float scale;
     bool invert;
