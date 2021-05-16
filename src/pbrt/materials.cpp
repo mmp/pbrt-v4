@@ -275,7 +275,7 @@ BSDF CoatedDiffuseMaterial::GetBSDF(TextureEvaluator texEval,
 
     *bxdf = CoatedDiffuseBxDF(
         DielectricInterfaceBxDF(sampledEta, SampledSpectrum(1.f), distrib),
-        IdealDiffuseBxDF(r), thick, a, gg, maxDepth, nSamples);
+        DiffuseBxDF(r), thick, a, gg, maxDepth, nSamples);
     return BSDF(ctx.ns, ctx.dpdus, bxdf);
 }
 

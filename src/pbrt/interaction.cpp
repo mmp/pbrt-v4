@@ -180,7 +180,7 @@ BSDF SurfaceInteraction::GetBSDF(const RayDifferential &ray, SampledWavelengths 
     if (bsdf && GetOptions().forceDiffuse) {
         // Override _bsdf_ with diffuse equivalent
         SampledSpectrum r = bsdf.rho(wo, {sampler.Get1D()}, {sampler.Get2D()});
-        bsdf = BSDF(shading.n, shading.dpdu, scratchBuffer.Alloc<IdealDiffuseBxDF>(r));
+        bsdf = BSDF(shading.n, shading.dpdu, scratchBuffer.Alloc<DiffuseBxDF>(r));
     }
     return bsdf;
 }

@@ -432,7 +432,7 @@ BSDF* createLambertian(const SurfaceInteraction& si, Allocator alloc) {
     SampledSpectrum Kd(1.);
     return alloc.new_object<BSDF>(
         si.shading.n, si.shading.dpdu,
-        alloc.new_object<DiffuseBxDF>(Kd, SampledSpectrum(0.), 0));
+        alloc.new_object<DiffuseBxDF>(Kd));
 }
 
 TEST(BSDFSampling, Lambertian) {
@@ -520,8 +520,7 @@ TEST(BSDFEnergyConservation, LambertianReflection) {
         [](const SurfaceInteraction& si, Allocator alloc) -> BSDF* {
             return alloc.new_object<BSDF>(
                 si.shading.n, si.shading.dpdu,
-                alloc.new_object<DiffuseBxDF>(SampledSpectrum(1.f), SampledSpectrum(0.),
-                                              0));
+                alloc.new_object<DiffuseBxDF>(SampledSpectrum(1.f)));
         },
         "LambertianReflection");
 }
@@ -531,8 +530,8 @@ TEST(BSDFEnergyConservation, OrenNayar) {
         [](const SurfaceInteraction& si, Allocator alloc) -> BSDF* {
             return alloc.new_object<BSDF>(
                 si.shading.n, si.shading.dpdu,
-                alloc.new_object<DiffuseBxDF>(SampledSpectrum(1.f), SampledSpectrum(0.),
-                                              20));
+                alloc.new_object<RoughDiffuseBxDF>(SampledSpectrum(1.f), SampledSpectrum(0.),
+                                                   20));
         },
         "Oren-Nayar sigma 20");
 }

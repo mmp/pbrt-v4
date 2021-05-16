@@ -619,9 +619,9 @@ class NanoVDBMediumProvider {
             LOG_VERBOSE("Max temperature: %f", maxTemperature);
 
             nanovdb::BBox<nanovdb::Vec3R> bbox = temperatureFloatGrid->worldBBox();
-            bounds = Union(bounds,
-                           Bounds3f(Point3f(bbox.min()[0], bbox.min()[1], bbox.min()[2]),
-                                    Point3f(bbox.max()[0], bbox.max()[1], bbox.max()[2])));
+            bounds = Union(
+                bounds, Bounds3f(Point3f(bbox.min()[0], bbox.min()[1], bbox.min()[2]),
+                                 Point3f(bbox.max()[0], bbox.max()[1], bbox.max()[2])));
         }
     }
 

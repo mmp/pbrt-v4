@@ -434,7 +434,7 @@ class HairMaterial {
 class DiffuseMaterial {
   public:
     // DiffuseMaterial Type Definitions
-    using BxDF = DiffuseBxDF;
+    using BxDF = RoughDiffuseBxDF;
     using BSSRDF = void;
 
     // DiffuseMaterial Public Methods
@@ -470,10 +470,10 @@ class DiffuseMaterial {
 
     template <typename TextureEvaluator>
     PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
-                              SampledWavelengths &lambda, DiffuseBxDF *bxdf) const {
+                              SampledWavelengths &lambda, RoughDiffuseBxDF *bxdf) const {
         SampledSpectrum r = Clamp(texEval(reflectance, ctx, lambda), 0, 1);
         Float sig = Clamp(texEval(sigma, ctx), 0, 90);
-        *bxdf = DiffuseBxDF(r, SampledSpectrum(0), sig);
+        *bxdf = RoughDiffuseBxDF(r, SampledSpectrum(0), sig);
         return BSDF(ctx.ns, ctx.dpdus, bxdf);
     }
 
@@ -802,7 +802,7 @@ class SubsurfaceMaterial {
 // DiffuseTransmissionMaterial Definition
 class DiffuseTransmissionMaterial {
   public:
-    using BxDF = DiffuseBxDF;
+    using BxDF = RoughDiffuseBxDF;
     using BSSRDF = void;
     // DiffuseTransmissionMaterial Public Methods
     DiffuseTransmissionMaterial(SpectrumTexture reflectance,
@@ -824,11 +824,11 @@ class DiffuseTransmissionMaterial {
 
     template <typename TextureEvaluator>
     PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
-                              SampledWavelengths &lambda, DiffuseBxDF *bxdf) const {
+                              SampledWavelengths &lambda, RoughDiffuseBxDF *bxdf) const {
         SampledSpectrum r = Clamp(scale * texEval(reflectance, ctx, lambda), 0, 1);
         SampledSpectrum t = Clamp(scale * texEval(transmittance, ctx, lambda), 0, 1);
         Float s = texEval(sigma, ctx);
-        *bxdf = DiffuseBxDF(r, t, s);
+        *bxdf = RoughDiffuseBxDF(r, t, s);
         return BSDF(ctx.ns, ctx.dpdus, bxdf);
     }
 

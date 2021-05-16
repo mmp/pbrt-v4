@@ -26,13 +26,13 @@
 
 namespace pbrt {
 
-// IdealDiffuseBxDF Definition
-class IdealDiffuseBxDF {
+// DiffuseBxDF Definition
+class DiffuseBxDF {
   public:
-    // IdealDiffuseBxDF Public Methods
-    IdealDiffuseBxDF() = default;
+    // DiffuseBxDF Public Methods
+    DiffuseBxDF() = default;
     PBRT_CPU_GPU
-    IdealDiffuseBxDF(const SampledSpectrum &R) : R(R) {}
+    DiffuseBxDF(const SampledSpectrum &R) : R(R) {}
 
     PBRT_CPU_GPU
     SampledSpectrum f(Vector3f wo, Vector3f wi, TransportMode mode) const {
@@ -65,7 +65,7 @@ class IdealDiffuseBxDF {
     }
 
     PBRT_CPU_GPU
-    static constexpr const char *Name() { return "IdealDiffuseBxDF"; }
+    static constexpr const char *Name() { return "DiffuseBxDF"; }
 
     std::string ToString() const;
 
@@ -81,13 +81,13 @@ class IdealDiffuseBxDF {
     SampledSpectrum R;
 };
 
-// DiffuseBxDF Definition
-class DiffuseBxDF {
+// RoughDiffuseBxDF Definition
+class RoughDiffuseBxDF {
   public:
-    // DiffuseBxDF Public Methods
-    DiffuseBxDF() = default;
+    // RoughDiffuseBxDF Public Methods
+    RoughDiffuseBxDF() = default;
     PBRT_CPU_GPU
-    DiffuseBxDF(SampledSpectrum R, SampledSpectrum T, Float sigma) : R(R), T(T) {
+    RoughDiffuseBxDF(SampledSpectrum R, SampledSpectrum T, Float sigma) : R(R), T(T) {
         Float sigma2 = Sqr(Radians(sigma));
         A = 1 - sigma2 / (2 * (sigma2 + 0.33f));
         B = 0.45f * sigma2 / (sigma2 + 0.09f);
@@ -172,7 +172,7 @@ class DiffuseBxDF {
     }
 
     PBRT_CPU_GPU
-    static constexpr const char *Name() { return "DiffuseBxDF"; }
+    static constexpr const char *Name() { return "RoughDiffuseBxDF"; }
 
     std::string ToString() const;
 
@@ -186,7 +186,7 @@ class DiffuseBxDF {
     }
 
   private:
-    // DiffuseBxDF Private Members
+    // RoughDiffuseBxDF Private Members
     SampledSpectrum R, T;
     Float A, B;
 };
@@ -931,8 +931,7 @@ class LayeredBxDF {
 };
 
 // CoatedDiffuseBxDF Definition
-class CoatedDiffuseBxDF
-    : public LayeredBxDF<DielectricInterfaceBxDF, IdealDiffuseBxDF, true> {
+class CoatedDiffuseBxDF : public LayeredBxDF<DielectricInterfaceBxDF, DiffuseBxDF, true> {
   public:
     // CoatedDiffuseBxDF Public Methods
     using LayeredBxDF::LayeredBxDF;
@@ -1195,7 +1194,7 @@ inline void BxDF::Regularize() {
     return Dispatch(regularize);
 }
 
-extern template class LayeredBxDF<DielectricInterfaceBxDF, IdealDiffuseBxDF, true>;
+extern template class LayeredBxDF<DielectricInterfaceBxDF, DiffuseBxDF, true>;
 extern template class LayeredBxDF<DielectricInterfaceBxDF, ConductorBxDF, true>;
 
 }  // namespace pbrt

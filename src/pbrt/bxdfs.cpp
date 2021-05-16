@@ -58,11 +58,11 @@ std::string ToString(TransportMode mode) {
 }
 
 // BxDF Method Definitions
-std::string IdealDiffuseBxDF::ToString() const {
-    return StringPrintf("[ IdealDiffuseBxDF R: %s ]", R);
-}
 std::string DiffuseBxDF::ToString() const {
-    return StringPrintf("[ DiffuseBxDF R: %s T: %s A: %f B: %f ]", R, T, A, B);
+    return StringPrintf("[ DiffuseBxDF R: %s ]", R);
+}
+std::string RoughDiffuseBxDF::ToString() const {
+    return StringPrintf("[ RoughDiffuseBxDF R: %s T: %s A: %f B: %f ]", R, T, A, B);
 }
 
 template <typename TopBxDF, typename BottomBxDF, bool twoSided>
@@ -1203,7 +1203,7 @@ std::string BxDF::ToString() const {
     return DispatchCPU(toStr);
 }
 
-template class LayeredBxDF<DielectricInterfaceBxDF, IdealDiffuseBxDF, true>;
+template class LayeredBxDF<DielectricInterfaceBxDF, DiffuseBxDF, true>;
 template class LayeredBxDF<DielectricInterfaceBxDF, ConductorBxDF, true>;
 
 }  // namespace pbrt
