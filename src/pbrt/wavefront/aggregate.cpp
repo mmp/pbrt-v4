@@ -20,51 +20,14 @@
 
 namespace pbrt {
 
-// FIXME: copied in gpu/aggregate.cpp
-static void updateMaterialNeeds(Material m, pstd::array<bool, Material::NumTags()> *haveBasicEvalMaterial,
-                                pstd::array<bool, Material::NumTags()> *haveUniversalEvalMaterial,
-                                bool *haveSubsurface) {
-    if (!m)
-        return;
-
-    if (MixMaterial *mix = m.CastOrNullptr<MixMaterial>(); mix) {
-        updateMaterialNeeds(mix->GetMaterial(0), haveBasicEvalMaterial, haveUniversalEvalMaterial,
-                            haveSubsurface);
-        updateMaterialNeeds(mix->GetMaterial(1), haveBasicEvalMaterial, haveUniversalEvalMaterial,
-                            haveSubsurface);
-        return;
-    }
-
-    *haveSubsurface |= m.HasSubsurfaceScattering();
-
-    FloatTexture displace = m.GetDisplacement();
-    if (m.CanEvaluateTextures(BasicTextureEvaluator()) &&
-        (!displace || BasicTextureEvaluator().CanEvaluate({displace}, {})))
-        (*haveBasicEvalMaterial)[m.Tag()] = true;
-    else
-        (*haveUniversalEvalMaterial)[m.Tag()] = true;
-}
-
 CPUAggregate::CPUAggregate(ParsedScene &scene, Allocator alloc,
          NamedTextures &textures,
          const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
          const std::map<std::string, Medium> &media,
-         pstd::array<bool, Material::NumTags()> *haveBasicEvalMaterial,
-         pstd::array<bool, Material::NumTags()> *haveUniversalEvalMaterial,
-         bool *haveSubsurface) {
-    std::map<std::string, pbrt::Material> namedMaterials;
-    std::vector<pbrt::Material> materials;
-    scene.CreateMaterials(textures, alloc, &namedMaterials, &materials);
-
+         const std::map<std::string, pbrt::Material> &namedMaterials,
+         const std::vector<pbrt::Material> &materials) {
     aggregate = scene.CreateAggregate(alloc, textures, shapeIndexToAreaLights, media,
                                       namedMaterials, materials);
-
-    for (Material m : materials)
-        updateMaterialNeeds(m, haveBasicEvalMaterial, haveUniversalEvalMaterial,
-                            haveSubsurface);
-    for (const auto &m : namedMaterials)
-        updateMaterialNeeds(m.second, haveBasicEvalMaterial, haveUniversalEvalMaterial,
-                            haveSubsurface);
 }
 
 void CPUAggregate::IntersectClosest(int maxRays, EscapedRayQueue *escapedRayQueue,

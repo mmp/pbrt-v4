@@ -593,9 +593,8 @@ OptiXAggregate::OptiXAggregate(
     const ParsedScene &scene, Allocator alloc, NamedTextures &textures,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
     const std::map<std::string, Medium> &media,
-    pstd::array<bool, Material::NumTags()> *haveBasicEvalMaterial,
-    pstd::array<bool, Material::NumTags()> *haveUniversalEvalMaterial,
-    bool *haveSubsurface)
+    const std::map<std::string, pbrt::Material> &namedMaterials,
+    const std::vector<pbrt::Material> &materials)
     : alloc(alloc),
       cudaStream(nullptr),
       intersectHGRecords(alloc),
@@ -966,22 +965,6 @@ OptiXAggregate::OptiXAggregate(
     randomHitSBT.missRecordCount = 1;
 
     LOG_VERBOSE("Finished OptiX initialization");
-
-    LOG_VERBOSE("Starting to create materials");
-
-    // Materials
-    std::map<std::string, Material> namedMaterials;
-    std::vector<Material> materials;
-    scene.CreateMaterials(textures, alloc, &namedMaterials, &materials);
-
-    // Report which Materials are actually present...
-    for (Material m : materials)
-        updateMaterialNeeds(m, haveBasicEvalMaterial, haveUniversalEvalMaterial,
-                            haveSubsurface);
-    for (const auto &m : namedMaterials)
-        updateMaterialNeeds(m.second, haveBasicEvalMaterial, haveUniversalEvalMaterial,
-                            haveSubsurface);
-    LOG_VERBOSE("Finished creating materials");
 
     LOG_VERBOSE("Starting to create shapes and acceleration structures");
     int nCurveWarnings = 0;

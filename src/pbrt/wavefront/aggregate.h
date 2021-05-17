@@ -27,9 +27,8 @@ class CPUAggregate : public WavefrontAggregate {
     CPUAggregate(ParsedScene &scene, Allocator alloc, NamedTextures &textures,
              const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
              const std::map<std::string, Medium> &media,
-             pstd::array<bool, Material::NumTags()> *haveBasicEvalMaterial,
-             pstd::array<bool, Material::NumTags()> *haveUniversalEvalMaterial,
-             bool *haveSubsurface);
+             const std::map<std::string, pbrt::Material> &namedMaterials,
+             const std::vector<pbrt::Material> &materials);
 
     Bounds3f Bounds() const { return aggregate.Bounds(); }
 

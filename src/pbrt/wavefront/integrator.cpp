@@ -43,6 +43,37 @@ namespace pbrt {
 
 STAT_MEMORY_COUNTER("Memory/Wavefront integrator pixel state", pathIntegratorBytes);
 
+static void updateMaterialNeeds(
+    Material m, pstd::array<bool, Material::NumTags()> *haveBasicEvalMaterial,
+    pstd::array<bool, Material::NumTags()> *haveUniversalEvalMaterial,
+    bool *haveSubsurface) {
+    if (!m)
+        return;
+
+    if (MixMaterial *mix = m.CastOrNullptr<MixMaterial>(); mix) {
+        // This is a somewhat odd place for this check, but it's convenient...
+        if (!m.CanEvaluateTextures(BasicTextureEvaluator()))
+            ErrorExit("\"mix\" material has a texture that can't be evaluated with the "
+                      "BasicTextureEvaluator, which is all that is currently supported "
+                      "int the wavefront renderer--sorry! %s",
+                      *mix);
+
+        updateMaterialNeeds(mix->GetMaterial(0), haveBasicEvalMaterial,
+                            haveUniversalEvalMaterial, haveSubsurface);
+        updateMaterialNeeds(mix->GetMaterial(1), haveBasicEvalMaterial,
+                            haveUniversalEvalMaterial, haveSubsurface);
+        return;
+    }
+
+    *haveSubsurface |= m.HasSubsurfaceScattering();
+
+    FloatTexture displace = m.GetDisplacement();
+    if (m.CanEvaluateTextures(BasicTextureEvaluator()) &&
+        (!displace || BasicTextureEvaluator().CanEvaluate({displace}, {})))
+        (*haveBasicEvalMaterial)[m.Tag()] = true;
+    else
+        (*haveUniversalEvalMaterial)[m.Tag()] = true;
+}
 WavefrontPathIntegrator::WavefrontPathIntegrator(Allocator alloc, ParsedScene &scene) {
     // Allocate all of the data structures that represent the scene...
     std::map<std::string, Medium> media = scene.CreateMedia(alloc);
@@ -183,21 +214,32 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(Allocator alloc, ParsedScene &s
         shapeIndexToAreaLights[i] = lightsForShape;
     }
 
+    LOG_VERBOSE("Starting to create materials");
+    std::map<std::string, pbrt::Material> namedMaterials;
+    std::vector<pbrt::Material> materials;
+    scene.CreateMaterials(textures, alloc, &namedMaterials, &materials);
+
     haveBasicEvalMaterial.fill(false);
     haveUniversalEvalMaterial.fill(false);
     haveSubsurface = false;
+    for (Material m : materials)
+        updateMaterialNeeds(m, &haveBasicEvalMaterial, &haveUniversalEvalMaterial,
+                            &haveSubsurface);
+    for (const auto &m : namedMaterials)
+        updateMaterialNeeds(m.second, &haveBasicEvalMaterial, &haveUniversalEvalMaterial,
+                            &haveSubsurface);
+    LOG_VERBOSE("Finished creating materials");
+
     if (Options->useGPU) {
 #ifdef PBRT_BUILD_GPU_RENDERER
         aggregate = new OptiXAggregate(scene, alloc, textures, shapeIndexToAreaLights,
-                                       media, &haveBasicEvalMaterial,
-                                       &haveUniversalEvalMaterial, &haveSubsurface);
+                                       media, namedMaterials, materials);
 #else
         LOG_FATAL("Options->useGPU was set without PBRT_BUILD_GPU_RENDERER enabled");
 #endif
     } else
         aggregate = new CPUAggregate(scene, alloc, textures, shapeIndexToAreaLights,
-                                     media, &haveBasicEvalMaterial,
-                                     &haveUniversalEvalMaterial, &haveSubsurface);
+                                     media, namedMaterials, materials);
 
     // Preprocess the light sources
     for (Light light : allLights)
