@@ -42,29 +42,6 @@ PBRT_CPU_GPU inline Float HenyeyGreenstein(Float cosTheta, Float g) {
 
 // Fresnel Inline Functions
 PBRT_CPU_GPU
-inline Float FrComplex(Float cosTheta_i, pstd::complex<Float> eta) {
-    cosTheta_i = Clamp(cosTheta_i, 0, 1);
-    using Complex = pstd::complex<Float>;
-
-    // Compute _cosTheta_t_ using Snell's law
-    Complex sinTheta_i = pstd::sqrt(1.f - cosTheta_i * cosTheta_i);
-    Complex sinTheta_t = sinTheta_i / eta;
-    Complex cosTheta_t = pstd::sqrt(1.f - sinTheta_t * sinTheta_t);
-    Complex r_parl = (eta * cosTheta_i - cosTheta_t) / (eta * cosTheta_i + cosTheta_t);
-    Complex r_perp = (eta * cosTheta_t - cosTheta_i) / (eta * cosTheta_t + cosTheta_i);
-    return (pstd::norm(r_parl) + pstd::norm(r_perp)) * .5f;
-}
-
-PBRT_CPU_GPU
-inline SampledSpectrum FrComplex(Float cosTheta_i, SampledSpectrum eta,
-                                 SampledSpectrum k) {
-    SampledSpectrum result;
-    for (int i = 0; i < NSpectrumSamples; ++i)
-        result[i] = FrComplex(cosTheta_i, pstd::complex<Float>(eta[i], k[i]));
-    return result;
-}
-
-PBRT_CPU_GPU
 inline Float FrDielectric(Float cosTheta_i, Float eta) {
     cosTheta_i = Clamp(cosTheta_i, -1, 1);
     // Potentially swap indices of refraction
@@ -86,6 +63,29 @@ inline Float FrDielectric(Float cosTheta_i, Float eta) {
     Float r_parl = (eta * cosTheta_i - cosTheta_t) / (eta * cosTheta_i + cosTheta_t);
     Float r_perp = (cosTheta_i - eta * cosTheta_t) / (cosTheta_i + eta * cosTheta_t);
     return (r_parl * r_parl + r_perp * r_perp) / 2;
+}
+
+PBRT_CPU_GPU
+inline Float FrComplex(Float cosTheta_i, pstd::complex<Float> eta) {
+    cosTheta_i = Clamp(cosTheta_i, 0, 1);
+    using Complex = pstd::complex<Float>;
+
+    // Compute _cosTheta_t_ using Snell's law
+    Complex sinTheta_i = pstd::sqrt(1.f - cosTheta_i * cosTheta_i);
+    Complex sinTheta_t = sinTheta_i / eta;
+    Complex cosTheta_t = pstd::sqrt(1.f - sinTheta_t * sinTheta_t);
+    Complex r_parl = (eta * cosTheta_i - cosTheta_t) / (eta * cosTheta_i + cosTheta_t);
+    Complex r_perp = (eta * cosTheta_t - cosTheta_i) / (eta * cosTheta_t + cosTheta_i);
+    return (pstd::norm(r_parl) + pstd::norm(r_perp)) * .5f;
+}
+
+PBRT_CPU_GPU
+inline SampledSpectrum FrComplex(Float cosTheta_i, SampledSpectrum eta,
+                                 SampledSpectrum k) {
+    SampledSpectrum result;
+    for (int i = 0; i < NSpectrumSamples; ++i)
+        result[i] = FrComplex(cosTheta_i, pstd::complex<Float>(eta[i], k[i]));
+    return result;
 }
 
 // BSSRDF Utility Declarations

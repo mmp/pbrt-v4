@@ -14,18 +14,18 @@ namespace pbrt {
 // WavefrontPathIntegrator Sampler Methods
 void WavefrontPathIntegrator::GenerateRaySamples(int wavefrontDepth, int sampleIndex) {
     auto generateSamples = [=](auto sampler) {
-        using Sampler = std::remove_reference_t<decltype(*sampler)>;
-        if constexpr (!std::is_same_v<Sampler, MLTSampler> &&
-                      !std::is_same_v<Sampler, DebugMLTSampler>)
-            GenerateRaySamples<Sampler>(wavefrontDepth, sampleIndex);
+        using ConcreteSampler = std::remove_reference_t<decltype(*sampler)>;
+        if constexpr (!std::is_same_v<ConcreteSampler, MLTSampler> &&
+                      !std::is_same_v<ConcreteSampler, DebugMLTSampler>)
+            GenerateRaySamples<ConcreteSampler>(wavefrontDepth, sampleIndex);
     };
     sampler.DispatchCPU(generateSamples);
 }
 
-template <typename Sampler>
+template <typename ConcreteSampler>
 void WavefrontPathIntegrator::GenerateRaySamples(int wavefrontDepth, int sampleIndex) {
     // Generate description string _desc_ for ray sample generation
-    std::string desc = std::string("Generate ray samples - ") + Sampler::Name();
+    std::string desc = std::string("Generate ray samples - ") + ConcreteSampler::Name();
 
     RayQueue *rayQueue = CurrentRayQueue(wavefrontDepth);
     ForAllQueued(
@@ -39,7 +39,7 @@ void WavefrontPathIntegrator::GenerateRaySamples(int wavefrontDepth, int sampleI
                 dimension += 2 * w.depth;
 
             // Initialize _Sampler_ for pixel, sample index, and dimension
-            Sampler pixelSampler = *sampler.Cast<Sampler>();
+            ConcreteSampler pixelSampler = *sampler.Cast<ConcreteSampler>();
             Point2i pPixel = pixelSampleState.pPixel[w.pixelIndex];
             pixelSampler.StartPixelSample(pPixel, sampleIndex, dimension);
 
@@ -47,7 +47,7 @@ void WavefrontPathIntegrator::GenerateRaySamples(int wavefrontDepth, int sampleI
             RaySamples rs;
             rs.direct.uc = pixelSampler.Get1D();
             rs.direct.u = pixelSampler.Get2D();
-            // Initialize indirect and possibly subsurface samples in _rs_
+            // Initialize indirect and possibly subsurface and medium samples in _rs_
             rs.indirect.uc = pixelSampler.Get1D();
             rs.indirect.u = pixelSampler.Get2D();
             rs.indirect.rr = pixelSampler.Get1D();

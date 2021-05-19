@@ -33,10 +33,10 @@ class CPUAggregate : public WavefrontAggregate {
     Bounds3f Bounds() const { return aggregate.Bounds(); }
 
     void IntersectClosest(
-        int maxRays, EscapedRayQueue *escapedRayQueue,
+        int maxRays, const RayQueue *rayQueue, EscapedRayQueue *escapedRayQueue,
         HitAreaLightQueue *hitAreaLightQueue, MaterialEvalQueue *basicEvalMaterialQueue,
         MaterialEvalQueue *universalEvalMaterialQueue,
-        MediumSampleQueue *mediumSampleQueue, RayQueue *rayQueue, RayQueue *nextRayQueue) const;
+        MediumSampleQueue *mediumSampleQueue, RayQueue *nextRayQueue) const;
 
     void IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue,
                          SOA<PixelSampleState> *pixelSampleState) const;

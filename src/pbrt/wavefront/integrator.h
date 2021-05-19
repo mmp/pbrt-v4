@@ -30,16 +30,18 @@ class ParsedScene;
 // WavefrontAggregate Definition
 class WavefrontAggregate {
   public:
+    // WavefrontAggregate Interface
     virtual ~WavefrontAggregate() = default;
 
     virtual Bounds3f Bounds() const = 0;
 
-    virtual void IntersectClosest(int maxRays, EscapedRayQueue *escapedRayQueue,
-                                  HitAreaLightQueue *hitAreaLightQueue,
-                                  MaterialEvalQueue *basicEvalMaterialQueue,
-                                  MaterialEvalQueue *universalEvalMaterialQueue,
-                                  MediumSampleQueue *mediumSampleQueue,
-                                  RayQueue *rayQueue, RayQueue *nextRayQueue) const = 0;
+    virtual void IntersectClosest(int maxRays, const RayQueue *rayQ,
+                                  EscapedRayQueue *escapedRayQ,
+                                  HitAreaLightQueue *hitAreaLightQ,
+                                  MaterialEvalQueue *basicMtlQ,
+                                  MaterialEvalQueue *universalMtlQ,
+                                  MediumSampleQueue *mediumSampleQ,
+                                  RayQueue *nextRayQ) const = 0;
 
     virtual void IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue,
                                  SOA<PixelSampleState> *pixelSampleState) const = 0;
@@ -72,7 +74,7 @@ class WavefrontPathIntegrator {
     void SampleSubsurface(int wavefrontDepth);
 
     void HandleEscapedRays();
-    void HandleRayFoundEmission();
+    void HandleEmissiveIntersection();
 
     void EvaluateMaterialsAndBSDFs(int wavefrontDepth);
     template <typename Mtl>
@@ -91,32 +93,31 @@ class WavefrontPathIntegrator {
 
     void UpdateFilm();
 
+    WavefrontPathIntegrator(Allocator alloc, ParsedScene &scene);
+
     template <typename F>
     void ParallelFor(const char *description, int nItems, F &&func) {
-        if (Options->useGPU) {
+        if (Options->useGPU)
 #ifdef PBRT_BUILD_GPU_RENDERER
             GPUParallelFor(description, nItems, func);
 #else
             LOG_FATAL("Options->useGPU was set without PBRT_BUILD_GPU_RENDERER enabled");
 #endif
-        } else
+        else
             pbrt::ParallelFor(0, nItems, func);
     }
 
     template <typename F>
     void Do(const char *description, F &&func) {
-        if (Options->useGPU) {
+        if (Options->useGPU)
 #ifdef PBRT_BUILD_GPU_RENDERER
-            GPUParallelFor(
-                description, 1, PBRT_CPU_GPU_LAMBDA(int) { func(); });
+            GPUParallelFor(description, 1, [=] PBRT_GPU(int) { func(); });
 #else
             LOG_FATAL("Options->useGPU was set without PBRT_BUILD_GPU_RENDERER enabled");
 #endif
-        } else
+        else
             func();
     }
-
-    WavefrontPathIntegrator(Allocator alloc, ParsedScene &scene);
 
     RayQueue *CurrentRayQueue(int wavefrontDepth) {
         return rayQueues[wavefrontDepth & 1];
@@ -143,13 +144,11 @@ class WavefrontPathIntegrator {
     };
     Stats *stats;
 
-    WavefrontAggregate *aggregate = nullptr;
-
     Filter filter;
     Film film;
     Sampler sampler;
     Camera camera;
-    pstd::vector<Light> *envLights;
+    pstd::vector<Light> *infiniteLights;
     LightSampler lightSampler;
 
     int maxDepth, samplesPerPixel;
@@ -160,6 +159,8 @@ class WavefrontPathIntegrator {
     SOA<PixelSampleState> pixelSampleState;
 
     RayQueue *rayQueues[2];
+
+    WavefrontAggregate *aggregate = nullptr;
 
     MediumSampleQueue *mediumSampleQueue = nullptr;
     MediumScatterQueue *mediumScatterQueue = nullptr;

@@ -1153,11 +1153,12 @@ OptiXAggregate::ParamBufferState &OptiXAggregate::getParamBuffer(
 }
 
 void OptiXAggregate::IntersectClosest(
-    int maxRays, EscapedRayQueue *escapedRayQueue, HitAreaLightQueue *hitAreaLightQueue,
+    int maxRays, const RayQueue *rayQueue,
+    EscapedRayQueue *escapedRayQueue, HitAreaLightQueue *hitAreaLightQueue,
     MaterialEvalQueue *basicEvalMaterialQueue,
     MaterialEvalQueue *universalEvalMaterialQueue,
     MediumSampleQueue *mediumSampleQueue,
-    RayQueue *rayQueue, RayQueue *nextRayQueue) const {
+    RayQueue *nextRayQueue) const {
     std::pair<cudaEvent_t, cudaEvent_t> events =
         GetProfilerEvents("Tracing closest hit rays");
 

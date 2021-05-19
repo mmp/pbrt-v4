@@ -44,6 +44,9 @@ struct SampleMediumScatteringCallback {
 
 // WavefrontPathIntegrator Participating Media Methods
 void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
+    if (!haveMedia)
+        return;
+
     RayQueue *nextRayQueue = NextRayQueue(wavefrontDepth);
     ForAllQueued(
         "Sample medium interaction", mediumSampleQueue, maxQueueSize,

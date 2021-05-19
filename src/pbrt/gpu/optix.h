@@ -50,7 +50,7 @@ struct QuadricRecord {
 struct RayIntersectParameters {
     OptixTraversableHandle traversable;
 
-    RayQueue *rayQueue;
+    const RayQueue *rayQueue;
 
     // closest hit
     RayQueue *nextRayQueue;

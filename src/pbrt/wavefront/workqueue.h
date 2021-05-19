@@ -116,10 +116,12 @@ class WorkQueue : public SOA<WorkItem> {
 
 // WorkQueue Inline Functions
 template <typename F, typename WorkItem>
-void ForAllQueued(const char *desc, WorkQueue<WorkItem> *q, int maxQueued, F &&func) {
-    if (Options->useGPU)
+void ForAllQueued(const char *desc, const WorkQueue<WorkItem> *q, int maxQueued,
+                  F &&func) {
+    if (Options->useGPU) {
+        // Launch GPU threads to process _q_ using _func_
 #ifdef PBRT_BUILD_GPU_RENDERER
-        GPUParallelFor(desc, maxQueued, [=] PBRT_GPU(int index) mutable {
+        GPUParallelFor(desc, maxQueued, [=] PBRT_GPU(int index) {
             if (index >= q->Size())
                 return;
             func((*q)[index]);
@@ -127,8 +129,11 @@ void ForAllQueued(const char *desc, WorkQueue<WorkItem> *q, int maxQueued, F &&f
 #else
         LOG_FATAL("Options->useGPU was set without PBRT_BUILD_GPU_RENDERER enabled");
 #endif
-    else
+
+    } else {
+        // Process _q_ using _func_ with CPU threads
         ParallelFor(0, q->Size(), [&](int index) { func((*q)[index]); });
+    }
 }
 
 // MultiWorkQueue Definition
@@ -157,6 +162,7 @@ class MultiWorkQueue<TypePack<Ts...>> {
     PBRT_CPU_GPU int Push(const T &value) {
         return Get<T>()->Push(value);
     }
+
     PBRT_CPU_GPU
     void Reset() { (Get<Ts>()->Reset(), ...); }
 

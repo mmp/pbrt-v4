@@ -18,16 +18,16 @@ namespace pbrt {
 void WavefrontPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
     // Define _generateRays_ lambda function
     auto generateRays = [=](auto sampler) {
-        using Sampler = std::remove_reference_t<decltype(*sampler)>;
-        if constexpr (!std::is_same_v<Sampler, MLTSampler> &&
-                      !std::is_same_v<Sampler, DebugMLTSampler>)
-            GenerateCameraRays<Sampler>(y0, sampleIndex);
+        using ConcreteSampler = std::remove_reference_t<decltype(*sampler)>;
+        if constexpr (!std::is_same_v<ConcreteSampler, MLTSampler> &&
+                      !std::is_same_v<ConcreteSampler, DebugMLTSampler>)
+            GenerateCameraRays<ConcreteSampler>(y0, sampleIndex);
     };
 
     sampler.DispatchCPU(generateRays);
 }
 
-template <typename Sampler>
+template <typename ConcreteSampler>
 void WavefrontPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
     RayQueue *rayQueue = CurrentRayQueue(0);
     ParallelFor(
@@ -45,7 +45,7 @@ void WavefrontPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
                 return;
 
             // Initialize _Sampler_ for current pixel and sample
-            Sampler pixelSampler = *sampler.Cast<Sampler>();
+            ConcreteSampler pixelSampler = *sampler.Cast<ConcreteSampler>();
             pixelSampler.StartPixelSample(pPixel, sampleIndex, 0);
 
             // Sample wavelengths for ray path
@@ -54,7 +54,7 @@ void WavefrontPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
                 lu = 0.5f;
             SampledWavelengths lambda = film.SampleWavelengths(lu);
 
-            // Compute _CameraSample_ and generate ray
+            // Generate _CameraSample_ and corresponding ray
             CameraSample cameraSample = GetCameraSample(pixelSampler, pPixel, filter);
             pstd::optional<CameraRay> cameraRay =
                 camera.GenerateRay(cameraSample, lambda);

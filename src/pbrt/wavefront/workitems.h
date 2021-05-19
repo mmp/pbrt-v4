@@ -156,9 +156,6 @@ struct EscapedRayWorkItem {
     LightSampleContext prevIntrCtx;
 };
 
-// EscapedRayQueue Definition
-using EscapedRayQueue = WorkQueue<EscapedRayWorkItem>;
-
 // HitAreaLightWorkItem Definition
 struct HitAreaLightWorkItem {
     // HitAreaLightWorkItem Public Members
@@ -412,6 +409,24 @@ class ShadowRayQueue : public WorkQueue<ShadowRayWorkItem> {
     }
 };
 
+// EscapedRayQueue Definition
+class EscapedRayQueue : public WorkQueue<EscapedRayWorkItem> {
+  public:
+    // EscapedRayQueue Public Methods
+    PBRT_CPU_GPU
+    int Push(RayWorkItem r);
+
+    using WorkQueue::WorkQueue;
+
+    using WorkQueue::Push;
+};
+
+inline int EscapedRayQueue::Push(RayWorkItem r) {
+    return Push(EscapedRayWorkItem{r.ray.o, r.ray.d, r.depth, r.lambda, r.pixelIndex,
+                                   (int)r.isSpecularBounce, r.T_hat, r.uniPathPDF,
+                                   r.lightPathPDF, r.prevIntrCtx});
+}
+
 // GetBSSRDFAndProbeRayQueue Definition
 class GetBSSRDFAndProbeRayQueue : public WorkQueue<GetBSSRDFAndProbeRayWorkItem> {
   public:
@@ -491,6 +506,13 @@ class MediumSampleQueue : public WorkQueue<MediumSampleWorkItem> {
         this->anyNonSpecularBounces[index] = anyNonSpecularBounces;
         this->etaScale[index] = etaScale;
         return index;
+    }
+
+    PBRT_CPU_GPU
+    int Push(RayWorkItem r, Float tMax) {
+        return Push(r.ray, tMax, r.lambda, r.T_hat, r.uniPathPDF, r.lightPathPDF,
+                    r.pixelIndex, r.prevIntrCtx, r.isSpecularBounce,
+                    r.anyNonSpecularBounces, r.etaScale);
     }
 };
 
