@@ -218,7 +218,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (options.useGPU && options.wavefront)
-        Warning("Both --gpu and --wavefront were specified; --gpu takes precidence.");
+        Warning("Both --gpu and --wavefront were specified; --gpu takes precedence.");
 
     if (options.pixelMaterial && options.wavefront) {
         Warning("Disabling --wavefront since --pixelmaterial was specified.");

@@ -223,7 +223,7 @@ TEST(PiecewiseConstant1D, Continuous) {
     EXPECT_FLOAT_EQ(dist.size() * 1. / 16., pdf);
     EXPECT_EQ(0, offset);
 
-    // Right at the bounary between the 4 and the 8 segments.
+    // Right at the boundary between the 4 and the 8 segments.
     EXPECT_FLOAT_EQ(.8, dist.Sample(0.5, &pdf, &offset));
 
     // Middle of the 8 segment

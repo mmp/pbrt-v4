@@ -119,7 +119,7 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
                         // Absorption--done.
                         PBRT_DBG("absorbed\n");
                         T_hat = SampledSpectrum(0.f);
-                        // Tell the medium to stop traveral.
+                        // Tell the medium to stop traversal.
                         return false;
                     } else if (mode == 1) {
                         // Scattering.

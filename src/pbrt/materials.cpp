@@ -487,7 +487,7 @@ CoatedConductorMaterial *CoatedConductorMaterial::Create(
 
 // SubsurfaceMaterial Method Definitions
 std::string SubsurfaceMaterial::ToString() const {
-    return StringPrintf("[ SubsurfaceMaterial displacment: %s scale: %f "
+    return StringPrintf("[ SubsurfaceMaterial displacement: %s scale: %f "
                         "sigma_a: %s sigma_s: %s "
                         "reflectance: %s mfp: %s uRoughness: %s vRoughness: %s "
                         "eta: %f remapRoughness: %s ]",
@@ -568,7 +568,7 @@ SubsurfaceMaterial *SubsurfaceMaterial::Create(
 
 // DiffuseTransmissionMaterial Method Definitions
 std::string DiffuseTransmissionMaterial::ToString() const {
-    return StringPrintf("[ DiffuseTransmissionMaterial displacment: %s reflectance: %s "
+    return StringPrintf("[ DiffuseTransmissionMaterial displacement: %s reflectance: %s "
                         "transmittance: %s sigma: %s ]",
                         displacement, reflectance, transmittance, sigma);
 }

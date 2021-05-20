@@ -943,7 +943,7 @@ static Imf::FrameBuffer imageToFrameBuffer(const Image &image,
     size_t xStride = image.NChannels() * TexelBytes(image.Format());
     size_t yStride = image.Resolution().x * xStride;
     // Would be nice to use PixelOffset(-dw.min.x, -dw.min.y) but
-    // it checks to make sure the coordiantes are >= 0 (which
+    // it checks to make sure the coordinates are >= 0 (which
     // usually makes sense...)
     char *originPtr = (((char *)image.RawPointer({0, 0})) - dataWindow.min.x * xStride -
                        dataWindow.min.y * yStride);
@@ -1217,7 +1217,7 @@ static ImageAndMetadata ReadPNG(const std::string &name, Allocator alloc,
         std::vector<unsigned char> buf;
         int bpp = state.info_png.color.bitdepth == 16 ? 16 : 8;
         bool hasAlpha = (state.info_png.color.colortype == LCT_RGBA);
-        // Force RGB if it's palletted or whatever.
+        // Force RGB if it's paletted or whatever.
         error =
             lodepng::decode(buf, width, height, (const unsigned char *)contents.data(),
                             contents.size(), hasAlpha ? LCT_RGBA : LCT_RGB, bpp);
