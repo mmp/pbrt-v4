@@ -1225,7 +1225,7 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
                     textureCacheMutex.unlock();
                     isSingleChannel = true;
                 } else {
-                    Warning(loc, "%s: unable to decypher image format", filename);
+                    Warning(loc, "%s: unable to decipher image format", filename);
                     return nullptr;
                 }
             }  // profile scope

@@ -698,7 +698,7 @@ static std::ostream &operator<<(std::ostream &os, Tensor::Type value) {
         os << "float64_t";
         break;
     default:
-        os << "unkown";
+        os << "unknown";
         break;
     }
     return os;
