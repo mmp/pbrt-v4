@@ -44,10 +44,10 @@ struct EvaluateMaterialCallback {
     int wavefrontDepth;
     WavefrontPathIntegrator *integrator;
     // EvaluateMaterialCallback Public Methods
-    template <typename Mtl>
+    template <typename ConcreteMaterial>
     void operator()() {
-        if constexpr (!std::is_same_v<Mtl, MixMaterial>)
-            integrator->EvaluateMaterialAndBSDF<Mtl>(wavefrontDepth);
+        if constexpr (!std::is_same_v<ConcreteMaterial, MixMaterial>)
+            integrator->EvaluateMaterialAndBSDF<ConcreteMaterial>(wavefrontDepth);
     }
 };
 
@@ -56,30 +56,33 @@ void WavefrontPathIntegrator::EvaluateMaterialsAndBSDFs(int wavefrontDepth) {
     ForEachType(EvaluateMaterialCallback{wavefrontDepth, this}, Material::Types());
 }
 
-template <typename Mtl>
+template <typename ConcreteMaterial>
 void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(int wavefrontDepth) {
-    if (haveBasicEvalMaterial[Material::TypeIndex<Mtl>()])
-        EvaluateMaterialAndBSDF<Mtl>(BasicTextureEvaluator(), basicEvalMaterialQueue,
-                                     wavefrontDepth);
-    if (haveUniversalEvalMaterial[Material::TypeIndex<Mtl>()])
-        EvaluateMaterialAndBSDF<Mtl>(UniversalTextureEvaluator(),
-                                     universalEvalMaterialQueue, wavefrontDepth);
+    int index = Material::TypeIndex<ConcreteMaterial>();
+    if (haveBasicEvalMaterial[index])
+        EvaluateMaterialAndBSDF<ConcreteMaterial, BasicTextureEvaluator>(
+            basicEvalMaterialQueue, wavefrontDepth);
+    if (haveUniversalEvalMaterial[index])
+        EvaluateMaterialAndBSDF<ConcreteMaterial, UniversalTextureEvaluator>(
+            universalEvalMaterialQueue, wavefrontDepth);
 }
 
-template <typename Mtl, typename TextureEvaluator>
-void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
-                                                      MaterialEvalQueue *evalQueue,
+template <typename ConcreteMaterial, typename TextureEvaluator>
+void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQueue,
                                                       int wavefrontDepth) {
+    // Get BSDF for items in _evalQueue_ and sample illumination
     // Construct _name_ for material/texture evaluator kernel
     std::string name = StringPrintf(
-        "%s + BxDF Eval (%s tex)", Mtl::Name(),
+        "%s + BxDF Eval (%s tex)", ConcreteMaterial::Name(),
         std::is_same_v<TextureEvaluator, BasicTextureEvaluator> ? "Basic" : "Universal");
 
     RayQueue *nextRayQueue = NextRayQueue(wavefrontDepth);
+    auto queue = evalQueue->Get<MaterialEvalWorkItem<ConcreteMaterial>>();
     ForAllQueued(
-        name.c_str(), evalQueue->Get<MaterialEvalWorkItem<Mtl>>(), maxQueueSize,
-        PBRT_CPU_GPU_LAMBDA(const MaterialEvalWorkItem<Mtl> w) {
+        name.c_str(), queue, maxQueueSize,
+        PBRT_CPU_GPU_LAMBDA(const MaterialEvalWorkItem<ConcreteMaterial> w) {
             // Evaluate material and BSDF for ray intersection
+            TextureEvaluator texEval;
             // Compute differentials for position and $(u,v)$ at intersection point
             Vector3f dpdx, dpdy;
             Float dudx = 0, dudy = 0, dvdx = 0, dvdy = 0;
@@ -107,7 +110,7 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
             dudy = IsFinite(dudy) ? Clamp(dudy, -1e8f, 1e8f) : 0.f;
             dvdy = IsFinite(dvdy) ? Clamp(dvdy, -1e8f, 1e8f) : 0.f;
 
-            // Apply bump mapping if material has a displacement texture
+            // Compute shading normal if bump or normal mapping is being used
             Normal3f ns = w.ns;
             Vector3f dpdus = w.dpdus;
             FloatTexture displacement = w.material->GetDisplacement();
@@ -126,9 +129,10 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
             SampledWavelengths lambda = w.lambda;
             MaterialEvalContext ctx =
                 w.GetMaterialEvalContext(dudx, dudy, dvdx, dvdy, ns, dpdus);
-            using BxDF = typename Mtl::BxDF;
-            BxDF bxdf;
+            using ConcreteBxDF = typename ConcreteMaterial::BxDF;
+            ConcreteBxDF bxdf;
             BSDF bsdf = w.material->GetBSDF(texEval, ctx, lambda, &bxdf);
+            // Handle terminated secondary wavelengths after BSDF creation
             if (lambda.SecondaryTerminated())
                 pixelSampleState.lambda[w.pixelIndex] = lambda;
 
@@ -173,21 +177,22 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
             // Sample BSDF and enqueue indirect ray at intersection point
             Vector3f wo = w.wo;
             RaySamples raySamples = pixelSampleState.samples[w.pixelIndex];
-            pstd::optional<BSDFSample> bsdfSample =
-                bsdf.Sample_f<BxDF>(wo, raySamples.indirect.uc, raySamples.indirect.u);
+            pstd::optional<BSDFSample> bsdfSample = bsdf.Sample_f<ConcreteBxDF>(
+                wo, raySamples.indirect.uc, raySamples.indirect.u);
             if (bsdfSample) {
                 // Compute updated path throughput and PDFs and enqueue indirect ray
                 Vector3f wi = bsdfSample->wi;
                 SampledSpectrum T_hat = w.T_hat * bsdfSample->f * AbsDot(wi, ns);
                 SampledSpectrum uniPathPDF = w.uniPathPDF, lightPathPDF = w.uniPathPDF;
 
-                PBRT_DBG("%s f*cos[0] %f bsdfSample->pdf %f f*cos/pdf %f\n", BxDF::Name(),
-                         bsdfSample->f[0] * AbsDot(wi, ns), bsdfSample->pdf,
+                PBRT_DBG("%s f*cos[0] %f bsdfSample->pdf %f f*cos/pdf %f\n",
+                         ConcreteBxDF::Name(), bsdfSample->f[0] * AbsDot(wi, ns),
+                         bsdfSample->pdf,
                          bsdfSample->f[0] * AbsDot(wi, ns) / bsdfSample->pdf);
 
                 // Update _uniPathPDF_ based on BSDF sample PDF
                 if (bsdfSample->pdfIsProportional) {
-                    Float pdf = bsdf.PDF<BxDF>(wo, wi);
+                    Float pdf = bsdf.PDF<ConcreteBxDF>(wo, wi);
                     T_hat *= pdf / bsdfSample->pdf;
                     uniPathPDF *= pdf;
                 } else
@@ -215,7 +220,7 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 }
 
                 if (T_hat) {
-                    // Enqueue ray in BSSRDF or indirect ray queue, as appropriate
+                    // Enqueue ray in indirect ray queue or BSSRDF queue, as appropriate
                     if (bsdfSample->IsTransmission() &&
                         w.material->HasSubsurfaceScattering()) {
                         bssrdfEvalQueue->Push(w.material, lambda, T_hat, uniPathPDF,
@@ -275,7 +280,7 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 if (!ls || !ls->L || ls->pdf == 0)
                     return;
                 Vector3f wi = ls->wi;
-                SampledSpectrum f = bsdf.f<BxDF>(wo, wi);
+                SampledSpectrum f = bsdf.f<ConcreteBxDF>(wo, wi);
                 if (!f)
                     return;
 
@@ -294,7 +299,8 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                 Float lightPDF = ls->pdf * sampledLight->pdf;
                 // This causes uniPathPDF to be zero for the shadow ray, so that
                 // part of MIS just becomes a no-op.
-                Float bsdfPDF = IsDeltaLight(light.Type()) ? 0.f : bsdf.PDF<BxDF>(wo, wi);
+                Float bsdfPDF =
+                    IsDeltaLight(light.Type()) ? 0.f : bsdf.PDF<ConcreteBxDF>(wo, wi);
                 SampledSpectrum uniPathPDF = w.uniPathPDF * bsdfPDF;
                 SampledSpectrum lightPathPDF = w.uniPathPDF * lightPDF;
 
@@ -306,8 +312,9 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(TextureEvaluator texEval,
                     ray.medium = Dot(ray.d, w.n) > 0 ? w.mediumInterface.outside
                                                      : w.mediumInterface.inside;
 
-                shadowRayQueue->Push(ray, 1 - ShadowEpsilon, lambda, Ld, uniPathPDF,
-                                     lightPathPDF, w.pixelIndex);
+                shadowRayQueue->Push(ShadowRayWorkItem{ray, 1 - ShadowEpsilon, lambda, Ld,
+                                                       uniPathPDF, lightPathPDF,
+                                                       w.pixelIndex});
 
                 PBRT_DBG(
                     "w.index %d spawned shadow ray depth %d Ld %f %f %f %f "

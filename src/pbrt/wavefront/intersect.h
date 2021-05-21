@@ -28,11 +28,32 @@ inline PBRT_CPU_GPU void EnqueueWorkAfterMiss(RayWorkItem r,
     }
 }
 
+inline PBRT_CPU_GPU void RecordShadowRayIntersection(
+    const ShadowRayWorkItem w, SOA<PixelSampleState> *pixelSampleState,
+    bool foundIntersection) {
+    if (foundIntersection) {
+        PBRT_DBG("Shadow ray was occluded\n");
+        return;
+    }
+    SampledSpectrum Ld = w.Ld / (w.uniPathPDF + w.lightPathPDF).Average();
+    PBRT_DBG("Unoccluded shadow ray. Final Ld %f %f %f %f "
+             "(sr.Ld %f %f %f %f uniPathPDF %f %f %f %f lightPathPDF %f %f %f %f)\n",
+             Ld[0], Ld[1], Ld[2], Ld[3], w.Ld[0], w.Ld[1], w.Ld[2], w.Ld[3],
+             w.uniPathPDF[0], w.uniPathPDF[1], w.uniPathPDF[2], w.uniPathPDF[3],
+             w.lightPathPDF[0], w.lightPathPDF[1], w.lightPathPDF[2], w.lightPathPDF[3]);
+
+    SampledSpectrum Lpixel = pixelSampleState->L[w.pixelIndex];
+    pixelSampleState->L[w.pixelIndex] = Lpixel + Ld;
+}
+
 inline PBRT_CPU_GPU void EnqueueWorkAfterIntersection(
     RayWorkItem r, Medium rayMedium, float tMax, SurfaceInteraction intr,
     MediumSampleQueue *mediumSampleQueue, RayQueue *nextRayQueue,
     HitAreaLightQueue *hitAreaLightQueue, MaterialEvalQueue *basicEvalMaterialQueue,
-    MaterialEvalQueue *universalEvalMaterialQueue, MediumInterface mediumInterface) {
+    MaterialEvalQueue *universalEvalMaterialQueue) {
+    MediumInterface mediumInterface =
+        intr.mediumInterface ? *intr.mediumInterface : MediumInterface(rayMedium);
+
     if (rayMedium) {
         assert(mediumSampleQueue);
         PBRT_DBG("Enqueuing into medium sample queue\n");
@@ -94,7 +115,7 @@ inline PBRT_CPU_GPU void EnqueueWorkAfterIntersection(
         // TODO: intr.wo == -ray.d?
         hitAreaLightQueue->Push(
             HitAreaLightWorkItem{intr.areaLight, intr.p(), intr.n, intr.uv, intr.wo,
-                                 r.depth, r.lambda, r.T_hat, r.uniPathPDF, r.lightPathPDF,
+                                 r.lambda, r.depth, r.T_hat, r.uniPathPDF, r.lightPathPDF,
                                  r.prevIntrCtx, (int)r.isSpecularBounce, r.pixelIndex});
     }
 
@@ -115,46 +136,27 @@ inline PBRT_CPU_GPU void EnqueueWorkAfterIntersection(
                                                intr.n,
                                                intr.dpdu,
                                                intr.dpdv,
+                                               intr.time,
+                                               r.depth,
                                                intr.shading.n,
                                                intr.shading.dpdu,
                                                intr.shading.dpdv,
                                                intr.shading.dndu,
                                                intr.shading.dndv,
                                                intr.uv,
-                                               r.depth,
                                                intr.faceIndex,
                                                r.lambda,
+                                               r.pixelIndex,
                                                r.anyNonSpecularBounces,
                                                intr.wo,
-                                               r.pixelIndex,
                                                r.T_hat,
                                                r.uniPathPDF,
                                                r.etaScale,
-                                               mediumInterface,
-                                               intr.time});
+                                               mediumInterface});
     };
     material.Dispatch(enqueue);
 
     PBRT_DBG("Closest hit found intersection at t %f\n", tMax);
-}
-
-inline PBRT_CPU_GPU void RecordShadowRayIntersection(
-    const ShadowRayWorkItem w, SOA<PixelSampleState> *pixelSampleState,
-    bool foundIntersection) {
-    if (foundIntersection) {
-        PBRT_DBG("Shadow ray was occluded\n");
-        return;
-    }
-
-    SampledSpectrum Ld = w.Ld / (w.uniPathPDF + w.lightPathPDF).Average();
-    PBRT_DBG("Unoccluded shadow ray. Final Ld %f %f %f %f "
-             "(sr.Ld %f %f %f %f uniPathPDF %f %f %f %f lightPathPDF %f %f %f %f)\n",
-             Ld[0], Ld[1], Ld[2], Ld[3], w.Ld[0], w.Ld[1], w.Ld[2], w.Ld[3],
-             w.uniPathPDF[0], w.uniPathPDF[1], w.uniPathPDF[2], w.uniPathPDF[3],
-             w.lightPathPDF[0], w.lightPathPDF[1], w.lightPathPDF[2], w.lightPathPDF[3]);
-
-    SampledSpectrum Lpixel = pixelSampleState->L[w.pixelIndex];
-    pixelSampleState->L[w.pixelIndex] = Lpixel + Ld;
 }
 
 struct TransmittanceTraceResult {

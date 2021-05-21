@@ -42,26 +42,20 @@ void CPUAggregate::IntersectClosest(int maxRays, const RayQueue *rayQueue,
     ParallelFor(0, rayQueue->Size(), [=](int index) {
         const RayWorkItem r = (*rayQueue)[index];
         // Intersect _r_'s ray with the scene and enqueue resulting work
-        pstd::optional<ShapeIntersection> si = aggregate.Intersect(r.ray, Infinity);
+        pstd::optional<ShapeIntersection> si = aggregate.Intersect(r.ray);
         if (!si)
             EnqueueWorkAfterMiss(r, mediumSampleQueue, escapedRayQueue);
-        else {
-            // Process queued ray intersected a surface
-            const SurfaceInteraction &intr = si->intr;
-            Float tHit = Distance(r.ray.o, intr.p()) / Length(r.ray.d);
-            MediumInterface mi = intr.mediumInterface ? *intr.mediumInterface
-                                                      : MediumInterface(r.ray.medium);
+        else
             // FIXME? Second arg r.ray.medium doesn't match OptiX path
-            EnqueueWorkAfterIntersection(r, r.ray.medium, tHit, si->intr,
-                                         mediumSampleQueue, nextRayQueue,
-                                         hitAreaLightQueue, basicEvalMaterialQueue,
-                                         universalEvalMaterialQueue, mi);
-        }
+            EnqueueWorkAfterIntersection(
+                r, r.ray.medium, si->tHit, si->intr, mediumSampleQueue, nextRayQueue,
+                hitAreaLightQueue, basicEvalMaterialQueue, universalEvalMaterialQueue);
     });
 }
 
 void CPUAggregate::IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue,
                                    SOA<PixelSampleState> *pixelSampleState) const {
+    // Intersect shadow rays from _shadowRayQueue_ in parallel
     ParallelFor(0, shadowRayQueue->Size(), [=](int index) {
         const ShadowRayWorkItem w = (*shadowRayQueue)[index];
         bool hit = aggregate.IntersectP(w.ray, w.tMax);

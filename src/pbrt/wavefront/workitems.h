@@ -151,8 +151,9 @@ struct EscapedRayWorkItem {
     int depth;
     SampledWavelengths lambda;
     int pixelIndex;
+    SampledSpectrum T_hat;
     int specularBounce;
-    SampledSpectrum T_hat, uniPathPDF, lightPathPDF;
+    SampledSpectrum uniPathPDF, lightPathPDF;
     LightSampleContext prevIntrCtx;
 };
 
@@ -164,8 +165,8 @@ struct HitAreaLightWorkItem {
     Normal3f n;
     Point2f uv;
     Vector3f wo;
-    int depth;
     SampledWavelengths lambda;
+    int depth;
     SampledSpectrum T_hat, uniPathPDF, lightPathPDF;
     LightSampleContext prevIntrCtx;
     int isSpecularBounce;
@@ -275,7 +276,7 @@ struct MediumScatterWorkItem {
 };
 
 // MaterialEvalWorkItem Definition
-template <typename Material>
+template <typename ConcreteMaterial>
 struct MaterialEvalWorkItem {
     // MaterialEvalWorkItem Public Methods
     PBRT_CPU_GPU
@@ -317,24 +318,24 @@ struct MaterialEvalWorkItem {
     }
 
     // MaterialEvalWorkItem Public Members
-    const Material *material;
+    const ConcreteMaterial *material;
     Point3fi pi;
     Normal3f n;
     Vector3f dpdu, dpdv;
+    Float time;
+    int depth;
     Normal3f ns;
     Vector3f dpdus, dpdvs;
     Normal3f dndus, dndvs;
     Point2f uv;
-    int depth;
     int faceIndex;
     SampledWavelengths lambda;
+    int pixelIndex;
     int anyNonSpecularBounces;
     Vector3f wo;
-    int pixelIndex;
     SampledSpectrum T_hat, uniPathPDF;
     Float etaScale;
     MediumInterface mediumInterface;
-    Float time;
 };
 
 #include "wavefront_workitems_soa.h"
@@ -397,17 +398,7 @@ inline int RayQueue::PushIndirectRay(
 }
 
 // ShadowRayQueue Definition
-class ShadowRayQueue : public WorkQueue<ShadowRayWorkItem> {
-  public:
-    using WorkQueue::WorkQueue;
-    // ShadowRayQueue Public Methods
-    PBRT_CPU_GPU
-    void Push(const Ray &ray, Float tMax, SampledWavelengths lambda, SampledSpectrum Ld,
-              SampledSpectrum uniPathPDF, SampledSpectrum lightPathPDF, int pixelIndex) {
-        WorkQueue<ShadowRayWorkItem>::Push(ShadowRayWorkItem{
-            ray, tMax, lambda, Ld, uniPathPDF, lightPathPDF, pixelIndex});
-    }
-};
+using ShadowRayQueue = WorkQueue<ShadowRayWorkItem>;
 
 // EscapedRayQueue Definition
 class EscapedRayQueue : public WorkQueue<EscapedRayWorkItem> {
@@ -423,7 +414,7 @@ class EscapedRayQueue : public WorkQueue<EscapedRayWorkItem> {
 
 inline int EscapedRayQueue::Push(RayWorkItem r) {
     return Push(EscapedRayWorkItem{r.ray.o, r.ray.d, r.depth, r.lambda, r.pixelIndex,
-                                   (int)r.isSpecularBounce, r.T_hat, r.uniPathPDF,
+                                   r.T_hat, (int)r.isSpecularBounce, r.uniPathPDF,
                                    r.lightPathPDF, r.prevIntrCtx});
 }
 

@@ -45,7 +45,6 @@ class WavefrontAggregate {
 
     virtual void IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue,
                                  SOA<PixelSampleState> *pixelSampleState) const = 0;
-
     virtual void IntersectShadowTr(int maxRays, ShadowRayQueue *shadowRayQueue,
                                    SOA<PixelSampleState> *pixelSampleState) const = 0;
 
@@ -77,19 +76,10 @@ class WavefrontPathIntegrator {
     void HandleEmissiveIntersection();
 
     void EvaluateMaterialsAndBSDFs(int wavefrontDepth);
-    template <typename Mtl>
+    template <typename ConcreteMaterial>
     void EvaluateMaterialAndBSDF(int wavefrontDepth);
-    template <typename Mtl, typename TextureEvaluator>
-    void EvaluateMaterialAndBSDF(TextureEvaluator texEval, MaterialEvalQueue *evalQueue,
-                                 int wavefrontDepth);
-
-    void SampleDirect(int wavefrontDepth);
-    template <typename BxDF>
-    void SampleDirect(int wavefrontDepth);
-
-    void SampleIndirect(int wavefrontDepth);
-    template <typename BxDF>
-    void SampleIndirect(int wavefrontDepth);
+    template <typename ConcreteMaterial, typename TextureEvaluator>
+    void EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQueue, int wavefrontDepth);
 
     void UpdateFilm();
 

@@ -491,7 +491,7 @@ Float WavefrontPathIntegrator::Render() {
     for (int sampleIndex = firstSampleIndex; sampleIndex < lastSampleIndex;
          ++sampleIndex) {
         CheckCallbackScope _([&]() {
-            return StringPrintf("Wavefrontrendering failed at sample %d. Debug with "
+            return StringPrintf("Wavefront rendering failed at sample %d. Debug with "
                                 "\"--debugstart %d\"\n",
                                 sampleIndex, sampleIndex);
         });
@@ -622,11 +622,10 @@ Float WavefrontPathIntegrator::Render() {
 void WavefrontPathIntegrator::HandleEscapedRays() {
     if (!escapedRayQueue)
         return;
-
     ForAllQueued(
         "Handle escaped rays", escapedRayQueue, maxQueueSize,
         PBRT_CPU_GPU_LAMBDA(const EscapedRayWorkItem w) {
-            // Update pixel radiance for escaped ray
+            // Compute weighted radiance for escaped ray
             SampledSpectrum L(0.f);
             for (const auto &light : *infiniteLights) {
                 if (SampledSpectrum Le = light.Le(Ray(w.rayo, w.rayd), w.lambda); Le) {
@@ -652,6 +651,8 @@ void WavefrontPathIntegrator::HandleEscapedRays() {
                     }
                 }
             }
+
+            // Update pixel radiance if ray's radiance is non-zero
             if (L) {
                 PBRT_DBG("Added L %f %f %f %f for escaped ray pixel index %d\n", L[0],
                          L[1], L[2], L[3], w.pixelIndex);

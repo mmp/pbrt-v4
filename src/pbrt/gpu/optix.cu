@@ -145,8 +145,7 @@ static __forceinline__ __device__ void ProcessClosestIntersection(
     EnqueueWorkAfterIntersection(r, rayMedium, optixGetRayTmax(), intr, params.mediumSampleQueue,
                                  params.nextRayQueue, params.hitAreaLightQueue,
                                  params.basicEvalMaterialQueue,
-                                 params.universalEvalMaterialQueue,
-                                 getPayload<ClosestHitContext>()->mediumInterface);
+                                 params.universalEvalMaterialQueue);
 }
 
 static __forceinline__ __device__ Transform getWorldFromInstance() {

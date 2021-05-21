@@ -28,9 +28,11 @@ void WavefrontPathIntegrator::UpdateFilm() {
             SampledWavelengths lambda = pixelSampleState.lambda[pixelIndex];
             Float filterWeight = pixelSampleState.filterWeight[pixelIndex];
             if (initializeVisibleSurface) {
+                // Call _Film::AddSample()_ with _VisibleSurface_ for pixel sample
                 VisibleSurface visibleSurface =
                     pixelSampleState.visibleSurface[pixelIndex];
                 film.AddSample(pPixel, Lw, lambda, &visibleSurface, filterWeight);
+
             } else
                 film.AddSample(pPixel, Lw, lambda, nullptr, filterWeight);
         });

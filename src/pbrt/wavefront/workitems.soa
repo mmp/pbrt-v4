@@ -142,12 +142,12 @@ soa MediumSampleWorkItem {
     MediumInterface mediumInterface;
 };
 
-soa MediumScatterWorkItem<PhaseFunction> {
+soa MediumScatterWorkItem<ConcretePhaseFunction> {
     Point3f p;
     int depth;
     SampledWavelengths lambda;
     SampledSpectrum T_hat, uniPathPDF;
-    const PhaseFunction *phase;
+    const ConcretePhaseFunction *phase;
     Vector3f wo;
     Float time;
     Float etaScale;
@@ -155,8 +155,8 @@ soa MediumScatterWorkItem<PhaseFunction> {
     int pixelIndex;
 };
 
-soa MaterialEvalWorkItem<Material> {
-    const Material *material;
+soa MaterialEvalWorkItem<ConcreteMaterial> {
+    const ConcreteMaterial *material;
     SampledWavelengths lambda;
     SampledSpectrum T_hat, uniPathPDF;
     Point3fi pi;

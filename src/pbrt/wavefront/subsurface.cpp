@@ -53,8 +53,8 @@ void WavefrontPathIntegrator::SampleSubsurface(int wavefrontDepth) {
 
             using BSSRDF = TabulatedBSSRDF;
             BSSRDF bssrdf = w.bssrdf;
-            using BxDF = typename BSSRDF::BxDF;
-            BxDF bxdf;
+            using ConcreteBxDF = typename BSSRDF::BxDF;
+            ConcreteBxDF bxdf;
 
             SubsurfaceInteraction &intr = w.ssi;
             BSSRDFSample bssrdfSample = bssrdf.ProbeIntersectionToSample(intr, &bxdf);
@@ -78,7 +78,8 @@ void WavefrontPathIntegrator::SampleSubsurface(int wavefrontDepth) {
                 Point2f u = raySamples.indirect.u;
                 Float uc = raySamples.indirect.uc;
 
-                pstd::optional<BSDFSample> bsdfSample = bsdf.Sample_f<BxDF>(wo, uc, u);
+                pstd::optional<BSDFSample> bsdfSample =
+                    bsdf.Sample_f<ConcreteBxDF>(wo, uc, u);
                 if (bsdfSample) {
                     Vector3f wi = bsdfSample->wi;
                     SampledSpectrum T_hat = T_hatp * bsdfSample->f * AbsDot(wi, intr.ns);
@@ -86,7 +87,7 @@ void WavefrontPathIntegrator::SampleSubsurface(int wavefrontDepth) {
                                     lightPathPDF = uniPathPDF;
 
                     PBRT_DBG("%s f*cos[0] %f bsdfSample->pdf %f f*cos/pdf %f\n",
-                             BxDF::Name(), bsdfSample->f[0] * AbsDot(wi, intr.ns),
+                             ConcreteBxDF::Name(), bsdfSample->f[0] * AbsDot(wi, intr.ns),
                              bsdfSample->pdf,
                              bsdfSample->f[0] * AbsDot(wi, intr.ns) / bsdfSample->pdf);
 
@@ -165,7 +166,7 @@ void WavefrontPathIntegrator::SampleSubsurface(int wavefrontDepth) {
                     return;
 
                 Vector3f wi = ls->wi;
-                SampledSpectrum f = bsdf.f<BxDF>(wo, wi);
+                SampledSpectrum f = bsdf.f<ConcreteBxDF>(wo, wi);
                 if (!f)
                     return;
 
@@ -180,7 +181,8 @@ void WavefrontPathIntegrator::SampleSubsurface(int wavefrontDepth) {
                 Float lightPDF = ls->pdf * sampledLight->pdf;
                 // This causes uniPathPDF to be zero for the shadow ray, so that
                 // part of MIS just becomes a no-op.
-                Float bsdfPDF = IsDeltaLight(light.Type()) ? 0.f : bsdf.PDF<BxDF>(wo, wi);
+                Float bsdfPDF =
+                    IsDeltaLight(light.Type()) ? 0.f : bsdf.PDF<ConcreteBxDF>(wo, wi);
                 SampledSpectrum lightPathPDF = uniPathPDF * lightPDF;
                 uniPathPDF *= bsdfPDF;
 
@@ -202,8 +204,9 @@ void WavefrontPathIntegrator::SampleSubsurface(int wavefrontDepth) {
                     ray.medium = Dot(ray.d, intr.n) > 0 ? w.mediumInterface.outside
                                                         : w.mediumInterface.inside;
 
-                shadowRayQueue->Push(ray, 1 - ShadowEpsilon, lambda, Ld, uniPathPDF,
-                                     lightPathPDF, w.pixelIndex);
+                shadowRayQueue->Push(ShadowRayWorkItem{ray, 1 - ShadowEpsilon, lambda, Ld,
+                                                       uniPathPDF, lightPathPDF,
+                                                       w.pixelIndex});
             }
         });
 

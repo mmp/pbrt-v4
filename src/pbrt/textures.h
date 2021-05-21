@@ -1108,27 +1108,31 @@ class BasicTextureEvaluator {
     PBRT_CPU_GPU
     bool CanEvaluate(std::initializer_list<FloatTexture> ftex,
                      std::initializer_list<SpectrumTexture> stex) const {
-        for (auto f : ftex)
+        // Return _false_ if any _FloatTexture_s cannot be evaluated
+        for (FloatTexture f : ftex)
             if (f && !f.Is<FloatConstantTexture>() && !f.Is<FloatImageTexture>() &&
                 !f.Is<GPUFloatPtexTexture>() && !f.Is<GPUFloatImageTexture>())
                 return false;
-        for (auto s : stex)
+
+        // Return _false_ if any _SpectrumTexture_s cannot be evaluated
+        for (SpectrumTexture s : stex)
             if (s && !s.Is<SpectrumConstantTexture>() && !s.Is<SpectrumImageTexture>() &&
                 !s.Is<GPUSpectrumPtexTexture>() && !s.Is<GPUSpectrumImageTexture>())
                 return false;
+
         return true;
     }
 
     PBRT_CPU_GPU
     Float operator()(FloatTexture tex, TextureEvalContext ctx) {
-        if (FloatConstantTexture *fcTex = tex.CastOrNullptr<FloatConstantTexture>())
-            return fcTex->Evaluate(ctx);
-        else if (FloatImageTexture *fiTex = tex.CastOrNullptr<FloatImageTexture>())
-            return fiTex->Evaluate(ctx);
-        else if (GPUFloatImageTexture *gfiTex = tex.CastOrNullptr<GPUFloatImageTexture>())
-            return gfiTex->Evaluate(ctx);
-        else if (GPUFloatPtexTexture *fPtex = tex.CastOrNullptr<GPUFloatPtexTexture>())
-            return fPtex->Evaluate(ctx);
+        if (tex.Is<FloatConstantTexture>())
+            return tex.Cast<FloatConstantTexture>()->Evaluate(ctx);
+        else if (tex.Is<FloatImageTexture>())
+            return tex.Cast<FloatImageTexture>()->Evaluate(ctx);
+        else if (tex.Is<GPUFloatImageTexture>())
+            return tex.Cast<GPUFloatImageTexture>()->Evaluate(ctx);
+        else if (tex.Is<GPUFloatPtexTexture>())
+            return tex.Cast<GPUFloatPtexTexture>()->Evaluate(ctx);
         else {
             if (tex)
                 LOG_FATAL("BasicTextureEvaluator::operator() called with %s", tex);
@@ -1139,16 +1143,14 @@ class BasicTextureEvaluator {
     PBRT_CPU_GPU
     SampledSpectrum operator()(SpectrumTexture tex, TextureEvalContext ctx,
                                SampledWavelengths lambda) {
-        if (SpectrumConstantTexture *sc = tex.CastOrNullptr<SpectrumConstantTexture>())
-            return sc->Evaluate(ctx, lambda);
-        else if (SpectrumImageTexture *siTex = tex.CastOrNullptr<SpectrumImageTexture>())
-            return siTex->Evaluate(ctx, lambda);
-        else if (GPUSpectrumImageTexture *gsiTex =
-                     tex.CastOrNullptr<GPUSpectrumImageTexture>())
-            return gsiTex->Evaluate(ctx, lambda);
-        else if (GPUSpectrumPtexTexture *sPtex =
-                     tex.CastOrNullptr<GPUSpectrumPtexTexture>())
-            return sPtex->Evaluate(ctx, lambda);
+        if (tex.Is<SpectrumConstantTexture>())
+            return tex.Cast<SpectrumConstantTexture>()->Evaluate(ctx, lambda);
+        else if (tex.Is<SpectrumImageTexture>())
+            return tex.Cast<SpectrumImageTexture>()->Evaluate(ctx, lambda);
+        else if (tex.Is<GPUSpectrumImageTexture>())
+            return tex.Cast<GPUSpectrumImageTexture>()->Evaluate(ctx, lambda);
+        else if (tex.Is<GPUSpectrumPtexTexture>())
+            return tex.Cast<GPUSpectrumPtexTexture>()->Evaluate(ctx, lambda);
         else {
             if (tex)
                 LOG_FATAL("BasicTextureEvaluator::operator() called with %s", tex);
