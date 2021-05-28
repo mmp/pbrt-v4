@@ -249,7 +249,8 @@ GenerateSamples(std::string samplerName, int nPoints, int iter) {
             points.push_back(u);
         }
 
-        sampler.DispatchCPU([&](auto sampler) { delete sampler; });
+        auto del = [&](auto sampler) { delete sampler; };
+        sampler.DispatchCPU(del);
     }
 
     return points;
