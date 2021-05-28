@@ -19,20 +19,20 @@ namespace pbrt {
 namespace detail {
 
 // TaggedPointer Helper Templates
-template <typename F, typename T>
-PBRT_CPU_GPU auto Dispatch(F &&func, const void *ptr, int index) {
+template <typename F, typename R, typename T>
+PBRT_CPU_GPU R Dispatch(F &&func, const void *ptr, int index) {
     DCHECK_EQ(0, index);
     return func((const T *)ptr);
 }
 
-template <typename F, typename T>
-PBRT_CPU_GPU auto Dispatch(F &&func, void *ptr, int index) {
+template <typename F, typename R, typename T>
+PBRT_CPU_GPU R Dispatch(F &&func, void *ptr, int index) {
     DCHECK_EQ(0, index);
     return func((T *)ptr);
 }
 
-template <typename F, typename T0, typename T1>
-PBRT_CPU_GPU auto Dispatch(F &&func, const void *ptr, int index) {
+template <typename F, typename R, typename T0, typename T1>
+PBRT_CPU_GPU R Dispatch(F &&func, const void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 2);
 
@@ -42,8 +42,8 @@ PBRT_CPU_GPU auto Dispatch(F &&func, const void *ptr, int index) {
         return func((const T1 *)ptr);
 }
 
-template <typename F, typename T0, typename T1>
-PBRT_CPU_GPU auto Dispatch(F &&func, void *ptr, int index) {
+template <typename F, typename R, typename T0, typename T1>
+PBRT_CPU_GPU R Dispatch(F &&func, void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 2);
 
@@ -53,8 +53,8 @@ PBRT_CPU_GPU auto Dispatch(F &&func, void *ptr, int index) {
         return func((T1 *)ptr);
 }
 
-template <typename F, typename T0, typename T1, typename T2>
-PBRT_CPU_GPU auto Dispatch(F &&func, const void *ptr, int index) {
+template <typename F, typename R, typename T0, typename T1, typename T2>
+PBRT_CPU_GPU R Dispatch(F &&func, const void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 3);
 
@@ -68,8 +68,8 @@ PBRT_CPU_GPU auto Dispatch(F &&func, const void *ptr, int index) {
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2>
-PBRT_CPU_GPU auto Dispatch(F &&func, void *ptr, int index) {
+template <typename F, typename R, typename T0, typename T1, typename T2>
+PBRT_CPU_GPU R Dispatch(F &&func, void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 3);
 
@@ -83,8 +83,9 @@ PBRT_CPU_GPU auto Dispatch(F &&func, void *ptr, int index) {
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2, typename T3>
-PBRT_CPU_GPU auto Dispatch(F &&func, const void *ptr, int index) {
+template <typename F, typename R, typename T0, typename T1, typename T2,
+          typename T3>
+PBRT_CPU_GPU R Dispatch(F &&func, const void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 4);
 
@@ -100,8 +101,9 @@ PBRT_CPU_GPU auto Dispatch(F &&func, const void *ptr, int index) {
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2, typename T3>
-PBRT_CPU_GPU auto Dispatch(F &&func, void *ptr, int index) {
+template <typename F, typename R, typename T0, typename T1, typename T2,
+          typename T3>
+PBRT_CPU_GPU R Dispatch(F &&func, void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 4);
 
@@ -117,9 +119,9 @@ PBRT_CPU_GPU auto Dispatch(F &&func, void *ptr, int index) {
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2, typename T3,
-          typename T4>
-PBRT_CPU_GPU auto Dispatch(F &&func, const void *ptr, int index) {
+template <typename F, typename R, typename T0, typename T1, typename T2,
+          typename T3, typename T4>
+PBRT_CPU_GPU R Dispatch(F &&func, const void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 5);
 
@@ -137,9 +139,9 @@ PBRT_CPU_GPU auto Dispatch(F &&func, const void *ptr, int index) {
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2, typename T3,
-          typename T4>
-PBRT_CPU_GPU auto Dispatch(F &&func, void *ptr, int index) {
+template <typename F, typename R, typename T0, typename T1, typename T2,
+          typename T3, typename T4>
+PBRT_CPU_GPU R Dispatch(F &&func, void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 5);
 
@@ -157,9 +159,9 @@ PBRT_CPU_GPU auto Dispatch(F &&func, void *ptr, int index) {
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2, typename T3,
-          typename T4, typename T5>
-PBRT_CPU_GPU auto Dispatch(F &&func, const void *ptr, int index) {
+template <typename F, typename R, typename T0, typename T1, typename T2,
+          typename T3, typename T4, typename T5>
+PBRT_CPU_GPU R Dispatch(F &&func, const void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 6);
 
@@ -179,9 +181,9 @@ PBRT_CPU_GPU auto Dispatch(F &&func, const void *ptr, int index) {
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2, typename T3,
-          typename T4, typename T5>
-PBRT_CPU_GPU auto Dispatch(F &&func, void *ptr, int index) {
+template <typename F, typename R, typename T0, typename T1, typename T2,
+          typename T3, typename T4, typename T5>
+PBRT_CPU_GPU R Dispatch(F &&func, void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 6);
 
@@ -201,9 +203,9 @@ PBRT_CPU_GPU auto Dispatch(F &&func, void *ptr, int index) {
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2, typename T3,
-          typename T4, typename T5, typename T6>
-PBRT_CPU_GPU auto Dispatch(F &&func, const void *ptr, int index) {
+template <typename F, typename R, typename T0, typename T1, typename T2,
+          typename T3, typename T4, typename T5, typename T6>
+PBRT_CPU_GPU R Dispatch(F &&func, const void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 7);
 
@@ -225,9 +227,9 @@ PBRT_CPU_GPU auto Dispatch(F &&func, const void *ptr, int index) {
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2, typename T3,
-          typename T4, typename T5, typename T6>
-PBRT_CPU_GPU auto Dispatch(F &&func, void *ptr, int index) {
+template <typename F, typename R, typename T0, typename T1, typename T2,
+          typename T3, typename T4, typename T5, typename T6>
+PBRT_CPU_GPU R Dispatch(F &&func, void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 7);
 
@@ -249,9 +251,9 @@ PBRT_CPU_GPU auto Dispatch(F &&func, void *ptr, int index) {
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2, typename T3,
-          typename T4, typename T5, typename T6, typename T7>
-PBRT_CPU_GPU auto Dispatch(F &&func, void *ptr, int index) {
+template <typename F, typename R, typename T0, typename T1, typename T2,
+          typename T3, typename T4, typename T5, typename T6, typename T7>
+PBRT_CPU_GPU R Dispatch(F &&func, void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 8);
 
@@ -275,9 +277,10 @@ PBRT_CPU_GPU auto Dispatch(F &&func, void *ptr, int index) {
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2, typename T3,
-          typename T4, typename T5, typename T6, typename T7, typename... Ts>
-PBRT_CPU_GPU auto Dispatch(F &&func, const void *ptr, int index) {
+template <typename F, typename R, typename T0, typename T1, typename T2,
+          typename T3, typename T4, typename T5, typename T6, typename T7,
+          typename... Ts>
+PBRT_CPU_GPU R Dispatch(F &&func, const void *ptr, int index) {
     DCHECK_GE(0, index);
 
     switch (index) {
@@ -298,13 +301,14 @@ PBRT_CPU_GPU auto Dispatch(F &&func, const void *ptr, int index) {
     case 7:
         return func((const T7 *)ptr);
     default:
-        return Dispatch<F, Ts...>(func, ptr, index - 8);
+        return Dispatch<F, R, Ts...>(func, ptr, index - 8);
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2, typename T3,
-          typename T4, typename T5, typename T6, typename T7, typename... Ts>
-PBRT_CPU_GPU auto Dispatch(F &&func, void *ptr, int index) {
+template <typename F, typename R, typename T0, typename T1, typename T2,
+          typename T3, typename T4, typename T5, typename T6, typename T7,
+          typename... Ts>
+PBRT_CPU_GPU R Dispatch(F &&func, void *ptr, int index) {
     DCHECK_GE(0, index);
 
     switch (index) {
@@ -325,23 +329,23 @@ PBRT_CPU_GPU auto Dispatch(F &&func, void *ptr, int index) {
     case 7:
         return func((T7 *)ptr);
     default:
-        return Dispatch<F, Ts...>(func, ptr, index - 8);
+        return Dispatch<F, R, Ts...>(func, ptr, index - 8);
     }
 }
 
-template <typename F, typename T>
+template <typename F, typename R, typename T>
 auto DispatchCPU(F &&func, const void *ptr, int index) {
     DCHECK_EQ(0, index);
     return func((const T *)ptr);
 }
 
-template <typename F, typename T>
+template <typename F, typename R, typename T>
 auto DispatchCPU(F &&func, void *ptr, int index) {
     DCHECK_EQ(0, index);
     return func((T *)ptr);
 }
 
-template <typename F, typename T0, typename T1>
+template <typename F, typename R, typename T0, typename T1>
 auto DispatchCPU(F &&func, const void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 2);
@@ -352,7 +356,7 @@ auto DispatchCPU(F &&func, const void *ptr, int index) {
         return func((const T1 *)ptr);
 }
 
-template <typename F, typename T0, typename T1>
+template <typename F, typename R, typename T0, typename T1>
 auto DispatchCPU(F &&func, void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 2);
@@ -363,7 +367,7 @@ auto DispatchCPU(F &&func, void *ptr, int index) {
         return func((T1 *)ptr);
 }
 
-template <typename F, typename T0, typename T1, typename T2>
+template <typename F, typename R, typename T0, typename T1, typename T2>
 auto DispatchCPU(F &&func, const void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 3);
@@ -378,7 +382,7 @@ auto DispatchCPU(F &&func, const void *ptr, int index) {
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2>
+template <typename F, typename R, typename T0, typename T1, typename T2>
 auto DispatchCPU(F &&func, void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 3);
@@ -393,7 +397,8 @@ auto DispatchCPU(F &&func, void *ptr, int index) {
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2, typename T3>
+template <typename F, typename R, typename T0, typename T1, typename T2,
+          typename T3>
 auto DispatchCPU(F &&func, const void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 4);
@@ -410,7 +415,8 @@ auto DispatchCPU(F &&func, const void *ptr, int index) {
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2, typename T3>
+template <typename F, typename R, typename T0, typename T1, typename T2,
+          typename T3>
 auto DispatchCPU(F &&func, void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 4);
@@ -427,8 +433,8 @@ auto DispatchCPU(F &&func, void *ptr, int index) {
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2, typename T3,
-          typename T4>
+template <typename F, typename R, typename T0, typename T1, typename T2,
+          typename T3, typename T4>
 auto DispatchCPU(F &&func, const void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 5);
@@ -447,8 +453,8 @@ auto DispatchCPU(F &&func, const void *ptr, int index) {
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2, typename T3,
-          typename T4>
+template <typename F, typename R, typename T0, typename T1, typename T2,
+          typename T3, typename T4>
 auto DispatchCPU(F &&func, void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 5);
@@ -467,8 +473,8 @@ auto DispatchCPU(F &&func, void *ptr, int index) {
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2, typename T3,
-          typename T4, typename T5>
+template <typename F, typename R, typename T0, typename T1, typename T2,
+          typename T3, typename T4, typename T5>
 auto DispatchCPU(F &&func, const void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 6);
@@ -489,8 +495,8 @@ auto DispatchCPU(F &&func, const void *ptr, int index) {
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2, typename T3,
-          typename T4, typename T5>
+template <typename F, typename R, typename T0, typename T1, typename T2,
+          typename T3, typename T4, typename T5>
 auto DispatchCPU(F &&func, void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 6);
@@ -511,8 +517,8 @@ auto DispatchCPU(F &&func, void *ptr, int index) {
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2, typename T3,
-          typename T4, typename T5, typename T6>
+template <typename F, typename R, typename T0, typename T1, typename T2,
+          typename T3, typename T4, typename T5, typename T6>
 auto DispatchCPU(F &&func, const void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 7);
@@ -535,8 +541,8 @@ auto DispatchCPU(F &&func, const void *ptr, int index) {
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2, typename T3,
-          typename T4, typename T5, typename T6>
+template <typename F, typename R, typename T0, typename T1, typename T2,
+          typename T3, typename T4, typename T5, typename T6>
 auto DispatchCPU(F &&func, void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 7);
@@ -559,8 +565,8 @@ auto DispatchCPU(F &&func, void *ptr, int index) {
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2, typename T3,
-          typename T4, typename T5, typename T6, typename T7>
+template <typename F, typename R, typename T0, typename T1, typename T2,
+          typename T3, typename T4, typename T5, typename T6, typename T7>
 auto DispatchCPU(F &&func, void *ptr, int index) {
     DCHECK_GE(0, index);
     DCHECK_LT(index, 8);
@@ -585,8 +591,9 @@ auto DispatchCPU(F &&func, void *ptr, int index) {
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2, typename T3,
-          typename T4, typename T5, typename T6, typename T7, typename... Ts>
+template <typename F, typename R, typename T0, typename T1, typename T2,
+          typename T3, typename T4, typename T5, typename T6, typename T7,
+          typename... Ts>
 auto DispatchCPU(F &&func, const void *ptr, int index) {
     DCHECK_GE(0, index);
 
@@ -608,12 +615,13 @@ auto DispatchCPU(F &&func, const void *ptr, int index) {
     case 7:
         return func((const T7 *)ptr);
     default:
-        return DispatchCPU<F, Ts...>(func, ptr, index - 8);
+        return DispatchCPU<F, R, Ts...>(func, ptr, index - 8);
     }
 }
 
-template <typename F, typename T0, typename T1, typename T2, typename T3,
-          typename T4, typename T5, typename T6, typename T7, typename... Ts>
+template <typename F, typename R, typename T0, typename T1, typename T2,
+          typename T3, typename T4, typename T5, typename T6, typename T7,
+          typename... Ts>
 auto DispatchCPU(F &&func, void *ptr, int index) {
     DCHECK_GE(0, index);
 
@@ -635,67 +643,46 @@ auto DispatchCPU(F &&func, void *ptr, int index) {
     case 7:
         return func((T7 *)ptr);
     default:
-        return DispatchCPU<F, Ts...>(func, ptr, index - 8);
+        return DispatchCPU<F, R, Ts...>(func, ptr, index - 8);
     }
 }
 
-// FIXME: can we at least DispatchCRef this from the caller and dispatch based
-// on whether F's return type is a const reference?
-//
-// https://stackoverflow.com/a/41538114 :-p
-
-template <int n>
-struct DispatchSplitCRef;
-
+template <typename... Ts>
+struct IsSameType;
 template <>
-struct DispatchSplitCRef<1> {
-    template <typename F, typename Tp, typename... Ts>
-    PBRT_CPU_GPU inline auto operator()(F func, Tp tp, int tag,
-                                        TypePack<Ts...> types) -> auto && {
-        DCHECK_EQ(1, tag);
-        static_assert(sizeof...(Ts) == 1);
-        using T = typename GetFirst<TypePack<Ts...>>::type;
-        return func(tp.template Cast<T>());
-    }
+struct IsSameType<> {
+    static constexpr bool value = true;
+};
+template <typename T>
+struct IsSameType<T> {
+    static constexpr bool value = true;
 };
 
-template <int n>
-struct DispatchSplitCRef {
-    template <typename F, typename Tp, typename... Ts>
-    PBRT_CPU_GPU inline auto operator()(F func, Tp tp, int tag,
-                                        TypePack<Ts...> types) -> auto && {
-        constexpr int mid = n / 2;
+template <typename T, typename U, typename... Ts>
+struct IsSameType<T, U, Ts...> {
+    static constexpr bool value =
+        (std::is_same<T, U>::value && IsSameType<U, Ts...>::value);
+};
 
-        if (tag - 1 < mid)  // 0-based indexing here to be more traditional
-            return DispatchSplitCRef<mid>()(
-                func, tp, tag,
-                typename TakeFirstN<mid, TypePack<Ts...>>::type());
-        else
-            return DispatchSplitCRef<n - mid>()(
-                func, tp, tag - mid,
-                typename RemoveFirstN<mid, TypePack<Ts...>>::type());
-    }
+template <typename... Ts>
+struct SameType;
+template <typename T, typename... Ts>
+struct SameType<T, Ts...> {
+    using type = T;
+    static_assert(IsSameType<T, Ts...>::value,
+                  "Not all types in pack are the same");
 };
 
 template <typename F, typename... Ts>
-struct ReturnsReference;
-
-template <typename F>
-struct ReturnsReference<F> {
-    static constexpr bool value = false;
+struct ReturnType {
+    using type =
+        typename SameType<typename std::invoke_result_t<F, Ts *>...>::type;
 };
 
-template <typename F, typename T>
-struct ReturnsReference<F, T> {
-    static constexpr bool value =
-        std::is_reference_v<std::invoke_result_t<F, T *>>;
-};
-
-template <typename F, typename T, typename... Ts>
-struct ReturnsReference<F, T, Ts...> {
-    static constexpr bool value =
-        std::is_reference_v<std::invoke_result_t<F, T *>> ||
-        ReturnsReference<F, Ts...>::value;
+template <typename F, typename... Ts>
+struct ReturnTypeConst {
+    using type = typename SameType<
+        typename std::invoke_result_t<F, const Ts *>...>::type;
 };
 
 }  // namespace detail
@@ -802,40 +789,31 @@ class TaggedPointer {
     }
 
     template <typename F>
-    PBRT_CPU_GPU inline auto Dispatch(F &&func) {
+    PBRT_CPU_GPU decltype(auto) Dispatch(F &&func) {
         DCHECK(ptr() != nullptr);
-        return detail::Dispatch<F, Ts...>(func, ptr(), Tag() - 1);
+        using R = typename detail::ReturnType<F, Ts...>::type;
+        return detail::Dispatch<F, R, Ts...>(func, ptr(), Tag() - 1);
     }
 
     template <typename F>
-    PBRT_CPU_GPU inline auto Dispatch(F &&func) const {
+    PBRT_CPU_GPU decltype(auto) Dispatch(F &&func) const {
         DCHECK(ptr() != nullptr);
-        return detail::Dispatch<F, Ts...>(func, ptr(), Tag() - 1);
+        using R = typename detail::ReturnType<F, Ts...>::type;
+        return detail::Dispatch<F, R, Ts...>(func, ptr(), Tag() - 1);
     }
 
     template <typename F>
-    PBRT_CPU_GPU inline auto DispatchCRef(F &&func) -> auto & {
+    decltype(auto) DispatchCPU(F &&func) {
         DCHECK(ptr() != nullptr);
-        return Dispatch<F, Ts...>(func, ptr(), Tag() - 1);
+        using R = typename detail::ReturnType<F, Ts...>::type;
+        return detail::DispatchCPU<F, R, Ts...>(func, ptr(), Tag() - 1);
     }
 
     template <typename F>
-    PBRT_CPU_GPU inline auto DispatchCRef(F &&func) const -> const auto & {
+    decltype(auto) DispatchCPU(F &&func) const {
         DCHECK(ptr() != nullptr);
-        return detail::DispatchSplitCRef<MaxTag()>()(func, *this, Tag(),
-                                                     Types());
-    }
-
-    template <typename F>
-    inline auto DispatchCPU(F &&func) {
-        DCHECK(ptr() != nullptr);
-        return detail::DispatchCPU<F, Ts...>(func, ptr(), Tag() - 1);
-    }
-
-    template <typename F>
-    inline auto DispatchCPU(F &&func) const {
-        DCHECK(ptr() != nullptr);
-        return detail::DispatchCPU<F, Ts...>(func, ptr(), Tag() - 1);
+        using R = typename detail::ReturnTypeConst<F, Ts...>::type;
+        return detail::DispatchCPU<F, R, Ts...>(func, ptr(), Tag() - 1);
     }
 
   private:

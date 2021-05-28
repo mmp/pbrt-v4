@@ -598,7 +598,7 @@ inline Float Camera::SampleTime(Float u) const {
 
 inline const CameraTransform &Camera::GetCameraTransform() const {
     auto gtc = [&](auto ptr) -> const CameraTransform & { return ptr->GetCameraTransform(); };
-    return DispatchCRef(gtc);
+    return Dispatch(gtc);
 }
 
 inline void Camera::Approximate_dp_dxy(Point3f p, Normal3f n, Float time,
