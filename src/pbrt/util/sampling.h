@@ -181,22 +181,24 @@ PBRT_CPU_GPU inline int SampleDiscrete(pstd::span<const Float> weights, Float u,
     for (Float w : weights)
         sumWeights += w;
 
+    Float up = u * sumWeights;
+    if (up == sumWeights)
+        up = NextFloatDown(up);
+
     // Find offset in _weights_ corresponding to _u_
     int offset = 0;
-    while (offset < weights.size() && u >= weights[offset] / sumWeights) {
-        u -= weights[offset] / sumWeights;
-        ++offset;
+    Float sum = 0;
+    while (sum + weights[offset] <= up) {
+        sum += weights[offset++];
+        DCHECK_LT(offset, weights.size());
     }
-    CHECK_RARE(1e-6, offset == weights.size());
-    if (offset == weights.size())
-        offset = weights.size() - 1;
 
     // Compute PMF and remapped _u_ value, if necessary
     Float p = weights[offset] / sumWeights;
     if (pmf != nullptr)
         *pmf = p;
     if (uRemapped != nullptr)
-        *uRemapped = std::min(u / p, OneMinusEpsilon);
+        *uRemapped = std::min((up - sum) / weights[offset], OneMinusEpsilon);
 
     return offset;
 }
