@@ -135,7 +135,9 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
                                 intr.p(), w.depth, lambda, T_hat, uniPathPDF, ptr, -ray.d,
                                 ray.time, w.etaScale, ray.medium, w.pixelIndex});
                         };
-                        intr.phase.Dispatch(enqueue);
+                        DCHECK_RARE(1e-6f, !T_hat);
+                        if (T_hat)
+                            intr.phase.Dispatch(enqueue);
 
                         scattered = true;
 
