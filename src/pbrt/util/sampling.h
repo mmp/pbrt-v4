@@ -27,6 +27,12 @@
 namespace pbrt {
 
 // Sampling Function Declarations
+PBRT_CPU_GPU inline int SampleDiscrete(pstd::span<const Float> weights, Float u,
+                                       Float *pmf = nullptr, Float *uRemapped = nullptr);
+
+PBRT_CPU_GPU inline Float SampleLinear(Float u, Float a, Float b);
+PBRT_CPU_GPU inline Float InvertLinearSample(Float x, Float a, Float b);
+
 PBRT_CPU_GPU
 pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v, Point3f p,
                                               Point2f u, Float *pdf = nullptr);
@@ -46,12 +52,6 @@ Point2f InvertSphericalRectangleSample(Point3f pRef, Point3f v00, Vector3f eu,
 PBRT_CPU_GPU
 Vector3f SampleHenyeyGreenstein(Vector3f wo, Float g, Point2f u, Float *pdf = nullptr);
 
-PBRT_CPU_GPU inline int SampleDiscrete(pstd::span<const Float> weights, Float u,
-                                       Float *pmf = nullptr, Float *uRemapped = nullptr);
-
-PBRT_CPU_GPU inline Float SampleLinear(Float u, Float a, Float b);
-PBRT_CPU_GPU inline Float InvertLinearSample(Float x, Float a, Float b);
-
 PBRT_CPU_GPU
 Float SampleCatmullRom(pstd::span<const Float> nodes, pstd::span<const Float> f,
                        pstd::span<const Float> cdf, Float sample, Float *fval = nullptr,
@@ -64,6 +64,97 @@ Float SampleCatmullRom2D(pstd::span<const Float> nodes1, pstd::span<const Float>
                          Float *pdf = nullptr);
 
 // Sampling Inline Functions
+PBRT_CPU_GPU inline Float BalanceHeuristic(int nf, Float fPdf, int ng, Float gPdf) {
+    return (nf * fPdf) / (nf * fPdf + ng * gPdf);
+}
+
+PBRT_CPU_GPU inline Float PowerHeuristic(int nf, Float fPdf, int ng, Float gPdf) {
+    Float f = nf * fPdf, g = ng * gPdf;
+    return Sqr(f) / (Sqr(f) + Sqr(g));
+}
+
+PBRT_CPU_GPU inline int SampleDiscrete(pstd::span<const Float> weights, Float u,
+                                       Float *pmf, Float *uRemapped) {
+    // Handle empty _weights_ for discrete sampling
+    if (weights.empty()) {
+        if (pmf != nullptr)
+            *pmf = 0;
+        return -1;
+    }
+
+    // Compute sum of _weights_
+    Float sumWeights = 0;
+    for (Float w : weights)
+        sumWeights += w;
+
+    // Compute rescaled $u'$ sample
+    Float up = u * sumWeights;
+    if (up == sumWeights)
+        up = NextFloatDown(up);
+
+    // Find offset in _weights_ corresponding to $u'$
+    int offset = 0;
+    Float sum = 0;
+    while (sum + weights[offset] <= up) {
+        sum += weights[offset++];
+        DCHECK_LT(offset, weights.size());
+    }
+
+    // Compute PMF and remapped _u_ value, if necessary
+    Float p = weights[offset] / sumWeights;
+    if (pmf != nullptr)
+        *pmf = p;
+    if (uRemapped != nullptr)
+        *uRemapped = std::min((up - sum) / weights[offset], OneMinusEpsilon);
+
+    return offset;
+}
+
+PBRT_CPU_GPU inline Float LinearPDF(Float x, Float a, Float b) {
+    DCHECK(a >= 0 && b >= 0);
+    if (x < 0 || x > 1)
+        return 0;
+    return 2 * Lerp(x, a, b) / (a + b);
+}
+
+PBRT_CPU_GPU inline Float SampleLinear(Float u, Float a, Float b) {
+    DCHECK(a >= 0 && b >= 0);
+    if (u == 0 && a == 0)
+        return 0;
+    Float x = u * (a + b) / (a + std::sqrt(Lerp(u, Sqr(a), Sqr(b))));
+    return std::min(x, OneMinusEpsilon);
+}
+
+PBRT_CPU_GPU inline Float InvertLinearSample(Float x, Float a, Float b) {
+    return x * (a * (2 - x) + b * x) / (a + b);
+}
+
+PBRT_CPU_GPU inline Float BilinearPDF(Point2f p, pstd::span<const Float> w) {
+    DCHECK_EQ(4, w.size());
+    if (p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1)
+        return 0;
+    if (w[0] + w[1] + w[2] + w[3] == 0)
+        return 1;
+    return 4 * Bilerp({p[0], p[1]}, w) / (w[0] + w[1] + w[2] + w[3]);
+}
+
+PBRT_CPU_GPU inline Point2f SampleBilinear(Point2f u, pstd::span<const Float> w) {
+    DCHECK_EQ(4, w.size());
+    Point2f p;
+    // Sample $v$ for bilinear marginal distribution
+    p[1] = SampleLinear(u[1], w[0] + w[1], w[2] + w[3]);
+
+    // Sample $u$ for bilinear conditional distribution
+    p[0] = SampleLinear(u[0], Lerp(p[1], w[0], w[2]), Lerp(p[1], w[1], w[3]));
+
+    return p;
+}
+
+PBRT_CPU_GPU inline Point2f InvertBilinearSample(Point2f p, pstd::span<const Float> v) {
+    return {InvertLinearSample(p[0], Lerp(p[1], v[0], v[2]), Lerp(p[1], v[1], v[3])),
+            InvertLinearSample(p[1], v[0] + v[1], v[2] + v[3])};
+}
+
 PBRT_CPU_GPU inline Float XYZMatchingPDF(Float lambda) {
     if (lambda < 360 || lambda > 830)
         return 0;
@@ -167,61 +258,6 @@ PBRT_CPU_GPU inline Vector3f SampleTrowbridgeReitzVisibleArea(Vector3f w, Float 
         Vector3f(alpha_x * nh.x, alpha_y * nh.y, std::max<Float>(1e-6f, nh.z)));
 }
 
-PBRT_CPU_GPU inline int SampleDiscrete(pstd::span<const Float> weights, Float u,
-                                       Float *pmf, Float *uRemapped) {
-    // Handle empty _weights_ for discrete sampling
-    if (weights.empty()) {
-        if (pmf != nullptr)
-            *pmf = 0;
-        return -1;
-    }
-
-    // Compute sum of _weights_
-    Float sumWeights = 0;
-    for (Float w : weights)
-        sumWeights += w;
-
-    Float up = u * sumWeights;
-    if (up == sumWeights)
-        up = NextFloatDown(up);
-
-    // Find offset in _weights_ corresponding to _u_
-    int offset = 0;
-    Float sum = 0;
-    while (sum + weights[offset] <= up) {
-        sum += weights[offset++];
-        DCHECK_LT(offset, weights.size());
-    }
-
-    // Compute PMF and remapped _u_ value, if necessary
-    Float p = weights[offset] / sumWeights;
-    if (pmf != nullptr)
-        *pmf = p;
-    if (uRemapped != nullptr)
-        *uRemapped = std::min((up - sum) / weights[offset], OneMinusEpsilon);
-
-    return offset;
-}
-
-PBRT_CPU_GPU inline Float LinearPDF(Float x, Float a, Float b) {
-    DCHECK(a >= 0 && b >= 0);
-    if (x < 0 || x > 1)
-        return 0;
-    return 2 * Lerp(x, a, b) / (a + b);
-}
-
-PBRT_CPU_GPU inline Float SampleLinear(Float u, Float a, Float b) {
-    DCHECK(a >= 0 && b >= 0);
-    if (u == 0 && a == 0)
-        return 0;
-    Float x = u * (a + b) / (a + std::sqrt(Lerp(u, Sqr(a), Sqr(b))));
-    return std::min(x, OneMinusEpsilon);
-}
-
-PBRT_CPU_GPU inline Float InvertLinearSample(Float x, Float a, Float b) {
-    return x * (a * (2 - x) + b * x) / (a + b);
-}
-
 PBRT_CPU_GPU inline Float ExponentialPDF(Float x, Float a) {
     DCHECK_GT(a, 0);
     return a * std::exp(-a * x);
@@ -316,42 +352,6 @@ PBRT_CPU_GPU inline Float InvertSmoothStepSample(Float x, Float a, Float b) {
     return (P(x) - P(a)) / (P(b) - P(a));
 }
 
-PBRT_CPU_GPU inline Vector3f SampleUniformHemisphere(const Point2f &u) {
-    Float z = u[0];
-    Float r = SafeSqrt(1 - Sqr(z));
-    Float phi = 2 * Pi * u[1];
-    return {r * std::cos(phi), r * std::sin(phi), z};
-}
-
-PBRT_CPU_GPU inline Float UniformHemispherePDF() {
-    return Inv2Pi;
-}
-
-PBRT_CPU_GPU inline Point2f InvertUniformHemisphereSample(const Vector3f &v) {
-    Float phi = std::atan2(v.y, v.x);
-    if (phi < 0)
-        phi += 2 * Pi;
-    return Point2f(v.z, phi / (2 * Pi));
-}
-
-PBRT_CPU_GPU inline Vector3f SampleUniformSphere(const Point2f &u) {
-    Float z = 1 - 2 * u[0];
-    Float r = SafeSqrt(1 - z * z);
-    Float phi = 2 * Pi * u[1];
-    return {r * std::cos(phi), r * std::sin(phi), z};
-}
-
-PBRT_CPU_GPU inline Float UniformSpherePDF() {
-    return Inv4Pi;
-}
-
-PBRT_CPU_GPU inline Point2f InvertUniformSphereSample(const Vector3f &v) {
-    Float phi = std::atan2(v.y, v.x);
-    if (phi < 0)
-        phi += 2 * Pi;
-    return Point2f((1 - v.z) / 2, phi / (2 * Pi));
-}
-
 PBRT_CPU_GPU inline Point2f SampleUniformDiskPolar(const Point2f &u) {
     Float r = std::sqrt(u[0]);
     Float theta = 2 * Pi * u[1];
@@ -414,6 +414,42 @@ inline Point2f InvertUniformDiskConcentricSample(const Point2f &p) {
     return {(uo.x + 1) / 2, (uo.y + 1) / 2};
 }
 
+PBRT_CPU_GPU inline Vector3f SampleUniformHemisphere(const Point2f &u) {
+    Float z = u[0];
+    Float r = SafeSqrt(1 - Sqr(z));
+    Float phi = 2 * Pi * u[1];
+    return {r * std::cos(phi), r * std::sin(phi), z};
+}
+
+PBRT_CPU_GPU inline Float UniformHemispherePDF() {
+    return Inv2Pi;
+}
+
+PBRT_CPU_GPU inline Point2f InvertUniformHemisphereSample(const Vector3f &v) {
+    Float phi = std::atan2(v.y, v.x);
+    if (phi < 0)
+        phi += 2 * Pi;
+    return Point2f(v.z, phi / (2 * Pi));
+}
+
+PBRT_CPU_GPU inline Vector3f SampleUniformSphere(const Point2f &u) {
+    Float z = 1 - 2 * u[0];
+    Float r = SafeSqrt(1 - z * z);
+    Float phi = 2 * Pi * u[1];
+    return {r * std::cos(phi), r * std::sin(phi), z};
+}
+
+PBRT_CPU_GPU inline Float UniformSpherePDF() {
+    return Inv4Pi;
+}
+
+PBRT_CPU_GPU inline Point2f InvertUniformSphereSample(const Vector3f &v) {
+    Float phi = std::atan2(v.y, v.x);
+    if (phi < 0)
+        phi += 2 * Pi;
+    return Point2f((1 - v.z) / 2, phi / (2 * Pi));
+}
+
 PBRT_CPU_GPU inline Vector3f SampleCosineHemisphere(const Point2f &u) {
     Point2f d = SampleUniformDiskConcentric(u);
     Float z = SafeSqrt(1 - d.x * d.x - d.y * d.y);
@@ -444,41 +480,6 @@ PBRT_CPU_GPU inline Point2f InvertUniformConeSample(const Vector3f &v,
     Float cosTheta = v.z;
     Float phi = SphericalPhi(v);
     return {(cosTheta - 1) / (cosThetaMax - 1), phi / (2 * Pi)};
-}
-
-PBRT_CPU_GPU inline Float BilinearPDF(Point2f p, pstd::span<const Float> w) {
-    DCHECK_EQ(4, w.size());
-    if (p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1)
-        return 0;
-    if (w[0] + w[1] + w[2] + w[3] == 0)
-        return 1;
-    return 4 * Bilerp({p[0], p[1]}, w) / (w[0] + w[1] + w[2] + w[3]);
-}
-
-PBRT_CPU_GPU inline Point2f SampleBilinear(Point2f u, pstd::span<const Float> w) {
-    DCHECK_EQ(4, w.size());
-    Point2f p;
-    // Sample $v$ for bilinear marginal distribution
-    p[1] = SampleLinear(u[1], w[0] + w[1], w[2] + w[3]);
-
-    // Sample $u$ for bilinear conditional distribution
-    p[0] = SampleLinear(u[0], Lerp(p[1], w[0], w[2]), Lerp(p[1], w[1], w[3]));
-
-    return p;
-}
-
-PBRT_CPU_GPU inline Point2f InvertBilinearSample(Point2f p, pstd::span<const Float> v) {
-    return {InvertLinearSample(p[0], Lerp(p[1], v[0], v[2]), Lerp(p[1], v[1], v[3])),
-            InvertLinearSample(p[1], v[0] + v[1], v[2] + v[3])};
-}
-
-PBRT_CPU_GPU inline Float BalanceHeuristic(int nf, Float fPdf, int ng, Float gPdf) {
-    return (nf * fPdf) / (nf * fPdf + ng * gPdf);
-}
-
-PBRT_CPU_GPU inline Float PowerHeuristic(int nf, Float fPdf, int ng, Float gPdf) {
-    Float f = nf * fPdf, g = ng * gPdf;
-    return Sqr(f) / (Sqr(f) + Sqr(g));
 }
 
 // Sample from e^(-c x), x from 0 to xMax

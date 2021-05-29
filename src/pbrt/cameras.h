@@ -597,7 +597,9 @@ inline Float Camera::SampleTime(Float u) const {
 }
 
 inline const CameraTransform &Camera::GetCameraTransform() const {
-    auto gtc = [&](auto ptr) -> const CameraTransform & { return ptr->GetCameraTransform(); };
+    auto gtc = [&](auto ptr) -> const CameraTransform & {
+        return ptr->GetCameraTransform();
+    };
     return Dispatch(gtc);
 }
 

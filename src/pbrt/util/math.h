@@ -206,6 +206,10 @@ template <int N>
 class SquareMatrix;
 
 // Math Inline Functions
+PBRT_CPU_GPU inline Float Lerp(Float x, Float a, Float b) {
+    return (1 - x) * a + x * b;
+}
+
 // http://www.plunk.org/~hatch/rightway.php
 PBRT_CPU_GPU inline Float SinXOverX(Float x) {
     if (1 + x * x == 1)
@@ -229,10 +233,6 @@ inline Float WindowedSinc(Float x, Float radius, Float tau) {
 
 PBRT_CPU_GPU inline Float Sinc(Float x) {
     return SinXOverX(Pi * x);
-}
-
-PBRT_CPU_GPU inline Float Lerp(Float x, Float a, Float b) {
-    return (1 - x) * a + x * b;
 }
 
 #ifdef PBRT_IS_MSVC

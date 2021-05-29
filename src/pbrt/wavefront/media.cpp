@@ -129,8 +129,8 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
 
                         // Enqueue medium scattering work.
                         auto enqueue = [=](auto ptr) {
-                            using PhaseFunction =
-                                typename std::remove_const_t<std::remove_reference_t<decltype(*ptr)>>;
+                            using PhaseFunction = typename std::remove_const_t<
+                                std::remove_reference_t<decltype(*ptr)>>;
                             mediumScatterQueue->Push(MediumScatterWorkItem<PhaseFunction>{
                                 intr.p(), w.depth, lambda, T_hat, uniPathPDF, ptr, -ray.d,
                                 ray.time, w.etaScale, ray.medium, w.pixelIndex});
