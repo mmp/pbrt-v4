@@ -21,11 +21,11 @@ inline Vector3f Reflect(const Vector3f &wo, const Vector3f &n) {
 }
 
 PBRT_CPU_GPU inline bool Refract(Vector3f wi, Normal3f n, Float eta, Vector3f *wt) {
-    // Compute $\cos\,\theta_\roman{t}$ using Snell's law
     Float cosTheta_i = Dot(n, wi);
+    // Compute $\cos\,\theta_\roman{t}$ using Snell's law
     Float sin2Theta_i = std::max<Float>(0, 1 - cosTheta_i * cosTheta_i);
     Float sin2Theta_t = sin2Theta_i / Sqr(eta);
-    // Handle total internal reflection for transmission
+    // Handle total internal reflection case
     if (sin2Theta_t >= 1)
         return false;
 
@@ -45,20 +45,17 @@ PBRT_CPU_GPU
 inline Float FrDielectric(Float cosTheta_i, Float eta) {
     cosTheta_i = Clamp(cosTheta_i, -1, 1);
     // Potentially swap indices of refraction
-    bool entering = cosTheta_i > 0;
-    if (!entering) {
+    if (cosTheta_i < 0) {
         eta = 1 / eta;
-        cosTheta_i = std::abs(cosTheta_i);
+        cosTheta_i = -cosTheta_i;
     }
 
-    // Compute _cosTheta_t_ using Snell's law
-    Float sinTheta_i = SafeSqrt(1 - cosTheta_i * cosTheta_i);
-    Float sinTheta_t = sinTheta_i / eta;
-    // Handle total internal reflection
-    if (sinTheta_t >= 1)
-        return 1;
-
-    Float cosTheta_t = SafeSqrt(1 - sinTheta_t * sinTheta_t);
+    // Compute $\cos\,\theta_\roman{t}$ for Fresnel equations using Snell's law
+    Float sin2Theta_i = 1 - cosTheta_i * cosTheta_i;
+    Float sin2Theta_t = sin2Theta_i / Sqr(eta);
+    if (sin2Theta_t >= 1)
+        return 1.f;
+    Float cosTheta_t = SafeSqrt(1 - sin2Theta_t);
 
     Float r_parl = (eta * cosTheta_i - cosTheta_t) / (eta * cosTheta_i + cosTheta_t);
     Float r_perp = (cosTheta_i - eta * cosTheta_t) / (cosTheta_i + eta * cosTheta_t);
