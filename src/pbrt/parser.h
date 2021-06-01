@@ -172,6 +172,8 @@ class Tokenizer {
     FileLoc loc;
 
   private:
+    void CheckUTF(const void *ptr, int len) const;
+
     // Tokenizer Private Methods
     int getChar() {
         if (pos == end)

@@ -221,6 +221,7 @@ Tokenizer::Tokenizer(std::string str,
     pos = contents.data();
     end = pos + contents.size();
     tokenizerMemory += contents.size();
+    CheckUTF(str.data(), str.size());
 }
 
 #if defined(PBRT_HAVE_MMAP) || defined(PBRT_IS_WINDOWS)
@@ -233,6 +234,7 @@ Tokenizer::Tokenizer(void *ptr, size_t len, std::string filename,
     loc = FileLoc(*new std::string(filename));
     pos = (const char *)ptr;
     end = pos + len;
+    CheckUTF(ptr, len);
 }
 #endif
 
@@ -246,6 +248,14 @@ Tokenizer::~Tokenizer() {
         errorCallback(StringPrintf("UnmapViewOfFile: %s", ErrorString()).c_str(),
                       nullptr);
 #endif
+}
+
+void Tokenizer::CheckUTF(const void *ptr, int len) const {
+    const unsigned char *c = (const unsigned char *)ptr;
+    // https://en.wikipedia.org/wiki/Byte_order_mark
+    if (len >= 2 && ((c[0] == 0xfe && c[1] == 0xff) || (c[0] == 0xff && c[1] == 0xfe)))
+        errorCallback("File is encoded with UTF-16, which is not currently "
+                      "supported by pbrt (https://github.com/mmp/pbrt-v4/issues/136).", &loc);
 }
 
 pstd::optional<Token> Tokenizer::Next() {
