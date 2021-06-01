@@ -144,11 +144,25 @@ if (CMAKE_CUDA_COMPILER)
         set (CMAKE_CUDA_STANDARD 17)
     endif ()
 
-    message (STATUS "Found CUDA: ${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR}")
+    # https://github.com/VIAME/VIAME/blob/aa6c5f56a898b08e4da102c400b453e23952199c/CMakeLists.txt#L291
+    if (NOT CUDA_VERSION_PATCH)
+      if (CUDA_NVCC_EXECUTABLE AND
+          CUDA_NVCC_EXECUTABLE STREQUAL CMAKE_CUDA_COMPILER AND
+          CMAKE_CUDA_COMPILER_VERSION MATCHES [=[([0-9]+)\.([0-9]+)\.([0-9]+)]=])
+        set (CUDA_VERSION_PATCH "${CMAKE_MATCH_3}")
+      elseif (CUDA_NVCC_EXECUTABLE)
+        execute_process (COMMAND ${CUDA_NVCC_EXECUTABLE} "--version" OUTPUT_VARIABLE NOUT)
+        if (NOUT MATCHES [=[ V([0-9]+)\.([0-9]+)\.([0-9]+)]=])
+          set (CUDA_VERSION_PATCH "${CMAKE_MATCH_3}")
+        endif ()
+      endif ()
+    endif ()
+
+    message (STATUS "Found CUDA: ${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR}.${CUDA_VERSION_PATCH}")
     if (CUDA_VERSION_MAJOR LESS 11)
       message(SEND_ERROR "pbrt-v4 requires CUDA version 11.0 or later. If you have multiple versions installed, please update your PATH.")
-    elseif (CUDA_VERSION_MINOR EQUAL 3)
-      message(SEND_ERROR "Unfortunately, pbrt-v4 triggers an internal compiler error in CUDA 11.3. Please use CUDA 11.0-11.2 until the compiler is fixed.")
+    elseif (CUDA_VERSION_MINOR EQUAL 3 AND CUDA_VERSION_PATCH LESS 109)
+      message(SEND_ERROR "Unfortunately, pbrt-v4 triggers an internal compiler error in CUDA 11.3.0. Please either use CUDA 11.0-11.2 or 11.3.1 or later.")
     endif ()
 
     if ("${PBRT_OPTIX7_PATH}" STREQUAL "")
