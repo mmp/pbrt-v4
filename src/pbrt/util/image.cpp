@@ -37,6 +37,7 @@
 // too old school
 #define STBI_NO_PIC
 #define STBI_ASSERT CHECK
+#define STBI_WINDOWS_UTF8
 #include <stb/stb_image.h>
 
 namespace pbrt {
