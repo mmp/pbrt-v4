@@ -14,6 +14,7 @@
 #include <cstring>
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace pbrt {
 namespace {
@@ -132,10 +133,10 @@ bool enable(bool *ptr) {
 }  // namespace
 
 // T basically needs to be a pointer type or a Span.
-template <typename T>
-bool ParseArg(char ***argv, const std::string &name, T out,
+template <typename Iter, typename T>
+bool ParseArg(Iter *iter, Iter end, const std::string &name, T out,
               std::function<void(std::string)> onError) {
-    std::string arg = **argv;
+    std::string arg = **iter;
 
     // Strip either one or two leading dashes.
     if (arg[1] == '-')
@@ -145,7 +146,6 @@ bool ParseArg(char ***argv, const std::string &name, T out,
 
     if (matchPrefix(normalizeArg(arg), normalizeArg(name + '='))) {
         // --arg=value
-        *argv += 1;
         std::string value = arg.substr(name.size() + 1);
         if (!initArg(value, out)) {
             onError(StringPrintf("invalid value \"%s\" for %s argument", value, name));
@@ -155,20 +155,21 @@ bool ParseArg(char ***argv, const std::string &name, T out,
     } else if (normalizeArg(arg) == normalizeArg(name)) {
         // --arg <value>, except for bool arguments, which are set to true
         // without expecting another argument.
-        *argv += 1;
         if (enable(out))
             return true;
 
-        if (**argv == nullptr) {
+        ++(*iter);
+        if (*iter == end) {
             onError(StringPrintf("missing value after %s argument", arg));
             return false;
         }
-        initArg(**argv, out);
-        *argv += 1;
+        initArg(**iter, out);
         return true;
     } else
         return false;
 }
+
+std::vector<std::string> GetCommandLineArguments(char *argv[]);
 
 }  // namespace pbrt
 

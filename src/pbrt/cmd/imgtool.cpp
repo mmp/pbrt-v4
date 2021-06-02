@@ -265,46 +265,45 @@ void help() {
                     "about <command>.\n");
 }
 
-int help(int argc, char **argv) {
-    if (argc == 0) {
+int help(std::vector<std::string> args) {
+    if (args.empty()) {
         help();
         return 0;
     }
-    while (*argv != nullptr) {
-        auto iter = commandUsage.find(*argv);
+    for (std::string cmd : args) {
+        auto iter = commandUsage.find(cmd);
         if (iter == commandUsage.end()) {
-            fprintf(stderr, "imgtool help: command \"%s\" not known.\n", *argv);
+            fprintf(stderr, "imgtool help: command \"%s\" not known.\n", cmd.c_str());
             help();
             return 1;
         } else {
             fprintf(stderr, "usage: imgtool %s\n\n", iter->second.usage.c_str());
             fprintf(stderr, "options:%s\n", iter->second.options.c_str());
         }
-        ++argv;
     }
     return 0;
 }
 
-int makesky(int argc, char *argv[]) {
+int makesky(std::vector<std::string> args) {
     std::string outfile;
     Float albedo = 0.5;
     Float turbidity = 3.;
     Float elevation = 10;
     int resolution = 2048;
 
-    while (*argv != nullptr) {
+    for (auto iter = args.begin(); iter != args.end(); ++iter) {
         auto onError = [](const std::string &err) {
             usage("makesky", "%s", err.c_str());
             exit(1);
         };
-        if (ParseArg(&argv, "outfile", &outfile, onError) ||
-            ParseArg(&argv, "albedo", &albedo, onError) ||
-            ParseArg(&argv, "turbidity", &turbidity, onError) ||
-            ParseArg(&argv, "elevation", &elevation, onError) ||
-            ParseArg(&argv, "resolution", &resolution, onError)) {
+        if (ParseArg(&iter, args.end(), "outfile", &outfile, onError) ||
+            ParseArg(&iter, args.end(), "albedo", &albedo, onError) ||
+            ParseArg(&iter, args.end(), "turbidity", &turbidity, onError) ||
+            ParseArg(&iter, args.end(), "elevation", &elevation, onError) ||
+            ParseArg(&iter, args.end(), "resolution", &resolution, onError)) {
             // success
         } else
-            onError(StringPrintf("argument %s invalid", *argv));
+            onError(StringPrintf("argument %s invalid", *iter));
     }
 
     if (outfile.empty())
@@ -378,23 +377,22 @@ int makesky(int argc, char *argv[]) {
     return 0;
 }
 
-int assemble(int argc, char *argv[]) {
-    if (argc == 0)
+int assemble(std::vector<std::string> args) {
+    if (args.empty())
         usage("assemble", "no filenames provided to \"assemble\"?");
     std::string outfile;
     std::vector<std::string> infiles;
 
-    while (*argv != nullptr) {
+    for (auto iter = args.begin(); iter != args.end(); ++iter) {
         auto onError = [](const std::string &err) {
             usage("assemble", "%s", err.c_str());
         };
-        if (ParseArg(&argv, "outfile", &outfile, onError))
+        if (ParseArg(&iter, args.end(), "outfile", &outfile, onError))
             ;  // success
-        else if (argv[0][0] == '-')
-            usage("assemble", "%s: unknown command flag", *argv);
+        else if ((*iter)[0] == '-')
+            usage("assemble", "%s: unknown command flag", iter->c_str());
         else {
-            infiles.push_back(*argv);
-            ++argv;
+            infiles.push_back(*iter);
         }
     }
 
@@ -509,8 +507,8 @@ int assemble(int argc, char *argv[]) {
     return 0;
 }
 
-int splitn(int argc, char *argv[]) {
-    if (argc == 0)
+int splitn(std::vector<std::string> args) {
+    if (args.empty())
         usage("splitn", "no filenames provided to \"splitn\"?");
     std::string outfile;
     std::vector<std::string> infiles;
@@ -518,24 +516,23 @@ int splitn(int argc, char *argv[]) {
     int cropSize = 96;
 
     std::string crop;
-    while (*argv != nullptr) {
+    for (auto iter = args.begin(); iter != args.end(); ++iter) {
         auto onError = [](const std::string &err) {
             usage("splitn", "%s", err.c_str());
         };
-        if (ParseArg(&argv, "outfile", &outfile, onError) ||
-            ParseArg(&argv, "cropsize", &cropSize, onError))
+        if (ParseArg(&iter, args.end(), "outfile", &outfile, onError) ||
+            ParseArg(&iter, args.end(), "cropsize", &cropSize, onError))
             ;  // success
-        else if (ParseArg(&argv, "crop", &crop, onError)) {
+        else if (ParseArg(&iter, args.end(), "crop", &crop, onError)) {
             std::vector<int> c = SplitStringToInts(crop, ',');
             if (c.size() != 2)
                 usage("splitn", "2 values not provided to --crop");
             crops.push_back(Bounds2i({c[0], c[1]}, {c[0]+cropSize, c[1]+cropSize}));
         }
-        else if (argv[0][0] == '-')
-            usage("splitn", "%s: unknown command flag", *argv);
+        else if ((*iter)[0] == '-')
+            usage("splitn", "%s: unknown command flag", iter->c_str());
         else {
-            infiles.push_back(*argv);
-            ++argv;
+            infiles.push_back(*iter);
         }
     }
 
@@ -655,23 +652,21 @@ int splitn(int argc, char *argv[]) {
     return 0;
 }
 
-int cat(int argc, char *argv[]) {
-    if (argc == 0)
+int cat(std::vector<std::string> args) {
+    if (args.empty())
         usage("cat", "no filenames provided to \"cat\"?");
     bool sort = false;
     bool csv = false;
     bool list = false;
 
-    for (int i = 0; i < argc; ++i) {
-        if (strcmp(argv[i], "--sort") == 0 || strcmp(argv[i], "-sort") == 0) {
+    for (auto iter = args.begin(); iter != args.end(); ++iter) {
+        if (*iter == "--sort" || *iter == "-sort") {
             sort = !sort;
             continue;
-        }
-        if (strcmp(argv[i], "--csv") == 0 || strcmp(argv[i], "-csv") == 0) {
+        } else if (*iter == "--csv" || *iter == "-csv") {
             csv = !csv;
             continue;
-        }
-        if (strcmp(argv[i], "--list") == 0 || strcmp(argv[i], "-list") == 0) {
+        } else if (*iter == "--list" || *iter == "-list") {
             list = !list;
             continue;
         }
@@ -687,7 +682,7 @@ int cat(int argc, char *argv[]) {
             return 1;
         }
 
-        ImageAndMetadata im = Image::Read(argv[i]);
+        ImageAndMetadata im = Image::Read(*iter);
         ImageMetadata &metadata = im.metadata;
         Image &image = im.image;
 
@@ -776,22 +771,21 @@ static bool checkImageCompatibility(const std::string &fn1, const Image &im1,
     return true;
 }
 
-int average(int argc, char *argv[]) {
+int average(std::vector<std::string> args) {
     std::string avgFile, filenameBase;
 
-    while (*argv != nullptr) {
+    for (auto iter = args.begin(); iter != args.end(); ++iter) {
         auto onError = [](const std::string &err) {
             usage("average", "%s", err.c_str());
             exit(1);
         };
 
-        if (ParseArg(&argv, "outfile", &avgFile, onError)) {
+        if (ParseArg(&iter, args.end(), "outfile", &avgFile, onError)) {
             // success
-        } else if (filenameBase.empty() && argv[0][0] != '-') {
-            filenameBase = *argv;
-            ++argv;
+        } else if (filenameBase.empty() && (*iter)[0] != '-') {
+            filenameBase = *iter;
         } else
-            usage("average", "%s: unknown argument", *argv);
+            usage("average", "%s: unknown argument", iter->c_str());
     }
 
     if (filenameBase.empty())
@@ -861,27 +855,26 @@ int average(int argc, char *argv[]) {
     return 0;
 }
 
-int error(int argc, char *argv[]) {
+int error(std::vector<std::string> args) {
     std::string referenceFile, errorFile, metric = "MSE";
     std::string filenameBase;
     std::array<int, 4> cropWindow = {-1, 0, -1, 0};
 
-    while (*argv != nullptr) {
+    for (auto iter = args.begin(); iter != args.end(); ++iter) {
         auto onError = [](const std::string &err) {
             usage("error", "%s", err.c_str());
             exit(1);
         };
 
-        if (ParseArg(&argv, "reference", &referenceFile, onError) ||
-            ParseArg(&argv, "errorfile", &errorFile, onError) ||
-            ParseArg(&argv, "metric", &metric, onError) ||
-            ParseArg(&argv, "crop", pstd::MakeSpan(cropWindow), onError)) {
+        if (ParseArg(&iter, args.end(), "reference", &referenceFile, onError) ||
+            ParseArg(&iter, args.end(), "errorfile", &errorFile, onError) ||
+            ParseArg(&iter, args.end(), "metric", &metric, onError) ||
+            ParseArg(&iter, args.end(), "crop", pstd::MakeSpan(cropWindow), onError)) {
             // success
-        } else if (filenameBase.empty() && argv[0][0] != '-') {
-            filenameBase = *argv;
-            ++argv;
+        } else if (filenameBase.empty() && (*iter)[0] != '-') {
+            filenameBase = *iter;
         } else
-            usage("error", "%s: unknown argument", *argv);
+            usage("error", "%s: unknown argument", iter->c_str());
     }
 
     if (filenameBase.empty())
@@ -1005,30 +998,29 @@ int error(int argc, char *argv[]) {
     return 0;
 }
 
-int diff(int argc, char *argv[]) {
+int diff(std::vector<std::string> args) {
     std::string outFile, imageFile, referenceFile, metric = "MSE";
     std::string channels = "R,G,B";
     std::array<int, 4> cropWindow = {-1, 0, -1, 0};
 
-    while (*argv != nullptr) {
+    for (auto iter = args.begin(); iter != args.end(); ++iter) {
         auto onError = [](const std::string &err) {
             usage("diff", "%s", err.c_str());
             exit(1);
         };
 
-        if (ParseArg(&argv, "outfile", &outFile, onError) ||
-            ParseArg(&argv, "reference", &referenceFile, onError) ||
-            ParseArg(&argv, "metric", &metric, onError) ||
-            ParseArg(&argv, "channels", &channels, onError) ||
-            ParseArg(&argv, "crop", pstd::MakeSpan(cropWindow), onError)) {
+        if (ParseArg(&iter, args.end(), "outfile", &outFile, onError) ||
+            ParseArg(&iter, args.end(), "reference", &referenceFile, onError) ||
+            ParseArg(&iter, args.end(), "metric", &metric, onError) ||
+            ParseArg(&iter, args.end(), "channels", &channels, onError) ||
+            ParseArg(&iter, args.end(), "crop", pstd::MakeSpan(cropWindow), onError)) {
             // success
-        } else if (argv[0][0] == '-') {
-            usage("diff", "%s: unknown command flag", *argv);
+        } else if ((*iter)[0] == '-') {
+            usage("diff", "%s: unknown command flag", iter->c_str());
         } else if (!imageFile.empty()) {
-            usage("diff", "%s: excess argument", *argv);
+            usage("diff", "%s: excess argument", iter->c_str());
         } else {
-            imageFile = *argv;
-            ++argv;
+            imageFile = *iter;
         }
     }
 
@@ -1410,27 +1402,26 @@ static const std::vector<RGB> falseColorValues = {
     RGB(0.983868f, 0.904867f, 0.136897f), RGB(0.993248f, 0.906157f, 0.143936f),
 };
 
-int falsecolor(int argc, char *argv[]) {
+int falsecolor(std::vector<std::string> args) {
     std::string outFile, inFile;
     bool plusMinus = false, ramp = false;
     Float maxValue = -Infinity;
 
-    while (*argv != nullptr) {
+    for (auto iter = args.begin(); iter != args.end(); ++iter) {
         auto onError = [](const std::string &err) {
             usage("falsecolor", "%s", err.c_str());
             exit(1);
         };
 
-        if (ParseArg(&argv, "outfile", &outFile, onError) ||
-            ParseArg(&argv, "plusminus", &plusMinus, onError) ||
-            ParseArg(&argv, "ramp", &ramp, onError) ||
-            ParseArg(&argv, "maxValue", &maxValue, onError)) {
+        if (ParseArg(&iter, args.end(), "outfile", &outFile, onError) ||
+            ParseArg(&iter, args.end(), "plusminus", &plusMinus, onError) ||
+            ParseArg(&iter, args.end(), "ramp", &ramp, onError) ||
+            ParseArg(&iter, args.end(), "maxValue", &maxValue, onError)) {
             // success
-        } else if (inFile.empty() && argv[0][0] != '-') {
-            inFile = *argv;
-            ++argv;
+        } else if (inFile.empty() && (*iter)[0] != '-') {
+            inFile = *iter;
         } else {
-            usage("falsecolor", "%s: unknown command flag", *argv);
+            usage("falsecolor", "%s: unknown command flag", iter->c_str());
         }
     }
 
@@ -1482,43 +1473,38 @@ int falsecolor(int argc, char *argv[]) {
     return 0;
 }
 
-int info(int argc, char *argv[]) {
+int info(std::vector<std::string> args) {
     int err = 0;
-    for (int i = 0; i < argc; ++i) {
-        ImageAndMetadata im = Image::Read(argv[i]);
-        printImageStats(argv[i], im.image, im.metadata);
+    for (std::string fn : args) {
+        ImageAndMetadata im = Image::Read(fn);
+        printImageStats(fn.c_str(), im.image, im.metadata);
     }
     return err;
 }
 
-Image bloom(Image image, Float level, int width, Float scale, int iters) {
-    return image;
-}
-
-int bloom(int argc, char *argv[]) {
+int bloom(std::vector<std::string> args) {
     std::string inFile, outFile;
     Float level = Infinity;
     int width = 15;
     Float scale = .3;
     int iterations = 5;
 
-    while (*argv != nullptr) {
+    for (auto iter = args.begin(); iter != args.end(); ++iter) {
         auto onError = [](const std::string &err) {
             usage("bloom", "%s", err.c_str());
             exit(1);
         };
 
-        if (ParseArg(&argv, "outfile", &outFile, onError) ||
-            ParseArg(&argv, "level", &level, onError) ||
-            ParseArg(&argv, "width", &width, onError) ||
-            ParseArg(&argv, "iterations", &iterations, onError) ||
-            ParseArg(&argv, "scale", &scale, onError)) {
+        if (ParseArg(&iter, args.end(), "outfile", &outFile, onError) ||
+            ParseArg(&iter, args.end(), "level", &level, onError) ||
+            ParseArg(&iter, args.end(), "width", &width, onError) ||
+            ParseArg(&iter, args.end(), "iterations", &iterations, onError) ||
+            ParseArg(&iter, args.end(), "scale", &scale, onError)) {
             // success
-        } else if (inFile.empty() && *argv[0] != '-') {
-            inFile = *argv;
-            ++argv;
+        } else if (inFile.empty() && (*iter)[0] != '-') {
+            inFile = *iter;
         } else {
-            onError(StringPrintf("argument %s invalid", *argv));
+            onError(StringPrintf("argument %s invalid", *iter));
         }
     }
 
@@ -1596,7 +1582,7 @@ int bloom(int argc, char *argv[]) {
     return 0;
 }
 
-int convert(int argc, char *argv[]) {
+int convert(std::vector<std::string> args) {
     bool acesFilmic = false;
     float scale = 1.f, gamma = 1.f;
     int repeat = 1;
@@ -1611,32 +1597,31 @@ int convert(int argc, char *argv[]) {
     std::string channelNames;
     std::array<int, 4> cropWindow = {-1, 0, -1, 0};
 
-    while (*argv != nullptr) {
+    for (auto iter = args.begin(); iter != args.end(); ++iter) {
         auto onError = [](const std::string &err) {
             usage("convert", "%s", err.c_str());
             exit(1);
         };
 
-        if (ParseArg(&argv, "acesfilmic", &acesFilmic, onError) ||
-            ParseArg(&argv, "bw", &bw, onError) ||
-            ParseArg(&argv, "channels", &channelNames, onError) ||
-            ParseArg(&argv, "colorspace", &colorspace, onError) ||
-            ParseArg(&argv, "crop", pstd::MakeSpan(cropWindow), onError) ||
-            ParseArg(&argv, "despike", &despikeLimit, onError) ||
-            ParseArg(&argv, "flipy", &flipy, onError) ||
-            ParseArg(&argv, "gamma", &gamma, onError) ||
-            ParseArg(&argv, "maxluminance", &maxY, onError) ||
-            ParseArg(&argv, "outfile", &outFile, onError) ||
-            ParseArg(&argv, "preservecolors", &preserveColors, onError) ||
-            ParseArg(&argv, "repeatpix", &repeat, onError) ||
-            ParseArg(&argv, "scale", &scale, onError) ||
-            ParseArg(&argv, "tonemap", &tonemap, onError)) {
+        if (ParseArg(&iter, args.end(), "acesfilmic", &acesFilmic, onError) ||
+            ParseArg(&iter, args.end(), "bw", &bw, onError) ||
+            ParseArg(&iter, args.end(), "channels", &channelNames, onError) ||
+            ParseArg(&iter, args.end(), "colorspace", &colorspace, onError) ||
+            ParseArg(&iter, args.end(), "crop", pstd::MakeSpan(cropWindow), onError) ||
+            ParseArg(&iter, args.end(), "despike", &despikeLimit, onError) ||
+            ParseArg(&iter, args.end(), "flipy", &flipy, onError) ||
+            ParseArg(&iter, args.end(), "gamma", &gamma, onError) ||
+            ParseArg(&iter, args.end(), "maxluminance", &maxY, onError) ||
+            ParseArg(&iter, args.end(), "outfile", &outFile, onError) ||
+            ParseArg(&iter, args.end(), "preservecolors", &preserveColors, onError) ||
+            ParseArg(&iter, args.end(), "repeatpix", &repeat, onError) ||
+            ParseArg(&iter, args.end(), "scale", &scale, onError) ||
+            ParseArg(&iter, args.end(), "tonemap", &tonemap, onError)) {
             // success
-        } else if (argv[0][0] != '-' && inFile.empty()) {
-            inFile = *argv;
-            ++argv;
+        } else if ((*iter)[0] != '-' && inFile.empty()) {
+            inFile = *iter;
         } else
-            usage("convert", "%s: unknown command flag", *argv);
+            usage("convert", "%s: unknown command flag", iter->c_str());
     }
 
     if (maxY <= 0)
@@ -1868,28 +1853,27 @@ int convert(int argc, char *argv[]) {
     return 0;
 }
 
-int whitebalance(int argc, char *argv[]) {
+int whitebalance(std::vector<std::string> args) {
     std::string inFile, outFile;
     Float temperature = 0;
     std::array<Float, 2> xy = {Float(0), Float(0)};
     std::string illuminant;
 
-    while (*argv != nullptr) {
+    for (auto iter = args.begin(); iter != args.end(); ++iter) {
         auto onError = [](const std::string &err) {
             usage("whitebalance", "%s", err.c_str());
             exit(1);
         };
 
-        if (ParseArg(&argv, "outfile", &outFile, onError) ||
-            ParseArg(&argv, "primaries", pstd::MakeSpan(xy), onError) ||
-            ParseArg(&argv, "illuminant", &illuminant, onError) ||
-            ParseArg(&argv, "temperature", &temperature, onError)) {
+        if (ParseArg(&iter, args.end(), "outfile", &outFile, onError) ||
+            ParseArg(&iter, args.end(), "primaries", pstd::MakeSpan(xy), onError) ||
+            ParseArg(&iter, args.end(), "illuminant", &illuminant, onError) ||
+            ParseArg(&iter, args.end(), "temperature", &temperature, onError)) {
             // success
-        } else if (inFile.empty() && *argv[0] != '-') {
-            inFile = *argv;
-            ++argv;
+        } else if (inFile.empty() && (*iter)[0] != '-') {
+            inFile = *iter;
         } else {
-            onError(StringPrintf("argument %s invalid", *argv));
+            onError(StringPrintf("argument %s invalid", *iter));
         }
     }
 
@@ -1948,27 +1932,26 @@ int whitebalance(int argc, char *argv[]) {
     return 0;
 }
 
-int makeemitters(int argc, char *argv[]) {
-    const char *filename = nullptr;
+int makeemitters(std::vector<std::string> args) {
+    std::string filename;
     int downsampleRate = 1;
 
     auto onError = [](const std::string &err) {
         usage("makeemitters", "%s", err.c_str());
         exit(1);
     };
-    while (*argv != nullptr) {
-        if (ParseArg(&argv, "downsample", &downsampleRate, onError)) {
+    for (auto iter = args.begin(); iter != args.end(); ++iter) {
+        if (ParseArg(&iter, args.end(), "downsample", &downsampleRate, onError)) {
             // success
-        } else if (argv[0][0] == '-')
-            usage("makeemitters", "%s: unknown command flag", *argv);
-        else if (!filename) {
-            filename = *argv;
-            ++argv;
+        } else if ((*iter)[0] == '-')
+            usage("makeemitters", "%s: unknown command flag", iter->c_str());
+        else if (filename.empty()) {
+            filename = *iter;
         } else
             usage("makeemitters", "multiple input filenames provided.");
     }
 
-    if (filename == nullptr)
+    if (filename.empty())
         usage("makeemitters", "missing image filename");
 
     ImageAndMetadata im = Image::Read(filename);
@@ -1976,7 +1959,7 @@ int makeemitters(int argc, char *argv[]) {
 
     ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
     if (!rgbDesc) {
-        fprintf(stderr, "%s: didn't find R, G, and B channels", filename);
+        fprintf(stderr, "%s: didn't find R, G, and B channels", filename.c_str());
         return 1;
     }
 
@@ -2019,7 +2002,7 @@ int makeemitters(int argc, char *argv[]) {
     return 0;
 }
 
-int makeequiarea(int argc, char *argv[]) {
+int makeequiarea(std::vector<std::string> args) {
     std::string inFilename, outFilename;
     int resolution = 0;
 
@@ -2027,15 +2010,14 @@ int makeequiarea(int argc, char *argv[]) {
         usage("makeequiarea", "%s", err.c_str());
         exit(1);
     };
-    while (*argv != nullptr) {
-        if (ParseArg(&argv, "resolution", &resolution, onError) ||
-            ParseArg(&argv, "outfile", &outFilename, onError)) {
+    for (auto iter = args.begin(); iter != args.end(); ++iter) {
+        if (ParseArg(&iter, args.end(), "resolution", &resolution, onError) ||
+            ParseArg(&iter, args.end(), "outfile", &outFilename, onError)) {
             // success
-        } else if (argv[0][0] == '-')
-            usage("makeequiarea", "%s: unknown command flag", *argv);
+        } else if ((*iter)[0] == '-')
+            usage("makeequiarea", "%s: unknown command flag", iter->c_str());
         else if (inFilename.empty()) {
-            inFilename = *argv;
-            ++argv;
+            inFilename = *iter;
         } else
             usage("makeequiarea", "multiple input filenames provided.");
     }
@@ -2276,21 +2258,20 @@ Image denoiseImage(const Image &in, const ImageChannelDesc &Ldesc,
     return currentImage;
 }
 
-int denoise(int argc, char *argv[]) {
+int denoise(std::vector<std::string> args) {
     std::string inFilename, outFilename;
 
     auto onError = [](const std::string &err) {
         usage("denoise", "%s", err.c_str());
         exit(1);
     };
-    while (*argv != nullptr) {
-        if (ParseArg(&argv, "outfile", &outFilename, onError)) {
+    for (auto iter = args.begin(); iter != args.end(); ++iter) {
+        if (ParseArg(&iter, args.end(), "outfile", &outFilename, onError)) {
             // success
-        } else if (argv[0][0] == '-')
-            usage("denoise", "%s: unknown command flag", *argv);
+        } else if ((*iter)[0] == '-')
+            usage("denoise", "%s: unknown command flag", iter->c_str());
         else if (inFilename.empty()) {
-            inFilename = *argv;
-            ++argv;
+            inFilename = *iter;
         } else
             usage("denoise", "multiple input filenames provided.");
     }
@@ -2351,21 +2332,20 @@ int denoise(int argc, char *argv[]) {
 }
 
 #ifdef PBRT_BUILD_GPU_RENDERER
-int denoise_optix(int argc, char *argv[]) {
+int denoise_optix(std::vector<std::string> args) {
     std::string inFilename, outFilename;
 
     auto onError = [](const std::string &err) {
         usage("denoise-optix", "%s", err.c_str());
         exit(1);
     };
-    while (*argv != nullptr) {
-        if (ParseArg(&argv, "outfile", &outFilename, onError)) {
+    for (auto iter = args.begin(); iter != args.end(); ++iter) {
+        if (ParseArg(&iter, args.end(), "outfile", &outFilename, onError)) {
             // success
-        } else if (argv[0][0] == '-')
-            usage("denoise-optix", "%s: unknown command flag", *argv);
+        } else if ((*iter)[0] == '-')
+            usage("denoise-optix", "%s: unknown command flag", iter->c_str());
         else if (inFilename.empty()) {
-            inFilename = *argv;
-            ++argv;
+            inFilename = *iter;
         } else
             usage("denoise-optix", "multiple input filenames provided.");
     }
@@ -2530,44 +2510,47 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    if (strcmp(argv[1], "average") == 0)
-        return average(argc - 2, argv + 2);
-    else if (strcmp(argv[1], "assemble") == 0)
-        return assemble(argc - 2, argv + 2);
-    else if (strcmp(argv[1], "bloom") == 0)
-        return bloom(argc - 2, argv + 2);
-    else if (strcmp(argv[1], "cat") == 0)
-        return cat(argc - 2, argv + 2);
-    else if (strcmp(argv[1], "convert") == 0)
-        return convert(argc - 2, argv + 2);
-    else if (strcmp(argv[1], "diff") == 0)
-        return diff(argc - 2, argv + 2);
-    else if (strcmp(argv[1], "denoise") == 0)
-        return denoise(argc - 2, argv + 2);
+    std::vector<std::string> args = GetCommandLineArguments(argv);
+    std::string cmd = args[0];
+    args.erase(args.begin());
+
+    if (cmd == "average")
+        return average(args);
+    else if (cmd == "assemble")
+        return assemble(args);
+    else if (cmd == "bloom")
+        return bloom(args);
+    else if (cmd == "cat")
+        return cat(args);
+    else if (cmd == "convert")
+        return convert(args);
+    else if (cmd == "diff")
+        return diff(args);
+    else if (cmd == "denoise")
+        return denoise(args);
 #ifdef PBRT_BUILD_GPU_RENDERER
-    else if (strcmp(argv[1], "denoise-optix") == 0)
-        return denoise_optix(argc - 2, argv + 2);
+    else if (cmd == "denoise-optix")
+        return denoise_optix(args);
 #endif  // PBRT_BUILD_GPU_RENDERER
-    else if (strcmp(argv[1], "error") == 0)
-        return error(argc - 2, argv + 2);
-    else if (strcmp(argv[1], "falsecolor") == 0)
-        return falsecolor(argc - 2, argv + 2);
-    else if (strcmp(argv[1], "help") == 0 || strcmp(argv[1], "-help") == 0 ||
-             strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0)
-        return help(argc - 2, argv + 2);
-    else if (strcmp(argv[1], "info") == 0)
-        return info(argc - 2, argv + 2);
-    else if (strcmp(argv[1], "makeequiarea") == 0)
-        return makeequiarea(argc - 2, argv + 2);
-    else if (strcmp(argv[1], "makeemitters") == 0)
-        return makeemitters(argc - 2, argv + 2);
-    else if (strcmp(argv[1], "makesky") == 0)
-        return makesky(argc - 2, argv + 2);
-    else if (strcmp(argv[1], "whitebalance") == 0)
-        return whitebalance(argc - 2, argv + 2);
-    else if (strcmp(argv[1], "splitn") == 0)
-        return splitn(argc - 2, argv + 2);
-    else if (strcmp(argv[1], "noisybit") == 0) {
+    else if (cmd == "error")
+        return error(args);
+    else if (cmd == "falsecolor")
+        return falsecolor(args);
+    else if (cmd == "help" || cmd == "-help" || cmd == "--help" || cmd == "-h")
+        help(args);
+    else if (cmd == "info")
+        return info(args);
+    else if (cmd == "makeequiarea")
+        return makeequiarea(args);
+    else if (cmd == "makeemitters")
+        return makeemitters(args);
+    else if (cmd == "makesky")
+        return makesky(args);
+    else if (cmd == "whitebalance")
+        return whitebalance(args);
+    else if (cmd == "splitn")
+        return splitn(args);
+    else if (cmd == "noisybit") {
         // hack for brute force comptuation of ideal filter weights.
 
         argv += 2;
@@ -2577,21 +2560,20 @@ int main(int argc, char *argv[]) {
         Float sigma = 1;
         int nInstances = 100;
 
-        while (*argv != nullptr) {
+        for (auto iter = args.begin(); iter != args.end(); ++iter) {
             auto onError = [](const std::string &err) {
                 usage("%s", err.c_str());
                 exit(1);
             };
-            if (ParseArg(&argv, "pixel", pstd::MakeSpan(pixel), onError) ||
-                ParseArg(&argv, "width", &width, onError) ||
-                ParseArg(&argv, "sigma", &sigma, onError) ||
-                ParseArg(&argv, "n", &nInstances, onError))
+            if (ParseArg(&iter, args.end(), "pixel", pstd::MakeSpan(pixel), onError) ||
+                ParseArg(&iter, args.end(), "width", &width, onError) ||
+                ParseArg(&iter, args.end(), "sigma", &sigma, onError) ||
+                ParseArg(&iter, args.end(), "n", &nInstances, onError))
                 ;  // yaay
             else if (filename.empty()) {
-                filename = *argv;
-                ++argv;
+                filename = *iter;
             } else
-                onError(StringPrintf("unexpected argument \"%s\"", *argv));
+                onError(StringPrintf("unexpected argument \"%s\"", iter->c_str()));
         }
         CHECK(!filename.empty());
 
@@ -2646,7 +2628,7 @@ int main(int argc, char *argv[]) {
           GrayLevel[4 a]]]
         */
     } else {
-        fprintf(stderr, "imgtool: unknown command \"%s\".\n", argv[1]);
+        fprintf(stderr, "imgtool: unknown command \"%s\".\n", cmd.c_str());
         help();
         CleanupPBRT();
         return 1;

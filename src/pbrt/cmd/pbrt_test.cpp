@@ -37,26 +37,26 @@ int main(int argc, char **argv) {
     std::string testFilter;
     bool listTests = false;
 
-    char **origArgv = argv;
+    std::vector<std::string> args = GetCommandLineArguments(argv);
+
     // Process command-line arguments
-    ++argv;
-    while (*argv != nullptr) {
+    for (auto iter = args.begin(); iter != args.end(); ++iter) {
         auto onError = [](const std::string &err) {
             usage(err);
             exit(1);
         };
 
-        if (ParseArg(&argv, "list-tests", &listTests, onError) ||
-            ParseArg(&argv, "log-level", &logLevel, onError) ||
-            ParseArg(&argv, "nthreads", &opt.nThreads, onError) ||
-            ParseArg(&argv, "gtest-filter", &testFilter, onError) ||
-            ParseArg(&argv, "test-filter", &testFilter, onError)) {
+        if (ParseArg(&iter, args.end(), "list-tests", &listTests, onError) ||
+            ParseArg(&iter, args.end(), "log-level", &logLevel, onError) ||
+            ParseArg(&iter, args.end(), "nthreads", &opt.nThreads, onError) ||
+            ParseArg(&iter, args.end(), "gtest-filter", &testFilter, onError) ||
+            ParseArg(&iter, args.end(), "test-filter", &testFilter, onError)) {
             // success
-        } else if ((strcmp(*argv, "--help") == 0) || (strcmp(*argv, "-h") == 0)) {
+        } else if (*iter == "--help" || *iter == "-help" || *iter == "-h") {
             usage();
             return 0;
         } else {
-            usage(StringPrintf("argument \"%s\" unknown", *argv));
+            usage(StringPrintf("argument \"%s\" unknown", *iter));
             return 1;
         }
     }

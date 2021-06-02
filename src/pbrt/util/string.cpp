@@ -140,6 +140,7 @@ std::u16string WStringToU16String(std::wstring str) {
 }
 #endif  // PBRT_IS_WINDOWS
 
+// https://stackoverflow.com/a/52703954
 std::string UTF16ToUTF8(std::u16string str) {
     std::wstring_convert<
         std::codecvt_utf8_utf16<char16_t, 0x10ffff, std::codecvt_mode::little_endian>,

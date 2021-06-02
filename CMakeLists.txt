@@ -567,6 +567,7 @@ SET (PBRT_WAVEFRONT_SOURCE_HEADERS
 )
 
 SET (PBRT_UTIL_SOURCE
+  src/pbrt/util/args.cpp
   src/pbrt/util/bluenoise.cpp
   src/pbrt/util/buffercache.cpp
   src/pbrt/util/check.cpp

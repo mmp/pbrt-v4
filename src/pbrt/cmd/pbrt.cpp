@@ -22,10 +22,6 @@
 #include <string>
 #include <vector>
 
-#ifdef PBRT_IS_WINDOWS
-#include <Windows.h>
-#endif  // PBRT_IS_WINDOWS
-
 using namespace pbrt;
 
 static void usage(const std::string &msg = {}) {
@@ -96,28 +92,7 @@ Reformatting options:
 
 // main program
 int main(int argc, char *argv[]) {
-    // Handle UTF16-encoded arguments on Windows
-#ifdef PBRT_IS_WINDOWS
-    LPWSTR *argvw = CommandLineToArgvW(GetCommandLineW(), &argc);
-    CHECK(argv != nullptr);
-    std::vector<std::string> argStrings;
-    for (int i = 0; i < argc; ++i) {
-        std::u16string su16 = WStringToU16String(argvw[i]);
-        printf("orig %s\n", argv[i]);
-        wprintf(L"wide %s\n", argvw[i]);
-        printf("su %d: ", i);
-        for (int j = 0; j < su16.size(); ++j)
-            printf("%x ", su16[j]);
-        printf("\n");
-        argStrings.push_back(UTF16ToUTF8(su16));
-        printf("as %d: ", i);
-        for (int j = 0; j < argStrings.back().size(); ++j)
-            printf("%x ", argStrings.back()[j]);
-        printf("\n");
-    }
-    for (int i = 0; i < argc; ++i)
-        argv[i] = const_cast<char *>(argStrings[i].c_str());
-#endif  // PBRT_IS_WINDOWS
+    std::vector<std::string> args = GetCommandLineArguments(argv);
 
     // Declare variables for parsed command line
     PBRTOptions options;
@@ -127,11 +102,9 @@ int main(int argc, char *argv[]) {
     bool format = false, toPly = false;
 
     // Process command-line arguments
-    ++argv;
-    while (*argv != nullptr) {
-        if ((*argv)[0] != '-') {
-            filenames.push_back(*argv);
-            ++argv;
+    for (auto iter = args.begin(); iter != args.end(); ++iter) {
+        if ((*iter)[0] != '-') {
+            filenames.push_back(*iter);
             continue;
         }
 
@@ -141,14 +114,14 @@ int main(int argc, char *argv[]) {
         };
 
         std::string cropWindow, pixelBounds, pixel, pixelMaterial;
-        if (ParseArg(&argv, "cropwindow", &cropWindow, onError)) {
+        if (ParseArg(&iter, args.end(), "cropwindow", &cropWindow, onError)) {
             std::vector<Float> c = SplitStringToFloats(cropWindow, ',');
             if (c.size() != 4) {
                 usage("Didn't find four values after --cropwindow");
                 return 1;
             }
             options.cropWindow = Bounds2f(Point2f(c[0], c[2]), Point2f(c[1], c[3]));
-        } else if (ParseArg(&argv, "pixel", &pixel, onError)) {
+        } else if (ParseArg(&iter, args.end(), "pixel", &pixel, onError)) {
             std::vector<int> p = SplitStringToInts(pixel, ',');
             if (p.size() != 2) {
                 usage("Didn't find two values after --pixel");
@@ -156,14 +129,14 @@ int main(int argc, char *argv[]) {
             }
             options.pixelBounds =
                 Bounds2i(Point2i(p[0], p[1]), Point2i(p[0] + 1, p[1] + 1));
-        } else if (ParseArg(&argv, "pixelbounds", &pixelBounds, onError)) {
+        } else if (ParseArg(&iter, args.end(), "pixelbounds", &pixelBounds, onError)) {
             std::vector<int> p = SplitStringToInts(pixelBounds, ',');
             if (p.size() != 4) {
                 usage("Didn't find four integer values after --pixelbounds");
                 return 1;
             }
             options.pixelBounds = Bounds2i(Point2i(p[0], p[2]), Point2i(p[1], p[3]));
-        } else if (ParseArg(&argv, "pixelmaterial", &pixelMaterial, onError)) {
+        } else if (ParseArg(&iter, args.end(), "pixelmaterial", &pixelMaterial, onError)) {
             std::vector<int> p = SplitStringToInts(pixelMaterial, ',');
             if (p.size() != 2) {
                 usage("Didn't find two values after --pixelmaterial");
@@ -172,42 +145,41 @@ int main(int argc, char *argv[]) {
             options.pixelMaterial = Point2i(p[0], p[1]);
         } else if (
 #ifdef PBRT_BUILD_GPU_RENDERER
-            ParseArg(&argv, "gpu", &options.useGPU, onError) ||
-            ParseArg(&argv, "gpu-device", &options.gpuDevice, onError) ||
+            ParseArg(&iter, args.end(), "gpu", &options.useGPU, onError) ||
+            ParseArg(&iter, args.end(), "gpu-device", &options.gpuDevice, onError) ||
 #endif
-            ParseArg(&argv, "debugstart", &options.debugStart, onError) ||
-            ParseArg(&argv, "disable-pixel-jitter", &options.disablePixelJitter,
+            ParseArg(&iter, args.end(), "debugstart", &options.debugStart, onError) ||
+            ParseArg(&iter, args.end(), "disable-pixel-jitter", &options.disablePixelJitter,
                      onError) ||
-            ParseArg(&argv, "disable-wavelength-jitter", &options.disableWavelengthJitter,
+            ParseArg(&iter, args.end(), "disable-wavelength-jitter", &options.disableWavelengthJitter,
                      onError) ||
-            ParseArg(&argv, "display-server", &options.displayServer, onError) ||
-            ParseArg(&argv, "force-diffuse", &options.forceDiffuse, onError) ||
-            ParseArg(&argv, "format", &format, onError) ||
-            ParseArg(&argv, "log-level", &logLevel, onError) ||
-            ParseArg(&argv, "log-file", &options.logFile, onError) ||
-            ParseArg(&argv, "mse-reference-image", &options.mseReferenceImage, onError) ||
-            ParseArg(&argv, "mse-reference-out", &options.mseReferenceOutput, onError) ||
-            ParseArg(&argv, "nthreads", &options.nThreads, onError) ||
-            ParseArg(&argv, "outfile", &options.imageFile, onError) ||
-            ParseArg(&argv, "pixelstats", &options.recordPixelStatistics, onError) ||
-            ParseArg(&argv, "quick", &options.quickRender, onError) ||
-            ParseArg(&argv, "quiet", &options.quiet, onError) ||
-            ParseArg(&argv, "render-coord-sys", &renderCoordSys, onError) ||
-            ParseArg(&argv, "seed", &options.seed, onError) ||
-            ParseArg(&argv, "spp", &options.pixelSamples, onError) ||
-            ParseArg(&argv, "stats", &options.printStatistics, onError) ||
-            ParseArg(&argv, "toply", &toPly, onError) ||
-            ParseArg(&argv, "wavefront", &options.wavefront, onError) ||
-            ParseArg(&argv, "write-partial-images", &options.writePartialImages,
+            ParseArg(&iter, args.end(), "display-server", &options.displayServer, onError) ||
+            ParseArg(&iter, args.end(), "force-diffuse", &options.forceDiffuse, onError) ||
+            ParseArg(&iter, args.end(), "format", &format, onError) ||
+            ParseArg(&iter, args.end(), "log-level", &logLevel, onError) ||
+            ParseArg(&iter, args.end(), "log-file", &options.logFile, onError) ||
+            ParseArg(&iter, args.end(), "mse-reference-image", &options.mseReferenceImage, onError) ||
+            ParseArg(&iter, args.end(), "mse-reference-out", &options.mseReferenceOutput, onError) ||
+            ParseArg(&iter, args.end(), "nthreads", &options.nThreads, onError) ||
+            ParseArg(&iter, args.end(), "outfile", &options.imageFile, onError) ||
+            ParseArg(&iter, args.end(), "pixelstats", &options.recordPixelStatistics, onError) ||
+            ParseArg(&iter, args.end(), "quick", &options.quickRender, onError) ||
+            ParseArg(&iter, args.end(), "quiet", &options.quiet, onError) ||
+            ParseArg(&iter, args.end(), "render-coord-sys", &renderCoordSys, onError) ||
+            ParseArg(&iter, args.end(), "seed", &options.seed, onError) ||
+            ParseArg(&iter, args.end(), "spp", &options.pixelSamples, onError) ||
+            ParseArg(&iter, args.end(), "stats", &options.printStatistics, onError) ||
+            ParseArg(&iter, args.end(), "toply", &toPly, onError) ||
+            ParseArg(&iter, args.end(), "wavefront", &options.wavefront, onError) ||
+            ParseArg(&iter, args.end(), "write-partial-images", &options.writePartialImages,
                      onError) ||
-            ParseArg(&argv, "upgrade", &options.upgrade, onError)) {
+            ParseArg(&iter, args.end(), "upgrade", &options.upgrade, onError)) {
             // success
-        } else if ((strcmp(*argv, "--help") == 0) || (strcmp(*argv, "-help") == 0) ||
-                   (strcmp(*argv, "-h") == 0)) {
+        } else if (*iter == "--help" || *iter == "-help" || *iter == "-h") {
             usage();
             return 0;
         } else {
-            usage(StringPrintf("argument \"%s\" unknown", *argv));
+            usage(StringPrintf("argument \"%s\" unknown", *iter));
             return 1;
         }
     }
