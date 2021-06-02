@@ -1441,7 +1441,7 @@ static ImageAndMetadata ReadPFM(const std::string &filename, Allocator alloc) {
     bool fileLittleEndian;
     ImageMetadata metadata;
 
-    FILE *fp = FOpenWrite(filename);
+    FILE *fp = FOpenRead(filename);
     if (fp == nullptr)
         ErrorExit("%s: unable to open PFM file", filename);
 
