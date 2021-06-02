@@ -503,11 +503,6 @@ set (PBRT_SOURCE
   src/pbrt/shapes.cpp
   src/pbrt/textures.cpp
 
-  src/pbrt/cpu/aggregates.cpp
-  src/pbrt/cpu/integrators.cpp
-  src/pbrt/cpu/primitive.cpp
-  src/pbrt/cpu/render.cpp
-
   src/pbrt/cmd/pspec_gpu.cpp
   )
 
@@ -534,6 +529,20 @@ set (PBRT_SOURCE_HEADERS
   src/pbrt/shapes.h
   src/pbrt/textures.h
   )  
+
+SET (PBRT_CPU_SOURCE
+  src/pbrt/cpu/aggregates.cpp
+  src/pbrt/cpu/integrators.cpp
+  src/pbrt/cpu/primitive.cpp
+  src/pbrt/cpu/render.cpp
+)
+
+SET (PBRT_CPU_SOURCE_HEADERS
+  src/pbrt/cpu/aggregates.h
+  src/pbrt/cpu/integrators.h
+  src/pbrt/cpu/primitive.h
+  src/pbrt/cpu/render.h
+)
 
 SET (PBRT_WAVEFRONT_SOURCE
   src/pbrt/wavefront/aggregate.cpp
@@ -716,6 +725,8 @@ endif ()
 
 source_group ("Source Files" FILES ${PBRT_SOURCE})
 source_group ("Header Files" FILES ${PBRT_SOURCE_HEADERS})
+source_group ("Source Files/cpu" FILES ${PBRT_CPU_SOURCE})
+source_group ("Header Files/cpu" FILES ${PBRT_CPU_SOURCE_HEADERS})
 source_group ("Source Files/util" FILES ${PBRT_UTIL_SOURCE})
 source_group ("Header Files/util" FILES ${PBRT_UTIL_SOURCE_HEADERS})
 source_group ("Source Files/wavefront" FILES ${PBRT_WAVEFRONT_SOURCE})
@@ -765,6 +776,8 @@ add_library (pbrt_lib STATIC
   ${PBRT_SOA_GENERATED}
   ${PBRT_SOURCE}
   ${PBRT_SOURCE_HEADERS}
+  ${PBRT_CPU_SOURCE}
+  ${PBRT_CPU_SOURCE_HEADERS}
   ${PBRT_UTIL_SOURCE}
   ${PBRT_UTIL_SOURCE_HEADERS}
   ${PBRT_WAVEFRONT_SOURCE}
