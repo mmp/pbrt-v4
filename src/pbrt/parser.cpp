@@ -14,6 +14,7 @@
 #include <pbrt/util/print.h>
 #include <pbrt/util/progressreporter.h>
 #include <pbrt/util/stats.h>
+#include <pbrt/util/string.h>
 
 #include <double-conversion/double-conversion.h>
 
@@ -171,7 +172,7 @@ std::unique_ptr<Tokenizer> Tokenizer::CreateFromFile(
         return nullptr;
     };
 
-    HANDLE fileHandle = CreateFileA(filename.c_str(), GENERIC_READ, FILE_SHARE_READ, 0,
+    HANDLE fileHandle = CreateFileW(UTF8ToWString(filename).c_str(), GENERIC_READ, FILE_SHARE_READ, 0,
                                     OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
     if (!fileHandle) {
         return errorReportLambda();

@@ -8,6 +8,15 @@
 #include <stdint.h>
 #include <cstddef>
 
+#ifdef PBRT_IS_WINDOWS
+#ifndef UNICODE
+#define UNICODE
+#endif
+#ifndef _UNICODE
+#define UNICODE
+#endif
+#endif  // PBRT_IS_WINDOWS
+
 // GPU Macro Definitions
 #if defined(__CUDA_ARCH__)
 #define PBRT_IS_GPU_CODE

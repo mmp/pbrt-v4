@@ -87,10 +87,10 @@ int LastError() {
 std::string ErrorString(int errorId) {
 #ifdef PBRT_IS_WINDOWS
     char *s = NULL;
-    FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+    FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
                       FORMAT_MESSAGE_IGNORE_INSERTS,
-                  NULL, errorId, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&s, 0,
-                  NULL);
+                   NULL, errorId, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&s, 0,
+                   NULL);
 
     std::string result = StringPrintf("%s (%d)", s, errorId);
     LocalFree(s);

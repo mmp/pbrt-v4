@@ -19,6 +19,15 @@
 #include <pbrt/util/string.h>
 #include <pbrt/wavefront/wavefront.h>
 
+#include <string>
+#include <vector>
+
+#ifdef PBRT_IS_WINDOWS
+#include <Windows.h>
+//#include <processenv.h>
+//#include <shellapi.h>
+#endif  // PBRT_IS_WINDOWS
+
 using namespace pbrt;
 
 static void usage(const std::string &msg = {}) {
@@ -89,6 +98,28 @@ Reformatting options:
 
 // main program
 int main(int argc, char *argv[]) {
+#ifdef PBRT_IS_WINDOWS
+    LPWSTR *argvw = CommandLineToArgvW(GetCommandLineW(), &argc);
+    CHECK(argv != nullptr);
+    std::vector<std::string> argStrings;
+    for (int i = 0; i < argc; ++i) {
+        std::u16string su16 = WStringToU16String(argvw[i]);
+        printf("orig %s\n", argv[i]);
+        wprintf(L"wide %s\n", argvw[i]);
+        printf("su %d: ", i);
+        for (int j = 0; j < su16.size(); ++j)
+            printf("%x ", su16[j]);
+        printf("\n");
+        argStrings.push_back(UTF16ToUTF8(su16));
+        printf("as %d: ", i);
+        for (int j = 0; j < argStrings.back().size(); ++j)
+            printf("%x ", argStrings.back()[j]);
+        printf("\n");
+    }
+    for (int i = 0; i < argc; ++i)
+        argv[i] = const_cast<char *>(argStrings[i].c_str());
+#endif  // PBRT_IS_WINDOWS
+
     // Declare variables for parsed command line
     PBRTOptions options;
     std::vector<std::string> filenames;

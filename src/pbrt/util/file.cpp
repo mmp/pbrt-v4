@@ -183,7 +183,7 @@ std::vector<Float> ReadFloatFile(const std::string &filename) {
 }
 
 bool WriteFile(const std::string &filename, const std::string &contents) {
-    std::ofstream out(filename);
+    std::ofstream out(filename, std::ios::binary);
     out << contents;
     out.close();
     if (!out.good()) {
