@@ -141,18 +141,18 @@ PBRT_CPU_GPU inline Float BilinearPDF(Point2f p, pstd::span<const Float> w) {
 PBRT_CPU_GPU inline Point2f SampleBilinear(Point2f u, pstd::span<const Float> w) {
     DCHECK_EQ(4, w.size());
     Point2f p;
-    // Sample $v$ for bilinear marginal distribution
-    p[1] = SampleLinear(u[1], w[0] + w[1], w[2] + w[3]);
+    // Sample $y$ for bilinear marginal distribution
+    p.y = SampleLinear(u[1], w[0] + w[1], w[2] + w[3]);
 
-    // Sample $u$ for bilinear conditional distribution
-    p[0] = SampleLinear(u[0], Lerp(p[1], w[0], w[2]), Lerp(p[1], w[1], w[3]));
+    // Sample $x$ for bilinear conditional distribution
+    p.x = SampleLinear(u[0], Lerp(p.y, w[0], w[2]), Lerp(p.y, w[1], w[3]));
 
     return p;
 }
 
-PBRT_CPU_GPU inline Point2f InvertBilinearSample(Point2f p, pstd::span<const Float> v) {
-    return {InvertLinearSample(p[0], Lerp(p[1], v[0], v[2]), Lerp(p[1], v[1], v[3])),
-            InvertLinearSample(p[1], v[0] + v[1], v[2] + v[3])};
+PBRT_CPU_GPU inline Point2f InvertBilinearSample(Point2f p, pstd::span<const Float> w) {
+    return {InvertLinearSample(p[0], Lerp(p[1], w[0], w[2]), Lerp(p[1], w[1], w[3])),
+            InvertLinearSample(p[1], w[0] + w[1], w[2] + w[3])};
 }
 
 PBRT_CPU_GPU inline Float XYZMatchingPDF(Float lambda) {
@@ -316,7 +316,8 @@ PBRT_CPU_GPU inline Float TrimmedLogisticPDF(Float x, Float s, Float a, Float b)
 PBRT_CPU_GPU inline Float SampleTrimmedLogistic(Float u, Float s, Float a, Float b) {
     DCHECK_LT(a, b);
     auto P = [&](Float x) { return InvertLogisticSample(x, s); };
-    Float x = SampleLogistic(Lerp(u, P(a), P(b)), s);
+    u = Lerp(u, P(a), P(b));
+    Float x = SampleLogistic(u, s);
     DCHECK(!IsNaN(x));
     return Clamp(x, a, b);
 }
@@ -452,7 +453,7 @@ PBRT_CPU_GPU inline Point2f InvertUniformSphereSample(const Vector3f &v) {
 
 PBRT_CPU_GPU inline Vector3f SampleCosineHemisphere(const Point2f &u) {
     Point2f d = SampleUniformDiskConcentric(u);
-    Float z = SafeSqrt(1 - d.x * d.x - d.y * d.y);
+    Float z = SafeSqrt(1 - Sqr(d.x) - Sqr(d.y));
     return Vector3f(d.x, d.y, z);
 }
 

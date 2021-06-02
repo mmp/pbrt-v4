@@ -1749,8 +1749,7 @@ PBRT_CPU_GPU inline Float CosDPhi(Vector3f wa, Vector3f wb) {
     return Clamp((wa.x * wb.x + wa.y * wb.y) / std::sqrt(waxy * wbxy), -1, 1);
 }
 
-PBRT_CPU_GPU
-inline bool SameHemisphere(Vector3f w, Vector3f wp) {
+PBRT_CPU_GPU inline bool SameHemisphere(Vector3f w, Vector3f wp) {
     return w.z * wp.z > 0;
 }
 

@@ -255,7 +255,8 @@ void Tokenizer::CheckUTF(const void *ptr, int len) const {
     // https://en.wikipedia.org/wiki/Byte_order_mark
     if (len >= 2 && ((c[0] == 0xfe && c[1] == 0xff) || (c[0] == 0xff && c[1] == 0xfe)))
         errorCallback("File is encoded with UTF-16, which is not currently "
-                      "supported by pbrt (https://github.com/mmp/pbrt-v4/issues/136).", &loc);
+                      "supported by pbrt (https://github.com/mmp/pbrt-v4/issues/136).",
+                      &loc);
 }
 
 pstd::optional<Token> Tokenizer::Next() {

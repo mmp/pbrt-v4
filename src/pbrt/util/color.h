@@ -156,21 +156,20 @@ inline RGB max(const RGB &a, const RGB &b) {
     return RGB(std::max(a.r, b.r), std::max(a.g, b.g), std::max(a.b, b.b));
 }
 
+PBRT_CPU_GPU
+inline RGB Lerp(Float t, const RGB &s1, const RGB &s2) {
+    return (1 - t) * s1 + t * s2;
+}
+
+// RGB Inline Functions
 template <typename U, typename V>
 PBRT_CPU_GPU inline RGB Clamp(const RGB &rgb, U min, V max) {
     return RGB(pbrt::Clamp(rgb.r, min, max), pbrt::Clamp(rgb.g, min, max),
                pbrt::Clamp(rgb.b, min, max));
 }
-
-PBRT_CPU_GPU
-inline RGB ClampZero(const RGB &rgb) {
+PBRT_CPU_GPU inline RGB ClampZero(const RGB &rgb) {
     return RGB(std::max<Float>(0, rgb.r), std::max<Float>(0, rgb.g),
                std::max<Float>(0, rgb.b));
-}
-
-PBRT_CPU_GPU
-inline RGB Lerp(Float t, const RGB &s1, const RGB &s2) {
-    return (1 - t) * s1 + t * s2;
 }
 
 // XYZ Definition
@@ -359,7 +358,7 @@ class RGBSigmoidPolynomial {
   private:
     // RGBSigmoidPolynomial Private Methods
     PBRT_CPU_GPU
-    static Float s(Float x) { return .5f + x / (2 * std::sqrt(1 + x * x)); };
+    static Float s(Float x) { return .5f + x / (2 * std::sqrt(1 + Sqr(x))); };
 
     // RGBSigmoidPolynomial Private Members
     Float c0, c1, c2;

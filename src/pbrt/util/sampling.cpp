@@ -586,7 +586,7 @@ AliasTable::AliasTable(pstd::span<const Float> weights, Allocator alloc)
         bins[un.index].alias = ov.index;
 
         // Push excess probability on to work list
-        Float pExcess = (un.pHat + ov.pHat) - 1;
+        Float pExcess = un.pHat + ov.pHat - 1;
         if (pExcess < 1)
             under.push_back(Outcome{pExcess, ov.index});
         else
