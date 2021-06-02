@@ -68,7 +68,7 @@ PBRT_GPU int nRawLogItems;
 void InitLogging(LogLevel level, std::string logFile, bool useGPU) {
     logging::logLevel = level;
     if (!logFile.empty()) {
-        logging::logFile = FOpenWrite(logFile.c_str());
+        logging::logFile = FOpenWrite(logFile);
         if (!logging::logFile)
             ErrorExit("%s: %s", logFile, ErrorString());
         logging::logLevel = LogLevel::Verbose;

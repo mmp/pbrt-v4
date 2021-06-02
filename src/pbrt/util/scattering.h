@@ -64,15 +64,15 @@ inline Float FrDielectric(Float cosTheta_i, Float eta) {
 
 PBRT_CPU_GPU
 inline Float FrComplex(Float cosTheta_i, pstd::complex<Float> eta) {
-    cosTheta_i = Clamp(cosTheta_i, 0, 1);
     using Complex = pstd::complex<Float>;
+    cosTheta_i = Clamp(cosTheta_i, 0, 1);
+    // Compute complex $\cos\,\theta_\roman{t}$ for Fresnel equations using Snell's law
+    Float sin2Theta_i = 1 - cosTheta_i * cosTheta_i;
+    Complex sin2Theta_t = sin2Theta_i / Sqr(eta);
+    Complex cosTheta_t = pstd::sqrt(1.f - sin2Theta_t);
 
-    // Compute _cosTheta_t_ using Snell's law
-    Complex sinTheta_i = pstd::sqrt(1.f - cosTheta_i * cosTheta_i);
-    Complex sinTheta_t = sinTheta_i / eta;
-    Complex cosTheta_t = pstd::sqrt(1.f - sinTheta_t * sinTheta_t);
     Complex r_parl = (eta * cosTheta_i - cosTheta_t) / (eta * cosTheta_i + cosTheta_t);
-    Complex r_perp = (eta * cosTheta_t - cosTheta_i) / (eta * cosTheta_t + cosTheta_i);
+    Complex r_perp = (cosTheta_i - eta * cosTheta_t) / (cosTheta_i + eta * cosTheta_t);
     return (pstd::norm(r_parl) + pstd::norm(r_perp)) * .5f;
 }
 

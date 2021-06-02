@@ -24,8 +24,6 @@
 
 #ifdef PBRT_IS_WINDOWS
 #include <Windows.h>
-//#include <processenv.h>
-//#include <shellapi.h>
 #endif  // PBRT_IS_WINDOWS
 
 using namespace pbrt;
@@ -98,6 +96,7 @@ Reformatting options:
 
 // main program
 int main(int argc, char *argv[]) {
+    // Handle UTF16-encoded arguments on Windows
 #ifdef PBRT_IS_WINDOWS
     LPWSTR *argvw = CommandLineToArgvW(GetCommandLineW(), &argc);
     CHECK(argv != nullptr);
