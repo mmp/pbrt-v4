@@ -196,17 +196,7 @@ std::unique_ptr<Tokenizer> Tokenizer::CreateFromFile(
 
     return std::make_unique<Tokenizer>(ptr, len, filename, std::move(errorCallback));
 #else
-    FILE *f = fopen(filename.c_str(), "r");
-    if (!f) {
-        errorCallback(StringPrintf("%s: %s", filename, ErrorString()).c_str(), nullptr);
-        return nullptr;
-    }
-
-    std::string str;
-    int ch;
-    while ((ch = fgetc(f)) != EOF)
-        str.push_back(char(ch));
-    fclose(f);
+    std::string str = ReadFileContents(filename);
     return std::make_unique_ptr<Tokenizer>(std::move(str), std::move(errorCallback));
 #endif
 }
