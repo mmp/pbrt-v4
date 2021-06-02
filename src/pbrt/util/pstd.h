@@ -1138,6 +1138,22 @@ PBRT_CPU_GPU inline double ceil(double arg) {
 #endif
 }
 
+PBRT_CPU_GPU inline float round(float arg) {
+#ifdef PBRT_IS_GPU_CODE
+    return ::roundf(arg);
+#else
+    return std::round(arg);
+#endif
+}
+
+PBRT_CPU_GPU inline double round(double arg) {
+#ifdef PBRT_IS_GPU_CODE
+    return ::round(arg);
+#else
+    return std::round(arg);
+#endif
+}
+
 template <typename T>
 PBRT_CPU_GPU T real(const complex<T> &z) {
     return z.re;

@@ -509,7 +509,7 @@ inline uint8_t LinearToSRGB8(Float value, Float dither = 0) {
         return 0;
     if (value >= 1)
         return 255;
-    return Clamp(std::round(255.f * LinearToSRGB(value) + dither), 0, 255);
+    return Clamp(pstd::round(255.f * LinearToSRGB(value) + dither), 0, 255);
 }
 
 PBRT_CPU_GPU

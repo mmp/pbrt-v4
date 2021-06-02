@@ -236,8 +236,8 @@ T MIPMap::Filter(Point2f st, Vector2f dst0, Vector2f dst1) const {
         if (options.filter == FilterFunction::Point) {
             // Return point-sampled value at selected MIP level
             Point2i resolution = LevelResolution(iLevel);
-            Point2i sti(std::round(st[0] * resolution[0] - 0.5f),
-                        std::round(st[1] * resolution[1] - 0.5f));
+            Point2i sti(pstd::round(st[0] * resolution[0] - 0.5f),
+                        pstd::round(st[1] * resolution[1] - 0.5f));
             return Texel<T>(iLevel, sti);
 
         } else if (options.filter == FilterFunction::Bilinear) {

@@ -1800,7 +1800,7 @@ class OctahedralVector {
     // OctahedralVector Private Methods
     PBRT_CPU_GPU
     static uint16_t Encode(Float f) {
-        return std::round(Clamp((f + 1) / 2, 0, 1) * 65535.f);
+        return pstd::round(Clamp((f + 1) / 2, 0, 1) * 65535.f);
     }
 
     PBRT_CPU_GPU
