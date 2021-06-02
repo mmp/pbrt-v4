@@ -136,7 +136,7 @@ void ImageTileIntegrator::Render() {
         *referenceImage = referenceImage->Crop(cropBounds);
         CHECK_EQ(referenceImage->Resolution(), Point2i(pixelBounds.Diagonal()));
 
-        mseOutFile = fopen(Options->mseReferenceOutput.c_str(), "w");
+        mseOutFile = FOpenWrite(Options->mseReferenceOutput);
         if (!mseOutFile)
             ErrorExit("%s: %s", Options->mseReferenceOutput, ErrorString());
     }

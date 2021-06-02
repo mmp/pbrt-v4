@@ -12,6 +12,7 @@
 #include <pbrt/util/color.h>
 #include <pbrt/util/colorspace.h>
 #include <pbrt/util/error.h>
+#include <pbrt/util/file.h>
 #include <pbrt/util/float.h>
 #include <pbrt/util/hash.h>
 #include <pbrt/util/log.h>
@@ -765,7 +766,7 @@ Tensor::Tensor(const std::string &filename) : m_filename(filename) {
 #define SAFE_READ(vars, size, count) \
     ASSERT(fread(vars, size, count, file) == (count), "Unable to read " #vars ".")
 
-    FILE *file = fopen(filename.c_str(), "rb");
+    FILE *file = FOpenRead(filename);
     if (file == NULL)
         ErrorExit("%s: unable to open file", filename);
 

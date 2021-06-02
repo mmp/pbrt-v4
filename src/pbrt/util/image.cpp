@@ -1441,7 +1441,7 @@ static ImageAndMetadata ReadPFM(const std::string &filename, Allocator alloc) {
     bool fileLittleEndian;
     ImageMetadata metadata;
 
-    FILE *fp = fopen(filename.c_str(), "rb");
+    FILE *fp = FOpenWrite(filename);
     if (fp == nullptr)
         ErrorExit("%s: unable to open PFM file", filename);
 
@@ -1546,7 +1546,7 @@ static ImageAndMetadata ReadHDR(const std::string &filename, Allocator alloc) {
 }
 
 bool Image::WritePFM(const std::string &filename, const ImageMetadata &metadata) const {
-    FILE *fp = fopen(filename.c_str(), "wb");
+    FILE *fp = FOpenWrite(filename);
     if (fp == nullptr) {
         Error("Unable to open output PFM file \"%s\"", filename);
         return false;

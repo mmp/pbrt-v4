@@ -110,8 +110,24 @@ std::string ReadFileContents(const std::string &filename) {
                        (std::istreambuf_iterator<char>()));
 }
 
+FILE *FOpenRead(const std::string &filename) {
+#ifdef PBRT_IS_WINDOWS
+    return _wfopen(UTF8ToWString(filename).c_str(), L"rb");
+#else
+    return fopen(filename.c_str(), "rb");
+#endif
+}
+
+FILE *FOpenWrite(const std::string &filename) {
+#ifdef PBRT_IS_WINDOWS
+    return _wfopen(UTF8ToWString(filename).c_str(), L"wb");
+#else
+    return fopen(filename.c_str(), "wb");
+#endif
+}
+
 std::vector<Float> ReadFloatFile(const std::string &filename) {
-    FILE *f = fopen(filename.c_str(), "r");
+    FILE *f = FOpenRead(filename);
     if (f == nullptr) {
         Error("%s: unable to open file", filename);
         return {};

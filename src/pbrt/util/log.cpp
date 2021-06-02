@@ -9,6 +9,7 @@
 #endif
 #include <pbrt/util/check.h>
 #include <pbrt/util/error.h>
+#include <pbrt/util/file.h>
 #include <pbrt/util/parallel.h>
 
 #include <stdio.h>
@@ -67,7 +68,7 @@ PBRT_GPU int nRawLogItems;
 void InitLogging(LogLevel level, std::string logFile, bool useGPU) {
     logging::logLevel = level;
     if (!logFile.empty()) {
-        logging::logFile = fopen(logFile.c_str(), "w");
+        logging::logFile = FOpenWrite(logFile.c_str());
         if (!logging::logFile)
             ErrorExit("%s: %s", logFile, ErrorString());
         logging::logLevel = LogLevel::Verbose;

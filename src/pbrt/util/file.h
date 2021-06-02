@@ -29,6 +29,9 @@ std::string RemoveExtension(const std::string &filename);
 
 std::vector<std::string> MatchingFilenames(const std::string &base);
 
+FILE *FOpenRead(const std::string &filename);
+FILE *FOpenWrite(const std::string &filename);
+
 }  // namespace pbrt
 
 #endif  // PBRT_UTIL_FILE_H
