@@ -67,11 +67,10 @@ class BSDF {
             DCHECK_GE(bs->pdf, 0);
         if (!bs || !bs->f || bs->pdf == 0 || bs->wi.z == 0)
             return {};
-        PBRT_DBG("For wo = (%f, %f, %f), ng %f %f %f ns %f %f %f "
-                 "sampled f = %f %f %f %f, pdf = %f, ratio[0] = %f "
-                 "wi = (%f, %f, %f)\n",
-                 wo.x, wo.y, wo.z, ng.x, ng.y, ng.z, shadingFrame.z.x, shadingFrame.z.y,
-                 shadingFrame.z.z, bs->f[0], bs->f[1], bs->f[2], bs->f[3], bs->pdf,
+        PBRT_DBG("For wo = (%f, %f, %f), ns %f %f %f sampled f = %f %f %f %f, pdf = %f, "
+                 "ratio[0] = %f wi = (%f, %f, %f)\n",
+                 wo.x, wo.y, wo.z, shadingFrame.z.x, shadingFrame.z.y, shadingFrame.z.z,
+                 bs->f[0], bs->f[1], bs->f[2], bs->f[3], bs->pdf,
                  (bs->pdf > 0) ? (bs->f[0] / bs->pdf) : 0, bs->wi.x, bs->wi.y, bs->wi.z);
         bs->wi = LocalToRender(bs->wi);
         return bs;
@@ -106,11 +105,10 @@ class BSDF {
             return {};
         DCHECK_GT(bs->pdf, 0);
 
-        PBRT_DBG("For wo = (%f, %f, %f), ng %f %f %f ns %f %f %f "
-                 "sampled f = %f %f %f %f, pdf = %f, ratio[0] = %f "
-                 "wi = (%f, %f, %f)\n",
-                 wo.x, wo.y, wo.z, ng.x, ng.y, ng.z, shadingFrame.z.x, shadingFrame.z.y,
-                 shadingFrame.z.z, bs->f[0], bs->f[1], bs->f[2], bs->f[3], bs->pdf,
+        PBRT_DBG("For wo = (%f, %f, %f) ns %f %f %f sampled f = %f %f %f %f, pdf = %f, "
+                 "ratio[0] = %f wi = (%f, %f, %f)\n",
+                 wo.x, wo.y, wo.z, shadingFrame.z.x, shadingFrame.z.y, shadingFrame.z.z,
+                 bs->f[0], bs->f[1], bs->f[2], bs->f[3], bs->pdf,
                  (bs->pdf > 0) ? (bs->f[0] / bs->pdf) : 0, bs->wi.x, bs->wi.y, bs->wi.z);
 
         bs->wi = LocalToRender(bs->wi);
