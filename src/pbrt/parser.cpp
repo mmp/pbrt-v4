@@ -173,7 +173,7 @@ std::unique_ptr<Tokenizer> Tokenizer::CreateFromFile(
     };
 
     HANDLE fileHandle =
-        CreateFileW(UTF8ToWString(filename).c_str(), GENERIC_READ, FILE_SHARE_READ, 0,
+        CreateFileW(WStringFromUTF8(filename).c_str(), GENERIC_READ, FILE_SHARE_READ, 0,
                     OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
     if (!fileHandle) {
         return errorReportLambda();

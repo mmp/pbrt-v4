@@ -112,7 +112,7 @@ std::string ReadFileContents(std::string filename) {
 
 FILE *FOpenRead(std::string filename) {
 #ifdef PBRT_IS_WINDOWS
-    return _wfopen(UTF8ToWString(filename).c_str(), L"rb");
+    return _wfopen(WStringFromUTF8(filename).c_str(), L"rb");
 #else
     return fopen(filename.c_str(), "rb");
 #endif
@@ -120,7 +120,7 @@ FILE *FOpenRead(std::string filename) {
 
 FILE *FOpenWrite(std::string filename) {
 #ifdef PBRT_IS_WINDOWS
-    return _wfopen(UTF8ToWString(filename).c_str(), L"wb");
+    return _wfopen(WStringFromUTF8(filename).c_str(), L"wb");
 #else
     return fopen(filename.c_str(), "wb");
 #endif
