@@ -31,7 +31,7 @@ TEST(File, RemoveExtension) {
 TEST(File, ReadWriteFile) {
     std::string fn = inTestDir("readwrite.txt");
     std::string str = "this is a test.";
-    EXPECT_TRUE(WriteFile(fn, str));
+    EXPECT_TRUE(WriteFileContents(fn, str));
     std::string contents = ReadFileContents(fn);
     EXPECT_FALSE(contents.empty());
     EXPECT_EQ(str, contents);
@@ -40,7 +40,7 @@ TEST(File, ReadWriteFile) {
 
 TEST(File, Success) {
     std::string fn = inTestDir("floatfile_good.txt");
-    EXPECT_TRUE(WriteFile(fn, R"(1
+    EXPECT_TRUE(WriteFileContents(fn, R"(1
 # comment 6632
 -2.5
 #6502
@@ -66,7 +66,7 @@ TEST(File, Failures) {
     EXPECT_EQ(0, floats.size());
 
     std::string fn = inTestDir("malformed.txt");
-    EXPECT_TRUE(WriteFile(fn, R"(1
+    EXPECT_TRUE(WriteFileContents(fn, R"(1
 2 3 4
 l5l
 6

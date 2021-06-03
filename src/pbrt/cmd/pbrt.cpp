@@ -92,6 +92,7 @@ Reformatting options:
 
 // main program
 int main(int argc, char *argv[]) {
+    // Convert command-line arguments to vector of strings
     std::vector<std::string> args = GetCommandLineArguments(argv);
 
     // Declare variables for parsed command line
@@ -136,7 +137,8 @@ int main(int argc, char *argv[]) {
                 return 1;
             }
             options.pixelBounds = Bounds2i(Point2i(p[0], p[2]), Point2i(p[1], p[3]));
-        } else if (ParseArg(&iter, args.end(), "pixelmaterial", &pixelMaterial, onError)) {
+        } else if (ParseArg(&iter, args.end(), "pixelmaterial", &pixelMaterial,
+                            onError)) {
             std::vector<int> p = SplitStringToInts(pixelMaterial, ',');
             if (p.size() != 2) {
                 usage("Didn't find two values after --pixelmaterial");
@@ -149,20 +151,25 @@ int main(int argc, char *argv[]) {
             ParseArg(&iter, args.end(), "gpu-device", &options.gpuDevice, onError) ||
 #endif
             ParseArg(&iter, args.end(), "debugstart", &options.debugStart, onError) ||
-            ParseArg(&iter, args.end(), "disable-pixel-jitter", &options.disablePixelJitter,
+            ParseArg(&iter, args.end(), "disable-pixel-jitter",
+                     &options.disablePixelJitter, onError) ||
+            ParseArg(&iter, args.end(), "disable-wavelength-jitter",
+                     &options.disableWavelengthJitter, onError) ||
+            ParseArg(&iter, args.end(), "display-server", &options.displayServer,
                      onError) ||
-            ParseArg(&iter, args.end(), "disable-wavelength-jitter", &options.disableWavelengthJitter,
+            ParseArg(&iter, args.end(), "force-diffuse", &options.forceDiffuse,
                      onError) ||
-            ParseArg(&iter, args.end(), "display-server", &options.displayServer, onError) ||
-            ParseArg(&iter, args.end(), "force-diffuse", &options.forceDiffuse, onError) ||
             ParseArg(&iter, args.end(), "format", &format, onError) ||
             ParseArg(&iter, args.end(), "log-level", &logLevel, onError) ||
             ParseArg(&iter, args.end(), "log-file", &options.logFile, onError) ||
-            ParseArg(&iter, args.end(), "mse-reference-image", &options.mseReferenceImage, onError) ||
-            ParseArg(&iter, args.end(), "mse-reference-out", &options.mseReferenceOutput, onError) ||
+            ParseArg(&iter, args.end(), "mse-reference-image", &options.mseReferenceImage,
+                     onError) ||
+            ParseArg(&iter, args.end(), "mse-reference-out", &options.mseReferenceOutput,
+                     onError) ||
             ParseArg(&iter, args.end(), "nthreads", &options.nThreads, onError) ||
             ParseArg(&iter, args.end(), "outfile", &options.imageFile, onError) ||
-            ParseArg(&iter, args.end(), "pixelstats", &options.recordPixelStatistics, onError) ||
+            ParseArg(&iter, args.end(), "pixelstats", &options.recordPixelStatistics,
+                     onError) ||
             ParseArg(&iter, args.end(), "quick", &options.quickRender, onError) ||
             ParseArg(&iter, args.end(), "quiet", &options.quiet, onError) ||
             ParseArg(&iter, args.end(), "render-coord-sys", &renderCoordSys, onError) ||
@@ -171,8 +178,8 @@ int main(int argc, char *argv[]) {
             ParseArg(&iter, args.end(), "stats", &options.printStatistics, onError) ||
             ParseArg(&iter, args.end(), "toply", &toPly, onError) ||
             ParseArg(&iter, args.end(), "wavefront", &options.wavefront, onError) ||
-            ParseArg(&iter, args.end(), "write-partial-images", &options.writePartialImages,
-                     onError) ||
+            ParseArg(&iter, args.end(), "write-partial-images",
+                     &options.writePartialImages, onError) ||
             ParseArg(&iter, args.end(), "upgrade", &options.upgrade, onError)) {
             // success
         } else if (*iter == "--help" || *iter == "-help" || *iter == "-h") {

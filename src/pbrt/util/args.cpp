@@ -17,10 +17,8 @@ std::vector<std::string> GetCommandLineArguments(char *argv[]) {
     int argc;
     LPWSTR *argvw = CommandLineToArgvW(GetCommandLineW(), &argc);
     CHECK(argv != nullptr);
-    for (int i = 1; i < argc; ++i) {
-        std::u16string su16 = WStringToU16String(argvw[i]);
-        argStrings.push_back(UTF16ToUTF8(su16));
-    }
+    for (int i = 1; i < argc; ++i)
+        argStrings.push_back(UTF8FromWString(argvw[i]));
 #else
     ++argv;  // skip executable name
     while (*argv) {

@@ -169,6 +169,7 @@ bool ParseArg(Iter *iter, Iter end, const std::string &name, T out,
         return false;
 }
 
+// Command-line Argument Utility Functions
 std::vector<std::string> GetCommandLineArguments(char *argv[]);
 
 }  // namespace pbrt

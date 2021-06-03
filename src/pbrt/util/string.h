@@ -24,14 +24,14 @@ std::vector<int> SplitStringToInts(std::string_view str, char ch);
 std::vector<Float> SplitStringToFloats(std::string_view str, char ch);
 std::vector<double> SplitStringToDoubles(std::string_view str, char ch);
 
-#ifdef PBRT_IS_WINDOWS
-std::wstring UTF8ToWString(std::string str);
-std::wstring U16StringToWString(std::u16string str);
-std::u16string WStringToU16String(std::wstring str);
-#endif // PBRT_IS_WINDOWS
+// String Utility Function Declarations
+std::string UTF8FromUTF16(std::u16string str);
+std::u16string UTF16FromUTF8(std::string str);
 
-std::string UTF16ToUTF8(std::u16string str);
-std::u16string UTF8ToUTF16(std::string str);
+#ifdef PBRT_IS_WINDOWS
+std::wstring WStringFromUTF8(std::string str);
+std::string UTF8FromWString(std::wstring str);
+#endif  // PBRT_IS_WINDOWS
 
 }  // namespace pbrt
 

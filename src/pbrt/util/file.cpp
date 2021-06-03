@@ -26,20 +26,20 @@ namespace pbrt {
 
 static filesystem::path searchDirectory;
 
-void SetSearchDirectory(const std::string &filename) {
+void SetSearchDirectory(std::string filename) {
     filesystem::path path(filename);
     if (!path.is_directory())
         path = path.parent_path();
     searchDirectory = path;
 }
 
-static bool IsAbsolutePath(const std::string &filename) {
+static bool IsAbsolutePath(std::string filename) {
     if (filename.empty())
         return false;
     return filesystem::path(filename).is_absolute();
 }
 
-bool HasExtension(const std::string &filename, const std::string &e) {
+bool HasExtension(std::string filename, std::string e) {
     std::string ext = e;
     if (!ext.empty() && ext[0] == '.')
         ext.erase(0, 1);
@@ -51,7 +51,7 @@ bool HasExtension(const std::string &filename, const std::string &e) {
                       [](char a, char b) { return std::tolower(a) == std::tolower(b); });
 }
 
-std::string RemoveExtension(const std::string &filename) {
+std::string RemoveExtension(std::string filename) {
     std::string ext = filesystem::path(filename).extension();
     if (ext.empty())
         return filename;
@@ -60,7 +60,7 @@ std::string RemoveExtension(const std::string &filename) {
     return f;
 }
 
-std::string ResolveFilename(const std::string &filename) {
+std::string ResolveFilename(std::string filename) {
     if (searchDirectory.empty() || filename.empty())
         return filename;
     else if (IsAbsolutePath(filename))
@@ -69,7 +69,7 @@ std::string ResolveFilename(const std::string &filename) {
         return (searchDirectory / filesystem::path(filename)).make_absolute().str();
 }
 
-std::vector<std::string> MatchingFilenames(const std::string &filenameBase) {
+std::vector<std::string> MatchingFilenames(std::string filenameBase) {
     std::vector<std::string> filenames;
 
     filesystem::path basePath(filenameBase);
@@ -97,12 +97,12 @@ std::vector<std::string> MatchingFilenames(const std::string &filenameBase) {
     return filenames;
 }
 
-bool FileExists(const std::string &filename) {
+bool FileExists(std::string filename) {
     std::ifstream ifs(filename);
     return (bool)ifs;
 }
 
-std::string ReadFileContents(const std::string &filename) {
+std::string ReadFileContents(std::string filename) {
     std::ifstream ifs(filename, std::ios::binary);
     if (!ifs)
         ErrorExit("%s: %s", filename, ErrorString());
@@ -110,7 +110,7 @@ std::string ReadFileContents(const std::string &filename) {
                        (std::istreambuf_iterator<char>()));
 }
 
-FILE *FOpenRead(const std::string &filename) {
+FILE *FOpenRead(std::string filename) {
 #ifdef PBRT_IS_WINDOWS
     return _wfopen(UTF8ToWString(filename).c_str(), L"rb");
 #else
@@ -118,7 +118,7 @@ FILE *FOpenRead(const std::string &filename) {
 #endif
 }
 
-FILE *FOpenWrite(const std::string &filename) {
+FILE *FOpenWrite(std::string filename) {
 #ifdef PBRT_IS_WINDOWS
     return _wfopen(UTF8ToWString(filename).c_str(), L"wb");
 #else
@@ -126,7 +126,7 @@ FILE *FOpenWrite(const std::string &filename) {
 #endif
 }
 
-std::vector<Float> ReadFloatFile(const std::string &filename) {
+std::vector<Float> ReadFloatFile(std::string filename) {
     FILE *f = FOpenRead(filename);
     if (f == nullptr) {
         Error("%s: unable to open file", filename);
@@ -182,7 +182,7 @@ std::vector<Float> ReadFloatFile(const std::string &filename) {
     return values;
 }
 
-bool WriteFile(const std::string &filename, const std::string &contents) {
+bool WriteFileContents(std::string filename, const std::string &contents) {
     std::ofstream out(filename, std::ios::binary);
     out << contents;
     out.close();

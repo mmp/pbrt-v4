@@ -3509,7 +3509,7 @@ void FunctionIntegrator::Render() {
 
     prog.Done();
 
-    WriteFile(outputFilename, result);
+    WriteFileContents(outputFilename, result);
 }
 
 std::string FunctionIntegrator::ToString() const {
