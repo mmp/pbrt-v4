@@ -81,13 +81,13 @@ class Tuple2 {
     // The default versions of these are fine for release builds; for debug
     // we define them so that we can add the Assert checks.
     PBRT_CPU_GPU
-    Tuple2(const Child<T> &c) {
+    Tuple2(Child<T> c) {
         DCHECK(!c.HasNaN());
         x = c.x;
         y = c.y;
     }
     PBRT_CPU_GPU
-    Child<T> &operator=(const Child<T> &c) {
+    Child<T> &operator=(Child<T> c) {
         DCHECK(!c.HasNaN());
         x = c.x;
         y = c.y;
@@ -96,12 +96,12 @@ class Tuple2 {
 #endif
 
     template <typename U>
-    PBRT_CPU_GPU auto operator+(const Child<U> &c) const -> Child<decltype(T{} + U{})> {
+    PBRT_CPU_GPU auto operator+(Child<U> c) const -> Child<decltype(T{} + U{})> {
         DCHECK(!c.HasNaN());
         return {x + c.x, y + c.y};
     }
     template <typename U>
-    PBRT_CPU_GPU Child<T> &operator+=(const Child<U> &c) {
+    PBRT_CPU_GPU Child<T> &operator+=(Child<U> c) {
         DCHECK(!c.HasNaN());
         x += c.x;
         y += c.y;
@@ -109,12 +109,12 @@ class Tuple2 {
     }
 
     template <typename U>
-    PBRT_CPU_GPU auto operator-(const Child<U> &c) const -> Child<decltype(T{} - U{})> {
+    PBRT_CPU_GPU auto operator-(Child<U> c) const -> Child<decltype(T{} - U{})> {
         DCHECK(!c.HasNaN());
         return {x - c.x, y - c.y};
     }
     template <typename U>
-    PBRT_CPU_GPU Child<T> &operator-=(const Child<U> &c) {
+    PBRT_CPU_GPU Child<T> &operator-=(Child<U> c) {
         DCHECK(!c.HasNaN());
         x -= c.x;
         y -= c.y;
@@ -122,9 +122,9 @@ class Tuple2 {
     }
 
     PBRT_CPU_GPU
-    bool operator==(const Child<T> &c) const { return x == c.x && y == c.y; }
+    bool operator==(Child<T> c) const { return x == c.x && y == c.y; }
     PBRT_CPU_GPU
-    bool operator!=(const Child<T> &c) const { return x != c.x || y != c.y; }
+    bool operator!=(Child<T> c) const { return x != c.x || y != c.y; }
 
     template <typename U>
     PBRT_CPU_GPU auto operator*(U s) const -> Child<decltype(T{} * U{})> {
@@ -175,86 +175,86 @@ class Tuple2 {
 
 // Tuple2 Inline Functions
 template <template <class> class C, typename T, typename U>
-PBRT_CPU_GPU inline auto operator*(U s, const Tuple2<C, T> &t) -> C<decltype(T{} * U{})> {
+PBRT_CPU_GPU inline auto operator*(U s, Tuple2<C, T> t) -> C<decltype(T{} * U{})> {
     DCHECK(!t.HasNaN());
     return t * s;
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline C<T> Abs(const Tuple2<C, T> &t) {
+PBRT_CPU_GPU inline C<T> Abs(Tuple2<C, T> t) {
     // "argument-dependent lookup..." (here and elsewhere)
     using std::abs;
     return {abs(t.x), abs(t.y)};
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline C<T> Ceil(const Tuple2<C, T> &t) {
+PBRT_CPU_GPU inline C<T> Ceil(Tuple2<C, T> t) {
     using pstd::ceil;
     return {ceil(t.x), ceil(t.y)};
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline C<T> Floor(const Tuple2<C, T> &t) {
+PBRT_CPU_GPU inline C<T> Floor(Tuple2<C, T> t) {
     using pstd::floor;
     return {floor(t.x), floor(t.y)};
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline auto Lerp(Float t, const Tuple2<C, T> &t0, const Tuple2<C, T> &t1) {
+PBRT_CPU_GPU inline auto Lerp(Float t, Tuple2<C, T> t0, Tuple2<C, T> t1) {
     return (1 - t) * t0 + t * t1;
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline C<T> FMA(Float a, const Tuple2<C, T> &b, const Tuple2<C, T> &c) {
+PBRT_CPU_GPU inline C<T> FMA(Float a, Tuple2<C, T> b, Tuple2<C, T> c) {
     return {FMA(a, b.x, c.x), FMA(a, b.y, c.y)};
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline C<T> FMA(const Tuple2<C, T> &a, Float b, const Tuple2<C, T> &c) {
+PBRT_CPU_GPU inline C<T> FMA(Tuple2<C, T> a, Float b, Tuple2<C, T> c) {
     return FMA(b, a, c);
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline C<T> Min(const Tuple2<C, T> &t0, const Tuple2<C, T> &t1) {
+PBRT_CPU_GPU inline C<T> Min(Tuple2<C, T> t0, Tuple2<C, T> t1) {
     using std::min;
     return {min(t0.x, t1.x), min(t0.y, t1.y)};
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline T MinComponentValue(const Tuple2<C, T> &t) {
+PBRT_CPU_GPU inline T MinComponentValue(Tuple2<C, T> t) {
     using std::min;
     return min({t.x, t.y});
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline int MinComponentIndex(const Tuple2<C, T> &t) {
+PBRT_CPU_GPU inline int MinComponentIndex(Tuple2<C, T> t) {
     return (t.x < t.y) ? 0 : 1;
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline C<T> Max(const Tuple2<C, T> &t0, const Tuple2<C, T> &t1) {
+PBRT_CPU_GPU inline C<T> Max(Tuple2<C, T> t0, Tuple2<C, T> t1) {
     using std::max;
     return {max(t0.x, t1.x), max(t0.y, t1.y)};
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline T MaxComponentValue(const Tuple2<C, T> &t) {
+PBRT_CPU_GPU inline T MaxComponentValue(Tuple2<C, T> t) {
     using std::max;
     return max({t.x, t.y});
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline int MaxComponentIndex(const Tuple2<C, T> &t) {
+PBRT_CPU_GPU inline int MaxComponentIndex(Tuple2<C, T> t) {
     return (t.x > t.y) ? 0 : 1;
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline C<T> Permute(const Tuple2<C, T> &t, pstd::array<int, 2> p) {
+PBRT_CPU_GPU inline C<T> Permute(Tuple2<C, T> t, pstd::array<int, 2> p) {
     return {t[p[0]], t[p[1]]};
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline T HProd(const Tuple2<C, T> &t) {
+PBRT_CPU_GPU inline T HProd(Tuple2<C, T> t) {
     return t.x * t.y;
 }
 
@@ -291,7 +291,7 @@ class Tuple3 {
     }
 
     template <typename U>
-    PBRT_CPU_GPU auto operator+(const Child<U> &c) const -> Child<decltype(T{} + U{})> {
+    PBRT_CPU_GPU auto operator+(Child<U> c) const -> Child<decltype(T{} + U{})> {
         DCHECK(!c.HasNaN());
         return {x + c.x, y + c.y, z + c.z};
     }
@@ -302,7 +302,7 @@ class Tuple3 {
     // The default versions of these are fine for release builds; for debug
     // we define them so that we can add the Assert checks.
     PBRT_CPU_GPU
-    Tuple3(const Child<T> &c) {
+    Tuple3(Child<T> c) {
         DCHECK(!c.HasNaN());
         x = c.x;
         y = c.y;
@@ -310,7 +310,7 @@ class Tuple3 {
     }
 
     PBRT_CPU_GPU
-    Child<T> &operator=(const Child<T> &c) {
+    Child<T> &operator=(Child<T> c) {
         DCHECK(!c.HasNaN());
         x = c.x;
         y = c.y;
@@ -320,7 +320,7 @@ class Tuple3 {
 #endif
 
     template <typename U>
-    PBRT_CPU_GPU Child<T> &operator+=(const Child<U> &c) {
+    PBRT_CPU_GPU Child<T> &operator+=(Child<U> c) {
         DCHECK(!c.HasNaN());
         x += c.x;
         y += c.y;
@@ -329,12 +329,12 @@ class Tuple3 {
     }
 
     template <typename U>
-    PBRT_CPU_GPU auto operator-(const Child<U> &c) const -> Child<decltype(T{} - U{})> {
+    PBRT_CPU_GPU auto operator-(Child<U> c) const -> Child<decltype(T{} - U{})> {
         DCHECK(!c.HasNaN());
         return {x - c.x, y - c.y, z - c.z};
     }
     template <typename U>
-    PBRT_CPU_GPU Child<T> &operator-=(const Child<U> &c) {
+    PBRT_CPU_GPU Child<T> &operator-=(Child<U> c) {
         DCHECK(!c.HasNaN());
         x -= c.x;
         y -= c.y;
@@ -343,9 +343,9 @@ class Tuple3 {
     }
 
     PBRT_CPU_GPU
-    bool operator==(const Child<T> &c) const { return x == c.x && y == c.y && z == c.z; }
+    bool operator==(Child<T> c) const { return x == c.x && y == c.y && z == c.z; }
     PBRT_CPU_GPU
-    bool operator!=(const Child<T> &c) const { return x != c.x || y != c.y || z != c.z; }
+    bool operator!=(Child<T> c) const { return x != c.x || y != c.y || z != c.z; }
 
     template <typename U>
     PBRT_CPU_GPU auto operator*(U s) const -> Child<decltype(T{} * U{})> {
@@ -384,84 +384,84 @@ class Tuple3 {
 
 // Tuple3 Inline Functions
 template <template <class> class C, typename T, typename U>
-PBRT_CPU_GPU inline auto operator*(U s, const Tuple3<C, T> &t) -> C<decltype(T{} * U{})> {
+PBRT_CPU_GPU inline auto operator*(U s, Tuple3<C, T> t) -> C<decltype(T{} * U{})> {
     return t * s;
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline C<T> Abs(const Tuple3<C, T> &t) {
+PBRT_CPU_GPU inline C<T> Abs(Tuple3<C, T> t) {
     using std::abs;
     return {abs(t.x), abs(t.y), abs(t.z)};
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline C<T> Ceil(const Tuple3<C, T> &t) {
+PBRT_CPU_GPU inline C<T> Ceil(Tuple3<C, T> t) {
     using pstd::ceil;
     return {ceil(t.x), ceil(t.y), ceil(t.z)};
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline C<T> Floor(const Tuple3<C, T> &t) {
+PBRT_CPU_GPU inline C<T> Floor(Tuple3<C, T> t) {
     using pstd::floor;
     return {floor(t.x), floor(t.y), floor(t.z)};
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline auto Lerp(Float t, const Tuple3<C, T> &t0, const Tuple3<C, T> &t1) {
+PBRT_CPU_GPU inline auto Lerp(Float t, Tuple3<C, T> t0, Tuple3<C, T> t1) {
     return (1 - t) * t0 + t * t1;
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline C<T> FMA(Float a, const Tuple3<C, T> &b, const Tuple3<C, T> &c) {
+PBRT_CPU_GPU inline C<T> FMA(Float a, Tuple3<C, T> b, Tuple3<C, T> c) {
     return {FMA(a, b.x, c.x), FMA(a, b.y, c.y), FMA(a, b.z, c.z)};
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline C<T> FMA(const Tuple3<C, T> &a, Float b, const Tuple3<C, T> &c) {
+PBRT_CPU_GPU inline C<T> FMA(Tuple3<C, T> a, Float b, Tuple3<C, T> c) {
     return FMA(b, a, c);
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline C<T> Min(const Tuple3<C, T> &t1, const Tuple3<C, T> &t2) {
+PBRT_CPU_GPU inline C<T> Min(Tuple3<C, T> t1, Tuple3<C, T> t2) {
     using std::min;
     return {min(t1.x, t2.x), min(t1.y, t2.y), min(t1.z, t2.z)};
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline T MinComponentValue(const Tuple3<C, T> &t) {
+PBRT_CPU_GPU inline T MinComponentValue(Tuple3<C, T> t) {
     using std::min;
     return min({t.x, t.y, t.z});
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline int MinComponentIndex(const Tuple3<C, T> &t) {
+PBRT_CPU_GPU inline int MinComponentIndex(Tuple3<C, T> t) {
     return (t.x < t.y) ? ((t.x < t.z) ? 0 : 2) : ((t.y < t.z) ? 1 : 2);
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline C<T> Max(const Tuple3<C, T> &t1, const Tuple3<C, T> &t2) {
+PBRT_CPU_GPU inline C<T> Max(Tuple3<C, T> t1, Tuple3<C, T> t2) {
     using std::max;
     return {max(t1.x, t2.x), max(t1.y, t2.y), max(t1.z, t2.z)};
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline T MaxComponentValue(const Tuple3<C, T> &t) {
+PBRT_CPU_GPU inline T MaxComponentValue(Tuple3<C, T> t) {
     using std::max;
     return max({t.x, t.y, t.z});
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline int MaxComponentIndex(const Tuple3<C, T> &t) {
+PBRT_CPU_GPU inline int MaxComponentIndex(Tuple3<C, T> t) {
     return (t.x > t.y) ? ((t.x > t.z) ? 0 : 2) : ((t.y > t.z) ? 1 : 2);
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline C<T> Permute(const Tuple3<C, T> &t, pstd::array<int, 3> p) {
+PBRT_CPU_GPU inline C<T> Permute(Tuple3<C, T> t, pstd::array<int, 3> p) {
     return {t[p[0]], t[p[1]], t[p[2]]};
 }
 
 template <template <class> class C, typename T>
-PBRT_CPU_GPU inline T HProd(const Tuple3<C, T> &t) {
+PBRT_CPU_GPU inline T HProd(Tuple3<C, T> t) {
     return t.x * t.y * t.z;
 }
 
@@ -477,9 +477,9 @@ class Vector2 : public Tuple2<Vector2, T> {
     PBRT_CPU_GPU
     Vector2(T x, T y) : Tuple2<pbrt::Vector2, T>(x, y) {}
     template <typename U>
-    PBRT_CPU_GPU explicit Vector2(const Point2<U> &p);
+    PBRT_CPU_GPU explicit Vector2(Point2<U> p);
     template <typename U>
-    PBRT_CPU_GPU explicit Vector2(const Vector2<U> &v)
+    PBRT_CPU_GPU explicit Vector2(Vector2<U> v)
         : Tuple2<pbrt::Vector2, T>(T(v.x), T(v.y)) {}
 };
 
@@ -497,13 +497,13 @@ class Vector3 : public Tuple3<Vector3, T> {
     Vector3(T x, T y, T z) : Tuple3<pbrt::Vector3, T>(x, y, z) {}
 
     template <typename U>
-    PBRT_CPU_GPU explicit Vector3(const Vector3<U> &v)
+    PBRT_CPU_GPU explicit Vector3(Vector3<U> v)
         : Tuple3<pbrt::Vector3, T>(T(v.x), T(v.y), T(v.z)) {}
 
     template <typename U>
-    PBRT_CPU_GPU explicit Vector3(const Point3<U> &p);
+    PBRT_CPU_GPU explicit Vector3(Point3<U> p);
     template <typename U>
-    PBRT_CPU_GPU explicit Vector3(const Normal3<U> &n);
+    PBRT_CPU_GPU explicit Vector3(Normal3<U> n);
 };
 
 // Vector2* Definitions
@@ -534,16 +534,16 @@ class Vector3fi : public Vector3<Interval> {
     PBRT_CPU_GPU
     Vector3fi(Interval x, Interval y, Interval z) : Vector3<Interval>(x, y, z) {}
     PBRT_CPU_GPU
-    Vector3fi(const Vector3f &p)
+    Vector3fi(Vector3f p)
         : Vector3<Interval>(Interval(p.x), Interval(p.y), Interval(p.z)) {}
     template <typename T>
     PBRT_CPU_GPU explicit Vector3fi(Point3<T> p)
         : Vector3<Interval>(Interval(p.x), Interval(p.y), Interval(p.z)) {}
 
-    PBRT_CPU_GPU Vector3fi(const Vector3<Interval> &pfi) : Vector3<Interval>(pfi) {}
+    PBRT_CPU_GPU Vector3fi(Vector3<Interval> pfi) : Vector3<Interval>(pfi) {}
 
     PBRT_CPU_GPU
-    Vector3fi(const Vector3f &v, const Vector3f &e)
+    Vector3fi(Vector3f v, Vector3f e)
         : Vector3<Interval>(Interval::FromValueAndError(v.x, e.x),
                             Interval::FromValueAndError(v.y, e.y),
                             Interval::FromValueAndError(v.z, e.z)) {}
@@ -572,20 +572,18 @@ class Point2 : public Tuple2<Point2, T> {
     PBRT_CPU_GPU
     Point2(T x, T y) : Tuple2<pbrt::Point2, T>(x, y) {}
     template <typename U>
-    PBRT_CPU_GPU explicit Point2(const Point2<U> &v)
-        : Tuple2<pbrt::Point2, T>(T(v.x), T(v.y)) {}
+    PBRT_CPU_GPU explicit Point2(Point2<U> v) : Tuple2<pbrt::Point2, T>(T(v.x), T(v.y)) {}
     template <typename U>
-    PBRT_CPU_GPU explicit Point2(const Vector2<U> &v)
+    PBRT_CPU_GPU explicit Point2(Vector2<U> v)
         : Tuple2<pbrt::Point2, T>(T(v.x), T(v.y)) {}
 
     template <typename U>
-    PBRT_CPU_GPU auto operator+(const Vector2<U> &v) const
-        -> Point2<decltype(T{} + U{})> {
+    PBRT_CPU_GPU auto operator+(Vector2<U> v) const -> Point2<decltype(T{} + U{})> {
         DCHECK(!v.HasNaN());
         return {x + v.x, y + v.y};
     }
     template <typename U>
-    PBRT_CPU_GPU Point2<T> &operator+=(const Vector2<U> &v) {
+    PBRT_CPU_GPU Point2<T> &operator+=(Vector2<U> v) {
         DCHECK(!v.HasNaN());
         x += v.x;
         y += v.y;
@@ -599,19 +597,17 @@ class Point2 : public Tuple2<Point2, T> {
     Point2<T> operator-() const { return {-x, -y}; }
 
     template <typename U>
-    PBRT_CPU_GPU auto operator-(const Point2<U> &p) const
-        -> Vector2<decltype(T{} - U{})> {
+    PBRT_CPU_GPU auto operator-(Point2<U> p) const -> Vector2<decltype(T{} - U{})> {
         DCHECK(!p.HasNaN());
         return {x - p.x, y - p.y};
     }
     template <typename U>
-    PBRT_CPU_GPU auto operator-(const Vector2<U> &v) const
-        -> Point2<decltype(T{} - U{})> {
+    PBRT_CPU_GPU auto operator-(Vector2<U> v) const -> Point2<decltype(T{} - U{})> {
         DCHECK(!v.HasNaN());
         return {x - v.x, y - v.y};
     }
     template <typename U>
-    PBRT_CPU_GPU Point2<T> &operator-=(const Vector2<U> &v) {
+    PBRT_CPU_GPU Point2<T> &operator-=(Vector2<U> v) {
         DCHECK(!v.HasNaN());
         x -= v.x;
         y -= v.y;
@@ -680,20 +676,19 @@ class Point3 : public Tuple3<Point3, T> {
     Point3<T> operator-() const { return {-x, -y, -z}; }
 
     template <typename U>
-    PBRT_CPU_GPU explicit Point3(const Point3<U> &p)
+    PBRT_CPU_GPU explicit Point3(Point3<U> p)
         : Tuple3<pbrt::Point3, T>(T(p.x), T(p.y), T(p.z)) {}
     template <typename U>
-    PBRT_CPU_GPU explicit Point3(const Vector3<U> &v)
+    PBRT_CPU_GPU explicit Point3(Vector3<U> v)
         : Tuple3<pbrt::Point3, T>(T(v.x), T(v.y), T(v.z)) {}
 
     template <typename U>
-    PBRT_CPU_GPU auto operator+(const Vector3<U> &v) const
-        -> Point3<decltype(T{} + U{})> {
+    PBRT_CPU_GPU auto operator+(Vector3<U> v) const -> Point3<decltype(T{} + U{})> {
         DCHECK(!v.HasNaN());
         return {x + v.x, y + v.y, z + v.z};
     }
     template <typename U>
-    PBRT_CPU_GPU Point3<T> &operator+=(const Vector3<U> &v) {
+    PBRT_CPU_GPU Point3<T> &operator+=(Vector3<U> v) {
         DCHECK(!v.HasNaN());
         x += v.x;
         y += v.y;
@@ -702,13 +697,12 @@ class Point3 : public Tuple3<Point3, T> {
     }
 
     template <typename U>
-    PBRT_CPU_GPU auto operator-(const Vector3<U> &v) const
-        -> Point3<decltype(T{} - U{})> {
+    PBRT_CPU_GPU auto operator-(Vector3<U> v) const -> Point3<decltype(T{} - U{})> {
         DCHECK(!v.HasNaN());
         return {x - v.x, y - v.y, z - v.z};
     }
     template <typename U>
-    PBRT_CPU_GPU Point3<T> &operator-=(const Vector3<U> &v) {
+    PBRT_CPU_GPU Point3<T> &operator-=(Vector3<U> v) {
         DCHECK(!v.HasNaN());
         x -= v.x;
         y -= v.y;
@@ -717,8 +711,7 @@ class Point3 : public Tuple3<Point3, T> {
     }
 
     template <typename U>
-    PBRT_CPU_GPU auto operator-(const Point3<U> &p) const
-        -> Vector3<decltype(T{} - U{})> {
+    PBRT_CPU_GPU auto operator-(Point3<U> p) const -> Vector3<decltype(T{} - U{})> {
         DCHECK(!p.HasNaN());
         return {x - p.x, y - p.y, z - p.z};
     }
@@ -753,9 +746,9 @@ class Point3fi : public Point3<Interval> {
     Point3fi(const Point3f &p)
         : Point3<Interval>(Interval(p.x), Interval(p.y), Interval(p.z)) {}
     PBRT_CPU_GPU
-    Point3fi(const Point3<Interval> &p) : Point3<Interval>(p) {}
+    Point3fi(Point3<Interval> p) : Point3<Interval>(p) {}
     PBRT_CPU_GPU
-    Point3fi(const Point3f &p, const Vector3f &e)
+    Point3fi(Point3f p, Vector3f e)
         : Point3<Interval>(Interval::FromValueAndError(p.x, e.x),
                            Interval::FromValueAndError(p.y, e.y),
                            Interval::FromValueAndError(p.z, e.z)) {}
@@ -767,12 +760,12 @@ class Point3fi : public Point3<Interval> {
 
     // Meh--can't seem to get these from Point3 via using declarations...
     template <typename U>
-    PBRT_CPU_GPU Point3fi operator+(const Vector3<U> &v) const {
+    PBRT_CPU_GPU Point3fi operator+(Vector3<U> v) const {
         DCHECK(!v.HasNaN());
         return {x + v.x, y + v.y, z + v.z};
     }
     template <typename U>
-    PBRT_CPU_GPU Point3fi &operator+=(const Vector3<U> &v) {
+    PBRT_CPU_GPU Point3fi &operator+=(Vector3<U> v) {
         DCHECK(!v.HasNaN());
         x += v.x;
         y += v.y;
@@ -784,17 +777,17 @@ class Point3fi : public Point3<Interval> {
     Point3fi operator-() const { return {-x, -y, -z}; }
 
     template <typename U>
-    PBRT_CPU_GPU Point3fi operator-(const Point3<U> &p) const {
+    PBRT_CPU_GPU Point3fi operator-(Point3<U> p) const {
         DCHECK(!p.HasNaN());
         return {x - p.x, y - p.y, z - p.z};
     }
     template <typename U>
-    PBRT_CPU_GPU Point3fi operator-(const Vector3<U> &v) const {
+    PBRT_CPU_GPU Point3fi operator-(Vector3<U> v) const {
         DCHECK(!v.HasNaN());
         return {x - v.x, y - v.y, z - v.z};
     }
     template <typename U>
-    PBRT_CPU_GPU Point3fi &operator-=(const Vector3<U> &v) {
+    PBRT_CPU_GPU Point3fi &operator-=(Vector3<U> v) {
         DCHECK(!v.HasNaN());
         x -= v.x;
         y -= v.y;
@@ -820,11 +813,11 @@ class Normal3 : public Tuple3<Normal3, T> {
     PBRT_CPU_GPU
     Normal3(T x, T y, T z) : Tuple3<pbrt::Normal3, T>(x, y, z) {}
     template <typename U>
-    PBRT_CPU_GPU explicit Normal3<T>(const Normal3<U> &v)
+    PBRT_CPU_GPU explicit Normal3<T>(Normal3<U> v)
         : Tuple3<pbrt::Normal3, T>(T(v.x), T(v.y), T(v.z)) {}
 
     template <typename U>
-    PBRT_CPU_GPU explicit Normal3<T>(const Vector3<U> &v)
+    PBRT_CPU_GPU explicit Normal3<T>(Vector3<U> v)
         : Tuple3<pbrt::Normal3, T>(T(v.x), T(v.y), T(v.z)) {}
 };
 
@@ -886,48 +879,47 @@ class Quaternion {
 // Vector2 Inline Functions
 template <typename T>
 template <typename U>
-Vector2<T>::Vector2(const Point2<U> &p) : Tuple2<pbrt::Vector2, T>(T(p.x), T(p.y)) {}
+Vector2<T>::Vector2(Point2<U> p) : Tuple2<pbrt::Vector2, T>(T(p.x), T(p.y)) {}
 
 // TODO: book discuss why Dot() and not e.g. a.Dot(b)
 template <typename T>
-PBRT_CPU_GPU inline auto Dot(const Vector2<T> &v1, const Vector2<T> &v2) ->
+PBRT_CPU_GPU inline auto Dot(Vector2<T> v1, Vector2<T> v2) ->
     typename TupleLength<T>::type {
     DCHECK(!v1.HasNaN() && !v2.HasNaN());
     return SumOfProducts(v1.x, v2.x, v1.y, v2.y);
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto AbsDot(const Vector2<T> &v1, const Vector2<T> &v2) ->
+PBRT_CPU_GPU inline auto AbsDot(Vector2<T> v1, Vector2<T> v2) ->
     typename TupleLength<T>::type {
     DCHECK(!v1.HasNaN() && !v2.HasNaN());
     return std::abs(Dot(v1, v2));
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto LengthSquared(const Vector2<T> &v) ->
-    typename TupleLength<T>::type {
+PBRT_CPU_GPU inline auto LengthSquared(Vector2<T> v) -> typename TupleLength<T>::type {
     return Sqr(v.x) + Sqr(v.y);
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto Length(const Vector2<T> &v) -> typename TupleLength<T>::type {
+PBRT_CPU_GPU inline auto Length(Vector2<T> v) -> typename TupleLength<T>::type {
     using std::sqrt;
     return sqrt(LengthSquared(v));
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto Normalize(const Vector2<T> &v) {
+PBRT_CPU_GPU inline auto Normalize(Vector2<T> v) {
     return v / Length(v);
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto Distance(const Point2<T> &p1, const Point2<T> &p2) ->
+PBRT_CPU_GPU inline auto Distance(Point2<T> p1, Point2<T> p2) ->
     typename TupleLength<T>::type {
     return Length(p1 - p2);
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto DistanceSquared(const Point2<T> &p1, const Point2<T> &p2) ->
+PBRT_CPU_GPU inline auto DistanceSquared(Point2<T> p1, Point2<T> p2) ->
     typename TupleLength<T>::type {
     return LengthSquared(p1 - p2);
 }
@@ -935,11 +927,10 @@ PBRT_CPU_GPU inline auto DistanceSquared(const Point2<T> &p1, const Point2<T> &p
 // Vector3 Inline Functions
 template <typename T>
 template <typename U>
-Vector3<T>::Vector3(const Point3<U> &p)
-    : Tuple3<pbrt::Vector3, T>(T(p.x), T(p.y), T(p.z)) {}
+Vector3<T>::Vector3(Point3<U> p) : Tuple3<pbrt::Vector3, T>(T(p.x), T(p.y), T(p.z)) {}
 
 template <typename T>
-PBRT_CPU_GPU inline Vector3<T> Cross(const Vector3<T> &v1, const Normal3<T> &v2) {
+PBRT_CPU_GPU inline Vector3<T> Cross(Vector3<T> v1, Normal3<T> v2) {
     DCHECK(!v1.HasNaN() && !v2.HasNaN());
     return {DifferenceOfProducts(v1.y, v2.z, v1.z, v2.y),
             DifferenceOfProducts(v1.z, v2.x, v1.x, v2.z),
@@ -947,7 +938,7 @@ PBRT_CPU_GPU inline Vector3<T> Cross(const Vector3<T> &v1, const Normal3<T> &v2)
 }
 
 template <typename T>
-PBRT_CPU_GPU inline Vector3<T> Cross(const Normal3<T> &v1, const Vector3<T> &v2) {
+PBRT_CPU_GPU inline Vector3<T> Cross(Normal3<T> v1, Vector3<T> v2) {
     DCHECK(!v1.HasNaN() && !v2.HasNaN());
     return {DifferenceOfProducts(v1.y, v2.z, v1.z, v2.y),
             DifferenceOfProducts(v1.z, v2.x, v1.x, v2.z),
@@ -955,23 +946,23 @@ PBRT_CPU_GPU inline Vector3<T> Cross(const Normal3<T> &v1, const Vector3<T> &v2)
 }
 
 template <typename T>
-PBRT_CPU_GPU inline T LengthSquared(const Vector3<T> &v) {
+PBRT_CPU_GPU inline T LengthSquared(Vector3<T> v) {
     return Sqr(v.x) + Sqr(v.y) + Sqr(v.z);
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto Length(const Vector3<T> &v) -> typename TupleLength<T>::type {
+PBRT_CPU_GPU inline auto Length(Vector3<T> v) -> typename TupleLength<T>::type {
     using std::sqrt;
     return sqrt(LengthSquared(v));
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto Normalize(const Vector3<T> &v) {
+PBRT_CPU_GPU inline auto Normalize(Vector3<T> v) {
     return v / Length(v);
 }
 
 template <typename T>
-PBRT_CPU_GPU inline T Dot(const Vector3<T> &v, const Vector3<T> &w) {
+PBRT_CPU_GPU inline T Dot(Vector3<T> v, Vector3<T> w) {
     DCHECK(!v.HasNaN() && !w.HasNaN());
     return v.x * w.x + v.y * w.y + v.z * w.z;
 }
@@ -979,7 +970,7 @@ PBRT_CPU_GPU inline T Dot(const Vector3<T> &v, const Vector3<T> &w) {
 // Equivalent to std::acos(Dot(a, b)), but more numerically stable.
 // via http://www.plunk.org/~hatch/rightway.php
 template <typename T>
-PBRT_CPU_GPU inline Float AngleBetween(const Vector3<T> &v1, const Vector3<T> &v2) {
+PBRT_CPU_GPU inline Float AngleBetween(Vector3<T> v1, Vector3<T> v2) {
     if (Dot(v1, v2) < 0)
         return Pi - 2 * SafeASin(Length(v1 + v2) / 2);
     else
@@ -987,13 +978,13 @@ PBRT_CPU_GPU inline Float AngleBetween(const Vector3<T> &v1, const Vector3<T> &v
 }
 
 template <typename T>
-PBRT_CPU_GPU inline T AbsDot(const Vector3<T> &v1, const Vector3<T> &v2) {
+PBRT_CPU_GPU inline T AbsDot(Vector3<T> v1, Vector3<T> v2) {
     DCHECK(!v1.HasNaN() && !v2.HasNaN());
     return std::abs(Dot(v1, v2));
 }
 
 template <typename T>
-PBRT_CPU_GPU inline Float AngleBetween(const Normal3<T> &a, const Normal3<T> &b) {
+PBRT_CPU_GPU inline Float AngleBetween(Normal3<T> a, Normal3<T> b) {
     if (Dot(a, b) < 0)
         return Pi - 2 * SafeASin(Length(a + b) / 2);
     else
@@ -1001,12 +992,12 @@ PBRT_CPU_GPU inline Float AngleBetween(const Normal3<T> &a, const Normal3<T> &b)
 }
 
 template <typename T>
-PBRT_CPU_GPU inline Vector3<T> GramSchmidt(const Vector3<T> &v, const Vector3<T> &w) {
+PBRT_CPU_GPU inline Vector3<T> GramSchmidt(Vector3<T> v, Vector3<T> w) {
     return v - Dot(v, w) * w;
 }
 
 template <typename T>
-PBRT_CPU_GPU inline Vector3<T> Cross(const Vector3<T> &v, const Vector3<T> &w) {
+PBRT_CPU_GPU inline Vector3<T> Cross(Vector3<T> v, Vector3<T> w) {
     DCHECK(!v.HasNaN() && !w.HasNaN());
     return {DifferenceOfProducts(v.y, w.z, v.z, w.y),
             DifferenceOfProducts(v.z, w.x, v.x, w.z),
@@ -1014,8 +1005,7 @@ PBRT_CPU_GPU inline Vector3<T> Cross(const Vector3<T> &v, const Vector3<T> &w) {
 }
 
 template <typename T>
-PBRT_CPU_GPU inline void CoordinateSystem(const Vector3<T> &v1, Vector3<T> *v2,
-                                          Vector3<T> *v3) {
+PBRT_CPU_GPU inline void CoordinateSystem(Vector3<T> v1, Vector3<T> *v2, Vector3<T> *v3) {
     Float sign = pstd::copysign(Float(1), v1.z);
     Float a = -1 / (sign + v1.z);
     Float b = v1.x * v1.y * a;
@@ -1024,8 +1014,7 @@ PBRT_CPU_GPU inline void CoordinateSystem(const Vector3<T> &v1, Vector3<T> *v2,
 }
 
 template <typename T>
-PBRT_CPU_GPU inline void CoordinateSystem(const Normal3<T> &v1, Vector3<T> *v2,
-                                          Vector3<T> *v3) {
+PBRT_CPU_GPU inline void CoordinateSystem(Normal3<T> v1, Vector3<T> *v2, Vector3<T> *v3) {
     Float sign = pstd::copysign(Float(1), v1.z);
     Float a = -1 / (sign + v1.z);
     Float b = v1.x * v1.y * a;
@@ -1035,68 +1024,66 @@ PBRT_CPU_GPU inline void CoordinateSystem(const Normal3<T> &v1, Vector3<T> *v2,
 
 template <typename T>
 template <typename U>
-Vector3<T>::Vector3(const Normal3<U> &n)
-    : Tuple3<pbrt::Vector3, T>(T(n.x), T(n.y), T(n.z)) {}
+Vector3<T>::Vector3(Normal3<U> n) : Tuple3<pbrt::Vector3, T>(T(n.x), T(n.y), T(n.z)) {}
 
 // Point3 Inline Functions
 template <typename T>
-PBRT_CPU_GPU inline auto Distance(const Point3<T> &p1, const Point3<T> &p2) {
+PBRT_CPU_GPU inline auto Distance(Point3<T> p1, Point3<T> p2) {
     return Length(p1 - p2);
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto DistanceSquared(const Point3<T> &p1, const Point3<T> &p2) {
+PBRT_CPU_GPU inline auto DistanceSquared(Point3<T> p1, Point3<T> p2) {
     return LengthSquared(p1 - p2);
 }
 
 // Normal3 Inline Functions
 template <typename T>
-PBRT_CPU_GPU inline auto LengthSquared(const Normal3<T> &n) ->
-    typename TupleLength<T>::type {
+PBRT_CPU_GPU inline auto LengthSquared(Normal3<T> n) -> typename TupleLength<T>::type {
     return Sqr(n.x) + Sqr(n.y) + Sqr(n.z);
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto Length(const Normal3<T> &n) -> typename TupleLength<T>::type {
+PBRT_CPU_GPU inline auto Length(Normal3<T> n) -> typename TupleLength<T>::type {
     using std::sqrt;
     return sqrt(LengthSquared(n));
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto Normalize(const Normal3<T> &n) {
+PBRT_CPU_GPU inline auto Normalize(Normal3<T> n) {
     return n / Length(n);
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto Dot(const Normal3<T> &n, const Vector3<T> &v) ->
+PBRT_CPU_GPU inline auto Dot(Normal3<T> n, Vector3<T> v) ->
     typename TupleLength<T>::type {
     DCHECK(!n.HasNaN() && !v.HasNaN());
     return FMA(n.x, v.x, SumOfProducts(n.y, v.y, n.z, v.z));
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto Dot(const Vector3<T> &v, const Normal3<T> &n) ->
+PBRT_CPU_GPU inline auto Dot(Vector3<T> v, Normal3<T> n) ->
     typename TupleLength<T>::type {
     DCHECK(!v.HasNaN() && !n.HasNaN());
     return FMA(n.x, v.x, SumOfProducts(n.y, v.y, n.z, v.z));
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto Dot(const Normal3<T> &n1, const Normal3<T> &n2) ->
+PBRT_CPU_GPU inline auto Dot(Normal3<T> n1, Normal3<T> n2) ->
     typename TupleLength<T>::type {
     DCHECK(!n1.HasNaN() && !n2.HasNaN());
     return FMA(n1.x, n2.x, SumOfProducts(n1.y, n2.y, n1.z, n2.z));
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto AbsDot(const Normal3<T> &n, const Vector3<T> &v) ->
+PBRT_CPU_GPU inline auto AbsDot(Normal3<T> n, Vector3<T> v) ->
     typename TupleLength<T>::type {
     DCHECK(!n.HasNaN() && !v.HasNaN());
     return std::abs(Dot(n, v));
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto AbsDot(const Vector3<T> &v, const Normal3<T> &n) ->
+PBRT_CPU_GPU inline auto AbsDot(Vector3<T> v, Normal3<T> n) ->
     typename TupleLength<T>::type {
     using std::abs;
     DCHECK(!v.HasNaN() && !n.HasNaN());
@@ -1104,7 +1091,7 @@ PBRT_CPU_GPU inline auto AbsDot(const Vector3<T> &v, const Normal3<T> &n) ->
 }
 
 template <typename T>
-PBRT_CPU_GPU inline auto AbsDot(const Normal3<T> &n1, const Normal3<T> &n2) ->
+PBRT_CPU_GPU inline auto AbsDot(Normal3<T> n1, Normal3<T> n2) ->
     typename TupleLength<T>::type {
     using std::abs;
     DCHECK(!n1.HasNaN() && !n2.HasNaN());
@@ -1112,22 +1099,22 @@ PBRT_CPU_GPU inline auto AbsDot(const Normal3<T> &n1, const Normal3<T> &n2) ->
 }
 
 template <typename T>
-PBRT_CPU_GPU inline Normal3<T> FaceForward(const Normal3<T> &n, const Vector3<T> &v) {
+PBRT_CPU_GPU inline Normal3<T> FaceForward(Normal3<T> n, Vector3<T> v) {
     return (Dot(n, v) < 0.f) ? -n : n;
 }
 
 template <typename T>
-PBRT_CPU_GPU inline Normal3<T> FaceForward(const Normal3<T> &n, const Normal3<T> &n2) {
+PBRT_CPU_GPU inline Normal3<T> FaceForward(Normal3<T> n, Normal3<T> n2) {
     return (Dot(n, n2) < 0.f) ? -n : n;
 }
 
 template <typename T>
-PBRT_CPU_GPU inline Vector3<T> FaceForward(const Vector3<T> &v, const Vector3<T> &v2) {
+PBRT_CPU_GPU inline Vector3<T> FaceForward(Vector3<T> v, Vector3<T> v2) {
     return (Dot(v, v2) < 0.f) ? -v : v;
 }
 
 template <typename T>
-PBRT_CPU_GPU inline Vector3<T> FaceForward(const Vector3<T> &v, const Normal3<T> &n2) {
+PBRT_CPU_GPU inline Vector3<T> FaceForward(Vector3<T> v, Normal3<T> n2) {
     return (Dot(v, n2) < 0.f) ? -v : v;
 }
 
@@ -1177,10 +1164,9 @@ class Bounds2 {
         pMax = Point2<T>(minNum, minNum);
     }
     PBRT_CPU_GPU
-    explicit Bounds2(const Point2<T> &p) : pMin(p), pMax(p) {}
+    explicit Bounds2(Point2<T> p) : pMin(p), pMax(p) {}
     PBRT_CPU_GPU
-    Bounds2(const Point2<T> &p1, const Point2<T> &p2)
-        : pMin(Min(p1, p2)), pMax(Max(p1, p2)) {}
+    Bounds2(Point2<T> p1, Point2<T> p2) : pMin(Min(p1, p2)), pMax(Max(p1, p2)) {}
     template <typename U>
     PBRT_CPU_GPU explicit Bounds2(const Bounds2<U> &b) {
         if (b.IsEmpty())
@@ -1217,7 +1203,7 @@ class Bounds2 {
             return 1;
     }
     PBRT_CPU_GPU
-    const Point2<T> &operator[](int i) const {
+    Point2<T> operator[](int i) const {
         DCHECK(i == 0 || i == 1);
         return (i == 0) ? pMin : pMax;
     }
@@ -1245,7 +1231,7 @@ class Bounds2 {
                          pbrt::Lerp(t.y, pMin.y, pMax.y));
     }
     PBRT_CPU_GPU
-    Vector2<T> Offset(const Point2<T> &p) const {
+    Vector2<T> Offset(Point2<T> p) const {
         Vector2<T> o = p - pMin;
         if (pMax.x > pMin.x)
             o.x /= pMax.x - pMin.x;
@@ -1279,14 +1265,13 @@ class Bounds3 {
     }
 
     PBRT_CPU_GPU
-    explicit Bounds3(const Point3<T> &p) : pMin(p), pMax(p) {}
+    explicit Bounds3(Point3<T> p) : pMin(p), pMax(p) {}
 
     PBRT_CPU_GPU
-    Bounds3(const Point3<T> &p1, const Point3<T> &p2)
-        : pMin(Min(p1, p2)), pMax(Max(p1, p2)) {}
+    Bounds3(Point3<T> p1, Point3<T> p2) : pMin(Min(p1, p2)), pMax(Max(p1, p2)) {}
 
     PBRT_CPU_GPU
-    const Point3<T> &operator[](int i) const {
+    Point3<T> operator[](int i) const {
         DCHECK(i == 0 || i == 1);
         return (i == 0) ? pMin : pMax;
     }
@@ -1467,7 +1452,7 @@ PBRT_CPU_GPU inline bool Overlaps(const Bounds2<T> &ba, const Bounds2<T> &bb) {
 }
 
 template <typename T>
-PBRT_CPU_GPU inline bool Inside(const Point2<T> &pt, const Bounds2<T> &b) {
+PBRT_CPU_GPU inline bool Inside(Point2<T> pt, const Bounds2<T> &b) {
     return (pt.x >= b.pMin.x && pt.x <= b.pMax.x && pt.y >= b.pMin.y && pt.y <= b.pMax.y);
 }
 
@@ -1478,7 +1463,7 @@ PBRT_CPU_GPU inline bool Inside(const Bounds2<T> &ba, const Bounds2<T> &bb) {
 }
 
 template <typename T>
-PBRT_CPU_GPU inline bool InsideExclusive(const Point2<T> &pt, const Bounds2<T> &b) {
+PBRT_CPU_GPU inline bool InsideExclusive(Point2<T> pt, const Bounds2<T> &b) {
     return (pt.x >= b.pMin.x && pt.x < b.pMax.x && pt.y >= b.pMin.y && pt.y < b.pMax.y);
 }
 
@@ -1492,7 +1477,7 @@ PBRT_CPU_GPU inline Bounds2<T> Expand(const Bounds2<T> &b, U delta) {
 
 // Bounds3 Inline Functions
 template <typename T>
-PBRT_CPU_GPU inline Bounds3<T> Union(const Bounds3<T> &b, const Point3<T> &p) {
+PBRT_CPU_GPU inline Bounds3<T> Union(const Bounds3<T> &b, Point3<T> p) {
     Bounds3<T> ret;
     ret.pMin = Min(b.pMin, p);
     ret.pMax = Max(b.pMax, p);
@@ -1524,19 +1509,19 @@ PBRT_CPU_GPU inline bool Overlaps(const Bounds3<T> &b1, const Bounds3<T> &b2) {
 }
 
 template <typename T>
-PBRT_CPU_GPU inline bool Inside(const Point3<T> &p, const Bounds3<T> &b) {
+PBRT_CPU_GPU inline bool Inside(Point3<T> p, const Bounds3<T> &b) {
     return (p.x >= b.pMin.x && p.x <= b.pMax.x && p.y >= b.pMin.y && p.y <= b.pMax.y &&
             p.z >= b.pMin.z && p.z <= b.pMax.z);
 }
 
 template <typename T>
-PBRT_CPU_GPU inline bool InsideExclusive(const Point3<T> &p, const Bounds3<T> &b) {
+PBRT_CPU_GPU inline bool InsideExclusive(Point3<T> p, const Bounds3<T> &b) {
     return (p.x >= b.pMin.x && p.x < b.pMax.x && p.y >= b.pMin.y && p.y < b.pMax.y &&
             p.z >= b.pMin.z && p.z < b.pMax.z);
 }
 
 template <typename T, typename U>
-PBRT_CPU_GPU inline auto DistanceSquared(const Point3<T> &p, const Bounds3<U> &b) {
+PBRT_CPU_GPU inline auto DistanceSquared(Point3<T> p, const Bounds3<U> &b) {
     using TDist = decltype(T{} - U{});
     TDist dx = std::max<TDist>({0, b.pMin.x - p.x, p.x - b.pMax.x});
     TDist dy = std::max<TDist>({0, b.pMin.y - p.y, p.y - b.pMax.y});
@@ -1545,7 +1530,7 @@ PBRT_CPU_GPU inline auto DistanceSquared(const Point3<T> &p, const Bounds3<U> &b
 }
 
 template <typename T, typename U>
-PBRT_CPU_GPU inline auto Distance(const Point3<T> &p, const Bounds3<U> &b) {
+PBRT_CPU_GPU inline auto Distance(Point3<T> p, const Bounds3<U> &b) {
     auto dist2 = DistanceSquared(p, b);
     using TDist = typename TupleLength<decltype(dist2)>::type;
     return std::sqrt(TDist(dist2));
@@ -1643,7 +1628,7 @@ inline Bounds2iIterator end(const Bounds2i &b) {
 }
 
 template <typename T>
-PBRT_CPU_GPU inline Bounds2<T> Union(const Bounds2<T> &b, const Point2<T> &p) {
+PBRT_CPU_GPU inline Bounds2<T> Union(const Bounds2<T> &b, Point2<T> p) {
     // Be careful to not run the two-point Bounds constructor.
     Bounds2<T> ret;
     ret.pMin = Min(b.pMin, p);

@@ -31,9 +31,9 @@ class Transform {
     inline RayDifferential ApplyInverse(const RayDifferential &r,
                                         Float *tMax = nullptr) const;
     template <typename T>
-    PBRT_CPU_GPU inline Vector3<T> ApplyInverse(const Vector3<T> &v) const;
+    PBRT_CPU_GPU inline Vector3<T> ApplyInverse(Vector3<T> v) const;
     template <typename T>
-    PBRT_CPU_GPU inline Normal3<T> ApplyInverse(const Normal3<T> &) const;
+    PBRT_CPU_GPU inline Normal3<T> ApplyInverse(Normal3<T>) const;
 
     uint64_t Hash() const { return HashBuffer<sizeof(m)>(&m); }
 
@@ -85,16 +85,16 @@ class Transform {
     }
 
     template <typename T>
-    PBRT_CPU_GPU Point3<T> operator()(const Point3<T> &p) const;
+    PBRT_CPU_GPU Point3<T> operator()(Point3<T> p) const;
 
     template <typename T>
-    PBRT_CPU_GPU inline Point3<T> ApplyInverse(const Point3<T> &p) const;
+    PBRT_CPU_GPU inline Point3<T> ApplyInverse(Point3<T> p) const;
 
     template <typename T>
-    PBRT_CPU_GPU Vector3<T> operator()(const Vector3<T> &v) const;
+    PBRT_CPU_GPU Vector3<T> operator()(Vector3<T> v) const;
 
     template <typename T>
-    PBRT_CPU_GPU Normal3<T> operator()(const Normal3<T> &) const;
+    PBRT_CPU_GPU Normal3<T> operator()(Normal3<T>) const;
 
     PBRT_CPU_GPU
     Ray operator()(const Ray &r, Float *tMax = nullptr) const;
@@ -308,7 +308,7 @@ inline Vector3fi Transform::operator()(const Vector3fi &v) const {
 
 // Transform Inline Methods
 template <typename T>
-inline Point3<T> Transform::operator()(const Point3<T> &p) const {
+inline Point3<T> Transform::operator()(Point3<T> p) const {
     T x = p.x, y = p.y, z = p.z;
     T xp = m[0][0] * x + m[0][1] * y + m[0][2] * z + m[0][3];
     T yp = m[1][0] * x + m[1][1] * y + m[1][2] * z + m[1][3];
@@ -321,7 +321,7 @@ inline Point3<T> Transform::operator()(const Point3<T> &p) const {
 }
 
 template <typename T>
-inline Vector3<T> Transform::operator()(const Vector3<T> &v) const {
+inline Vector3<T> Transform::operator()(Vector3<T> v) const {
     T x = v.x, y = v.y, z = v.z;
     return Vector3<T>(m[0][0] * x + m[0][1] * y + m[0][2] * z,
                       m[1][0] * x + m[1][1] * y + m[1][2] * z,
@@ -329,7 +329,7 @@ inline Vector3<T> Transform::operator()(const Vector3<T> &v) const {
 }
 
 template <typename T>
-inline Normal3<T> Transform::operator()(const Normal3<T> &n) const {
+inline Normal3<T> Transform::operator()(Normal3<T> n) const {
     T x = n.x, y = n.y, z = n.z;
     return Normal3<T>(mInv[0][0] * x + mInv[1][0] * y + mInv[2][0] * z,
                       mInv[0][1] * x + mInv[1][1] * y + mInv[2][1] * z,
@@ -387,7 +387,7 @@ inline Transform::Transform(Quaternion q) {
 }
 
 template <typename T>
-inline Point3<T> Transform::ApplyInverse(const Point3<T> &p) const {
+inline Point3<T> Transform::ApplyInverse(Point3<T> p) const {
     T x = p.x, y = p.y, z = p.z;
     T xp = (mInv[0][0] * x + mInv[0][1] * y) + (mInv[0][2] * z + mInv[0][3]);
     T yp = (mInv[1][0] * x + mInv[1][1] * y) + (mInv[1][2] * z + mInv[1][3]);
@@ -401,7 +401,7 @@ inline Point3<T> Transform::ApplyInverse(const Point3<T> &p) const {
 }
 
 template <typename T>
-inline Vector3<T> Transform::ApplyInverse(const Vector3<T> &v) const {
+inline Vector3<T> Transform::ApplyInverse(Vector3<T> v) const {
     T x = v.x, y = v.y, z = v.z;
     return Vector3<T>(mInv[0][0] * x + mInv[0][1] * y + mInv[0][2] * z,
                       mInv[1][0] * x + mInv[1][1] * y + mInv[1][2] * z,
@@ -409,7 +409,7 @@ inline Vector3<T> Transform::ApplyInverse(const Vector3<T> &v) const {
 }
 
 template <typename T>
-inline Normal3<T> Transform::ApplyInverse(const Normal3<T> &n) const {
+inline Normal3<T> Transform::ApplyInverse(Normal3<T> n) const {
     T x = n.x, y = n.y, z = n.z;
     return Normal3<T>(m[0][0] * x + m[1][0] * y + m[2][0] * z,
                       m[0][1] * x + m[1][1] * y + m[2][1] * z,
