@@ -322,33 +322,6 @@ class ConductorBxDF {
     }
 
     PBRT_CPU_GPU
-    static constexpr const char *Name() { return "ConductorBxDF"; }
-    std::string ToString() const;
-
-    PBRT_CPU_GPU
-    SampledSpectrum f(Vector3f wo, Vector3f wi, TransportMode mode) const {
-        if (!SameHemisphere(wo, wi))
-            return {};
-        if (mfDistrib.EffectivelySmooth())
-            return {};
-        // Evaluate Torrance--Sparrow model for conductor BRDF
-        // Compute cosines and $\wh$ for conductor BRDF
-        Float cosTheta_o = AbsCosTheta(wo), cosTheta_i = AbsCosTheta(wi);
-        if (cosTheta_i == 0 || cosTheta_o == 0)
-            return {};
-        Vector3f wh = wi + wo;
-        if (wh.x == 0 && wh.y == 0 && wh.z == 0)
-            return {};
-        wh = Normalize(wh);
-
-        // Evaluate Fresnel factor _F_ for conductor BRDF
-        Float frCosTheta_i = AbsDot(wi, wh);
-        SampledSpectrum F = FrComplex(frCosTheta_i, eta, k);
-
-        return mfDistrib.D(wh) * mfDistrib.G(wo, wi) * F / (4 * cosTheta_i * cosTheta_o);
-    }
-
-    PBRT_CPU_GPU
     pstd::optional<BSDFSample> Sample_f(
         Vector3f wo, Float uc, Point2f u, TransportMode mode,
         BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
@@ -360,7 +333,7 @@ class ConductorBxDF {
             SampledSpectrum f = FrComplex(AbsCosTheta(wi), eta, k) / AbsCosTheta(wi);
             return BSDFSample(f, wi, 1, BxDFFlags::SpecularReflection);
         }
-        // Sample Torrance--Sparow model for conductor BRDF
+        // Sample rough conductor BRDF
         // Sample microfacet orientation $\wh$ and reflected direction $\wi$
         if (wo.z == 0)
             return {};
@@ -386,6 +359,29 @@ class ConductorBxDF {
     }
 
     PBRT_CPU_GPU
+    SampledSpectrum f(Vector3f wo, Vector3f wi, TransportMode mode) const {
+        if (!SameHemisphere(wo, wi))
+            return {};
+        if (mfDistrib.EffectivelySmooth())
+            return {};
+        // Evaluate rough conductor BRDF
+        // Compute cosines and $\wh$ for conductor BRDF
+        Float cosTheta_o = AbsCosTheta(wo), cosTheta_i = AbsCosTheta(wi);
+        if (cosTheta_i == 0 || cosTheta_o == 0)
+            return {};
+        Vector3f wh = wi + wo;
+        if (wh.x == 0 && wh.y == 0 && wh.z == 0)
+            return {};
+        wh = Normalize(wh);
+
+        // Evaluate Fresnel factor _F_ for conductor BRDF
+        Float frCosTheta_i = AbsDot(wi, wh);
+        SampledSpectrum F = FrComplex(frCosTheta_i, eta, k);
+
+        return mfDistrib.D(wh) * mfDistrib.G(wo, wi) * F / (4 * cosTheta_i * cosTheta_o);
+    }
+
+    PBRT_CPU_GPU
     Float PDF(Vector3f wo, Vector3f wi, TransportMode mode,
               BxDFReflTransFlags sampleFlags) const {
         if (!(sampleFlags & BxDFReflTransFlags::Reflection))
@@ -394,7 +390,7 @@ class ConductorBxDF {
             return 0;
         if (mfDistrib.EffectivelySmooth())
             return 0;
-        // Return PDF for sampling Torrance--Sparrow conductor BRDF
+        // Evaluate sampling PDF of rough conductor BRDF
         Vector3f wh = wo + wi;
         CHECK_RARE(1e-5f, LengthSquared(wh) == 0);
         CHECK_RARE(1e-5f, Dot(wo, wh) < 0);
@@ -403,6 +399,10 @@ class ConductorBxDF {
         wh = Normalize(wh);
         return mfDistrib.PDF(wo, wh) / (4 * Dot(wo, wh));
     }
+
+    PBRT_CPU_GPU
+    static constexpr const char *Name() { return "ConductorBxDF"; }
+    std::string ToString() const;
 
     PBRT_CPU_GPU
     void Regularize() { mfDistrib.Regularize(); }

@@ -101,9 +101,8 @@ PBRT_CPU_GPU inline int SampleDiscrete(pstd::span<const Float> weights, Float u,
     }
 
     // Compute PMF and remapped _u_ value, if necessary
-    Float p = weights[offset] / sumWeights;
     if (pmf != nullptr)
-        *pmf = p;
+        *pmf = weights[offset] / sumWeights;
     if (uRemapped != nullptr)
         *uRemapped = std::min((up - sum) / weights[offset], OneMinusEpsilon);
 

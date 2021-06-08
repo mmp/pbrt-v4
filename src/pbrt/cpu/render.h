@@ -11,7 +11,7 @@ namespace pbrt {
 
 class ParsedScene;
 
-void CPURender(ParsedScene &scene);
+void RenderCPU(ParsedScene &scene);
 
 }  // namespace pbrt
 

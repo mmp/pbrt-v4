@@ -251,7 +251,7 @@ int main(int argc, char *argv[]) {
         if (options.useGPU || options.wavefront)
             RenderWavefront(scene);
         else
-            CPURender(scene);
+            RenderCPU(scene);
 
         LOG_VERBOSE("Memory used after post-render cleanup: %s", GetCurrentRSS());
         // Clean up after rendering the scene

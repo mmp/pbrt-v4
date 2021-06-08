@@ -20,7 +20,7 @@
 
 namespace pbrt {
 
-void CPURender(ParsedScene &parsedScene) {
+void RenderCPU(ParsedScene &parsedScene) {
     Allocator alloc;
 
     // Create media first (so have them for the camera...)
