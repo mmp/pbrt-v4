@@ -150,8 +150,8 @@ PBRT_CPU_GPU inline Point2f SampleBilinear(Point2f u, pstd::span<const Float> w)
 }
 
 PBRT_CPU_GPU inline Point2f InvertBilinearSample(Point2f p, pstd::span<const Float> w) {
-    return {InvertLinearSample(p[0], Lerp(p[1], w[0], w[2]), Lerp(p[1], w[1], w[3])),
-            InvertLinearSample(p[1], w[0] + w[1], w[2] + w[3])};
+    return {InvertLinearSample(p.x, Lerp(p.y, w[0], w[2]), Lerp(p.y, w[1], w[3])),
+            InvertLinearSample(p.y, w[0] + w[1], w[2] + w[3])};
 }
 
 PBRT_CPU_GPU inline Float XYZMatchingPDF(Float lambda) {

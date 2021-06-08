@@ -1009,8 +1009,8 @@ PBRT_CPU_GPU inline void CoordinateSystem(Vector3<T> v1, Vector3<T> *v2, Vector3
     Float sign = pstd::copysign(Float(1), v1.z);
     Float a = -1 / (sign + v1.z);
     Float b = v1.x * v1.y * a;
-    *v2 = Vector3<T>(1 + sign * v1.x * v1.x * a, sign * b, -sign * v1.x);
-    *v3 = Vector3<T>(b, sign + v1.y * v1.y * a, -v1.y);
+    *v2 = Vector3<T>(1 + sign * Sqr(v1.x) * a, sign * b, -sign * v1.x);
+    *v3 = Vector3<T>(b, sign + Sqr(v1.y) * a, -v1.y);
 }
 
 template <typename T>
@@ -1018,8 +1018,8 @@ PBRT_CPU_GPU inline void CoordinateSystem(Normal3<T> v1, Vector3<T> *v2, Vector3
     Float sign = pstd::copysign(Float(1), v1.z);
     Float a = -1 / (sign + v1.z);
     Float b = v1.x * v1.y * a;
-    *v2 = Vector3<T>(1 + sign * v1.x * v1.x * a, sign * b, -sign * v1.x);
-    *v3 = Vector3<T>(b, sign + v1.y * v1.y * a, -v1.y);
+    *v2 = Vector3<T>(1 + sign * Sqr(v1.x) * a, sign * b, -sign * v1.x);
+    *v3 = Vector3<T>(b, sign + Sqr(v1.y) * a, -v1.y);
 }
 
 template <typename T>
@@ -1315,14 +1315,14 @@ class Bounds3 {
     }
 
     PBRT_CPU_GPU
-    Point3<T> Lerp(Point3f t) const {
-        return Point3<T>(pbrt::Lerp(t.x, pMin.x, pMax.x), pbrt::Lerp(t.y, pMin.y, pMax.y),
-                         pbrt::Lerp(t.z, pMin.z, pMax.z));
+    Point3f Lerp(Point3f t) const {
+        return Point3f(pbrt::Lerp(t.x, pMin.x, pMax.x), pbrt::Lerp(t.y, pMin.y, pMax.y),
+                       pbrt::Lerp(t.z, pMin.z, pMax.z));
     }
 
     PBRT_CPU_GPU
-    Vector3<T> Offset(const Point3<T> &p) const {
-        Vector3<T> o = p - pMin;
+    Vector3f Offset(Point3f p) const {
+        Vector3f o = p - pMin;
         if (pMax.x > pMin.x)
             o.x /= pMax.x - pMin.x;
         if (pMax.y > pMin.y)

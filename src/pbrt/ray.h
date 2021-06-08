@@ -23,13 +23,13 @@ class Ray {
 
     std::string ToString() const;
 
+    PBRT_CPU_GPU
+    Point3f operator()(Float t) const { return o + d * t; }
+
     Ray() = default;
     PBRT_CPU_GPU
     Ray(Point3f o, Vector3f d, Float time = 0.f, Medium medium = nullptr)
         : o(o), d(d), time(time), medium(medium) {}
-
-    PBRT_CPU_GPU
-    Point3f operator()(Float t) const { return o + d * t; }
 
     // Ray Public Members
     Point3f o;
