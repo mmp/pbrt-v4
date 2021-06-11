@@ -347,13 +347,13 @@ class span {
 
     // Explicit reference constructor for a mutable `span<T>` type. Can be
     // replaced with Makespan() to infer the type parameter.
-    template <typename V, typename = EnableIfConvertibleFrom<V>,
-              typename = EnableIfMutableView<V>>
+    template <typename V, typename X = EnableIfConvertibleFrom<V>,
+              typename Y = EnableIfMutableView<V>>
     PBRT_CPU_GPU explicit span(V &v) noexcept : span(v.data(), v.size()) {}
 
     // Implicit reference constructor for a read-only `span<const T>` type
-    template <typename V, typename = EnableIfConvertibleFrom<V>,
-              typename = EnableIfConstView<V>>
+    template <typename V, typename X = EnableIfConvertibleFrom<V>,
+              typename Y = EnableIfConstView<V>>
     PBRT_CPU_GPU constexpr span(const V &v) noexcept : span(v.data(), v.size()) {}
 
     PBRT_CPU_GPU
