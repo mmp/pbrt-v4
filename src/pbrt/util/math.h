@@ -1446,8 +1446,6 @@ PBRT_CPU_GPU inline pstd::optional<SquareMatrix<3>> Inverse(const SquareMatrix<3
     return r;
 }
 
-PBRT_CPU_GPU
-
 template <int N, typename T>
 PBRT_CPU_GPU inline T operator*(const SquareMatrix<N> &m, const T &v) {
     return Mul<T>(m, v);
