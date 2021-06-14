@@ -32,9 +32,9 @@ RGBColorSpace::RGBColorSpace(Point2f r, Point2f g, Point2f b, Spectrum illuminan
 
     // Initialize XYZ color space conversion matrices
     SquareMatrix<3> rgb(R.X, G.X, B.X, R.Y, G.Y, B.Y, R.Z, G.Z, B.Z);
-    XYZ C = *Inverse(rgb) * W;
+    XYZ C = InvertOrExit(rgb) * W;
     XYZFromRGB = rgb * SquareMatrix<3>::Diag(C[0], C[1], C[2]);
-    RGBFromXYZ = *Inverse(XYZFromRGB);
+    RGBFromXYZ = InvertOrExit(XYZFromRGB);
 }
 
 SquareMatrix<3> ConvertRGBColorSpace(const RGBColorSpace &from, const RGBColorSpace &to) {
@@ -48,7 +48,7 @@ RGBSigmoidPolynomial RGBColorSpace::ToRGBCoeffs(const RGB &rgb) const {
     return (*rgbToSpectrumTable)(ClampZero(rgb));
 }
 
-const RGBColorSpace *RGBColorSpace::GetNamed(const std::string &n) {
+const RGBColorSpace *RGBColorSpace::GetNamed(std::string n) {
     std::string name;
     std::transform(n.begin(), n.end(), std::back_inserter(name), ::tolower);
     if (name == "aces2065-1")

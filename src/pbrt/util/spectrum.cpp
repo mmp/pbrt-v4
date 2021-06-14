@@ -52,7 +52,8 @@ Float SpectrumToPhotometric(Spectrum s) {
 
 XYZ SpectrumToXYZ(Spectrum s) {
     return XYZ(InnerProduct(&Spectra::X(), s), InnerProduct(&Spectra::Y(), s),
-               InnerProduct(&Spectra::Z(), s));
+               InnerProduct(&Spectra::Z(), s)) /
+           CIE_Y_integral;
 }
 
 std::string Spectrum::ToString() const {
@@ -156,7 +157,7 @@ PiecewiseLinearSpectrum *PiecewiseLinearSpectrum::FromInterleaved(
 
     if (normalize)
         // Normalize to have luminance of 1.
-        spec->Scale(1 / InnerProduct(spec, &Spectra::Y()));
+        spec->Scale(CIE_Y_integral / InnerProduct(spec, &Spectra::Y()));
 
     return spec;
 }
@@ -2882,7 +2883,7 @@ void Init(Allocator alloc) {
 
 }  // namespace Spectra
 
-Spectrum GetNamedSpectrum(const std::string &name) {
+Spectrum GetNamedSpectrum(std::string name) {
     auto iter = Spectra::namedSpectra.find(name);
     if (iter != Spectra::namedSpectra.end())
         return iter->second;

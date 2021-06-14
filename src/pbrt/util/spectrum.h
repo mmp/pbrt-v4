@@ -724,7 +724,7 @@ inline const DenselySampledSpectrum &Z() {
 }  // namespace Spectra
 
 // Spectral Function Declarations
-Spectrum GetNamedSpectrum(const std::string &name);
+Spectrum GetNamedSpectrum(std::string name);
 
 std::string FindMatchingNamedSpectrum(Spectrum s);
 
@@ -735,11 +735,11 @@ inline const DenselySampledSpectrum &Z();
 }  // namespace Spectra
 
 // Spectrum Inline Functions
-inline Float InnerProduct(Spectrum a, Spectrum b) {
-    Float result = 0;
+inline Float InnerProduct(Spectrum f, Spectrum g) {
+    Float integral = 0;
     for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda)
-        result += a(lambda) * b(lambda);
-    return result / CIE_Y_integral;
+        integral += f(lambda) * g(lambda);
+    return integral;
 }
 
 // Spectrum Inline Method Definitions

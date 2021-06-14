@@ -1409,6 +1409,13 @@ template <int N>
 PBRT_CPU_GPU pstd::optional<SquareMatrix<N>> Inverse(const SquareMatrix<N> &);
 
 template <int N>
+PBRT_CPU_GPU SquareMatrix<N> InvertOrExit(const SquareMatrix<N> &m) {
+    pstd::optional<SquareMatrix<N>> inv = Inverse(m);
+    CHECK(inv.has_value());
+    return *inv;
+}
+
+template <int N>
 PBRT_CPU_GPU inline SquareMatrix<N> Transpose(const SquareMatrix<N> &m) {
     SquareMatrix<N> r;
     for (int i = 0; i < N; ++i)
@@ -1438,6 +1445,8 @@ PBRT_CPU_GPU inline pstd::optional<SquareMatrix<3>> Inverse(const SquareMatrix<3
 
     return r;
 }
+
+PBRT_CPU_GPU
 
 template <int N, typename T>
 PBRT_CPU_GPU inline T operator*(const SquareMatrix<N> &m, const T &v) {

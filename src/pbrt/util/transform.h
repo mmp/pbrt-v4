@@ -309,11 +309,10 @@ inline Vector3fi Transform::operator()(const Vector3fi &v) const {
 // Transform Inline Methods
 template <typename T>
 inline Point3<T> Transform::operator()(Point3<T> p) const {
-    T x = p.x, y = p.y, z = p.z;
-    T xp = m[0][0] * x + m[0][1] * y + m[0][2] * z + m[0][3];
-    T yp = m[1][0] * x + m[1][1] * y + m[1][2] * z + m[1][3];
-    T zp = m[2][0] * x + m[2][1] * y + m[2][2] * z + m[2][3];
-    T wp = m[3][0] * x + m[3][1] * y + m[3][2] * z + m[3][3];
+    T xp = m[0][0] * p.x + m[0][1] * p.y + m[0][2] * p.z + m[0][3];
+    T yp = m[1][0] * p.x + m[1][1] * p.y + m[1][2] * p.z + m[1][3];
+    T zp = m[2][0] * p.x + m[2][1] * p.y + m[2][2] * p.z + m[2][3];
+    T wp = m[3][0] * p.x + m[3][1] * p.y + m[3][2] * p.z + m[3][3];
     if (wp == 1)
         return Point3<T>(xp, yp, zp);
     else
@@ -322,10 +321,9 @@ inline Point3<T> Transform::operator()(Point3<T> p) const {
 
 template <typename T>
 inline Vector3<T> Transform::operator()(Vector3<T> v) const {
-    T x = v.x, y = v.y, z = v.z;
-    return Vector3<T>(m[0][0] * x + m[0][1] * y + m[0][2] * z,
-                      m[1][0] * x + m[1][1] * y + m[1][2] * z,
-                      m[2][0] * x + m[2][1] * y + m[2][2] * z);
+    return Vector3<T>(m[0][0] * v.x + m[0][1] * v.y + m[0][2] * v.z,
+                      m[1][0] * v.x + m[1][1] * v.y + m[1][2] * v.z,
+                      m[2][0] * v.x + m[2][1] * v.y + m[2][2] * v.z);
 }
 
 template <typename T>

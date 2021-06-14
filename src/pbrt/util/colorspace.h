@@ -29,7 +29,7 @@ class RGBColorSpace {
 
     // RGBColorSpace Public Members
     Point2f r, g, b, w;
-    const DenselySampledSpectrum illuminant;
+    DenselySampledSpectrum illuminant;
     SquareMatrix<3> XYZFromRGB, RGBFromXYZ;
     static const RGBColorSpace *sRGB, *DCI_P3, *Rec2020, *ACES2065_1;
 
@@ -56,7 +56,7 @@ class RGBColorSpace {
     PBRT_CPU_GPU
     XYZ ToXYZ(const RGB &rgb) const { return Mul<XYZ>(XYZFromRGB, rgb); }
 
-    static const RGBColorSpace *GetNamed(const std::string &name);
+    static const RGBColorSpace *GetNamed(std::string name);
     static const RGBColorSpace *Lookup(Point2f r, Point2f g, Point2f b, Point2f w);
 
   private:

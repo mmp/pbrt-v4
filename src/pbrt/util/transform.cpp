@@ -108,11 +108,8 @@ Transform LookAt(Point3f pos, Point3f look, Vector3f up) {
     worldFromCamera[2][2] = dir.z;
     worldFromCamera[3][2] = 0.;
 
-    pstd::optional<SquareMatrix<4>> cameraFromWorld = Inverse(worldFromCamera);
-#ifdef PBRT_DEBUG_BUILD
-    DCHECK(cameraFromWorld);
-#endif
-    return Transform(*cameraFromWorld, worldFromCamera);
+    SquareMatrix<4> cameraFromWorld = InvertOrExit(worldFromCamera);
+    return Transform(cameraFromWorld, worldFromCamera);
 }
 
 Transform Orthographic(Float zNear, Float zFar) {
@@ -146,12 +143,12 @@ Transform Transform::operator*(const Transform &t2) const {
 }
 
 bool Transform::SwapsHandedness() const {
-    Float minor12 = DifferenceOfProducts(m[1][1], m[2][2], m[1][2], m[2][1]);
-    Float minor02 = DifferenceOfProducts(m[1][0], m[2][2], m[1][2], m[2][0]);
-    Float minor01 = DifferenceOfProducts(m[1][0], m[2][1], m[1][1], m[2][0]);
-    Float det =
-        m[0][2] * minor01 + DifferenceOfProducts(m[0][0], minor12, m[0][1], minor02);
-    return det < 0;
+    // clang-format off
+    SquareMatrix<3> s(m[0][0], m[0][1], m[0][2],
+                      m[1][0], m[1][1], m[1][2],
+                      m[2][0], m[2][1], m[2][2]);
+    // clang-format on
+    return s.Determinant() < 0;
 }
 
 Transform::operator Quaternion() const {
@@ -209,7 +206,7 @@ void Transform::Decompose(Vector3f *T, SquareMatrix<4> *R, SquareMatrix<4> *S) c
     *R = M;
     do {
         // Compute next matrix _Rnext_ in series
-        SquareMatrix<4> Rit = *Inverse(Transpose(*R));
+        SquareMatrix<4> Rit = InvertOrExit(Transpose(*R));
         SquareMatrix<4> Rnext = (*R + Rit) / 2;
 
         // Compute norm of difference between _R_ and _Rnext_
@@ -226,7 +223,7 @@ void Transform::Decompose(Vector3f *T, SquareMatrix<4> *R, SquareMatrix<4> *S) c
     // XXX TODO FIXME deal with flip...
 
     // Compute scale _S_ using rotation and original matrix
-    *S = *Inverse(*R) * M;
+    *S = InvertOrExit(*R) * M;
 }
 
 SurfaceInteraction Transform::operator()(const SurfaceInteraction &si) const {

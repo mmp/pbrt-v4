@@ -1784,12 +1784,12 @@ class OctahedralVector {
   private:
     // OctahedralVector Private Methods
     PBRT_CPU_GPU
+    static Float SignNotZero(Float v) { return (v < 0) ? -1 : 1; }
+
+    PBRT_CPU_GPU
     static uint16_t Encode(Float f) {
         return pstd::round(Clamp((f + 1) / 2, 0, 1) * 65535.f);
     }
-
-    PBRT_CPU_GPU
-    static Float SignNotZero(Float v) { return (v < 0) ? -1 : 1; }
 
     // OctahedralVector Private Members
     uint16_t x, y;
@@ -1869,14 +1869,7 @@ class Frame {
     PBRT_CPU_GPU
     Frame() : x(1, 0, 0), y(0, 1, 0), z(0, 0, 1) {}
     PBRT_CPU_GPU
-    Frame(Vector3f x, Vector3f y, Vector3f z) : x(x), y(y), z(z) {
-        DCHECK_LT(std::abs(LengthSquared(x) - 1), 1e-4);
-        DCHECK_LT(std::abs(LengthSquared(y) - 1), 1e-4);
-        DCHECK_LT(std::abs(LengthSquared(z) - 1), 1e-4);
-        DCHECK_LT(std::abs(Dot(x, y)), 1e-4);
-        DCHECK_LT(std::abs(Dot(y, z)), 1e-4);
-        DCHECK_LT(std::abs(Dot(z, x)), 1e-4);
-    }
+    Frame(Vector3f x, Vector3f y, Vector3f z);
 
     PBRT_CPU_GPU
     static Frame FromXZ(Vector3f x, Vector3f z) { return Frame(x, Cross(z, x), z); }
@@ -1944,6 +1937,16 @@ class Frame {
     // Frame Public Members
     Vector3f x, y, z;
 };
+
+// Frame Inline Functions
+inline Frame::Frame(Vector3f x, Vector3f y, Vector3f z) : x(x), y(y), z(z) {
+    DCHECK_LT(std::abs(LengthSquared(x) - 1), 1e-4);
+    DCHECK_LT(std::abs(LengthSquared(y) - 1), 1e-4);
+    DCHECK_LT(std::abs(LengthSquared(z) - 1), 1e-4);
+    DCHECK_LT(std::abs(Dot(x, y)), 1e-4);
+    DCHECK_LT(std::abs(Dot(y, z)), 1e-4);
+    DCHECK_LT(std::abs(Dot(z, x)), 1e-4);
+}
 
 }  // namespace pbrt
 
