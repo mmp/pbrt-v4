@@ -123,7 +123,7 @@ class BSDF {
         BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
         Vector3f wo = RenderToLocal(woRender), wi = RenderToLocal(wiRender);
         if (wo.z == 0)
-            return 0.;
+            return 0;
         const BxDF *specificBxDF = bxdf.Cast<BxDF>();
         return specificBxDF->PDF(wo, wi, mode, sampleFlags);
     }

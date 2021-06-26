@@ -100,7 +100,7 @@ class RoughDiffuseBxDF {
             return SameHemisphere(wo, wi) ? (R * InvPi) : (T * InvPi);
 
         if ((SameHemisphere(wo, wi) && !R) || (!SameHemisphere(wo, wi) && !T))
-            return SampledSpectrum(0.);
+            return SampledSpectrum(0.f);
         // Evaluate Oren--Nayar BRDF for given directions
         Float sinTheta_i = SinTheta(wi), sinTheta_o = SinTheta(wo);
         Float maxCos = std::max<Float>(0, CosDPhi(wi, wo));
@@ -191,24 +191,24 @@ class RoughDiffuseBxDF {
     Float A, B;
 };
 
-// DielectricInterfaceBxDF Definition
-class DielectricInterfaceBxDF {
+// DielectricBxDF Definition
+class DielectricBxDF {
   public:
-    // DielectricInterfaceBxDF Public Methods
-    DielectricInterfaceBxDF() = default;
+    // DielectricBxDF Public Methods
+    DielectricBxDF() = default;
     PBRT_CPU_GPU
-    DielectricInterfaceBxDF(Float eta, SampledSpectrum tint,
-                            const TrowbridgeReitzDistribution &mfDistrib)
-        : eta(eta == 1 ? 1.001 : eta), tint(tint), mfDistrib(mfDistrib) {}
+    DielectricBxDF(Float eta, const TrowbridgeReitzDistribution &mfDistrib)
+        : eta(eta), mfDistrib(mfDistrib) {}
 
     PBRT_CPU_GPU
     BxDFFlags Flags() const {
-        return BxDFFlags::Reflection | BxDFFlags::Transmission |
-               (mfDistrib.EffectivelySmooth() ? BxDFFlags::Specular : BxDFFlags::Glossy);
+        if (eta == 1)
+            return BxDFFlags::Transmission;
+        else
+            return BxDFFlags::Reflection | BxDFFlags::Transmission |
+                   (mfDistrib.EffectivelySmooth() ? BxDFFlags::Specular
+                                                  : BxDFFlags::Glossy);
     }
-
-    PBRT_CPU_GPU
-    SampledSpectrum f(Vector3f wo, Vector3f wi, TransportMode mode) const;
 
     PBRT_CPU_GPU
     pstd::optional<BSDFSample> Sample_f(
@@ -216,11 +216,14 @@ class DielectricInterfaceBxDF {
         BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const;
 
     PBRT_CPU_GPU
+    SampledSpectrum f(Vector3f wo, Vector3f wi, TransportMode mode) const;
+
+    PBRT_CPU_GPU
     Float PDF(Vector3f wo, Vector3f wi, TransportMode mode,
               BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const;
 
     PBRT_CPU_GPU
-    static constexpr const char *Name() { return "DielectricInterfaceBxDF"; }
+    static constexpr const char *Name() { return "DielectricBxDF"; }
 
     std::string ToString() const;
 
@@ -228,9 +231,8 @@ class DielectricInterfaceBxDF {
     void Regularize() { mfDistrib.Regularize(); }
 
   private:
-    // DielectricInterfaceBxDF Private Members
+    // DielectricBxDF Private Members
     Float eta;
-    SampledSpectrum tint;
     TrowbridgeReitzDistribution mfDistrib;
 };
 
@@ -339,12 +341,11 @@ class ConductorBxDF {
             return {};
         Vector3f wh = mfDistrib.Sample_wm(wo, u);
         Vector3f wi = Reflect(wo, wh);
-        CHECK_RARE(1e-5f, Dot(wo, wh) <= 0);
-        if (!SameHemisphere(wo, wi) || Dot(wo, wh) <= 0)
+        if (!SameHemisphere(wo, wi))
             return {};
 
         // Compute PDF of _wi_ for microfacet reflection
-        Float pdf = mfDistrib.PDF(wo, wh) / (4 * Dot(wo, wh));
+        Float pdf = mfDistrib.PDF(wo, wh) / (4 * AbsDot(wo, wh));
 
         Float cosTheta_o = AbsCosTheta(wo), cosTheta_i = AbsCosTheta(wi);
         if (cosTheta_i == 0 || cosTheta_o == 0)
@@ -393,11 +394,10 @@ class ConductorBxDF {
         // Evaluate sampling PDF of rough conductor BRDF
         Vector3f wh = wo + wi;
         CHECK_RARE(1e-5f, LengthSquared(wh) == 0);
-        CHECK_RARE(1e-5f, Dot(wo, wh) < 0);
-        if (LengthSquared(wh) == 0 || Dot(wo, wh) <= 0)
+        if (LengthSquared(wh) == 0)
             return 0;
-        wh = Normalize(wh);
-        return mfDistrib.PDF(wo, wh) / (4 * Dot(wo, wh));
+        wh = FaceForward(Normalize(wh), Normal3f(0, 0, 1));
+        return mfDistrib.PDF(wo, wh) / (4 * AbsDot(wo, wh));
     }
 
     PBRT_CPU_GPU
@@ -931,7 +931,7 @@ class LayeredBxDF {
 };
 
 // CoatedDiffuseBxDF Definition
-class CoatedDiffuseBxDF : public LayeredBxDF<DielectricInterfaceBxDF, DiffuseBxDF, true> {
+class CoatedDiffuseBxDF : public LayeredBxDF<DielectricBxDF, DiffuseBxDF, true> {
   public:
     // CoatedDiffuseBxDF Public Methods
     using LayeredBxDF::LayeredBxDF;
@@ -940,8 +940,7 @@ class CoatedDiffuseBxDF : public LayeredBxDF<DielectricInterfaceBxDF, DiffuseBxD
 };
 
 // CoatedConductorBxDF Definition
-class CoatedConductorBxDF
-    : public LayeredBxDF<DielectricInterfaceBxDF, ConductorBxDF, true> {
+class CoatedConductorBxDF : public LayeredBxDF<DielectricBxDF, ConductorBxDF, true> {
   public:
     // CoatedConductorBxDF Public Methods
     PBRT_CPU_GPU
@@ -1194,8 +1193,8 @@ inline void BxDF::Regularize() {
     return Dispatch(regularize);
 }
 
-extern template class LayeredBxDF<DielectricInterfaceBxDF, DiffuseBxDF, true>;
-extern template class LayeredBxDF<DielectricInterfaceBxDF, ConductorBxDF, true>;
+extern template class LayeredBxDF<DielectricBxDF, DiffuseBxDF, true>;
+extern template class LayeredBxDF<DielectricBxDF, ConductorBxDF, true>;
 
 }  // namespace pbrt
 

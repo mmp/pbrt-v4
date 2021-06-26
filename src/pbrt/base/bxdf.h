@@ -153,7 +153,7 @@ struct BSDFSample {
 
 class DiffuseBxDF;
 class RoughDiffuseBxDF;
-class DielectricInterfaceBxDF;
+class DielectricBxDF;
 class ThinDielectricBxDF;
 class HairBxDF;
 class MeasuredBxDF;
@@ -163,10 +163,10 @@ class CoatedDiffuseBxDF;
 class CoatedConductorBxDF;
 
 // BxDF Definition
-class BxDF : public TaggedPointer<DiffuseBxDF, RoughDiffuseBxDF, CoatedDiffuseBxDF,
-                                  CoatedConductorBxDF, DielectricInterfaceBxDF,
-                                  ThinDielectricBxDF, HairBxDF, MeasuredBxDF,
-                                  ConductorBxDF, NormalizedFresnelBxDF> {
+class BxDF
+    : public TaggedPointer<DiffuseBxDF, RoughDiffuseBxDF, CoatedDiffuseBxDF,
+                           CoatedConductorBxDF, DielectricBxDF, ThinDielectricBxDF,
+                           HairBxDF, MeasuredBxDF, ConductorBxDF, NormalizedFresnelBxDF> {
   public:
     // BxDF Interface
     PBRT_CPU_GPU inline BxDFFlags Flags() const;

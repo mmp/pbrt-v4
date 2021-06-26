@@ -41,8 +41,8 @@ std::string BumpEvalContext::ToString() const {
 // DielectricMaterial Method Definitions
 std::string DielectricMaterial::ToString() const {
     return StringPrintf("[ DielectricMaterial displacement: %s uRoughness: %s "
-                        "vRoughness: %s eta: %s tint: %s remapRoughness: %s ]",
-                        displacement, uRoughness, vRoughness, eta, tint, remapRoughness);
+                        "vRoughness: %s eta: %s remapRoughness: %s ]",
+                        displacement, uRoughness, vRoughness, eta, remapRoughness);
 }
 
 DielectricMaterial *DielectricMaterial::Create(
@@ -66,10 +66,8 @@ DielectricMaterial *DielectricMaterial::Create(
     FloatTexture displacement = parameters.GetFloatTextureOrNull("displacement", alloc);
     bool remapRoughness = parameters.GetOneBool("remaproughness", true);
 
-    SpectrumTexture tint =
-        parameters.GetSpectrumTextureOrNull("tint", SpectrumType::Albedo, alloc);
     return alloc.new_object<DielectricMaterial>(uRoughness, vRoughness, eta, displacement,
-                                                normalMap, tint, remapRoughness);
+                                                normalMap, remapRoughness);
 }
 
 // ThinDielectricMaterial Method Definitions
@@ -273,9 +271,8 @@ BSDF CoatedDiffuseMaterial::GetBSDF(TextureEvaluator texEval,
     SampledSpectrum a = Clamp(texEval(albedo, ctx, lambda), 0, 1);
     Float gg = Clamp(texEval(g, ctx), -1, 1);
 
-    *bxdf = CoatedDiffuseBxDF(
-        DielectricInterfaceBxDF(sampledEta, SampledSpectrum(1.f), distrib),
-        DiffuseBxDF(r), thick, a, gg, maxDepth, nSamples);
+    *bxdf = CoatedDiffuseBxDF(DielectricBxDF(sampledEta, distrib), DiffuseBxDF(r), thick,
+                              a, gg, maxDepth, nSamples);
     return BSDF(ctx.ns, ctx.dpdus, bxdf);
 }
 
@@ -383,9 +380,9 @@ BSDF CoatedConductorMaterial::GetBSDF(TextureEvaluator texEval,
     SampledSpectrum a = Clamp(texEval(albedo, ctx, lambda), 0, 1);
     Float gg = Clamp(texEval(g, ctx), -1, 1);
 
-    *bxdf = CoatedConductorBxDF(
-        DielectricInterfaceBxDF(ieta, SampledSpectrum(1.f), interfaceDistrib),
-        ConductorBxDF(conductorDistrib, ce, ck), thick, a, gg, maxDepth, nSamples);
+    *bxdf = CoatedConductorBxDF(DielectricBxDF(ieta, interfaceDistrib),
+                                ConductorBxDF(conductorDistrib, ce, ck), thick, a, gg,
+                                maxDepth, nSamples);
     return BSDF(ctx.ns, ctx.dpdus, bxdf);
 }
 

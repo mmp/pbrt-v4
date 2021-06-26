@@ -139,26 +139,24 @@ PBRT_CPU_GPU void Bump(TextureEvaluator texEval, FloatTexture displacement,
 class DielectricMaterial {
   public:
     // DielectricMaterial Type Definitions
-    using BxDF = DielectricInterfaceBxDF;
+    using BxDF = DielectricBxDF;
     using BSSRDF = void;
 
     // DielectricMaterial Public Methods
     DielectricMaterial(FloatTexture uRoughness, FloatTexture vRoughness, Spectrum eta,
-                       FloatTexture displacement, Image *normalMap, SpectrumTexture tint,
-                       bool remapRoughness)
+                       FloatTexture displacement, Image *normalMap, bool remapRoughness)
         : displacement(displacement),
           normalMap(normalMap),
           uRoughness(uRoughness),
           vRoughness(vRoughness),
           eta(eta),
-          tint(tint),
           remapRoughness(remapRoughness) {}
 
     static const char *Name() { return "DielectricMaterial"; }
 
     template <typename TextureEvaluator>
     PBRT_CPU_GPU bool CanEvaluateTextures(TextureEvaluator texEval) const {
-        return texEval.CanEvaluate({uRoughness, vRoughness}, {tint});
+        return texEval.CanEvaluate({uRoughness, vRoughness}, {});
     }
 
     PBRT_CPU_GPU
@@ -180,8 +178,7 @@ class DielectricMaterial {
 
     template <typename TextureEvaluator>
     PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
-                              SampledWavelengths &lambda,
-                              DielectricInterfaceBxDF *bxdf) const {
+                              SampledWavelengths &lambda, DielectricBxDF *bxdf) const {
         // Compute index of refraction for dielectric material
         Float sampledEta = eta(lambda[0]);
         if (!eta.template Is<ConstantSpectrum>())
@@ -198,8 +195,7 @@ class DielectricMaterial {
         TrowbridgeReitzDistribution distrib(urough, vrough);
 
         // Return BSDF for dielectric material
-        SampledSpectrum t = tint ? texEval(tint, ctx, lambda) : SampledSpectrum(1.f);
-        *bxdf = DielectricInterfaceBxDF(sampledEta, t, distrib);
+        *bxdf = DielectricBxDF(sampledEta, distrib);
         return BSDF(ctx.ns, ctx.dpdus, bxdf);
     }
 
@@ -208,7 +204,6 @@ class DielectricMaterial {
     FloatTexture displacement;
     Image *normalMap;
     FloatTexture uRoughness, vRoughness;
-    SpectrumTexture tint;
     Spectrum eta;
     bool remapRoughness;
 };
@@ -705,7 +700,7 @@ class CoatedConductorMaterial {
 class SubsurfaceMaterial {
   public:
     // SubsurfaceMaterial Type Definitions
-    using BxDF = DielectricInterfaceBxDF;
+    using BxDF = DielectricBxDF;
     using BSSRDF = TabulatedBSSRDF;
 
     // SubsurfaceMaterial Public Methods
@@ -738,8 +733,7 @@ class SubsurfaceMaterial {
 
     template <typename TextureEvaluator>
     PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, const MaterialEvalContext &ctx,
-                              SampledWavelengths &lambda,
-                              DielectricInterfaceBxDF *bxdf) const {
+                              SampledWavelengths &lambda, DielectricBxDF *bxdf) const {
         // Initialize BSDF for _SubsurfaceMaterial_
 
         Float urough = texEval(uRoughness, ctx), vrough = texEval(vRoughness, ctx);
@@ -750,7 +744,7 @@ class SubsurfaceMaterial {
         TrowbridgeReitzDistribution distrib(urough, vrough);
 
         // Initialize _bsdf_ for smooth or rough dielectric
-        *bxdf = DielectricInterfaceBxDF(eta, SampledSpectrum(1.f), distrib);
+        *bxdf = DielectricBxDF(eta, distrib);
         return BSDF(ctx.ns, ctx.dpdus, bxdf);
     }
 

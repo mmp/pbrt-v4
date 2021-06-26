@@ -20,10 +20,18 @@ inline Vector3f Reflect(const Vector3f &wo, const Vector3f &n) {
     return -wo + 2 * Dot(wo, n) * n;
 }
 
-PBRT_CPU_GPU inline bool Refract(Vector3f wi, Normal3f n, Float eta, Vector3f *wt) {
+PBRT_CPU_GPU inline bool Refract(Vector3f wi, Normal3f n, Float eta, Float *etap,
+                                 Vector3f *wt) {
     Float cosTheta_i = Dot(n, wi);
+    // Potentially flip interface orientation for Snell's law
+    if (cosTheta_i < 0) {
+        eta = 1 / eta;
+        cosTheta_i = -cosTheta_i;
+        n = -n;
+    }
+
     // Compute $\cos\,\theta_\roman{t}$ using Snell's law
-    Float sin2Theta_i = std::max<Float>(0, 1 - cosTheta_i * cosTheta_i);
+    Float sin2Theta_i = std::max<Float>(0, 1 - Sqr(cosTheta_i));
     Float sin2Theta_t = sin2Theta_i / Sqr(eta);
     // Handle total internal reflection case
     if (sin2Theta_t >= 1)
@@ -32,6 +40,10 @@ PBRT_CPU_GPU inline bool Refract(Vector3f wi, Normal3f n, Float eta, Vector3f *w
     Float cosTheta_t = SafeSqrt(1 - sin2Theta_t);
 
     *wt = -wi / eta + (cosTheta_i / eta - cosTheta_t) * Vector3f(n);
+    // Provide relative IOR along ray to caller
+    if (etap)
+        *etap = eta;
+
     return true;
 }
 
@@ -44,14 +56,14 @@ PBRT_CPU_GPU inline Float HenyeyGreenstein(Float cosTheta, Float g) {
 PBRT_CPU_GPU
 inline Float FrDielectric(Float cosTheta_i, Float eta) {
     cosTheta_i = Clamp(cosTheta_i, -1, 1);
-    // Potentially swap indices of refraction
+    // Potentially flip interface orientation for Fresnel equations
     if (cosTheta_i < 0) {
         eta = 1 / eta;
         cosTheta_i = -cosTheta_i;
     }
 
     // Compute $\cos\,\theta_\roman{t}$ for Fresnel equations using Snell's law
-    Float sin2Theta_i = 1 - cosTheta_i * cosTheta_i;
+    Float sin2Theta_i = 1 - Sqr(cosTheta_i);
     Float sin2Theta_t = sin2Theta_i / Sqr(eta);
     if (sin2Theta_t >= 1)
         return 1.f;
@@ -67,7 +79,7 @@ inline Float FrComplex(Float cosTheta_i, pstd::complex<Float> eta) {
     using Complex = pstd::complex<Float>;
     cosTheta_i = Clamp(cosTheta_i, 0, 1);
     // Compute complex $\cos\,\theta_\roman{t}$ for Fresnel equations using Snell's law
-    Float sin2Theta_i = 1 - cosTheta_i * cosTheta_i;
+    Float sin2Theta_i = 1 - Sqr(cosTheta_i);
     Complex sin2Theta_t = sin2Theta_i / Sqr(eta);
     Complex cosTheta_t = pstd::sqrt(1.f - sin2Theta_t);
 
@@ -100,23 +112,19 @@ class TrowbridgeReitzDistribution {
     TrowbridgeReitzDistribution(Float alpha_x, Float alpha_y)
         : alpha_x(alpha_x), alpha_y(alpha_y) {}
 
-    PBRT_CPU_GPU
-    static Float RoughnessToAlpha(Float roughness) { return std::sqrt(roughness); }
-
     PBRT_CPU_GPU inline Float D(const Vector3f &wm) const {
         Float tan2Theta = Tan2Theta(wm);
         if (IsInf(tan2Theta))
             return 0;
-        Float cos4Theta = Cos2Theta(wm) * Cos2Theta(wm);
+        Float cos4Theta = Sqr(Cos2Theta(wm));
         if (cos4Theta < 1e-16f)
             return 0;
-        Float e =
-            tan2Theta * (Sqr(CosPhi(wm)) / Sqr(alpha_x) + Sqr(SinPhi(wm)) / Sqr(alpha_y));
+        Float e = tan2Theta * (Sqr(CosPhi(wm) / alpha_x) + Sqr(SinPhi(wm) / alpha_y));
         return 1 / (Pi * alpha_x * alpha_y * cos4Theta * Sqr(1 + e));
     }
 
     PBRT_CPU_GPU
-    bool EffectivelySmooth() const { return std::min(alpha_x, alpha_y) < 1e-3f; }
+    bool EffectivelySmooth() const { return std::max(alpha_x, alpha_y) < 1e-3f; }
 
     PBRT_CPU_GPU
     Float G1(const Vector3f &w) const { return 1 / (1 + Lambda(w)); }
@@ -125,11 +133,9 @@ class TrowbridgeReitzDistribution {
     Float Lambda(const Vector3f &w) const {
         Float tan2Theta = Tan2Theta(w);
         if (IsInf(tan2Theta))
-            return 0.;
-        // Compute _alpha2_ for direction _w_
+            return 0;
         Float alpha2 = Sqr(CosPhi(w) * alpha_x) + Sqr(SinPhi(w) * alpha_y);
-
-        return (-1 + std::sqrt(1 + alpha2 * tan2Theta)) / 2;
+        return .5f * (std::sqrt(1 + alpha2 * tan2Theta) - 1);
     }
 
     PBRT_CPU_GPU
@@ -138,21 +144,35 @@ class TrowbridgeReitzDistribution {
     }
 
     PBRT_CPU_GPU
-    Vector3f Sample_wm(Point2f u) const {
-        return SampleTrowbridgeReitz(alpha_x, alpha_y, u);
-    }
-
-    PBRT_CPU_GPU
     Float D(const Vector3f &w, const Vector3f &wm) const {
-        return D(wm) * G1(w) * std::max<Float>(0, Dot(w, wm)) / AbsCosTheta(w);
+        return D(wm) * G1(w) * std::abs(Dot(w, wm) / CosTheta(w));
     }
 
     PBRT_CPU_GPU
-    Vector3f Sample_wm(Vector3f wo, Point2f u) const {
-        bool flip = wo.z < 0;
-        Vector3f wm =
-            SampleTrowbridgeReitzVisibleArea(flip ? -wo : wo, alpha_x, alpha_y, u);
-        return flip ? -wm : wm;
+    Vector3f Sample_wm(Vector3f w, Point2f u) const {
+        // Transform _w_ to hemispherical configuration for visible area sampling
+        Vector3f wh = Normalize(Vector3f(alpha_x * w.x, alpha_y * w.y, w.z));
+        if (w.z < 0)
+            wh = -wh;
+
+        // Find orthonormal basis for visible area microfacet sampling
+        Vector3f T1 = (wh.z < 0.99999f) ? Normalize(Cross(Vector3f(0, 0, 1), wh))
+                                        : Vector3f(1, 0, 0);
+        Vector3f T2 = Cross(wh, T1);
+
+        // Sample parameterization of projected microfacet area
+        Float r = std::sqrt(u[0]);
+        Float phi = 2 * Pi * u[1];
+        Float t1 = r * std::cos(phi), t2 = r * std::sin(phi);
+        Float s = .5f * (1 + wh.z);
+        t2 = (1 - s) * std::sqrt(1 - Sqr(t1)) + s * t2;
+
+        // Reproject to hemisphere and transform normal to ellipsoid configuration
+        Vector3f nh =
+            t1 * T1 + t2 * T2 + std::sqrt(std::max<Float>(0, 1 - Sqr(t1) - Sqr(t2))) * wh;
+        CHECK_RARE(1e-5f, nh.z == 0);
+        return Normalize(
+            Vector3f(alpha_x * nh.x, alpha_y * nh.y, std::max<Float>(1e-6f, nh.z)));
     }
 
     std::string ToString() const;
@@ -161,6 +181,9 @@ class TrowbridgeReitzDistribution {
     Float PDF(Vector3f wo, Vector3f wm) const {
         return D(wm) * G1(wo) * AbsDot(wo, wm) / AbsCosTheta(wo);
     }
+
+    PBRT_CPU_GPU
+    static Float RoughnessToAlpha(Float roughness) { return std::sqrt(roughness); }
 
     PBRT_CPU_GPU
     void Regularize() {
