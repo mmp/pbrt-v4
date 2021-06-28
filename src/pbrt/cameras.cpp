@@ -848,7 +848,6 @@ Bounds2f RealisticCamera::BoundExitPupil(Float filmX0, Float filmX1) const {
     Bounds2f pupilBounds;
     // Sample a collection of points on the rear lens to find exit pupil
     const int nSamples = 1024 * 1024;
-    int nExitingRays = 0;
     // Compute bounding box of projection of rear element on sampling plane
     Float rearRadius = RearElementRadius();
     Bounds2f projRearBounds(Point2f(-1.5f * rearRadius, -1.5f * rearRadius),
@@ -863,17 +862,15 @@ Bounds2f RealisticCamera::BoundExitPupil(Float filmX0, Float filmX1) const {
                       LensRearZ());
 
         // Expand pupil bounds if ray makes it through the lens system
-        if (Inside(Point2f(pRear.x, pRear.y), pupilBounds) ||
-            TraceLensesFromFilm(Ray(pFilm, pRear - pFilm), nullptr)) {
+        if (!Inside(Point2f(pRear.x, pRear.y), pupilBounds) &&
+            TraceLensesFromFilm(Ray(pFilm, pRear - pFilm), nullptr))
             pupilBounds = Union(pupilBounds, Point2f(pRear.x, pRear.y));
-            ++nExitingRays;
-        }
     }
 
-    // Return entire element bounds if no rays made it through the lens system
-    if (nExitingRays == 0) {
+    // Return degenerate bounds if no rays made it through the lens system
+    if (pupilBounds.IsDegenerate()) {
         LOG_VERBOSE("Unable to find exit pupil in x = [%f,%f] on film.", filmX0, filmX1);
-        return projRearBounds;
+        return pupilBounds;
     }
 
     // Expand bounds to account for sample spacing
@@ -883,24 +880,26 @@ Bounds2f RealisticCamera::BoundExitPupil(Float filmX0, Float filmX1) const {
     return pupilBounds;
 }
 
-Point3f RealisticCamera::SampleExitPupil(Point2f pFilm, Point2f lensSample,
-                                         Float *sampleBoundsArea) const {
+pstd::optional<ExitPupilSample> RealisticCamera::SampleExitPupil(Point2f pFilm,
+                                                                 Point2f uLens) const {
     // Find exit pupil bound for sample distance from film center
     Float rFilm = std::sqrt(Sqr(pFilm.x) + Sqr(pFilm.y));
     int rIndex = rFilm / (film.Diagonal() / 2) * exitPupilBounds.size();
     rIndex = std::min<int>(exitPupilBounds.size() - 1, rIndex);
     Bounds2f pupilBounds = exitPupilBounds[rIndex];
-    if (sampleBoundsArea != nullptr)
-        *sampleBoundsArea = pupilBounds.Area();
+    if (pupilBounds.IsDegenerate())
+        return {};
 
     // Generate sample point inside exit pupil bound
-    Point2f pLens = pupilBounds.Lerp(lensSample);
+    Point2f pLens = pupilBounds.Lerp(uLens);
+    Float pdf = 1 / pupilBounds.Area();
 
     // Return sample point rotated by angle of _pFilm_ with $+x$ axis
     Float sinTheta = (rFilm != 0) ? pFilm.y / rFilm : 0;
     Float cosTheta = (rFilm != 0) ? pFilm.x / rFilm : 1;
-    return {cosTheta * pLens.x - sinTheta * pLens.y,
-            sinTheta * pLens.x + cosTheta * pLens.y, LensRearZ()};
+    Point3f pPupil(cosTheta * pLens.x - sinTheta * pLens.y,
+                   sinTheta * pLens.x + cosTheta * pLens.y, LensRearZ());
+    return ExitPupilSample{pPupil, pdf};
 }
 
 pstd::optional<CameraRay> RealisticCamera::GenerateRay(CameraSample sample,
@@ -912,10 +911,11 @@ pstd::optional<CameraRay> RealisticCamera::GenerateRay(CameraSample sample,
     Point3f pFilm(-pFilm2.x, pFilm2.y, 0);
 
     // Trace ray from _pFilm_ through lens system
-    Float exitPupilBoundsArea;
-    Point3f pRear =
-        SampleExitPupil(Point2f(pFilm.x, pFilm.y), sample.pLens, &exitPupilBoundsArea);
-    Ray rFilm(pFilm, pRear - pFilm);
+    pstd::optional<ExitPupilSample> eps =
+        SampleExitPupil(Point2f(pFilm.x, pFilm.y), sample.pLens);
+    if (!eps)
+        return {};
+    Ray rFilm(pFilm, eps->pPupil - pFilm);
     Ray ray;
     Float weight = TraceLensesFromFilm(rFilm, &ray);
     if (weight == 0)
@@ -929,7 +929,7 @@ pstd::optional<CameraRay> RealisticCamera::GenerateRay(CameraSample sample,
 
     // Compute weighting for _RealisticCamera_ ray
     Float cosTheta = Normalize(rFilm.d).z;
-    weight *= Pow<4>(cosTheta) * exitPupilBoundsArea / Sqr(LensRearZ());
+    weight *= Pow<4>(cosTheta) / (eps->pdf * Sqr(LensRearZ()));
 
     return CameraRay{ray, SampledSpectrum(weight)};
 }

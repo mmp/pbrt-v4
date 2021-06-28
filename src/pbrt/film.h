@@ -43,14 +43,13 @@ class PixelSensor {
     static PixelSensor *CreateDefault(Allocator alloc = {});
 
     PixelSensor(Spectrum r, Spectrum g, Spectrum b, const RGBColorSpace *outputColorSpace,
-                Float wbTemp, Float imagingRatio, Allocator alloc)
+                Spectrum sensorIllum, Float imagingRatio, Allocator alloc)
         : r_bar(r, alloc), g_bar(g, alloc), b_bar(b, alloc), imagingRatio(imagingRatio) {
         // Compute XYZ from camera RGB matrix
         // Compute _rgbCamera_ values for training swatches
-        DenselySampledSpectrum sensorIllum = Spectra::D(wbTemp, alloc);
         Float rgbCamera[nSwatchReflectances][3];
         for (int i = 0; i < nSwatchReflectances; ++i) {
-            RGB rgb = ProjectReflectance<RGB>(swatchReflectances[i], &sensorIllum, &r_bar,
+            RGB rgb = ProjectReflectance<RGB>(swatchReflectances[i], sensorIllum, &r_bar,
                                               &g_bar, &b_bar);
             for (int c = 0; c < 3; ++c)
                 rgbCamera[i][c] = rgb[c];
@@ -58,8 +57,8 @@ class PixelSensor {
 
         // Compute _xyzOutput_ values for training swatches
         Float xyzOutput[24][3];
-        Float sensorWhiteG = InnerProduct(&sensorIllum, &g_bar);
-        Float sensorWhiteY = InnerProduct(&sensorIllum, &Spectra::Y());
+        Float sensorWhiteG = InnerProduct(sensorIllum, &g_bar);
+        Float sensorWhiteY = InnerProduct(sensorIllum, &Spectra::Y());
         for (size_t i = 0; i < nSwatchReflectances; ++i) {
             Spectrum s = swatchReflectances[i];
             XYZ xyz =
@@ -78,16 +77,15 @@ class PixelSensor {
         XYZFromSensorRGB = *m;
     }
 
-    PixelSensor(const RGBColorSpace *outputColorSpace, Float wbTemp, Float imagingRatio,
-                Allocator alloc)
+    PixelSensor(const RGBColorSpace *outputColorSpace, Spectrum sensorIllum,
+                Float imagingRatio, Allocator alloc)
         : r_bar(&Spectra::X(), alloc),
           g_bar(&Spectra::Y(), alloc),
           b_bar(&Spectra::Z(), alloc),
           imagingRatio(imagingRatio) {
         // Compute white balancing matrix for XYZ _PixelSensor_
-        if (wbTemp != 0) {
-            auto whiteIlluminant = Spectra::D(wbTemp, alloc);
-            Point2f sourceWhite = SpectrumToXYZ(&whiteIlluminant).xy();
+        if (sensorIllum) {
+            Point2f sourceWhite = SpectrumToXYZ(sensorIllum).xy();
             Point2f targetWhite = outputColorSpace->w;
             XYZFromSensorRGB = WhiteBalance(sourceWhite, targetWhite);
         }

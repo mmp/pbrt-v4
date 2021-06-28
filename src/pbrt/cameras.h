@@ -457,6 +457,12 @@ class SphericalCamera : public CameraBase {
     Mapping mapping;
 };
 
+// ExitPupilSample Definition
+struct ExitPupilSample {
+    Point3f pPupil;
+    Float pdf;
+};
+
 // RealisticCamera Definition
 class RealisticCamera : public CameraBase {
   public:
@@ -568,8 +574,7 @@ class RealisticCamera : public CameraBase {
     void RenderExitPupil(Float sx, Float sy, const char *filename) const;
 
     PBRT_CPU_GPU
-    Point3f SampleExitPupil(Point2f pFilm, Point2f lensSample,
-                            Float *sampleBoundsArea) const;
+    pstd::optional<ExitPupilSample> SampleExitPupil(Point2f pFilm, Point2f uLens) const;
 
     void TestExitPupilBounds() const;
 

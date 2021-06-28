@@ -222,8 +222,12 @@ PixelSensor *PixelSensor::Create(const ParameterDictionary &parameters,
     // "round" numbers like 1 and 100.
     Float imagingRatio = exposureTime * ISO / 100;
 
+    DenselySampledSpectrum dIllum =
+        Spectra::D(whiteBalanceTemp == 0 ? 6500.f : whiteBalanceTemp, alloc);
+    Spectrum sensorIllum = whiteBalanceTemp != 0 ? &dIllum : nullptr;
+
     if (sensorName == "cie1931") {
-        return alloc.new_object<PixelSensor>(colorSpace, whiteBalanceTemp, imagingRatio,
+        return alloc.new_object<PixelSensor>(colorSpace, sensorIllum, imagingRatio,
                                              alloc);
     } else {
         Spectrum r = GetNamedSpectrum(sensorName + "_r");
@@ -233,7 +237,7 @@ PixelSensor *PixelSensor::Create(const ParameterDictionary &parameters,
         if (!r || !g || !b)
             ErrorExit(loc, "%s: unknown sensor type", sensorName);
 
-        return alloc.new_object<PixelSensor>(r, g, b, colorSpace, whiteBalanceTemp,
+        return alloc.new_object<PixelSensor>(r, g, b, colorSpace, sensorIllum,
                                              imagingRatio, alloc);
     }
 }
