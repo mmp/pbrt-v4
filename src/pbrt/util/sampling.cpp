@@ -27,7 +27,7 @@ namespace pbrt {
 // Sampling Function Definitions
 pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v, Point3f p,
                                               Point2f u, Float *pdf) {
-    if (pdf != nullptr)
+    if (pdf)
         *pdf = 0;
     // Compute vectors _a_, _b_, and _c_ to spherical triangle vertices
     Vector3f a(v[0] - p), b(v[1] - p), c(v[2] - p);
@@ -54,7 +54,7 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v, 
     // Uniformly sample triangle area $A$ to compute $A'$
     Float A_pi = alpha + beta + gamma;
     Float Ap_pi = Lerp(u[0], Pi, A_pi);
-    if (pdf != nullptr) {
+    if (pdf) {
         Float A = A_pi - Pi;
         *pdf = (A <= 0) ? 0 : 1 / A;
     }
@@ -188,11 +188,11 @@ Point3f SampleSphericalRectangle(Point3f pRef, Point3f s, Vector3f ex, Vector3f 
     Float solidAngle = g0 + g1 + g2 + g3 - 2 * Pi;
     CHECK_RARE(1e-5, solidAngle <= 0);
     if (solidAngle <= 0) {
-        if (pdf != nullptr)
+        if (pdf)
             *pdf = 0;
         return Point3f(s + u[0] * ex + u[1] * ey);
     }
-    if (pdf != nullptr)
+    if (pdf)
         *pdf = std::max<Float>(0, 1 / solidAngle);
     if (solidAngle < 1e-3)
         return Point3f(s + u[0] * ex + u[1] * ey);

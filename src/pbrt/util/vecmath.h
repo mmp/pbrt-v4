@@ -1367,11 +1367,11 @@ class Bounds3 {
         return b.pMin != pMin || b.pMax != pMax;
     }
     PBRT_CPU_GPU
-    bool IntersectP(const Point3f &o, const Vector3f &d, Float tMax = Infinity,
-                    Float *hitt0 = nullptr, Float *hitt1 = nullptr) const;
+    bool IntersectP(Point3f o, Vector3f d, Float tMax = Infinity, Float *hitt0 = nullptr,
+                    Float *hitt1 = nullptr) const;
     PBRT_CPU_GPU
-    bool IntersectP(const Point3f &o, const Vector3f &d, Float tMax,
-                    const Vector3f &invDir, const int dirIsNeg[3]) const;
+    bool IntersectP(Point3f o, Vector3f d, Float tMax, Vector3f invDir,
+                    const int dirIsNeg[3]) const;
 
     std::string ToString() const { return StringPrintf("[ %s - %s ]", pMin, pMax); }
 
@@ -1545,9 +1545,8 @@ PBRT_CPU_GPU inline Bounds3<T> Expand(const Bounds3<T> &b, U delta) {
 }
 
 template <typename T>
-PBRT_CPU_GPU inline bool Bounds3<T>::IntersectP(const Point3f &o, const Vector3f &d,
-                                                Float tMax, Float *hitt0,
-                                                Float *hitt1) const {
+PBRT_CPU_GPU inline bool Bounds3<T>::IntersectP(Point3f o, Vector3f d, Float tMax,
+                                                Float *hitt0, Float *hitt1) const {
     Float t0 = 0, t1 = tMax;
     for (int i = 0; i < 3; ++i) {
         // Update interval for _i_th bounding box slab
@@ -1573,8 +1572,8 @@ PBRT_CPU_GPU inline bool Bounds3<T>::IntersectP(const Point3f &o, const Vector3f
 }
 
 template <typename T>
-PBRT_CPU_GPU inline bool Bounds3<T>::IntersectP(const Point3f &o, const Vector3f &d,
-                                                Float raytMax, const Vector3f &invDir,
+PBRT_CPU_GPU inline bool Bounds3<T>::IntersectP(Point3f o, Vector3f d, Float raytMax,
+                                                Vector3f invDir,
                                                 const int dirIsNeg[3]) const {
     const Bounds3f &bounds = *this;
     // Check for ray intersection against $x$ and $y$ slabs

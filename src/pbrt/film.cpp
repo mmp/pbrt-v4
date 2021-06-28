@@ -30,8 +30,7 @@
 
 namespace pbrt {
 
-void Film::AddSplat(const Point2f &p, SampledSpectrum v,
-                    const SampledWavelengths &lambda) {
+void Film::AddSplat(Point2f p, SampledSpectrum v, const SampledWavelengths &lambda) {
     auto splat = [&](auto ptr) { return ptr->AddSplat(p, v, lambda); };
     return Dispatch(splat);
 }
@@ -483,8 +482,7 @@ RGBFilm::RGBFilm(FilmBaseParameters p, const RGBColorSpace *colorSpace,
     outputRGBFromSensorRGB = colorSpace->RGBFromXYZ * sensor->XYZFromSensorRGB;
 }
 
-void RGBFilm::AddSplat(const Point2f &p, SampledSpectrum L,
-                       const SampledWavelengths &lambda) {
+void RGBFilm::AddSplat(Point2f p, SampledSpectrum L, const SampledWavelengths &lambda) {
     CHECK(!L.HasNaNs());
     // Convert sample radiance to _PixelSensor_ RGB
     RGB rgb = sensor->ToSensorRGB(L, lambda);
@@ -508,7 +506,7 @@ void RGBFilm::AddSplat(const Point2f &p, SampledSpectrum L,
         if (wt != 0) {
             Pixel &pixel = pixels[pi];
             for (int i = 0; i < 3; ++i)
-                pixel.splatRGB[i].Add(wt * rgb[i]);
+                pixel.rgbSplat[i].Add(wt * rgb[i]);
         }
     }
 }
@@ -574,7 +572,7 @@ RGBFilm *RGBFilm::Create(const ParameterDictionary &parameters, Float exposureTi
 }
 
 // GBufferFilm Method Definitions
-void GBufferFilm::AddSample(const Point2i &pFilm, SampledSpectrum L,
+void GBufferFilm::AddSample(Point2i pFilm, SampledSpectrum L,
                             const SampledWavelengths &lambda,
                             const VisibleSurface *visibleSurface, Float weight) {
     RGB rgb = sensor->ToSensorRGB(L, lambda);
@@ -586,7 +584,7 @@ void GBufferFilm::AddSample(const Point2i &pFilm, SampledSpectrum L,
     if (visibleSurface && *visibleSurface) {
         // Update variance estimates.
         for (int c = 0; c < 3; ++c)
-            p.varianceEstimator[c].Add(rgb[c]);
+            p.rgbVariance[c].Add(rgb[c]);
 
         p.pSum += weight * visibleSurface->p;
 
@@ -600,7 +598,7 @@ void GBufferFilm::AddSample(const Point2i &pFilm, SampledSpectrum L,
             visibleSurface->albedo * colorSpace->illuminant.Sample(lambda);
         RGB albedoRGB = albedo.ToRGB(lambda, *colorSpace);
         for (int c = 0; c < 3; ++c)
-            p.albedoSum[c] += weight * albedoRGB[c];
+            p.rgbAlbedoSum[c] += weight * albedoRGB[c];
     }
 
     for (int c = 0; c < 3; ++c)
@@ -621,7 +619,7 @@ GBufferFilm::GBufferFilm(FilmBaseParameters p, const RGBColorSpace *colorSpace,
     outputRGBFromSensorRGB = colorSpace->RGBFromXYZ * sensor->XYZFromSensorRGB;
 }
 
-void GBufferFilm::AddSplat(const Point2f &p, SampledSpectrum v,
+void GBufferFilm::AddSplat(Point2f p, SampledSpectrum v,
                            const SampledWavelengths &lambda) {
     // NOTE: same code as RGBFilm::AddSplat()...
     CHECK(!v.HasNaNs());
@@ -639,7 +637,7 @@ void GBufferFilm::AddSplat(const Point2f &p, SampledSpectrum v,
         if (wt != 0) {
             Pixel &pixel = pixels[pi];
             for (int i = 0; i < 3; ++i)
-                pixel.splatRGB[i].Add(wt * rgb[i]);
+                pixel.rgbSplat[i].Add(wt * rgb[i]);
         }
     }
 }
@@ -695,7 +693,8 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
     ParallelFor2D(pixelBounds, [&](Point2i p) {
         Pixel &pixel = pixels[p];
         RGB rgb(pixel.rgbSum[0], pixel.rgbSum[1], pixel.rgbSum[2]);
-        RGB albedoRgb(pixel.albedoSum[0], pixel.albedoSum[1], pixel.albedoSum[2]);
+        RGB albedoRgb(pixel.rgbAlbedoSum[0], pixel.rgbAlbedoSum[1],
+                      pixel.rgbAlbedoSum[2]);
 
         // Normalize pixel with weight sum
         Float weightSum = pixel.weightSum;
@@ -711,7 +710,7 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
 
         // Add splat value at pixel
         for (int c = 0; c < 3; ++c)
-            rgb[c] += splatScale * pixel.splatRGB[c] / filterIntegral;
+            rgb[c] += splatScale * pixel.rgbSplat[c] / filterIntegral;
 
         rgb = outputRGBFromSensorRGB * rgb;
 
@@ -740,12 +739,12 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
         image.SetChannels(pOffset, nsDesc, {ns.x, ns.y, ns.z});
         image.SetChannels(
             pOffset, varianceDesc,
-            {pixel.varianceEstimator[0].Variance(), pixel.varianceEstimator[1].Variance(),
-             pixel.varianceEstimator[2].Variance()});
+            {pixel.rgbVariance[0].Variance(), pixel.rgbVariance[1].Variance(),
+             pixel.rgbVariance[2].Variance()});
         image.SetChannels(pOffset, relVarianceDesc,
-                          {pixel.varianceEstimator[0].RelativeVariance(),
-                           pixel.varianceEstimator[1].RelativeVariance(),
-                           pixel.varianceEstimator[2].RelativeVariance()});
+                          {pixel.rgbVariance[0].RelativeVariance(),
+                           pixel.rgbVariance[1].RelativeVariance(),
+                           pixel.rgbVariance[2].RelativeVariance()});
     });
 
     if (nClamped.load() > 0)

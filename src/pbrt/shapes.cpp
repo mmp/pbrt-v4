@@ -43,7 +43,8 @@ pstd::optional<ShapeSample> Sphere::Sample(Point2f u) const {
     Vector3f pObjError = gamma(5) * Abs((Vector3f)pObj);
 
     // Compute surface normal for sphere sample and return _ShapeSample_
-    Normal3f n = Normalize((*renderFromObject)(Normal3f(pObj.x, pObj.y, pObj.z)));
+    Normal3f nObj(pObj.x, pObj.y, pObj.z);
+    Normal3f n = Normalize((*renderFromObject)(nObj));
     if (reverseOrientation)
         n *= -1;
     // Compute $(u, v)$ coordinates for sphere sample
@@ -304,7 +305,7 @@ DirectionCone Triangle::NormalBounds() const {
 
     Normal3f n = Normalize(Normal3f(Cross(p1 - p0, p2 - p0)));
     // Ensure correct orientation of geometric normal for normal bounds
-    if (mesh->n != nullptr) {
+    if (mesh->n) {
         Normal3f ns(mesh->n[v[0]] + mesh->n[v[1]] + mesh->n[v[2]]);
         n = FaceForward(n, ns);
     } else if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
@@ -678,7 +679,7 @@ bool Curve::RecursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Poin
         if (pc.z < 0 || pc.z > rayLength * tMax)
             return false;
 
-        if (si != nullptr) {
+        if (si) {
             // Initialize _ShapeIntersection_ for curve intersection
             // Compute _tHit_ for curve intersection
             // FIXME: this tHit isn't quite right for ribbons...
@@ -1085,7 +1086,7 @@ DirectionCone BilinearPatch::NormalBounds() const {
         Vector3f dpdu = Lerp(0.5f, p10, p11) - Lerp(0.5f, p00, p01);
         Vector3f dpdv = Lerp(0.5f, p01, p11) - Lerp(0.5f, p00, p10);
         Vector3f n = Normalize(Cross(dpdu, dpdv));
-        if (mesh->n != nullptr) {
+        if (mesh->n) {
             Normal3f ns =
                 (mesh->n[v[0]] + mesh->n[v[1]] + mesh->n[v[2]] + mesh->n[v[3]]) / 4;
             n = FaceForward(n, ns);
@@ -1096,7 +1097,7 @@ DirectionCone BilinearPatch::NormalBounds() const {
 
     // Compute bilinear patch normal _n00_ at $(0,0)$
     Vector3f n00 = Normalize(Cross(p10 - p00, p01 - p00));
-    if (mesh->n != nullptr)
+    if (mesh->n)
         n00 = FaceForward(n00, mesh->n[v[0]]);
     else if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
         n00 = -n00;
@@ -1105,7 +1106,7 @@ DirectionCone BilinearPatch::NormalBounds() const {
     Vector3f n10 = Normalize(Cross(p11 - p10, p00 - p10));
     Vector3f n01 = Normalize(Cross(p00 - p01, p11 - p01));
     Vector3f n11 = Normalize(Cross(p01 - p11, p10 - p11));
-    if (mesh->n != nullptr) {
+    if (mesh->n) {
         n10 = FaceForward(n10, mesh->n[v[1]]);
         n01 = FaceForward(n01, mesh->n[v[2]]);
         n11 = FaceForward(n11, mesh->n[v[3]]);
@@ -1183,7 +1184,7 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(Point2f u) const {
         return {};
 
     Point2f st = uv;
-    if (mesh->uv != nullptr) {
+    if (mesh->uv) {
         // Compute texture coordinates for bilinear patch intersection point
         Point2f uv00 = mesh->uv[v[0]], uv10 = mesh->uv[v[1]];
         Point2f uv01 = mesh->uv[v[2]], uv11 = mesh->uv[v[3]];

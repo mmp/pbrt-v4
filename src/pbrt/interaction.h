@@ -89,12 +89,10 @@ class Interaction {
     std::string ToString() const;
 
     PBRT_CPU_GPU
-    Point3f OffsetRayOrigin(const Vector3f &w) const {
-        return pbrt::OffsetRayOrigin(pi, n, w);
-    }
+    Point3f OffsetRayOrigin(Vector3f w) const { return pbrt::OffsetRayOrigin(pi, n, w); }
 
     PBRT_CPU_GPU
-    Point3f OffsetRayOrigin(const Point3f &pt) const { return OffsetRayOrigin(pt - p()); }
+    Point3f OffsetRayOrigin(Point3f pt) const { return OffsetRayOrigin(pt - p()); }
 
     PBRT_CPU_GPU
     RayDifferential SpawnRay(const Vector3f &d) const {

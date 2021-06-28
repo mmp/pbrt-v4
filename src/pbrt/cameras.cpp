@@ -773,8 +773,7 @@ Float RealisticCamera::TraceLensesFromFilm(const Ray &rCamera, Ray *rOut) const 
 
         } else {
             // Check intersection point against spherical aperture
-            Float r2 = Sqr(pHit.x) + Sqr(pHit.y);
-            if (r2 > Sqr(element.apertureRadius))
+            if (Sqr(pHit.x) + Sqr(pHit.y) > Sqr(element.apertureRadius))
                 return 0;
         }
         rLens.o = pHit;

@@ -106,21 +106,21 @@ bool TriangleMesh::WritePLY(const std::string &filename) const {
     ply_add_scalar_property(plyFile, "x", PLY_FLOAT);
     ply_add_scalar_property(plyFile, "y", PLY_FLOAT);
     ply_add_scalar_property(plyFile, "z", PLY_FLOAT);
-    if (n != nullptr) {
+    if (n) {
         ply_add_scalar_property(plyFile, "nx", PLY_FLOAT);
         ply_add_scalar_property(plyFile, "ny", PLY_FLOAT);
         ply_add_scalar_property(plyFile, "nz", PLY_FLOAT);
     }
-    if (uv != nullptr) {
+    if (uv) {
         ply_add_scalar_property(plyFile, "u", PLY_FLOAT);
         ply_add_scalar_property(plyFile, "v", PLY_FLOAT);
     }
-    if (s != nullptr)
+    if (s)
         Warning(R"(%s: PLY mesh will be missing tangent vectors "S".)", filename);
 
     ply_add_element(plyFile, "face", nTriangles);
     ply_add_list_property(plyFile, "vertex_indices", PLY_UINT8, PLY_INT);
-    if (faceIndices != nullptr)
+    if (faceIndices)
         ply_add_scalar_property(plyFile, "face_indices", PLY_INT);
 
     ply_write_header(plyFile);
@@ -129,12 +129,12 @@ bool TriangleMesh::WritePLY(const std::string &filename) const {
         ply_write(plyFile, p[i].x);
         ply_write(plyFile, p[i].y);
         ply_write(plyFile, p[i].z);
-        if (n != nullptr) {
+        if (n) {
             ply_write(plyFile, n[i].x);
             ply_write(plyFile, n[i].y);
             ply_write(plyFile, n[i].z);
         }
-        if (uv != nullptr) {
+        if (uv) {
             ply_write(plyFile, uv[i].x);
             ply_write(plyFile, uv[i].y);
         }
@@ -145,7 +145,7 @@ bool TriangleMesh::WritePLY(const std::string &filename) const {
         ply_write(plyFile, vertexIndices[3 * i]);
         ply_write(plyFile, vertexIndices[3 * i + 1]);
         ply_write(plyFile, vertexIndices[3 * i + 2]);
-        if (faceIndices != nullptr)
+        if (faceIndices)
             ply_write(plyFile, faceIndices[i]);
     }
 
