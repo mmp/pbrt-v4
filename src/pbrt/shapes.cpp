@@ -1192,7 +1192,13 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(Point2f u) const {
     }
     // Compute surface normal for sampled bilinear patch $(u,v)$
     Normal3f n = Normal3f(Normalize(Cross(dpdu, dpdv)));
-    if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
+    // Flip normal at sampled $(u,v)$ if necessary
+    if (mesh->n) {
+        Normal3f n00 = mesh->n[v[0]], n10 = mesh->n[v[1]];
+        Normal3f n01 = mesh->n[v[2]], n11 = mesh->n[v[3]];
+        Normal3f ns = Lerp(uv[0], Lerp(uv[1], n00, n01), Lerp(uv[1], n10, n11));
+        n = FaceForward(n, ns);
+    } else if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
         n = -n;
 
     // Compute _pError_ for sampled bilinear patch $(u,v)$
@@ -1292,12 +1298,18 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,
     Point3f p = SampleSphericalRectangle(ctx.p(), p00, eu, ev, u, &quadPDF);
     pdf *= quadPDF;
 
-    // Compute surface normal and $(u,v)$ for sampled point on rectangle
-    Normal3f n = Normal3f(Normalize(Cross(eu, ev)));
-    if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
-        n *= -1;
+    // Compute $(u,v)$ and surface normal for sampled point on rectangle
     Point2f uv(Dot(p - p00, eu) / DistanceSquared(p10, p00),
                Dot(p - p00, ev) / DistanceSquared(p01, p00));
+    Normal3f n = Normal3f(Normalize(Cross(eu, ev)));
+    // Flip normal at sampled $(u,v)$ if necessary
+    if (mesh->n) {
+        Normal3f n00 = mesh->n[v[0]], n10 = mesh->n[v[1]];
+        Normal3f n01 = mesh->n[v[2]], n11 = mesh->n[v[3]];
+        Normal3f ns = Lerp(uv[0], Lerp(uv[1], n00, n01), Lerp(uv[1], n10, n11));
+        n = FaceForward(n, ns);
+    } else if (mesh->reverseOrientation ^ mesh->transformSwapsHandedness)
+        n = -n;
 
     // Compute $(s,t)$ texture coordinates for sampled $(u,v)$
     Point2f st = uv;
