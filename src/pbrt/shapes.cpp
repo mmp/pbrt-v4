@@ -1196,8 +1196,8 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(Point2f u) const {
         n = -n;
 
     // Compute _pError_ for sampled bilinear patch $(u,v)$
-    Vector3f pError =
-        gamma(4) * Vector3f(Max(Max(Abs(p00), Abs(p10)), Max(Abs(p01), Abs(p11))));
+    Point3f pAbsSum = Abs(p00) + Abs(p01) + Abs(p10) + Abs(p11);
+    Vector3f pError = gamma(6) * Vector3f(pAbsSum);
 
     // Return _ShapeSample_ for sampled bilinear patch point
     return ShapeSample{Interaction(Point3fi(p, pError), n, st),

@@ -1457,8 +1457,8 @@ class BilinearPatch {
         dndv = dndt;
 
         // Initialize bilinear patch intersection point error _pError_
-        Vector3f pError =
-            gamma(4) * Vector3f(Max(Max(Abs(p00), Abs(p10)), Max(Abs(p01), Abs(p11))));
+        Point3f pAbsSum = Abs(p00) + Abs(p01) + Abs(p10) + Abs(p11);
+        Vector3f pError = gamma(6) * Vector3f(pAbsSum);
 
         // Initialize _SurfaceInteraction_ for bilinear patch intersection
         int faceIndex = mesh->faceIndices ? mesh->faceIndices[blpIndex] : 0;
