@@ -65,7 +65,7 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v, 
     Float cosPhi = std::cos(Ap_pi) * cosAlpha + std::sin(Ap_pi) * sinAlpha;
     Float k1 = cosPhi + cosAlpha;
     Float k2 = sinPhi - sinAlpha * Dot(a, b) /* cos c */;
-    Float cosBp = ((DifferenceOfProducts(k2, cosPhi, k1, sinPhi)) * cosAlpha + k2) /
+    Float cosBp = (k2 + (DifferenceOfProducts(k2, cosPhi, k1, sinPhi)) * cosAlpha) /
                   ((SumOfProducts(k2, sinPhi, k1, cosPhi)) * sinAlpha);
     // Happens if the triangle basically covers the entire hemisphere.
     // We currently depend on calling code to detect this case, which
@@ -82,7 +82,7 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v, 
     Float sinTheta = SafeSqrt(1 - Sqr(cosTheta));
     Vector3f w = cosTheta * b + sinTheta * Normalize(GramSchmidt(cp, b));
     // Find barycentric coordinates for sampled direction _w_
-    Vector3f e1(v[1] - v[0]), e2(v[2] - v[0]);
+    Vector3f e1 = v[1] - v[0], e2 = v[2] - v[0];
     Vector3f s1 = Cross(w, e2);
     Float divisor = Dot(s1, e1);
     CHECK_RARE(1e-6, divisor == 0);
@@ -92,7 +92,7 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v, 
         return {1.f / 3.f, 1.f / 3.f, 1.f / 3.f};
     }
     Float invDivisor = 1 / divisor;
-    Vector3f s(p - v[0]);
+    Vector3f s = p - v[0];
     Float b1 = Dot(s, s1) * invDivisor;
     Float b2 = Dot(w, Cross(s, e1)) * invDivisor;
 

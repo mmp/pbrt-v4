@@ -95,12 +95,12 @@ class Interaction {
     Point3f OffsetRayOrigin(Point3f pt) const { return OffsetRayOrigin(pt - p()); }
 
     PBRT_CPU_GPU
-    RayDifferential SpawnRay(const Vector3f &d) const {
+    RayDifferential SpawnRay(Vector3f d) const {
         return RayDifferential(OffsetRayOrigin(d), d, time, GetMedium(d));
     }
 
     PBRT_CPU_GPU
-    Ray SpawnRayTo(const Point3f &p2) const {
+    Ray SpawnRayTo(Point3f p2) const {
         Ray r = pbrt::SpawnRayTo(pi, n, time, p2);
         r.medium = GetMedium(r.d);
         return r;

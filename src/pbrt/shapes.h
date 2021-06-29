@@ -294,7 +294,7 @@ class Sphere {
         Point3f pCenter = (*renderFromObject)(Point3f(0, 0, 0));
         Point3f pOrigin = ctx.OffsetRayOrigin(pCenter);
         if (DistanceSquared(pOrigin, pCenter) <= Sqr(radius)) {
-            // Uniformly sample shape and compute incident direction _wi_
+            // Sample shape by area and compute incident direction _wi_
             pstd::optional<ShapeSample> ss = Sample(u);
             DCHECK(ss.has_value());
             ss->intr.time = ctx.time;
@@ -303,7 +303,7 @@ class Sphere {
                 return {};
             wi = Normalize(wi);
 
-            // Convert uniform area sample PDF in _ss_ to solid angle measure
+            // Convert area sampling PDF in _ss_ to solid angle measure
             ss->pdf /= AbsDot(ss->intr.n, -wi) / DistanceSquared(ctx.p(), ss->intr.p());
             if (IsInf(ss->pdf))
                 return {};
@@ -527,7 +527,7 @@ class Disk {
 
     PBRT_CPU_GPU
     pstd::optional<ShapeSample> Sample(const ShapeSampleContext &ctx, Point2f u) const {
-        // Uniformly sample shape and compute incident direction _wi_
+        // Sample shape by area and compute incident direction _wi_
         pstd::optional<ShapeSample> ss = Sample(u);
         DCHECK(ss.has_value());
         ss->intr.time = ctx.time;
@@ -536,7 +536,7 @@ class Disk {
             return {};
         wi = Normalize(wi);
 
-        // Convert uniform area sample PDF in _ss_ to solid angle measure
+        // Convert area sampling PDF in _ss_ to solid angle measure
         ss->pdf /= AbsDot(ss->intr.n, -wi) / DistanceSquared(ctx.p(), ss->intr.p());
         if (IsInf(ss->pdf))
             return {};
@@ -755,7 +755,7 @@ class Cylinder {
 
     PBRT_CPU_GPU
     pstd::optional<ShapeSample> Sample(const ShapeSampleContext &ctx, Point2f u) const {
-        // Uniformly sample shape and compute incident direction _wi_
+        // Sample shape by area and compute incident direction _wi_
         pstd::optional<ShapeSample> ss = Sample(u);
         DCHECK(ss.has_value());
         ss->intr.time = ctx.time;
@@ -764,7 +764,7 @@ class Cylinder {
             return {};
         wi = Normalize(wi);
 
-        // Convert uniform area sample PDF in _ss_ to solid angle measure
+        // Convert area sampling PDF in _ss_ to solid angle measure
         ss->pdf /= AbsDot(ss->intr.n, -wi) / DistanceSquared(ctx.p(), ss->intr.p());
         if (IsInf(ss->pdf))
             return {};
@@ -1062,7 +1062,7 @@ class Triangle {
         // Use uniform area sampling for numerically unstable cases
         Float solidAngle = SolidAngle(ctx.p());
         if (solidAngle < MinSphericalSampleArea || solidAngle > MaxSphericalSampleArea) {
-            // Uniformly sample shape and compute incident direction _wi_
+            // Sample shape by area and compute incident direction _wi_
             pstd::optional<ShapeSample> ss = Sample(u);
             DCHECK(ss.has_value());
             ss->intr.time = ctx.time;
@@ -1071,7 +1071,7 @@ class Triangle {
                 return {};
             wi = Normalize(wi);
 
-            // Convert uniform area sample PDF in _ss_ to solid angle measure
+            // Convert area sampling PDF in _ss_ to solid angle measure
             ss->pdf /= AbsDot(ss->intr.n, -wi) / DistanceSquared(ctx.p(), ss->intr.p());
             if (IsInf(ss->pdf))
                 return {};
@@ -1398,8 +1398,8 @@ class BilinearPatch {
         // Compute bilinear patch point $\pt{}$, $\dpdu$, and $\dpdv$ for $(u,v)$
         // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
         const int *v = &mesh->vertexIndices[4 * blpIndex];
-        const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
-        const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
+        Point3f p00 = mesh->p[v[0]], p10 = mesh->p[v[1]];
+        Point3f p01 = mesh->p[v[2]], p11 = mesh->p[v[3]];
 
         Point3f p = Lerp(uv[0], Lerp(uv[1], p00, p01), Lerp(uv[1], p10, p11));
         Vector3f dpdu = Lerp(uv[1], p10, p11) - Lerp(uv[1], p00, p01);
@@ -1510,8 +1510,8 @@ class BilinearPatch {
     bool IsRectangle(const BilinearPatchMesh *mesh) const {
         // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
         const int *v = &mesh->vertexIndices[4 * blpIndex];
-        const Point3f &p00 = mesh->p[v[0]], &p10 = mesh->p[v[1]];
-        const Point3f &p01 = mesh->p[v[2]], &p11 = mesh->p[v[3]];
+        Point3f p00 = mesh->p[v[0]], p10 = mesh->p[v[1]];
+        Point3f p01 = mesh->p[v[2]], p11 = mesh->p[v[3]];
 
         if (p00 == p01 || p01 == p11 || p11 == p10 || p10 == p00)
             return false;
