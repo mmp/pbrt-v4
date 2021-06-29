@@ -923,8 +923,7 @@ class Triangle {
         // Return _SurfaceInteraction_ for triangle hit
         bool flipNormal = mesh->reverseOrientation ^ mesh->transformSwapsHandedness;
         // Compute error bounds _pError_ for triangle intersection
-        Point3f pAbsSum =
-            Abs(ti.b0 * p0) + Abs(ti.b1 * p1) + Abs((1 - ti.b0 - ti.b1) * p2);
+        Point3f pAbsSum = Abs(ti.b0 * p0) + Abs(ti.b1 * p1) + Abs(ti.b2 * p2);
         Vector3f pError = gamma(7) * Vector3f(pAbsSum);
 
         SurfaceInteraction isect(Point3fi(pHit, pError), uvHit, wo, dpdu, dpdv,
