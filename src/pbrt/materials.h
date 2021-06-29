@@ -88,7 +88,7 @@ template <typename TextureEvaluator>
 PBRT_CPU_GPU void Bump(TextureEvaluator texEval, FloatTexture displacement,
                        const Image *normalMap, const BumpEvalContext &ctx, Vector3f *dpdu,
                        Vector3f *dpdv) {
-    DCHECK(displacement != nullptr || normalMap != nullptr);
+    DCHECK(displacement || normalMap);
     if (displacement) {
         if (displacement)
             DCHECK(texEval.CanEvaluate({displacement}, {}));

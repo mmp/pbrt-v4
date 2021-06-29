@@ -406,9 +406,9 @@ Float SampleCatmullRom(pstd::span<const Float> nodes, pstd::span<const Float> f,
     };
     Float t = NewtonBisection(0, 1, eval);
 
-    if (fval != nullptr)
+    if (fval)
         *fval = fhat;
-    if (pdf != nullptr)
+    if (pdf)
         *pdf = fhat / F.back();
     return x0 + width * t;
 }
@@ -468,9 +468,9 @@ Float SampleCatmullRom2D(pstd::span<const Float> nodes1, pstd::span<const Float>
     };
     Float t = NewtonBisection(0, 1, eval);
 
-    if (fval != nullptr)
+    if (fval)
         *fval = fhat;
-    if (pdf != nullptr)
+    if (pdf)
         *pdf = fhat / maximum;
     return x0 + width * t;
 }

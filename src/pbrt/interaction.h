@@ -115,7 +115,7 @@ class Interaction {
 
     PBRT_CPU_GPU
     Medium GetMedium(const Vector3f &w) const {
-        if (mediumInterface != nullptr)
+        if (mediumInterface)
             return Dot(w, n) > 0 ? mediumInterface->outside : mediumInterface->inside;
         return medium;
     }

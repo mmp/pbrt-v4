@@ -285,7 +285,7 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(Allocator alloc, ParsedScene &s
 #ifdef PBRT_BUILD_GPU_RENDERER
     CUDATrackedMemoryResource *mr =
         dynamic_cast<CUDATrackedMemoryResource *>(gpuMemoryAllocator.resource());
-    CHECK(mr != nullptr);
+    CHECK(mr);
     size_t startSize = mr->BytesAllocated();
 #endif  // PBRT_BUILD_GPU_RENDERER
 
@@ -380,7 +380,7 @@ Float WavefrontPathIntegrator::Render() {
             // of rays as that stuff is copied over on demand.
             CUDATrackedMemoryResource *mr =
                 dynamic_cast<CUDATrackedMemoryResource *>(gpuMemoryAllocator.resource());
-            CHECK(mr != nullptr);
+            CHECK(mr);
             mr->PrefetchToGPU();
         } else {
             // TODO: on systems with basic unified memory, just launching a

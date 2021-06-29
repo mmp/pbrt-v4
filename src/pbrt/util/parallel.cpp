@@ -127,7 +127,7 @@ void ThreadPool::workerFunc(int tIndex) {
 std::unique_lock<std::mutex> ThreadPool::AddToJobList(ParallelJob *job) {
     std::unique_lock<std::mutex> lock(mutex);
     // Add _job_ to head of _jobList_
-    if (jobList != nullptr)
+    if (jobList)
         jobList->prev = job;
     job->next = jobList;
     jobList = job;
@@ -140,9 +140,9 @@ void ThreadPool::WorkOrWait(std::unique_lock<std::mutex> *lock) {
     DCHECK(lock->owns_lock());
 
     ParallelJob *job = jobList;
-    while (job != nullptr && !job->HaveWork())
+    while (job && !job->HaveWork())
         job = job->next;
-    if (job != nullptr) {
+    if (job) {
         // Execute work for _job_
         job->activeWorkers++;
         job->RunStep(lock);
@@ -160,13 +160,13 @@ void ThreadPool::WorkOrWait(std::unique_lock<std::mutex> *lock) {
 void ThreadPool::RemoveFromJobList(ParallelJob *job) {
     DCHECK(!job->removed);
 
-    if (job->prev != nullptr)
+    if (job->prev)
         job->prev->next = job->next;
     else {
         DCHECK(jobList == job);
         jobList = job->next;
     }
-    if (job->next != nullptr)
+    if (job->next)
         job->next->prev = job->prev;
 
     job->removed = true;

@@ -421,7 +421,7 @@ class InlinedVector {
             pstd::swap(ptr, other.ptr);
             pstd::swap(nAlloc, other.nAlloc);
             pstd::swap(nStored, other.nStored);
-            if (nStored > 0 && ptr == nullptr) {
+            if (nStored > 0 && !ptr) {
                 for (int i = 0; i < nStored; ++i)
                     alloc.template construct<T>(fixed + i, std::move(other.fixed[i]));
                 other.nStored = nStored;  // so that dtors run...

@@ -21,7 +21,7 @@ std::vector<Sampler> Sampler::Clone(int n, Allocator alloc) {
 }
 
 std::string Sampler::ToString() const {
-    if (ptr() == nullptr)
+    if (!ptr())
         return "(nullptr)";
 
     auto ts = [&](auto ptr) { return ptr->ToString(); };

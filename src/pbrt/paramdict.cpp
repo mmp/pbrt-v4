@@ -143,7 +143,7 @@ ParameterDictionary::ParameterDictionary(ParsedParameterVector p,
     : params(std::move(p)), colorSpace(colorSpace) {
     nOwnedParams = params.size();
     std::reverse(params.begin(), params.end());
-    CHECK(colorSpace != nullptr);
+    CHECK(colorSpace);
     checkParameterTypes();
 }
 
@@ -153,7 +153,7 @@ ParameterDictionary::ParameterDictionary(ParsedParameterVector p0,
     : params(std::move(p0)), colorSpace(colorSpace) {
     nOwnedParams = params.size();
     std::reverse(params.begin(), params.end());
-    CHECK(colorSpace != nullptr);
+    CHECK(colorSpace);
     params.insert(params.end(), params1.rbegin(), params1.rend());
     checkParameterTypes();
 }
@@ -845,7 +845,7 @@ SpectrumTexture TextureParameterDictionary::GetSpectrumTextureOrNull(
             return alloc.new_object<SpectrumConstantTexture>(s);
         } else if (p->type == "spectrum" || p->type == "blackbody") {
             Spectrum s = GetOneSpectrum(name, nullptr, spectrumType, alloc);
-            CHECK(s != nullptr);
+            CHECK(s);
             return alloc.new_object<SpectrumConstantTexture>(s);
         }
     }

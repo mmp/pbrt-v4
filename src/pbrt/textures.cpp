@@ -63,7 +63,7 @@ TextureMapping3D TextureMapping3D::Create(const ParameterDictionary &parameters,
 }
 
 std::string FloatTexture::ToString() const {
-    if (ptr() == nullptr)
+    if (!ptr())
         return "(nullptr)";
 
     auto toStr = [](auto ptr) { return ptr->ToString(); };
@@ -71,7 +71,7 @@ std::string FloatTexture::ToString() const {
 }
 
 std::string SpectrumTexture::ToString() const {
-    if (ptr() == nullptr)
+    if (!ptr())
         return "(nullptr)";
 
     auto toStr = [](auto ptr) { return ptr->ToString(); };
@@ -359,7 +359,7 @@ SampledSpectrum SpectrumImageTexture::Evaluate(TextureEvalContext ctx,
     rgb = ClampZero(invert ? (RGB(1, 1, 1) - rgb) : rgb);
 
     // Return _SampledSpectrum_ for RGB image texture value
-    if (const RGBColorSpace *cs = mipmap->GetRGBColorSpace(); cs != nullptr) {
+    if (const RGBColorSpace *cs = mipmap->GetRGBColorSpace(); cs) {
         if (spectrumType == SpectrumType::Unbounded)
             return RGBUnboundedSpectrum(*cs, rgb).Sample(lambda);
         else if (spectrumType == SpectrumType::Albedo)
@@ -558,7 +558,7 @@ PtexTextureBase::PtexTextureBase(const std::string &filename, ColorEncoding enco
     : filename(filename), encoding(encoding), scale(scale) {
     std::mutex mutex;
     mutex.lock();
-    if (cache == nullptr) {
+    if (!cache) {
         int maxFiles = 100;
         size_t maxMem = 1ull << 32;  // 4GB
         bool premultiply = true;
@@ -574,7 +574,7 @@ PtexTextureBase::PtexTextureBase(const std::string &filename, ColorEncoding enco
     valid = false;
     Ptex::String error;
     Ptex::PtexTexture *texture = cache->get(filename.c_str(), error);
-    if (texture == nullptr)
+    if (!texture)
         Error("%s", error);
     else {
         if (texture->numChannels() != 1 && texture->numChannels() != 3)
@@ -606,7 +606,7 @@ int PtexTextureBase::SampleTexture(TextureEvalContext ctx, float result[3]) cons
     ++nLookups;
     Ptex::String error;
     Ptex::PtexTexture *texture = cache->get(filename.c_str(), error);
-    CHECK(texture != nullptr);
+    CHECK(texture);
     // TODO: make the filter an option?
     Ptex::PtexFilter::Options opts(Ptex::PtexFilter::FilterType::f_bspline);
     Ptex::PtexFilter *filter = Ptex::PtexFilter::getFilter(texture, opts);
@@ -714,7 +714,7 @@ GPUFloatPtexTexture::GPUFloatPtexTexture(const std::string &filename,
 
     Ptex::String error;
     Ptex::PtexTexture *texture = cache->get(filename.c_str(), error);
-    CHECK(texture != nullptr);
+    CHECK(texture);
     int nFaces = texture->getInfo().numFaces;
     texture->release();
 
@@ -775,7 +775,7 @@ GPUSpectrumPtexTexture::GPUSpectrumPtexTexture(const std::string &filename,
 
     Ptex::String error;
     Ptex::PtexTexture *texture = cache->get(filename.c_str(), error);
-    CHECK(texture != nullptr);
+    CHECK(texture);
     int nFaces = texture->getInfo().numFaces;
     texture->release();
 

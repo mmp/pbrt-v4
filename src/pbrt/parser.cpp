@@ -189,9 +189,8 @@ std::unique_ptr<Tokenizer> Tokenizer::CreateFromFile(
 
     LPVOID ptr = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, 0);
     CloseHandle(mapping);
-    if (ptr == nullptr) {
+    if (!ptr)
         return errorReportLambda();
-    }
 
     std::string str(static_cast<const char *>(ptr), len);
 
@@ -232,7 +231,7 @@ Tokenizer::Tokenizer(void *ptr, size_t len, std::string filename,
 
 Tokenizer::~Tokenizer() {
 #ifdef PBRT_HAVE_MMAP
-    if ((unmapPtr != nullptr) && unmapLength > 0)
+    if (unmapPtr && unmapLength > 0)
         if (munmap(unmapPtr, unmapLength) != 0)
             errorCallback(StringPrintf("munmap: %s", ErrorString()).c_str(), nullptr);
 #elif defined(PBRT_IS_WINDOWS)
@@ -582,7 +581,7 @@ static ParsedParameterVector parseParameters(
 
 void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
     FormattingScene *formattingScene = dynamic_cast<FormattingScene *>(scene);
-    bool formatting = formattingScene != nullptr;
+    bool formatting = formattingScene;
 
     static std::atomic<bool> warnedTransformBeginEndDeprecated{false};
 
@@ -757,7 +756,7 @@ void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
                            dynamic_cast<FormattingScene *>(scene)->indent(), filename);
                 else {
                     ParsedScene *parsedScene = dynamic_cast<ParsedScene *>(scene);
-                    CHECK(parsedScene != nullptr);
+                    CHECK(parsedScene);
 
                     if (parsedScene->currentBlock != ParsedScene::BlockState::WorldBlock)
                         ErrorExit(&tok->loc, "Import statement only allowed inside world "
@@ -985,7 +984,7 @@ void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
         import.first.join();
 
         ParsedScene *parsedScene = dynamic_cast<ParsedScene *>(scene);
-        CHECK(parsedScene != nullptr);
+        CHECK(parsedScene);
         parsedScene->MergeImported(import.second);
         // HACK: let import.second leak so that its TransformCache isn't deallocated...
     }

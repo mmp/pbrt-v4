@@ -530,13 +530,13 @@ int BVHAggregate::flattenBVHTree(BVHBuildNode *node, int *offset) {
 }
 
 Bounds3f BVHAggregate::Bounds() const {
-    CHECK(nodes != nullptr);
+    CHECK(nodes);
     return nodes[0].bounds;
 }
 
 pstd::optional<ShapeIntersection> BVHAggregate::Intersect(const Ray &ray,
                                                           Float tMax) const {
-    if (nodes == nullptr)
+    if (!nodes)
         return {};
     pstd::optional<ShapeIntersection> si;
     Vector3f invDir(1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z);
@@ -587,7 +587,7 @@ pstd::optional<ShapeIntersection> BVHAggregate::Intersect(const Ray &ray,
 }
 
 bool BVHAggregate::IntersectP(const Ray &ray, Float tMax) const {
-    if (nodes == nullptr)
+    if (!nodes)
         return false;
     Vector3f invDir(1.f / ray.d.x, 1.f / ray.d.y, 1.f / ray.d.z);
     int dirIsNeg[3] = {static_cast<int>(invDir.x < 0), static_cast<int>(invDir.y < 0),
@@ -1000,7 +1000,7 @@ pstd::optional<ShapeIntersection> KdTreeAggregate::Intersect(const Ray &ray,
     // Traverse kd-tree nodes in order for ray
     pstd::optional<ShapeIntersection> si;
     const KdTreeNode *node = &nodes[0];
-    while (node != nullptr) {
+    while (node) {
         // Bail out if we found a hit closer than the current node
         if (rayTMax < tMin)
             break;
@@ -1092,7 +1092,7 @@ bool KdTreeAggregate::IntersectP(const Ray &ray, Float raytMax) const {
     int toVisitIndex = 0;
     int nodesVisited = 0;
     const KdTreeNode *node = &nodes[0];
-    while (node != nullptr) {
+    while (node) {
         ++nodesVisited;
         if (node->IsLeaf()) {
             // Check for shadow ray intersections inside leaf node

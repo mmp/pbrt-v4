@@ -77,7 +77,7 @@ PBRT_CPU_GPU inline int SampleDiscrete(pstd::span<const Float> weights, Float u,
                                        Float *pmf, Float *uRemapped) {
     // Handle empty _weights_ for discrete sampling
     if (weights.empty()) {
-        if (pmf != nullptr)
+        if (pmf)
             *pmf = 0;
         return -1;
     }
@@ -101,9 +101,9 @@ PBRT_CPU_GPU inline int SampleDiscrete(pstd::span<const Float> weights, Float u,
     }
 
     // Compute PMF and remapped _u_ value, if necessary
-    if (pmf != nullptr)
+    if (pmf)
         *pmf = weights[offset] / sumWeights;
-    if (uRemapped != nullptr)
+    if (uRemapped)
         *uRemapped = std::min((up - sum) / weights[offset], OneMinusEpsilon);
 
     return offset;
@@ -661,7 +661,7 @@ class PiecewiseConstant1D {
         DCHECK(!IsNaN(du));
 
         // Compute PDF for sampled offset
-        if (pdf != nullptr)
+        if (pdf)
             *pdf = (funcInt > 0) ? func[o] / funcInt : 0;
 
         // Return $x$ corresponding to sample
@@ -757,9 +757,9 @@ class PiecewiseConstant2D {
         Point2i uv;
         Float d1 = pMarginal.Sample(u[1], &pdfs[1], &uv[1]);
         Float d0 = pConditionalV[uv[1]].Sample(u[0], &pdfs[0], &uv[0]);
-        if (pdf != nullptr)
+        if (pdf)
             *pdf = pdfs[0] * pdfs[1];
-        if (offset != nullptr)
+        if (offset)
             *offset = uv;
         return Point2f(d0, d1);
     }

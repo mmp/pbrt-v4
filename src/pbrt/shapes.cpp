@@ -1442,7 +1442,7 @@ pstd::vector<Shape> Shape::Create(const std::string &name,
 }
 
 std::string Shape::ToString() const {
-    if (ptr() == nullptr)
+    if (!ptr())
         return "(nullptr)";
 
     auto tostr = [&](auto ptr) { return ptr->ToString(); };

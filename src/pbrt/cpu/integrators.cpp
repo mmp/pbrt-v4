@@ -339,7 +339,7 @@ SampledSpectrum Integrator::Tr(const Interaction &p0, const Interaction &p1,
             return SampledSpectrum(0.0f);
 
         // Update transmittance for current ray segment
-        if (ray.medium != nullptr) {
+        if (ray.medium) {
             Point3f pExit = ray(si ? si->tHit : (1 - ShadowEpsilon));
             ray.d = pExit - ray.o;
 
@@ -688,7 +688,7 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
         }
 
         // Initialize _visibleSurf_ at first intersection
-        if (depth == 0 && visibleSurf != nullptr) {
+        if (depth == 0 && visibleSurf) {
             // Estimate BSDF's albedo
             // Define sample arrays _ucRho_ and _uRho_ for reflectance estimate
             constexpr int nRhoSamples = 16;
@@ -786,7 +786,7 @@ SampledSpectrum PathIntegrator::SampleLd(const SurfaceInteraction &intr, const B
 
     // Sample a point on the light source for direct lighting
     Light light = sampledLight->light;
-    DCHECK(light != nullptr && sampledLight->pdf > 0);
+    DCHECK(light && sampledLight->pdf > 0);
     pstd::optional<LightLiSample> ls =
         light.SampleLi(ctx, uLight, lambda, LightSamplingMode::WithMIS);
     if (!ls || !ls->L || ls->pdf == 0)
@@ -1120,7 +1120,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
         }
 
         // Initialize _visibleSurf_ at first intersection
-        if (depth == 0 && visibleSurf != nullptr) {
+        if (depth == 0 && visibleSurf) {
             // Estimate BSDF's albedo
             // Define sample arrays _ucRho_ and _uRho_ for reflectance estimate
             constexpr int nRhoSamples = 16;
@@ -1302,7 +1302,7 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
     if (!sampledLight)
         return SampledSpectrum(0.f);
     Light light = sampledLight->light;
-    DCHECK(light != nullptr && sampledLight->pdf != 0);
+    DCHECK(light && sampledLight->pdf != 0);
 
     // Sample a point on the light source
     pstd::optional<LightLiSample> ls =
@@ -1343,7 +1343,7 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
             return SampledSpectrum(0.f);
 
         // Update transmittance for current ray segment
-        if (lightRay.medium != nullptr) {
+        if (lightRay.medium) {
             Float tMax = si ? si->tHit : (1 - ShadowEpsilon);
             Float u = rng.Uniform<Float>();
             SampledSpectrum T_maj = lightRay.medium.SampleT_maj(
@@ -1812,7 +1812,7 @@ struct Vertex {
         } else {
             // Compute sampling density for non-infinite light sources
             CHECK(type == VertexType::Light);
-            CHECK(ei.light != nullptr);
+            CHECK(ei.light);
             Float pdfPos, pdfDir;
             ei.light.PDF_Le(Ray(p(), w, time()), &pdfPos, &pdfDir);
             pdf = pdfDir * invDist2;
@@ -2410,7 +2410,7 @@ SampledSpectrum ConnectBDPT(const Integrator &integrator, SampledWavelengths &la
     PBRT_DBG("MIS weight for (s,t) = (%d, %d) connection: %f\n", s, t, misWeight);
     DCHECK(!IsNaN(misWeight));
     L *= misWeight;
-    if (misWeightPtr != nullptr)
+    if (misWeightPtr)
         *misWeightPtr = misWeight;
 
     return L;
@@ -3103,7 +3103,7 @@ void SPPMIntegrator::Render() {
                             // Add photon contribution to visible points in _grid[h]_
                             for (SPPMPixelListNode *node =
                                      grid[h].load(std::memory_order_relaxed);
-                                 node != nullptr; node = node->next) {
+                                 node; node = node->next) {
                                 ++visiblePointsChecked;
                                 SPPMPixel &pixel = *node->pixel;
                                 if (DistanceSquared(pixel.vp.p, isect.p()) >
@@ -3217,7 +3217,7 @@ void SPPMIntegrator::Render() {
             rgbImage.Write(camera.GetFilm().GetFilename(), metadata);
 
             // Write SPPM radius image, if requested
-            if (getenv("SPPM_RADIUS") != nullptr) {
+            if (getenv("SPPM_RADIUS")) {
                 Image rimg(PixelFormat::Float, Point2i(pixelBounds.Diagonal()),
                            {"Radius"});
                 Float minrad = 1e30f, maxrad = 0;
@@ -3274,7 +3274,7 @@ SampledSpectrum SPPMIntegrator::SampleLd(const SurfaceInteraction &intr, const B
 
     // Sample a point on the light source for direct lighting
     Light light = sampledLight->light;
-    DCHECK(light != nullptr && sampledLight->pdf > 0);
+    DCHECK(light && sampledLight->pdf > 0);
     pstd::optional<LightLiSample> ls =
         light.SampleLi(ctx, uLight, lambda, LightSamplingMode::WithMIS);
     if (!ls || !ls->L || ls->pdf == 0)

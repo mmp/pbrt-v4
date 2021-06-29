@@ -193,7 +193,7 @@ static PBRT_CONST Float MIPFilterLUT[MIPFilterLUTSize] = {
 MIPMap::MIPMap(Image image, const RGBColorSpace *colorSpace, WrapMode wrapMode,
                Allocator alloc, const MIPMapFilterOptions &options)
     : colorSpace(colorSpace), wrapMode(wrapMode), options(options) {
-    CHECK(colorSpace != nullptr);
+    CHECK(colorSpace);
     pyramid = Image::GeneratePyramid(std::move(image), wrapMode, alloc);
     std::for_each(pyramid.begin(), pyramid.end(),
                   [](const Image &im) { imageMapBytes += im.BytesUsed(); });

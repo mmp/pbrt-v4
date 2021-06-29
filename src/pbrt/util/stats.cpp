@@ -96,12 +96,12 @@ StatRegisterer::StatRegisterer(AccumFunc func, PixelAccumFunc pfunc) {
     static std::mutex mutex;
     std::lock_guard<std::mutex> lock(mutex);
 
-    if (statFuncs == nullptr)
+    if (!statFuncs)
         statFuncs = new std::vector<AccumFunc>;
     if (func)
         statFuncs->push_back(func);
 
-    if (pixelStatFuncs == nullptr)
+    if (!pixelStatFuncs)
         pixelStatFuncs = new std::vector<PixelAccumFunc>;
     if (pfunc)
         pixelStatFuncs->push_back(pfunc);

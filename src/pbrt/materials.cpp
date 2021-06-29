@@ -619,7 +619,7 @@ MeasuredMaterial *MeasuredMaterial::Create(const TextureParameterDictionary &par
 }
 
 std::string Material::ToString() const {
-    if (ptr() == nullptr)
+    if (!ptr())
         return "(nullptr)";
 
     auto toStr = [](auto ptr) { return ptr->ToString(); };

@@ -91,7 +91,7 @@ void Camera::InitMetadata(ImageMetadata *metadata) const {
 }
 
 std::string Camera::ToString() const {
-    if (ptr() == nullptr)
+    if (!ptr())
         return "(nullptr)";
 
     auto ts = [&](auto ptr) { return ptr->ToString(); };
@@ -791,7 +791,7 @@ Float RealisticCamera::TraceLensesFromFilm(const Ray &rCamera, Ray *rOut) const 
         }
     }
     // Transform _rLens_ from lens system space back to camera space
-    if (rOut != nullptr)
+    if (rOut)
         *rOut = Ray(Point3f(rLens.o.x, rLens.o.y, -rLens.o.z),
                     Vector3f(rLens.d.x, rLens.d.y, -rLens.d.z), rLens.time);
 
@@ -986,7 +986,7 @@ Float RealisticCamera::TraceLensesFromScene(const Ray &rCamera, Ray *rOut) const
         elementZ += element.thickness;
     }
     // Transform _rLens_ from lens system space back to camera space
-    if (rOut != nullptr)
+    if (rOut)
         *rOut = Ray(Point3f(rLens.o.x, rLens.o.y, -rLens.o.z),
                     Vector3f(rLens.d.x, rLens.d.y, -rLens.d.z), rLens.time);
     return 1;

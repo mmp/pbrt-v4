@@ -332,16 +332,16 @@ class CuboidMedium {
                 Warning(loc, "Material preset \"%s\" not found.", preset);
         }
 
-        if (sig_a == nullptr) {
+        if (!sig_a) {
             sig_a = parameters.GetOneSpectrum("sigma_a", nullptr, SpectrumType::Unbounded,
                                               alloc);
-            if (sig_a == nullptr)
+            if (!sig_a)
                 sig_a = alloc.new_object<ConstantSpectrum>(1.f);
         }
-        if (sig_s == nullptr) {
+        if (!sig_s) {
             sig_s = parameters.GetOneSpectrum("sigma_s", nullptr, SpectrumType::Unbounded,
                                               alloc);
-            if (sig_s == nullptr)
+            if (!sig_s)
                 sig_s = alloc.new_object<ConstantSpectrum>(1.f);
         }
 
@@ -628,7 +628,7 @@ class NanoVDBMediumProvider {
     PBRT_CPU_GPU
     const Bounds3f &Bounds() const { return bounds; }
 
-    bool IsEmissive() const { return temperatureFloatGrid != nullptr && LeScale > 0; }
+    bool IsEmissive() const { return temperatureFloatGrid && LeScale > 0; }
 
     PBRT_CPU_GPU
     SampledSpectrum Le(const Point3f &p, const SampledWavelengths &lambda) const {

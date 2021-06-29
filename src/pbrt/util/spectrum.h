@@ -407,7 +407,7 @@ class DenselySampledSpectrum {
           lambda_max(lambda_max),
           values(lambda_max - lambda_min + 1, alloc) {
         CHECK_GE(lambda_max, lambda_min);
-        if (spec != nullptr)
+        if (spec)
             for (int lambda = lambda_min; lambda <= lambda_max; ++lambda)
                 values[lambda - lambda_min] = spec(lambda);
     }

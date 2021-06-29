@@ -11,7 +11,7 @@
 namespace pbrt {
 
 std::string Filter::ToString() const {
-    if (ptr() == nullptr)
+    if (!ptr())
         return "(nullptr)";
 
     auto ts = [&](auto ptr) { return ptr->ToString(); };

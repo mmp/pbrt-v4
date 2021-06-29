@@ -359,7 +359,7 @@ Image::Image(PixelFormat format, Point2i resolution,
       p32(alloc) {
     if (Is8Bit(format)) {
         p8.resize(NChannels() * resolution[0] * resolution[1]);
-        CHECK(encoding != nullptr);
+        CHECK(encoding);
     } else if (Is16Bit(format))
         p16.resize(NChannels() * resolution[0] * resolution[1]);
     else if (Is32Bit(format))
@@ -978,12 +978,12 @@ static ImageAndMetadata ReadEXR(const std::string &name, Allocator alloc) {
         ImageMetadata metadata;
         const Imf::FloatAttribute *renderTimeAttrib =
             file.header().findTypedAttribute<Imf::FloatAttribute>("renderTimeSeconds");
-        if (renderTimeAttrib != nullptr)
+        if (renderTimeAttrib)
             metadata.renderTimeSeconds = renderTimeAttrib->value();
 
         const Imf::M44fAttribute *worldToCameraAttrib =
             file.header().findTypedAttribute<Imf::M44fAttribute>("worldToCamera");
-        if (worldToCameraAttrib != nullptr) {
+        if (worldToCameraAttrib) {
             SquareMatrix<4> m;
             for (int i = 0; i < 4; ++i)
                 for (int j = 0; j < 4; ++j)
@@ -994,7 +994,7 @@ static ImageAndMetadata ReadEXR(const std::string &name, Allocator alloc) {
 
         const Imf::M44fAttribute *worldToNDCAttrib =
             file.header().findTypedAttribute<Imf::M44fAttribute>("worldToNDC");
-        if (worldToNDCAttrib != nullptr) {
+        if (worldToNDCAttrib) {
             SquareMatrix<4> m;
             for (int i = 0; i < 4; ++i)
                 for (int j = 0; j < 4; ++j)
@@ -1012,12 +1012,12 @@ static ImageAndMetadata ReadEXR(const std::string &name, Allocator alloc) {
 
         const Imf::IntAttribute *sppAttrib =
             file.header().findTypedAttribute<Imf::IntAttribute>("samplesPerPixel");
-        if (sppAttrib != nullptr)
+        if (sppAttrib)
             metadata.samplesPerPixel = sppAttrib->value();
 
         const Imf::FloatAttribute *mseAttrib =
             file.header().findTypedAttribute<Imf::FloatAttribute>("MSE");
-        if (mseAttrib != nullptr)
+        if (mseAttrib)
             metadata.MSE = mseAttrib->value();
 
         // Find any string vector attributes
@@ -1034,7 +1034,7 @@ static ImageAndMetadata ReadEXR(const std::string &name, Allocator alloc) {
         const Imf::ChromaticitiesAttribute *chromaticitiesAttrib =
             file.header().findTypedAttribute<Imf::ChromaticitiesAttribute>(
                 "chromaticities");
-        if (chromaticitiesAttrib != nullptr) {
+        if (chromaticitiesAttrib) {
             Imf::Chromaticities c = chromaticitiesAttrib->value();
             const RGBColorSpace *cs = RGBColorSpace::Lookup(
                 Point2f(c.red.x, c.red.y), Point2f(c.green.x, c.green.y),
@@ -1174,7 +1174,7 @@ static ImageAndMetadata ReadPNG(const std::string &name, Allocator alloc,
                                 ColorEncoding encoding) {
     std::string contents = ReadFileContents(name);
 
-    if (encoding == nullptr)
+    if (!encoding)
         encoding = ColorEncoding::sRGB;
 
     unsigned width, height;
@@ -1443,7 +1443,7 @@ static ImageAndMetadata ReadPFM(const std::string &filename, Allocator alloc) {
     ImageMetadata metadata;
 
     FILE *fp = FOpenRead(filename);
-    if (fp == nullptr)
+    if (!fp)
         ErrorExit("%s: unable to open PFM file", filename);
 
     // read either "Pf" or "PF"
@@ -1511,7 +1511,7 @@ static ImageAndMetadata ReadPFM(const std::string &filename, Allocator alloc) {
                                 metadata};
 
 fail:
-    if (fp != nullptr)
+    if (fp)
         fclose(fp);
     ErrorExit("%s: premature end of file in PFM file", filename);
 }
@@ -1548,7 +1548,7 @@ static ImageAndMetadata ReadHDR(const std::string &filename, Allocator alloc) {
 
 bool Image::WritePFM(const std::string &filename, const ImageMetadata &metadata) const {
     FILE *fp = FOpenWrite(filename);
-    if (fp == nullptr) {
+    if (!fp) {
         Error("Unable to open output PFM file \"%s\"", filename);
         return false;
     }

@@ -46,7 +46,7 @@ Image Film::GetImage(ImageMetadata *metadata, Float splatScale) {
 }
 
 std::string Film::ToString() const {
-    if (ptr() == nullptr)
+    if (!ptr())
         return "(nullptr)";
 
     auto ts = [&](auto ptr) { return ptr->ToString(); };
@@ -480,7 +480,7 @@ RGBFilm::RGBFilm(FilmBaseParameters p, const RGBColorSpace *colorSpace,
       writeFP16(writeFP16) {
     filterIntegral = filter.Integral();
     CHECK(!pixelBounds.IsEmpty());
-    CHECK(colorSpace != nullptr);
+    CHECK(colorSpace);
     filmPixelMemory += pixelBounds.Area() * sizeof(Pixel);
     // Compute _outputRGBFromSensorRGB_ matrix
     outputRGBFromSensorRGB = colorSpace->RGBFromXYZ * sensor->XYZFromSensorRGB;

@@ -31,8 +31,7 @@ void InitPBRT(const PBRTOptions &opt) {
     // API Initialization
 
 #if defined(PBRT_IS_WINDOWS) && defined(PBRT_BUILD_GPU_RENDERER)
-    if (Options->useGPU && Options->gpuDevice &&
-        getenv("CUDA_VISIBLE_DEVICES") == nullptr) {
+    if (Options->useGPU && Options->gpuDevice && !getenv("CUDA_VISIBLE_DEVICES")) {
         // Limit CUDA to considering only a single GPU on Windows.  pbrt
         // only uses a single GPU anyway, and if there are multiple GPUs
         // plugged in with different architectures, pbrt's use of unified

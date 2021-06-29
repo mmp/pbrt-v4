@@ -776,28 +776,28 @@ class TaggedPointer {
 
     template <typename F>
     PBRT_CPU_GPU decltype(auto) Dispatch(F &&func) {
-        DCHECK(ptr() != nullptr);
+        DCHECK(ptr());
         using R = typename detail::ReturnType<F, Ts...>::type;
         return detail::Dispatch<F, R, Ts...>(func, ptr(), Tag() - 1);
     }
 
     template <typename F>
     PBRT_CPU_GPU decltype(auto) Dispatch(F &&func) const {
-        DCHECK(ptr() != nullptr);
+        DCHECK(ptr());
         using R = typename detail::ReturnType<F, Ts...>::type;
         return detail::Dispatch<F, R, Ts...>(func, ptr(), Tag() - 1);
     }
 
     template <typename F>
     decltype(auto) DispatchCPU(F &&func) {
-        DCHECK(ptr() != nullptr);
+        DCHECK(ptr());
         using R = typename detail::ReturnType<F, Ts...>::type;
         return detail::DispatchCPU<F, R, Ts...>(func, ptr(), Tag() - 1);
     }
 
     template <typename F>
     decltype(auto) DispatchCPU(F &&func) const {
-        DCHECK(ptr() != nullptr);
+        DCHECK(ptr());
         using R = typename detail::ReturnTypeConst<F, Ts...>::type;
         return detail::DispatchCPU<F, R, Ts...>(func, ptr(), Tag() - 1);
     }

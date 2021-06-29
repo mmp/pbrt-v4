@@ -33,7 +33,7 @@ std::string MediumInterface::ToString() const {
 }
 
 std::string PhaseFunction::ToString() const {
-    if (ptr() == nullptr)
+    if (!ptr())
         return "(nullptr)";
 
     auto ts = [&](auto ptr) { return ptr->ToString(); };
@@ -134,7 +134,7 @@ bool Medium::IsEmissive() const {
 }
 
 std::string Medium::ToString() const {
-    if (ptr() == nullptr)
+    if (!ptr())
         return "(nullptr)";
 
     auto ts = [&](auto ptr) { return ptr->ToString(); };
@@ -150,23 +150,23 @@ HomogeneousMedium *HomogeneousMedium::Create(const ParameterDictionary &paramete
         if (!GetMediumScatteringProperties(preset, &sig_a, &sig_s, alloc))
             Warning(loc, "Material preset \"%s\" not found.", preset);
     }
-    if (sig_a == nullptr) {
+    if (!sig_a) {
         sig_a =
             parameters.GetOneSpectrum("sigma_a", nullptr, SpectrumType::Unbounded, alloc);
-        if (sig_a == nullptr)
+        if (!sig_a)
             sig_a = alloc.new_object<ConstantSpectrum>(1.f);
     }
-    if (sig_s == nullptr) {
+    if (!sig_s) {
         sig_s =
             parameters.GetOneSpectrum("sigma_s", nullptr, SpectrumType::Unbounded, alloc);
-        if (sig_s == nullptr)
+        if (!sig_s)
             sig_s = alloc.new_object<ConstantSpectrum>(1.f);
     }
 
     Spectrum Le =
         parameters.GetOneSpectrum("Le", nullptr, SpectrumType::Illuminant, alloc);
     Float LeScale = parameters.GetOneFloat("Lescale", 1.f);
-    if (Le == nullptr || Le.MaxValue() == 0)
+    if (!Le || Le.MaxValue() == 0)
         Le = alloc.new_object<ConstantSpectrum>(0.f);
     else
         LeScale /= SpectrumToPhotometric(Le);
@@ -286,7 +286,7 @@ UniformGridMediumProvider *UniformGridMediumProvider::Create(
     Spectrum Le =
         parameters.GetOneSpectrum("Le", nullptr, SpectrumType::Illuminant, alloc);
     Float LeNorm = 1;
-    if (Le == nullptr || Le.MaxValue() == 0)
+    if (!Le || Le.MaxValue() == 0)
         Le = alloc.new_object<ConstantSpectrum>(0.f);
     else
         LeNorm = 1 / SpectrumToPhotometric(Le);

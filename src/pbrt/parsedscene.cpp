@@ -281,7 +281,7 @@ void ParsedScene::Shape(const std::string &name, ParsedParameterVector params,
 
     if (CTMIsAnimated()) {
         std::vector<AnimatedShapeSceneEntity> *as = &animatedShapes;
-        if (currentInstance != nullptr) {
+        if (currentInstance) {
             if (!graphicsState.areaLightName.empty())
                 Warning(&loc, "Area lights not supported with object instancing");
             as = &currentInstance->animatedShapes;
@@ -297,7 +297,7 @@ void ParsedScene::Shape(const std::string &name, ParsedParameterVector params,
              graphicsState.currentInsideMedium, graphicsState.currentOutsideMedium}));
     } else {
         std::vector<ShapeSceneEntity> *s = &shapes;
-        if (currentInstance != nullptr) {
+        if (currentInstance) {
             if (!graphicsState.areaLightName.empty())
                 Warning(&loc, "Area lights not supported with object instancing");
             s = &currentInstance->shapes;
@@ -322,7 +322,7 @@ void ParsedScene::ObjectBegin(const std::string &name, FileLoc loc) {
 
     pushStack.push_back(std::make_pair('o', loc));
 
-    if (currentInstance != nullptr) {
+    if (currentInstance) {
         ErrorExitDeferred(&loc, "ObjectBegin called inside of instance definition");
         return;
     }
@@ -341,7 +341,7 @@ void ParsedScene::ObjectBegin(const std::string &name, FileLoc loc) {
 
 void ParsedScene::ObjectEnd(FileLoc loc) {
     VERIFY_WORLD("ObjectEnd");
-    if (currentInstance == nullptr) {
+    if (!currentInstance) {
         ErrorExitDeferred(&loc, "ObjectEnd called outside of instance definition");
         return;
     }
@@ -365,7 +365,7 @@ void ParsedScene::ObjectEnd(FileLoc loc) {
 void ParsedScene::ObjectInstance(const std::string &name, FileLoc loc) {
     VERIFY_WORLD("ObjectInstance");
 
-    if (currentInstance != nullptr) {
+    if (currentInstance) {
         ErrorExitDeferred(&loc,
                           "ObjectInstance can't be called inside instance definition");
         return;
@@ -1220,7 +1220,7 @@ Primitive ParsedScene::CreateAggregate(
                 if (sh.lightIndex != -1 && iter != shapeIndexToAreaLights.end())
                     area = (*iter->second)[j];
 
-                if (area == nullptr && !mi.IsMediumTransition() && !alphaTex)
+                if (!area && !mi.IsMediumTransition() && !alphaTex)
                     primitives.push_back(new SimplePrimitive(shapes[j], mtl));
                 else
                     primitives.push_back(
@@ -1352,7 +1352,7 @@ Primitive ParsedScene::CreateAggregate(
         if (iter == instanceDefinitions.end())
             ErrorExit(&inst.loc, "%s: object instance not defined", inst.name);
 
-        if (iter->second == nullptr)
+        if (!iter->second)
             // empty instance
             continue;
 
@@ -2171,8 +2171,7 @@ void FormattingScene::Shape(const std::string &name, ParsedParameterVector param
             std::cout << dict.ToParameterList(catIndentCount);
         } else {
             static int count = 1;
-            const char *plyPrefix =
-                getenv("PLY_PREFIX") != nullptr ? getenv("PLY_PREFIX") : "mesh";
+            const char *plyPrefix = getenv("PLY_PREFIX") ? getenv("PLY_PREFIX") : "mesh";
             std::string fn = StringPrintf("%s_%05d.ply", plyPrefix, count++);
 
             class Transform identity;

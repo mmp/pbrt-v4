@@ -30,7 +30,7 @@ class NewDeleteResource : public memory_resource {
     }
 
     void do_deallocate(void *ptr, size_t bytes, size_t alignment) {
-        if (ptr == nullptr)
+        if (!ptr)
             return;
 #if defined(PBRT_HAVE__ALIGNED_MALLOC)
         _aligned_free(ptr);

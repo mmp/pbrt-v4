@@ -99,7 +99,7 @@ static void PlyErrorCallback(p_ply, const char *message) {
 bool TriangleMesh::WritePLY(const std::string &filename) const {
     p_ply plyFile =
         ply_create(filename.c_str(), PLY_DEFAULT, PlyErrorCallback, 0, nullptr);
-    if (plyFile == nullptr)
+    if (!plyFile)
         return false;
 
     ply_add_element(plyFile, "vertex", nVertices);
@@ -300,7 +300,7 @@ TriQuadMesh TriQuadMesh::ReadPLY(const std::string &filename) {
     TriQuadMesh mesh;
 
     p_ply ply = ply_open(filename.c_str(), rply_message_callback, 0, nullptr);
-    if (ply == nullptr)
+    if (!ply)
         ErrorExit("Couldn't open PLY file \"%s\"", filename);
 
     if (ply_read_header(ply) == 0)

@@ -692,7 +692,7 @@ DiffuseAreaLight::DiffuseAreaLight(const Transform &renderFromLight,
                       "channels.");
         CHECK_EQ(3, desc.size());
         CHECK(desc.IsIdentity());
-        CHECK(imageColorSpace != nullptr);
+        CHECK(imageColorSpace);
     } else {
         CHECK(Le);
     }
@@ -849,7 +849,7 @@ DiffuseAreaLight *DiffuseAreaLight::Create(const Transform &renderFromLight,
     Image image(alloc);
     const RGBColorSpace *imageColorSpace = nullptr;
     if (!filename.empty()) {
-        if (L != nullptr)
+        if (L)
             ErrorExit(loc, "Both \"L\" and \"filename\" specified for DiffuseAreaLight.");
         ImageAndMetadata im = Image::Read(filename, alloc);
 
@@ -862,7 +862,7 @@ DiffuseAreaLight *DiffuseAreaLight::Create(const Transform &renderFromLight,
         image = im.image.SelectChannels(channelDesc, alloc);
 
         imageColorSpace = im.metadata.GetColorSpace();
-    } else if (L == nullptr)
+    } else if (!L)
         L = &colorSpace->illuminant;
 
     // scale so that radiance is equivalent to 1 nit
@@ -1452,7 +1452,7 @@ pstd::optional<LightBounds> Light::Bounds() const {
 }
 
 std::string Light::ToString() const {
-    if (ptr() == nullptr)
+    if (!ptr())
         return "(nullptr)";
 
     auto str = [](auto ptr) { return ptr->ToString(); };
