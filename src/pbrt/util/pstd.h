@@ -313,6 +313,8 @@ using HasData = std::is_convertible<
 
 }  // namespace span_internal
 
+inline constexpr std::size_t dynamic_extent = -1;
+
 // span implementation partially based on absl::Span from Google's Abseil library.
 template <typename T>
 class span {
@@ -403,7 +405,7 @@ class span {
     }
 
     PBRT_CPU_GPU
-    span subspan(size_t pos, size_t count) {
+    span subspan(size_t pos, size_t count = dynamic_extent) {
         size_t np = count < (size() - pos) ? count : (size() - pos);
         return span(ptr + pos, np);
     }

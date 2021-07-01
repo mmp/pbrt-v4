@@ -43,8 +43,8 @@ class BVHAggregate {
   private:
     // BVHAggregate Private Methods
     BVHBuildNode *buildRecursive(std::vector<Allocator> &threadAllocators,
-                                 std::vector<BVHPrimitive> &primitiveInfo, int start,
-                                 int end, std::atomic<int> *totalNodes,
+                                 pstd::span<BVHPrimitive> bvhPrimitives,
+                                 std::atomic<int> *totalNodes,
                                  std::atomic<int> *orderedPrimsOffset,
                                  std::vector<Primitive> &orderedPrims);
     BVHBuildNode *buildHLBVH(Allocator alloc,
@@ -59,7 +59,7 @@ class BVHAggregate {
     BVHBuildNode *buildUpperSAH(Allocator alloc,
                                 std::vector<BVHBuildNode *> &treeletRoots, int start,
                                 int end, std::atomic<int> *totalNodes) const;
-    int flattenBVHTree(BVHBuildNode *node, int *offset);
+    int flattenBVH(BVHBuildNode *node, int *offset);
 
     // BVHAggregate Private Members
     int maxPrimsInNode;

@@ -34,7 +34,7 @@ struct MortonPrimitive {
 
 // LBVHTreelet Definition
 struct LBVHTreelet {
-    int startIndex, nPrimitives;
+    size_t startIndex, nPrimitives;
     BVHBuildNode *buildNodes;
 };
 
@@ -49,7 +49,7 @@ static void RadixSort(std::vector<MortonPrimitive> *v) {
     for (int pass = 0; pass < nPasses; ++pass) {
         // Perform one pass of radix sort, sorting _bitsPerPass_ bits
         int lowBit = pass * bitsPerPass;
-        // Set in and out vector pointers for radix sort pass
+        // Set in and out vector references for radix sort pass
         std::vector<MortonPrimitive> &in = (pass & 1) ? tempVector : *v;
         std::vector<MortonPrimitive> &out = (pass & 1) ? *v : tempVector;
 
@@ -91,12 +91,11 @@ struct BVHSplitBucket {
 struct BVHPrimitive {
     BVHPrimitive() {}
     BVHPrimitive(size_t primitiveIndex, const Bounds3f &bounds)
-        : primitiveIndex(primitiveIndex),
-          bounds(bounds),
-          centroid(.5f * bounds.pMin + .5f * bounds.pMax) {}
+        : primitiveIndex(primitiveIndex), bounds(bounds) {}
     size_t primitiveIndex;
     Bounds3f bounds;
-    Point3f centroid;
+    // BVHPrimitive Public Methods
+    Point3f Centroid() const { return .5f * bounds.pMin + .5f * bounds.pMax; }
 };
 
 // BVHBuildNode Definition
@@ -168,8 +167,7 @@ BVHAggregate::BVHAggregate(std::vector<Primitive> prims, int maxPrimsInNode,
         root = buildHLBVH(alloc, bvhPrimitives, &totalNodes, orderedPrims);
     } else {
         std::atomic<int> orderedPrimsOffset{0};
-        size_t nPrimitives = primitives.size();
-        root = buildRecursive(threadAllocators, bvhPrimitives, 0, nPrimitives,
+        root = buildRecursive(threadAllocators, pstd::span<BVHPrimitive>(bvhPrimitives),
                               &totalNodes, &orderedPrimsOffset, orderedPrims);
         CHECK_EQ(orderedPrimsOffset.load(), orderedPrims.size());
     }
@@ -184,81 +182,78 @@ BVHAggregate::BVHAggregate(std::vector<Primitive> prims, int maxPrimsInNode,
                  primitives.size() * sizeof(primitives[0]);
     nodes = new LinearBVHNode[totalNodes];
     int offset = 0;
-    flattenBVHTree(root, &offset);
+    flattenBVH(root, &offset);
     CHECK_EQ(totalNodes.load(), offset);
 }
 
 BVHBuildNode *BVHAggregate::buildRecursive(std::vector<Allocator> &threadAllocators,
-                                           std::vector<BVHPrimitive> &bvhPrimitives,
-                                           int start, int end,
+                                           pstd::span<BVHPrimitive> bvhPrimitives,
                                            std::atomic<int> *totalNodes,
                                            std::atomic<int> *orderedPrimsOffset,
                                            std::vector<Primitive> &orderedPrims) {
-    DCHECK_NE(start, end);
+    DCHECK_NE(bvhPrimitives.size(), 0);
     Allocator alloc = threadAllocators[ThreadIndex];
     BVHBuildNode *node = alloc.new_object<BVHBuildNode>();
     // Initialize _BVHBuildNode_ for primitive range
     ++*totalNodes;
     // Compute bounds of all primitives in BVH node
     Bounds3f bounds;
-    for (int i = start; i < end; ++i)
-        bounds = Union(bounds, bvhPrimitives[i].bounds);
+    for (const auto &prim : bvhPrimitives)
+        bounds = Union(bounds, prim.bounds);
 
-    int nPrimitives = end - start;
-    if (bounds.SurfaceArea() == 0 || nPrimitives == 1) {
+    if (bounds.SurfaceArea() == 0 || bvhPrimitives.size() == 1) {
         // Create leaf _BVHBuildNode_
-        int firstPrimOffset = orderedPrimsOffset->fetch_add(nPrimitives);
-        for (int i = start; i < end; ++i) {
+        int firstPrimOffset = orderedPrimsOffset->fetch_add(bvhPrimitives.size());
+        for (size_t i = 0; i < bvhPrimitives.size(); ++i) {
             int index = bvhPrimitives[i].primitiveIndex;
-            orderedPrims[firstPrimOffset + i - start] = primitives[index];
+            orderedPrims[firstPrimOffset + i] = primitives[index];
         }
-        node->InitLeaf(firstPrimOffset, nPrimitives, bounds);
+        node->InitLeaf(firstPrimOffset, bvhPrimitives.size(), bounds);
         return node;
 
     } else {
-        // Compute bound of primitive centroids, choose split dimension _dim_
+        // Compute bound of primitive centroids and choose split dimension _dim_
         Bounds3f centroidBounds;
-        for (int i = start; i < end; ++i)
-            centroidBounds = Union(centroidBounds, bvhPrimitives[i].centroid);
+        for (const auto &prim : bvhPrimitives)
+            centroidBounds = Union(centroidBounds, prim.Centroid());
         int dim = centroidBounds.MaxDimension();
 
         // Partition primitives into two sets and build children
-        int mid = (start + end) / 2;
         if (centroidBounds.pMax[dim] == centroidBounds.pMin[dim]) {
             // Create leaf _BVHBuildNode_
-            int firstPrimOffset = orderedPrimsOffset->fetch_add(nPrimitives);
-            for (int i = start; i < end; ++i) {
+            int firstPrimOffset = orderedPrimsOffset->fetch_add(bvhPrimitives.size());
+            for (size_t i = 0; i < bvhPrimitives.size(); ++i) {
                 int index = bvhPrimitives[i].primitiveIndex;
-                orderedPrims[firstPrimOffset + i - start] = primitives[index];
+                orderedPrims[firstPrimOffset + i] = primitives[index];
             }
-            node->InitLeaf(firstPrimOffset, nPrimitives, bounds);
+            node->InitLeaf(firstPrimOffset, bvhPrimitives.size(), bounds);
             return node;
 
         } else {
+            int mid = bvhPrimitives.size() / 2;
             // Partition primitives based on _splitMethod_
             switch (splitMethod) {
             case SplitMethod::Middle: {
                 // Partition primitives through node's midpoint
                 Float pmid = (centroidBounds.pMin[dim] + centroidBounds.pMax[dim]) / 2;
-                BVHPrimitive *midPtr =
-                    std::partition(&bvhPrimitives[start], &bvhPrimitives[end - 1] + 1,
-                                   [dim, pmid](const BVHPrimitive &pi) {
-                                       return pi.centroid[dim] < pmid;
-                                   });
-                mid = midPtr - &bvhPrimitives[0];
+                auto midIter = std::partition(bvhPrimitives.begin(), bvhPrimitives.end(),
+                                              [dim, pmid](const BVHPrimitive &pi) {
+                                                  return pi.Centroid()[dim] < pmid;
+                                              });
+                mid = midIter - bvhPrimitives.begin();
                 // For lots of prims with large overlapping bounding boxes, this
                 // may fail to partition; in that case do not break and fall through
                 // to EqualCounts.
-                if (mid != start && mid != end)
+                if (midIter != bvhPrimitives.begin() && midIter != bvhPrimitives.end())
                     break;
             }
             case SplitMethod::EqualCounts: {
                 // Partition primitives into equally sized subsets
-                mid = (start + end) / 2;
-                std::nth_element(&bvhPrimitives[start], &bvhPrimitives[mid],
-                                 &bvhPrimitives[end - 1] + 1,
+                mid = bvhPrimitives.size() / 2;
+                std::nth_element(bvhPrimitives.begin(), bvhPrimitives.begin() + mid,
+                                 bvhPrimitives.end(),
                                  [dim](const BVHPrimitive &a, const BVHPrimitive &b) {
-                                     return a.centroid[dim] < b.centroid[dim];
+                                     return a.Centroid()[dim] < b.Centroid()[dim];
                                  });
 
                 break;
@@ -266,13 +261,13 @@ BVHBuildNode *BVHAggregate::buildRecursive(std::vector<Allocator> &threadAllocat
             case SplitMethod::SAH:
             default: {
                 // Partition primitives using approximate SAH
-                if (nPrimitives <= 2) {
+                if (bvhPrimitives.size() <= 2) {
                     // Partition primitives into equally sized subsets
-                    mid = (start + end) / 2;
-                    std::nth_element(&bvhPrimitives[start], &bvhPrimitives[mid],
-                                     &bvhPrimitives[end - 1] + 1,
+                    mid = bvhPrimitives.size() / 2;
+                    std::nth_element(bvhPrimitives.begin(), bvhPrimitives.begin() + mid,
+                                     bvhPrimitives.end(),
                                      [dim](const BVHPrimitive &a, const BVHPrimitive &b) {
-                                         return a.centroid[dim] < b.centroid[dim];
+                                         return a.Centroid()[dim] < b.Centroid()[dim];
                                      });
 
                 } else {
@@ -281,16 +276,14 @@ BVHBuildNode *BVHAggregate::buildRecursive(std::vector<Allocator> &threadAllocat
                     BVHSplitBucket buckets[nBuckets];
 
                     // Initialize _BVHSplitBucket_ for SAH partition buckets
-                    for (int i = start; i < end; ++i) {
-                        int b = nBuckets *
-                                centroidBounds.Offset(bvhPrimitives[i].centroid)[dim];
+                    for (const auto &prim : bvhPrimitives) {
+                        int b = nBuckets * centroidBounds.Offset(prim.Centroid())[dim];
                         if (b == nBuckets)
                             b = nBuckets - 1;
                         DCHECK_GE(b, 0);
                         DCHECK_LT(b, nBuckets);
                         buckets[b].count++;
-                        buckets[b].bounds =
-                            Union(buckets[b].bounds, bvhPrimitives[i].bounds);
+                        buckets[b].bounds = Union(buckets[b].bounds, prim.bounds);
                     }
 
                     // Compute costs for splitting after each bucket
@@ -331,29 +324,30 @@ BVHBuildNode *BVHAggregate::buildRecursive(std::vector<Allocator> &threadAllocat
                         }
                     }
                     // Compute leaf cost and SAH split cost for chosen split
-                    Float leafCost = nPrimitives;
+                    Float leafCost = bvhPrimitives.size();
                     minCost = 1.f / 2.f + minCost / bounds.SurfaceArea();
 
                     // Either create leaf or split primitives at selected SAH bucket
-                    if (nPrimitives > maxPrimsInNode || minCost < leafCost) {
-                        BVHPrimitive *pmid = std::partition(
-                            &bvhPrimitives[start], &bvhPrimitives[end - 1] + 1,
+                    if (bvhPrimitives.size() > maxPrimsInNode || minCost < leafCost) {
+                        auto midIter = std::partition(
+                            bvhPrimitives.begin(), bvhPrimitives.end(),
                             [=](const BVHPrimitive &bp) {
                                 int b =
-                                    nBuckets * centroidBounds.Offset(bp.centroid)[dim];
+                                    nBuckets * centroidBounds.Offset(bp.Centroid())[dim];
                                 if (b == nBuckets)
                                     b = nBuckets - 1;
                                 return b <= minCostSplitBucket;
                             });
-                        mid = pmid - &bvhPrimitives[0];
+                        mid = midIter - bvhPrimitives.begin();
                     } else {
                         // Create leaf _BVHBuildNode_
-                        int firstPrimOffset = orderedPrimsOffset->fetch_add(nPrimitives);
-                        for (int i = start; i < end; ++i) {
+                        int firstPrimOffset =
+                            orderedPrimsOffset->fetch_add(bvhPrimitives.size());
+                        for (size_t i = 0; i < bvhPrimitives.size(); ++i) {
                             int index = bvhPrimitives[i].primitiveIndex;
-                            orderedPrims[firstPrimOffset + i - start] = primitives[index];
+                            orderedPrims[firstPrimOffset + i] = primitives[index];
                         }
-                        node->InitLeaf(firstPrimOffset, nPrimitives, bounds);
+                        node->InitLeaf(firstPrimOffset, bvhPrimitives.size(), bounds);
                         return node;
                     }
                 }
@@ -364,27 +358,27 @@ BVHBuildNode *BVHAggregate::buildRecursive(std::vector<Allocator> &threadAllocat
 
             BVHBuildNode *children[2];
             // Recursively build BVHs for _children_
-            if (end - start > 128 * 1024) {
+            if (bvhPrimitives.size() > 128 * 1024) {
                 // Recursively build child BVHs in parallel
                 ParallelFor(0, 2, [&](int i) {
                     if (i == 0)
-                        children[0] =
-                            buildRecursive(threadAllocators, bvhPrimitives, start, mid,
-                                           totalNodes, orderedPrimsOffset, orderedPrims);
+                        children[0] = buildRecursive(
+                            threadAllocators, bvhPrimitives.subspan(0, mid), totalNodes,
+                            orderedPrimsOffset, orderedPrims);
                     else
                         children[1] =
-                            buildRecursive(threadAllocators, bvhPrimitives, mid, end,
+                            buildRecursive(threadAllocators, bvhPrimitives.subspan(mid),
                                            totalNodes, orderedPrimsOffset, orderedPrims);
                 });
 
             } else {
                 // Recursively build child BVHs sequentially
                 children[0] =
-                    buildRecursive(threadAllocators, bvhPrimitives, start, mid,
+                    buildRecursive(threadAllocators, bvhPrimitives.subspan(0, mid),
                                    totalNodes, orderedPrimsOffset, orderedPrims);
                 children[1] =
-                    buildRecursive(threadAllocators, bvhPrimitives, mid, end, totalNodes,
-                                   orderedPrimsOffset, orderedPrims);
+                    buildRecursive(threadAllocators, bvhPrimitives.subspan(mid),
+                                   totalNodes, orderedPrimsOffset, orderedPrims);
             }
 
             node->InitInterior(dim, children[0], children[1]);
@@ -400,8 +394,8 @@ BVHBuildNode *BVHAggregate::buildHLBVH(Allocator alloc,
                                        std::vector<Primitive> &orderedPrims) {
     // Compute bounding box of all primitive centroids
     Bounds3f bounds;
-    for (const BVHPrimitive &pi : bvhPrimitives)
-        bounds = Union(bounds, pi.centroid);
+    for (const BVHPrimitive &prim : bvhPrimitives)
+        bounds = Union(bounds, prim.Centroid());
 
     // Compute Morton indices of primitives
     std::vector<MortonPrimitive> mortonPrims(bvhPrimitives.size());
@@ -410,7 +404,7 @@ BVHBuildNode *BVHAggregate::buildHLBVH(Allocator alloc,
         constexpr int mortonBits = 10;
         constexpr int mortonScale = 1 << mortonBits;
         mortonPrims[i].primitiveIndex = bvhPrimitives[i].primitiveIndex;
-        Vector3f centroidOffset = bounds.Offset(bvhPrimitives[i].centroid);
+        Vector3f centroidOffset = bounds.Offset(bvhPrimitives[i].Centroid());
         Vector3f offset = centroidOffset * mortonScale;
         mortonPrims[i].mortonCode = EncodeMorton3(offset.x, offset.y, offset.z);
     });
@@ -421,12 +415,12 @@ BVHBuildNode *BVHAggregate::buildHLBVH(Allocator alloc,
     // Create LBVH treelets at bottom of BVH
     // Find intervals of primitives for each treelet
     std::vector<LBVHTreelet> treeletsToBuild;
-    for (int start = 0, end = 1; end <= (int)mortonPrims.size(); ++end) {
+    for (size_t start = 0, end = 1; end <= mortonPrims.size(); ++end) {
         uint32_t mask = 0b00111111111111000000000000000000;
         if (end == (int)mortonPrims.size() || ((mortonPrims[start].mortonCode & mask) !=
                                                (mortonPrims[end].mortonCode & mask))) {
             // Add entry to _treeletsToBuild_ for this treelet
-            int nPrimitives = end - start;
+            size_t nPrimitives = end - start;
             int maxBVHNodes = 2 * nPrimitives - 1;
             BVHBuildNode *nodes = alloc.allocate_object<BVHBuildNode>(maxBVHNodes);
             treeletsToBuild.push_back({start, nPrimitives, nodes});
@@ -510,7 +504,7 @@ BVHBuildNode *BVHAggregate::emitLBVH(BVHBuildNode *&buildNodes,
     }
 }
 
-int BVHAggregate::flattenBVHTree(BVHBuildNode *node, int *offset) {
+int BVHAggregate::flattenBVH(BVHBuildNode *node, int *offset) {
     LinearBVHNode *linearNode = &nodes[*offset];
     linearNode->bounds = node->bounds;
     int nodeOffset = (*offset)++;
@@ -523,8 +517,8 @@ int BVHAggregate::flattenBVHTree(BVHBuildNode *node, int *offset) {
         // Create interior flattened BVH node
         linearNode->axis = node->splitAxis;
         linearNode->nPrimitives = 0;
-        flattenBVHTree(node->children[0], offset);
-        linearNode->secondChildOffset = flattenBVHTree(node->children[1], offset);
+        flattenBVH(node->children[0], offset);
+        linearNode->secondChildOffset = flattenBVH(node->children[1], offset);
     }
     return nodeOffset;
 }

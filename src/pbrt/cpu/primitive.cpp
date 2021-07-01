@@ -56,7 +56,7 @@ pstd::optional<ShapeIntersection> GeometricPrimitive::Intersect(const Ray &r,
     // Test intersection against alpha texture, if present
     if (alpha) {
         if (Float a = alpha.Evaluate(si->intr); a < 1) {
-            // Potentially skip intersection based on stochastic alpha test
+            // Possibly ignore intersection based on stochastic alpha test
             Float u = (a <= 0) ? 1.f : HashFloat(r.o, r.d);
             if (u > a) {
                 // Ignore this intersection and trace a new ray
