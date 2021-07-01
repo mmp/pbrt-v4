@@ -754,32 +754,27 @@ struct KdNodeToVisit {
 // KdTreeNode Definition
 struct alignas(8) KdTreeNode {
     // KdTreeNode Methods
-    void InitLeaf(int *primNums, int np, std::vector<int> *primitiveIndices);
+    void InitLeaf(pstd::span<const int> primNums, std::vector<int> *primitiveIndices);
 
-    void InitInterior(int axis, int ac, Float s) {
+    void InitInterior(int axis, int aboveChild, Float s) {
         split = s;
-        flags = axis;
-        aboveChild |= (ac << 2);
+        flags = axis | (aboveChild << 2);
     }
 
     Float SplitPos() const { return split; }
-    int nPrimitives() const { return nPrims >> 2; }
+    int nPrimitives() const { return flags >> 2; }
     int SplitAxis() const { return flags & 3; }
     bool IsLeaf() const { return (flags & 3) == 3; }
-    int AboveChild() const { return aboveChild >> 2; }
+    int AboveChild() const { return flags >> 2; }
 
     union {
         Float split;                 // Interior
-        int onePrimitive;            // Leaf
+        int onePrimitiveIndex;       // Leaf
         int primitiveIndicesOffset;  // Leaf
     };
 
   private:
-    union {
-        int flags;       // Both
-        int nPrims;      // Leaf
-        int aboveChild;  // Interior
-    };
+    uint32_t flags;
 };
 
 // EdgeType Definition
@@ -810,7 +805,7 @@ KdTreeAggregate::KdTreeAggregate(std::vector<Primitive> p, int isectCost,
       maxPrims(maxPrims),
       emptyBonus(emptyBonus),
       primitives(std::move(p)) {
-    // Build kd-tree for accelerator
+    // Build kd-tree aggregate
     nextFreeNode = nAllocedNodes = 0;
     if (maxDepth <= 0)
         maxDepth = std::round(8 + 1.3f * Log2Int(int64_t(primitives.size())));
@@ -824,51 +819,50 @@ KdTreeAggregate::KdTreeAggregate(std::vector<Primitive> p, int isectCost,
     }
 
     // Allocate working memory for kd-tree construction
-    std::unique_ptr<BoundEdge[]> edges[3];
+    std::vector<BoundEdge> edges[3];
     for (int i = 0; i < 3; ++i)
-        edges[i] = std::make_unique<BoundEdge[]>(2 * primitives.size());
+        edges[i].resize(2 * primitives.size());
 
-    std::unique_ptr<int[]> prims0 = std::make_unique<int[]>(primitives.size());
-    std::unique_ptr<int[]> prims1 =
-        std::make_unique<int[]>((maxDepth + 1) * primitives.size());
+    std::vector<int> prims0(primitives.size());
+    std::vector<int> prims1((maxDepth + 1) * primitives.size());
 
     // Initialize _primNums_ for kd-tree construction
-    std::unique_ptr<int[]> primNums = std::make_unique<int[]>(primitives.size());
+    std::vector<int> primNums(primitives.size());
     for (size_t i = 0; i < primitives.size(); ++i)
         primNums[i] = i;
 
     // Start recursive construction of kd-tree
-    buildTree(0, bounds, primBounds, primNums.get(), primitives.size(), maxDepth, edges,
-              prims0.get(), prims1.get(), 0);
+    buildTree(0, bounds, primBounds, primNums, maxDepth, edges, pstd::span<int>(prims0),
+              pstd::span<int>(prims1), 0);
 }
 
-void KdTreeNode::InitLeaf(int *primNums, int np, std::vector<int> *primitiveIndices) {
-    flags = 3;
-    nPrims |= (np << 2);
+void KdTreeNode::InitLeaf(pstd::span<const int> primNums,
+                          std::vector<int> *primitiveIndices) {
+    flags = 3 | (primNums.size() << 2);
     // Store primitive ids for leaf node
-    if (np == 0)
-        onePrimitive = 0;
-    else if (np == 1)
-        onePrimitive = primNums[0];
+    if (primNums.size() == 0)
+        onePrimitiveIndex = 0;
+    else if (primNums.size() == 1)
+        onePrimitiveIndex = primNums[0];
     else {
         primitiveIndicesOffset = primitiveIndices->size();
-        for (int i = 0; i < np; ++i)
-            primitiveIndices->push_back(primNums[i]);
+        for (int pn : primNums)
+            primitiveIndices->push_back(pn);
     }
 }
 
 void KdTreeAggregate::buildTree(int nodeNum, const Bounds3f &nodeBounds,
-                                const std::vector<Bounds3f> &allPrimBounds, int *primNums,
-                                int nPrimitives, int depth,
-                                const std::unique_ptr<BoundEdge[]> edges[3], int *prims0,
-                                int *prims1, int badRefines) {
+                                const std::vector<Bounds3f> &allPrimBounds,
+                                pstd::span<const int> primNums, int depth,
+                                std::vector<BoundEdge> edges[3], pstd::span<int> prims0,
+                                pstd::span<int> prims1, int badRefines) {
     CHECK_EQ(nodeNum, nextFreeNode);
     // Get next free node from _nodes_ array
     if (nextFreeNode == nAllocedNodes) {
         int nNewAllocNodes = std::max(2 * nAllocedNodes, 512);
         KdTreeNode *n = new KdTreeNode[nNewAllocNodes];
         if (nAllocedNodes > 0) {
-            memcpy(n, nodes, nAllocedNodes * sizeof(KdTreeNode));
+            std::memcpy(n, nodes, nAllocedNodes * sizeof(KdTreeNode));
             delete[] nodes;
         }
         nodes = n;
@@ -877,38 +871,39 @@ void KdTreeAggregate::buildTree(int nodeNum, const Bounds3f &nodeBounds,
     ++nextFreeNode;
 
     // Initialize leaf node if termination criteria met
-    if (nPrimitives <= maxPrims || depth == 0) {
-        nodes[nodeNum].InitLeaf(primNums, nPrimitives, &primitiveIndices);
+    if (primNums.size() <= maxPrims || depth == 0) {
+        nodes[nodeNum].InitLeaf(primNums, &primitiveIndices);
         return;
     }
 
     // Initialize interior node and continue recursion
     // Choose split axis position for interior node
     int bestAxis = -1, bestOffset = -1;
-    Float bestCost = Infinity, leafCost = isectCost * nPrimitives;
+    Float bestCost = Infinity, leafCost = isectCost * primNums.size();
     Float invTotalSA = 1 / nodeBounds.SurfaceArea();
     // Choose which axis to split along
     int axis = nodeBounds.MaxDimension();
 
     // Choose split along axis and attempt to partition primitives
     int retries = 0;
+    size_t nPrimitives = primNums.size();
 retrySplit:
     // Initialize edges for _axis_
-    for (int i = 0; i < nPrimitives; ++i) {
+    for (size_t i = 0; i < nPrimitives; ++i) {
         int pn = primNums[i];
         const Bounds3f &bounds = allPrimBounds[pn];
         edges[axis][2 * i] = BoundEdge(bounds.pMin[axis], pn, true);
         edges[axis][2 * i + 1] = BoundEdge(bounds.pMax[axis], pn, false);
     }
     // Sort _edges_ for _axis_
-    std::sort(&edges[axis][0], &edges[axis][2 * nPrimitives],
+    std::sort(edges[axis].begin(), edges[axis].begin() + 2 * nPrimitives,
               [](const BoundEdge &e0, const BoundEdge &e1) -> bool {
                   return std::tie(e0.t, e0.type) < std::tie(e1.t, e1.type);
               });
 
     // Compute cost of all splits for _axis_ to find best
-    int nBelow = 0, nAbove = nPrimitives;
-    for (int i = 0; i < 2 * nPrimitives; ++i) {
+    int nBelow = 0, nAbove = primNums.size();
+    for (size_t i = 0; i < 2 * primNums.size(); ++i) {
         if (edges[axis][i].type == EdgeType::End)
             --nAbove;
         Float edgeT = edges[axis][i].t;
@@ -952,7 +947,7 @@ retrySplit:
         ++badRefines;
     if ((bestCost > 4 * leafCost && nPrimitives < 16) || bestAxis == -1 ||
         badRefines == 3) {
-        nodes[nodeNum].InitLeaf(primNums, nPrimitives, &primitiveIndices);
+        nodes[nodeNum].InitLeaf(primNums, &primitiveIndices);
         return;
     }
 
@@ -969,12 +964,12 @@ retrySplit:
     Float tSplit = edges[bestAxis][bestOffset].t;
     Bounds3f bounds0 = nodeBounds, bounds1 = nodeBounds;
     bounds0.pMax[bestAxis] = bounds1.pMin[bestAxis] = tSplit;
-    buildTree(nodeNum + 1, bounds0, allPrimBounds, prims0, n0, depth - 1, edges, prims0,
-              prims1 + nPrimitives, badRefines);
+    buildTree(nodeNum + 1, bounds0, allPrimBounds, prims0.subspan(0, n0), depth - 1,
+              edges, prims0, prims1.subspan(n1), badRefines);
     int aboveChild = nextFreeNode;
     nodes[nodeNum].InitInterior(bestAxis, aboveChild, tSplit);
-    buildTree(aboveChild, bounds1, allPrimBounds, prims1, n1, depth - 1, edges, prims0,
-              prims1 + nPrimitives, badRefines);
+    buildTree(aboveChild, bounds1, allPrimBounds, prims1.subspan(0, n1), depth - 1, edges,
+              prims0, prims1.subspan(n1), badRefines);
 }
 
 pstd::optional<ShapeIntersection> KdTreeAggregate::Intersect(const Ray &ray,
@@ -1038,7 +1033,7 @@ pstd::optional<ShapeIntersection> KdTreeAggregate::Intersect(const Ray &ray,
             // Check for intersections inside leaf node
             int nPrimitives = node->nPrimitives();
             if (nPrimitives == 1) {
-                const Primitive &p = primitives[node->onePrimitive];
+                const Primitive &p = primitives[node->onePrimitiveIndex];
                 // Check one primitive inside leaf node
                 pstd::optional<ShapeIntersection> primSi = p.Intersect(ray, rayTMax);
                 if (primSi) {
@@ -1092,7 +1087,7 @@ bool KdTreeAggregate::IntersectP(const Ray &ray, Float raytMax) const {
             // Check for shadow ray intersections inside leaf node
             int nPrimitives = node->nPrimitives();
             if (nPrimitives == 1) {
-                const Primitive &p = primitives[node->onePrimitive];
+                const Primitive &p = primitives[node->onePrimitiveIndex];
                 if (p.IntersectP(ray, raytMax)) {
                     kdNodesVisited += nodesVisited;
                     return true;
