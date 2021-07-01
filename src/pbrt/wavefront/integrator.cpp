@@ -652,7 +652,7 @@ void WavefrontPathIntegrator::HandleEscapedRays() {
                 }
             }
 
-            // Update pixel radiance if ray's radiance is non-zero
+            // Update pixel radiance if ray's radiance is nonzero
             if (L) {
                 PBRT_DBG("Added L %f %f %f %f for escaped ray pixel index %d\n", L[0],
                          L[1], L[2], L[3], w.pixelIndex);

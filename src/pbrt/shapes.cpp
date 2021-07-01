@@ -607,7 +607,7 @@ bool Curve::RecursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Poin
                                int depth, pstd::optional<ShapeIntersection> *si) const {
     Float rayLength = Length(ray.d);
     if (depth > 0) {
-        // Split curve segment into sub-segments and test for intersection
+        // Split curve segment into subsegments and test for intersection
         pstd::array<Point3f, 7> cpSplit = SubdivideCubicBezier(cp);
         Float u[3] = {u0, (u0 + u1) / 2, u1};
         for (int seg = 0; seg < 2; ++seg) {

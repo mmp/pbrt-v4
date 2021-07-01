@@ -47,7 +47,7 @@ std::pair<cudaEvent_t, cudaEvent_t> GetProfilerEvents(const char *description);
 
 template <typename F>
 inline int GetBlockSize(const char *description, F kernel) {
-    // Note: this isn't re-entrant, but that's fine for our purposes...
+    // Note: this isn't reentrant, but that's fine for our purposes...
     static std::map<std::type_index, int> kernelBlockSizes;
 
     std::type_index index = std::type_index(typeid(F));

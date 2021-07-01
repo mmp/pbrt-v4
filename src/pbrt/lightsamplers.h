@@ -312,7 +312,7 @@ class BVHLightSampler {
                     nodeIndex = (child == 0) ? (nodeIndex + 1) : node.childOrLightIndex;
 
                 } else {
-                    // Confirm light has non-zero importance before returning light sample
+                    // Confirm light has nonzero importance before returning light sample
                     if (nodeIndex > 0)
                         DCHECK_GT(node.lightBounds.Importance(p, n, allLightBounds), 0);
                     if (nodeIndex > 0 ||

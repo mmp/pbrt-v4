@@ -151,9 +151,9 @@ class PaddedSobolSampler {
     PaddedSobolSampler(int samplesPerPixel, RandomizeStrategy randomizer, int seed = 0)
         : samplesPerPixel(samplesPerPixel), randomize(randomizer), seed(seed) {
         if (!IsPowerOf2(samplesPerPixel))
-            Warning("Sobol samplers with non power-of-two sample counts (%d) are "
-                    "sub-optimal.",
-                    samplesPerPixel);
+            Warning(
+                "Sobol samplers with non power-of-two sample counts (%d) are suboptimal.",
+                samplesPerPixel);
     }
 
     PBRT_CPU_GPU
@@ -227,9 +227,9 @@ class ZSobolSampler {
                   RandomizeStrategy randomize, int seed = 0)
         : randomize(randomize), seed(seed) {
         if (!IsPowerOf2(samplesPerPixel))
-            Warning("Sobol samplers with non power-of-two sample counts (%d) are "
-                    "sub-optimal.",
-                    samplesPerPixel);
+            Warning(
+                "Sobol samplers with non power-of-two sample counts (%d) are suboptimal.",
+                samplesPerPixel);
         log2SamplesPerPixel = Log2Int(samplesPerPixel);
         int res = RoundUpPow2(std::max(fullResolution.x, fullResolution.y));
         int log4SamplesPerPixel = (log2SamplesPerPixel + 1) / 2;
@@ -484,8 +484,8 @@ class SobolSampler {
                  RandomizeStrategy randomize)
         : samplesPerPixel(samplesPerPixel), randomize(randomize) {
         if (!IsPowerOf2(samplesPerPixel))
-            Warning("Non power-of-two sample count %d will perform sub-optimally with "
-                    "the SobolSampler.",
+            Warning("Non power-of-two sample count %d will perform suboptimally with the "
+                    "SobolSampler.",
                     samplesPerPixel);
         scale = RoundUpPow2(std::max(fullResolution.x, fullResolution.y));
     }

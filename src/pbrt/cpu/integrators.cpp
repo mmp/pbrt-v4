@@ -541,7 +541,7 @@ void LightPathIntegrator::EvaluatePixelSample(Point2i pPixel, int sampleIndex,
             camera.SampleWi(*les->intr, sampler.Get2D(), lambda);
         if (cs && cs->pdf != 0) {
             if (Float pdf = light.PDF_Li(cs->pLens, cs->wi); pdf > 0) {
-                // Add light's emitted radiance if non-zero and light is visible
+                // Add light's emitted radiance if nonzero and light is visible
                 SampledSpectrum Le =
                     light.L(les->intr->p(), les->intr->n, les->intr->uv, cs->wi, lambda);
                 if (Le && Unoccluded(cs->pRef, cs->pLens)) {
@@ -1810,7 +1810,7 @@ struct Vertex {
             pdf = pdfDir * invDist2;
 
         } else {
-            // Compute sampling density for non-infinite light sources
+            // Compute sampling density for noninfinite light sources
             CHECK(type == VertexType::Light);
             CHECK(ei.light);
             Float pdfPos, pdfDir;
@@ -1834,7 +1834,7 @@ struct Vertex {
             return InfiniteLightDensity(infiniteLights, lightSampler, w);
 
         } else {
-            // Return sampling density for non-infinite light source
+            // Return sampling density for noninfinite light source
             Light light = (type == VertexType::Light) ? ei.light : si.areaLight;
             Float pdfPos, pdfDir, pdfChoice = lightSampler.PDF(light);
             if (IsOnSurface())

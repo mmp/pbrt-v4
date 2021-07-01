@@ -141,7 +141,7 @@ Point2f InvertSphericalTriangleSample(const pstd::array<Point3f, 3> &v, Point3f 
     if (Dot(a, cp) > 0.99999847691f /* 0.1 degrees */)
         u0 = 0;
     else {
-        // Compute area $A'$ of sub-triangle
+        // Compute area $A'$ of subtriangle
         Vector3f n_cpb = Cross(cp, b), n_acp = Cross(a, cp);
         CHECK_RARE(1e-5, LengthSquared(n_cpb) == 0 || LengthSquared(n_acp) == 0);
         if (LengthSquared(n_cpb) == 0 || LengthSquared(n_acp) == 0)
@@ -391,7 +391,7 @@ Float SampleCatmullRom(pstd::span<const Float> nodes, pstd::span<const Float> f,
     Float d1 = (i + 2 < nodes.size()) ? width * (f[i + 2] - f0) / (nodes[i + 2] - x0)
                                       : (f1 - f0);
 
-    // Re-scale _u_ for continuous spline sampling step
+    // Rescale _u_ for continuous spline sampling step
     u = (u - F[i]) / width;
 
     // Invert definite integral over spline segment
@@ -443,7 +443,7 @@ Float SampleCatmullRom2D(pstd::span<const Float> nodes1, pstd::span<const Float>
     Float width = x1 - x0;
     Float d0, d1;
 
-    // Re-scale _u_ using the interpolated _cdf_
+    // Rescale _u_ using the interpolated _cdf_
     u = (u - interpolate(cdf, idx)) / width;
 
     // Approximate derivatives using finite differences of the interpolant

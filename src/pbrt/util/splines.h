@@ -81,7 +81,7 @@ PBRT_CPU_GPU inline pstd::array<Point3f, 4> ElevateQuadraticBezierToCubic(
 PBRT_CPU_GPU inline pstd::array<Point3f, 3> QuadraticBSplineToBezier(
     pstd::span<const Point3f> cp) {
     // We can compute equivalent Bezier control points via some blossoming.
-    // We have three control points and a uniform knot vector; we'll label
+    // We have three control points and a uniform knot vector; we will label
     // the points p01, p12, and p23.  We want the Bezier control points of
     // the equivalent curve, which are p11, p12, and p22.  We already have
     // p12.

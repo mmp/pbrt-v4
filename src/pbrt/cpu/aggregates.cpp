@@ -479,7 +479,7 @@ BVHBuildNode *BVHAggregate::emitLBVH(BVHBuildNode *&buildNodes,
 
     } else {
         int mask = 1 << bitIndex;
-        // Advance to next subtree level if there's no LBVH split for this bit
+        // Advance to next subtree level if there is no LBVH split for this bit
         if ((mortonPrims[0].mortonCode & mask) ==
             (mortonPrims[nPrimitives - 1].mortonCode & mask))
             return emitLBVH(buildNodes, bvhPrimitives, mortonPrims, nPrimitives,
