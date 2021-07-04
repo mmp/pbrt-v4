@@ -165,6 +165,7 @@ void RenderCPU(ParsedScene &parsedScene) {
         Printf("World-space p: %s\n", worldFromRender(intr.p()));
         Printf("World-space n: %s\n", worldFromRender(intr.n));
         Printf("World-space ns: %s\n", worldFromRender(intr.shading.n));
+        Printf("Distance from camera: %f\n", Distance(intr.p(), cr->ray.o));
 
         for (const auto &mtl : namedMaterials)
             if (mtl.second == intr.material) {
