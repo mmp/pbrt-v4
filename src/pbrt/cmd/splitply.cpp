@@ -12,6 +12,7 @@
 #include <pbrt/util/vecmath.h>
 #include <stdlib.h>
 
+#include <cstdarg>
 #include <map>
 #include <string>
 #include <vector>
