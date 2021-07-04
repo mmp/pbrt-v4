@@ -115,6 +115,8 @@ static std::map<std::string, CommandUsage> commandUsage = {
     --bw               Convert to black and white (average channels)
     --channels <names> Process the provided comma-delineated set of channels.
                        Default: R,G,B.
+    --clamp <value>    Rescale pixel components if necessary so that they do not
+                       exceed <value>. Default: no clamping.
     --crop <x0,x1,y0,y1> Crop image to the given dimensions. Default: no crop.
     --colorspace <n>   Convert image to given colorspace.
                        (Options: "ACES2065-1", "Rec2020", "sRGB")
@@ -1596,6 +1598,7 @@ int convert(std::vector<std::string> args) {
     std::string colorspace;
     std::string channelNames;
     std::array<int, 4> cropWindow = {-1, 0, -1, 0};
+    Float clamp = Infinity;
 
     for (auto iter = args.begin(); iter != args.end(); ++iter) {
         auto onError = [](const std::string &err) {
@@ -1606,6 +1609,7 @@ int convert(std::vector<std::string> args) {
         if (ParseArg(&iter, args.end(), "acesfilmic", &acesFilmic, onError) ||
             ParseArg(&iter, args.end(), "bw", &bw, onError) ||
             ParseArg(&iter, args.end(), "channels", &channelNames, onError) ||
+            ParseArg(&iter, args.end(), "clamp", &clamp, onError) ||
             ParseArg(&iter, args.end(), "colorspace", &colorspace, onError) ||
             ParseArg(&iter, args.end(), "crop", pstd::MakeSpan(cropWindow), onError) ||
             ParseArg(&iter, args.end(), "despike", &despikeLimit, onError) ||
@@ -1688,6 +1692,20 @@ int convert(std::vector<std::string> args) {
     // processing.
     if (!Is32Bit(image.Format()))
         image = image.ConvertToFormat(PixelFormat::Float);
+
+    if (clamp < Infinity) {
+        for (int y = 0; y < res.y; ++y)
+            for (int x = 0; x < res.x; ++x) {
+                Float maxValue = 0;
+                for (int c = 0; c < nc; ++c)
+                    maxValue = std::max(maxValue, image.GetChannel({x, y}, c));
+                if (maxValue > clamp) {
+                    Float scale = clamp / maxValue;
+                    for (int c = 0; c < nc; ++c)
+                        image.SetChannel({x, y}, c, scale * image.GetChannel({x, y}, c));
+                }
+            }
+    }
 
     if (!colorspace.empty()) {
         const RGBColorSpace *dest = RGBColorSpace::GetNamed(colorspace);
