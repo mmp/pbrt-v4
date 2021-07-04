@@ -928,6 +928,21 @@ target_link_libraries (pspec PRIVATE ${ALL_PBRT_LIBS} pbrt_warnings)
 add_sanitizers (pspec)
 
 ######################
+# splitply
+
+add_executable (splitply src/pbrt/cmd/splitply.cpp)
+add_executable (pbrt::splitply ALIAS splitply)
+
+target_compile_definitions (splitply PRIVATE ${PBRT_DEFINITIONS})
+target_compile_options (splitply PUBLIC ${PBRT_CXX_FLAGS})
+target_include_directories (splitply PUBLIC src src/ext)
+target_link_libraries (splitply PRIVATE ${ALL_PBRT_LIBS} pbrt_warnings pbrt_opt)
+
+set_target_properties (splitply PROPERTIES OUTPUT_NAME splitply)
+
+add_sanitizers (splitply)
+
+######################
 # cyhair2pbrt
 
 add_executable (cyhair2pbrt src/pbrt/cmd/cyhair2pbrt.cpp)
