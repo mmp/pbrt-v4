@@ -146,6 +146,7 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
                 isect.pi = w.pi;
                 isect.n = w.n;
                 isect.shading.n = ns;
+                isect.uv = w.uv;
                 isect.wo = w.wo;
                 isect.time = w.time;
                 isect.dpdx = dpdx;

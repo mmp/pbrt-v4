@@ -188,6 +188,7 @@ VisibleSurface::VisibleSurface(const SurfaceInteraction &si,
     Vector3f wo = cameraFromRender(si.wo);
     n = FaceForward(cameraFromRender(si.n), wo);
     ns = FaceForward(cameraFromRender(si.shading.n), wo);
+    uv = si.uv;
     time = si.time;
     dzdx = cameraFromRender(si.dpdx).z;
     dzdy = cameraFromRender(si.dpdy).z;
@@ -594,6 +595,7 @@ void GBufferFilm::AddSample(Point2i pFilm, SampledSpectrum L,
 
         p.nSum += weight * visibleSurface->n;
         p.nsSum += weight * visibleSurface->ns;
+        p.uvSum += weight * visibleSurface->uv;
 
         p.dzdxSum += weight * visibleSurface->dzdx;
         p.dzdySum += weight * visibleSurface->dzdy;
@@ -674,6 +676,8 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
                  "Nsx",
                  "Nsy",
                  "Nsz",
+                 "u",
+                 "v",
                  "Variance.R",
                  "Variance.G",
                  "Variance.B",
@@ -686,6 +690,7 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
     ImageChannelDesc dzDesc = image.GetChannelDesc({"dzdx", "dzdy"});
     ImageChannelDesc nDesc = image.GetChannelDesc({"Nx", "Ny", "Nz"});
     ImageChannelDesc nsDesc = image.GetChannelDesc({"Nsx", "Nsy", "Nsz"});
+    ImageChannelDesc uvDesc = image.GetChannelDesc({"u", "v"});
     ImageChannelDesc albedoRgbDesc =
         image.GetChannelDesc({"Albedo.R", "Albedo.G", "Albedo.B"});
     ImageChannelDesc varianceDesc =
@@ -703,11 +708,13 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
         // Normalize pixel with weight sum
         Float weightSum = pixel.weightSum;
         Point3f pt = pixel.pSum;
+        Point2f uv = pixel.uvSum;
         Float dzdx = pixel.dzdxSum, dzdy = pixel.dzdySum;
         if (weightSum != 0) {
             rgb /= weightSum;
             albedoRgb /= weightSum;
             pt /= weightSum;
+            uv /= weightSum;
             dzdx /= weightSum;
             dzdy /= weightSum;
         }
@@ -741,6 +748,7 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
         image.SetChannels(pOffset, dzDesc, {std::abs(dzdx), std::abs(dzdy)});
         image.SetChannels(pOffset, nDesc, {n.x, n.y, n.z});
         image.SetChannels(pOffset, nsDesc, {ns.x, ns.y, ns.z});
+        image.SetChannels(pOffset, uvDesc, {uv[0], uv[1]});
         image.SetChannels(
             pOffset, varianceDesc,
             {pixel.rgbVariance[0].Variance(), pixel.rgbVariance[1].Variance(),

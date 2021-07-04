@@ -47,6 +47,7 @@ soa VisibleSurface {
     bool set;
     Point3f p;
     Normal3f n, ns;
+    Point2f uv;
     Float time;
     Float dzdx, dzdy;
     SampledSpectrum albedo;

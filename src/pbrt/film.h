@@ -148,6 +148,7 @@ class VisibleSurface {
     // VisibleSurface Public Members
     Point3f p;
     Normal3f n, ns;
+    Point2f uv;
     Float time = 0;
     Float dzdx = 0, dzdy = 0;
     SampledSpectrum albedo;
@@ -375,6 +376,7 @@ class GBufferFilm : public FilmBase {
         Point3f pSum;
         Float dzdxSum = 0, dzdySum = 0;
         Normal3f nSum, nsSum;
+        Point2f uvSum;
         double rgbAlbedoSum[3] = {0., 0., 0.};
         VarianceEstimator<Float> rgbVariance[3];
     };
