@@ -414,7 +414,6 @@ void ParsedScene::EndOfFiles() {
     auto checkVec = [&](const ParsedParameterVector &vec) {
         for (const ParsedParameter *p : vec) {
             if (p->type == "texture") {
-                CHECK(!p->strings.empty());
                 if (auto iter = unusedFloatTextures.find(p->strings[0]);
                     iter != unusedFloatTextures.end())
                     unusedFloatTextures.erase(iter);
