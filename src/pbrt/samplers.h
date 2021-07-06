@@ -169,8 +169,7 @@ class PaddedSobolSampler {
     PBRT_CPU_GPU
     Float Get1D() {
         // Get permuted index for current pixel sample
-        uint64_t hash = MixBits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
-                                ((uint64_t)dimension << 16) ^ seed);
+        uint64_t hash = Hash(pixel, dimension, seed);
         int index = PermutationElement(sampleIndex, samplesPerPixel, hash);
 
         int dim = dimension++;
@@ -181,8 +180,7 @@ class PaddedSobolSampler {
     PBRT_CPU_GPU
     Point2f Get2D() {
         // Get permuted index for current pixel sample
-        uint64_t hash = MixBits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
-                                ((uint64_t)dimension << 16) ^ seed);
+        uint64_t hash = Hash(pixel, dimension, seed);
         int index = PermutationElement(sampleIndex, samplesPerPixel, hash);
 
         int dim = dimension;
@@ -257,7 +255,7 @@ class ZSobolSampler {
         uint64_t sampleIndex = GetSampleIndex();
         ++dimension;
         // Generate 1D Sobol$'$ sample at _sampleIndex_
-        uint32_t sampleHash = MixBits(dimension ^ seed);
+        uint32_t sampleHash = Hash(dimension, seed);
         if (randomize == RandomizeStrategy::None)
             return SobolSample(sampleIndex, 0, NoRandomizer());
         else if (randomize == RandomizeStrategy::PermuteDigits)
@@ -273,7 +271,7 @@ class ZSobolSampler {
         uint64_t sampleIndex = GetSampleIndex();
         dimension += 2;
         // Generate 2D Sobol sample at _sampleIndex_
-        uint64_t bits = MixBits(dimension ^ seed);
+        uint64_t bits = Hash(dimension, seed);
         uint32_t sampleHash[2] = {uint32_t(bits), uint32_t(bits >> 32)};
         if (randomize == RandomizeStrategy::None)
             return {SobolSample(sampleIndex, 0, NoRandomizer()),
@@ -385,8 +383,7 @@ class PMJ02BNSampler {
     PBRT_CPU_GPU
     Float Get1D() {
         // Find permuted sample index for 1D PMJ02BNSampler sample
-        uint64_t hash = MixBits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
-                                ((uint64_t)dimension << 16) ^ seed);
+        uint64_t hash = Hash(pixel, dimension, seed);
         int index = PermutationElement(sampleIndex, samplesPerPixel, hash);
 
         Float delta = BlueNoise(dimension, pixel);
@@ -408,9 +405,7 @@ class PMJ02BNSampler {
         int pmjInstance = dimension / 2;
         if (pmjInstance >= nPMJ02bnSets) {
             // Permute index to be used for pmj02bn sample array
-            uint64_t hash =
-                MixBits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
-                        ((uint64_t)dimension << 16) ^ seed);
+            uint64_t hash = Hash(pixel, dimension, seed);
             index = PermutationElement(sampleIndex, samplesPerPixel, hash);
         }
 
@@ -456,7 +451,7 @@ class IndependentSampler {
 
     PBRT_CPU_GPU
     void StartPixelSample(Point2i p, int sampleIndex, int dimension) {
-        rng.SetSequence((p.x + p.y * 65536) | (uint64_t(seed) << 32));
+        rng.SetSequence(Hash(p, seed));
         rng.Advance(sampleIndex * 65536 + dimension);
     }
 
@@ -548,7 +543,7 @@ class SobolSampler {
             return SobolSample(sobolIndex, dimension, NoRandomizer());
 
         // Return randomized Sobol$'$ sample using _randomize_
-        uint32_t hash = MixBits((uint64_t(dimension) << 32) ^ GetOptions().seed);
+        uint32_t hash = Hash(dimension, GetOptions().seed);
         if (randomize == RandomizeStrategy::PermuteDigits)
             return SobolSample(sobolIndex, dimension, BinaryPermuteScrambler(hash));
         else if (randomize == RandomizeStrategy::FastOwen)
@@ -588,15 +583,14 @@ class StratifiedSampler {
         pixel = p;
         sampleIndex = index;
         dimension = dim;
-        rng.SetSequence((p.x + p.y * 65536) | (uint64_t(seed) << 32));
+        rng.SetSequence(Hash(p, seed));
         rng.Advance(sampleIndex * 65536 + dimension);
     }
 
     PBRT_CPU_GPU
     Float Get1D() {
         // Compute _stratum_ index for current pixel and dimension
-        uint64_t hash = MixBits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
-                                ((uint64_t)dimension << 16) ^ seed);
+        uint64_t hash = Hash(pixel, dimension, seed);
         int stratum = PermutationElement(sampleIndex, SamplesPerPixel(), hash);
 
         ++dimension;
@@ -607,8 +601,7 @@ class StratifiedSampler {
     PBRT_CPU_GPU
     Point2f Get2D() {
         // Compute _stratum_ index for current pixel and dimension
-        uint64_t hash = MixBits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
-                                ((uint64_t)dimension << 16) ^ seed);
+        uint64_t hash = Hash(pixel, dimension, seed);
         int stratum = PermutationElement(sampleIndex, SamplesPerPixel(), hash);
 
         dimension += 2;
@@ -662,7 +655,7 @@ class MLTSampler {
 
     PBRT_CPU_GPU
     void StartPixelSample(const Point2i &p, int sampleIndex, int dim) {
-        rng.SetSequence(p.x + p.y * 65536);
+        rng.SetSequence(Hash(p));
         rng.Advance(sampleIndex * 65536 + dim * 8192);
     }
 
