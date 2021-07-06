@@ -1878,7 +1878,7 @@ std::string FormattingScene::upgradeMaterial(std::string *name, ParameterDiction
         std::string m2 = dict->GetOneString("namedmaterial2", "");
         if (m2.empty())
             ErrorExitDeferred(
-                &loc, "Didn't find \"namedmaterial1\" parameter for \"mix\" material.");
+                &loc, "Didn't find \"namedmaterial2\" parameter for \"mix\" material.");
         dict->RemoveString("namedmaterial2");
 
         // Note: swapped order vs pbrt-v3!

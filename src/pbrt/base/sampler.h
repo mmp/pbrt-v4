@@ -36,9 +36,12 @@ class MLTSampler;
 class DebugMLTSampler;
 
 // Sampler Definition
-class Sampler : public TaggedPointer<IndependentSampler, StratifiedSampler, HaltonSampler,
-                                     PaddedSobolSampler, SobolSampler, ZSobolSampler,
-                                     PMJ02BNSampler, MLTSampler, DebugMLTSampler> {
+class Sampler
+    : public TaggedPointer<  // Sampler Types
+          PMJ02BNSampler, IndependentSampler, StratifiedSampler, HaltonSampler,
+          PaddedSobolSampler, SobolSampler, ZSobolSampler, MLTSampler, DebugMLTSampler
+
+          > {
   public:
     // Sampler Interface
     using TaggedPointer::TaggedPointer;
@@ -48,7 +51,7 @@ class Sampler : public TaggedPointer<IndependentSampler, StratifiedSampler, Halt
 
     PBRT_CPU_GPU inline int SamplesPerPixel() const;
 
-    PBRT_CPU_GPU inline void StartPixelSample(const Point2i &p, int sampleIndex,
+    PBRT_CPU_GPU inline void StartPixelSample(Point2i p, int sampleIndex,
                                               int dimension = 0);
 
     PBRT_CPU_GPU inline Float Get1D();
