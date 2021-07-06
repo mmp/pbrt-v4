@@ -32,7 +32,7 @@ class DigitPermutation {
         // Compute number of digits needed for _base_
         nDigits = 0;
         Float invBase = (Float)1 / (Float)base, invBaseM = 1;
-        while (1 - invBaseM < 1) {
+        while (1 - (base - 1) * invBaseM < 1) {
             ++nDigits;
             invBaseM *= invBase;
         }
@@ -115,7 +115,7 @@ PBRT_CPU_GPU inline Float ScrambledRadicalInverse(int baseIndex, uint64_t a,
     Float invBase = (Float)1 / (Float)base, invBaseM = 1;
     uint64_t reversedDigits = 0;
     int digitIndex = 0;
-    while (1 - invBaseM < 1) {
+    while (1 - (base - 1) * invBaseM < 1) {
         // Permute least significant digit from _a_ and update _reversedDigits_
         uint64_t next = a / base;
         int digitValue = a - next * base;
