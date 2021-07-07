@@ -40,10 +40,10 @@ class DigitPermutation {
         permutations = alloc.allocate_object<uint16_t>(nDigits * base);
         // Compute random permutations for all digits
         for (int digitIndex = 0; digitIndex < nDigits; ++digitIndex) {
-            uint64_t seed = Hash(base, digitIndex, seed);
+            uint64_t dseed = Hash(base, digitIndex, seed);
             for (int digitValue = 0; digitValue < base; ++digitValue) {
                 int index = digitIndex * base + digitValue;
-                permutations[index] = PermutationElement(digitValue, base, seed);
+                permutations[index] = PermutationElement(digitValue, base, dseed);
             }
         }
     }
