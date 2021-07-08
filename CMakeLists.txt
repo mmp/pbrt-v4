@@ -928,19 +928,19 @@ target_link_libraries (pspec PRIVATE ${ALL_PBRT_LIBS} pbrt_warnings)
 add_sanitizers (pspec)
 
 ######################
-# splitply
+# plytool
 
-add_executable (splitply src/pbrt/cmd/splitply.cpp)
-add_executable (pbrt::splitply ALIAS splitply)
+add_executable (plytool src/pbrt/cmd/plytool.cpp)
+add_executable (pbrt::plytool ALIAS plytool)
 
-target_compile_definitions (splitply PRIVATE ${PBRT_DEFINITIONS})
-target_compile_options (splitply PUBLIC ${PBRT_CXX_FLAGS})
-target_include_directories (splitply PUBLIC src src/ext)
-target_link_libraries (splitply PRIVATE ${ALL_PBRT_LIBS} pbrt_warnings pbrt_opt)
+target_compile_definitions (plytool PRIVATE ${PBRT_DEFINITIONS})
+target_compile_options (plytool PUBLIC ${PBRT_CXX_FLAGS})
+target_include_directories (plytool PUBLIC src src/ext)
+target_link_libraries (plytool PRIVATE ${ALL_PBRT_LIBS} pbrt_warnings pbrt_opt)
 
-set_target_properties (splitply PROPERTIES OUTPUT_NAME splitply)
+set_target_properties (plytool PROPERTIES OUTPUT_NAME plytool)
 
-add_sanitizers (splitply)
+add_sanitizers (plytool)
 
 ######################
 # cyhair2pbrt
