@@ -32,14 +32,14 @@ namespace pbrt {
 class HaltonSampler {
   public:
     // HaltonSampler Public Methods
-    HaltonSampler(int samplesPerPixel, const Point2i &fullResolution,
+    HaltonSampler(int samplesPerPixel, Point2i fullResolution,
                   RandomizeStrategy randomize = RandomizeStrategy::PermuteDigits,
                   int seed = 0, Allocator alloc = {});
 
     PBRT_CPU_GPU
     static constexpr const char *Name() { return "HaltonSampler"; }
     static HaltonSampler *Create(const ParameterDictionary &parameters,
-                                 const Point2i &fullResolution, const FileLoc *loc,
+                                 Point2i fullResolution, const FileLoc *loc,
                                  Allocator alloc);
 
     PBRT_CPU_GPU
@@ -475,8 +475,7 @@ class IndependentSampler {
 class SobolSampler {
   public:
     // SobolSampler Public Methods
-    SobolSampler(int samplesPerPixel, const Point2i &fullResolution,
-                 RandomizeStrategy randomize)
+    SobolSampler(int samplesPerPixel, Point2i fullResolution, RandomizeStrategy randomize)
         : samplesPerPixel(samplesPerPixel), randomize(randomize) {
         if (!IsPowerOf2(samplesPerPixel))
             Warning("Non power-of-two sample count %d will perform suboptimally with the "
@@ -488,7 +487,7 @@ class SobolSampler {
     PBRT_CPU_GPU
     static constexpr const char *Name() { return "SobolSampler"; }
     static SobolSampler *Create(const ParameterDictionary &parameters,
-                                const Point2i &fullResolution, const FileLoc *loc,
+                                Point2i fullResolution, const FileLoc *loc,
                                 Allocator alloc);
 
     PBRT_CPU_GPU

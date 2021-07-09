@@ -156,6 +156,7 @@ class BSDF;
 class CameraTransform;
 class Image;
 class ParameterDictionary;
+struct NamedTextures;
 class TextureParameterDictionary;
 struct ImageMetadata;
 struct MediumInterface;

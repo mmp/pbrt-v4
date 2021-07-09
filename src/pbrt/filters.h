@@ -48,7 +48,7 @@ class FilterSampler {
 class BoxFilter {
   public:
     // BoxFilter Public Methods
-    BoxFilter(const Vector2f &radius = Vector2f(0.5, 0.5)) : radius(radius) {}
+    BoxFilter(Vector2f radius = Vector2f(0.5, 0.5)) : radius(radius) {}
 
     static BoxFilter *Create(const ParameterDictionary &parameters, const FileLoc *loc,
                              Allocator alloc);
@@ -80,7 +80,7 @@ class BoxFilter {
 class GaussianFilter {
   public:
     // GaussianFilter Public Methods
-    GaussianFilter(const Vector2f &radius, Float sigma = 0.5f, Allocator alloc = {})
+    GaussianFilter(Vector2f radius, Float sigma = 0.5f, Allocator alloc = {})
         : radius(radius),
           sigma(sigma),
           expX(Gaussian(radius.x, 0, sigma)),
@@ -121,7 +121,7 @@ class GaussianFilter {
 class MitchellFilter {
   public:
     // MitchellFilter Public Methods
-    MitchellFilter(const Vector2f &radius, Float b = 1.f / 3.f, Float c = 1.f / 3.f,
+    MitchellFilter(Vector2f radius, Float b = 1.f / 3.f, Float c = 1.f / 3.f,
                    Allocator alloc = {})
         : radius(radius), b(b), c(c), sampler(this, alloc) {}
 
@@ -171,7 +171,7 @@ class MitchellFilter {
 class LanczosSincFilter {
   public:
     // LanczosSincFilter Public Methods
-    LanczosSincFilter(const Vector2f &radius, Float tau = 3.f, Allocator alloc = {})
+    LanczosSincFilter(Vector2f radius, Float tau = 3.f, Allocator alloc = {})
         : radius(radius), tau(tau), sampler(this, alloc) {}
 
     static LanczosSincFilter *Create(const ParameterDictionary &parameters,
@@ -204,7 +204,7 @@ class LanczosSincFilter {
 class TriangleFilter {
   public:
     // TriangleFilter Public Methods
-    TriangleFilter(const Vector2f &radius) : radius(radius) {}
+    TriangleFilter(Vector2f radius) : radius(radius) {}
 
     static TriangleFilter *Create(const ParameterDictionary &parameters,
                                   const FileLoc *loc, Allocator alloc);

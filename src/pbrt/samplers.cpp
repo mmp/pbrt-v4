@@ -29,7 +29,7 @@ std::string Sampler::ToString() const {
 }
 
 // HaltonSampler Method Definitions
-HaltonSampler::HaltonSampler(int samplesPerPixel, const Point2i &fullRes,
+HaltonSampler::HaltonSampler(int samplesPerPixel, Point2i fullRes,
                              RandomizeStrategy randomize, int seed, Allocator alloc)
     : samplesPerPixel(samplesPerPixel), randomize(randomize) {
     if (randomize == RandomizeStrategy::PermuteDigits)
@@ -71,7 +71,7 @@ std::string HaltonSampler::ToString() const {
 }
 
 HaltonSampler *HaltonSampler::Create(const ParameterDictionary &parameters,
-                                     const Point2i &fullResolution, const FileLoc *loc,
+                                     Point2i fullResolution, const FileLoc *loc,
                                      Allocator alloc) {
     int nsamp = parameters.GetOneInt("pixelsamples", 16);
     if (Options->pixelSamples)
@@ -295,7 +295,7 @@ std::string SobolSampler::ToString() const {
 }
 
 SobolSampler *SobolSampler::Create(const ParameterDictionary &parameters,
-                                   const Point2i &fullResolution, const FileLoc *loc,
+                                   Point2i fullResolution, const FileLoc *loc,
                                    Allocator alloc) {
     int nsamp = parameters.GetOneInt("pixelsamples", 16);
     if (Options->pixelSamples)

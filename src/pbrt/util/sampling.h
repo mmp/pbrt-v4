@@ -187,25 +187,25 @@ inline Point2f InvertUniformTriangleSample(const pstd::array<Float, 3> &b) {
     }
 }
 
-PBRT_CPU_GPU inline Float SampleTent(Float u, Float radius) {
+PBRT_CPU_GPU inline Float SampleTent(Float u, Float r) {
     if (SampleDiscrete({0.5f, 0.5f}, u, nullptr, &u) == 0)
-        return -radius + radius * SampleLinear(u, 0, 1);
+        return -r + r * SampleLinear(u, 0, 1);
     else
-        return radius * SampleLinear(u, 1, 0);
+        return r * SampleLinear(u, 1, 0);
 }
 
-PBRT_CPU_GPU inline Float TentPDF(Float x, Float radius) {
-    if (std::abs(x) >= radius)
+PBRT_CPU_GPU inline Float TentPDF(Float x, Float r) {
+    if (std::abs(x) >= r)
         return 0;
-    return 1 / radius - std::abs(x) / Sqr(radius);
+    return 1 / r - std::abs(x) / Sqr(r);
 }
 
 PBRT_CPU_GPU
-inline Float InvertTentSample(Float x, Float radius) {
+inline Float InvertTentSample(Float x, Float r) {
     if (x <= 0)
-        return (1 - InvertLinearSample(-x / radius, 1, 0)) / 2;
+        return (1 - InvertLinearSample(-x / r, 1, 0)) / 2;
     else
-        return 0.5f + InvertLinearSample(x / radius, 1, 0) / 2;
+        return 0.5f + InvertLinearSample(x / r, 1, 0) / 2;
 }
 
 PBRT_CPU_GPU inline Float ExponentialPDF(Float x, Float a) {
