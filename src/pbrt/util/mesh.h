@@ -26,7 +26,7 @@ class TriangleMesh {
 
     std::string ToString() const;
 
-    bool WritePLY(const std::string &filename) const;
+    bool WritePLY(std::string filename) const;
 
     static void Init(Allocator alloc);
 
@@ -77,6 +77,11 @@ struct TriQuadMesh {
     std::vector<int> faceIndices;
     std::vector<int> triIndices, quadIndices;
 };
+
+bool WritePLY(std::string filename, pstd::span<const int> triIndices,
+              pstd::span<const int> quadIndices, pstd::span<const Point3f> p,
+              pstd::span<const Normal3f> n, pstd::span<const Point2f> uv,
+              pstd::span<const int> faceIndices);
 
 }  // namespace pbrt
 

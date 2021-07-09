@@ -270,12 +270,29 @@ int displace(std::vector<std::string> args) {
         outputMesh.p[i] += Vector3f(d * outputMesh.n[i]);
     }
 
-    // Yuck. :-p
-    TriangleMesh triMesh(Transform(), false /* reverse orientation */,
-                         outputMesh.triIndices, outputMesh.p,
-                         std::vector<Vector3f>(), outputMesh.n, outputMesh.uv,
-                         std::vector<int>());
-    if (!triMesh.WritePLY(outFilename))
+    // Recompute surface normals.
+    for (size_t i = 0; i < outputMesh.n.size(); ++i)
+        outputMesh.n[i] = Normal3f(0, 0, 0);
+    for (size_t i = 0; i < outputMesh.triIndices.size(); i += 3) {
+        int v[3] = { outputMesh.triIndices[i], outputMesh.triIndices[i + 1],
+                     outputMesh.triIndices[i + 2] };
+        Vector3f v10 = outputMesh.p[v[1]] - outputMesh.p[v[0]];
+        Vector3f v21 = outputMesh.p[v[2]] - outputMesh.p[v[1]];
+
+        Normal3f n(Cross(v10, v21));
+        if (LengthSquared(n) > 0) {
+            n = Normalize(n);
+            outputMesh.n[v[0]] += n;
+            outputMesh.n[v[1]] += n;
+            outputMesh.n[v[2]] += n;
+        }
+    }
+    for (size_t i = 0; i < outputMesh.n.size(); ++i)
+        if (LengthSquared(outputMesh.n[i]) > 0)
+            outputMesh.n[i] = Normalize(outputMesh.n[i]);
+
+    if (!WritePLY(outFilename, outputMesh.triIndices, {}, outputMesh.p,
+                  outputMesh.n, outputMesh.uv, {}))
         return 1;
 
     return 0;
