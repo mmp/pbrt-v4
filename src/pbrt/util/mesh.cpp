@@ -441,6 +441,32 @@ void TriQuadMesh::ConvertToOnlyTriangles() {
     quadIndices.clear();
 }
 
+void TriQuadMesh::ComputeNormals() {
+    n.resize(p.size());
+    for (size_t i = 0; i < n.size(); ++i)
+        n[i] = Normal3f(0, 0, 0);
+
+    for (size_t i = 0; i < triIndices.size(); i += 3) {
+        int v[3] = { triIndices[i], triIndices[i + 1],
+                     triIndices[i + 2] };
+        Vector3f v10 = p[v[1]] - p[v[0]];
+        Vector3f v21 = p[v[2]] - p[v[1]];
+
+        Normal3f vn(Cross(v10, v21));
+        if (LengthSquared(vn) > 0) {
+            vn = Normalize(vn);
+            n[v[0]] += vn;
+            n[v[1]] += vn;
+            n[v[2]] += vn;
+        }
+    }
+    CHECK_EQ(0, quadIndices.size()); // TODO: handle this...
+
+    for (size_t i = 0; i < n.size(); ++i)
+        if (LengthSquared(n[i]) > 0)
+            n[i] = Normalize(n[i]);
+}
+
 std::string TriQuadMesh::ToString() const {
     return StringPrintf("[ TriQuadMesh p: %s n: %s uv: %s faceIndices: %s triIndices: %s "
                         "quadIndices: %s ]",

@@ -165,52 +165,6 @@ int info(std::vector<std::string> args) {
     return 0;
 }
 
-static void refine(int v0, int v1, int v2, TriQuadMesh &mesh, Float edgeLength,
-                   std::map<std::pair<int, int>, int> &edgeSplit) {
-    Point3f p0 = mesh.p[v0], p1 = mesh.p[v1], p2 = mesh.p[v2];
-    Float d01 = Distance(p0, p1), d12 = Distance(p1, p2), d20 = Distance(p2, p0);
-
-    if (d01 < edgeLength && d12 < edgeLength && d20 < edgeLength) {
-        mesh.triIndices.push_back(v0);
-        mesh.triIndices.push_back(v1);
-        mesh.triIndices.push_back(v2);
-        return;
-    }
-
-    // order so that the first two vertices have the longest edge
-    std::array<int, 3> v;
-    if (d01 > d12) {
-        if (d01 > d20)
-            v = { v0, v1, v2 };
-        else
-            v = { v2, v0, v1 };
-    } else {
-        if (d12 > d20)
-            v = { v1, v2, v0 };
-        else
-            v = { v2, v0, v1 };
-    }
-
-    // has the edge been spilt before?
-    std::pair<int, int> edge(v[0], v[1]);
-    if (v[0] > v[1]) std::swap(edge.first, edge.second);
-    int vmid;
-    if (auto iter = edgeSplit.find(edge); iter != edgeSplit.end()) {
-        vmid = iter->second;
-    } else {
-        vmid = mesh.p.size();
-        edgeSplit[edge] = vmid;
-        mesh.p.push_back((mesh.p[v[0]] + mesh.p[v[1]]) / 2);
-        if (!mesh.n.empty())
-            mesh.n.push_back(Normalize(mesh.n[v[0]] + mesh.n[v[1]]));
-        if (!mesh.uv.empty())
-            mesh.uv.push_back((mesh.uv[v[0]] + mesh.uv[v[1]]) / 2);
-    }
-
-    refine(v[0], vmid, v[2], mesh, edgeLength, edgeSplit);
-    refine(vmid, v[1], v[2], mesh, edgeLength, edgeSplit);
-}
-
 int displace(std::vector<std::string> args) {
     Float scale = 1, uvScale = 1, edgeLength = 1;
     std::string filename, imageFilename, outFilename;
@@ -239,57 +193,13 @@ int displace(std::vector<std::string> args) {
     TriQuadMesh mesh = TriQuadMesh::ReadPLY(filename);
     ImageAndMetadata immeta = Image::Read(imageFilename);
 
-    if (!mesh.quadIndices.empty()) {
-        fprintf(stderr, "%s: quad faces are not currently supported by \"displace\". Sorry.\n",
-            filename.c_str());
-        return 1;
-    }
-    if (mesh.n.empty()) {
-        fprintf(stderr, "%s: vertex normals are currently required by \"displace\". Sorry.\n",
-            filename.c_str());
-        return 1;
-    }
-    if (mesh.uv.empty()) {
-        fprintf(stderr, "%s: vertex uvs are currently required by \"displace\". Sorry.\n",
-            filename.c_str());
-        return 1;
-    }
-
-    TriQuadMesh outputMesh = mesh;
-    outputMesh.triIndices.clear();
-    std::map<std::pair<int, int>, int> edgeSplit;
-    for (size_t i = 0; i < mesh.triIndices.size(); i += 3)
-        refine(mesh.triIndices[i], mesh.triIndices[i+1], mesh.triIndices[i+2],
-               outputMesh, edgeLength, edgeSplit);
-
-    // Displace the vertices...
-    for (size_t i = 0; i < outputMesh.p.size(); ++i) {
-        Float d = immeta.image.Bilerp(uvScale * outputMesh.uv[i],
-                                      WrapMode::Repeat).Average();
-        d *= scale;
-        outputMesh.p[i] += Vector3f(d * outputMesh.n[i]);
-    }
-
-    // Recompute surface normals.
-    for (size_t i = 0; i < outputMesh.n.size(); ++i)
-        outputMesh.n[i] = Normal3f(0, 0, 0);
-    for (size_t i = 0; i < outputMesh.triIndices.size(); i += 3) {
-        int v[3] = { outputMesh.triIndices[i], outputMesh.triIndices[i + 1],
-                     outputMesh.triIndices[i + 2] };
-        Vector3f v10 = outputMesh.p[v[1]] - outputMesh.p[v[0]];
-        Vector3f v21 = outputMesh.p[v[2]] - outputMesh.p[v[1]];
-
-        Normal3f n(Cross(v10, v21));
-        if (LengthSquared(n) > 0) {
-            n = Normalize(n);
-            outputMesh.n[v[0]] += n;
-            outputMesh.n[v[1]] += n;
-            outputMesh.n[v[2]] += n;
-        }
-    }
-    for (size_t i = 0; i < outputMesh.n.size(); ++i)
-        if (LengthSquared(outputMesh.n[i]) > 0)
-            outputMesh.n[i] = Normalize(outputMesh.n[i]);
+    TriQuadMesh outputMesh =
+        mesh.Displace([](Point3f v0, Point3f v1) { return Distance(v0, v1); }, edgeLength,
+                      [&](Point3f p, Point2f uv) {
+                          Float d = immeta.image.Bilerp(uvScale * uv,
+                                                        WrapMode::Repeat).Average();
+                          return d * scale;
+                      });
 
     if (!WritePLY(outFilename, outputMesh.triIndices, {}, outputMesh.p,
                   outputMesh.n, outputMesh.uv, {}))
