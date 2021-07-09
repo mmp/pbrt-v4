@@ -7,11 +7,13 @@
 
 #include <pbrt/pbrt.h>
 
+#include <pbrt/util/containers.h>
+#include <pbrt/util/hash.h>
 #include <pbrt/util/error.h>
+#include <pbrt/util/parallel.h>
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/vecmath.h>
 
-#include <map>
 #include <string>
 #include <vector>
 
@@ -67,6 +69,12 @@ class BilinearPatchMesh {
     PiecewiseConstant2D *imageDistribution;
 };
 
+struct HashIntPair {
+    size_t operator()(std::pair<int, int> p) const {
+        return MixBits(uint64_t(p.first) << 32 | p.second);
+    };
+};
+
 struct TriQuadMesh {
     static TriQuadMesh ReadPLY(const std::string &filename);
 
@@ -89,16 +97,17 @@ struct TriQuadMesh {
         outputMesh.triIndices.clear();
 
         // Refine
-        std::map<std::pair<int, int>, int> edgeSplit;
-        for (size_t i = 0; i < triIndices.size(); i += 3)
-            outputMesh.Refine(dist, maxDist, triIndices[i], triIndices[i+1],
-                              triIndices[i+2], edgeSplit);
+        HashMap<std::pair<int, int>, int, HashIntPair> edgeSplit({});
+        //ParallelFor(0, triIndices.size() / 3, [&](int64_t i) {
+        for (int i = 0; i < triIndices.size() / 3; ++i)
+            outputMesh.Refine(dist, maxDist, triIndices[3*i], triIndices[3*i+1],
+                              triIndices[3*i+2], edgeSplit);
 
         // Displace
-        for (size_t i = 0; i < outputMesh.p.size(); ++i) {
+        ParallelFor(0, outputMesh.p.size(), [&](int64_t i) {
             Float d = displace(outputMesh.p[i], outputMesh.uv[i]);
             outputMesh.p[i] += Vector3f(d * outputMesh.n[i]);
-        }
+        });
 
         outputMesh.ComputeNormals();
 
@@ -114,7 +123,7 @@ struct TriQuadMesh {
 private:
     template <typename Dist>
     void Refine(Dist &&distance, Float maxDist, int v0, int v1, int v2,
-                std::map<std::pair<int, int>, int> &edgeSplit) {
+                HashMap<std::pair<int, int>, int, HashIntPair> &edgeSplit) {
         Point3f p0 = p[v0], p1 = p[v1], p2 = p[v2];
         Float d01 = distance(p0, p1), d12 = distance(p1, p2), d20 = distance(p2, p0);
 
@@ -142,12 +151,13 @@ private:
         // has the edge been spilt before?
         std::pair<int, int> edge(v[0], v[1]);
         if (v[0] > v[1]) std::swap(edge.first, edge.second);
+
         int vmid;
-        if (auto iter = edgeSplit.find(edge); iter != edgeSplit.end()) {
-            vmid = iter->second;
+        if (edgeSplit.HasKey(edge)) {
+            vmid = edgeSplit[edge];
         } else {
             vmid = p.size();
-            edgeSplit[edge] = vmid;
+            edgeSplit.Insert(edge, vmid);
             p.push_back((p[v[0]] + p[v[1]]) / 2);
             if (!n.empty())
                 n.push_back(Normalize(n[v[0]] + n[v[1]]));
@@ -158,8 +168,6 @@ private:
         Refine(distance, maxDist, v[0], vmid, v[2], edgeSplit);
         Refine(distance, maxDist, vmid, v[1], v[2], edgeSplit);
     }
-
-
 };
 
 bool WritePLY(std::string filename, pstd::span<const int> triIndices,
