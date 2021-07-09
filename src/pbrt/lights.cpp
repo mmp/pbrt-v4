@@ -1494,7 +1494,7 @@ Light Light::Create(const std::string &name, const ParameterDictionary &paramete
         std::string filename = ResolveFilename(parameters.GetOneString("filename", ""));
         Float E_v = parameters.GetOneFloat("illuminance", -1);
 
-        if (L.empty() && filename.empty()) {
+        if (L.empty() && filename.empty() && portal.empty()) {
             // Scale the light spectrum to be equivalent to 1 nit
             scale /= SpectrumToPhotometric(&colorSpace->illuminant);
             if (E_v > 0) {
@@ -1508,14 +1508,10 @@ Light Light::Create(const std::string &name, const ParameterDictionary &paramete
             // Default: color space's std illuminant
             light = alloc.new_object<UniformInfiniteLight>(
                 renderFromLight, &colorSpace->illuminant, scale, alloc);
-        } else if (!L.empty()) {
+        } else if (!L.empty() && portal.empty()) {
             if (!filename.empty())
                 ErrorExit(loc, "Can't specify both emission \"L\" and "
                                "\"filename\" with ImageInfiniteLight");
-
-            if (!portal.empty())
-                ErrorExit(loc, "Portals are not supported for infinite lights "
-                               "without \"filename\".");
 
             // Scale the light spectrum to be equivalent to 1 nit
             scale /= SpectrumToPhotometric(L[0]);
@@ -1531,7 +1527,33 @@ Light Light::Create(const std::string &name, const ParameterDictionary &paramete
             light = alloc.new_object<UniformInfiniteLight>(renderFromLight, L[0], scale,
                                                            alloc);
         } else {
-            ImageAndMetadata imageAndMetadata = Image::Read(filename, alloc);
+            // Either an image was provided or it's "L" with a portal.
+            ImageAndMetadata imageAndMetadata;
+            if (filename.empty()) {
+                // Create a uniform image with the L spectrum converted to
+                // RGB so it can be stored in an Image. This usually should
+                // be ok, but it is the best we can do under the circumstances.
+                // (More generally, for uniform L, it's just as well to create
+                // an emissive bilinear patch at the portal location, though
+                // that doesn't allow things like putting an emissive sphere out
+                // there for the sun, so here we go...
+                if (!L[0].Is<RGBIlluminantSpectrum>())
+                    Warning(loc, "Converting non-RGB \"L\" parameter to RGB so that a "
+                                 "portal light can be used.");
+                XYZ xyz = SpectrumToXYZ(L[0]);
+                RGB rgb = RGBColorSpace::sRGB->ToRGB(xyz);
+
+                int res = 1;  // happily, this all just works.
+                imageAndMetadata.image =
+                    Image(PixelFormat::Float, {res, res}, {"R", "G", "B"});
+                imageAndMetadata.metadata.colorSpace = RGBColorSpace::sRGB;
+                for (int y = 0; y < res; ++y)
+                    for (int x = 0; x < res; ++x)
+                        for (int c = 0; c < 3; ++c)
+                            imageAndMetadata.image.SetChannel({x, y}, c, rgb[c]);
+            } else
+                imageAndMetadata = Image::Read(filename, alloc);
+
             const RGBColorSpace *colorSpace = imageAndMetadata.metadata.GetColorSpace();
 
             ImageChannelDesc channelDesc =
