@@ -153,28 +153,43 @@ void RenderCPU(ParsedScene &parsedScene) {
         if (!cr)
             ErrorExit("Unable to generate camera ray for specified pixel.");
 
-        pstd::optional<ShapeIntersection> isect = accel.Intersect(cr->ray, Infinity);
-        if (!isect)
-            ErrorExit("No geometry visible at specified pixel.");
-
-        const SurfaceInteraction &intr = isect->intr;
-        if (!intr.material)
-            ErrorExit("No material at intersection point.");
-
-        Transform worldFromRender = camera.GetCameraTransform().WorldFromRender();
-        Printf("World-space p: %s\n", worldFromRender(intr.p()));
-        Printf("World-space n: %s\n", worldFromRender(intr.n));
-        Printf("World-space ns: %s\n", worldFromRender(intr.shading.n));
-        Printf("Distance from camera: %f\n", Distance(intr.p(), cr->ray.o));
-
-        for (const auto &mtl : namedMaterials)
-            if (mtl.second == intr.material) {
-                Printf("Named material: %s\n", mtl.first);
-                return;
+        int depth = 1;
+        Ray ray = cr->ray;
+        while (true) {
+            pstd::optional<ShapeIntersection> isect = accel.Intersect(ray, Infinity);
+            if (!isect) {
+                if (depth == 1)
+                    ErrorExit("No geometry visible at specified pixel.");
+                else
+                    break;
             }
 
-        // If we didn't find a named material, dump out the whole thing.
-        Printf("%s\n\n", intr.material.ToString());
+            const SurfaceInteraction &intr = isect->intr;
+            if (!intr.material)
+                Warning("Ignoring \"interface\" material at intersection.");
+            else {
+                Transform worldFromRender = camera.GetCameraTransform().WorldFromRender();
+                Printf("Intersection depth %d\n", depth);
+                Printf("World-space p: %s\n", worldFromRender(intr.p()));
+                Printf("World-space n: %s\n", worldFromRender(intr.n));
+                Printf("World-space ns: %s\n", worldFromRender(intr.shading.n));
+                Printf("Distance from camera: %f\n", Distance(intr.p(), cr->ray.o));
+
+                bool isNamed = false;
+                for (const auto &mtl : namedMaterials)
+                    if (mtl.second == intr.material) {
+                        Printf("Named material: %s\n\n", mtl.first);
+                        isNamed = true;
+                        break;
+                    }
+                if (!isNamed)
+                    // If we didn't find a named material, dump out the whole thing.
+                    Printf("%s\n\n", intr.material.ToString());
+
+                ++depth;
+                ray = intr.SpawnRay(ray.d);
+            }
+        }
 
         return;
     }
