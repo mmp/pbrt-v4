@@ -178,12 +178,13 @@ class CylindricalMapping2D {
 class PlanarMapping2D {
   public:
     // PlanarMapping2D Public Methods
-    PlanarMapping2D(Vector3f vs, Vector3f vt, Float ds, Float dt)
-        : vs(vs), vt(vt), ds(ds), dt(dt) {}
+    PlanarMapping2D(const Transform &textureFromRender, Vector3f vs, Vector3f vt,
+                    Float ds, Float dt)
+        : textureFromRender(textureFromRender), vs(vs), vt(vt), ds(ds), dt(dt) {}
 
     PBRT_CPU_GPU
     Point2f Map(TextureEvalContext ctx, Vector2f *dstdx, Vector2f *dstdy) const {
-        Vector3f vec(ctx.p);
+        Vector3f vec(textureFromRender(ctx.p));
         *dstdx = Vector2f(Dot(ctx.dpdx, vs), Dot(ctx.dpdx, vt));
         *dstdy = Vector2f(Dot(ctx.dpdy, vs), Dot(ctx.dpdy, vt));
         return {ds + Dot(vec, vs), dt + Dot(vec, vt)};
@@ -192,6 +193,7 @@ class PlanarMapping2D {
     std::string ToString() const;
 
   private:
+    Transform textureFromRender;
     Vector3f vs, vt;
     Float ds, dt;
 };

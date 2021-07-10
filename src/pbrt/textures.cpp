@@ -47,6 +47,7 @@ TextureMapping2D TextureMapping2D::Create(const ParameterDictionary &parameters,
         return alloc.new_object<CylindricalMapping2D>(Inverse(renderFromTexture));
     else if (type == "planar")
         return alloc.new_object<PlanarMapping2D>(
+            Inverse(renderFromTexture),
             parameters.GetOneVector3f("v1", Vector3f(1, 0, 0)),
             parameters.GetOneVector3f("v2", Vector3f(0, 1, 0)),
             parameters.GetOneFloat("udelta", 0.f), parameters.GetOneFloat("vdelta", 0.f));
