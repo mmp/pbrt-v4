@@ -1415,6 +1415,8 @@ pstd::vector<Shape> Shape::Create(const std::string &name,
         TriQuadMesh plyMesh = TriQuadMesh::ReadPLY(filename);
 
         Float edgeLength = parameters.GetOneFloat("displacement.edgelength", 1.f);
+        edgeLength *= Options->displacementEdgeScale;
+
         std::string displacementTexName = parameters.GetTexture("displacement");
         if (!displacementTexName.empty()) {
             auto iter = floatTextures.find(displacementTexName);
@@ -1442,7 +1444,7 @@ pstd::vector<Shape> Shape::Create(const std::string &name,
                                     });
                     }, loc);
 
-            LOG_ERROR("Finished displacing mesh \"%s\" with \"%s\" -> %d tris", filename,
+            LOG_VERBOSE("Finished displacing mesh \"%s\" with \"%s\" -> %d tris", filename,
                       displacementTexName, plyMesh.triIndices.size() / 3);
         }
 

@@ -100,7 +100,6 @@ struct TriQuadMesh {
 
         // Refine
         HashMap<std::pair<int, int>, int, HashIntPair> edgeSplit({});
-        //ParallelFor(0, triIndices.size() / 3, [&](int64_t i) {
         for (int i = 0; i < triIndices.size() / 3; ++i)
             outputMesh.Refine(dist, maxDist, triIndices[3*i], triIndices[3*i+1],
                               triIndices[3*i+2], edgeSplit);

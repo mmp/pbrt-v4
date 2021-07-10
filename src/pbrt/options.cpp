@@ -33,12 +33,13 @@ std::string PBRTOptions::ToString() const {
         "logLevel: %s logFile: %s writePartialImages: %s recordPixelStatistics: %s "
         "printStatistics: %s pixelSamples: %s gpuDevice: %s quickRender: %s upgrade: %s "
         "imageFile: %s mseReferenceImage: %s mseReferenceOutput: %s debugStart: %s "
-        "displayServer: %s cropWindow: %s pixelBounds: %s pixelMaterial: %s ]",
+        "displayServer: %s cropWindow: %s pixelBounds: %s pixelMaterial: %s "
+        "displacementEdgeScale: %f ]",
         seed, quiet, disablePixelJitter, disableWavelengthJitter, forceDiffuse, useGPU,
         wavefront, renderingSpace, nThreads, logLevel, logFile, writePartialImages,
         recordPixelStatistics, printStatistics, pixelSamples, gpuDevice, quickRender,
         upgrade, imageFile, mseReferenceImage, mseReferenceOutput, debugStart,
-        displayServer, cropWindow, pixelBounds, pixelMaterial);
+        displayServer, cropWindow, pixelBounds, pixelMaterial, displacementEdgeScale);
 }
 
 }  // namespace pbrt
