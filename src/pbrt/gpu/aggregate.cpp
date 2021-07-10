@@ -234,10 +234,11 @@ std::map<int, TriQuadMesh>
 OptiXAggregate::PreparePLYMeshes(const std::vector<ShapeSceneEntity> &shapes,
                                  const std::map<std::string, FloatTexture> &floatTextures) const {
     std::map<int, TriQuadMesh> plyMeshes;
-    for (size_t i = 0; i < shapes.size(); ++i) {
+    std::mutex mutex;
+    ParallelFor(0, shapes.size(), [&](int64_t i) {
         const auto &shape = shapes[i];
         if (shape.name != "plymesh")
-            continue;
+            return;
 
         std::string filename =
             ResolveFilename(shape.parameters.GetOneString("filename", ""));
@@ -300,8 +301,9 @@ OptiXAggregate::PreparePLYMeshes(const std::vector<ShapeSceneEntity> &shapes,
             }
         }
 
+        std::lock_guard<std::mutex> lock(mutex);
         plyMeshes[i] = std::move(plyMesh);
-    }
+    });
 
     return plyMeshes;
 }
