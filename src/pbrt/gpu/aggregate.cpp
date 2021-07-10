@@ -380,8 +380,6 @@ OptixTraversableHandle OptiXAggregate::createGASForTriangles(
                               "shapes as a workaround. (Sorry!).", filename);
                 }
 
-                plyMesh.ConvertToOnlyTriangles();
-
                 mesh = alloc.new_object<TriangleMesh>(
                     *shape.renderFromObject, shape.reverseOrientation, plyMesh.triIndices,
                     plyMesh.p, std::vector<Vector3f>(), plyMesh.n, plyMesh.uv,
