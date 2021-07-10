@@ -71,6 +71,7 @@ class BilinearPatchMesh {
 };
 
 struct HashIntPair {
+    PBRT_CPU_GPU
     size_t operator()(std::pair<int, int> p) const {
         return MixBits(uint64_t(p.first) << 32 | p.second);
     };
@@ -105,10 +106,8 @@ struct TriQuadMesh {
                               triIndices[3*i+2], edgeSplit);
 
         // Displace
-        ParallelFor(0, outputMesh.p.size(), [&](int64_t i) {
-            Float d = displace(outputMesh.p[i], outputMesh.uv[i]);
-            outputMesh.p[i] += Vector3f(d * outputMesh.n[i]);
-        });
+        displace(outputMesh.p.data(), outputMesh.n.data(), outputMesh.uv.data(),
+                 outputMesh.p.size());
 
         outputMesh.ComputeNormals();
 

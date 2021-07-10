@@ -7,9 +7,11 @@
 
 #include <pbrt/pbrt.h>
 
+#include <pbrt/base/texture.h>
 #include <pbrt/util/taggedptr.h>
 #include <pbrt/util/vecmath.h>
 
+#include <map>
 #include <string>
 
 namespace pbrt {
@@ -38,6 +40,7 @@ class Shape
                                       const Transform *objectFromRender,
                                       bool reverseOrientation,
                                       const ParameterDictionary &parameters,
+                                      const std::map<std::string, FloatTexture> &floatTextures,
                                       const FileLoc *loc, Allocator alloc);
     std::string ToString() const;
 

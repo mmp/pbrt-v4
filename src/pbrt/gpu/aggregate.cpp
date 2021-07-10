@@ -305,6 +305,52 @@ OptixTraversableHandle OptiXAggregate::createGASForTriangles(
 
                 plyMesh.ConvertToOnlyTriangles();
 
+                Float edgeLength = shape.parameters.GetOneFloat("displacement.edgelength", 1.f);
+                std::string displacementTexName = shape.parameters.GetTexture("displacement");
+                if (!displacementTexName.empty()) {
+                    auto iter = floatTextures.find(displacementTexName);
+                    if (iter == floatTextures.end())
+                        ErrorExit(&shape.loc, "%s: no such texture defined.", displacementTexName);
+                    FloatTexture displacement = iter->second;
+
+                    LOG_VERBOSE("Starting to displace mesh \"%s\" with \"%s\"", filename,
+                                displacementTexName);
+
+                    plyMesh =
+                        plyMesh.Displace([&](Point3f v0, Point3f v1) {
+                                             v0 = (*shape.renderFromObject)(v0);
+                                             v1 = (*shape.renderFromObject)(v1);
+                                             return Distance(v0, v1);
+                                         }, edgeLength,
+                                         [&](Point3f *pCPU, const Normal3f *nCPU, const Point2f *uvCPU, int nVertices) {
+                                             Point3f *p = alloc.allocate_object<Point3f>(nVertices);
+                                             Normal3f *n = alloc.allocate_object<Normal3f>(nVertices);
+                                             Point2f *uv = alloc.allocate_object<Point2f>(nVertices);
+                                             std::memcpy(p, pCPU, nVertices * sizeof(Point3f));
+                                             std::memcpy(n, nCPU, nVertices * sizeof(Normal3f));
+                                             std::memcpy(uv, uvCPU, nVertices * sizeof(Point2f));
+
+                                             GPUParallelFor("Evaluate Displacement", nVertices,
+                                                            [=] PBRT_GPU (int i) {
+                                                                TextureEvalContext ctx;
+                                                                ctx.p = p[i];
+                                                                ctx.uv = uv[i];
+                                                                Float d = UniversalTextureEvaluator()(displacement, ctx);
+                                                                p[i] += Vector3f(d * n[i]);
+                                                            });
+                                             GPUWait();
+
+                                             std::memcpy(pCPU, p, nVertices * sizeof(Point3f));
+
+                                             alloc.deallocate_object(p, nVertices);
+                                             alloc.deallocate_object(n, nVertices);
+                                             alloc.deallocate_object(uv, nVertices);
+                                         }, &shape.loc);
+
+                    LOG_ERROR("Finished displacing mesh \"%s\" with \"%s\" -> %d tris", filename,
+                                displacementTexName, plyMesh.triIndices.size() / 3);
+                }
+
                 mesh = alloc.new_object<TriangleMesh>(
                     *shape.renderFromObject, shape.reverseOrientation, plyMesh.triIndices,
                     plyMesh.p, std::vector<Vector3f>(), plyMesh.n, plyMesh.uv,
@@ -514,7 +560,7 @@ OptixTraversableHandle OptiXAggregate::createGASForQuadrics(
 
         pstd::vector<Shape> shapes = Shape::Create(
             s.name, s.renderFromObject, s.objectFromRender,
-            s.reverseOrientation, s.parameters, &s.loc, alloc);
+            s.reverseOrientation, s.parameters, floatTextures, &s.loc, alloc);
         if (shapes.empty())
             continue;
         CHECK_EQ(1, shapes.size());
@@ -987,7 +1033,8 @@ OptiXAggregate::OptiXAggregate(
 
     OptixTraversableHandle triangleGASTraversable = createGASForTriangles(
         scene.shapes, hitPGTriangle, anyhitPGShadowTriangle, hitPGRandomHitTriangle,
-        textures.floatTextures, namedMaterials, materials, media, shapeIndexToAreaLights, &bounds);
+        textures.floatTextures, namedMaterials, materials, media, shapeIndexToAreaLights,
+        &bounds);
     int bilinearSBTOffset = intersectHGRecords.size();
     OptixTraversableHandle bilinearPatchGASTraversable =
         createGASForBLPs(scene.shapes, hitPGBilinearPatch, anyhitPGShadowBilinearPatch,

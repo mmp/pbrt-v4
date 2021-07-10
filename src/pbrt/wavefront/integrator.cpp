@@ -176,7 +176,8 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(Allocator alloc, ParsedScene &s
 
         pstd::vector<Shape> shapes =
             Shape::Create(shape.name, shape.renderFromObject, shape.objectFromRender,
-                          shape.reverseOrientation, shape.parameters, &shape.loc, alloc);
+                          shape.reverseOrientation, shape.parameters,
+                          textures.floatTextures, &shape.loc, alloc);
 
         if (shapes.empty())
             continue;

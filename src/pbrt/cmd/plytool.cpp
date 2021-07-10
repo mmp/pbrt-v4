@@ -195,10 +195,12 @@ int displace(std::vector<std::string> args) {
 
     TriQuadMesh outputMesh =
         mesh.Displace([](Point3f v0, Point3f v1) { return Distance(v0, v1); }, edgeLength,
-                      [&](Point3f p, Point2f uv) {
-                          Float d = immeta.image.Bilerp(uvScale * uv,
-                                                        WrapMode::Repeat).Average();
-                          return d * scale;
+                      [&](Point3f *p, const Normal3f *n, const Point2f *uv, int nVertices) {
+                          ParallelFor(0, nVertices, [&](int64_t i) {
+                              Point2f uvp(uvScale * uv[i][0], 1 - uvScale * uv[i][1]);
+                              Float d = immeta.image.Bilerp(uvp, WrapMode::Repeat).Average();
+                              p[i] += Vector3f(d * scale * n[i]);
+                          });
                       });
 
     if (!WritePLY(outFilename, outputMesh.triIndices, {}, outputMesh.p,

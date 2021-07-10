@@ -1114,7 +1114,8 @@ std::vector<Light> ParsedScene::CreateLights(
 
         pstd::vector<pbrt::Shape> shapeObjects =
             Shape::Create(sh.name, sh.renderFromObject, sh.objectFromRender,
-                          sh.reverseOrientation, sh.parameters, &sh.loc, alloc);
+                          sh.reverseOrientation, sh.parameters, textures.floatTextures,
+                          &sh.loc, alloc);
 
         FloatTexture alphaTex = getAlphaTexture(sh.parameters, &sh.loc);
 
@@ -1183,7 +1184,8 @@ Primitive ParsedScene::CreateAggregate(
             const auto &sh = shapes[i];
             shapeVectors[i] =
                 Shape::Create(sh.name, sh.renderFromObject, sh.objectFromRender,
-                              sh.reverseOrientation, sh.parameters, &sh.loc, alloc);
+                              sh.reverseOrientation, sh.parameters,
+                              textures.floatTextures, &sh.loc, alloc);
         });
 
         std::vector<Primitive> primitives;
@@ -1246,7 +1248,7 @@ Primitive ParsedScene::CreateAggregate(
         for (auto &sh : shapes) {
             pstd::vector<pbrt::Shape> shapes =
                 Shape::Create(sh.name, sh.identity, sh.identity, sh.reverseOrientation,
-                              sh.parameters, &sh.loc, alloc);
+                              sh.parameters, textures.floatTextures, &sh.loc, alloc);
             if (shapes.empty())
                 continue;
 
