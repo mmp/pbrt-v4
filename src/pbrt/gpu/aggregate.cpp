@@ -230,8 +230,87 @@ static MediumInterface *getMediumInterface(
                                              getMedium(shape.outsideMedium));
 }
 
+std::map<int, TriQuadMesh>
+OptiXAggregate::PreparePLYMeshes(const std::vector<ShapeSceneEntity> &shapes,
+                                 const std::map<std::string, FloatTexture> &floatTextures) const {
+    std::map<int, TriQuadMesh> plyMeshes;
+    for (size_t i = 0; i < shapes.size(); ++i) {
+        const auto &shape = shapes[i];
+        if (shape.name != "plymesh")
+            continue;
+
+        std::string filename =
+            ResolveFilename(shape.parameters.GetOneString("filename", ""));
+        if (filename.empty())
+            ErrorExit(&shape.loc, "plymesh: \"filename\" must be provided.");
+        TriQuadMesh plyMesh = TriQuadMesh::ReadPLY(filename);  // todo: alloc
+        if (!plyMesh.triIndices.empty() || !plyMesh.quadIndices.empty()) {
+            plyMesh.ConvertToOnlyTriangles();
+
+            Float edgeLength = shape.parameters.GetOneFloat("displacement.edgelength", 1.f);
+            edgeLength *= Options->displacementEdgeScale;
+
+            std::string displacementTexName = shape.parameters.GetTexture("displacement");
+            if (!displacementTexName.empty()) {
+                auto iter = floatTextures.find(displacementTexName);
+                if (iter == floatTextures.end())
+                    ErrorExit(&shape.loc, "%s: no such texture defined.", displacementTexName);
+                FloatTexture displacement = iter->second;
+
+                LOG_VERBOSE("Starting to displace mesh \"%s\" with \"%s\"", filename,
+                            displacementTexName);
+
+                plyMesh =
+                    plyMesh.Displace([&](Point3f v0, Point3f v1) {
+                        v0 = (*shape.renderFromObject)(v0);
+                        v1 = (*shape.renderFromObject)(v1);
+                        return Distance(v0, v1);
+                    }, edgeLength,
+                        [&](Point3f *pCPU, const Normal3f *nCPU, const Point2f *uvCPU, int nVertices) {
+                            Point3f *p;
+                            Normal3f *n;
+                            Point2f *uv;
+                            CUDA_CHECK(cudaMallocManaged(&p, nVertices * sizeof(Point3f)));
+                            CUDA_CHECK(cudaMallocManaged(&n, nVertices * sizeof(Normal3f)));
+                            CUDA_CHECK(cudaMallocManaged(&uv, nVertices * sizeof(Point2f)));
+
+                            std::memcpy(p, pCPU, nVertices * sizeof(Point3f));
+                            std::memcpy(n, nCPU, nVertices * sizeof(Normal3f));
+                            std::memcpy(uv, uvCPU, nVertices * sizeof(Point2f));
+
+                            GPUParallelFor("Evaluate Displacement", nVertices,
+                                           [=] PBRT_GPU (int i) {
+                                               TextureEvalContext ctx;
+                                               ctx.p = p[i];
+                                               ctx.uv = uv[i];
+                                               Float d = UniversalTextureEvaluator()(displacement, ctx);
+                                               p[i] += Vector3f(d * n[i]);
+                                           });
+                            GPUWait();
+
+                            std::memcpy(pCPU, p, nVertices * sizeof(Point3f));
+
+                            CUDA_CHECK(cudaFree(p));
+                            CUDA_CHECK(cudaFree(n));
+                            CUDA_CHECK(cudaFree(uv));
+                        }, &shape.loc);
+
+                LOG_VERBOSE("Finished displacing mesh \"%s\" with \"%s\" -> %d tris", filename,
+                            displacementTexName, plyMesh.triIndices.size() / 3);
+            }
+        }
+
+        plyMeshes[i] = std::move(plyMesh);
+    }
+
+    return plyMeshes;
+}
+
+
 OptixTraversableHandle OptiXAggregate::createGASForTriangles(
-    const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
+    const std::vector<ShapeSceneEntity> &shapes,
+    const std::map<int, TriQuadMesh> &plyMeshes,
+    const OptixProgramGroup &intersectPG,
     const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
     const std::map<std::string, FloatTexture> &floatTextures,
     const std::map<std::string, Material> &namedMaterials,
@@ -280,13 +359,9 @@ OptixTraversableHandle OptiXAggregate::createGASForTriangles(
                 CHECK(mesh != nullptr);
             } else {
                 CHECK_EQ(shape.name, "plymesh");
-                std::string filename =
-                    ResolveFilename(shape.parameters.GetOneString("filename", ""));
-                if (filename.empty())
-                    ErrorExit(&shape.loc, "plymesh: \"filename\" must be provided.");
-                TriQuadMesh plyMesh = TriQuadMesh::ReadPLY(filename);  // todo: alloc
-                if (plyMesh.triIndices.empty() && plyMesh.quadIndices.empty())
-                    return;
+                auto plyIter = plyMeshes.find(shapeIndex);
+                CHECK(plyIter != plyMeshes.end());
+                const TriQuadMesh &plyMesh = plyIter->second;
 
                 if (!plyMesh.quadIndices.empty() && shape.lightIndex != -1) {
 #if 0
@@ -298,57 +373,11 @@ OptixTraversableHandle OptiXAggregate::createGASForTriangles(
                     // plumbing and it's a rare case. The underlying issue
                     // is that when we create AreaLights for emissive
                     // shapes earlier, we're not expecting this..
+                    std::string filename =
+                        ResolveFilename(shape.parameters.GetOneString("filename", ""));
                     ErrorExit(&shape.loc, "%s: PLY file being used as an area light has quads--"
                               "this is currently unsupported. Please replace them with \"bilinearmesh\" "
                               "shapes as a workaround. (Sorry!).", filename);
-                }
-
-                plyMesh.ConvertToOnlyTriangles();
-
-                Float edgeLength = shape.parameters.GetOneFloat("displacement.edgelength", 1.f);
-                std::string displacementTexName = shape.parameters.GetTexture("displacement");
-                if (!displacementTexName.empty()) {
-                    auto iter = floatTextures.find(displacementTexName);
-                    if (iter == floatTextures.end())
-                        ErrorExit(&shape.loc, "%s: no such texture defined.", displacementTexName);
-                    FloatTexture displacement = iter->second;
-
-                    LOG_VERBOSE("Starting to displace mesh \"%s\" with \"%s\"", filename,
-                                displacementTexName);
-
-                    plyMesh =
-                        plyMesh.Displace([&](Point3f v0, Point3f v1) {
-                                             v0 = (*shape.renderFromObject)(v0);
-                                             v1 = (*shape.renderFromObject)(v1);
-                                             return Distance(v0, v1);
-                                         }, edgeLength,
-                                         [&](Point3f *pCPU, const Normal3f *nCPU, const Point2f *uvCPU, int nVertices) {
-                                             Point3f *p = alloc.allocate_object<Point3f>(nVertices);
-                                             Normal3f *n = alloc.allocate_object<Normal3f>(nVertices);
-                                             Point2f *uv = alloc.allocate_object<Point2f>(nVertices);
-                                             std::memcpy(p, pCPU, nVertices * sizeof(Point3f));
-                                             std::memcpy(n, nCPU, nVertices * sizeof(Normal3f));
-                                             std::memcpy(uv, uvCPU, nVertices * sizeof(Point2f));
-
-                                             GPUParallelFor("Evaluate Displacement", nVertices,
-                                                            [=] PBRT_GPU (int i) {
-                                                                TextureEvalContext ctx;
-                                                                ctx.p = p[i];
-                                                                ctx.uv = uv[i];
-                                                                Float d = UniversalTextureEvaluator()(displacement, ctx);
-                                                                p[i] += Vector3f(d * n[i]);
-                                                            });
-                                             GPUWait();
-
-                                             std::memcpy(pCPU, p, nVertices * sizeof(Point3f));
-
-                                             alloc.deallocate_object(p, nVertices);
-                                             alloc.deallocate_object(n, nVertices);
-                                             alloc.deallocate_object(uv, nVertices);
-                                         }, &shape.loc);
-
-                    LOG_ERROR("Finished displacing mesh \"%s\" with \"%s\" -> %d tris", filename,
-                                displacementTexName, plyMesh.triIndices.size() / 3);
                 }
 
                 mesh = alloc.new_object<TriangleMesh>(
@@ -1031,15 +1060,18 @@ OptiXAggregate::OptiXAggregate(
                 ErrorExit(&shape.loc, "%s: unknown shape", shape.name);
         }
 
+    std::map<int, TriQuadMesh> plyMeshes = PreparePLYMeshes(scene.shapes, textures.floatTextures);
     OptixTraversableHandle triangleGASTraversable = createGASForTriangles(
-        scene.shapes, hitPGTriangle, anyhitPGShadowTriangle, hitPGRandomHitTriangle,
+        scene.shapes, plyMeshes, hitPGTriangle, anyhitPGShadowTriangle, hitPGRandomHitTriangle,
         textures.floatTextures, namedMaterials, materials, media, shapeIndexToAreaLights,
         &bounds);
+
     int bilinearSBTOffset = intersectHGRecords.size();
     OptixTraversableHandle bilinearPatchGASTraversable =
         createGASForBLPs(scene.shapes, hitPGBilinearPatch, anyhitPGShadowBilinearPatch,
                          hitPGRandomHitBilinearPatch, textures.floatTextures, namedMaterials,
                          materials, media, shapeIndexToAreaLights, &bounds);
+
     int quadricSBTOffset = intersectHGRecords.size();
     OptixTraversableHandle quadricGASTraversable = createGASForQuadrics(
         scene.shapes, hitPGQuadric, anyhitPGShadowQuadric, hitPGRandomHitQuadric,
@@ -1076,6 +1108,24 @@ OptiXAggregate::OptiXAggregate(
         int sbtOffset;
         Bounds3f bounds;
     };
+
+    // Read (and possibly displace!) PLY meshes in parallel.
+    std::map<std::string, std::map<int, TriQuadMesh>> instancePLYMeshes;
+    std::vector<std::string> allInstanceNames;
+    for (const auto &def : scene.instanceDefinitions)
+        allInstanceNames.push_back(def.first);
+
+    std::mutex mutex;
+    ParallelFor(0, allInstanceNames.size(), [&](int64_t i) {
+        const std::string &name = allInstanceNames[i];
+        auto iter = scene.instanceDefinitions.find(name);
+        std::map<int, TriQuadMesh> meshes =
+            PreparePLYMeshes(iter->second.shapes, textures.floatTextures);
+
+        std::lock_guard<std::mutex> lock(mutex);
+        instancePLYMeshes[name] = std::move(meshes);
+    });
+
     std::multimap<std::string, Instance> instanceMap;
     for (const auto &def : scene.instanceDefinitions) {
         if (!def.second.animatedShapes.empty())
@@ -1085,9 +1135,10 @@ OptiXAggregate::OptiXAggregate(
         int triSBTOffset = intersectHGRecords.size();
         Bounds3f triBounds;
         OptixTraversableHandle triHandle = createGASForTriangles(
-            def.second.shapes, hitPGTriangle, anyhitPGShadowTriangle,
+            def.second.shapes, instancePLYMeshes[def.first], hitPGTriangle, anyhitPGShadowTriangle,
             hitPGRandomHitTriangle, textures.floatTextures, namedMaterials, materials, media, {},
             &triBounds);
+        instancePLYMeshes[def.first].clear();
         if (triHandle)
             instanceMap.insert({def.first, Instance{triHandle, triSBTOffset, triBounds}});
 

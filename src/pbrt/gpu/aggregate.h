@@ -53,11 +53,10 @@ class OptiXAggregate : public WavefrontAggregate {
   private:
     struct HitgroupRecord;
 
-    // WAR: The enclosing parent function ("createGASForTriangles") for an extended __device__
-    // lambda cannot have private or protected access within its class
-  public:
     OptixTraversableHandle createGASForTriangles(
-        const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
+        const std::vector<ShapeSceneEntity> &shapes,
+        const std::map<int, TriQuadMesh> &plyMeshes,
+        const OptixProgramGroup &intersectPG,
         const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
         const std::map<std::string, FloatTexture> &floatTextures,
         const std::map<std::string, Material> &namedMaterials,
@@ -66,7 +65,13 @@ class OptiXAggregate : public WavefrontAggregate {
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
         Bounds3f *gasBounds);
 
+    // WAR: The enclosing parent function ("createGASForTriangles") for an extended __device__
+    // lambda cannot have private or protected access within its class
+  public:
+    std::map<int, TriQuadMesh> PreparePLYMeshes(const std::vector<ShapeSceneEntity> &shapes,
+                                                const std::map<std::string, FloatTexture> &floatTextures) const;
   private:
+
     OptixTraversableHandle createGASForBLPs(
         const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
         const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
