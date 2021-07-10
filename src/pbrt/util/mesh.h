@@ -14,6 +14,7 @@
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/vecmath.h>
 
+#include <array>
 #include <string>
 #include <vector>
 
