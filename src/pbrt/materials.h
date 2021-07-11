@@ -32,13 +32,12 @@ struct MaterialEvalContext : public TextureEvalContext {
     MaterialEvalContext(const SurfaceInteraction &si)
         : TextureEvalContext(si),
           wo(si.wo),
-          n(si.n),
           ns(si.shading.n),
           dpdus(si.shading.dpdu) {}
     std::string ToString() const;
 
     Vector3f wo;
-    Normal3f n, ns;
+    Normal3f ns;
     Vector3f dpdus;
 };
 
@@ -50,6 +49,7 @@ struct BumpEvalContext {
     BumpEvalContext(const SurfaceInteraction &si)
         : p(si.p()),
           uv(si.uv),
+          n(si.n),
           dudx(si.dudx),
           dudy(si.dudy),
           dvdx(si.dvdx),
@@ -67,12 +67,13 @@ struct BumpEvalContext {
 
     PBRT_CPU_GPU
     operator TextureEvalContext() const {
-        return TextureEvalContext(p, dpdx, dpdy, uv, dudx, dudy, dvdx, dvdy, faceIndex);
+        return TextureEvalContext(p, dpdx, dpdy, n, uv, dudx, dudy, dvdx, dvdy, faceIndex);
     }
 
     // BumpEvalContext Public Members
     Point3f p;
     Point2f uv;
+    Normal3f n;
     struct {
         Normal3f n;
         Vector3f dpdu, dpdv;

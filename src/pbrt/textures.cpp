@@ -539,6 +539,38 @@ SpectrumMixTexture *SpectrumMixTexture::Create(
         parameters.GetFloatTexture("amount", 0.5f, alloc));
 }
 
+std::string FloatDirectionMixTexture::ToString() const {
+    return StringPrintf("[ FloatDirectionMixTexture tex1: %s tex2: %s dir: %s ]", tex1, tex2, dir);
+}
+
+std::string SpectrumDirectionMixTexture::ToString() const {
+    return StringPrintf("[ SpectrumDirectionMixTexture tex1: %s tex2: %s dir: %s ]", tex1, tex2, dir);
+}
+
+FloatDirectionMixTexture *FloatDirectionMixTexture::Create(const Transform &renderFromTexture,
+                                                     const TextureParameterDictionary &parameters,
+                                                     const FileLoc *loc, Allocator alloc) {
+    Vector3f dir = parameters.GetOneVector3f("dir", Vector3f(0, 1, 0));
+    dir = Normalize(renderFromTexture(dir));
+    return alloc.new_object<FloatDirectionMixTexture>(
+        parameters.GetFloatTexture("tex1", 0.f, alloc),
+        parameters.GetFloatTexture("tex2", 1.f, alloc),
+        dir);
+}
+
+SpectrumDirectionMixTexture *SpectrumDirectionMixTexture::Create(
+    const Transform &renderFromTexture, const TextureParameterDictionary &parameters,
+    SpectrumType spectrumType, const FileLoc *loc, Allocator alloc) {
+    Spectrum zero = alloc.new_object<ConstantSpectrum>(0.);
+    Spectrum one = alloc.new_object<ConstantSpectrum>(1.);
+    Vector3f dir = parameters.GetOneVector3f("dir", Vector3f(0, 1, 0));
+    dir = Normalize(renderFromTexture(dir));
+    return alloc.new_object<SpectrumDirectionMixTexture>(
+        parameters.GetSpectrumTexture("tex1", zero, spectrumType, alloc),
+        parameters.GetSpectrumTexture("tex2", one, spectrumType, alloc),
+        dir);
+}
+
 static Ptex::PtexCache *cache;
 
 STAT_COUNTER("Texture/Ptex lookups", nLookups);
@@ -722,7 +754,7 @@ GPUFloatPtexTexture::GPUFloatPtexTexture(const std::string &filename,
     faceValues.resize(nFaces);
     for (int i = 0; i < nFaces; ++i) {
         Float filterWidth = 0.75f;
-        TextureEvalContext ctx(Point3f(), Vector3f(), Vector3f(), Point2f(0.5f, 0.5f),
+        TextureEvalContext ctx(Point3f(), Vector3f(), Vector3f(), Normal3f(), Point2f(0.5f, 0.5f),
                                filterWidth, filterWidth, filterWidth, filterWidth, i);
         faceValues[i] = Evaluate(ctx);
     }
@@ -783,7 +815,7 @@ GPUSpectrumPtexTexture::GPUSpectrumPtexTexture(const std::string &filename,
     faceValues.resize(nFaces);
     for (int i = 0; i < nFaces; ++i) {
         Float filterWidth = 0.75f;
-        TextureEvalContext ctx(Point3f(), Vector3f(), Vector3f(), Point2f(0.5f, 0.5f),
+        TextureEvalContext ctx(Point3f(), Vector3f(), Vector3f(), Normal3f(), Point2f(0.5f, 0.5f),
                                filterWidth, filterWidth, filterWidth, filterWidth, i);
 
         float result[3];
@@ -1399,6 +1431,8 @@ FloatTexture FloatTexture::Create(const std::string &name,
         tex = FloatScaledTexture::Create(renderFromTexture, parameters, loc, alloc);
     else if (name == "mix")
         tex = FloatMixTexture::Create(renderFromTexture, parameters, loc, alloc);
+    else if (name == "directionmix")
+        tex = FloatDirectionMixTexture::Create(renderFromTexture, parameters, loc, alloc);
     else if (name == "bilerp")
         tex = FloatBilerpTexture::Create(renderFromTexture, parameters, loc, alloc);
     else if (name == "imagemap") {
@@ -1449,6 +1483,9 @@ SpectrumTexture SpectrumTexture::Create(const std::string &name,
     else if (name == "mix")
         tex = SpectrumMixTexture::Create(renderFromTexture, parameters, spectrumType, loc,
                                          alloc);
+    else if (name == "directionmix")
+        tex = SpectrumDirectionMixTexture::Create(renderFromTexture, parameters, spectrumType, loc,
+                                                  alloc);
     else if (name == "bilerp")
         tex = SpectrumBilerpTexture::Create(renderFromTexture, parameters, spectrumType,
                                             loc, alloc);
