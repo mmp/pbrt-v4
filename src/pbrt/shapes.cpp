@@ -1375,13 +1375,12 @@ STAT_COUNTER("Geometry/Spheres", nSpheres);
 STAT_COUNTER("Geometry/Cylinders", nCylinders);
 STAT_COUNTER("Geometry/Disks", nDisks);
 
-pstd::vector<Shape> Shape::Create(const std::string &name,
-                                  const Transform *renderFromObject,
-                                  const Transform *objectFromRender,
-                                  bool reverseOrientation,
-                                  const ParameterDictionary &parameters,
-                                  const std::map<std::string, FloatTexture> &floatTextures,
-                                  const FileLoc *loc, Allocator alloc) {
+pstd::vector<Shape> Shape::Create(
+    const std::string &name, const Transform *renderFromObject,
+    const Transform *objectFromRender, bool reverseOrientation,
+    const ParameterDictionary &parameters,
+    const std::map<std::string, FloatTexture> &floatTextures, const FileLoc *loc,
+    Allocator alloc) {
     pstd::vector<Shape> shapes(alloc);
     if (name == "sphere") {
         shapes = {Sphere::Create(renderFromObject, objectFromRender, reverseOrientation,
@@ -1427,25 +1426,26 @@ pstd::vector<Shape> Shape::Create(const std::string &name,
             LOG_VERBOSE("Starting to displace mesh \"%s\" with \"%s\"", filename,
                         displacementTexName);
 
-            plyMesh =
-                plyMesh.Displace([&](Point3f v0, Point3f v1) {
+            plyMesh = plyMesh.Displace(
+                [&](Point3f v0, Point3f v1) {
                     v0 = (*renderFromObject)(v0);
                     v1 = (*renderFromObject)(v1);
                     return Distance(v0, v1);
-                }, edgeLength,
-                    [&](Point3f *p, const Normal3f *n, const Point2f *uv, int nVertices) {
-                        ParallelFor(0, nVertices,
-                                    [=] (int i) {
-                                        TextureEvalContext ctx;
-                                        ctx.p = p[i];
-                                        ctx.uv = uv[i];
-                                        Float d = UniversalTextureEvaluator()(displacement, ctx);
-                                        p[i] += Vector3f(d * n[i]);
-                                    });
-                    }, loc);
+                },
+                edgeLength,
+                [&](Point3f *p, const Normal3f *n, const Point2f *uv, int nVertices) {
+                    ParallelFor(0, nVertices, [=](int i) {
+                        TextureEvalContext ctx;
+                        ctx.p = p[i];
+                        ctx.uv = uv[i];
+                        Float d = UniversalTextureEvaluator()(displacement, ctx);
+                        p[i] += Vector3f(d * n[i]);
+                    });
+                },
+                loc);
 
-            LOG_VERBOSE("Finished displacing mesh \"%s\" with \"%s\" -> %d tris", filename,
-                      displacementTexName, plyMesh.triIndices.size() / 3);
+            LOG_VERBOSE("Finished displacing mesh \"%s\" with \"%s\" -> %d tris",
+                        filename, displacementTexName, plyMesh.triIndices.size() / 3);
         }
 
         if (!plyMesh.triIndices.empty()) {

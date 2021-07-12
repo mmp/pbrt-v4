@@ -45,9 +45,8 @@ struct TextureEvalContext {
           dvdy(si.dvdy),
           faceIndex(si.faceIndex) {}
     PBRT_CPU_GPU
-    TextureEvalContext(Point3f p, Vector3f dpdx, Vector3f dpdy, Normal3f n,
-                       Point2f uv, Float dudx, Float dudy, Float dvdx, Float dvdy,
-                       int faceIndex)
+    TextureEvalContext(Point3f p, Vector3f dpdx, Vector3f dpdy, Normal3f n, Point2f uv,
+                       Float dudx, Float dudy, Float dvdx, Float dvdy, int faceIndex)
         : p(p),
           dpdx(dpdx),
           dpdy(dpdy),
@@ -169,7 +168,7 @@ class CylindricalMapping2D {
     // CylindricalMapping2D Private Methods
     PBRT_CPU_GPU
     Point2f Cylinder(const Point3f &p) const {
-        Vector3f vec = (textureFromRender(p) - Point3f(0, 0, 0));
+        Vector3f vec = textureFromRender(p) - Point3f(0, 0, 0);
         return Point2f((Pi + std::atan2(vec.y, vec.x)) * Inv2Pi, vec.z);
     }
 
@@ -863,6 +862,7 @@ class FloatDirectionMixTexture {
     std::string ToString() const;
 
   private:
+    // FloatDirectionMixTexture Private Members
     FloatTexture tex1, tex2;
     Vector3f dir;
 };
@@ -899,8 +899,8 @@ class SpectrumMixTexture {
 // SpectrumDirectionMixTexture Definition
 class SpectrumDirectionMixTexture {
   public:
-    SpectrumDirectionMixTexture(SpectrumTexture tex1, SpectrumTexture tex2,
-                                Vector3f dir)
+    // SpectrumDirectionMixTexture Public Methods
+    SpectrumDirectionMixTexture(SpectrumTexture tex1, SpectrumTexture tex2, Vector3f dir)
         : tex1(tex1), tex2(tex2), dir(dir) {}
 
     PBRT_CPU_GPU
@@ -914,14 +914,14 @@ class SpectrumDirectionMixTexture {
         return amt * t1 + (1 - amt) * t2;
     }
 
-    static SpectrumDirectionMixTexture *Create(const Transform &renderFromTexture,
-                                      const TextureParameterDictionary &parameters,
-                                      SpectrumType spectrumType, const FileLoc *loc,
-                                      Allocator alloc);
+    static SpectrumDirectionMixTexture *Create(
+        const Transform &renderFromTexture, const TextureParameterDictionary &parameters,
+        SpectrumType spectrumType, const FileLoc *loc, Allocator alloc);
 
     std::string ToString() const;
 
   private:
+    // SpectrumDirectionMixTexture Private Members
     SpectrumTexture tex1, tex2;
     Vector3f dir;
 };

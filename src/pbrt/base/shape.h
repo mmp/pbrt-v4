@@ -35,13 +35,12 @@ class Shape
     // Shape Interface
     using TaggedPointer::TaggedPointer;
 
-    static pstd::vector<Shape> Create(const std::string &name,
-                                      const Transform *renderFromObject,
-                                      const Transform *objectFromRender,
-                                      bool reverseOrientation,
-                                      const ParameterDictionary &parameters,
-                                      const std::map<std::string, FloatTexture> &floatTextures,
-                                      const FileLoc *loc, Allocator alloc);
+    static pstd::vector<Shape> Create(
+        const std::string &name, const Transform *renderFromObject,
+        const Transform *objectFromRender, bool reverseOrientation,
+        const ParameterDictionary &parameters,
+        const std::map<std::string, FloatTexture> &floatTextures, const FileLoc *loc,
+        Allocator alloc);
     std::string ToString() const;
 
     PBRT_CPU_GPU inline Bounds3f Bounds() const;

@@ -100,11 +100,12 @@ bool TriangleMesh::WritePLY(std::string filename) const {
     if (s)
         Warning(R"(%s: PLY mesh will be missing tangent vectors "S".)", filename);
 
-    return pbrt::WritePLY(filename, pstd::span<const int>(vertexIndices, 3 * nTriangles),
-                          pstd::span<const int>(), pstd::span<const Point3f>(p, nVertices),
-                          pstd::span<const Normal3f>(n, n ? nVertices : 0),
-                          pstd::span<const Point2f>(uv, uv ? nVertices : 0),
-                          pstd::span<const int>(faceIndices, faceIndices ? nTriangles : 0));
+    return pbrt::WritePLY(
+        filename, pstd::span<const int>(vertexIndices, 3 * nTriangles),
+        pstd::span<const int>(), pstd::span<const Point3f>(p, nVertices),
+        pstd::span<const Normal3f>(n, n ? nVertices : 0),
+        pstd::span<const Point2f>(uv, uv ? nVertices : 0),
+        pstd::span<const int>(faceIndices, faceIndices ? nTriangles : 0));
 }
 
 bool WritePLY(std::string filename, pstd::span<const int> triIndices,
@@ -447,8 +448,7 @@ void TriQuadMesh::ComputeNormals() {
         n[i] = Normal3f(0, 0, 0);
 
     for (size_t i = 0; i < triIndices.size(); i += 3) {
-        int v[3] = { triIndices[i], triIndices[i + 1],
-                     triIndices[i + 2] };
+        int v[3] = {triIndices[i], triIndices[i + 1], triIndices[i + 2]};
         Vector3f v10 = p[v[1]] - p[v[0]];
         Vector3f v21 = p[v[2]] - p[v[1]];
 
@@ -460,7 +460,7 @@ void TriQuadMesh::ComputeNormals() {
             n[v[2]] += vn;
         }
     }
-    CHECK_EQ(0, quadIndices.size()); // TODO: handle this...
+    CHECK_EQ(0, quadIndices.size());  // TODO: handle this...
 
     for (size_t i = 0; i < n.size(); ++i)
         if (LengthSquared(n[i]) > 0)

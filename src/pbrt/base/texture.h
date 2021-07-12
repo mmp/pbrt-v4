@@ -33,10 +33,10 @@ class WrinkledTexture;
 // FloatTexture Definition
 class FloatTexture
     : public TaggedPointer<  // FloatTextures
-          FloatImageTexture, GPUFloatImageTexture, FloatMixTexture, FloatDirectionMixTexture, FloatScaledTexture,
-          FloatConstantTexture, FloatBilerpTexture, FloatCheckerboardTexture,
-          FloatDotsTexture, FBmTexture, FloatPtexTexture, GPUFloatPtexTexture,
-          WindyTexture, WrinkledTexture
+          FloatImageTexture, GPUFloatImageTexture, FloatMixTexture,
+          FloatDirectionMixTexture, FloatScaledTexture, FloatConstantTexture,
+          FloatBilerpTexture, FloatCheckerboardTexture, FloatDotsTexture, FBmTexture,
+          FloatPtexTexture, GPUFloatPtexTexture, WindyTexture, WrinkledTexture
 
           > {
   public:
@@ -71,10 +71,10 @@ class SpectrumScaledTexture;
 // SpectrumTexture Definition
 class SpectrumTexture
     : public TaggedPointer<  // SpectrumTextures
-          SpectrumImageTexture, GPUSpectrumImageTexture, SpectrumMixTexture, SpectrumDirectionMixTexture,
-          SpectrumScaledTexture, SpectrumConstantTexture, SpectrumBilerpTexture,
-          SpectrumCheckerboardTexture, MarbleTexture, SpectrumDotsTexture,
-          SpectrumPtexTexture, GPUSpectrumPtexTexture
+          SpectrumImageTexture, GPUSpectrumImageTexture, SpectrumMixTexture,
+          SpectrumDirectionMixTexture, SpectrumScaledTexture, SpectrumConstantTexture,
+          SpectrumBilerpTexture, SpectrumCheckerboardTexture, MarbleTexture,
+          SpectrumDotsTexture, SpectrumPtexTexture, GPUSpectrumPtexTexture
 
           > {
   public:

@@ -26,8 +26,8 @@
 namespace pbrt {
 
 std::string MaterialEvalContext::ToString() const {
-    return StringPrintf("[ MaterialEvalContext %s wo: %s n: %s ns: %s dpdus: %s ]",
-                        TextureEvalContext::ToString(), wo, n, ns, dpdus);
+    return StringPrintf("[ MaterialEvalContext %s wo: %s ns: %s dpdus: %s ]",
+                        TextureEvalContext::ToString(), wo, ns, dpdus);
 }
 
 std::string BumpEvalContext::ToString() const {

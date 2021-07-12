@@ -8,8 +8,8 @@
 #include <pbrt/pbrt.h>
 
 #include <pbrt/util/containers.h>
-#include <pbrt/util/hash.h>
 #include <pbrt/util/error.h>
+#include <pbrt/util/hash.h>
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/vecmath.h>
@@ -70,6 +70,7 @@ class BilinearPatchMesh {
     PiecewiseConstant2D *imageDistribution;
 };
 
+// HashIntPair Definition
 struct HashIntPair {
     PBRT_CPU_GPU
     size_t operator()(std::pair<int, int> p) const {
@@ -78,6 +79,7 @@ struct HashIntPair {
 };
 
 struct TriQuadMesh {
+    // TriQuadMesh Public Methods
     static TriQuadMesh ReadPLY(const std::string &filename);
 
     void ConvertToOnlyTriangles();
@@ -101,8 +103,8 @@ struct TriQuadMesh {
         // Refine
         HashMap<std::pair<int, int>, int, HashIntPair> edgeSplit({});
         for (int i = 0; i < triIndices.size() / 3; ++i)
-            outputMesh.Refine(dist, maxDist, triIndices[3*i], triIndices[3*i+1],
-                              triIndices[3*i+2], edgeSplit);
+            outputMesh.Refine(dist, maxDist, triIndices[3 * i], triIndices[3 * i + 1],
+                              triIndices[3 * i + 2], edgeSplit);
 
         // Displace
         displace(outputMesh.p.data(), outputMesh.n.data(), outputMesh.uv.data(),
@@ -119,7 +121,8 @@ struct TriQuadMesh {
     std::vector<int> faceIndices;
     std::vector<int> triIndices, quadIndices;
 
-private:
+  private:
+    // TriQuadMesh Private Methods
     template <typename Dist>
     void Refine(Dist &&distance, Float maxDist, int v0, int v1, int v2,
                 HashMap<std::pair<int, int>, int, HashIntPair> &edgeSplit) {
@@ -137,19 +140,20 @@ private:
         std::array<int, 3> v;
         if (d01 > d12) {
             if (d01 > d20)
-                v = { v0, v1, v2 };
+                v = {v0, v1, v2};
             else
-                v = { v2, v0, v1 };
+                v = {v2, v0, v1};
         } else {
             if (d12 > d20)
-                v = { v1, v2, v0 };
+                v = {v1, v2, v0};
             else
-                v = { v2, v0, v1 };
+                v = {v2, v0, v1};
         }
 
         // has the edge been spilt before?
         std::pair<int, int> edge(v[0], v[1]);
-        if (v[0] > v[1]) std::swap(edge.first, edge.second);
+        if (v[0] > v[1])
+            std::swap(edge.first, edge.second);
 
         int vmid;
         if (edgeSplit.HasKey(edge)) {
