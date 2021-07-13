@@ -475,8 +475,9 @@ class IndependentSampler {
 class SobolSampler {
   public:
     // SobolSampler Public Methods
-    SobolSampler(int samplesPerPixel, Point2i fullResolution, RandomizeStrategy randomize)
-        : samplesPerPixel(samplesPerPixel), randomize(randomize) {
+    SobolSampler(int samplesPerPixel, Point2i fullResolution, RandomizeStrategy randomize,
+                 int seed = 0)
+        : samplesPerPixel(samplesPerPixel), seed(seed), randomize(randomize) {
         if (!IsPowerOf2(samplesPerPixel))
             Warning("Non power-of-two sample count %d will perform suboptimally with the "
                     "SobolSampler.",
@@ -542,7 +543,7 @@ class SobolSampler {
             return SobolSample(sobolIndex, dimension, NoRandomizer());
 
         // Return randomized Sobol$'$ sample using _randomize_
-        uint32_t hash = Hash(dimension, GetOptions().seed);
+        uint32_t hash = Hash(dimension, seed);
         if (randomize == RandomizeStrategy::PermuteDigits)
             return SobolSample(sobolIndex, dimension, BinaryPermuteScrambler(hash));
         else if (randomize == RandomizeStrategy::FastOwen)
@@ -552,7 +553,7 @@ class SobolSampler {
     }
 
     // SobolSampler Private Members
-    int samplesPerPixel, scale;
+    int samplesPerPixel, scale, seed;
     RandomizeStrategy randomize;
     Point2i pixel;
     int dimension;

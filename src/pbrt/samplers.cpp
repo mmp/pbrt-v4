@@ -290,8 +290,9 @@ IndependentSampler *IndependentSampler::Create(const ParameterDictionary &parame
 std::string SobolSampler::ToString() const {
     return StringPrintf("[ SobolSampler pixel: %s dimension: %d "
                         "samplesPerPixel: %d scale: %d sobolIndex: %d "
-                        "randomize: %s ]",
-                        pixel, dimension, samplesPerPixel, scale, sobolIndex, randomize);
+                        "seed: %d randomize: %s ]",
+                        pixel, dimension, samplesPerPixel, scale, sobolIndex, seed,
+                        randomize);
 }
 
 SobolSampler *SobolSampler::Create(const ParameterDictionary &parameters,
@@ -316,7 +317,9 @@ SobolSampler *SobolSampler::Create(const ParameterDictionary &parameters,
     else
         ErrorExit(loc, "%s: unknown randomization strategy given to SobolSampler", s);
 
-    return alloc.new_object<SobolSampler>(nsamp, fullResolution, randomizer);
+    int seed = parameters.GetOneInt("seed", Options->seed);
+
+    return alloc.new_object<SobolSampler>(nsamp, fullResolution, randomizer, seed);
 }
 
 // StratifiedSampler Method Definitions
