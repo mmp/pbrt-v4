@@ -457,6 +457,33 @@ TEST(Image, ExrMetadata) {
     EXPECT_EQ(0, remove(filename.c_str()));
 }
 
+TEST(Image, PngYIO) {
+    Point2i res(11, 50);
+    pstd::vector<float> rgbPixels = GetFloatPixels(res, 1);
+
+    Image image(rgbPixels, res, {"Y"});
+    EXPECT_TRUE(image.Write("test.png"));
+    ImageAndMetadata read = Image::Read("test.png");
+
+    EXPECT_EQ(image.Resolution(), read.image.Resolution());
+    EXPECT_EQ(read.image.Format(), PixelFormat::U256);
+    ASSERT_TRUE(read.image.Encoding() != nullptr);
+
+    for (int y = 0; y < res[1]; ++y)
+        for (int x = 0; x < res[0]; ++x) {
+            EXPECT_LE(sRGBRoundTrip(image.GetChannel({x, y}, 0), -.5f),
+                      read.image.GetChannel({x, y}, 0))
+                    << " x " << x << ", y " << y << ", orig "
+                    << rgbPixels[y * res[0] + x];
+            EXPECT_LE(read.image.GetChannel({x, y}, 0),
+                          sRGBRoundTrip(image.GetChannel({x, y}, 0), 0.5f))
+                    << " x " << x << ", y " << y << ", orig "
+                    << rgbPixels[y * res[0] + x];
+            }
+
+    EXPECT_EQ(0, remove("test.png"));
+}
+
 TEST(Image, PngRgbIO) {
     Point2i res(11, 50);
     pstd::vector<float> rgbPixels = GetFloatPixels(res, 3);
@@ -487,6 +514,41 @@ TEST(Image, PngRgbIO) {
             }
 
     EXPECT_EQ(0, remove("test.png"));
+}
+
+TEST(Image, PngEmojiIO) {
+    Point2i res(11, 50);
+    pstd::vector<float> rgbPixels = GetFloatPixels(res, 3);
+
+    Image image(rgbPixels, res, {"R", "G", "B"});
+    // trex.png
+    const uint8_t fn[] = { 0xF0, 0x9F, 0xA6, 0x96, '.', 'p', 'n', 'g', '\0' };
+    std::string filename((char *)fn, strlen((char *)fn));
+    EXPECT_TRUE(image.Write(filename));
+    ImageAndMetadata read = Image::Read(filename);
+
+    EXPECT_EQ(image.Resolution(), read.image.Resolution());
+    EXPECT_EQ(read.image.Format(), PixelFormat::U256);
+    ASSERT_TRUE(read.image.Encoding() != nullptr);
+    // EXPECT_EQ(*read.image.Encoding(), *ColorEncoding::sRGB);
+    ASSERT_TRUE((bool)read.metadata.colorSpace);
+    ASSERT_TRUE(*read.metadata.colorSpace != nullptr);
+    EXPECT_EQ(*RGBColorSpace::sRGB, *read.metadata.GetColorSpace());
+
+    for (int y = 0; y < res[1]; ++y)
+        for (int x = 0; x < res[0]; ++x)
+            for (int c = 0; c < 3; ++c) {
+                EXPECT_LE(sRGBRoundTrip(image.GetChannel({x, y}, c), -.5f),
+                          read.image.GetChannel({x, y}, c))
+                    << " x " << x << ", y " << y << ", c " << c << ", orig "
+                    << rgbPixels[3 * y * res[0] + 3 * x + c];
+                EXPECT_LE(read.image.GetChannel({x, y}, c),
+                          sRGBRoundTrip(image.GetChannel({x, y}, c), 0.5f))
+                    << " x " << x << ", y " << y << ", c " << c << ", orig "
+                    << rgbPixels[3 * y * res[0] + 3 * x + c];
+            }
+
+    EXPECT_EQ(0, remove(filename.c_str()));
 }
 
 TEST(Image, SampleSimple) {
