@@ -548,7 +548,9 @@ TEST(Image, PngEmojiIO) {
                     << rgbPixels[3 * y * res[0] + 3 * x + c];
             }
 
+#ifndef PBRT_IS_WINDOWS
     EXPECT_EQ(0, remove(filename.c_str()));
+#endif
 }
 
 TEST(Image, SampleSimple) {
