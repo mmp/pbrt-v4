@@ -766,7 +766,6 @@ Float RealisticCamera::TraceLensesFromFilm(const Ray &rCamera, Ray *rOut) const 
             // Check intersection point against _apertureImage_
             Point2f uv((pHit.x / element.apertureRadius + 1) / 2,
                        (pHit.y / element.apertureRadius + 1) / 2);
-            uv.y = 1 - uv.y;
             weight = apertureImage.BilerpChannel(uv, 0, WrapMode::Black);
             if (weight == 0)
                 return 0;
@@ -1403,6 +1402,8 @@ RealisticCamera *RealisticCamera::Create(const ParameterDictionary &parameters,
         }
 
         if (apertureImage) {
+            apertureImage.FlipY();
+
             // Normalize it so that brightness matches a circular aperture
             Float sum = 0;
             for (int y = 0; y < apertureImage.Resolution().y; ++y)
