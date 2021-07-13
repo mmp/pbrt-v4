@@ -21,6 +21,8 @@ bool WriteFileContents(std::string filename, const std::string &contents);
 std::vector<Float> ReadFloatFile(std::string filename);
 
 bool FileExists(std::string filename);
+bool RemoveFile(std::string filename);
+
 std::string ResolveFilename(std::string filename);
 void SetSearchDirectory(std::string filename);
 

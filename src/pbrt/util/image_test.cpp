@@ -320,7 +320,7 @@ TEST(Image, PfmIO) {
             for (int c = 0; c < 3; ++c)
                 EXPECT_EQ(image.GetChannel({x, y}, c), read.image.GetChannel({x, y}, c));
 
-    EXPECT_EQ(0, remove("test.pfm"));
+    EXPECT_TRUE(RemoveFile("test.pfm"));
 }
 
 TEST(Image, ExrIO) {
@@ -372,7 +372,7 @@ TEST(Image, ExrIO) {
                             << " @ (" << x << ", " << y << ", ch " << c << ")";
             }
 
-        EXPECT_EQ(0, remove("test.exr"));
+        EXPECT_TRUE(RemoveFile("test.exr"));
     }
 }
 
@@ -400,7 +400,7 @@ TEST(Image, ExrNoMetadata) {
     EXPECT_EQ(*metadata.fullResolution, res);
     EXPECT_EQ(0, metadata.stringVectors.size());
 
-    EXPECT_EQ(0, remove(filename.c_str()));
+    EXPECT_TRUE(RemoveFile(filename.c_str()));
 }
 
 TEST(Image, ExrMetadata) {
@@ -454,7 +454,7 @@ TEST(Image, ExrMetadata) {
     EXPECT_EQ("foo", iter->second[0]);
     EXPECT_EQ("bar", iter->second[1]);
 
-    EXPECT_EQ(0, remove(filename.c_str()));
+    EXPECT_TRUE(RemoveFile(filename.c_str()));
 }
 
 TEST(Image, PngYIO) {
@@ -481,7 +481,7 @@ TEST(Image, PngYIO) {
                     << rgbPixels[y * res[0] + x];
             }
 
-    EXPECT_EQ(0, remove("test.png"));
+    EXPECT_TRUE(RemoveFile("test.png"));
 }
 
 TEST(Image, PngRgbIO) {
@@ -513,7 +513,7 @@ TEST(Image, PngRgbIO) {
                     << rgbPixels[3 * y * res[0] + 3 * x + c];
             }
 
-    EXPECT_EQ(0, remove("test.png"));
+    EXPECT_TRUE(RemoveFile("test.png"));
 }
 
 TEST(Image, PngEmojiIO) {
@@ -548,9 +548,7 @@ TEST(Image, PngEmojiIO) {
                     << rgbPixels[3 * y * res[0] + 3 * x + c];
             }
 
-#ifndef PBRT_IS_WINDOWS
-    EXPECT_EQ(0, remove(filename.c_str()));
-#endif
+    EXPECT_TRUE(RemoveFile(filename.c_str()));
 }
 
 TEST(Image, SampleSimple) {
@@ -744,7 +742,7 @@ static void TestRoundTrip(const char *fn) {
         }
 
     // Clean up
-    EXPECT_EQ(0, remove(filename.c_str()));
+    EXPECT_TRUE(RemoveFile(filename.c_str()));
 }
 
 TEST(ImageIO, RoundTripEXR) {

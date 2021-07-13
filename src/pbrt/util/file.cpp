@@ -106,6 +106,14 @@ bool FileExists(std::string filename) {
     return (bool)ifs;
 }
 
+bool RemoveFile(std::string filename) {
+#ifdef PBRT_IS_WINDOWS
+    return _wremove(WStringFromUTF8(filename).c_str()) == 0;
+#else
+    return remove(filename.c_str()) == 0;
+#endif
+}
+
 std::string ReadFileContents(std::string filename) {
 #ifdef PBRT_IS_WINDOWS
     std::ifstream ifs(WStringFromUTF8(filename).c_str(), std::ios::binary);
