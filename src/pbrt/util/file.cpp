@@ -98,12 +98,20 @@ std::vector<std::string> MatchingFilenames(std::string filenameBase) {
 }
 
 bool FileExists(std::string filename) {
+#ifdef PBRT_IS_WINDOWS
+    std::ifstream ifs(WStringFromUTF8(filename).c_str());
+#else
     std::ifstream ifs(filename);
+#endif
     return (bool)ifs;
 }
 
 std::string ReadFileContents(std::string filename) {
+#ifdef PBRT_IS_WINDOWS
+    std::ifstream ifs(WStringFromUTF8(filename).c_str(), std::ios::binary);
+#else
     std::ifstream ifs(filename, std::ios::binary);
+#endif
     if (!ifs)
         ErrorExit("%s: %s", filename, ErrorString());
     return std::string((std::istreambuf_iterator<char>(ifs)),
@@ -183,7 +191,11 @@ std::vector<Float> ReadFloatFile(std::string filename) {
 }
 
 bool WriteFileContents(std::string filename, const std::string &contents) {
+#ifdef PBRT_IS_WINDOWS
+    std::ofstream ifs(WStringFromUTF8(filename).c_str(), std::ios::binary);
+#else
     std::ofstream out(filename, std::ios::binary);
+#endif
     out << contents;
     out.close();
     if (!out.good()) {
