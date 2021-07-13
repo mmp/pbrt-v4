@@ -33,21 +33,39 @@ std::string normalizeArg(const std::string &str) {
 bool initArg(const std::string &str, int *ptr) {
     if (str.empty() || (!std::isdigit(str[0]) && str[0] != '-'))
         return false;
-    *ptr = std::stoi(str);
+    try {
+        *ptr = std::stoi(str);
+    } catch (const std::invalid_argument &) {
+        return false;
+    } catch (const std::out_of_range &) {
+        return false;
+    }
     return true;
 }
 
 bool initArg(const std::string &str, float *ptr) {
-    if (str.empty() || (!std::isdigit(str[0]) && str[0] != '-' && str[0] != '.'))
+    if (str.empty())
         return false;
-    *ptr = std::stof(str);
+    try {
+        *ptr = std::stof(str);
+    } catch (const std::invalid_argument &) {
+        return false;
+    } catch (const std::out_of_range &) {
+        return false;
+    }
     return true;
 }
 
 bool initArg(const std::string &str, double *ptr) {
-    if (str.empty() || (!std::isdigit(str[0]) && str[0] != '-' && str[0] != '.'))
+    if (str.empty())
         return false;
-    *ptr = std::stod(str);
+    try {
+        *ptr = std::stod(str);
+    } catch (const std::invalid_argument &) {
+        return false;
+    } catch (const std::out_of_range &) {
+        return false;
+    }
     return true;
 }
 
@@ -148,7 +166,7 @@ bool ParseArg(Iter *iter, Iter end, const std::string &name, T out,
         // --arg=value
         std::string value = arg.substr(name.size() + 1);
         if (!initArg(value, out)) {
-            onError(StringPrintf("invalid value \"%s\" for %s argument", value, name));
+            onError(StringPrintf("invalid value \"%s\" for --%s argument", value, name));
             return false;
         }
         return true;
@@ -160,10 +178,13 @@ bool ParseArg(Iter *iter, Iter end, const std::string &name, T out,
 
         ++(*iter);
         if (*iter == end) {
-            onError(StringPrintf("missing value after %s argument", arg));
+            onError(StringPrintf("missing value after --%s argument", arg));
             return false;
         }
-        initArg(**iter, out);
+        if (!initArg(**iter, out)) {
+            onError(StringPrintf("invalid value \"%s\" for --%s argument", **iter, name));
+            return false;
+        }
         return true;
     } else
         return false;
