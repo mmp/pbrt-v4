@@ -317,6 +317,9 @@ class Image {
 
     ImageChannelValues Average(const ImageChannelDesc &desc) const;
 
+    bool HasAnyInfinitePixels() const;
+    bool HasAnyNaNPixels() const;
+
     ImageChannelValues MAE(const ImageChannelDesc &desc, const Image &ref,
                            Image *errorImage = nullptr) const;
     ImageChannelValues MSE(const ImageChannelDesc &desc, const Image &ref,

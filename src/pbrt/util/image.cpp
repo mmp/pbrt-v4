@@ -193,6 +193,24 @@ pstd::vector<Image> Image::GeneratePyramid(Image image, WrapMode2D wrapMode,
     return pyramid;
 }
 
+bool Image::HasAnyInfinitePixels() const {
+    for (int y = 0; y < resolution.y; ++y)
+        for (int x = 0; x < resolution.x; ++x)
+            for (int c = 0; c < NChannels(); ++c)
+                if (IsInf(GetChannel({x, y}, c)))
+                    return true;
+    return false;
+}
+
+bool Image::HasAnyNaNPixels() const {
+    for (int y = 0; y < resolution.y; ++y)
+        for (int x = 0; x < resolution.x; ++x)
+            for (int c = 0; c < NChannels(); ++c)
+                if (IsNaN(GetChannel({x, y}, c)))
+                    return true;
+    return false;
+}
+
 Image Image::GaussianFilter(const ImageChannelDesc &desc, int halfWidth,
                             Float sigma) const {
     // Compute filter weights

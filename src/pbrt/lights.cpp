@@ -448,6 +448,16 @@ ProjectionLight *ProjectionLight::Create(const Transform &renderFromLight, Mediu
         ErrorExit(loc, "Must provide \"filename\" to \"projection\" light source");
 
     ImageAndMetadata imageAndMetadata = Image::Read(texname, alloc);
+    if (imageAndMetadata.image.HasAnyInfinitePixels())
+        ErrorExit(
+            loc, "%s: image has infinite pixel values and so is not suitable as a light.",
+            texname);
+    if (imageAndMetadata.image.HasAnyNaNPixels())
+        ErrorExit(
+            loc,
+            "%s: image has not-a-number pixel values and so is not suitable as a light.",
+            texname);
+
     const RGBColorSpace *colorSpace = imageAndMetadata.metadata.GetColorSpace();
 
     ImageChannelDesc channelDesc = imageAndMetadata.image.GetChannelDesc({"R", "G", "B"});
@@ -597,6 +607,17 @@ GoniometricLight *GoniometricLight::Create(const Transform &renderFromLight,
         Warning(loc, "No \"filename\" parameter provided for goniometric light.");
     else {
         ImageAndMetadata imageAndMetadata = Image::Read(texname, alloc);
+
+        if (imageAndMetadata.image.HasAnyInfinitePixels())
+            ErrorExit(
+                loc,
+                "%s: image has infinite pixel values and so is not suitable as a light.",
+                texname);
+        if (imageAndMetadata.image.HasAnyNaNPixels())
+            ErrorExit(loc,
+                      "%s: image has not-a-number pixel values and so is not suitable as "
+                      "a light.",
+                      texname);
 
         if (imageAndMetadata.image.Resolution().x !=
             imageAndMetadata.image.Resolution().y)
@@ -852,6 +873,17 @@ DiffuseAreaLight *DiffuseAreaLight::Create(const Transform &renderFromLight,
         if (L)
             ErrorExit(loc, "Both \"L\" and \"filename\" specified for DiffuseAreaLight.");
         ImageAndMetadata im = Image::Read(filename, alloc);
+
+        if (im.image.HasAnyInfinitePixels())
+            ErrorExit(
+                loc,
+                "%s: image has infinite pixel values and so is not suitable as a light.",
+                filename);
+        if (im.image.HasAnyNaNPixels())
+            ErrorExit(loc,
+                      "%s: image has not-a-number pixel values and so is not suitable as "
+                      "a light.",
+                      filename);
 
         ImageChannelDesc channelDesc = im.image.GetChannelDesc({"R", "G", "B"});
         if (!channelDesc)
@@ -1551,8 +1583,20 @@ Light Light::Create(const std::string &name, const ParameterDictionary &paramete
                     for (int x = 0; x < res; ++x)
                         for (int c = 0; c < 3; ++c)
                             imageAndMetadata.image.SetChannel({x, y}, c, rgb[c]);
-            } else
+            } else {
                 imageAndMetadata = Image::Read(filename, alloc);
+
+                if (imageAndMetadata.image.HasAnyInfinitePixels())
+                    ErrorExit(loc,
+                              "%s: image has infinite pixel values and so is not "
+                              "suitable as a light.",
+                              filename);
+                if (imageAndMetadata.image.HasAnyNaNPixels())
+                    ErrorExit(loc,
+                              "%s: image has not-a-number pixel values and so is not "
+                              "suitable as a light.",
+                              filename);
+            }
 
             const RGBColorSpace *colorSpace = imageAndMetadata.metadata.GetColorSpace();
 
