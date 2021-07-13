@@ -227,6 +227,13 @@ static std::map<std::string, CommandUsage> commandUsage = {
     --outfile <name>   Filename to store final image in. Crop images are stored in
                        the file "crop-<name>".
 )")}},
+    {"scalenormalmap", {"scalenormalmap [options] <filename>",
+                        "Scale the provided normal map by applying the given factor for x and y\n"
+                        "    and output the resulting normal map.\n",
+                        std::string(R"(
+    --scale <s>        Scale factor. Default: 1
+    --outfile <name>   Filename to store final image in.
+)")}},
     {"whitebalance", {"whitebalance [options] <filename>",
                       "Apply white balancing to the specified image.",
                       std::string(R"(
@@ -650,6 +657,59 @@ int splitn(std::vector<std::string> args) {
     result.Write(outfile);
     if (crops.size())
         cropsImage.Write(std::string("crops-") + outfile);
+
+    return 0;
+}
+
+int scalenormalmap(std::vector<std::string> args) {
+    std::string filename, outfile;
+    Float scale = 1;
+
+    for (auto iter = args.begin(); iter != args.end(); ++iter) {
+        auto onError = [](const std::string &err) {
+            usage("error", "%s", err.c_str());
+            exit(1);
+        };
+
+        if (ParseArg(&iter, args.end(), "scale", &scale, onError) ||
+            ParseArg(&iter, args.end(), "outfile", &outfile, onError)) {
+            // success
+        } else if (filename.empty() && (*iter)[0] != '-') {
+            filename = *iter;
+        } else
+            usage("error", "%s: unknown argument", iter->c_str());
+    }
+
+    if (filename.empty())
+        usage("error", "Must provide base filename.");
+
+    ImageAndMetadata im = Image::Read(filename);
+    const Image &image = im.image;
+    ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
+    if (!rgbDesc) {
+        fprintf(stderr, "%s: doesn't have R, G, B channels.\n", filename.c_str());
+        return 1;
+    }
+
+    Image scaledImage = image;
+    for (int y = 0; y < image.Resolution().y; ++y)
+        for (int x = 0; x < image.Resolution().x; ++x) {
+            ImageChannelValues rgb = image.GetChannels({x, y}, rgbDesc);
+            for (int c = 0; c < 3; ++c)
+                rgb[c] = 2 * rgb[c] - 1;
+
+            rgb[0] *= scale;
+            rgb[1] *= scale;
+            rgb[2] = SafeSqrt(1 - Sqr(rgb[0]) - Sqr(rgb[1]));
+
+            for (int c = 0; c < 3; ++c)
+                rgb[c] = (rgb[c] + 1) / 2;
+
+            scaledImage.SetChannels({x, y}, rgbDesc, rgb);
+        }
+
+    if (!scaledImage.Write(outfile))
+        return 1;
 
     return 0;
 }
@@ -2566,6 +2626,8 @@ int main(int argc, char *argv[]) {
         return makesky(args);
     else if (cmd == "whitebalance")
         return whitebalance(args);
+    else if (cmd == "scalenormalmap")
+        return scalenormalmap(args);
     else if (cmd == "splitn")
         return splitn(args);
     else if (cmd == "noisybit") {
