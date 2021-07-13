@@ -192,7 +192,7 @@ std::vector<Float> ReadFloatFile(std::string filename) {
 
 bool WriteFileContents(std::string filename, const std::string &contents) {
 #ifdef PBRT_IS_WINDOWS
-    std::ofstream ifs(WStringFromUTF8(filename).c_str(), std::ios::binary);
+    std::ofstream out(WStringFromUTF8(filename).c_str(), std::ios::binary);
 #else
     std::ofstream out(filename, std::ios::binary);
 #endif
