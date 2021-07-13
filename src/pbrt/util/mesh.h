@@ -162,8 +162,12 @@ struct TriQuadMesh {
             vmid = p.size();
             edgeSplit.Insert(edge, vmid);
             p.push_back((p[v[0]] + p[v[1]]) / 2);
-            if (!n.empty())
-                n.push_back(Normalize(n[v[0]] + n[v[1]]));
+            if (!n.empty()) {
+                Normal3f nn = n[v[0]] + n[v[1]];
+                if (LengthSquared(nn) > 0)
+                    nn = Normalize(nn);
+                n.push_back(nn);
+            }
             if (!uv.empty())
                 uv.push_back((uv[v[0]] + uv[v[1]]) / 2);
         }
