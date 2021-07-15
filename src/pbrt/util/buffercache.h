@@ -31,7 +31,7 @@ class BufferCache {
     // BufferCache Public Methods
     BufferCache(Allocator alloc) : alloc(alloc) {}
 
-    const T *LookupOrAdd(const std::vector<T> &buf) {
+    const T *LookupOrAdd(pstd::span<const T> buf) {
         ++nBufferCacheLookups;
         std::lock_guard<std::mutex> lock(mutex);
         // Return pointer to data if _buf_ contents is already in the cache
@@ -39,7 +39,7 @@ class BufferCache {
         if (auto iter = cache.find(lookupBuffer); iter != cache.end()) {
             DCHECK(std::memcmp(buf.data(), iter->ptr, buf.size() * sizeof(T)) == 0);
             ++nBufferCacheHits;
-            redundantBufferBytes += buf.capacity() * sizeof(T);
+            redundantBufferBytes += buf.size() * sizeof(T);
             return iter->ptr;
         }
 
