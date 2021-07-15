@@ -30,17 +30,15 @@ class CameraTransform {
     explicit CameraTransform(const AnimatedTransform &worldFromCamera);
 
     PBRT_CPU_GPU
-    Point3f RenderFromCamera(const Point3f &p, Float time) const {
+    Point3f RenderFromCamera(Point3f p, Float time) const {
         return renderFromCamera(p, time);
     }
     PBRT_CPU_GPU
-    Point3f CameraFromRender(const Point3f &p, Float time) const {
+    Point3f CameraFromRender(Point3f p, Float time) const {
         return renderFromCamera.ApplyInverse(p, time);
     }
     PBRT_CPU_GPU
-    Point3f RenderFromWorld(const Point3f &p) const {
-        return worldFromRender.ApplyInverse(p);
-    }
+    Point3f RenderFromWorld(Point3f p) const { return worldFromRender.ApplyInverse(p); }
 
     PBRT_CPU_GPU
     Transform RenderFromWorld() const { return Inverse(worldFromRender); }
@@ -222,7 +220,7 @@ class CameraBase {
     }
 
     PBRT_CPU_GPU
-    Point3f RenderFromCamera(const Point3f &p, Float time) const {
+    Point3f RenderFromCamera(Point3f p, Float time) const {
         return cameraTransform.RenderFromCamera(p, time);
     }
 
@@ -237,7 +235,7 @@ class CameraBase {
     }
 
     PBRT_CPU_GPU
-    Point3f CameraFromRender(const Point3f &p, Float time) const {
+    Point3f CameraFromRender(Point3f p, Float time) const {
         return cameraTransform.CameraFromRender(p, time);
     }
 

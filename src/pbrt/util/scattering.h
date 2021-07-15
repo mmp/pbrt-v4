@@ -152,7 +152,7 @@ class TrowbridgeReitzDistribution {
     Vector3f Sample_wm(Vector3f w, Point2f u) const {
         // Transform _w_ to hemispherical configuration for visible area sampling
         Vector3f wh = Normalize(Vector3f(alpha_x * w.x, alpha_y * w.y, w.z));
-        if (w.z < 0)
+        if (w.z < 0)  /// TODO: look into whether this can actually happen?
             wh = -wh;
 
         // Find orthonormal basis for visible area microfacet sampling

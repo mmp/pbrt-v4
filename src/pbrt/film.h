@@ -256,7 +256,7 @@ class RGBFilm : public FilmBase {
     }
 
     PBRT_CPU_GPU
-    RGB GetPixelRGB(const Point2i &p, Float splatScale = 1) const {
+    RGB GetPixelRGB(Point2i p, Float splatScale = 1) const {
         const Pixel &pixel = pixels[p];
         RGB rgb(pixel.rgbSum[0], pixel.rgbSum[1], pixel.rgbSum[2]);
         // Normalize _rgb_ with weight sum
@@ -343,7 +343,7 @@ class GBufferFilm : public FilmBase {
     bool UsesVisibleSurface() const { return true; }
 
     PBRT_CPU_GPU
-    RGB GetPixelRGB(const Point2i &p, Float splatScale = 1) const {
+    RGB GetPixelRGB(Point2i p, Float splatScale = 1) const {
         const Pixel &pixel = pixels[p];
         RGB rgb(pixel.rgbSum[0], pixel.rgbSum[1], pixel.rgbSum[2]);
 
@@ -433,7 +433,7 @@ inline bool Film::UsesVisibleSurface() const {
 }
 
 PBRT_CPU_GPU
-inline RGB Film::GetPixelRGB(const Point2i &p, Float splatScale) const {
+inline RGB Film::GetPixelRGB(Point2i p, Float splatScale) const {
     auto get = [&](auto ptr) { return ptr->GetPixelRGB(p, splatScale); };
     return Dispatch(get);
 }
