@@ -136,6 +136,11 @@ include (CheckLanguage)
 check_language(CUDA)
 
 if (CMAKE_CUDA_COMPILER)
+  if (CUDA_VERSION_MAJOR LESS 11)
+    message (WARNING "pbrt-v4 requires CUDA version 11.0 or later but version ${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR}\
+was found. GPU support is therefore disabled. If you have multiple versions\
+of CUDA installed, please update your PATH.")
+  else ()
     find_package (CUDA REQUIRED)
 
     # This seems to be necessary starting with 3.17.1, but gives an error
@@ -159,10 +164,8 @@ if (CMAKE_CUDA_COMPILER)
     endif ()
 
     message (STATUS "Found CUDA: ${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR}.${CUDA_VERSION_PATCH}")
-    if (CUDA_VERSION_MAJOR LESS 11)
-      message(SEND_ERROR "pbrt-v4 requires CUDA version 11.0 or later. If you have multiple versions installed, please update your PATH.")
-    elseif (CUDA_VERSION_MINOR EQUAL 3 AND CUDA_VERSION_PATCH LESS 109)
-      message(SEND_ERROR "Unfortunately, pbrt-v4 triggers an internal compiler error in CUDA 11.3.0. Please either use CUDA 11.0-11.2 or 11.3.1 or later.")
+    if (CUDA_VERSION_MAJOR EQUAL 11 AND CUDA_VERSION_MINOR EQUAL 3 AND CUDA_VERSION_PATCH LESS 109)
+      message (SEND_ERROR "Unfortunately, pbrt-v4 triggers an internal compiler error in CUDA 11.3.0. Please either use CUDA 11.0-11.2 or 11.3.1 or later.")
     endif ()
 
     if ("${PBRT_OPTIX7_PATH}" STREQUAL "")
@@ -314,6 +317,7 @@ if (CMAKE_CUDA_COMPILER)
           set (${output_var} ${embedded_file})
         endmacro ()
     endif ()
+  endif()
 else ()
     message (STATUS "CUDA not found")
 endif ()
