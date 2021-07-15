@@ -2802,7 +2802,7 @@ void SPPMIntegrator::Render() {
     // Allocate per-thread _ScratchBuffer_s for SPPM rendering
     std::vector<ScratchBuffer> threadScratchBuffers;
     for (int i = 0; i < MaxThreadIndex(); ++i) {
-        size_t allocSize = nPixels * 4096 / MaxThreadIndex();
+        size_t allocSize = size_t(nPixels) * 4096 / MaxThreadIndex();
         threadScratchBuffers.push_back(ScratchBuffer(allocSize));
     }
 
