@@ -715,6 +715,7 @@ class LayeredBxDF {
             return bs;
         }
         Vector3f w = bs->wi;
+        bool specularPath = bs->IsSpecular();
 
         // Declare _RNG_ for layered BSDF sampling
         RNG rng(Hash(GetOptions().seed, wo), Hash(uc, u));
@@ -757,6 +758,7 @@ class LayeredBxDF {
                         return {};
                     f *= albedo * ps->p;
                     pdf *= ps->pdf;
+                    specularPath = false;
                     w = ps->wi;
                     z = zp;
 
@@ -788,12 +790,14 @@ class LayeredBxDF {
                 return {};
             f *= bs->f;
             pdf *= bs->pdf;
+            specularPath &= bs->IsSpecular();
             w = bs->wi;
 
             // Return _BSDFSample_ if path has left the layers
             if (bs->IsTransmission()) {
-                BxDFFlags flags = SameHemisphere(wo, w) ? BxDFFlags::GlossyReflection
-                                                        : BxDFFlags::GlossyTransmission;
+                BxDFFlags flags = SameHemisphere(wo, w) ? BxDFFlags::Reflection
+                                                        : BxDFFlags::Transmission;
+                flags |= specularPath ? BxDFFlags::Specular : BxDFFlags::Glossy;
                 if (flipWi)
                     w = -w;
                 return BSDFSample(f, w, pdf, flags, 1.f, true);
