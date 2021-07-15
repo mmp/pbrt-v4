@@ -55,7 +55,8 @@ void RenderCPU(ParsedScene &parsedScene) {
                   "The specified camera shutter times imply that the shutter "
                   "does not open.  A black image will result.");
     Film film = Film::Create(parsedScene.film.name, parsedScene.film.parameters,
-                             exposureTime, filter, &parsedScene.film.loc, alloc);
+                             exposureTime, parsedScene.camera.cameraTransform, filter,
+                             &parsedScene.film.loc, alloc);
 
     // Camera
     Medium cameraMedium = findMedium(parsedScene.camera.medium, &parsedScene.camera.loc);

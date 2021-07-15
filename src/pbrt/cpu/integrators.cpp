@@ -708,8 +708,7 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
 
             SampledSpectrum albedo = bsdf.rho(isect.wo, ucRho, uRho);
 
-            *visibleSurf =
-                VisibleSurface(isect, camera.GetCameraTransform(), albedo, lambda);
+            *visibleSurf = VisibleSurface(isect, albedo, lambda);
         }
 
         // Possibly regularize the BSDF
@@ -1140,8 +1139,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
 
             SampledSpectrum albedo = bsdf.rho(isect.wo, ucRho, uRho);
 
-            *visibleSurf =
-                VisibleSurface(isect, camera.GetCameraTransform(), albedo, lambda);
+            *visibleSurf = VisibleSurface(isect, albedo, lambda);
         }
 
         // Terminate path if maximum depth reached

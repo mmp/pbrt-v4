@@ -108,8 +108,8 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(Allocator alloc, ParsedScene &s
                   "The specified camera shutter times imply that the shutter "
                   "does not open.  A black image will result.");
 
-    film = Film::Create(scene.film.name, scene.film.parameters, exposureTime, filter,
-                        &scene.film.loc, alloc);
+    film = Film::Create(scene.film.name, scene.film.parameters, exposureTime,
+                        scene.camera.cameraTransform, filter, &scene.film.loc, alloc);
     initializeVisibleSurface = film.UsesVisibleSurface();
 
     sampler = Sampler::Create(scene.sampler.name, scene.sampler.parameters,

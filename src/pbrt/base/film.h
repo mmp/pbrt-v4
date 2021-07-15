@@ -59,8 +59,8 @@ class Film : public TaggedPointer<RGBFilm, GBufferFilm> {
     using TaggedPointer::TaggedPointer;
 
     static Film Create(const std::string &name, const ParameterDictionary &parameters,
-                       Float exposureTime, Filter filter, const FileLoc *loc,
-                       Allocator alloc);
+                       Float exposureTime, const CameraTransform &cameraTransform,
+                       Filter filter, const FileLoc *loc, Allocator alloc);
 
     std::string ToString() const;
 };

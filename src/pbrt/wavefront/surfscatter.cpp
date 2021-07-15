@@ -172,7 +172,7 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
                 SampledSpectrum albedo = bsdf.rho(isect.wo, ucRho, uRho);
 
                 pixelSampleState.visibleSurface[w.pixelIndex] =
-                    VisibleSurface(isect, camera.GetCameraTransform(), albedo, lambda);
+                    VisibleSurface(isect, albedo, lambda);
             }
 
             // Sample BSDF and enqueue indirect ray at intersection point

@@ -49,7 +49,7 @@ soa VisibleSurface {
     Normal3f n, ns;
     Point2f uv;
     Float time;
-    Float dzdx, dzdy;
+    Vector3f dpdx, dpdy;
     SampledSpectrum albedo;
 };
 

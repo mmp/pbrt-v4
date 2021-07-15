@@ -176,28 +176,25 @@ std::string FilmBase::BaseToString() const {
 }
 
 // VisibleSurface Method Definitions
-VisibleSurface::VisibleSurface(const SurfaceInteraction &si,
-                               const CameraTransform &cameraTransform,
-                               const SampledSpectrum &albedo,
+VisibleSurface::VisibleSurface(const SurfaceInteraction &si, SampledSpectrum albedo,
                                const SampledWavelengths &lambda)
     : albedo(albedo) {
     set = true;
     // Initialize geometric _VisibleSurface_ members
-    Transform cameraFromRender = cameraTransform.CameraFromRender(si.time);
-    p = cameraFromRender(si.p());
-    Vector3f wo = cameraFromRender(si.wo);
-    n = FaceForward(cameraFromRender(si.n), wo);
-    ns = FaceForward(cameraFromRender(si.shading.n), wo);
+    p = si.p();
+    Vector3f wo = si.wo;
+    n = FaceForward(si.n, wo);
+    ns = FaceForward(si.shading.n, wo);
     uv = si.uv;
     time = si.time;
-    dzdx = cameraFromRender(si.dpdx).z;
-    dzdy = cameraFromRender(si.dpdy).z;
+    dpdx = si.dpdx;
+    dpdy = si.dpdy;
 }
 
 std::string VisibleSurface::ToString() const {
-    return StringPrintf("[ VisibleSurface set: %s p: %s n: %s ns: %s dzdx: %f dzdy: %f "
+    return StringPrintf("[ VisibleSurface set: %s p: %s n: %s ns: %s dpdx: %f dpdy: %f "
                         "time: %f albedo: %s ]",
-                        set, p, n, ns, dzdx, dzdy, time, albedo);
+                        set, p, n, ns, dpdx, dpdy, time, albedo);
 }
 
 // PixelSensor Method Definitions
@@ -591,14 +588,32 @@ void GBufferFilm::AddSample(Point2i pFilm, SampledSpectrum L,
         for (int c = 0; c < 3; ++c)
             p.rgbVariance[c].Add(rgb[c]);
 
-        p.pSum += weight * visibleSurface->p;
-
-        p.nSum += weight * visibleSurface->n;
-        p.nsSum += weight * visibleSurface->ns;
+        if (applyInverse) {
+            p.pSum += weight * outputFromRender.ApplyInverse(visibleSurface->p,
+                                                             visibleSurface->time);
+            p.nSum += weight * outputFromRender.ApplyInverse(visibleSurface->n,
+                                                             visibleSurface->time);
+            p.nsSum += weight * outputFromRender.ApplyInverse(visibleSurface->ns,
+                                                              visibleSurface->time);
+            p.dzdxSum +=
+                weight *
+                outputFromRender.ApplyInverse(visibleSurface->dpdx, visibleSurface->time)
+                    .z;
+            p.dzdySum +=
+                weight *
+                outputFromRender.ApplyInverse(visibleSurface->dpdy, visibleSurface->time)
+                    .z;
+        } else {
+            p.pSum += weight * outputFromRender(visibleSurface->p, visibleSurface->time);
+            p.nSum += weight * outputFromRender(visibleSurface->n, visibleSurface->time);
+            p.nsSum +=
+                weight * outputFromRender(visibleSurface->ns, visibleSurface->time);
+            p.dzdxSum +=
+                weight * outputFromRender(visibleSurface->dpdx, visibleSurface->time).z;
+            p.dzdySum +=
+                weight * outputFromRender(visibleSurface->dpdy, visibleSurface->time).z;
+        }
         p.uvSum += weight * visibleSurface->uv;
-
-        p.dzdxSum += weight * visibleSurface->dzdx;
-        p.dzdySum += weight * visibleSurface->dzdy;
 
         SampledSpectrum albedo =
             visibleSurface->albedo * colorSpace->illuminant.Sample(lambda);
@@ -612,9 +627,12 @@ void GBufferFilm::AddSample(Point2i pFilm, SampledSpectrum L,
     p.weightSum += weight;
 }
 
-GBufferFilm::GBufferFilm(FilmBaseParameters p, const RGBColorSpace *colorSpace,
+GBufferFilm::GBufferFilm(FilmBaseParameters p, const AnimatedTransform &outputFromRender,
+                         bool applyInverse, const RGBColorSpace *colorSpace,
                          Float maxComponentValue, bool writeFP16, Allocator alloc)
     : FilmBase(p),
+      outputFromRender(outputFromRender),
+      applyInverse(applyInverse),
       pixels(pixelBounds, alloc),
       colorSpace(colorSpace),
       maxComponentValue(maxComponentValue),
@@ -770,13 +788,15 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
 }
 
 std::string GBufferFilm::ToString() const {
-    return StringPrintf("[ GBufferFilm %s colorSpace: %s maxComponentValue: %f "
-                        "writeFP16: %s ]",
-                        BaseToString(), *colorSpace, maxComponentValue, writeFP16);
+    return StringPrintf("[ GBufferFilm %s outputFromRender: %s applyInverse: %s "
+                        "colorSpace: %s maxComponentValue: %f writeFP16: %s ]",
+                        BaseToString(), outputFromRender, applyInverse, *colorSpace,
+                        maxComponentValue, writeFP16);
 }
 
 GBufferFilm *GBufferFilm::Create(const ParameterDictionary &parameters,
-                                 Float exposureTime, Filter filter,
+                                 Float exposureTime,
+                                 const CameraTransform &cameraTransform, Filter filter,
                                  const RGBColorSpace *colorSpace, const FileLoc *loc,
                                  Allocator alloc) {
     Float maxComponentValue = parameters.GetOneFloat("maxcomponentvalue", Infinity);
@@ -791,19 +811,34 @@ GBufferFilm *GBufferFilm::Create(const ParameterDictionary &parameters,
         ErrorExit(loc, "%s: EXR is the only format supported by the GBufferFilm.",
                   filmBaseParameters.filename);
 
-    return alloc.new_object<GBufferFilm>(filmBaseParameters, colorSpace,
-                                         maxComponentValue, writeFP16, alloc);
+    std::string coordinateSystem = parameters.GetOneString("coordinatesystem", "camera");
+    AnimatedTransform outputFromRender;
+    bool applyInverse = false;
+    if (coordinateSystem == "camera") {
+        outputFromRender = cameraTransform.RenderFromCamera();
+        applyInverse = true;
+    } else if (coordinateSystem == "world")
+        outputFromRender = AnimatedTransform(cameraTransform.WorldFromRender());
+    else
+        ErrorExit(loc,
+                  "%s: unknown coordinate system for GBufferFilm. (Expecting \"camera\" "
+                  "or \"world\".)",
+                  coordinateSystem);
+
+    return alloc.new_object<GBufferFilm>(filmBaseParameters, outputFromRender,
+                                         applyInverse, colorSpace, maxComponentValue,
+                                         writeFP16, alloc);
 }
 
 Film Film::Create(const std::string &name, const ParameterDictionary &parameters,
-                  Float exposureTime, Filter filter, const FileLoc *loc,
-                  Allocator alloc) {
+                  Float exposureTime, const CameraTransform &cameraTransform,
+                  Filter filter, const FileLoc *loc, Allocator alloc) {
     Film film;
     if (name == "rgb")
         film = RGBFilm::Create(parameters, exposureTime, filter, parameters.ColorSpace(),
                                loc, alloc);
     else if (name == "gbuffer")
-        film = GBufferFilm::Create(parameters, exposureTime, filter,
+        film = GBufferFilm::Create(parameters, exposureTime, cameraTransform, filter,
                                    parameters.ColorSpace(), loc, alloc);
     else
         ErrorExit(loc, "%s: film type unknown.", name);

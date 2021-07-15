@@ -135,8 +135,8 @@ class VisibleSurface {
   public:
     // VisibleSurface Public Methods
     PBRT_CPU_GPU
-    VisibleSurface(const SurfaceInteraction &si, const CameraTransform &cameraTransform,
-                   const SampledSpectrum &albedo, const SampledWavelengths &lambda);
+    VisibleSurface(const SurfaceInteraction &si, SampledSpectrum albedo,
+                   const SampledWavelengths &lambda);
 
     PBRT_CPU_GPU
     operator bool() const { return set; }
@@ -150,7 +150,7 @@ class VisibleSurface {
     Normal3f n, ns;
     Point2f uv;
     Float time = 0;
-    Float dzdx = 0, dzdy = 0;
+    Vector3f dpdx, dpdy;
     SampledSpectrum albedo;
     bool set = false;
 };
@@ -318,13 +318,15 @@ class RGBFilm : public FilmBase {
 class GBufferFilm : public FilmBase {
   public:
     // GBufferFilm Public Methods
-    GBufferFilm(FilmBaseParameters p, const RGBColorSpace *colorSpace,
+    GBufferFilm(FilmBaseParameters p, const AnimatedTransform &outputFromRender,
+                bool applyInverse, const RGBColorSpace *colorSpace,
                 Float maxComponentValue = Infinity, bool writeFP16 = true,
                 Allocator alloc = {});
 
     static GBufferFilm *Create(const ParameterDictionary &parameters, Float exposureTime,
-                               Filter filter, const RGBColorSpace *colorSpace,
-                               const FileLoc *loc, Allocator alloc);
+                               const CameraTransform &cameraTransform, Filter filter,
+                               const RGBColorSpace *colorSpace, const FileLoc *loc,
+                               Allocator alloc);
 
     PBRT_CPU_GPU
     void AddSample(Point2i pFilm, SampledSpectrum L, const SampledWavelengths &lambda,
@@ -382,6 +384,8 @@ class GBufferFilm : public FilmBase {
     };
 
     // GBufferFilm Private Members
+    AnimatedTransform outputFromRender;
+    bool applyInverse;
     Array2D<Pixel> pixels;
     const RGBColorSpace *colorSpace;
     Float maxComponentValue;
