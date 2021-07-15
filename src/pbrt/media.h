@@ -84,7 +84,7 @@ struct MediumSample {
 
 // MediumProperties Definition
 struct MediumProperties {
-    SampledSpectrum sigma_a, sigma;
+    SampledSpectrum sigma_a, sigma_s;
     PhaseFunction phase;
     SampledSpectrum Le;
 };
