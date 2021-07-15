@@ -1248,6 +1248,8 @@ class Curve {
     PBRT_CPU_GPU
     DirectionCone NormalBounds() const { return DirectionCone::EntireSphere(); }
 
+    BilinearPatchMesh *Dice(int nSegs, Allocator alloc) const;
+
   private:
     // Curve Private Methods
     bool IntersectRay(const Ray &r, Float tMax,
