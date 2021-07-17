@@ -193,33 +193,33 @@ UniformGridMediumProvider::UniformGridMediumProvider(
     pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbGrid, Spectrum Le,
     SampledGrid<Float> LeGrid, Allocator alloc)
     : bounds(bounds),
-      density(std::move(d)),
-      sigma_a(std::move(sa)),
-      sigma_s(std::move(ss)),
-      rgb(std::move(rgbGrid)),
+      densityGrid(std::move(d)),
+      sigma_aGrid(std::move(sa)),
+      sigma_sGrid(std::move(ss)),
+      rgbGrid(std::move(rgbGrid)),
       Le_spec(Le, alloc),
       LeScale(std::move(LeGrid)) {
-    if (density) {
-        CHECK(!sigma_a && !sigma_s && !rgb);
+    if (densityGrid) {
+        CHECK(!sigma_aGrid && !sigma_sGrid && !rgbGrid);
     }
-    if (sigma_a) {
-        CHECK(sigma_s && !density && !rgb);
+    if (sigma_aGrid) {
+        CHECK(sigma_sGrid && !densityGrid && !rgbGrid);
     }
-    if (sigma_s) {
-        CHECK(sigma_a);
+    if (sigma_sGrid) {
+        CHECK(sigma_aGrid);
     }
-    if (rgb) {
-        CHECK(!density && !sigma_a && !sigma_s);
+    if (rgbGrid) {
+        CHECK(!densityGrid && !sigma_aGrid && !sigma_sGrid);
     }
     volumeGridBytes += LeScale.BytesAllocated();
-    if (density)
-        volumeGridBytes += density->BytesAllocated();
-    if (sigma_a)
-        volumeGridBytes += sigma_a->BytesAllocated();
-    if (sigma_s)
-        volumeGridBytes += sigma_s->BytesAllocated();
-    if (rgb)
-        volumeGridBytes += rgb->BytesAllocated();
+    if (densityGrid)
+        volumeGridBytes += densityGrid->BytesAllocated();
+    if (sigma_aGrid)
+        volumeGridBytes += sigma_aGrid->BytesAllocated();
+    if (sigma_sGrid)
+        volumeGridBytes += sigma_sGrid->BytesAllocated();
+    if (rgbGrid)
+        volumeGridBytes += rgbGrid->BytesAllocated();
 }
 
 UniformGridMediumProvider *UniformGridMediumProvider::Create(

@@ -160,11 +160,11 @@ class HomogeneousMedium {
 };
 
 // CuboidMedium Definition
-template <typename Provider>
+template <typename CuboidProvider>
 class CuboidMedium {
   public:
     // CuboidMedium Public Methods
-    CuboidMedium(const Provider *provider, Spectrum sigma_a, Spectrum sigma_s,
+    CuboidMedium(const CuboidProvider *provider, Spectrum sigma_a, Spectrum sigma_s,
                  Float sigScale, Float g, const Transform &renderFromMedium,
                  Allocator alloc)
         : provider(provider),
@@ -227,7 +227,7 @@ class CuboidMedium {
         Float nextCrossingT[3], deltaT[3];
         int step[3], voxelLimit[3], voxel[3];
         for (int axis = 0; axis < 3; ++axis) {
-            // Initialize ray stepping parameters for axis
+            // Initialize ray stepping parameters for _axis_
             // Compute current voxel for axis and handle negative zero direction
             voxel[axis] = Clamp(gridIntersect[axis] * gridResolution[axis], 0,
                                 gridResolution[axis] - 1);
@@ -292,8 +292,8 @@ class CuboidMedium {
                         T_majAccum = SampledSpectrum(1.f);
                         Point3f p = ray(t);
                         MediumDensity d = provider->Density(p, lambda);
-                        SampledSpectrum sigmap_a = sigma_a * d.sigma_a,
-                                        sigmap_s = sigma_s * d.sigma_s;
+                        SampledSpectrum sigmap_a = sigma_a * d.sigma_a;
+                        SampledSpectrum sigmap_s = sigma_s * d.sigma_s;
                         SampledSpectrum Le = provider->Le(p, lambda);
 
                         // Report scattering event in grid to callback function
@@ -321,10 +321,10 @@ class CuboidMedium {
         return T_majAccum;
     }
 
-    static CuboidMedium<Provider> *Create(const Provider *provider,
-                                          const ParameterDictionary &parameters,
-                                          const Transform &renderFromMedium,
-                                          const FileLoc *loc, Allocator alloc) {
+    static CuboidMedium<CuboidProvider> *Create(const CuboidProvider *provider,
+                                                const ParameterDictionary &parameters,
+                                                const Transform &renderFromMedium,
+                                                const FileLoc *loc, Allocator alloc) {
         Spectrum sig_a = nullptr, sig_s = nullptr;
         std::string preset = parameters.GetOneString("preset", "");
         if (!preset.empty()) {
@@ -349,13 +349,13 @@ class CuboidMedium {
 
         Float g = parameters.GetOneFloat("g", 0.0f);
 
-        return alloc.new_object<CuboidMedium<Provider>>(provider, sig_a, sig_s, sigScale,
-                                                        g, renderFromMedium, alloc);
+        return alloc.new_object<CuboidMedium<CuboidProvider>>(
+            provider, sig_a, sig_s, sigScale, g, renderFromMedium, alloc);
     }
 
   private:
     // CuboidMedium Private Members
-    const Provider *provider;
+    const CuboidProvider *provider;
     Bounds3f mediumBounds;
     DenselySampledSpectrum sigma_a_spec, sigma_s_spec;
     Float sigScale;
@@ -395,17 +395,17 @@ class UniformGridMediumProvider {
     PBRT_CPU_GPU
     MediumDensity Density(Point3f p, const SampledWavelengths &lambda) const {
         Point3f pp = Point3f(bounds.Offset(p));
-        if (density)
-            return MediumDensity(density->Lookup(pp));
-        else if (sigma_a)
-            return MediumDensity(SampledSpectrum(sigma_a->Lookup(pp)),
-                                 SampledSpectrum(sigma_s->Lookup(pp)));
+        if (densityGrid)
+            return MediumDensity(densityGrid->Lookup(pp));
+        else if (sigma_aGrid)
+            return MediumDensity(SampledSpectrum(sigma_aGrid->Lookup(pp)),
+                                 SampledSpectrum(sigma_sGrid->Lookup(pp)));
         else {
             // Return _SampledSpectrum_ density from _rgb_
             auto convert = [=] PBRT_CPU_GPU(RGBUnboundedSpectrum s) {
                 return s.Sample(lambda);
             };
-            SampledSpectrum d = rgb->Lookup(pp, convert);
+            SampledSpectrum d = rgbGrid->Lookup(pp, convert);
             return MediumDensity(d, d);
         }
     }
@@ -422,16 +422,16 @@ class UniformGridMediumProvider {
                         Point3f(x / res->x, y / res->y, z / res->z),
                         Point3f((x + 1) / res->x, (y + 1) / res->y, (z + 1) / res->z));
                     // Set current _maxGrid_ entry for maximum density over _bounds_
-                    if (density)
-                        maxGrid[offset++] = density->MaxValue(bounds);
-                    else if (sigma_a)
+                    if (densityGrid)
+                        maxGrid[offset++] = densityGrid->MaxValue(bounds);
+                    else if (sigma_aGrid)
                         maxGrid[offset++] =
-                            sigma_a->MaxValue(bounds) + sigma_s->MaxValue(bounds);
+                            sigma_aGrid->MaxValue(bounds) + sigma_sGrid->MaxValue(bounds);
                     else {
                         auto max = [] PBRT_CPU_GPU(RGBUnboundedSpectrum s) {
                             return s.MaxValue();
                         };
-                        maxGrid[offset++] = rgb->MaxValue(bounds, max);
+                        maxGrid[offset++] = rgbGrid->MaxValue(bounds, max);
                     }
                 }
 
@@ -441,9 +441,9 @@ class UniformGridMediumProvider {
   private:
     // UniformGridMediumProvider Private Members
     Bounds3f bounds;
-    pstd::optional<SampledGrid<Float>> density;
-    pstd::optional<SampledGrid<Float>> sigma_a, sigma_s;
-    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgb;
+    pstd::optional<SampledGrid<Float>> densityGrid;
+    pstd::optional<SampledGrid<Float>> sigma_aGrid, sigma_sGrid;
+    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbGrid;
     DenselySampledSpectrum Le_spec;
     SampledGrid<Float> LeScale;
 };
