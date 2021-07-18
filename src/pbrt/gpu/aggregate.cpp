@@ -489,11 +489,10 @@ OptixTraversableHandle OptiXAggregate::createGASForBLPs(
     const std::map<std::string, Medium> &media,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
     Bounds3f *gasBounds) {
-    std::vector<OptixBuildInput> buildInputs;
-    pstd::vector<OptixAabb> shapeAABBs(alloc);
-    std::vector<CUdeviceptr> aabbPtrs;
-    std::vector<uint32_t> flags;
-
+    // Create meshes
+    std::vector<BilinearPatchMesh *> meshes(shapes.size(), nullptr);
+    std::vector<int> shapeIndexToBuildInputIndex(shapes.size(), -1);
+    int nPatches = 0, nBuildInputs = 0;
     for (size_t shapeIndex = 0; shapeIndex < shapes.size(); ++shapeIndex) {
         const auto &shape = shapes[shapeIndex];
         if (shape.name != "bilinearmesh")
@@ -502,29 +501,55 @@ OptixTraversableHandle OptiXAggregate::createGASForBLPs(
         BilinearPatchMesh *mesh =
             BilinearPatch::CreateMesh(shape.renderFromObject, shape.reverseOrientation,
                                       shape.parameters, &shape.loc, alloc);
-        CHECK(mesh != nullptr);
 
-        OptixBuildInput buildInput = {};
-        buildInput.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
-        buildInput.customPrimitiveArray.numSbtRecords = 1;
-        buildInput.customPrimitiveArray.numPrimitives = mesh->nVertices;
-        // aabbBuffers and flags pointers are set when we're done
-        buildInputs.push_back(buildInput);
+        shapeIndexToBuildInputIndex[shapeIndex] = nBuildInputs;
+        nPatches += mesh->nPatches;
+        ++nBuildInputs;
 
-        Bounds3f shapeBounds;
-        for (size_t i = 0; i < mesh->nVertices; ++i)
-            shapeBounds = Union(shapeBounds, mesh->p[i]);
+        meshes[shapeIndex] = mesh;
+    }
 
-        OptixAabb aabb = {float(shapeBounds.pMin.x), float(shapeBounds.pMin.y), float(shapeBounds.pMin.z),
-                          float(shapeBounds.pMax.x), float(shapeBounds.pMax.y), float(shapeBounds.pMax.z)};
-        shapeAABBs.push_back(aabb);
+    if (nBuildInputs == 0)
+        return {};
 
-        *gasBounds = Union(*gasBounds, shapeBounds);
+    // Create build inputs
+    OptixAabb *aabbs = alloc.allocate_object<OptixAabb>(nPatches);
+    OptixAabb *aabbPtr = aabbs;
+    std::vector<OptixBuildInput> buildInputs(nBuildInputs);
+    std::vector<CUdeviceptr> aabbDevicePtrs(nBuildInputs);
+    std::vector<uint32_t> flags(nBuildInputs);
+    for (size_t shapeIndex = 0; shapeIndex < meshes.size(); ++shapeIndex) {
+        BilinearPatchMesh *mesh = meshes[shapeIndex];
+        if (!mesh)
+            continue;
 
+        int buildInputIndex = shapeIndexToBuildInputIndex[shapeIndex];
+
+        buildInputs[buildInputIndex].type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
+        buildInputs[buildInputIndex].customPrimitiveArray.numSbtRecords = 1;
+        buildInputs[buildInputIndex].customPrimitiveArray.numPrimitives = mesh->nPatches;
+        aabbDevicePtrs[buildInputIndex] = CUdeviceptr(aabbPtr);
+        buildInputs[buildInputIndex].customPrimitiveArray.aabbBuffers = &aabbDevicePtrs[buildInputIndex];
+        buildInputs[buildInputIndex].customPrimitiveArray.flags = &flags[buildInputIndex];
+
+        for (int patchIndex = 0; patchIndex < mesh->nPatches; ++patchIndex) {
+            Bounds3f shapeBounds;
+            for (int i = 0; i < 4; ++i)
+                shapeBounds = Union(shapeBounds, mesh->p[mesh->vertexIndices[4 * patchIndex + i]]);
+
+            OptixAabb aabb = {float(shapeBounds.pMin.x), float(shapeBounds.pMin.y), float(shapeBounds.pMin.z),
+                              float(shapeBounds.pMax.x), float(shapeBounds.pMax.y), float(shapeBounds.pMax.z)};
+            *aabbPtr = aabb;
+            ++aabbPtr;
+
+            *gasBounds = Union(*gasBounds, shapeBounds);
+        }
+
+        const auto &shape = shapes[shapeIndex];
         Material material = getMaterial(shape, namedMaterials, materials);
         FloatTexture alphaTexture = getAlphaTexture(shape, floatTextures, alloc);
 
-        flags.push_back(getOptixGeometryFlags(false, alphaTexture, material));
+        flags[buildInputIndex] = getOptixGeometryFlags(false, alphaTexture, material);
 
         HitgroupRecord hgRecord;
         OPTIX_CHECK(optixSbtRecordPackHeader(intersectPG, &hgRecord));
@@ -553,21 +578,13 @@ OptixTraversableHandle OptiXAggregate::createGASForBLPs(
 
         OPTIX_CHECK(optixSbtRecordPackHeader(shadowPG, &hgRecord));
         shadowHGRecords.push_back(hgRecord);
-    }
+    };
 
-    if (buildInputs.empty())
-        return {};
+    OptixTraversableHandle handle = buildBVH(buildInputs);
 
-    for (size_t i = 0; i < shapeAABBs.size(); ++i)
-        aabbPtrs.push_back(CUdeviceptr(&shapeAABBs[i]));
+    alloc.deallocate_object(aabbs, nPatches);
 
-    CHECK_EQ(buildInputs.size(), flags.size());
-    for (size_t i = 0; i < buildInputs.size(); ++i) {
-        buildInputs[i].customPrimitiveArray.aabbBuffers = &aabbPtrs[i];
-        buildInputs[i].customPrimitiveArray.flags = &flags[i];
-    }
-
-    return buildBVH(buildInputs);
+    return handle;
 }
 
 OptixTraversableHandle OptiXAggregate::createGASForQuadrics(
