@@ -919,7 +919,9 @@ pstd::vector<Shape> Curve::Create(const Transform *renderFromObject,
         return {};
     }
 
-    int sd = parameters.GetOneInt("splitdepth", 3);
+    // This is kind of a hack, but since we dice curves on the GPU we
+    // really don't want to have them split here.
+    int sd = Options->useGPU ? 0 : parameters.GetOneInt("splitdepth", 3);
 
     if (type == CurveType::Ribbon && n.empty()) {
         Error(loc, "Must provide normals \"N\" at curve endpoints with ribbon "

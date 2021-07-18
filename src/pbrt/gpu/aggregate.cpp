@@ -493,20 +493,32 @@ OptixTraversableHandle OptiXAggregate::createGASForBLPs(
     std::vector<BilinearPatchMesh *> meshes(shapes.size(), nullptr);
     std::vector<int> shapeIndexToBuildInputIndex(shapes.size(), -1);
     int nPatches = 0, nBuildInputs = 0;
+
     for (size_t shapeIndex = 0; shapeIndex < shapes.size(); ++shapeIndex) {
         const auto &shape = shapes[shapeIndex];
-        if (shape.name != "bilinearmesh")
-            continue;
+        BilinearPatchMesh *mesh = nullptr;
+        if (shape.name == "bilinearmesh")
+            mesh = BilinearPatch::CreateMesh(shape.renderFromObject, shape.reverseOrientation,
+                                             shape.parameters, &shape.loc, alloc);
+        else if (shape.name == "curve") {
+            // Use the default allocator since there's no need for
+            // allocating GPU memory for these...
+            pstd::vector<Shape> curves = Curve::Create(shape.renderFromObject, shape.objectFromRender,
+                                                       shape.reverseOrientation, shape.parameters,
+                                                       &shape.loc, Allocator());
+            CHECK_EQ(1, curves.size());
 
-        BilinearPatchMesh *mesh =
-            BilinearPatch::CreateMesh(shape.renderFromObject, shape.reverseOrientation,
-                                      shape.parameters, &shape.loc, alloc);
+            const Curve *curve = curves[0].CastOrNullptr<Curve>();
+            CHECK(curve != nullptr);
+            mesh = curve->Dice(4 /* nsegs */, alloc);
+        }
 
-        shapeIndexToBuildInputIndex[shapeIndex] = nBuildInputs;
-        nPatches += mesh->nPatches;
-        ++nBuildInputs;
+        if (mesh) {
+            shapeIndexToBuildInputIndex[shapeIndex] = nBuildInputs++;
+            nPatches += mesh->nPatches;
 
-        meshes[shapeIndex] = mesh;
+            meshes[shapeIndex] = mesh;
+        }
     }
 
     if (nBuildInputs == 0)
@@ -1065,19 +1077,12 @@ OptiXAggregate::OptiXAggregate(
     LOG_VERBOSE("Finished OptiX initialization");
 
     LOG_VERBOSE("Starting to create shapes and acceleration structures");
-    int nCurveWarnings = 0;
     for (const auto &shape : scene.shapes)
         if (shape.name != "sphere" && shape.name != "cylinder" && shape.name != "disk" &&
             shape.name != "trianglemesh" && shape.name != "plymesh" &&
-            shape.name != "loopsubdiv" && shape.name != "bilinearmesh") {
-            if (shape.name == "curve") {
-                if (++nCurveWarnings < 10)
-                    Warning(&shape.loc, "\"curve\" shape is not yet supported on the GPU.");
-                else if (nCurveWarnings == 10)
-                    Warning(&shape.loc, "\"curve\" shape is not yet supported on the GPU. (Silencing further warnings.) ");
-            } else
-                ErrorExit(&shape.loc, "%s: unknown shape", shape.name);
-        }
+            shape.name != "loopsubdiv" && shape.name != "bilinearmesh" &&
+            shape.name != "curve")
+            ErrorExit(&shape.loc, "%s: unknown shape", shape.name);
 
     std::map<int, TriQuadMesh> plyMeshes = PreparePLYMeshes(scene.shapes, textures.floatTextures);
     OptixTraversableHandle triangleGASTraversable = createGASForTriangles(
