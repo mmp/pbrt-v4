@@ -491,11 +491,15 @@ Float WavefrontPathIntegrator::Render() {
                               Options->quiet, Options->useGPU);
     for (int sampleIndex = firstSampleIndex; sampleIndex < lastSampleIndex;
          ++sampleIndex) {
+        // Attempt to work around issue #145.
+#if !(defined(PBRT_IS_WINDOWS) && defined(PBRT_BUILD_GPU_RENDERER) && \
+      __CUDACC_VER_MAJOR__ == 11 && __CUDACC_VER_MINIOR__ == 1)
         CheckCallbackScope _([&]() {
             return StringPrintf("Wavefront rendering failed at sample %d. Debug with "
                                 "\"--debugstart %d\"\n",
                                 sampleIndex, sampleIndex);
         });
+#endif
 
         // Render image for sample _sampleIndex_
         LOG_VERBOSE("Starting to submit work for sample %d", sampleIndex);
