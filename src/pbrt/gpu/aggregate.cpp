@@ -490,59 +490,58 @@ OptixTraversableHandle OptiXAggregate::createGASForBLPs(
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
     Bounds3f *gasBounds) {
     // Create meshes
-    std::vector<BilinearPatchMesh *> meshes(shapes.size(), nullptr);
-    std::vector<int> shapeIndexToBuildInputIndex(shapes.size(), -1);
-    int nPatches = 0, nBuildInputs = 0;
+    std::vector<BilinearPatchMesh *> meshes;
+    std::vector<int> meshIndexToShapeIndex;
+    int nPatches = 0;
 
     for (size_t shapeIndex = 0; shapeIndex < shapes.size(); ++shapeIndex) {
         const auto &shape = shapes[shapeIndex];
         BilinearPatchMesh *mesh = nullptr;
-        if (shape.name == "bilinearmesh")
-            mesh = BilinearPatch::CreateMesh(shape.renderFromObject, shape.reverseOrientation,
-                                             shape.parameters, &shape.loc, alloc);
-        else if (shape.name == "curve") {
+        if (shape.name == "bilinearmesh") {
+            BilinearPatchMesh *mesh = BilinearPatch::CreateMesh(shape.renderFromObject, shape.reverseOrientation,
+                                                                shape.parameters, &shape.loc, alloc);
+
+            nPatches += mesh->nPatches;
+            meshes.push_back(mesh);
+            meshIndexToShapeIndex.push_back(shapeIndex);
+        } else if (shape.name == "curve") {
             // Use the default allocator since there's no need for
             // allocating GPU memory for these...
             pstd::vector<Shape> curves = Curve::Create(shape.renderFromObject, shape.objectFromRender,
                                                        shape.reverseOrientation, shape.parameters,
                                                        &shape.loc, Allocator());
-            CHECK_EQ(1, curves.size());
 
-            const Curve *curve = curves[0].CastOrNullptr<Curve>();
-            CHECK(curve != nullptr);
-            mesh = curve->Dice(4 /* nsegs */, alloc);
-        }
+            for (size_t i = 0; i < curves.size(); ++i) {
+                const Curve *curve = curves[i].CastOrNullptr<Curve>();
+                CHECK(curve != nullptr);
+                BilinearPatchMesh *mesh = curve->Dice(4 /* nsegs */, alloc);
 
-        if (mesh) {
-            shapeIndexToBuildInputIndex[shapeIndex] = nBuildInputs++;
-            nPatches += mesh->nPatches;
-
-            meshes[shapeIndex] = mesh;
+                nPatches += mesh->nPatches;
+                meshes.push_back(mesh);
+                meshIndexToShapeIndex.push_back(shapeIndex);
+            }
         }
     }
 
-    if (nBuildInputs == 0)
+    if (meshes.size() == 0)
         return {};
 
     // Create build inputs
     OptixAabb *aabbs = alloc.allocate_object<OptixAabb>(nPatches);
     OptixAabb *aabbPtr = aabbs;
-    std::vector<OptixBuildInput> buildInputs(nBuildInputs);
-    std::vector<CUdeviceptr> aabbDevicePtrs(nBuildInputs);
-    std::vector<uint32_t> flags(nBuildInputs);
-    for (size_t shapeIndex = 0; shapeIndex < meshes.size(); ++shapeIndex) {
-        BilinearPatchMesh *mesh = meshes[shapeIndex];
-        if (!mesh)
-            continue;
+    std::vector<OptixBuildInput> buildInputs(meshes.size());
+    std::vector<CUdeviceptr> aabbDevicePtrs(meshes.size());
+    std::vector<uint32_t> flags(meshes.size());
+    for (size_t meshIndex = 0; meshIndex < meshes.size(); ++meshIndex) {
+        BilinearPatchMesh *mesh = meshes[meshIndex];
+        int shapeIndex = meshIndexToShapeIndex[meshIndex];
 
-        int buildInputIndex = shapeIndexToBuildInputIndex[shapeIndex];
-
-        buildInputs[buildInputIndex].type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
-        buildInputs[buildInputIndex].customPrimitiveArray.numSbtRecords = 1;
-        buildInputs[buildInputIndex].customPrimitiveArray.numPrimitives = mesh->nPatches;
-        aabbDevicePtrs[buildInputIndex] = CUdeviceptr(aabbPtr);
-        buildInputs[buildInputIndex].customPrimitiveArray.aabbBuffers = &aabbDevicePtrs[buildInputIndex];
-        buildInputs[buildInputIndex].customPrimitiveArray.flags = &flags[buildInputIndex];
+        buildInputs[meshIndex].type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
+        buildInputs[meshIndex].customPrimitiveArray.numSbtRecords = 1;
+        buildInputs[meshIndex].customPrimitiveArray.numPrimitives = mesh->nPatches;
+        aabbDevicePtrs[meshIndex] = CUdeviceptr(aabbPtr);
+        buildInputs[meshIndex].customPrimitiveArray.aabbBuffers = &aabbDevicePtrs[meshIndex];
+        buildInputs[meshIndex].customPrimitiveArray.flags = &flags[meshIndex];
 
         for (int patchIndex = 0; patchIndex < mesh->nPatches; ++patchIndex) {
             Bounds3f shapeBounds;
@@ -561,7 +560,7 @@ OptixTraversableHandle OptiXAggregate::createGASForBLPs(
         Material material = getMaterial(shape, namedMaterials, materials);
         FloatTexture alphaTexture = getAlphaTexture(shape, floatTextures, alloc);
 
-        flags[buildInputIndex] = getOptixGeometryFlags(false, alphaTexture, material);
+        flags[meshIndex] = getOptixGeometryFlags(false, alphaTexture, material);
 
         HitgroupRecord hgRecord;
         OPTIX_CHECK(optixSbtRecordPackHeader(intersectPG, &hgRecord));
