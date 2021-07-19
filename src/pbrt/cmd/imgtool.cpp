@@ -2498,10 +2498,8 @@ int denoise_optix(std::vector<std::string> args) {
         CUdeviceptr(denoiserState), memorySizes.stateSizeInBytes,
         CUdeviceptr(scratchBuffer), memorySizes.withoutOverlapScratchSizeInBytes));
 
-    CUDAMemoryResource cudaMemoryResource;
-    Allocator alloc(&cudaMemoryResource);
-
-    OptixImage2D *inputLayers = alloc.allocate_object<OptixImage2D>(nLayers);
+    size_t imageBytes = 3 * image.Resolution().x * image.Resolution().y * sizeof(float);
+    std::vector<OptixImage2D> inputLayers(nLayers);
     for (int i = 0; i < nLayers; ++i) {
         inputLayers[i].width = image.Resolution().x;
         inputLayers[i].height = image.Resolution().y;
@@ -2510,7 +2508,7 @@ int denoise_optix(std::vector<std::string> args) {
         inputLayers[i].format = OPTIX_PIXEL_FORMAT_FLOAT3;
 
         size_t sz = 3 * image.Resolution().x * image.Resolution().y;
-        float *buf = alloc.allocate_object<float>(sz);
+        std::vector<float> bufHost(sz);
         int offset = 0;
         for (int y = 0; y < image.Resolution().y; ++y)
             for (int x = 0; x < image.Resolution().x; ++x) {
@@ -2518,27 +2516,28 @@ int denoise_optix(std::vector<std::string> args) {
                 if (i == 2)
                     v[2] *= -1;  // flip z--right handed...
                 for (int c = 0; c < 3; ++c)
-                    buf[offset++] = v[c];
+                    bufHost[offset++] = v[c];
             }
 
-        inputLayers[i].data = CUdeviceptr(buf);
+        void *bufGPU;
+        CUDA_CHECK(cudaMalloc(&bufGPU, imageBytes));
+        CUDA_CHECK(cudaMemcpy(bufGPU, bufHost.data(), imageBytes, cudaMemcpyHostToDevice));
+        inputLayers[i].data = CUdeviceptr(bufGPU);
     }
 
-    OptixImage2D *outputImage = alloc.allocate_object<OptixImage2D>();
-    outputImage->width = image.Resolution().x;
-    outputImage->height = image.Resolution().y;
-    outputImage->rowStrideInBytes = image.Resolution().x * 3 * sizeof(float);
-    outputImage->pixelStrideInBytes = 0;
-    outputImage->format = OPTIX_PIXEL_FORMAT_FLOAT3;
+    OptixImage2D outputImage;
+    outputImage.width = image.Resolution().x;
+    outputImage.height = image.Resolution().y;
+    outputImage.rowStrideInBytes = image.Resolution().x * 3 * sizeof(float);
+    outputImage.pixelStrideInBytes = 0;
+    outputImage.format = OPTIX_PIXEL_FORMAT_FLOAT3;
+    CUDA_CHECK(cudaMalloc((void **)&outputImage.data, imageBytes));
 
-    float *intensity = alloc.allocate_object<float>();
+    void *intensity;
+    CUDA_CHECK(cudaMalloc(&intensity, sizeof(float)));
     OPTIX_CHECK(optixDenoiserComputeIntensity(
         denoiserHandle, 0 /* stream */, &inputLayers[0], CUdeviceptr(intensity),
         CUdeviceptr(scratchBuffer), memorySizes.withoutOverlapScratchSizeInBytes));
-
-    size_t sz = 3 * image.Resolution().x * image.Resolution().y;
-    pstd::vector<float> buf(sz, alloc);
-    outputImage->data = CUdeviceptr(buf.data());
 
     OptixDenoiserParams params = {};
     params.denoiseAlpha = 0;
@@ -2551,9 +2550,10 @@ int denoise_optix(std::vector<std::string> args) {
         guideLayer.albedo = inputLayers[1];
         guideLayer.normal = inputLayers[2];
     }
+
     OptixDenoiserLayer layers;
     layers.input = inputLayers[0];
-    layers.output = *outputImage;
+    layers.output = outputImage;
 
     OPTIX_CHECK(optixDenoiserInvoke(
         denoiserHandle, 0 /* stream */, &params, CUdeviceptr(denoiserState),
@@ -2564,14 +2564,17 @@ int denoise_optix(std::vector<std::string> args) {
 #else
     OPTIX_CHECK(optixDenoiserInvoke(
         denoiserHandle, 0 /* stream */, &params, CUdeviceptr(denoiserState),
-        memorySizes.stateSizeInBytes, inputLayers, nLayers, 0 /* offset x */, 0 /* offset y */,
-        outputImage, CUdeviceptr(scratchBuffer),
+        memorySizes.stateSizeInBytes, inputLayers.data(), nLayers,
+        0 /* offset x */, 0 /* offset y */,
+        &outputImage, CUdeviceptr(scratchBuffer),
         memorySizes.withoutOverlapScratchSizeInBytes));
 #endif
 
     CUDA_CHECK(cudaDeviceSynchronize());
 
-    Image result(buf, image.Resolution(), {"R", "G", "B"});
+    Image result(PixelFormat::Float, image.Resolution(), {"R", "G", "B"});
+    CUDA_CHECK(cudaMemcpy(result.RawPointer({0,0}), (const void *)outputImage.data,
+                          imageBytes, cudaMemcpyDeviceToHost));
     CHECK(result.Write(outFilename));
 
     return 0;
