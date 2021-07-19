@@ -739,7 +739,7 @@ class PiecewiseConstant2D {
                                        domain.pMax[0], alloc);
 
         // Compute marginal sampling distribution $p[\tilde{v}]$
-        std::vector<Float> marginalFunc;
+        pstd::vector<Float> marginalFunc;
         marginalFunc.reserve(nv);
         for (int v = 0; v < nv; ++v)
             marginalFunc.push_back(pConditionalV[v].Integral());
@@ -1409,9 +1409,9 @@ class PiecewiseLinear2D {
                 float normalization = 1.f / HProd(m_inv_patch_size);
                 if (normalize) {
                     double sum = 0.0;
-                    for (uint32_t y = 0; y < m_size.y - 1; ++y) {
+                    for (int y = 0; y < m_size.y - 1; ++y) {
                         size_t i = y * xSize;
-                        for (uint32_t x = 0; x < m_size.x - 1; ++x, ++i) {
+                        for (int x = 0; x < m_size.x - 1; ++x, ++i) {
                             float v00 = data[i], v10 = data[i + 1], v01 = data[i + xSize],
                                   v11 = data[i + 1 + xSize],
                                   avg = .25f * (v00 + v10 + v01 + v11);
