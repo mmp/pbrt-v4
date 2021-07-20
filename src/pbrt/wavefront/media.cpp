@@ -302,8 +302,8 @@ void WavefrontPathIntegrator::SampleMediumScattering(int wavefrontDepth) {
             if (sampledLight) {
                 Light light = sampledLight->light;
                 // And now sample a point on the light.
-                pstd::optional<LightLiSample> ls = light.SampleLi(
-                    ctx, raySamples.direct.u, w.lambda, LightSamplingMode::WithMIS);
+                pstd::optional<LightLiSample> ls =
+                    light.SampleLi(ctx, raySamples.direct.u, w.lambda, true);
                 if (ls && ls->L && ls->pdf > 0) {
                     Vector3f wi = ls->wi;
                     SampledSpectrum T_hat = w.T_hat * w.phase->p(wo, wi);

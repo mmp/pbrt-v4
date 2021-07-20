@@ -160,8 +160,8 @@ void WavefrontPathIntegrator::SampleSubsurface(int wavefrontDepth) {
                     return;
                 Light light = sampledLight->light;
 
-                pstd::optional<LightLiSample> ls = light.SampleLi(
-                    ctx, raySamples.direct.u, lambda, LightSamplingMode::WithMIS);
+                pstd::optional<LightLiSample> ls =
+                    light.SampleLi(ctx, raySamples.direct.u, lambda, true);
                 if (!ls || !ls->L || ls->pdf == 0)
                     return;
 

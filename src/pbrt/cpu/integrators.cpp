@@ -651,9 +651,8 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
                     L += beta * Le;
                 else {
                     // Compute MIS weight for infinite light
-                    Float lightPDF =
-                        lightSampler.PDF(prevIntrCtx, light) *
-                        light.PDF_Li(prevIntrCtx, ray.d, LightSamplingMode::WithMIS);
+                    Float lightPDF = lightSampler.PDF(prevIntrCtx, light) *
+                                     light.PDF_Li(prevIntrCtx, ray.d, true);
                     Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
 
                     L += beta * weight * Le;
@@ -670,9 +669,8 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
             else {
                 // Compute MIS weight for area light
                 Light areaLight(si->intr.areaLight);
-                Float lightPDF =
-                    lightSampler.PDF(prevIntrCtx, areaLight) *
-                    areaLight.PDF_Li(prevIntrCtx, ray.d, LightSamplingMode::WithMIS);
+                Float lightPDF = lightSampler.PDF(prevIntrCtx, areaLight) *
+                                 areaLight.PDF_Li(prevIntrCtx, ray.d, true);
                 Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
 
                 L += beta * weight * Le;
@@ -786,8 +784,7 @@ SampledSpectrum PathIntegrator::SampleLd(const SurfaceInteraction &intr, const B
     // Sample a point on the light source for direct lighting
     Light light = sampledLight->light;
     DCHECK(light && sampledLight->pdf > 0);
-    pstd::optional<LightLiSample> ls =
-        light.SampleLi(ctx, uLight, lambda, LightSamplingMode::WithMIS);
+    pstd::optional<LightLiSample> ls = light.SampleLi(ctx, uLight, lambda, true);
     if (!ls || !ls->L || ls->pdf == 0)
         return {};
 
@@ -1085,8 +1082,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                     else {
                         // Add infinite light contribution using both PDFs with MIS
                         Float lightPDF = lightSampler.PDF(prevIntrContext, light) *
-                                         light.PDF_Li(prevIntrContext, ray.d,
-                                                      LightSamplingMode::WithMIS);
+                                         light.PDF_Li(prevIntrContext, ray.d, true);
                         lightPathPDF *= lightPDF;
                         L += T_hat * Le / (uniPathPDF + lightPathPDF).Average();
                     }
@@ -1103,9 +1099,8 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             else {
                 // Add surface light contribution using both PDFs with MIS
                 Light areaLight(isect.areaLight);
-                Float lightPDF =
-                    lightSampler.PDF(prevIntrContext, areaLight) *
-                    areaLight.PDF_Li(prevIntrContext, ray.d, LightSamplingMode::WithMIS);
+                Float lightPDF = lightSampler.PDF(prevIntrContext, areaLight) *
+                                 areaLight.PDF_Li(prevIntrContext, ray.d, true);
                 lightPathPDF *= lightPDF;
                 L += T_hat * Le / (uniPathPDF + lightPathPDF).Average();
             }
@@ -1303,8 +1298,7 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
     DCHECK(light && sampledLight->pdf != 0);
 
     // Sample a point on the light source
-    pstd::optional<LightLiSample> ls =
-        light.SampleLi(ctx, uLight, lambda, LightSamplingMode::WithMIS);
+    pstd::optional<LightLiSample> ls = light.SampleLi(ctx, uLight, lambda, true);
     if (!ls || !ls->L || ls->pdf == 0)
         return SampledSpectrum(0.f);
     Float lightPDF = sampledLight->pdf * ls->pdf;
@@ -2876,8 +2870,7 @@ void SPPMIntegrator::Render() {
                             else {
                                 // Compute MIS weight for infinite light
                                 Float lightPDF = lightSampler.PDF(prevIntrCtx, light) *
-                                                 light.PDF_Li(prevIntrCtx, ray.d,
-                                                              LightSamplingMode::WithMIS);
+                                                 light.PDF_Li(prevIntrCtx, ray.d, true);
                                 Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
 
                                 L += beta * weight * Le;
@@ -2911,8 +2904,7 @@ void SPPMIntegrator::Render() {
                             // Compute MIS weight for area light
                             Light areaLight(si->intr.areaLight);
                             Float lightPDF = lightSampler.PDF(prevIntrCtx, areaLight) *
-                                             areaLight.PDF_Li(prevIntrCtx, ray.d,
-                                                              LightSamplingMode::WithMIS);
+                                             areaLight.PDF_Li(prevIntrCtx, ray.d, true);
                             Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
 
                             L += beta * weight * Le;
@@ -3273,8 +3265,7 @@ SampledSpectrum SPPMIntegrator::SampleLd(const SurfaceInteraction &intr, const B
     // Sample a point on the light source for direct lighting
     Light light = sampledLight->light;
     DCHECK(light && sampledLight->pdf > 0);
-    pstd::optional<LightLiSample> ls =
-        light.SampleLi(ctx, uLight, lambda, LightSamplingMode::WithMIS);
+    pstd::optional<LightLiSample> ls = light.SampleLi(ctx, uLight, lambda, true);
     if (!ls || !ls->L || ls->pdf == 0)
         return {};
 

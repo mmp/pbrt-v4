@@ -310,7 +310,7 @@ ProjectionLight::ProjectionLight(Transform renderFromLight,
 
 pstd::optional<LightLiSample> ProjectionLight::SampleLi(LightSampleContext ctx, Point2f u,
                                                         SampledWavelengths lambda,
-                                                        LightSamplingMode mode) const {
+                                                        bool allowIncompletePDF) const {
     // Return sample for incident radiance from _ProjectionLight_
     Point3f p = renderFromLight(Point3f(0, 0, 0));
     Vector3f wi = Normalize(p - ctx.p());
@@ -322,7 +322,7 @@ pstd::optional<LightLiSample> ProjectionLight::SampleLi(LightSampleContext ctx, 
 }
 
 Float ProjectionLight::PDF_Li(LightSampleContext, Vector3f,
-                              LightSamplingMode mode) const {
+                              bool allowIncompletePDF) const {
     return 0.f;
 }
 
@@ -529,7 +529,7 @@ GoniometricLight::GoniometricLight(const Transform &renderFromLight,
 pstd::optional<LightLiSample> GoniometricLight::SampleLi(LightSampleContext ctx,
                                                          Point2f u,
                                                          SampledWavelengths lambda,
-                                                         LightSamplingMode mode) const {
+                                                         bool allowIncompletePDF) const {
     Point3f p = renderFromLight(Point3f(0, 0, 0));
     Vector3f wi = Normalize(p - ctx.p());
     SampledSpectrum L =
@@ -538,7 +538,7 @@ pstd::optional<LightLiSample> GoniometricLight::SampleLi(LightSampleContext ctx,
 }
 
 Float GoniometricLight::PDF_Li(LightSampleContext, Vector3f,
-                               LightSamplingMode mode) const {
+                               bool allowIncompletePDF) const {
     return 0.f;
 }
 
@@ -730,7 +730,7 @@ DiffuseAreaLight::DiffuseAreaLight(const Transform &renderFromLight,
 pstd::optional<LightLiSample> DiffuseAreaLight::SampleLi(LightSampleContext ctx,
                                                          Point2f u,
                                                          SampledWavelengths lambda,
-                                                         LightSamplingMode mode) const {
+                                                         bool allowIncompletePDF) const {
     // Sample point on shape for _DiffuseAreaLight_
     ShapeSampleContext shapeCtx(ctx.pi, ctx.n, ctx.ns, 0 /* time */);
     pstd::optional<ShapeSample> ss = shape.Sample(shapeCtx, u);
@@ -752,7 +752,7 @@ pstd::optional<LightLiSample> DiffuseAreaLight::SampleLi(LightSampleContext ctx,
 }
 
 Float DiffuseAreaLight::PDF_Li(LightSampleContext ctx, Vector3f wi,
-                               LightSamplingMode) const {
+                               bool allowIncompletePDF) const {
     ShapeSampleContext shapeCtx(ctx.pi, ctx.n, ctx.ns, 0 /* time */);
     return shape.PDF(shapeCtx, wi);
 }
@@ -949,8 +949,8 @@ SampledSpectrum UniformInfiniteLight::Le(const Ray &ray,
 
 pstd::optional<LightLiSample> UniformInfiniteLight::SampleLi(
     LightSampleContext ctx, Point2f u, SampledWavelengths lambda,
-    LightSamplingMode mode) const {
-    if (mode == LightSamplingMode::WithMIS)
+    bool allowIncompletePDF) const {
+    if (allowIncompletePDF)
         return {};
     // Return uniform spherical sample for uniform infinite light
     Vector3f wi = SampleUniformSphere(u);
@@ -960,8 +960,8 @@ pstd::optional<LightLiSample> UniformInfiniteLight::SampleLi(
 }
 
 Float UniformInfiniteLight::PDF_Li(LightSampleContext ctx, Vector3f w,
-                                   LightSamplingMode mode) const {
-    if (mode == LightSamplingMode::WithMIS)
+                                   bool allowIncompletePDF) const {
+    if (allowIncompletePDF)
         return 0;
     return UniformSpherePDF();
 }
@@ -1035,11 +1035,11 @@ ImageInfiniteLight::ImageInfiniteLight(Transform renderFromLight, Image im,
 }
 
 Float ImageInfiniteLight::PDF_Li(LightSampleContext ctx, Vector3f w,
-                                 LightSamplingMode mode) const {
+                                 bool allowIncompletePDF) const {
     Vector3f wLight = renderFromLight.ApplyInverse(w);
     Point2f uv = EqualAreaSphereToSquare(wLight);
     Float pdf = 0;
-    if (mode == LightSamplingMode::WithMIS)
+    if (allowIncompletePDF)
         pdf = compensatedDistribution.PDF(uv);
     else
         pdf = distribution.PDF(uv);
@@ -1218,7 +1218,7 @@ SampledSpectrum PortalImageInfiniteLight::ImageLookup(
 
 pstd::optional<LightLiSample> PortalImageInfiniteLight::SampleLi(
     LightSampleContext ctx, Point2f u, SampledWavelengths lambda,
-    LightSamplingMode mode) const {
+    bool allowIncompletePDF) const {
     // Sample $(u,v)$ in potentially-visible region of light image
     pstd::optional<Bounds2f> b = ImageBounds(ctx.p());
     if (!b)
@@ -1243,7 +1243,7 @@ pstd::optional<LightLiSample> PortalImageInfiniteLight::SampleLi(
 }
 
 Float PortalImageInfiniteLight::PDF_Li(LightSampleContext ctx, Vector3f w,
-                                       LightSamplingMode mode) const {
+                                       bool allowIncompletePDF) const {
     // Find image $(u,v)$ coordinates corresponding to direction _w_
     Float duv_dw;
     pstd::optional<Point2f> uv = ImageFromRender(w, &duv_dw);
@@ -1346,7 +1346,7 @@ SpotLight::SpotLight(const Transform &renderFromLight,
     CHECK_LE(falloffStart, totalWidth);
 }
 
-Float SpotLight::PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const {
+Float SpotLight::PDF_Li(LightSampleContext, Vector3f, bool allowIncompletePDF) const {
     return 0.f;
 }
 

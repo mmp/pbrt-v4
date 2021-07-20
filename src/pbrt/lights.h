@@ -199,7 +199,7 @@ class PointLight : public LightBase {
     PBRT_CPU_GPU
     pstd::optional<LightLiSample> SampleLi(LightSampleContext ctx, Point2f u,
                                            SampledWavelengths lambda,
-                                           LightSamplingMode mode) const {
+                                           bool allowIncompletePDF) const {
         Point3f p = renderFromLight(Point3f(0, 0, 0));
         Vector3f wi = Normalize(p - ctx.p());
         SampledSpectrum Li = scale * I.Sample(lambda) / DistanceSquared(p, ctx.p());
@@ -207,7 +207,9 @@ class PointLight : public LightBase {
     }
 
     PBRT_CPU_GPU
-    Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const { return 0; }
+    Float PDF_Li(LightSampleContext, Vector3f, bool allowIncompletePDF) const {
+        return 0;
+    }
 
   private:
     // PointLight Private Members
@@ -233,7 +235,9 @@ class DistantLight : public LightBase {
     SampledSpectrum Phi(SampledWavelengths lambda) const;
 
     PBRT_CPU_GPU
-    Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const { return 0; }
+    Float PDF_Li(LightSampleContext, Vector3f, bool allowIncompletePDF) const {
+        return 0;
+    }
 
     PBRT_CPU_GPU
     pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
@@ -257,7 +261,7 @@ class DistantLight : public LightBase {
     PBRT_CPU_GPU
     pstd::optional<LightLiSample> SampleLi(LightSampleContext ctx, Point2f u,
                                            SampledWavelengths lambda,
-                                           LightSamplingMode mode) const {
+                                           bool allowIncompletePDF) const {
         Vector3f wi = Normalize(renderFromLight(Vector3f(0, 0, 1)));
         Point3f pOutside = ctx.p() + wi * (2 * sceneRadius);
         return LightLiSample(scale * Lemit.Sample(lambda), wi, 1,
@@ -289,14 +293,14 @@ class ProjectionLight : public LightBase {
     PBRT_CPU_GPU
     pstd::optional<LightLiSample> SampleLi(LightSampleContext ctx, Point2f u,
                                            SampledWavelengths lambda,
-                                           LightSamplingMode mode) const;
+                                           bool allowIncompletePDF) const;
     PBRT_CPU_GPU
     SampledSpectrum I(Vector3f w, const SampledWavelengths &lambda) const;
 
     SampledSpectrum Phi(SampledWavelengths lambda) const;
 
     PBRT_CPU_GPU
-    Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
+    Float PDF_Li(LightSampleContext, Vector3f, bool allowIncompletePDF) const;
 
     PBRT_CPU_GPU
     pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
@@ -343,12 +347,12 @@ class GoniometricLight : public LightBase {
     PBRT_CPU_GPU
     pstd::optional<LightLiSample> SampleLi(LightSampleContext ctx, Point2f u,
                                            SampledWavelengths lambda,
-                                           LightSamplingMode mode) const;
+                                           bool allowIncompletePDF) const;
 
     SampledSpectrum Phi(SampledWavelengths lambda) const;
 
     PBRT_CPU_GPU
-    Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
+    Float PDF_Li(LightSampleContext, Vector3f, bool allowIncompletePDF) const;
 
     PBRT_CPU_GPU
     pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
@@ -439,10 +443,10 @@ class DiffuseAreaLight : public LightBase {
     PBRT_CPU_GPU
     pstd::optional<LightLiSample> SampleLi(LightSampleContext ctx, Point2f u,
                                            SampledWavelengths lambda,
-                                           LightSamplingMode mode) const;
+                                           bool allowIncompletePDF) const;
 
     PBRT_CPU_GPU
-    Float PDF_Li(LightSampleContext ctx, Vector3f wi, LightSamplingMode) const;
+    Float PDF_Li(LightSampleContext ctx, Vector3f wi, bool allowIncompletePDF) const;
 
   private:
     // DiffuseAreaLight Private Members
@@ -491,9 +495,9 @@ class UniformInfiniteLight : public LightBase {
     PBRT_CPU_GPU
     pstd::optional<LightLiSample> SampleLi(LightSampleContext ctx, Point2f u,
                                            SampledWavelengths lambda,
-                                           LightSamplingMode mode) const;
+                                           bool allowIncompletePDF) const;
     PBRT_CPU_GPU
-    Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
+    Float PDF_Li(LightSampleContext, Vector3f, bool allowIncompletePDF) const;
 
     PBRT_CPU_GPU
     pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
@@ -533,7 +537,7 @@ class ImageInfiniteLight : public LightBase {
     SampledSpectrum Phi(SampledWavelengths lambda) const;
 
     PBRT_CPU_GPU
-    Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
+    Float PDF_Li(LightSampleContext, Vector3f, bool allowIncompletePDF) const;
 
     PBRT_CPU_GPU
     pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
@@ -558,11 +562,11 @@ class ImageInfiniteLight : public LightBase {
     PBRT_CPU_GPU
     pstd::optional<LightLiSample> SampleLi(LightSampleContext ctx, Point2f u,
                                            SampledWavelengths lambda,
-                                           LightSamplingMode mode) const {
+                                           bool allowIncompletePDF) const {
         // Find $(u,v)$ sample coordinates in infinite light texture
         Float mapPDF = 0;
         Point2f uv;
-        if (mode == LightSamplingMode::WithMIS)
+        if (allowIncompletePDF)
             uv = compensatedDistribution.Sample(u, &mapPDF);
         else
             uv = distribution.Sample(u, &mapPDF);
@@ -626,10 +630,10 @@ class PortalImageInfiniteLight : public LightBase {
     PBRT_CPU_GPU
     pstd::optional<LightLiSample> SampleLi(LightSampleContext ctx, Point2f u,
                                            SampledWavelengths lambda,
-                                           LightSamplingMode mode) const;
+                                           bool allowIncompletePDF) const;
 
     PBRT_CPU_GPU
-    Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
+    Float PDF_Li(LightSampleContext, Vector3f, bool allowIncompletePDF) const;
 
     PBRT_CPU_GPU
     pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
@@ -728,7 +732,7 @@ class SpotLight : public LightBase {
     SampledSpectrum Phi(SampledWavelengths lambda) const;
 
     PBRT_CPU_GPU
-    Float PDF_Li(LightSampleContext, Vector3f, LightSamplingMode mode) const;
+    Float PDF_Li(LightSampleContext, Vector3f, bool allowIncompletePDF) const;
 
     PBRT_CPU_GPU
     pstd::optional<LightLeSample> SampleLe(Point2f u1, Point2f u2,
@@ -748,7 +752,7 @@ class SpotLight : public LightBase {
     PBRT_CPU_GPU
     pstd::optional<LightLiSample> SampleLi(LightSampleContext ctx, Point2f u,
                                            SampledWavelengths lambda,
-                                           LightSamplingMode mode) const {
+                                           bool allowIncompletePDF) const {
         Point3f p = renderFromLight(Point3f(0, 0, 0));
         Vector3f wi = Normalize(p - ctx.p());
         // Compute incident radiance _Li_ for _SpotLight_
@@ -768,14 +772,16 @@ class SpotLight : public LightBase {
 
 inline pstd::optional<LightLiSample> Light::SampleLi(LightSampleContext ctx, Point2f u,
                                                      SampledWavelengths lambda,
-                                                     LightSamplingMode mode) const {
-    auto sample = [&](auto ptr) { return ptr->SampleLi(ctx, u, lambda, mode); };
+                                                     bool allowIncompletePDF) const {
+    auto sample = [&](auto ptr) {
+        return ptr->SampleLi(ctx, u, lambda, allowIncompletePDF);
+    };
     return Dispatch(sample);
 }
 
 inline Float Light::PDF_Li(LightSampleContext ctx, Vector3f wi,
-                           LightSamplingMode mode) const {
-    auto pdf = [&](auto ptr) { return ptr->PDF_Li(ctx, wi, mode); };
+                           bool allowIncompletePDF) const {
+    auto pdf = [&](auto ptr) { return ptr->PDF_Li(ctx, wi, allowIncompletePDF); };
     return Dispatch(pdf);
 }
 
