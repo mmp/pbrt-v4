@@ -231,6 +231,8 @@ static MediumInterface *getMediumInterface(
                                              getMedium(shape.outsideMedium));
 }
 
+STAT_COUNTER("Geometry/Triangles added from displacement mapping", displacedTrisDelta);
+
 std::map<int, TriQuadMesh>
 OptiXAggregate::PreparePLYMeshes(const std::vector<ShapeSceneEntity> &shapes,
                                  const std::map<std::string, FloatTexture> &floatTextures) const {
@@ -261,6 +263,8 @@ OptiXAggregate::PreparePLYMeshes(const std::vector<ShapeSceneEntity> &shapes,
 
                 LOG_VERBOSE("Starting to displace mesh \"%s\" with \"%s\"", filename,
                             displacementTexName);
+
+                size_t origNumTris = plyMesh.triIndices.size() / 3;
 
                 plyMesh =
                     plyMesh.Displace([&](Point3f v0, Point3f v1) {
@@ -296,6 +300,8 @@ OptiXAggregate::PreparePLYMeshes(const std::vector<ShapeSceneEntity> &shapes,
                             CUDA_CHECK(cudaFree(n));
                             CUDA_CHECK(cudaFree(uv));
                         }, &shape.loc);
+
+                displacedTrisDelta += plyMesh.triIndices.size() / 3 - origNumTris;
 
                 LOG_VERBOSE("Finished displacing mesh \"%s\" with \"%s\" -> %d tris", filename,
                             displacementTexName, plyMesh.triIndices.size() / 3);
@@ -481,12 +487,17 @@ OptixTraversableHandle OptiXAggregate::createGASForTriangles(
     return buildBVH(buildInputs);
 }
 
+STAT_COUNTER("Geometry/Curves", nCurves);
+STAT_COUNTER("Geometry/Bilinear patches created for diced curves", nBLPsForCurves);
+
 BilinearPatchMesh *OptiXAggregate::diceCurveToBLP(const ShapeSceneEntity &shape,
                                                   int nDiceU, int nDiceV,
                                                   Allocator alloc) {
     CHECK_EQ("curve", shape.name);
     const ParameterDictionary &parameters = shape.parameters;
     const FileLoc *loc = &shape.loc;
+
+    ++nCurves;
 
     // Extract parameters; the following ~90 lines of code are,
     // unfortunately, copied from Curve::Create.  We would like to avoid
@@ -688,6 +699,8 @@ BilinearPatchMesh *OptiXAggregate::diceCurveToBLP(const ShapeSceneEntity &shape,
         }
         }
     }
+
+    nBLPsForCurves += blpIndices.size() / 4;
 
     return alloc.new_object<BilinearPatchMesh>(
         *shape.renderFromObject, shape.reverseOrientation, blpIndices, blpP, blpN,

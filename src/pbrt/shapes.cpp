@@ -1376,6 +1376,7 @@ std::string BilinearPatch::ToString() const {
 STAT_COUNTER("Geometry/Spheres", nSpheres);
 STAT_COUNTER("Geometry/Cylinders", nCylinders);
 STAT_COUNTER("Geometry/Disks", nDisks);
+STAT_COUNTER("Geometry/Triangles added from displacement mapping", displacedTrisDelta);
 
 pstd::vector<Shape> Shape::Create(
     const std::string &name, const Transform *renderFromObject,
@@ -1428,6 +1429,7 @@ pstd::vector<Shape> Shape::Create(
             LOG_VERBOSE("Starting to displace mesh \"%s\" with \"%s\"", filename,
                         displacementTexName);
 
+            int origTriCount = plyMesh.triIndices.size() / 3;
             plyMesh = plyMesh.Displace(
                 [&](Point3f v0, Point3f v1) {
                     v0 = (*renderFromObject)(v0);
@@ -1448,6 +1450,8 @@ pstd::vector<Shape> Shape::Create(
 
             LOG_VERBOSE("Finished displacing mesh \"%s\" with \"%s\" -> %d tris",
                         filename, displacementTexName, plyMesh.triIndices.size() / 3);
+
+            displacedTrisDelta += plyMesh.triIndices.size() / 3 - origTriCount;
         }
 
         if (!plyMesh.triIndices.empty()) {
