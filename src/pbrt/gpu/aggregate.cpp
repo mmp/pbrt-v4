@@ -17,6 +17,7 @@
 #include <pbrt/util/mesh.h>
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/pstd.h>
+#include <pbrt/util/splines.h>
 #include <pbrt/util/stats.h>
 #include <pbrt/wavefront/intersect.h>
 
@@ -480,6 +481,219 @@ OptixTraversableHandle OptiXAggregate::createGASForTriangles(
     return buildBVH(buildInputs);
 }
 
+BilinearPatchMesh *OptiXAggregate::diceCurveToBLP(const ShapeSceneEntity &shape,
+                                                  int nDiceU, int nDiceV,
+                                                  Allocator alloc) {
+    CHECK_EQ("curve", shape.name);
+    const ParameterDictionary &parameters = shape.parameters;
+    const FileLoc *loc = &shape.loc;
+
+    // Extract parameters; the following ~90 lines of code are,
+    // unfortunately, copied from Curve::Create.  We would like to avoid
+    // the overhead of splitting the curve and creating Curve objects, so
+    // here we go..
+    Float width = parameters.GetOneFloat("width", 1.f);
+    Float width0 = parameters.GetOneFloat("width0", width);
+    Float width1 = parameters.GetOneFloat("width1", width);
+
+    int degree = parameters.GetOneInt("degree", 3);
+    if (degree != 2 && degree != 3) {
+        Error(loc, "Invalid degree %d: only degree 2 and 3 curves are supported.",
+              degree);
+        return {};
+    }
+
+    std::string basis = parameters.GetOneString("basis", "bezier");
+    if (basis != "bezier" && basis != "bspline") {
+        Error(loc,
+              "Invalid basis \"%s\": only \"bezier\" and \"bspline\" are "
+              "supported.",
+              basis);
+        return {};
+    }
+
+    int nSegments;
+    std::vector<Point3f> cp = parameters.GetPoint3fArray("P");
+    bool bezierBasis = (basis == "bezier");
+    if (bezierBasis) {
+        // After the first segment, which uses degree+1 control points,
+        // subsequent segments reuse the last control point of the previous
+        // one and then use degree more control points.
+        if (((cp.size() - 1 - degree) % degree) != 0) {
+            Error(loc,
+                  "Invalid number of control points %d: for the degree %d "
+                  "Bezier basis %d + n * %d are required, for n >= 0.",
+                  (int)cp.size(), degree, degree + 1, degree);
+            return {};
+        }
+        nSegments = (cp.size() - 1) / degree;
+    } else {
+        if (cp.size() < degree + 1) {
+            Error(loc,
+                  "Invalid number of control points %d: for the degree %d "
+                  "b-spline basis, must have >= %d.",
+                  int(cp.size()), degree, degree + 1);
+            return {};
+        }
+        nSegments = cp.size() - degree;
+    }
+
+    CurveType type;
+    std::string curveType = parameters.GetOneString("type", "flat");
+    if (curveType == "flat")
+        type = CurveType::Flat;
+    else if (curveType == "ribbon")
+        type = CurveType::Ribbon;
+    else if (curveType == "cylinder")
+        type = CurveType::Cylinder;
+    else {
+        Error(loc, R"(Unknown curve type "%s".  Using "cylinder".)", curveType);
+        type = CurveType::Cylinder;
+    }
+
+    std::vector<Normal3f> n = parameters.GetNormal3fArray("N");
+    if (!n.empty()) {
+        if (type != CurveType::Ribbon) {
+            Warning("Curve normals are only used with \"ribbon\" type curves.");
+            n = {};
+        } else if (n.size() != nSegments + 1) {
+            Error(loc,
+                  "Invalid number of normals %d: must provide %d normals for "
+                  "ribbon "
+                  "curves with %d segments.",
+                  int(n.size()), nSegments + 1, nSegments);
+            return {};
+        }
+        for (Normal3f &nn : n)
+            Normalize(nn);
+    } else if (type == CurveType::Ribbon) {
+        Error(loc, "Must provide normals \"N\" at curve endpoints with ribbon "
+                   "curves.");
+        return {};
+    }
+
+    // Start dicing...
+    std::vector<int> blpIndices;
+    std::vector<Point3f> blpP;
+    std::vector<Normal3f> blpN;
+    std::vector<Point2f> blpUV;
+
+    int lastCPOffset = -1;
+    pstd::array<Point3f, 4> segCpBezier;
+
+    for (int i = 0; i <= nDiceU; ++i) {
+        Float u = Float(i) / Float(nDiceU);
+        Float width = Lerp(u, width0, width1);
+
+        int segmentIndex = int(u * nSegments);
+
+        // Compute offset into original control points for current u
+        int cpOffset;
+        if (bezierBasis)
+            cpOffset = segmentIndex * degree;
+        else
+            // Uniform b-spline.
+            cpOffset = segmentIndex;
+
+        if (cpOffset != lastCPOffset) {
+            // update segCpBezier
+            if (bezierBasis) {
+                if (degree == 2) {
+                    // Elevate to degree 3.
+                    segCpBezier =
+                        ElevateQuadraticBezierToCubic(pstd::MakeConstSpan(cp).subspan(cpOffset, 3));
+                } else {
+                    // All set.
+                    for (int i = 0; i < 4; ++i)
+                        segCpBezier[i] = cp[cpOffset + i];
+                }
+            } else {
+                // Uniform b-spline.
+                if (degree == 2) {
+                    pstd::array<Point3f, 3> bezCp =
+                        QuadraticBSplineToBezier(pstd::MakeConstSpan(cp).subspan(cpOffset, 3));
+                    segCpBezier = ElevateQuadraticBezierToCubic(pstd::MakeConstSpan(bezCp));
+                } else {
+                    segCpBezier =
+                        CubicBSplineToBezier(pstd::MakeConstSpan(cp).subspan(cpOffset, 4));
+                }
+            }
+            lastCPOffset = cpOffset;
+        }
+
+        Float uSeg = (u * nSegments) - segmentIndex;
+        CHECK(uSeg >= 0 && uSeg <= 1);
+
+        Vector3f dpdu;
+        Point3f p = EvaluateCubicBezier(segCpBezier, uSeg, &dpdu);
+
+        switch (type) {
+        case CurveType::Ribbon: {
+            Float normalAngle = AngleBetween(n[segmentIndex],
+                                             n[segmentIndex + 1]);
+            Float invSinNormalAngle = 1 / std::sin(normalAngle);
+
+            Normal3f nu;
+            if (normalAngle == 0)
+                nu = n[segmentIndex];
+            else {
+                Float sin0 =
+                    std::sin((1 - uSeg) * normalAngle) * invSinNormalAngle;
+                Float sin1 =
+                    std::sin(uSeg * normalAngle) * invSinNormalAngle;
+                nu = sin0 * n[segmentIndex] + sin1 * n[segmentIndex + 1];
+            }
+            Vector3f dpdv = Normalize(Cross(nu, dpdu)) * width;
+
+            blpP.push_back(p - dpdv / 2);
+            blpP.push_back(p + dpdv / 2);
+            blpUV.push_back(Point2f(u, 0));
+            blpUV.push_back(Point2f(u, 1));
+
+            if (i > 0) {
+                blpIndices.push_back(2 * (i - 1));
+                blpIndices.push_back(2 * (i - 1) + 1);
+                blpIndices.push_back(2 * i);
+                blpIndices.push_back(2 * i + 1);
+            }
+            break;
+        }
+        case CurveType::Flat:
+        case CurveType::Cylinder: {
+            Vector3f ortho[2];
+            CoordinateSystem(Normalize(dpdu), &ortho[0], &ortho[1]);
+            ortho[0] *= width / 2;
+            ortho[1] *= width / 2;
+
+            // Repeat the first/last vertex so we can assign different
+            // texture coordinates...
+            for (int v = 0; v <= nDiceV; ++v) {
+                Float angle = Float(v) / nDiceV * 2 * Pi;
+                blpP.push_back(p + ortho[0] * std::cos(angle) +
+                               ortho[1] * std::sin(angle));
+                blpN.push_back(Normal3f(Normalize(blpP.back() - p)));
+                blpUV.push_back(Point2f(u, Float(v) / nDiceV));
+            }
+
+            if (i > 0) {
+                for (int v = 0; v < nDiceV; ++v) {
+                    // Indexing is funny due to doubled-up last vertex
+                    blpIndices.push_back((nDiceV + 1) * (i - 1) + v);
+                    blpIndices.push_back((nDiceV + 1) * (i - 1) + v + 1);
+                    blpIndices.push_back((nDiceV + 1) * i + v);
+                    blpIndices.push_back((nDiceV + 1) * i + v + 1);
+                }
+            }
+            break;
+        }
+        }
+    }
+
+    return alloc.new_object<BilinearPatchMesh>(
+        *shape.renderFromObject, shape.reverseOrientation, blpIndices, blpP, blpN,
+        blpUV, std::vector<int>(), nullptr);
+}
+
 OptixTraversableHandle OptiXAggregate::createGASForBLPs(
     const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
     const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
@@ -490,58 +704,49 @@ OptixTraversableHandle OptiXAggregate::createGASForBLPs(
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
     Bounds3f *gasBounds) {
     // Create meshes
-    std::vector<BilinearPatchMesh *> meshes;
-    std::vector<int> meshIndexToShapeIndex;
-    int nPatches = 0;
+    std::vector<BilinearPatchMesh *> meshes(shapes.size(), nullptr);
+    std::atomic<int> nPatches = 0, nMeshes = 0;
 
     for (size_t shapeIndex = 0; shapeIndex < shapes.size(); ++shapeIndex) {
         const auto &shape = shapes[shapeIndex];
-        BilinearPatchMesh *mesh = nullptr;
         if (shape.name == "bilinearmesh") {
             BilinearPatchMesh *mesh = BilinearPatch::CreateMesh(shape.renderFromObject, shape.reverseOrientation,
                                                                 shape.parameters, &shape.loc, alloc);
-
+            meshes[shapeIndex] = mesh;
             nPatches += mesh->nPatches;
-            meshes.push_back(mesh);
-            meshIndexToShapeIndex.push_back(shapeIndex);
+            ++nMeshes;
         } else if (shape.name == "curve") {
-            // Use the default allocator since there's no need for
-            // allocating GPU memory for these...
-            pstd::vector<Shape> curves = Curve::Create(shape.renderFromObject, shape.objectFromRender,
-                                                       shape.reverseOrientation, shape.parameters,
-                                                       &shape.loc, Allocator());
-
-            for (size_t i = 0; i < curves.size(); ++i) {
-                const Curve *curve = curves[i].CastOrNullptr<Curve>();
-                CHECK(curve != nullptr);
-                BilinearPatchMesh *mesh = curve->Dice(4 /* nsegs */, alloc);
-
-                nPatches += mesh->nPatches;
-                meshes.push_back(mesh);
-                meshIndexToShapeIndex.push_back(shapeIndex);
+            BilinearPatchMesh *curveMesh = diceCurveToBLP(shape, 5 /* nseg */, 5 /* nvert */, alloc);
+            if (curveMesh) {
+                nPatches += curveMesh->nPatches;
+                ++nMeshes;
+                meshes[shapeIndex] = curveMesh;
             }
         }
     }
 
-    if (meshes.size() == 0)
+    if (nMeshes == 0)
         return {};
 
     // Create build inputs
     OptixAabb *aabbs = alloc.allocate_object<OptixAabb>(nPatches);
     OptixAabb *aabbPtr = aabbs;
-    std::vector<OptixBuildInput> buildInputs(meshes.size());
-    std::vector<CUdeviceptr> aabbDevicePtrs(meshes.size());
-    std::vector<uint32_t> flags(meshes.size());
-    for (size_t meshIndex = 0; meshIndex < meshes.size(); ++meshIndex) {
-        BilinearPatchMesh *mesh = meshes[meshIndex];
-        int shapeIndex = meshIndexToShapeIndex[meshIndex];
+    std::vector<OptixBuildInput> buildInputs(nMeshes);
+    std::vector<CUdeviceptr> aabbDevicePtrs(nMeshes);
+    std::vector<uint32_t> flags(nMeshes);
+    int buildInputIndex = 0;
 
-        buildInputs[meshIndex].type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
-        buildInputs[meshIndex].customPrimitiveArray.numSbtRecords = 1;
-        buildInputs[meshIndex].customPrimitiveArray.numPrimitives = mesh->nPatches;
-        aabbDevicePtrs[meshIndex] = CUdeviceptr(aabbPtr);
-        buildInputs[meshIndex].customPrimitiveArray.aabbBuffers = &aabbDevicePtrs[meshIndex];
-        buildInputs[meshIndex].customPrimitiveArray.flags = &flags[meshIndex];
+    for (size_t shapeIndex = 0; shapeIndex < meshes.size(); ++shapeIndex) {
+        BilinearPatchMesh *mesh = meshes[shapeIndex];
+        if (!mesh)
+            continue;
+
+        buildInputs[buildInputIndex].type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
+        buildInputs[buildInputIndex].customPrimitiveArray.numSbtRecords = 1;
+        buildInputs[buildInputIndex].customPrimitiveArray.numPrimitives = mesh->nPatches;
+        aabbDevicePtrs[buildInputIndex] = CUdeviceptr(aabbPtr);
+        buildInputs[buildInputIndex].customPrimitiveArray.aabbBuffers = &aabbDevicePtrs[buildInputIndex];
+        buildInputs[buildInputIndex].customPrimitiveArray.flags = &flags[buildInputIndex];
 
         for (int patchIndex = 0; patchIndex < mesh->nPatches; ++patchIndex) {
             Bounds3f shapeBounds;
@@ -560,7 +765,7 @@ OptixTraversableHandle OptiXAggregate::createGASForBLPs(
         Material material = getMaterial(shape, namedMaterials, materials);
         FloatTexture alphaTexture = getAlphaTexture(shape, floatTextures, alloc);
 
-        flags[meshIndex] = getOptixGeometryFlags(false, alphaTexture, material);
+        flags[buildInputIndex] = getOptixGeometryFlags(false, alphaTexture, material);
 
         HitgroupRecord hgRecord;
         OPTIX_CHECK(optixSbtRecordPackHeader(intersectPG, &hgRecord));
@@ -589,6 +794,8 @@ OptixTraversableHandle OptiXAggregate::createGASForBLPs(
 
         OPTIX_CHECK(optixSbtRecordPackHeader(shadowPG, &hgRecord));
         shadowHGRecords.push_back(hgRecord);
+
+        ++buildInputIndex;
     };
 
     OptixTraversableHandle handle = buildBVH(buildInputs);

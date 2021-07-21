@@ -71,6 +71,8 @@ class OptiXAggregate : public WavefrontAggregate {
     std::map<int, TriQuadMesh> PreparePLYMeshes(const std::vector<ShapeSceneEntity> &shapes,
                                                 const std::map<std::string, FloatTexture> &floatTextures) const;
   private:
+    static BilinearPatchMesh *diceCurveToBLP(const ShapeSceneEntity &shape,
+                                             int nDiceU, int nDiceV, Allocator alloc);
 
     OptixTraversableHandle createGASForBLPs(
         const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
