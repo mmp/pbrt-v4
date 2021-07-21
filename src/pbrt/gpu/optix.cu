@@ -110,7 +110,7 @@ extern "C" __global__ void __raygen__findClosest() {
         ray.d.y, ray.d.z, tMax);
 
     uint32_t missed = 0;
-    Trace(params.traversable, ray, 0.f /* tMin */, tMax, OPTIX_RAY_FLAG_NONE, p0, p1,
+    Trace(params.traversable, ray, 1e-5f /* tMin */, tMax, OPTIX_RAY_FLAG_NONE, p0, p1,
           missed);
 
     if (missed)
