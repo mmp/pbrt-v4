@@ -373,7 +373,7 @@ class GBufferFilm : public FilmBase {
     struct Pixel {
         Pixel() = default;
         double rgbSum[3] = {0., 0., 0.};
-        double weightSum = 0.;
+        double weightSum = 0., gBufferWeightSum = 0.;
         AtomicDouble rgbSplat[3];
         Point3f pSum;
         Float dzdxSum = 0, dzdySum = 0;

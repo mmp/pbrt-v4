@@ -584,6 +584,8 @@ void GBufferFilm::AddSample(Point2i pFilm, SampledSpectrum L,
 
     Pixel &p = pixels[pFilm];
     if (visibleSurface && *visibleSurface) {
+        p.gBufferWeightSum += weight;
+
         // Update variance estimates.
         for (int c = 0; c < 3; ++c)
             p.rgbVariance[c].Add(rgb[c]);
@@ -724,17 +726,19 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
                       pixel.rgbAlbedoSum[2]);
 
         // Normalize pixel with weight sum
-        Float weightSum = pixel.weightSum;
+        Float weightSum = pixel.weightSum, gBufferWeightSum = pixel.gBufferWeightSum;
         Point3f pt = pixel.pSum;
         Point2f uv = pixel.uvSum;
         Float dzdx = pixel.dzdxSum, dzdy = pixel.dzdySum;
         if (weightSum != 0) {
             rgb /= weightSum;
             albedoRgb /= weightSum;
-            pt /= weightSum;
-            uv /= weightSum;
-            dzdx /= weightSum;
-            dzdy /= weightSum;
+        }
+        if (gBufferWeightSum != 0) {
+            pt /= gBufferWeightSum;
+            uv /= gBufferWeightSum;
+            dzdx /= gBufferWeightSum;
+            dzdy /= gBufferWeightSum;
         }
 
         // Add splat value at pixel
