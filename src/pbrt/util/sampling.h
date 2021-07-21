@@ -843,7 +843,7 @@ class SummedAreaTable {
     }
 
     PBRT_CPU_GPU
-    Float Integral(const Bounds2f &extent) const {
+    Float Integral(Bounds2f extent) const {
         double s = (((double)Lookup(extent.pMax.x, extent.pMax.y) -
                      (double)Lookup(extent.pMin.x, extent.pMax.y)) +
                     ((double)Lookup(extent.pMin.x, extent.pMin.y) -
@@ -895,7 +895,7 @@ class WindowedPiecewiseConstant2D {
         : sat(f, alloc), func(f, alloc) {}
 
     PBRT_CPU_GPU
-    Point2f Sample(const Point2f &u, const Bounds2f &b, Float *pdf) const {
+    Point2f Sample(Point2f u, Bounds2f b, Float *pdf) const {
         // Handle zero-valued function for windowed sampling
         if (sat.Integral(b) == 0) {
             *pdf = 0;
@@ -942,9 +942,10 @@ class WindowedPiecewiseConstant2D {
 
     PBRT_CPU_GPU
     Float PDF(Point2f p, const Bounds2f &b) const {
-        if (sat.Integral(b) == 0)
+        Float funcInt = sat.Integral(b);
+        if (funcInt == 0)
             return 0;
-        return Eval(p) / sat.Integral(b);
+        return Eval(p) / funcInt;
     }
 
   private:

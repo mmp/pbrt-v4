@@ -337,7 +337,7 @@ SampledSpectrum ProjectionLight::I(Vector3f w, const SampledWavelengths &lambda)
         return SampledSpectrum(0.f);
 
     // Project point onto projection plane and compute RGB
-    Point3f ps = screenFromLight(Point3f(w.x, w.y, w.z));
+    Point3f ps = screenFromLight(Point3f(w));
     if (!Inside(Point2f(ps.x, ps.y), screenBounds))
         return SampledSpectrum(0.f);
     Point2f uv = Point2f(screenBounds.Offset(Point2f(ps.x, ps.y)));
@@ -1084,7 +1084,7 @@ pstd::optional<LightLeSample> ImageInfiniteLight::SampleLe(Point2f u1, Point2f u
     Float pdfDir = mapPDF / (4 * Pi);
     Float pdfPos = 1 / (Pi * Sqr(sceneRadius));
 
-    return LightLeSample(Le(uv, lambda), ray, pdfPos, pdfDir);
+    return LightLeSample(ImageLe(uv, lambda), ray, pdfPos, pdfDir);
 }
 
 void ImageInfiniteLight::PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const {

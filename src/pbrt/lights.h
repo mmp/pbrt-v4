@@ -104,7 +104,7 @@ class LightBounds {
   public:
     // LightBounds Public Methods
     LightBounds() = default;
-    LightBounds(const Bounds3f &b, const Vector3f &w, Float phi, Float cosTheta_o,
+    LightBounds(const Bounds3f &b, Vector3f w, Float phi, Float cosTheta_o,
                 Float cosTheta_e, bool twoSided);
 
     PBRT_CPU_GPU
@@ -124,7 +124,7 @@ class LightBounds {
 };
 
 // LightBounds Inline Methods
-inline LightBounds::LightBounds(const Bounds3f &b, const Vector3f &w, Float phi,
+inline LightBounds::LightBounds(const Bounds3f &b, Vector3f w, Float phi,
                                 Float cosTheta_o, Float cosTheta_e, bool twoSided)
     : bounds(b),
       w(Normalize(w)),
@@ -223,7 +223,7 @@ class DistantLight : public LightBase {
     // DistantLight Public Methods
     DistantLight(const Transform &renderFromLight, Spectrum Lemit, Float scale,
                  Allocator alloc)
-        : LightBase(LightType::DeltaDirection, renderFromLight, MediumInterface()),
+        : LightBase(LightType::DeltaDirection, renderFromLight, {}),
           Lemit(Lemit, alloc),
           scale(scale) {}
 
@@ -265,7 +265,7 @@ class DistantLight : public LightBase {
         Vector3f wi = Normalize(renderFromLight(Vector3f(0, 0, 1)));
         Point3f pOutside = ctx.p() + wi * (2 * sceneRadius);
         return LightLiSample(scale * Lemit.Sample(lambda), wi, 1,
-                             Interaction(pOutside, &mediumInterface));
+                             Interaction(pOutside, nullptr));
     }
 
   private:
@@ -433,8 +433,8 @@ class DiffuseAreaLight : public LightBase {
             uv[1] = 1 - uv[1];
             for (int c = 0; c < 3; ++c)
                 rgb[c] = image.BilerpChannel(uv, c);
-            return scale *
-                   RGBIlluminantSpectrum(*imageColorSpace, ClampZero(rgb)).Sample(lambda);
+            RGBIlluminantSpectrum spec(*imageColorSpace, ClampZero(rgb));
+            return scale * spec.Sample(lambda);
 
         } else
             return scale * Lemit.Sample(lambda);
@@ -556,7 +556,7 @@ class ImageInfiniteLight : public LightBase {
     SampledSpectrum Le(const Ray &ray, const SampledWavelengths &lambda) const {
         Vector3f wLight = Normalize(renderFromLight.ApplyInverse(ray.d));
         Point2f uv = EqualAreaSphereToSquare(wLight);
-        return Le(uv, lambda);
+        return ImageLe(uv, lambda);
     }
 
     PBRT_CPU_GPU
@@ -582,7 +582,7 @@ class ImageInfiniteLight : public LightBase {
 
         // Return radiance value for infinite light direction
         return LightLiSample(
-            Le(uv, lambda), wi, pdf,
+            ImageLe(uv, lambda), wi, pdf,
             Interaction(ctx.p() + wi * (2 * sceneRadius), &mediumInterface));
     }
 
@@ -591,7 +591,7 @@ class ImageInfiniteLight : public LightBase {
   private:
     // ImageInfiniteLight Private Methods
     PBRT_CPU_GPU
-    SampledSpectrum Le(Point2f uv, const SampledWavelengths &lambda) const {
+    SampledSpectrum ImageLe(Point2f uv, const SampledWavelengths &lambda) const {
         RGB rgb;
         for (int c = 0; c < 3; ++c)
             rgb[c] = image.LookupNearestChannel(uv, c, WrapMode::OctahedralSphere);

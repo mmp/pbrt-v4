@@ -74,8 +74,8 @@ std::string LightSampler::ToString() const {
 
 // PowerLightSampler Method Definitions
 PowerLightSampler::PowerLightSampler(pstd::span<const Light> lights, Allocator alloc)
-    : lightToIndex(alloc),
-      lights(lights.begin(), lights.end(), alloc),
+    : lights(lights.begin(), lights.end(), alloc),
+      lightToIndex(alloc),
       aliasTable(alloc) {
     if (lights.empty())
         return;
@@ -114,7 +114,7 @@ BVHLightSampler::BVHLightSampler(pstd::span<const Light> lights, Allocator alloc
     // Initialize _infiniteLights_ array and light BVH
     std::vector<std::pair<int, LightBounds>> bvhLights;
     for (size_t i = 0; i < lights.size(); ++i) {
-        // Partition $i$th light into _infiniteLights_ or _bvhLights_
+        // Store $i$th light in either _infiniteLights_ or _bvhLights_
         Light light = lights[i];
         pstd::optional<LightBounds> lightBounds = light.Bounds();
         if (!lightBounds)
