@@ -20,9 +20,6 @@ namespace pbrt {
 // LightType Definition
 enum class LightType { DeltaPosition, DeltaDirection, Area, Infinite };
 
-// LightSamplingMode Definition
-enum class LightSamplingMode { WithMIS, WithoutMIS };
-
 class PointLight;
 class DistantLight;
 class ProjectionLight;
@@ -66,11 +63,10 @@ class Light : public TaggedPointer<  // Light Source Types
 
     PBRT_CPU_GPU inline pstd::optional<LightLiSample> SampleLi(
         LightSampleContext ctx, Point2f u, SampledWavelengths lambda,
-        LightSamplingMode mode = LightSamplingMode::WithoutMIS) const;
+        bool allowIncompletePDF = false) const;
 
-    PBRT_CPU_GPU inline Float PDF_Li(
-        LightSampleContext ctx, Vector3f wi,
-        LightSamplingMode mode = LightSamplingMode::WithoutMIS) const;
+    PBRT_CPU_GPU inline Float PDF_Li(LightSampleContext ctx, Vector3f wi,
+                                     bool allowIncompletePDF = false) const;
 
     std::string ToString() const;
 

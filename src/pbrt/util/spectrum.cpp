@@ -114,7 +114,7 @@ pstd::optional<Spectrum> PiecewiseLinearSpectrum::Read(const std::string &fn,
             Warning("%s: extra value found in spectrum file.", fn);
             return {};
         }
-        std::vector<Float> lambda, v;
+        pstd::vector<Float> lambda, v;
         for (size_t i = 0; i < vals.size() / 2; ++i) {
             if (i > 0 && vals[2 * i] <= lambda.back()) {
                 Warning("%s: spectrum file invalid: at %d'th entry, "
@@ -134,7 +134,7 @@ PiecewiseLinearSpectrum *PiecewiseLinearSpectrum::FromInterleaved(
     pstd::span<const Float> samples, bool normalize, Allocator alloc) {
     CHECK_EQ(0, samples.size() % 2);
     int n = samples.size() / 2;
-    std::vector<Float> lambda, v;
+    pstd::vector<Float> lambda, v;
 
     // Extend samples to cover range of visible wavelengths if needed.
     if (samples[0] > Lambda_min) {

@@ -275,10 +275,10 @@ class BVHLightSampler {
 
         if (u < pInfinite) {
             // Sample infinite lights with uniform probability
-            u = std::min<Float>(u * pInfinite, OneMinusEpsilon);
+            u *= pInfinite;
             int index =
                 std::min<int>(u * infiniteLights.size(), infiniteLights.size() - 1);
-            Float pdf = pInfinite * 1.f / infiniteLights.size();
+            Float pdf = pInfinite / infiniteLights.size();
             return SampledLight{infiniteLights[index], pdf};
 
         } else {
@@ -334,7 +334,11 @@ class BVHLightSampler {
         uint32_t bitTrail = lightToBitTrail[light];
         Point3f p = ctx.p();
         Normal3f n = ctx.ns;
-        Float pdf = 1;
+        // Compute infinite light sampling probability _pInfinite_
+        Float pInfinite = Float(infiniteLights.size()) /
+                          Float(infiniteLights.size() + (nodes.empty() ? 0 : 1));
+
+        Float pdf = 1 - pInfinite;
         int nodeIndex = 0;
 
         // Compute light's PDF by walking down tree nodes to the light
@@ -342,7 +346,7 @@ class BVHLightSampler {
             const LightBVHNode *node = &nodes[nodeIndex];
             if (node->isLeaf) {
                 DCHECK_EQ(light, lights[node->childOrLightIndex]);
-                break;
+                return pdf;
             }
             // Compute child importances and update PDF for current node
             const LightBVHNode *child0 = &nodes[nodeIndex + 1];
@@ -356,13 +360,6 @@ class BVHLightSampler {
             nodeIndex = (bitTrail & 1) ? node->childOrLightIndex : (nodeIndex + 1);
             bitTrail >>= 1;
         }
-
-        // Return final PDF accounting for infinite light sampling probability
-        // Compute infinite light sampling probability _pInfinite_
-        Float pInfinite = Float(infiniteLights.size()) /
-                          Float(infiniteLights.size() + (nodes.empty() ? 0 : 1));
-
-        return pdf * (1 - pInfinite);
     }
 
     PBRT_CPU_GPU

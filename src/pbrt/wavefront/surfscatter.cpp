@@ -276,8 +276,8 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
                 Light light = sampledLight->light;
 
                 // Sample light source and evaluate BSDF for direct lighting
-                pstd::optional<LightLiSample> ls = light.SampleLi(
-                    ctx, raySamples.direct.u, lambda, LightSamplingMode::WithMIS);
+                pstd::optional<LightLiSample> ls =
+                    light.SampleLi(ctx, raySamples.direct.u, lambda, true);
                 if (!ls || !ls->L || ls->pdf == 0)
                     return;
                 Vector3f wi = ls->wi;

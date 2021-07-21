@@ -649,9 +649,8 @@ void WavefrontPathIntegrator::HandleEscapedRays() {
                         // Compute MIS-weighted radiance contribution from infinite light
                         LightSampleContext ctx = w.prevIntrCtx;
                         Float lightChoicePDF = lightSampler.PDF(ctx, light);
-                        SampledSpectrum lightPathPDF =
-                            w.lightPathPDF * lightChoicePDF *
-                            light.PDF_Li(ctx, w.rayd, LightSamplingMode::WithMIS);
+                        SampledSpectrum lightPathPDF = w.lightPathPDF * lightChoicePDF *
+                                                       light.PDF_Li(ctx, w.rayd, true);
                         L += w.T_hat * Le / (w.uniPathPDF + lightPathPDF).Average();
                     }
                 }
@@ -688,8 +687,7 @@ void WavefrontPathIntegrator::HandleEmissiveIntersection() {
                 Vector3f wi = -w.wo;
                 LightSampleContext ctx = w.prevIntrCtx;
                 Float lightChoicePDF = lightSampler.PDF(ctx, w.areaLight);
-                Float lightPDF = lightChoicePDF *
-                                 w.areaLight.PDF_Li(ctx, wi, LightSamplingMode::WithMIS);
+                Float lightPDF = lightChoicePDF * w.areaLight.PDF_Li(ctx, wi, true);
 
                 SampledSpectrum uniPathPDF = w.uniPathPDF;
                 SampledSpectrum lightPathPDF = w.lightPathPDF * lightPDF;

@@ -739,7 +739,7 @@ class PiecewiseConstant2D {
                                        domain.pMax[0], alloc);
 
         // Compute marginal sampling distribution $p[\tilde{v}]$
-        std::vector<Float> marginalFunc;
+        pstd::vector<Float> marginalFunc;
         marginalFunc.reserve(nv);
         for (int v = 0; v < nv; ++v)
             marginalFunc.push_back(pConditionalV[v].Integral());
@@ -843,7 +843,7 @@ class SummedAreaTable {
     }
 
     PBRT_CPU_GPU
-    Float Integral(const Bounds2f &extent) const {
+    Float Integral(Bounds2f extent) const {
         double s = (((double)Lookup(extent.pMax.x, extent.pMax.y) -
                      (double)Lookup(extent.pMin.x, extent.pMax.y)) +
                     ((double)Lookup(extent.pMin.x, extent.pMin.y) -
@@ -895,7 +895,7 @@ class WindowedPiecewiseConstant2D {
         : sat(f, alloc), func(f, alloc) {}
 
     PBRT_CPU_GPU
-    Point2f Sample(const Point2f &u, const Bounds2f &b, Float *pdf) const {
+    Point2f Sample(Point2f u, Bounds2f b, Float *pdf) const {
         // Handle zero-valued function for windowed sampling
         if (sat.Integral(b) == 0) {
             *pdf = 0;
@@ -942,9 +942,10 @@ class WindowedPiecewiseConstant2D {
 
     PBRT_CPU_GPU
     Float PDF(Point2f p, const Bounds2f &b) const {
-        if (sat.Integral(b) == 0)
+        Float funcInt = sat.Integral(b);
+        if (funcInt == 0)
             return 0;
-        return Eval(p) / sat.Integral(b);
+        return Eval(p) / funcInt;
     }
 
   private:
@@ -1409,9 +1410,9 @@ class PiecewiseLinear2D {
                 float normalization = 1.f / HProd(m_inv_patch_size);
                 if (normalize) {
                     double sum = 0.0;
-                    for (uint32_t y = 0; y < m_size.y - 1; ++y) {
+                    for (int y = 0; y < m_size.y - 1; ++y) {
                         size_t i = y * xSize;
-                        for (uint32_t x = 0; x < m_size.x - 1; ++x, ++i) {
+                        for (int x = 0; x < m_size.x - 1; ++x, ++i) {
                             float v00 = data[i], v10 = data[i + 1], v01 = data[i + xSize],
                                   v11 = data[i + 1 + xSize],
                                   avg = .25f * (v00 + v10 + v01 + v11);
