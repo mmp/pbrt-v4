@@ -74,10 +74,16 @@ static void updateMaterialNeeds(
     else
         (*haveUniversalEvalMaterial)[m.Tag()] = true;
 }
+
 WavefrontPathIntegrator::WavefrontPathIntegrator(Allocator alloc, ParsedScene &scene) {
     // Allocate all of the data structures that represent the scene...
     std::map<std::string, Medium> media = scene.CreateMedia(alloc);
 
+    // "haveMedia" is a bit of a misnomer in that determines both whether
+    // queues are allocated for the medium sampling kernels and they are
+    // launched as well as whether the ray marching shadow ray kernel is
+    // launched... Thus, it will be true if there actually are no media,
+    // but some "interface" materials are present in the scene.
     haveMedia = false;
     // Check the shapes...
     for (const auto &shape : scene.shapes)
@@ -85,6 +91,12 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(Allocator alloc, ParsedScene &s
             haveMedia = true;
     for (const auto &shape : scene.animatedShapes)
         if (!shape.insideMedium.empty() || !shape.outsideMedium.empty())
+            haveMedia = true;
+    for (const auto &mtl : scene.materials)
+        if (mtl.name == "interface")
+            haveMedia = true;
+    for (const auto &namedMtl : scene.namedMaterials)
+        if (namedMtl.second.name == "interface")
             haveMedia = true;
 
     auto findMedium = [&](const std::string &s, const FileLoc *loc) -> Medium {
