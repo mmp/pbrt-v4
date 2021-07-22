@@ -832,7 +832,21 @@ class SampledGrid {
 
     PBRT_CPU_GPU
     T Lookup(const Point3f &p) const {
-        return Lookup(p, [] PBRT_CPU_GPU(T value) { return value; });
+        // Compute voxel coordinates and offsets for _p_
+        Point3f pSamples(p.x * nx - .5f, p.y * ny - .5f, p.z * nz - .5f);
+        Point3i pi = (Point3i)Floor(pSamples);
+        Vector3f d = pSamples - (Point3f)pi;
+
+        // Return trilinearly interpolated voxel values
+        auto d00 =
+            Lerp(d.x, Lookup(pi), Lookup(pi + Vector3i(1, 0, 0)));
+        auto d10 = Lerp(d.x, Lookup(pi + Vector3i(0, 1, 0)),
+                        Lookup(pi + Vector3i(1, 1, 0)));
+        auto d01 = Lerp(d.x, Lookup(pi + Vector3i(0, 0, 1)),
+                        Lookup(pi + Vector3i(1, 0, 1)));
+        auto d11 = Lerp(d.x, Lookup(pi + Vector3i(0, 1, 1)),
+                        Lookup(pi + Vector3i(1, 1, 1)));
+        return Lerp(d.z, Lerp(d.y, d00, d10), Lerp(d.y, d01, d11));
     }
 
     template <typename F>
@@ -845,7 +859,10 @@ class SampledGrid {
 
     PBRT_CPU_GPU
     T Lookup(const Point3i &p) const {
-        return Lookup(p, [] PBRT_CPU_GPU(T value) { return value; });
+        Bounds3i sampleBounds(Point3i(0, 0, 0), Point3i(nx, ny, nz));
+        if (!InsideExclusive(p, sampleBounds))
+            return T{};
+        return values[(p.z * ny + p.y) * nx + p.x];
     }
 
     template <typename F>
