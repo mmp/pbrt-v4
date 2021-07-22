@@ -1303,22 +1303,31 @@ OptiXAggregate::OptiXAggregate(
             shape.name != "curve")
             ErrorExit(&shape.loc, "%s: unknown shape", shape.name);
 
+    LOG_VERBOSE("Starting to read PLY meshes");
     std::map<int, TriQuadMesh> plyMeshes = PreparePLYMeshes(scene.shapes, textures.floatTextures);
+    LOG_VERBOSE("Finished reading PLY meshes");
+
+    LOG_VERBOSE("Starting to create GAS for top-level triangles");
     OptixTraversableHandle triangleGASTraversable = createGASForTriangles(
         scene.shapes, plyMeshes, hitPGTriangle, anyhitPGShadowTriangle, hitPGRandomHitTriangle,
         textures.floatTextures, namedMaterials, materials, media, shapeIndexToAreaLights,
         &bounds);
+    LOG_VERBOSE("Finished creating GAS for top-level triangles");
 
+    LOG_VERBOSE("Starting to create GAS for top-level blps/curves");
     int bilinearSBTOffset = intersectHGRecords.size();
     OptixTraversableHandle bilinearPatchGASTraversable =
         createGASForBLPs(scene.shapes, hitPGBilinearPatch, anyhitPGShadowBilinearPatch,
                          hitPGRandomHitBilinearPatch, textures.floatTextures, namedMaterials,
                          materials, media, shapeIndexToAreaLights, &bounds);
+    LOG_VERBOSE("Finished creating GAS for top-level blps/curves");
 
+    LOG_VERBOSE("Starting to create GAS for top-level quadrics");
     int quadricSBTOffset = intersectHGRecords.size();
     OptixTraversableHandle quadricGASTraversable = createGASForQuadrics(
         scene.shapes, hitPGQuadric, anyhitPGShadowQuadric, hitPGRandomHitQuadric,
         textures.floatTextures, namedMaterials, materials, media, shapeIndexToAreaLights, &bounds);
+    LOG_VERBOSE("Finished creating GAS for top-level quadrics");
 
     pstd::vector<OptixInstance> iasInstances(alloc);
 
@@ -1358,6 +1367,7 @@ OptiXAggregate::OptiXAggregate(
     for (const auto &def : scene.instanceDefinitions)
         allInstanceNames.push_back(def.first);
 
+    LOG_VERBOSE("Starting to read PLY meshes for instances");
     std::mutex mutex;
     ParallelFor(0, allInstanceNames.size(), [&](int64_t i) {
         const std::string &name = allInstanceNames[i];
@@ -1368,7 +1378,9 @@ OptiXAggregate::OptiXAggregate(
         std::lock_guard<std::mutex> lock(mutex);
         instancePLYMeshes[name] = std::move(meshes);
     });
+    LOG_VERBOSE("Finished reading PLY meshes for instances");
 
+    LOG_VERBOSE("Starting to create GASes for instance definitions");
     std::multimap<std::string, Instance> instanceMap;
     for (const auto &def : scene.instanceDefinitions) {
         if (!def.second.animatedShapes.empty())
@@ -1409,6 +1421,7 @@ OptiXAggregate::OptiXAggregate(
             // definition below.
             instanceMap.insert({def.first, Instance{{}, -1, {}}});
     }
+    LOG_VERBOSE("Finished creating GASes for instance definitions");
 
     // Create OptixInstances for instances
     for (const auto &inst : scene.instances) {
@@ -1452,7 +1465,9 @@ OptiXAggregate::OptiXAggregate(
     buildInput.instanceArray.numInstances = iasInstances.size();
     std::vector<OptixBuildInput> buildInputs = {buildInput};
 
+    LOG_VERBOSE("Starting to build top-level IAS");
     rootTraversable = buildBVH({buildInput});
+    LOG_VERBOSE("Finished building top-level IAS");
 
     LOG_VERBOSE("Finished creating shapes and acceleration structures");
 

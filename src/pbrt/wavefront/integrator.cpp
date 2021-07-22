@@ -137,8 +137,8 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(Allocator alloc, ParsedScene &s
     NamedTextures textures = scene.CreateTextures(alloc, Options->useGPU);
     LOG_VERBOSE("Done creating textures");
 
+    LOG_VERBOSE("Starting to create lights");
     pstd::vector<Light> allLights;
-
     infiniteLights = alloc.new_object<pstd::vector<Light>>(alloc);
     for (const auto &light : scene.lights) {
         Medium outsideMedium = findMedium(light.medium, &light.loc);
@@ -226,6 +226,7 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(Allocator alloc, ParsedScene &s
         }
         shapeIndexToAreaLights[i] = lightsForShape;
     }
+    LOG_VERBOSE("Done creating lights");
 
     LOG_VERBOSE("Starting to create materials");
     std::map<std::string, pbrt::Material> namedMaterials;
