@@ -849,6 +849,7 @@ if (PBRT_CUDA_ENABLED)
       )
   add_dependencies (pbrt_embedded_ptx_lib pbrt_soa_generated)
   list (APPEND ALL_PBRT_LIBS pbrt_embedded_ptx_lib)
+  list (APPEND ALL_PBRT_LIBS "nvidia-ml")
 endif()
 
 if (WIN32)

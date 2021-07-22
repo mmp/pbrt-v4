@@ -48,7 +48,7 @@ void InitPBRT(const PBRTOptions &opt) {
     if (Options->quiet)
         SuppressErrorMessages();
 
-    InitLogging(opt.logLevel, opt.logFile, Options->useGPU);
+    InitLogging(opt.logLevel, opt.logFile, opt.logUtilization, Options->useGPU);
 
     // General \pbrt Initialization
     int nThreads = Options->nThreads != 0 ? Options->nThreads : AvailableCores();
@@ -107,7 +107,8 @@ void CleanupPBRT() {
     // API Cleanup
     ParallelCleanup();
 
-    // CO    delete Options;
+    ShutdownLogging();
+
     Options = nullptr;
 }
 

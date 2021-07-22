@@ -34,6 +34,7 @@ struct PBRTOptions : BasicPBRTOptions {
     int nThreads = 0;
     LogLevel logLevel = LogLevel::Error;
     std::string logFile;
+    bool logUtilization = false;
     bool writePartialImages = false;
     bool recordPixelStatistics = false;
     bool printStatistics = false;
