@@ -26,6 +26,15 @@ bool Atoi(std::string_view str, int *ptr) {
     return true;
 }
 
+bool Atoi(std::string_view str, int64_t *ptr) {
+    try {
+        *ptr = std::stoll(std::string(str.begin(), str.end()));
+    } catch (...) {
+        return false;
+    }
+    return true;
+}
+
 bool Atof(std::string_view str, float *ptr) {
     try {
         *ptr = std::stof(std::string(str.begin(), str.end()));
@@ -91,6 +100,16 @@ std::vector<std::string> SplitString(std::string_view str, char ch) {
 std::vector<int> SplitStringToInts(std::string_view str, char ch) {
     std::vector<std::string> strs = SplitString(str, ch);
     std::vector<int> ints(strs.size());
+
+    for (size_t i = 0; i < strs.size(); ++i)
+        if (!Atoi(strs[i], &ints[i]))
+            return {};
+    return ints;
+}
+
+std::vector<int64_t> SplitStringToInt64s(std::string_view str, char ch) {
+    std::vector<std::string> strs = SplitString(str, ch);
+    std::vector<int64_t> ints(strs.size());
 
     for (size_t i = 0; i < strs.size(); ++i)
         if (!Atoi(strs[i], &ints[i]))

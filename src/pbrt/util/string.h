@@ -7,6 +7,7 @@
 
 #include <pbrt/pbrt.h>
 
+#include <ctype.h>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -14,6 +15,7 @@
 namespace pbrt {
 
 bool Atoi(std::string_view str, int *);
+bool Atoi(std::string_view str, int64_t *);
 bool Atof(std::string_view str, float *);
 bool Atof(std::string_view str, double *);
 
@@ -21,6 +23,7 @@ std::vector<std::string> SplitStringsFromWhitespace(std::string_view str);
 
 std::vector<std::string> SplitString(std::string_view str, char ch);
 std::vector<int> SplitStringToInts(std::string_view str, char ch);
+std::vector<int64_t> SplitStringToInt64s(std::string_view str, char ch);
 std::vector<Float> SplitStringToFloats(std::string_view str, char ch);
 std::vector<double> SplitStringToDoubles(std::string_view str, char ch);
 
