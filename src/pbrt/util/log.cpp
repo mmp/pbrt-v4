@@ -38,7 +38,8 @@
 #ifdef PBRT_IS_WINDOWS
 #include <windows.h>
 #endif
-#ifdef PBRT_BUILD_GPU_RENDERER
+#if defined(PBRT_BUILD_GPU_RENDERER) && __has_include(<nvml.h>)
+#define PBRT_HAVE_NVML
 #include <nvml.h>
 #endif
 
@@ -149,7 +150,7 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization,
             int64_t userPrev, nicePrev, systemPrev, idlePrev;
             getCPUUsage(&userPrev, &nicePrev, &systemPrev, &idlePrev);
 
-#ifdef PBRT_BUILD_GPU_RENDERER
+#ifdef PBRT_HAVE_NVML
             // NOTE: per https://stackoverflow.com/a/64610732 apparently a
             // call to LoadLibraryW(L"nvapi64.dll") will be a good idea on
             // windows...
@@ -185,7 +186,7 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization,
                 systemPrev = systemCur;
                 idlePrev = idleCur;
 
-#ifdef PBRT_BUILD_GPU_RENDERER
+#ifdef PBRT_HAVE_NVML
                 nvmlMemory_t info;
                 nvmlUtilization_t utilization;
                 if (nvmlDeviceGetMemoryInfo(device, &info) == NVML_SUCCESS &&
@@ -194,7 +195,7 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization,
                                 info.used / (1024*1024), utilization.gpu, utilization.memory);
 #endif
             }
-#ifdef PBRT_BUILD_GPU_RENDERER
+#ifdef PBRT_HAVE_NVML
             nvmlShutdown();
 #endif
         });
