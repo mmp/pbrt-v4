@@ -107,7 +107,7 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization,
                 rec.tv_nsec = ms * 1000000;
                 nanosleep(&rec, &rem);
 #elif defined(PBRT_IS_WINDOWS)
-                Sleep(ms)
+                Sleep(ms);
 #else
 #error "Need to implement sleepms() for current platform"
 #endif
@@ -137,6 +137,8 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization,
 #elif defined(PBRT_IS_OSX)
             *user = *nice = *system = *idle = 0;
 #elif defined(PBRT_IS_WINDOWS)
+            // possibly useful: https://stackoverflow.com/questions/23143693/retrieving-cpu-load-percent-total-in-windows-with-c
+            // https://stackoverflow.com/questions/63166/how-to-determine-cpu-and-memory-consumption-from-inside-a-process
             *user = *nice = *system = *idle = 0;
 #else
 #error "Need to implement getCPUUsage for current platform"
