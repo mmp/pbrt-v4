@@ -197,6 +197,8 @@ pstd::vector<Image> Image::GeneratePyramid(Image image, WrapMode2D wrapMode,
 }
 
 bool Image::HasAnyInfinitePixels() const {
+    if (format == PixelFormat::U256) return false;
+
     for (int y = 0; y < resolution.y; ++y)
         for (int x = 0; x < resolution.x; ++x)
             for (int c = 0; c < NChannels(); ++c)
@@ -206,6 +208,8 @@ bool Image::HasAnyInfinitePixels() const {
 }
 
 bool Image::HasAnyNaNPixels() const {
+    if (format == PixelFormat::U256) return false;
+
     for (int y = 0; y < resolution.y; ++y)
         for (int x = 0; x < resolution.x; ++x)
             for (int c = 0; c < NChannels(); ++c)
@@ -1228,7 +1232,7 @@ static ImageAndMetadata ReadPNG(const std::string &name, Allocator alloc,
                     v = encoding.ToFloatLinear(v);
                     image.SetChannel(Point2i(x, y), 0, v);
                 }
-            CHECK(bufIter == buf.end());
+            DCHECK(bufIter == buf.end());
         } else {
             image = Image(PixelFormat::U256, Point2i(width, height), {"Y"}, encoding);
             std::copy(buf.begin(), buf.end(), (uint8_t *)image.RawPointer({0, 0}));
@@ -1255,7 +1259,7 @@ static ImageAndMetadata ReadPNG(const std::string &name, Allocator alloc,
                 auto bufIter = buf.begin();
                 for (unsigned int y = 0; y < height; ++y)
                     for (unsigned int x = 0; x < width; ++x, bufIter += 8) {
-                        CHECK(bufIter < buf.end());
+                        DCHECK(bufIter < buf.end());
                         // Convert from little endian.
                         Float rgba[4] = {
                             (((int)bufIter[0] << 8) + (int)bufIter[1]) / 65535.f,
@@ -1267,13 +1271,13 @@ static ImageAndMetadata ReadPNG(const std::string &name, Allocator alloc,
                             image.SetChannel(Point2i(x, y), c, rgba[c]);
                         }
                     }
-                CHECK(bufIter == buf.end());
+                DCHECK(bufIter == buf.end());
             } else {
                 image = Image(PixelFormat::Half, Point2i(width, height), {"R", "G", "B"});
                 auto bufIter = buf.begin();
                 for (unsigned int y = 0; y < height; ++y)
                     for (unsigned int x = 0; x < width; ++x, bufIter += 6) {
-                        CHECK(bufIter < buf.end());
+                        DCHECK(bufIter < buf.end());
                         // Convert from little endian.
                         Float rgb[3] = {
                             (((int)bufIter[0] << 8) + (int)bufIter[1]) / 65535.f,
@@ -1284,7 +1288,7 @@ static ImageAndMetadata ReadPNG(const std::string &name, Allocator alloc,
                             image.SetChannel(Point2i(x, y), c, rgb[c]);
                         }
                     }
-                CHECK(bufIter == buf.end());
+                DCHECK(bufIter == buf.end());
             }
         } else if (hasAlpha) {
             image = Image(PixelFormat::U256, Point2i(width, height), {"R", "G", "B", "A"},
@@ -1301,6 +1305,17 @@ static ImageAndMetadata ReadPNG(const std::string &name, Allocator alloc,
 }
 
 Image Image::SelectChannels(const ImageChannelDesc &desc, Allocator alloc) const {
+    bool descIsCurrentDesc = [&]() {
+        if (desc.size() != NChannels())
+            return false;
+        for (int i = 0; i < NChannels(); ++i)
+            if (desc.offset[i] != i)
+                return false;
+        return true;
+    }();
+    if (descIsCurrentDesc)
+        return *this;
+
     std::vector<std::string> descChannelNames;
     // TODO: descChannelNames = ChannelNames(desc)
     for (size_t i = 0; i < desc.offset.size(); ++i)

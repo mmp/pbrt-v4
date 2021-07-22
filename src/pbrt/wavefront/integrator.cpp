@@ -159,25 +159,29 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(Allocator alloc, ParsedScene &s
 
     // Area lights...
     std::map<int, pstd::vector<Light> *> shapeIndexToAreaLights;
+
+    std::set<std::string> namedMaterialsThatAreInterfaces;
+    for (auto iter = scene.namedMaterials.begin();
+         iter != scene.namedMaterials.end(); ++iter) {
+        std::string materialName = iter->second.parameters.GetOneString("type", "");
+        if (materialName == "interface" || materialName == "none" ||
+            materialName.empty())
+            namedMaterialsThatAreInterfaces.insert(iter->first);
+    }
+
     for (size_t i = 0; i < scene.shapes.size(); ++i) {
         const auto &shape = scene.shapes[i];
         if (shape.lightIndex == -1)
             continue;
 
         auto isInterface = [&]() {
-            std::string materialName;
-            if (shape.materialIndex != -1)
-                materialName = scene.materials[shape.materialIndex].name;
-            else {
-                for (auto iter = scene.namedMaterials.begin();
-                     iter != scene.namedMaterials.end(); ++iter)
-                    if (iter->first == shape.materialName) {
-                        materialName = iter->second.parameters.GetOneString("type", "");
-                        break;
-                    }
-            }
-            return (materialName == "interface" || materialName == "none" ||
-                    materialName.empty());
+            if (shape.materialIndex != -1) {
+                std::string materialName = scene.materials[shape.materialIndex].name;
+                return (materialName == "interface" || materialName == "none" ||
+                        materialName.empty());
+            } else
+                return (namedMaterialsThatAreInterfaces.find(shape.materialName) !=
+                        namedMaterialsThatAreInterfaces.end());
         };
         if (isInterface())
             continue;
