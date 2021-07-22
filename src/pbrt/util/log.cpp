@@ -38,8 +38,7 @@
 #ifdef PBRT_IS_WINDOWS
 #include <windows.h>
 #endif
-#if defined(PBRT_BUILD_GPU_RENDERER) && __has_include(<nvml.h>)
-#define PBRT_HAVE_NVML
+#if defined(PBRT_USE_NVML)
 #include <nvml.h>
 #endif
 
@@ -150,7 +149,7 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization,
             int64_t userPrev, nicePrev, systemPrev, idlePrev;
             getCPUUsage(&userPrev, &nicePrev, &systemPrev, &idlePrev);
 
-#ifdef PBRT_HAVE_NVML
+#ifdef PBRT_USE_NVML
             // NOTE: per https://stackoverflow.com/a/64610732 apparently a
             // call to LoadLibraryW(L"nvapi64.dll") will be a good idea on
             // windows...
@@ -174,7 +173,7 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization,
                 int64_t delta = (userCur + niceCur + systemCur + idleCur) -
                     (userPrev + nicePrev + systemPrev + idlePrev);
                 LOG_VERBOSE("CPU: Memory used %d MB. "
-                            "Core activity: %.2f user %.2f nice %.2f system %.2f idle",
+                            "Core activity: %.4f user %.4f nice %.4f system %.4f idle",
                             GetCurrentRSS() / (1024*1024),
                             double(userCur - userPrev) / delta,
                             double(niceCur - nicePrev) / delta,
@@ -186,7 +185,7 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization,
                 systemPrev = systemCur;
                 idlePrev = idleCur;
 
-#ifdef PBRT_HAVE_NVML
+#ifdef PBRT_USE_NVML
                 nvmlMemory_t info;
                 nvmlUtilization_t utilization;
                 if (nvmlDeviceGetMemoryInfo(device, &info) == NVML_SUCCESS &&
@@ -195,7 +194,7 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization,
                                 info.used / (1024*1024), utilization.gpu, utilization.memory);
 #endif
             }
-#ifdef PBRT_HAVE_NVML
+#ifdef PBRT_USE_NVML
             nvmlShutdown();
 #endif
         });
