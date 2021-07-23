@@ -597,6 +597,8 @@ BilinearPatchMesh *OptiXAggregate::diceCurveToBLP(const ShapeSceneEntity &shape,
         Float width = Lerp(u, width0, width1);
 
         int segmentIndex = int(u * nSegments);
+        if (segmentIndex == nSegments) // u == 1...
+            --segmentIndex;
 
         // Compute offset into original control points for current u
         int cpOffset;
