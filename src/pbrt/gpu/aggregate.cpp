@@ -57,31 +57,6 @@ OptiXAggregate::ASBuildInput::ASBuildInput(size_t size) {
     randomHitHGRecords.resize(size);
 }
 
-// FIXME: copied in wavefront/aggregate.cpp
-static void updateMaterialNeeds(Material m, pstd::array<bool, Material::NumTags()> *haveBasicEvalMaterial,
-                                pstd::array<bool, Material::NumTags()> *haveUniversalEvalMaterial,
-                                bool *haveSubsurface) {
-    if (!m)
-        return;
-
-    if (MixMaterial *mix = m.CastOrNullptr<MixMaterial>(); mix) {
-        updateMaterialNeeds(mix->GetMaterial(0), haveBasicEvalMaterial, haveUniversalEvalMaterial,
-                            haveSubsurface);
-        updateMaterialNeeds(mix->GetMaterial(1), haveBasicEvalMaterial, haveUniversalEvalMaterial,
-                            haveSubsurface);
-        return;
-    }
-
-    *haveSubsurface |= m.HasSubsurfaceScattering();
-
-    FloatTexture displace = m.GetDisplacement();
-    if (m.CanEvaluateTextures(BasicTextureEvaluator()) &&
-        (!displace || BasicTextureEvaluator().CanEvaluate({displace}, {})))
-        (*haveBasicEvalMaterial)[m.Tag()] = true;
-    else
-        (*haveUniversalEvalMaterial)[m.Tag()] = true;
-}
-
 struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) RaygenRecord {
     __align__(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
 };
@@ -226,8 +201,7 @@ static FloatTexture getAlphaTexture(
     return alphaTexture;
 }
 
-static int getOptixGeometryFlags(bool isTriangle, FloatTexture alphaTexture,
-                                 Material material) {
+static int getOptixGeometryFlags(bool isTriangle, FloatTexture alphaTexture) {
     if (alphaTexture && isTriangle)
         // Need anyhit
         return OPTIX_GEOMETRY_FLAG_NONE;
@@ -259,7 +233,7 @@ STAT_COUNTER("Geometry/Triangles added from displacement mapping", displacedTris
 
 std::map<int, TriQuadMesh>
 OptiXAggregate::PreparePLYMeshes(const std::vector<ShapeSceneEntity> &shapes,
-                                 const std::map<std::string, FloatTexture> &floatTextures) const {
+                                 const std::map<std::string, FloatTexture> &floatTextures) {
     std::map<int, TriQuadMesh> plyMeshes;
     std::mutex mutex;
     ParallelFor(0, shapes.size(), [&](int64_t i) {
@@ -424,13 +398,14 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForTriangles(
         }
     });
 
-    if (meshesCreated.load() == 0)
+    int nMeshes = meshesCreated.load();
+    if (nMeshes == 0)
         return {};
 
-    ASBuildInput buildInput(meshesCreated.load());
+    ASBuildInput buildInput(nMeshes);
     // FIXME: these leak, unfortunately...
-    CUdeviceptr *pDeviceDevicePtrs = new CUdeviceptr[meshesCreated.load()];
-    uint32_t *triangleInputFlags = new uint32_t[meshesCreated.load()];
+    CUdeviceptr *pDeviceDevicePtrs = new CUdeviceptr[nMeshes];
+    uint32_t *triangleInputFlags = new uint32_t[nMeshes];
 
     int buildIndex = 0;
     for (int shapeIndex = 0; shapeIndex < meshes.size(); ++shapeIndex) {
@@ -439,9 +414,6 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForTriangles(
             continue;
 
         const auto &shape = shapes[shapeIndex];
-
-        FloatTexture alphaTexture = getAlphaTexture(shape, floatTextures, alloc);
-        Material material = getMaterial(shape, namedMaterials, materials);
 
         OptixBuildInput input = {};
 
@@ -458,8 +430,9 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForTriangles(
         input.triangleArray.numIndexTriplets = mesh->nTriangles;
         input.triangleArray.indexBuffer = CUdeviceptr(mesh->vertexIndices);
 
-        triangleInputFlags[buildIndex] =
-            getOptixGeometryFlags(true, alphaTexture, material);
+        FloatTexture alphaTexture = getAlphaTexture(shape, floatTextures, alloc);
+        Material material = getMaterial(shape, namedMaterials, materials);
+        triangleInputFlags[buildIndex] = getOptixGeometryFlags(true, alphaTexture);
         input.triangleArray.flags = &triangleInputFlags[buildIndex];
 
         input.triangleArray.numSbtRecords = 1;
@@ -588,8 +561,7 @@ BilinearPatchMesh *OptiXAggregate::diceCurveToBLP(const ShapeSceneEntity &shape,
         } else if (n.size() != nSegments + 1) {
             Error(loc,
                   "Invalid number of normals %d: must provide %d normals for "
-                  "ribbon "
-                  "curves with %d segments.",
+                  "ribbon curves with %d segments.",
                   int(n.size()), nSegments + 1, nSegments);
             return {};
         }
@@ -653,7 +625,7 @@ BilinearPatchMesh *OptiXAggregate::diceCurveToBLP(const ShapeSceneEntity &shape,
         }
 
         Float uSeg = (u * nSegments) - segmentIndex;
-        CHECK(uSeg >= 0 && uSeg <= 1);
+        DCHECK(uSeg >= 0 && uSeg <= 1);
 
         Vector3f dpdu;
         Point3f p = EvaluateCubicBezier(segCpBezier, uSeg, &dpdu);
@@ -775,15 +747,13 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForBLPs(
         if (!mesh)
             continue;
 
-        OptixBuildInput input = {};
+        OptixBuildInput &input = buildInput.optixInputs[buildInputIndex];
         input.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
         input.customPrimitiveArray.numSbtRecords = 1;
         input.customPrimitiveArray.numPrimitives = mesh->nPatches;
         aabbDevicePtrs[buildInputIndex] = CUdeviceptr(&aabbs[aabbIndex]);
         input.customPrimitiveArray.aabbBuffers = &aabbDevicePtrs[buildInputIndex];
         input.customPrimitiveArray.flags = &flags[buildInputIndex];
-
-        buildInput.optixInputs[buildInputIndex] = input;
 
         for (int patchIndex = 0; patchIndex < mesh->nPatches; ++patchIndex) {
             Bounds3f shapeBounds;
@@ -801,7 +771,7 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForBLPs(
         Material material = getMaterial(shape, namedMaterials, materials);
         FloatTexture alphaTexture = getAlphaTexture(shape, floatTextures, alloc);
 
-        flags[buildInputIndex] = getOptixGeometryFlags(false, alphaTexture, material);
+        flags[buildInputIndex] = getOptixGeometryFlags(false, alphaTexture);
 
         HitgroupRecord hgRecord;
         OPTIX_CHECK(optixSbtRecordPackHeader(intersectPG, &hgRecord));
@@ -876,8 +846,7 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForQuadrics(
         CHECK_EQ(1, shapes.size());
         Shape shape = shapes[0];
 
-        OptixBuildInput input = {};
-
+        OptixBuildInput &input = buildInput.optixInputs[quadricIndex];
         input.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
         input.customPrimitiveArray.numSbtRecords = 1;
         input.customPrimitiveArray.numPrimitives = 1;
@@ -890,14 +859,12 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForQuadrics(
         aabbDevicePtrs[quadricIndex] = CUdeviceptr(&shapeAABBs[quadricIndex]);
         input.customPrimitiveArray.aabbBuffers = &aabbDevicePtrs[quadricIndex];
 
-        buildInput.optixInputs[quadricIndex] = input;
-
         buildInput.bounds = Union(buildInput.bounds, shapeBounds);
 
         // Find alpha texture, if present.
         Material material = getMaterial(s, namedMaterials, materials);
         FloatTexture alphaTexture = getAlphaTexture(s, floatTextures, alloc);
-        flags[quadricIndex] = getOptixGeometryFlags(false, alphaTexture, material);
+        flags[quadricIndex] = getOptixGeometryFlags(false, alphaTexture);
 
         HitgroupRecord hgRecord;
         OPTIX_CHECK(optixSbtRecordPackHeader(intersectPG, &hgRecord));
@@ -1510,7 +1477,6 @@ OptiXAggregate::OptiXAggregate(
     buildInput.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
     buildInput.instanceArray.instances = CUdeviceptr(iasInstances.data());
     buildInput.instanceArray.numInstances = iasInstances.size();
-    std::vector<OptixBuildInput> buildInputs = {buildInput};
 
     rootTraversable = buildBVH({buildInput});
     LOG_VERBOSE("Finished building top-level IAS");

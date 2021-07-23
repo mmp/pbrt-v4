@@ -8,7 +8,6 @@
 #include <pbrt/pbrt.h>
 
 #include <pbrt/gpu/optix.h>
-#include <pbrt/materials.h>
 #include <pbrt/parsedscene.h>
 #include <pbrt/util/containers.h>
 #include <pbrt/util/pstd.h>
@@ -19,6 +18,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 #include <cuda.h>
 #include <cuda_runtime.h>
@@ -50,6 +50,13 @@ class OptiXAggregate : public WavefrontAggregate {
 
     void IntersectOneRandom(int maxRays, SubsurfaceScatterQueue *subsurfaceScatterQueue) const;
 
+    // WAR: The enclosing parent function ("PreparePLYMeshes") for an
+    // extended __device__ lambda cannot have private or protected access
+    // within its class, so it's public...
+    static std::map<int, TriQuadMesh> PreparePLYMeshes(
+        const std::vector<ShapeSceneEntity> &shapes,
+        const std::map<std::string, FloatTexture> &floatTextures);
+
   private:
     struct HitgroupRecord;
 
@@ -76,14 +83,6 @@ class OptiXAggregate : public WavefrontAggregate {
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
         Allocator alloc);
 
-    // WAR: The enclosing parent function ("PreparePLYMeshes") for an
-    // extended __device__ lambda cannot have private or protected access
-    // within its class
-  public:
-    std::map<int, TriQuadMesh> PreparePLYMeshes(const std::vector<ShapeSceneEntity> &shapes,
-                                                const std::map<std::string, FloatTexture> &floatTextures) const;
-
-  private:
     static BilinearPatchMesh *diceCurveToBLP(const ShapeSceneEntity &shape,
                                              int nDiceU, int nDiceV, Allocator alloc);
 
