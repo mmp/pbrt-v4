@@ -53,7 +53,18 @@ class OptiXAggregate : public WavefrontAggregate {
   private:
     struct HitgroupRecord;
 
-    OptixTraversableHandle createGASForTriangles(
+    struct ASBuildInput {
+        ASBuildInput() = default;
+        ASBuildInput(size_t size);
+
+        std::vector<OptixBuildInput> optixInputs;
+        std::vector<HitgroupRecord> intersectHGRecords;
+        std::vector<HitgroupRecord> shadowHGRecords;
+        std::vector<HitgroupRecord> randomHitHGRecords;
+        Bounds3f bounds;
+    };
+
+    static ASBuildInput createBuildInputForTriangles(
         const std::vector<ShapeSceneEntity> &shapes,
         const std::map<int, TriQuadMesh> &plyMeshes,
         const OptixProgramGroup &intersectPG,
@@ -63,18 +74,20 @@ class OptiXAggregate : public WavefrontAggregate {
         const std::vector<Material> &materials,
         const std::map<std::string, Medium> &media,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-        Bounds3f *gasBounds);
+        Allocator alloc);
 
-    // WAR: The enclosing parent function ("createGASForTriangles") for an extended __device__
-    // lambda cannot have private or protected access within its class
+    // WAR: The enclosing parent function ("PreparePLYMeshes") for an
+    // extended __device__ lambda cannot have private or protected access
+    // within its class
   public:
     std::map<int, TriQuadMesh> PreparePLYMeshes(const std::vector<ShapeSceneEntity> &shapes,
                                                 const std::map<std::string, FloatTexture> &floatTextures) const;
+
   private:
     static BilinearPatchMesh *diceCurveToBLP(const ShapeSceneEntity &shape,
                                              int nDiceU, int nDiceV, Allocator alloc);
 
-    OptixTraversableHandle createGASForBLPs(
+    static ASBuildInput createBuildInputForBLPs(
         const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
         const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
         const std::map<std::string, FloatTexture> &floatTextures,
@@ -82,9 +95,9 @@ class OptiXAggregate : public WavefrontAggregate {
         const std::vector<Material> &materials,
         const std::map<std::string, Medium> &media,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-        Bounds3f *gasBounds);
+        Allocator alloc);
 
-    OptixTraversableHandle createGASForQuadrics(
+    static ASBuildInput createBuildInputForQuadrics(
         const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
         const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
         const std::map<std::string, FloatTexture> &floatTextures,
@@ -92,7 +105,9 @@ class OptiXAggregate : public WavefrontAggregate {
         const std::vector<Material> &materials,
         const std::map<std::string, Medium> &media,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-        Bounds3f *gasBounds);
+        Allocator alloc);
+
+    int addHGRecords(const ASBuildInput &buildInput);
 
     OptixTraversableHandle buildBVH(const std::vector<OptixBuildInput> &buildInputs);
 

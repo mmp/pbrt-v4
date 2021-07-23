@@ -50,6 +50,13 @@
 
 namespace pbrt {
 
+OptiXAggregate::ASBuildInput::ASBuildInput(size_t size) {
+    optixInputs.resize(size);
+    intersectHGRecords.resize(size);
+    shadowHGRecords.resize(size);
+    randomHitHGRecords.resize(size);
+}
+
 // FIXME: copied in wavefront/aggregate.cpp
 static void updateMaterialNeeds(Material m, pstd::array<bool, Material::NumTags()> *haveBasicEvalMaterial,
                                 pstd::array<bool, Material::NumTags()> *haveUniversalEvalMaterial,
@@ -86,6 +93,11 @@ struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) MissRecord {
 struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) OptiXAggregate::HitgroupRecord {
     HitgroupRecord() {}
     HitgroupRecord(const HitgroupRecord &r) { memcpy(this, &r, sizeof(HitgroupRecord)); }
+    HitgroupRecord &operator=(const HitgroupRecord &r) {
+        if (this != &r)
+            memcpy(this, &r, sizeof(HitgroupRecord));
+        return *this;
+    }
 
     __align__(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
     union {
@@ -103,6 +115,9 @@ STAT_MEMORY_COUNTER("Memory/Acceleration structures", gpuBVHBytes);
 
 OptixTraversableHandle OptiXAggregate::buildBVH(
     const std::vector<OptixBuildInput> &buildInputs) {
+    if (buildInputs.empty())
+        return {};
+
     // Figure out memory requirements.
     OptixAccelBuildOptions accelOptions = {};
     accelOptions.buildFlags =
@@ -315,8 +330,7 @@ OptiXAggregate::PreparePLYMeshes(const std::vector<ShapeSceneEntity> &shapes,
     return plyMeshes;
 }
 
-
-OptixTraversableHandle OptiXAggregate::createGASForTriangles(
+OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForTriangles(
     const std::vector<ShapeSceneEntity> &shapes,
     const std::map<int, TriQuadMesh> &plyMeshes,
     const OptixProgramGroup &intersectPG,
@@ -326,11 +340,7 @@ OptixTraversableHandle OptiXAggregate::createGASForTriangles(
     const std::vector<Material> &materials,
     const std::map<std::string, Medium> &media,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-    Bounds3f *gasBounds) {
-    std::vector<OptixBuildInput> buildInputs;
-    std::vector<CUdeviceptr> pDeviceDevicePtrs;
-    std::vector<uint32_t> triangleInputFlags;
-
+    Allocator alloc) {
     // Allocate space for potentially all shapes being triangle meshes so
     // that we can write them in order (just potentially sparsely...)
     std::vector<TriangleMesh *> meshes(shapes.size(), nullptr);
@@ -405,11 +415,13 @@ OptixTraversableHandle OptiXAggregate::createGASForTriangles(
         }
     });
 
-    buildInputs.resize(meshesCreated.load());
-    // Important so that these aren't reallocated so we can take pointers to
-    // elements...
-    pDeviceDevicePtrs.resize(meshesCreated.load());
-    triangleInputFlags.resize(meshesCreated.load());
+    if (meshesCreated.load() == 0)
+        return {};
+
+    ASBuildInput buildInput(meshesCreated.load());
+    // FIXME: these leak, unfortunately...
+    CUdeviceptr *pDeviceDevicePtrs = new CUdeviceptr[meshesCreated.load()];
+    uint32_t *triangleInputFlags = new uint32_t[meshesCreated.load()];
 
     int buildIndex = 0;
     for (int shapeIndex = 0; shapeIndex < meshes.size(); ++shapeIndex) {
@@ -446,7 +458,7 @@ OptixTraversableHandle OptiXAggregate::createGASForTriangles(
         input.triangleArray.sbtIndexOffsetSizeInBytes = 0;
         input.triangleArray.sbtIndexOffsetStrideInBytes = 0;
 
-        buildInputs[buildIndex] = input;
+        buildInput.optixInputs[buildIndex] = input;
 
         HitgroupRecord hgRecord;
         OPTIX_CHECK(optixSbtRecordPackHeader(intersectPG, &hgRecord));
@@ -468,23 +480,20 @@ OptixTraversableHandle OptiXAggregate::createGASForTriangles(
         }
         hgRecord.triRec.mediumInterface = getMediumInterface(shape, media, alloc);
 
-        *gasBounds = Union(*gasBounds, meshBounds[shapeIndex]);
+        buildInput.bounds = Union(buildInput.bounds, meshBounds[shapeIndex]);
 
-        intersectHGRecords.push_back(hgRecord);
+        buildInput.intersectHGRecords[buildIndex] = hgRecord;
 
         OPTIX_CHECK(optixSbtRecordPackHeader(randomHitPG, &hgRecord));
-        randomHitHGRecords.push_back(hgRecord);
+        buildInput.randomHitHGRecords[buildIndex]= hgRecord;
 
         OPTIX_CHECK(optixSbtRecordPackHeader(shadowPG, &hgRecord));
-        shadowHGRecords.push_back(hgRecord);
+        buildInput.shadowHGRecords[buildIndex] = hgRecord;
 
         ++buildIndex;
     }
 
-    if (buildInputs.empty())
-        return {};
-
-    return buildBVH(buildInputs);
+    return buildInput;
 }
 
 STAT_COUNTER("Geometry/Curves", nCurves);
@@ -709,7 +718,7 @@ BilinearPatchMesh *OptiXAggregate::diceCurveToBLP(const ShapeSceneEntity &shape,
         blpUV, std::vector<int>(), nullptr);
 }
 
-OptixTraversableHandle OptiXAggregate::createGASForBLPs(
+OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForBLPs(
     const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
     const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
     const std::map<std::string, FloatTexture> &floatTextures,
@@ -717,7 +726,7 @@ OptixTraversableHandle OptiXAggregate::createGASForBLPs(
     const std::vector<Material> &materials,
     const std::map<std::string, Medium> &media,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-    Bounds3f *gasBounds) {
+    Allocator alloc) {
     // Create meshes
     std::vector<BilinearPatchMesh *> meshes(shapes.size(), nullptr);
     std::atomic<int> nPatches = 0, nMeshes = 0;
@@ -744,24 +753,28 @@ OptixTraversableHandle OptiXAggregate::createGASForBLPs(
         return {};
 
     // Create build inputs
-    OptixAabb *aabbs = alloc.allocate_object<OptixAabb>(nPatches);
-    OptixAabb *aabbPtr = aabbs;
-    std::vector<OptixBuildInput> buildInputs(nMeshes);
-    std::vector<CUdeviceptr> aabbDevicePtrs(nMeshes);
-    std::vector<uint32_t> flags(nMeshes);
+    ASBuildInput buildInput(nMeshes);
     int buildInputIndex = 0;
+    // FIXME: leaks...
+    OptixAabb *aabbs = alloc.allocate_object<OptixAabb>(nPatches);
+    int aabbIndex = 0;
+    CUdeviceptr *aabbDevicePtrs = new CUdeviceptr[nMeshes];
+    uint32_t *flags = new uint32_t[nMeshes];
 
     for (size_t shapeIndex = 0; shapeIndex < meshes.size(); ++shapeIndex) {
         BilinearPatchMesh *mesh = meshes[shapeIndex];
         if (!mesh)
             continue;
 
-        buildInputs[buildInputIndex].type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
-        buildInputs[buildInputIndex].customPrimitiveArray.numSbtRecords = 1;
-        buildInputs[buildInputIndex].customPrimitiveArray.numPrimitives = mesh->nPatches;
-        aabbDevicePtrs[buildInputIndex] = CUdeviceptr(aabbPtr);
-        buildInputs[buildInputIndex].customPrimitiveArray.aabbBuffers = &aabbDevicePtrs[buildInputIndex];
-        buildInputs[buildInputIndex].customPrimitiveArray.flags = &flags[buildInputIndex];
+        OptixBuildInput input = {};
+        input.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
+        input.customPrimitiveArray.numSbtRecords = 1;
+        input.customPrimitiveArray.numPrimitives = mesh->nPatches;
+        aabbDevicePtrs[buildInputIndex] = CUdeviceptr(&aabbs[aabbIndex]);
+        input.customPrimitiveArray.aabbBuffers = &aabbDevicePtrs[buildInputIndex];
+        input.customPrimitiveArray.flags = &flags[buildInputIndex];
+
+        buildInput.optixInputs[buildInputIndex] = input;
 
         for (int patchIndex = 0; patchIndex < mesh->nPatches; ++patchIndex) {
             Bounds3f shapeBounds;
@@ -770,10 +783,9 @@ OptixTraversableHandle OptiXAggregate::createGASForBLPs(
 
             OptixAabb aabb = {float(shapeBounds.pMin.x), float(shapeBounds.pMin.y), float(shapeBounds.pMin.z),
                               float(shapeBounds.pMax.x), float(shapeBounds.pMax.y), float(shapeBounds.pMax.z)};
-            *aabbPtr = aabb;
-            ++aabbPtr;
+            aabbs[aabbIndex++] = aabb;
 
-            *gasBounds = Union(*gasBounds, shapeBounds);
+            buildInput.bounds = Union(buildInput.bounds, shapeBounds);
         }
 
         const auto &shape = shapes[shapeIndex];
@@ -802,25 +814,21 @@ OptixTraversableHandle OptiXAggregate::createGASForBLPs(
         }
         hgRecord.bilinearRec.mediumInterface = getMediumInterface(shape, media, alloc);
 
-        intersectHGRecords.push_back(hgRecord);
+        buildInput.intersectHGRecords[buildInputIndex] = hgRecord;
 
         OPTIX_CHECK(optixSbtRecordPackHeader(randomHitPG, &hgRecord));
-        randomHitHGRecords.push_back(hgRecord);
+        buildInput.randomHitHGRecords[buildInputIndex] = hgRecord;
 
         OPTIX_CHECK(optixSbtRecordPackHeader(shadowPG, &hgRecord));
-        shadowHGRecords.push_back(hgRecord);
+        buildInput.shadowHGRecords[buildInputIndex] = hgRecord;
 
         ++buildInputIndex;
     };
 
-    OptixTraversableHandle handle = buildBVH(buildInputs);
-
-    alloc.deallocate_object(aabbs, nPatches);
-
-    return handle;
+    return buildInput;
 }
 
-OptixTraversableHandle OptiXAggregate::createGASForQuadrics(
+OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForQuadrics(
     const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
     const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
     const std::map<std::string, FloatTexture> &floatTextures,
@@ -828,12 +836,24 @@ OptixTraversableHandle OptiXAggregate::createGASForQuadrics(
     const std::vector<Material> &materials,
     const std::map<std::string, Medium> &media,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-    Bounds3f *gasBounds) {
-    std::vector<OptixBuildInput> buildInputs;
-    pstd::vector<OptixAabb> shapeAABBs(alloc);
-    std::vector<CUdeviceptr> aabbPtrs;
-    std::vector<unsigned int> flags;
+    Allocator alloc) {
+    int nQuadrics = 0;
+    for (size_t shapeIndex = 0; shapeIndex < shapes.size(); ++shapeIndex) {
+        const auto &s = shapes[shapeIndex];
+        if (s.name == "sphere" || s.name == "cylinder" || s.name == "disk")
+            ++nQuadrics;
+    }
 
+    if (nQuadrics == 0)
+        return {};
+
+    ASBuildInput buildInput(nQuadrics);
+    // FIXME: leaks
+    OptixAabb *shapeAABBs = alloc.allocate_object<OptixAabb>(nQuadrics);
+    CUdeviceptr *aabbDevicePtrs = new CUdeviceptr[nQuadrics];
+    unsigned int *flags = new unsigned int[nQuadrics];
+
+    int quadricIndex = 0;
     for (size_t shapeIndex = 0; shapeIndex < shapes.size(); ++shapeIndex) {
         const auto &s = shapes[shapeIndex];
         if (s.name != "sphere" && s.name != "cylinder" && s.name != "disk")
@@ -847,27 +867,28 @@ OptixTraversableHandle OptiXAggregate::createGASForQuadrics(
         CHECK_EQ(1, shapes.size());
         Shape shape = shapes[0];
 
-        OptixBuildInput buildInput = {};
-        memset(&buildInput, 0, sizeof(buildInput));
+        OptixBuildInput input = {};
 
-        buildInput.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
-        buildInput.customPrimitiveArray.numSbtRecords = 1;
-        buildInput.customPrimitiveArray.numPrimitives = 1;
-        // aabbBuffers and flags pointers are set when we're done
-
-        buildInputs.push_back(buildInput);
+        input.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
+        input.customPrimitiveArray.numSbtRecords = 1;
+        input.customPrimitiveArray.numPrimitives = 1;
+        input.customPrimitiveArray.flags = &flags[quadricIndex];
 
         Bounds3f shapeBounds = shape.Bounds();
         OptixAabb aabb = {float(shapeBounds.pMin.x), float(shapeBounds.pMin.y), float(shapeBounds.pMin.z),
                           float(shapeBounds.pMax.x), float(shapeBounds.pMax.y), float(shapeBounds.pMax.z)};
-        shapeAABBs.push_back(aabb);
+        shapeAABBs[quadricIndex] = aabb;
+        aabbDevicePtrs[quadricIndex] = CUdeviceptr(&shapeAABBs[quadricIndex]);
+        input.customPrimitiveArray.aabbBuffers = &aabbDevicePtrs[quadricIndex];
 
-        *gasBounds = Union(*gasBounds, shapeBounds);
+        buildInput.optixInputs[quadricIndex] = input;
+
+        buildInput.bounds = Union(buildInput.bounds, shapeBounds);
 
         // Find alpha texture, if present.
         Material material = getMaterial(s, namedMaterials, materials);
         FloatTexture alphaTexture = getAlphaTexture(s, floatTextures, alloc);
-        flags.push_back(getOptixGeometryFlags(false, alphaTexture, material));
+        flags[quadricIndex] = getOptixGeometryFlags(false, alphaTexture, material);
 
         HitgroupRecord hgRecord;
         OPTIX_CHECK(optixSbtRecordPackHeader(intersectPG, &hgRecord));
@@ -889,35 +910,39 @@ OptixTraversableHandle OptiXAggregate::createGASForQuadrics(
         }
         hgRecord.quadricRec.mediumInterface = getMediumInterface(s, media, alloc);
 
-        intersectHGRecords.push_back(hgRecord);
+        buildInput.intersectHGRecords[quadricIndex] = hgRecord;
 
         OPTIX_CHECK(optixSbtRecordPackHeader(randomHitPG, &hgRecord));
-        randomHitHGRecords.push_back(hgRecord);
+        buildInput.randomHitHGRecords[quadricIndex] = hgRecord;
 
         OPTIX_CHECK(optixSbtRecordPackHeader(shadowPG, &hgRecord));
-        shadowHGRecords.push_back(hgRecord);
+        buildInput.shadowHGRecords[quadricIndex] = hgRecord;
+
+        ++quadricIndex;
     }
 
-    if (buildInputs.empty())
-        return {};
-
-    for (size_t i = 0; i < shapeAABBs.size(); ++i)
-        aabbPtrs.push_back(CUdeviceptr(&shapeAABBs[i]));
-
-    CHECK_EQ(buildInputs.size(), flags.size());
-    for (size_t i = 0; i < buildInputs.size(); ++i) {
-        buildInputs[i].customPrimitiveArray.aabbBuffers = &aabbPtrs[i];
-        buildInputs[i].customPrimitiveArray.flags = &flags[i];
-    }
-
-    return buildBVH(buildInputs);
+    return buildInput;
 }
 
-static void logCallback(unsigned int level, const char* tag, const char* message, void* cbdata) {
+static void logCallback(unsigned int level, const char *tag, const char *message, void *cbdata) {
     if (level <= 2)
         LOG_ERROR("OptiX: %s: %s", tag, message);
     else
         LOG_VERBOSE("OptiX: %s: %s", tag, message);
+}
+
+int OptiXAggregate::addHGRecords(const ASBuildInput &buildInput) {
+    int sbtOffset = intersectHGRecords.size();
+    intersectHGRecords.insert(intersectHGRecords.end(),
+                              buildInput.intersectHGRecords.begin(),
+                              buildInput.intersectHGRecords.end());
+    shadowHGRecords.insert(shadowHGRecords.end(),
+                           buildInput.shadowHGRecords.begin(),
+                           buildInput.shadowHGRecords.end());
+    randomHitHGRecords.insert(randomHitHGRecords.end(),
+                              buildInput.randomHitHGRecords.begin(),
+                              buildInput.randomHitHGRecords.end());
+    return sbtOffset;
 }
 
 OptiXAggregate::OptiXAggregate(
@@ -1310,25 +1335,32 @@ OptiXAggregate::OptiXAggregate(
     LOG_VERBOSE("Finished reading PLY meshes");
 
     LOG_VERBOSE("Starting to create GAS for top-level triangles");
-    OptixTraversableHandle triangleGASTraversable = createGASForTriangles(
+    ASBuildInput triangleBuildInput = createBuildInputForTriangles(
         scene.shapes, plyMeshes, hitPGTriangle, anyhitPGShadowTriangle, hitPGRandomHitTriangle,
-        textures.floatTextures, namedMaterials, materials, media, shapeIndexToAreaLights,
-        &bounds);
+        textures.floatTextures, namedMaterials, materials, media, shapeIndexToAreaLights, alloc);
+    bounds = Union(bounds, triangleBuildInput.bounds);
+    (void)addHGRecords(triangleBuildInput);
+    OptixTraversableHandle triangleGASTraversable = buildBVH(triangleBuildInput.optixInputs);
     LOG_VERBOSE("Finished creating GAS for top-level triangles");
 
     LOG_VERBOSE("Starting to create GAS for top-level blps/curves");
-    int bilinearSBTOffset = intersectHGRecords.size();
-    OptixTraversableHandle bilinearPatchGASTraversable =
-        createGASForBLPs(scene.shapes, hitPGBilinearPatch, anyhitPGShadowBilinearPatch,
-                         hitPGRandomHitBilinearPatch, textures.floatTextures, namedMaterials,
-                         materials, media, shapeIndexToAreaLights, &bounds);
+    ASBuildInput blpBuildInput =
+        createBuildInputForBLPs(scene.shapes, hitPGBilinearPatch, anyhitPGShadowBilinearPatch,
+                                hitPGRandomHitBilinearPatch, textures.floatTextures, namedMaterials,
+                                materials, media, shapeIndexToAreaLights, alloc);
+    bounds = Union(bounds, blpBuildInput.bounds);
+    int bilinearSBTOffset = addHGRecords(blpBuildInput);
+    OptixTraversableHandle bilinearPatchGASTraversable = buildBVH(blpBuildInput.optixInputs);
     LOG_VERBOSE("Finished creating GAS for top-level blps/curves");
 
     LOG_VERBOSE("Starting to create GAS for top-level quadrics");
-    int quadricSBTOffset = intersectHGRecords.size();
-    OptixTraversableHandle quadricGASTraversable = createGASForQuadrics(
+    ASBuildInput quadricBuildInput = createBuildInputForQuadrics(
         scene.shapes, hitPGQuadric, anyhitPGShadowQuadric, hitPGRandomHitQuadric,
-        textures.floatTextures, namedMaterials, materials, media, shapeIndexToAreaLights, &bounds);
+        textures.floatTextures, namedMaterials, materials, media, shapeIndexToAreaLights, alloc);
+
+    bounds = Union(bounds, quadricBuildInput.bounds);
+    int quadricSBTOffset = addHGRecords(quadricBuildInput);
+    OptixTraversableHandle quadricGASTraversable = buildBVH(quadricBuildInput.optixInputs);
     LOG_VERBOSE("Finished creating GAS for top-level quadrics");
 
     pstd::vector<OptixInstance> iasInstances(alloc);
@@ -1389,33 +1421,36 @@ OptiXAggregate::OptiXAggregate(
             Warning("Ignoring %d animated shapes in instance \"%s\".",
                     def.second.animatedShapes.size(), def.first);
 
-        int triSBTOffset = intersectHGRecords.size();
-        Bounds3f triBounds;
-        OptixTraversableHandle triHandle = createGASForTriangles(
+        ASBuildInput triangleBuildInput = createBuildInputForTriangles(
             def.second.shapes, instancePLYMeshes[def.first], hitPGTriangle, anyhitPGShadowTriangle,
             hitPGRandomHitTriangle, textures.floatTextures, namedMaterials, materials, media, {},
-            &triBounds);
+            alloc);
         instancePLYMeshes[def.first].clear();
+        int triSBTOffset = addHGRecords(triangleBuildInput);
+        OptixTraversableHandle triHandle = buildBVH(triangleBuildInput.optixInputs);
         if (triHandle)
-            instanceMap.insert({def.first, Instance{triHandle, triSBTOffset, triBounds}});
+            instanceMap.insert({def.first, Instance{triHandle, triSBTOffset,
+                                                    triangleBuildInput.bounds}});
 
-        int bilinearSBTOffset = intersectHGRecords.size();
-        Bounds3f bilinearBounds;
-        OptixTraversableHandle bilinearHandle =
-            createGASForBLPs(def.second.shapes, hitPGBilinearPatch, anyhitPGShadowBilinearPatch,
-                             hitPGRandomHitBilinearPatch, textures.floatTextures, namedMaterials,
-                             materials, media, {}, &bilinearBounds);
+        ASBuildInput bilinearBuildInput =
+            createBuildInputForBLPs(def.second.shapes, hitPGBilinearPatch, anyhitPGShadowBilinearPatch,
+                                    hitPGRandomHitBilinearPatch, textures.floatTextures, namedMaterials,
+                                    materials, media, {}, alloc);
+        int bilinearSBTOffset = addHGRecords(bilinearBuildInput);
+        OptixTraversableHandle bilinearHandle = buildBVH(bilinearBuildInput.optixInputs);
         if (bilinearHandle)
-            instanceMap.insert({def.first, Instance{bilinearHandle, bilinearSBTOffset, bilinearBounds}});
+            instanceMap.insert({def.first, Instance{bilinearHandle, bilinearSBTOffset,
+                                                    bilinearBuildInput.bounds}});
 
-        int quadricSBTOffset = intersectHGRecords.size();
-        Bounds3f quadricBounds;
-        OptixTraversableHandle quadricHandle =
-            createGASForQuadrics(def.second.shapes, hitPGQuadric, anyhitPGShadowQuadric,
-                                 hitPGRandomHitQuadric, textures.floatTextures, namedMaterials,
-                                 materials, media, {}, &quadricBounds);
+        ASBuildInput quadricBuildInput =
+            createBuildInputForQuadrics(def.second.shapes, hitPGQuadric, anyhitPGShadowQuadric,
+                                        hitPGRandomHitQuadric, textures.floatTextures, namedMaterials,
+                                        materials, media, {}, alloc);
+        int quadricSBTOffset = addHGRecords(quadricBuildInput);
+        OptixTraversableHandle quadricHandle = buildBVH(quadricBuildInput.optixInputs);
         if (quadricHandle)
-            instanceMap.insert({def.first, Instance{quadricHandle, quadricSBTOffset, quadricBounds}});
+            instanceMap.insert({def.first, Instance{quadricHandle, quadricSBTOffset,
+                                                    quadricBuildInput.bounds}});
 
         if (!triHandle && !bilinearHandle && !quadricHandle)
             // empty instance definition... put something there so we can
@@ -1461,13 +1496,13 @@ OptiXAggregate::OptiXAggregate(
     }
 
     // Build the top-level IAS
+    LOG_VERBOSE("Starting to build top-level IAS");
     OptixBuildInput buildInput = {};
     buildInput.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
     buildInput.instanceArray.instances = CUdeviceptr(iasInstances.data());
     buildInput.instanceArray.numInstances = iasInstances.size();
     std::vector<OptixBuildInput> buildInputs = {buildInput};
 
-    LOG_VERBOSE("Starting to build top-level IAS");
     rootTraversable = buildBVH({buildInput});
     LOG_VERBOSE("Finished building top-level IAS");
 
