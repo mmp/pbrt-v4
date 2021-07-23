@@ -1305,26 +1305,41 @@ static ImageAndMetadata ReadPNG(const std::string &name, Allocator alloc,
 }
 
 Image Image::SelectChannels(const ImageChannelDesc &desc, Allocator alloc) const {
-    bool descIsCurrentDesc = [&]() {
-        if (desc.size() != NChannels())
-            return false;
-        for (int i = 0; i < NChannels(); ++i)
-            if (desc.offset[i] != i)
-                return false;
-        return true;
-    }();
-    if (descIsCurrentDesc)
-        return *this;
-
     std::vector<std::string> descChannelNames;
     // TODO: descChannelNames = ChannelNames(desc)
     for (size_t i = 0; i < desc.offset.size(); ++i)
         descChannelNames.push_back(channelNames[desc.offset[i]]);
 
     Image image(format, resolution, descChannelNames, encoding, alloc);
-    for (int y = 0; y < resolution.y; ++y)
-        for (int x = 0; x < resolution.x; ++x)
-            image.SetChannels({x, y}, GetChannels({x, y}, desc));
+    switch (format) {
+    case PixelFormat::U256:
+        for (int y = 0; y < resolution.y; ++y)
+            for (int x = 0; x < resolution.x; ++x) {
+                const uint8_t *src = (const uint8_t *)RawPointer({x, y});
+                uint8_t *dst = (uint8_t *)image.RawPointer({x, y});
+                for (size_t i = 0; i < desc.offset.size(); ++i)
+                    dst[i] = src[desc.offset[i]];
+            }
+        break;
+    case PixelFormat::Half:
+        for (int y = 0; y < resolution.y; ++y)
+            for (int x = 0; x < resolution.x; ++x) {
+                const Half *src = (const Half *)RawPointer({x, y});
+                Half *dst = (Half *)image.RawPointer({x, y});
+                for (size_t i = 0; i < desc.offset.size(); ++i)
+                    dst[i] = src[desc.offset[i]];
+            }
+        break;
+    case PixelFormat::Float:
+        for (int y = 0; y < resolution.y; ++y)
+            for (int x = 0; x < resolution.x; ++x) {
+                const float *src = (const float *)RawPointer({x, y});
+                float *dst = (float *)image.RawPointer({x, y});
+                for (size_t i = 0; i < desc.offset.size(); ++i)
+                    dst[i] = src[desc.offset[i]];
+            }
+        break;
+    }
     return image;
 }
 
