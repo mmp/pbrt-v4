@@ -109,7 +109,7 @@ class OptiXAggregate : public WavefrontAggregate {
 
     int addHGRecords(const ASBuildInput &buildInput);
 
-    OptixTraversableHandle buildBVH(const std::vector<OptixBuildInput> &buildInputs);
+    OptixTraversableHandle buildBVH(const std::vector<OptixBuildInput> &buildInputs) const;
 
     Allocator alloc;
     Bounds3f bounds;

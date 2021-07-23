@@ -114,7 +114,7 @@ extern const unsigned char PBRT_EMBEDDED_PTX[];
 STAT_MEMORY_COUNTER("Memory/Acceleration structures", gpuBVHBytes);
 
 OptixTraversableHandle OptiXAggregate::buildBVH(
-    const std::vector<OptixBuildInput> &buildInputs) {
+    const std::vector<OptixBuildInput> &buildInputs) const {
     if (buildInputs.empty())
         return {};
 
@@ -130,10 +130,11 @@ OptixTraversableHandle OptiXAggregate::buildBVH(
                                              buildInputs.data(), buildInputs.size(),
                                              &blasBufferSizes));
 
-    uint64_t *compactedSizeBufferPtr = alloc.new_object<uint64_t>();
+    uint64_t *compactedSizePtr;
+    CUDA_CHECK(cudaMalloc(&compactedSizePtr, sizeof(uint64_t)));
     OptixAccelEmitDesc emitDesc;
     emitDesc.type = OPTIX_PROPERTY_TYPE_COMPACTED_SIZE;
-    emitDesc.result = (CUdeviceptr)compactedSizeBufferPtr;
+    emitDesc.result = (CUdeviceptr)compactedSizePtr;
 
     // Allocate buffers.
     void *tempBuffer;
@@ -149,22 +150,30 @@ OptixTraversableHandle OptiXAggregate::buildBVH(
         CUdeviceptr(outputBuffer), blasBufferSizes.outputSizeInBytes, &traversableHandle,
         &emitDesc, 1));
 
-    CUDA_CHECK(cudaDeviceSynchronize());
-
-    gpuBVHBytes += *compactedSizeBufferPtr;
-
-    // Compact
-    void *asBuffer;
-    CUDA_CHECK(cudaMalloc(&asBuffer, *compactedSizeBufferPtr));
-
-    OPTIX_CHECK(optixAccelCompact(optixContext, cudaStream, traversableHandle,
-                                  CUdeviceptr(asBuffer), *compactedSizeBufferPtr,
-                                  &traversableHandle));
-    CUDA_CHECK(cudaDeviceSynchronize());
-
     CUDA_CHECK(cudaFree(tempBuffer));
-    CUDA_CHECK(cudaFree(outputBuffer));
-    alloc.delete_object(compactedSizeBufferPtr);
+
+    uint64_t compactedSize;
+    CUDA_CHECK(cudaMemcpy(&compactedSize, compactedSizePtr, sizeof(uint64_t),
+                          cudaMemcpyDeviceToHost));
+
+    if (compactedSize >= blasBufferSizes.outputSizeInBytes) {
+        // No need to compact...
+        gpuBVHBytes += blasBufferSizes.outputSizeInBytes;
+    } else {
+        // Compact the acceleration structure
+        gpuBVHBytes += compactedSize;
+
+        void *asBuffer;
+        CUDA_CHECK(cudaMalloc(&asBuffer, compactedSize));
+
+        OPTIX_CHECK(optixAccelCompact(optixContext, cudaStream, traversableHandle,
+                                      CUdeviceptr(asBuffer), compactedSize,
+                                      &traversableHandle));
+
+        CUDA_CHECK(cudaFree(outputBuffer));
+    }
+
+    CUDA_CHECK(cudaFree(compactedSizePtr));
 
     return traversableHandle;
 }
