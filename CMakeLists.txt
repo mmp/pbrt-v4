@@ -1011,6 +1011,7 @@ install (TARGETS
   pbrt_exe
   imgtool
   pspec
+  plytool
   cyhair2pbrt
   DESTINATION
   bin
