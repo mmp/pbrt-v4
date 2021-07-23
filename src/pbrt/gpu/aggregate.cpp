@@ -908,6 +908,9 @@ static void logCallback(unsigned int level, const char *tag, const char *message
 }
 
 int OptiXAggregate::addHGRecords(const ASBuildInput &buildInput) {
+    if (buildInput.intersectHGRecords.empty())
+        return -1;
+
     int sbtOffset = intersectHGRecords.size();
     intersectHGRecords.insert(intersectHGRecords.end(),
                               buildInput.intersectHGRecords.begin(),
@@ -1201,6 +1204,8 @@ OptiXAggregate::OptiXAggregate(
 
     LOG_VERBOSE("Finished OptiX initialization");
 
+    ///////////////////////////////////////////////////////////////////////////
+    // Build top-level acceleration structures for non-instanced shapes
     LOG_VERBOSE("Starting to create shapes and acceleration structures");
     for (const auto &shape : scene.shapes)
         if (shape.name != "sphere" && shape.name != "cylinder" && shape.name != "disk" &&
@@ -1266,14 +1271,7 @@ OptiXAggregate::OptiXAggregate(
         iasInstances.push_back(gasInstance);
     }
 
-    // Create GASs for instance definitions
-    // TODO: better name here...
-    struct Instance {
-        OptixTraversableHandle handle;
-        int sbtOffset;
-        Bounds3f bounds;
-    };
-
+    ///////////////////////////////////////////////////////////////////////////
     // Read (and possibly displace!) PLY meshes in parallel.
     std::map<std::string, std::map<int, TriQuadMesh>> instancePLYMeshes;
     std::vector<std::string> allInstanceNames;
@@ -1293,87 +1291,145 @@ OptiXAggregate::OptiXAggregate(
     });
     LOG_VERBOSE("Finished reading PLY meshes for instances");
 
-    LOG_VERBOSE("Starting to create GASes for instance definitions");
-    std::multimap<std::string, Instance> instanceMap;
+    ///////////////////////////////////////////////////////////////////////////
+    // Create IASes for instance definitions
+    // TODO: better name here...
+    struct Instance {
+        OptixTraversableHandle handles[3] = {};
+        int sbtOffsets[3] = { -1, -1, -1 };
+        Bounds3f bounds;
+
+        int NumValidHandles() const {
+            return (handles[0] ? 1 : 0) + (handles[1] ? 1 : 0) + (handles[2] ? 1 : 0);
+        }
+    };
+
+    LOG_VERBOSE("Starting to create IASes for instance definitions");
+    std::unordered_map<std::string, Instance> instanceMap;
     for (const auto &def : scene.instanceDefinitions) {
         if (!def.second.animatedShapes.empty())
             Warning("Ignoring %d animated shapes in instance \"%s\".",
                     def.second.animatedShapes.size(), def.first);
+
+        Instance inst;
 
         ASBuildInput triangleBuildInput = createBuildInputForTriangles(
             def.second.shapes, instancePLYMeshes[def.first], hitPGTriangle, anyhitPGShadowTriangle,
             hitPGRandomHitTriangle, textures.floatTextures, namedMaterials, materials, media, {},
             alloc);
         instancePLYMeshes[def.first].clear();
-        int triSBTOffset = addHGRecords(triangleBuildInput);
-        OptixTraversableHandle triHandle = buildBVH(triangleBuildInput.optixInputs);
-        if (triHandle)
-            instanceMap.insert({def.first, Instance{triHandle, triSBTOffset,
-                                                    triangleBuildInput.bounds}});
+        if (triangleBuildInput) {
+            inst.handles[0] = buildBVH(triangleBuildInput.optixInputs);
+            inst.sbtOffsets[0] = addHGRecords(triangleBuildInput);
+            inst.bounds = triangleBuildInput.bounds;
+        }
 
         ASBuildInput bilinearBuildInput =
             createBuildInputForBLPs(def.second.shapes, hitPGBilinearPatch, anyhitPGShadowBilinearPatch,
                                     hitPGRandomHitBilinearPatch, textures.floatTextures, namedMaterials,
                                     materials, media, {}, alloc);
-        int bilinearSBTOffset = addHGRecords(bilinearBuildInput);
-        OptixTraversableHandle bilinearHandle = buildBVH(bilinearBuildInput.optixInputs);
-        if (bilinearHandle)
-            instanceMap.insert({def.first, Instance{bilinearHandle, bilinearSBTOffset,
-                                                    bilinearBuildInput.bounds}});
+        if (bilinearBuildInput) {
+            inst.handles[1] = buildBVH(bilinearBuildInput.optixInputs);
+            inst.sbtOffsets[1] = addHGRecords(bilinearBuildInput);
+            inst.bounds = Union(inst.bounds, bilinearBuildInput.bounds);
+        }
 
         ASBuildInput quadricBuildInput =
             createBuildInputForQuadrics(def.second.shapes, hitPGQuadric, anyhitPGShadowQuadric,
                                         hitPGRandomHitQuadric, textures.floatTextures, namedMaterials,
                                         materials, media, {}, alloc);
-        int quadricSBTOffset = addHGRecords(quadricBuildInput);
-        OptixTraversableHandle quadricHandle = buildBVH(quadricBuildInput.optixInputs);
-        if (quadricHandle)
-            instanceMap.insert({def.first, Instance{quadricHandle, quadricSBTOffset,
-                                                    quadricBuildInput.bounds}});
-
-        if (!triHandle && !bilinearHandle && !quadricHandle)
-            // empty instance definition... put something there so we can
-            // tell the difference between an empty definition and no
-            // definition below.
-            instanceMap.insert({def.first, Instance{{}, -1, {}}});
-    }
-    LOG_VERBOSE("Finished creating GASes for instance definitions");
-
-    // Create OptixInstances for instances
-    for (const auto &inst : scene.instances) {
-        auto iterPair = instanceMap.equal_range(inst.name);
-        if (std::distance(iterPair.first, iterPair.second) == 0)
-            ErrorExit(&inst.loc, "%s: object instance not defined.", inst.name);
-
-        if (inst.renderFromInstance == nullptr) {
-            Warning(&inst.loc, "%s: object instance has animated transformation. TODO",
-                    inst.name);
-            continue;
+        if (quadricBuildInput) {
+            inst.handles[2] = buildBVH(quadricBuildInput.optixInputs);
+            inst.sbtOffsets[2] = addHGRecords(quadricBuildInput);
+            inst.bounds = Union(inst.bounds, quadricBuildInput.bounds);
         }
 
-        for (auto iter = iterPair.first; iter != iterPair.second; ++iter) {
+        instanceMap[def.first] = inst;
+    }
+    LOG_VERBOSE("Finished creating IASes for instance definitions");
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Create OptixInstances for instances
+    LOG_VERBOSE("Starting to create %d OptixInstances", scene.instances.size());
+
+    // Get the appropriate instanceMap iterator for each instance use, just
+    // once, and in parallel.
+    std::vector<std::unordered_map<std::string, Instance>::const_iterator> instanceMapIters(scene.instances.size());
+    ParallelFor(0, scene.instances.size(), [&](int64_t i) {
+        const auto &sceneInstance = scene.instances[i];
+        auto iter = instanceMap.find(sceneInstance.name);
+        instanceMapIters[i] = iter;
+    });
+
+    // Count total number of OptixInstances that will be added to iasInstances
+    int totalOptixInstances = 0;
+    for (size_t i = 0; i < scene.instances.size(); ++i)
+        if (auto iter = instanceMapIters[i]; iter != instanceMap.end())
+            totalOptixInstances += iter->second.NumValidHandles();
+
+    // Resize iasInstances to make room for all of the OptixInstances to come
+    size_t iasInstancesOffset = iasInstances.size();
+    iasInstances.resize(iasInstances.size() + totalOptixInstances);
+
+    // Compute the staring offset in iasInstances for each instance use.
+    std::vector<size_t> instanceIASOffset(scene.instances.size());
+    for (size_t i = 0; i < scene.instances.size(); ++i) {
+        instanceIASOffset[i] = iasInstancesOffset;
+        if (auto iter = instanceMapIters[i]; iter != instanceMap.end())
+            iasInstancesOffset += iter->second.NumValidHandles();
+    }
+
+    // Now loop over all of the instance uses in parallel.
+    std::mutex boundsMutex;
+    ParallelFor(0, scene.instances.size(), [&](int64_t indexBegin, int64_t indexEnd) {
+        Bounds3f localBounds;
+
+        for (int64_t index = indexBegin; index < indexEnd; ++index) {
+            const auto &sceneInstance = scene.instances[index];
+            auto iter = instanceMapIters[index];
+            if (iter == instanceMap.end())
+                ErrorExit(&sceneInstance.loc, "%s: object instance not defined.", sceneInstance.name);
+
+            if (sceneInstance.renderFromInstance == nullptr) {
+                Warning(&sceneInstance.loc, "%s: object instance has animated transformation. TODO",
+                        sceneInstance.name);
+                continue;
+            }
+
             const Instance &in = iter->second;
-            if (!in.handle)
-                // empty instance definition
+            if (in.bounds.IsDegenerate())
+                // Empty instance. Nothing to do (and don't update bounds!)
                 continue;
 
-            bounds = Union(bounds, (*inst.renderFromInstance)(in.bounds));
+            localBounds = Union(localBounds, (*sceneInstance.renderFromInstance)(in.bounds));
 
-            OptixInstance optixInstance = {};
-            for (int i = 0; i < 3; ++i)
-                for (int j = 0; j < 4; ++j)
-                    optixInstance.transform[4 * i + j] =
-                        inst.renderFromInstance->GetMatrix()[i][j];
-            optixInstance.visibilityMask = 255;
-            optixInstance.sbtOffset = in.sbtOffset;
-            optixInstance.flags =
-                OPTIX_INSTANCE_FLAG_NONE;  // TODO:
-            // OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT
-            optixInstance.traversableHandle = in.handle;
-            iasInstances.push_back(optixInstance);
+            size_t iasOffset = instanceIASOffset[index];
+            for (int i = 0; i < 3; ++i) {
+                if (!in.handles[i])
+                    continue;
+
+                OptixInstance optixInstance = {};
+                SquareMatrix<4> renderFromInstance = sceneInstance.renderFromInstance->GetMatrix();
+                for (int j = 0; j < 3; ++j)
+                    for (int k = 0; k < 4; ++k)
+                        optixInstance.transform[4 * j + k] = renderFromInstance[j][k];
+                optixInstance.visibilityMask = 255;
+                optixInstance.sbtOffset = in.sbtOffsets[i];
+                optixInstance.flags =
+                    OPTIX_INSTANCE_FLAG_NONE;  // TODO:
+                // OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT
+                optixInstance.traversableHandle = in.handles[i];
+                iasInstances[iasOffset] = optixInstance;
+                ++iasOffset;
+            }
         }
-    }
 
+        std::lock_guard<std::mutex> lock(boundsMutex);
+        bounds = Union(bounds, localBounds);
+    });
+    LOG_VERBOSE("Finished creating OptixInstances");
+
+    ///////////////////////////////////////////////////////////////////////////
     // Build the top-level IAS
     LOG_VERBOSE("Starting to build top-level IAS");
     OptixBuildInput buildInput = {};
@@ -1389,6 +1445,8 @@ OptiXAggregate::OptiXAggregate(
     if (!scene.animatedShapes.empty())
         Warning("Ignoring %d animated shapes", scene.animatedShapes.size());
 
+    ///////////////////////////////////////////////////////////////////////////
+    // Final SBT initialization
     intersectSBT.hitgroupRecordBase = (CUdeviceptr)intersectHGRecords.data();
     intersectSBT.hitgroupRecordStrideInBytes = sizeof(HitgroupRecord);
     intersectSBT.hitgroupRecordCount = intersectHGRecords.size();

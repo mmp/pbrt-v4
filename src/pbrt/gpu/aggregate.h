@@ -69,6 +69,8 @@ class OptiXAggregate : public WavefrontAggregate {
         std::vector<HitgroupRecord> shadowHGRecords;
         std::vector<HitgroupRecord> randomHitHGRecords;
         Bounds3f bounds;
+
+        operator bool() const { return !optixInputs.empty(); }
     };
 
     static ASBuildInput createBuildInputForTriangles(
