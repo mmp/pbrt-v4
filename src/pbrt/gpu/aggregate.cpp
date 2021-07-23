@@ -921,6 +921,112 @@ int OptiXAggregate::addHGRecords(const ASBuildInput &buildInput) {
     return sbtOffset;
 }
 
+OptixPipelineCompileOptions OptiXAggregate::getPipelineCompileOptions() {
+    OptixPipelineCompileOptions pipelineCompileOptions = {};
+    pipelineCompileOptions.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY;
+    pipelineCompileOptions.usesMotionBlur = false;
+    pipelineCompileOptions.numPayloadValues = 3;
+    pipelineCompileOptions.numAttributeValues = 4;
+    // OPTIX_EXCEPTION_FLAG_NONE;
+    pipelineCompileOptions.exceptionFlags =
+        (OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW | OPTIX_EXCEPTION_FLAG_TRACE_DEPTH |
+         OPTIX_EXCEPTION_FLAG_DEBUG);
+    pipelineCompileOptions.pipelineLaunchParamsVariableName = "params";
+
+    return pipelineCompileOptions;
+}
+
+OptixModule OptiXAggregate::createOptiXModule(OptixDeviceContext optixContext, const char *ptx) {
+    OptixModuleCompileOptions moduleCompileOptions = {};
+    // TODO: REVIEW THIS
+    moduleCompileOptions.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
+#ifndef NDEBUG
+    moduleCompileOptions.optLevel = OPTIX_COMPILE_OPTIMIZATION_LEVEL_0;
+    moduleCompileOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;
+#else
+    moduleCompileOptions.optLevel = OPTIX_COMPILE_OPTIMIZATION_DEFAULT;
+    moduleCompileOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
+#endif
+
+    OptixPipelineCompileOptions pipelineCompileOptions =
+        getPipelineCompileOptions();
+
+    char log[4096];
+    size_t logSize = sizeof(log);
+    OptixModule optixModule;
+    OPTIX_CHECK_WITH_LOG(
+        optixModuleCreateFromPTX(optixContext, &moduleCompileOptions,
+                                 &pipelineCompileOptions, ptx, strlen(ptx),
+                                 log, &logSize, &optixModule),
+        log);
+    LOG_VERBOSE("%s", log);
+
+    return optixModule;
+}
+
+OptixProgramGroup OptiXAggregate::createRaygenPG(const char *entrypoint) const {
+    OptixProgramGroupOptions pgOptions = {};
+    OptixProgramGroupDesc desc = {};
+    desc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
+    desc.raygen.module = optixModule;
+    desc.raygen.entryFunctionName = entrypoint;
+
+    char log[4096];
+    size_t logSize = sizeof(log);
+    OptixProgramGroup pg;
+    OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                                 log, &logSize, &pg), log);
+    LOG_VERBOSE("%s", log);
+
+    return pg;
+}
+
+OptixProgramGroup OptiXAggregate::createMissPG(const char *entrypoint) const {
+    OptixProgramGroupOptions pgOptions = {};
+    OptixProgramGroupDesc desc = {};
+    desc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
+    desc.miss.module = optixModule;
+    desc.miss.entryFunctionName = entrypoint;
+
+    char log[4096];
+    size_t logSize = sizeof(log);
+    OptixProgramGroup pg;
+    OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                                 log, &logSize, &pg), log);
+    LOG_VERBOSE("%s", log);
+
+    return pg;
+}
+
+OptixProgramGroup OptiXAggregate::createIntersectionPG(const char *closest, const char *any,
+                                                       const char *intersect) const {
+    OptixProgramGroupOptions pgOptions = {};
+    OptixProgramGroupDesc desc = {};
+    desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+
+    if (closest) {
+        desc.hitgroup.moduleCH = optixModule;
+        desc.hitgroup.entryFunctionNameCH = closest;
+    }
+    if (any) {
+        desc.hitgroup.moduleAH = optixModule;
+        desc.hitgroup.entryFunctionNameAH = any;
+    }
+    if (intersect) {
+        desc.hitgroup.moduleIS = optixModule;
+        desc.hitgroup.entryFunctionNameIS = intersect;
+    }
+
+    char log[4096];
+    size_t logSize = sizeof(log);
+    OptixProgramGroup pg;
+    OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
+                                                 log, &logSize, &pg), log);
+    LOG_VERBOSE("%s", log);
+
+    return pg;
+}
+
 OptiXAggregate::OptiXAggregate(
     const ParsedScene &scene, Allocator alloc, NamedTextures &textures,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
@@ -964,260 +1070,45 @@ OptiXAggregate::OptiXAggregate(
                 (OPTIX_VERSION % 10000) / 100, OPTIX_VERSION % 100);
 
     // OptiX module
-    OptixModuleCompileOptions moduleCompileOptions = {};
-    // TODO: REVIEW THIS
-    moduleCompileOptions.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
-#ifndef NDEBUG
-    moduleCompileOptions.optLevel = OPTIX_COMPILE_OPTIMIZATION_LEVEL_0;
-    moduleCompileOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;
-#else
-    moduleCompileOptions.optLevel = OPTIX_COMPILE_OPTIMIZATION_DEFAULT;
-    moduleCompileOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
-#endif
-
-    OptixPipelineCompileOptions pipelineCompileOptions = {};
-    pipelineCompileOptions.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY;
-    pipelineCompileOptions.usesMotionBlur = false;
-    pipelineCompileOptions.numPayloadValues = 3;
-    pipelineCompileOptions.numAttributeValues = 4;
-    // OPTIX_EXCEPTION_FLAG_NONE;
-    pipelineCompileOptions.exceptionFlags =
-        (OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW | OPTIX_EXCEPTION_FLAG_TRACE_DEPTH |
-         OPTIX_EXCEPTION_FLAG_DEBUG);
-    pipelineCompileOptions.pipelineLaunchParamsVariableName = "params";
-
-    OptixPipelineLinkOptions pipelineLinkOptions = {};
-    pipelineLinkOptions.maxTraceDepth = 2;
-#ifndef NDEBUG
-    pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
-#else
-    pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
-#endif
-
-    const std::string ptxCode((const char *)PBRT_EMBEDDED_PTX);
-
-    char log[4096];
-    size_t logSize = sizeof(log);
-    OPTIX_CHECK_WITH_LOG(
-        optixModuleCreateFromPTX(optixContext, &moduleCompileOptions,
-                                 &pipelineCompileOptions, ptxCode.c_str(),
-                                 ptxCode.size(), log, &logSize, &optixModule),
-        log);
-    LOG_VERBOSE("%s", log);
+    optixModule = createOptiXModule(optixContext, (const char *)PBRT_EMBEDDED_PTX);
 
     // Optix program groups...
-    OptixProgramGroupOptions pgOptions = {};
-    OptixProgramGroup raygenPGClosest;
-    {
-        OptixProgramGroupDesc desc = {};
-        desc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
-        desc.raygen.module = optixModule;
-        desc.raygen.entryFunctionName = "__raygen__findClosest";
-        OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
-                                                     log, &logSize, &raygenPGClosest),
-                             log);
-        LOG_VERBOSE("%s", log);
-    }
+    char log[4096];
+    size_t logSize = sizeof(log);
 
-    OptixProgramGroup missPGNoOp;
-    {
-        OptixProgramGroupDesc desc = {};
-        desc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
-        desc.miss.module = optixModule;
-        desc.miss.entryFunctionName = "__miss__noop";
-        OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
-                                                     log, &logSize, &missPGNoOp),
-                             log);
-        LOG_VERBOSE("%s", log);
-    }
+    OptixProgramGroup raygenPGClosest = createRaygenPG("__raygen__findClosest");
+    OptixProgramGroup missPGNoOp = createMissPG("__miss__noop");
+    OptixProgramGroup hitPGTriangle = createIntersectionPG("__closesthit__triangle",
+                                                           "__anyhit__triangle", nullptr);
+    OptixProgramGroup hitPGBilinearPatch =
+        createIntersectionPG("__closesthit__bilinearPatch", nullptr,
+                             "__intersection__bilinearPatch");
+    OptixProgramGroup hitPGQuadric =
+        createIntersectionPG("__closesthit__quadric", nullptr, "__intersection__quadric");
 
-    OptixProgramGroup hitPGTriangle;
-    {
-        OptixProgramGroupDesc desc = {};
-        desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-        desc.hitgroup.moduleCH = optixModule;
-        desc.hitgroup.entryFunctionNameCH = "__closesthit__triangle";
-        desc.hitgroup.moduleAH = optixModule;
-        desc.hitgroup.entryFunctionNameAH = "__anyhit__triangle";
-        OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
-                                                     log, &logSize, &hitPGTriangle),
-                             log);
-        LOG_VERBOSE("%s", log);
-    }
+    OptixProgramGroup raygenPGShadow = createRaygenPG("__raygen__shadow");
+    OptixProgramGroup missPGShadow = createMissPG("__miss__shadow");
+    OptixProgramGroup anyhitPGShadowTriangle =
+        createIntersectionPG(nullptr, "__anyhit__shadowTriangle", nullptr);
 
-    OptixProgramGroup hitPGBilinearPatch;
-    {
-        OptixProgramGroupDesc desc = {};
-        desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-        desc.hitgroup.moduleCH = optixModule;
-        desc.hitgroup.entryFunctionNameCH = "__closesthit__bilinearPatch";
-        desc.hitgroup.moduleIS = optixModule;
-        desc.hitgroup.entryFunctionNameIS = "__intersection__bilinearPatch";
-        OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
-                                                     log, &logSize, &hitPGBilinearPatch),
-                             log);
-        LOG_VERBOSE("%s", log);
-    }
+    OptixProgramGroup raygenPGShadowTr = createRaygenPG("__raygen__shadow_Tr");
+    OptixProgramGroup missPGShadowTr = createMissPG("__miss__shadow_Tr");
 
-    OptixProgramGroup hitPGQuadric;
-    {
-        OptixProgramGroupDesc desc = {};
-        desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-        desc.hitgroup.moduleCH = optixModule;
-        desc.hitgroup.entryFunctionNameCH = "__closesthit__quadric";
-        desc.hitgroup.moduleIS = optixModule;
-        desc.hitgroup.entryFunctionNameIS = "__intersection__quadric";
-        OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
-                                                     log, &logSize, &hitPGQuadric),
-                             log);
-        LOG_VERBOSE("%s", log);
-    }
+    OptixProgramGroup anyhitPGShadowBilinearPatch =
+        createIntersectionPG(nullptr, "__anyhit__shadowBilinearPatch",
+                             "__intersection__bilinearPatch");
+    OptixProgramGroup anyhitPGShadowQuadric =
+        createIntersectionPG(nullptr, "__anyhit__shadowQuadric", "__intersection__quadric");
 
-    OptixProgramGroup raygenPGShadow;
-    {
-        OptixProgramGroupDesc desc = {};
-        desc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
-        desc.raygen.module = optixModule;
-        desc.raygen.entryFunctionName = "__raygen__shadow";
-        OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
-                                                     log, &logSize, &raygenPGShadow),
-                             log);
-        LOG_VERBOSE("%s", log);
-    }
-
-    OptixProgramGroup missPGShadow;
-    {
-        OptixProgramGroupDesc desc = {};
-        desc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
-        desc.miss.module = optixModule;
-        desc.miss.entryFunctionName = "__miss__shadow";
-        OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
-                                                     log, &logSize, &missPGShadow),
-                             log);
-        LOG_VERBOSE("%s", log);
-    }
-
-    OptixProgramGroup anyhitPGShadowTriangle;
-    {
-        OptixProgramGroupDesc desc = {};
-        desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-        desc.hitgroup.moduleAH = optixModule;
-        desc.hitgroup.entryFunctionNameAH = "__anyhit__shadowTriangle";
-        OPTIX_CHECK_WITH_LOG(
-            optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log, &logSize,
-                                    &anyhitPGShadowTriangle),
-            log);
-        LOG_VERBOSE("%s", log);
-    }
-
-    OptixProgramGroup raygenPGShadowTr;
-    {
-        OptixProgramGroupDesc desc = {};
-        desc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
-        desc.raygen.module = optixModule;
-        desc.raygen.entryFunctionName = "__raygen__shadow_Tr";
-        OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
-                                                     log, &logSize, &raygenPGShadowTr),
-                             log);
-        LOG_VERBOSE("%s", log);
-    }
-
-    OptixProgramGroup missPGShadowTr;
-    {
-        OptixProgramGroupDesc desc = {};
-        desc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
-        desc.miss.module = optixModule;
-        desc.miss.entryFunctionName = "__miss__shadow_Tr";
-        OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
-                                                     log, &logSize, &missPGShadowTr),
-                             log);
-        LOG_VERBOSE("%s", log);
-    }
-
-    OptixProgramGroup anyhitPGShadowBilinearPatch;
-    {
-        OptixProgramGroupDesc desc = {};
-        desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-        desc.hitgroup.moduleIS = optixModule;
-        desc.hitgroup.entryFunctionNameIS = "__intersection__bilinearPatch";
-        desc.hitgroup.moduleAH = optixModule;
-        desc.hitgroup.entryFunctionNameAH = "__anyhit__shadowBilinearPatch";
-        OPTIX_CHECK_WITH_LOG(
-            optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log, &logSize,
-                                    &anyhitPGShadowBilinearPatch),
-            log);
-        LOG_VERBOSE("%s", log);
-    }
-
-    OptixProgramGroup anyhitPGShadowQuadric;
-    {
-        OptixProgramGroupDesc desc = {};
-        desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-        desc.hitgroup.moduleIS = optixModule;
-        desc.hitgroup.entryFunctionNameIS = "__intersection__quadric";
-        desc.hitgroup.moduleAH = optixModule;
-        desc.hitgroup.entryFunctionNameAH = "__anyhit__shadowQuadric";
-        OPTIX_CHECK_WITH_LOG(
-            optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log, &logSize,
-                                    &anyhitPGShadowQuadric),
-            log);
-        LOG_VERBOSE("%s", log);
-    }
-
-    OptixProgramGroup raygenPGRandomHit;
-    {
-        OptixProgramGroupDesc desc = {};
-        desc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
-        desc.raygen.module = optixModule;
-        desc.raygen.entryFunctionName = "__raygen__randomHit";
-        OPTIX_CHECK_WITH_LOG(optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions,
-                                                     log, &logSize, &raygenPGRandomHit),
-                             log);
-        LOG_VERBOSE("%s", log);
-    }
-
-    OptixProgramGroup hitPGRandomHitTriangle;
-    {
-        OptixProgramGroupDesc desc = {};
-        desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-        desc.hitgroup.moduleCH = optixModule;
-        desc.hitgroup.entryFunctionNameCH = "__closesthit__randomHitTriangle";
-        OPTIX_CHECK_WITH_LOG(
-            optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log, &logSize,
-                                    &hitPGRandomHitTriangle),
-            log);
-        LOG_VERBOSE("%s", log);
-    }
-
-    OptixProgramGroup hitPGRandomHitBilinearPatch;
-    {
-        OptixProgramGroupDesc desc = {};
-        desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-        desc.hitgroup.moduleIS = optixModule;
-        desc.hitgroup.entryFunctionNameIS = "__intersection__bilinearPatch";
-        desc.hitgroup.moduleCH = optixModule;
-        desc.hitgroup.entryFunctionNameCH = "__closesthit__randomHitBilinearPatch";
-        OPTIX_CHECK_WITH_LOG(
-            optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log, &logSize,
-                                    &hitPGRandomHitBilinearPatch),
-            log);
-        LOG_VERBOSE("%s", log);
-    }
-
-    OptixProgramGroup hitPGRandomHitQuadric;
-    {
-        OptixProgramGroupDesc desc = {};
-        desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-        desc.hitgroup.moduleIS = optixModule;
-        desc.hitgroup.entryFunctionNameIS = "__intersection__quadric";
-        desc.hitgroup.moduleCH = optixModule;
-        desc.hitgroup.entryFunctionNameCH = "__closesthit__randomHitQuadric";
-        OPTIX_CHECK_WITH_LOG(
-            optixProgramGroupCreate(optixContext, &desc, 1, &pgOptions, log, &logSize,
-                                    &hitPGRandomHitQuadric),
-            log);
-        LOG_VERBOSE("%s", log);
-    }
+    OptixProgramGroup raygenPGRandomHit = createRaygenPG("__raygen__randomHit");
+    OptixProgramGroup hitPGRandomHitTriangle = createIntersectionPG("__closesthit__randomHitTriangle",
+                                                                    nullptr, nullptr);
+    OptixProgramGroup hitPGRandomHitBilinearPatch =
+        createIntersectionPG("__closesthit__randomHitBilinearPatch", nullptr,
+                             "__intersection__bilinearPatch");
+    OptixProgramGroup hitPGRandomHitQuadric =
+        createIntersectionPG("__closesthit__randomHitQuadric", nullptr,
+                             "__intersection__quadric");
 
     // Optix pipeline...
     OptixProgramGroup allPGs[] = {raygenPGClosest,
@@ -1236,6 +1127,18 @@ OptiXAggregate::OptiXAggregate(
                                   hitPGRandomHitTriangle,
                                   hitPGRandomHitBilinearPatch,
                                   hitPGRandomHitQuadric};
+
+    OptixPipelineCompileOptions pipelineCompileOptions =
+        getPipelineCompileOptions();
+
+    OptixPipelineLinkOptions pipelineLinkOptions = {};
+    pipelineLinkOptions.maxTraceDepth = 2;
+#ifndef NDEBUG
+    pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
+#else
+    pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
+#endif
+
     OPTIX_CHECK_WITH_LOG(
         optixPipelineCreate(optixContext, &pipelineCompileOptions, &pipelineLinkOptions,
                             allPGs, sizeof(allPGs) / sizeof(allPGs[0]), log, &logSize,

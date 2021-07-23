@@ -108,6 +108,14 @@ class OptiXAggregate : public WavefrontAggregate {
 
     int addHGRecords(const ASBuildInput &buildInput);
 
+    static OptixModule createOptiXModule(OptixDeviceContext optixContext, const char *ptx);
+    static OptixPipelineCompileOptions getPipelineCompileOptions();
+
+    OptixProgramGroup createRaygenPG(const char *entrypoint) const;
+    OptixProgramGroup createMissPG(const char *entrypoint) const;
+    OptixProgramGroup createIntersectionPG(const char *closest, const char *any,
+                                           const char *intersect) const;
+
     OptixTraversableHandle buildBVH(const std::vector<OptixBuildInput> &buildInputs) const;
 
     Allocator alloc;
