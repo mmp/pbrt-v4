@@ -79,6 +79,8 @@ Logging options:
                                 --log-level verbose if specified.
   --log-level <level>           Log messages at or above this level, where <level>
                                 is "verbose", "error", or "fatal". Default: "error".
+  --log-utilization             Periodically print processor and memory use in verbose-
+                                level logging.
 
 Reformatting options:
   --format                      Print a reformatted version of the input file(s) to
@@ -166,6 +168,7 @@ int main(int argc, char *argv[]) {
             ParseArg(&iter, args.end(), "format", &format, onError) ||
             ParseArg(&iter, args.end(), "log-level", &logLevel, onError) ||
             ParseArg(&iter, args.end(), "log-file", &options.logFile, onError) ||
+            ParseArg(&iter, args.end(), "log-utilization", &options.logUtilization, onError) ||
             ParseArg(&iter, args.end(), "mse-reference-image", &options.mseReferenceImage,
                      onError) ||
             ParseArg(&iter, args.end(), "mse-reference-out", &options.mseReferenceOutput,

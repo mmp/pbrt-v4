@@ -4,31 +4,42 @@
 
 #include <pbrt/util/log.h>
 
+#include <pbrt/options.h>
 #ifdef PBRT_BUILD_GPU_RENDERER
 #include <pbrt/gpu/util.h>
 #endif
 #include <pbrt/util/check.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/file.h>
+#include <pbrt/util/memory.h>
 #include <pbrt/util/parallel.h>
+#include <pbrt/util/string.h>
 
 #include <stdio.h>
+#include <atomic>
 #include <ctime>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <mutex>
+#include <thread>
 #include <sstream>
 
 #ifdef PBRT_IS_OSX
 #include <sys/syscall.h>
+#include <time.h>
 #include <unistd.h>
 #endif
 #ifdef PBRT_IS_LINUX
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 #endif
 #ifdef PBRT_IS_WINDOWS
 #include <windows.h>
+#endif
+#if defined(PBRT_USE_NVML)
+#include <nvml.h>
 #endif
 
 namespace pbrt {
@@ -65,7 +76,11 @@ PBRT_GPU GPULogItem rawLogItems[MAX_LOG_ITEMS];
 PBRT_GPU int nRawLogItems;
 #endif  // PBRT_BUILD_GPU_RENDERER
 
-void InitLogging(LogLevel level, std::string logFile, bool useGPU) {
+static std::atomic<bool> shutdownLogUtilization;
+static std::thread logUtilizationThread;
+
+void InitLogging(LogLevel level, std::string logFile, bool logUtilization,
+                 bool useGPU) {
     logging::logLevel = level;
     if (!logFile.empty()) {
         logging::logFile = FOpenWrite(logFile);
@@ -82,6 +97,115 @@ void InitLogging(LogLevel level, std::string logFile, bool useGPU) {
         CUDA_CHECK(cudaMemcpyToSymbol(LOGGING_LogLevelGPU, &logging::logLevel,
                                       sizeof(logging::logLevel)));
 #endif
+
+    if (logUtilization) {
+        shutdownLogUtilization = false;
+        auto sleepms = [](int64_t ms) {
+#if defined(PBRT_IS_LINUX) || defined(PBRT_IS_OSX)
+                struct timespec rec, rem;
+                rec.tv_sec = 0;
+                rec.tv_nsec = ms * 1000000;
+                nanosleep(&rec, &rem);
+#elif defined(PBRT_IS_WINDOWS)
+                Sleep(ms);
+#else
+#error "Need to implement sleepms() for current platform"
+#endif
+        };
+
+        // Return overall CPU usage in ticks
+        auto getCPUUsage = [&](int64_t *user, int64_t *nice, int64_t *system, int64_t *idle) {
+#ifdef PBRT_IS_LINUX
+            std::ifstream stat("/proc/stat");
+            CHECK((bool)stat);
+
+            std::string line;
+            while (std::getline(stat, line)) {
+                if (line.compare(0, 4, "cpu ") != 0)
+                    continue;
+
+                std::string_view tail(line.c_str() + 5);
+                std::vector<int64_t> values = SplitStringToInt64s(tail, ' ');
+
+                CHECK_GE(values.size(), 4);
+                *user = values[0];
+                *nice = values[1];
+                *system = values[2];
+                *idle = values[3];
+                return;
+            }
+#elif defined(PBRT_IS_OSX)
+            *user = *nice = *system = *idle = 0;
+#elif defined(PBRT_IS_WINDOWS)
+            // possibly useful: https://stackoverflow.com/questions/23143693/retrieving-cpu-load-percent-total-in-windows-with-c
+            // https://stackoverflow.com/questions/63166/how-to-determine-cpu-and-memory-consumption-from-inside-a-process
+            *user = *nice = *system = *idle = 0;
+#else
+#error "Need to implement getCPUUsage for current platform"
+#endif
+        };
+
+        logUtilizationThread = std::thread([&]() {
+            int64_t userPrev, nicePrev, systemPrev, idlePrev;
+            getCPUUsage(&userPrev, &nicePrev, &systemPrev, &idlePrev);
+
+#ifdef PBRT_USE_NVML
+            // NOTE: per https://stackoverflow.com/a/64610732 apparently a
+            // call to LoadLibraryW(L"nvapi64.dll") will be a good idea on
+            // windows...
+            if (nvmlInit_v2() != NVML_SUCCESS)
+                LOG_ERROR("Unable to initialize NVML");
+
+            int deviceIndex = Options->gpuDevice ? *Options->gpuDevice : 0;
+            nvmlDevice_t device;
+            if (nvmlDeviceGetHandleByIndex_v2(deviceIndex, &device) != NVML_SUCCESS)
+                LOG_ERROR("Unable to get NVML device");
+#endif
+
+            while (!shutdownLogUtilization) {
+                sleepms(100);
+
+                int64_t userCur, niceCur, systemCur, idleCur;
+                getCPUUsage(&userCur, &niceCur, &systemCur, &idleCur);
+
+                // Report activity since last logging event. A value of 1
+                // represents all cores running at 100% utilization.
+                int64_t delta = (userCur + niceCur + systemCur + idleCur) -
+                    (userPrev + nicePrev + systemPrev + idlePrev);
+                LOG_VERBOSE("CPU: Memory used %d MB. "
+                            "Core activity: %.4f user %.4f nice %.4f system %.4f idle",
+                            GetCurrentRSS() / (1024*1024),
+                            double(userCur - userPrev) / delta,
+                            double(niceCur - nicePrev) / delta,
+                            double(systemCur - systemPrev) / delta,
+                            double(idleCur - idlePrev) / delta);
+
+                userPrev = userCur;
+                nicePrev = niceCur;
+                systemPrev = systemCur;
+                idlePrev = idleCur;
+
+#ifdef PBRT_USE_NVML
+                nvmlMemory_t info;
+                nvmlUtilization_t utilization;
+                if (nvmlDeviceGetMemoryInfo(device, &info) == NVML_SUCCESS &&
+                    nvmlDeviceGetUtilizationRates(device, &utilization) == NVML_SUCCESS)
+                    LOG_VERBOSE("GPU: Memory used %d MB. SM activity: %d%% memory activity: %d%%",
+                                info.used / (1024*1024), utilization.gpu, utilization.memory);
+#endif
+            }
+#ifdef PBRT_USE_NVML
+            nvmlShutdown();
+#endif
+        });
+    }
+}
+
+void ShutdownLogging() {
+    if (logUtilizationThread.get_id() != std::thread::id()) {
+        shutdownLogUtilization = true;
+        logUtilizationThread.join();
+    }
 }
 
 #ifdef PBRT_BUILD_GPU_RENDERER
