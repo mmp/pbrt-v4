@@ -15,7 +15,7 @@
 #include <pbrt/util/vecmath.h>
 
 #include <cstring>
-#include <mutex>
+#include <shared_mutex>
 #include <string>
 #include <unordered_set>
 
@@ -33,29 +33,55 @@ class BufferCache {
 
     const T *LookupOrAdd(pstd::span<const T> buf) {
         ++nBufferCacheLookups;
-        std::lock_guard<std::mutex> lock(mutex);
         // Return pointer to data if _buf_ contents is already in the cache
         Buffer lookupBuffer(buf.data(), buf.size());
-        if (auto iter = cache.find(lookupBuffer); iter != cache.end()) {
+
+        int shardIndex = uint32_t(lookupBuffer.hash) >> (32 - logShards);
+        CHECK(shardIndex >= 0 && shardIndex < nShards);
+
+        mutex[shardIndex].lock_shared();
+        if (auto iter = cache[shardIndex].find(lookupBuffer); iter != cache[shardIndex].end()) {
             DCHECK(std::memcmp(buf.data(), iter->ptr, buf.size() * sizeof(T)) == 0);
+            const T *ptr = iter->ptr;
+            mutex[shardIndex].unlock_shared();
+
             ++nBufferCacheHits;
             redundantBufferBytes += buf.size() * sizeof(T);
-            return iter->ptr;
+            return ptr;
         }
+
+        mutex[shardIndex].unlock_shared();
 
         // Add _buf_ contents to cache and return pointer to cached copy
         T *ptr = alloc.allocate_object<T>(buf.size());
         std::copy(buf.begin(), buf.end(), ptr);
         bytesUsed += buf.size() * sizeof(T);
-        cache.insert(Buffer(ptr, buf.size()));
+
+        mutex[shardIndex].lock();
+        if (auto iter = cache[shardIndex].find(lookupBuffer); iter != cache[shardIndex].end()) {
+            // Someone else got it in there in the meantime...
+            alloc.deallocate_object(ptr, buf.size());
+
+            const T *ptr = iter->ptr;
+            mutex[shardIndex].unlock();
+
+            ++nBufferCacheHits;
+            redundantBufferBytes += buf.size() * sizeof(T);
+            return ptr;
+        }
+        cache[shardIndex].insert(Buffer(ptr, buf.size()));
+        mutex[shardIndex].unlock();
         return ptr;
     }
 
     void Clear() {
-        std::lock_guard<std::mutex> lock(mutex);
-        for (auto iter : cache)
-            alloc.deallocate_object(const_cast<T *>(iter.ptr), iter.size);
-        cache.clear();
+        for (int i = 0; i < nShards; ++i) {
+            mutex[i].lock();
+            for (auto iter : cache[i])
+                alloc.deallocate_object(const_cast<T *>(iter.ptr), iter.size);
+            cache[i].clear();
+            mutex[i].unlock();
+        }
         bytesUsed = 0;
     }
 
@@ -66,7 +92,9 @@ class BufferCache {
     struct Buffer {
         // BufferCache::Buffer Public Methods
         Buffer() = default;
-        Buffer(const T *ptr, size_t size) : ptr(ptr), size(size) {}
+        Buffer(const T *ptr, size_t size) : ptr(ptr), size(size) {
+            hash = HashBuffer(ptr, size);
+        }
 
         bool operator==(const Buffer &b) const {
             return size == b.size && std::memcmp(ptr, b.ptr, size * sizeof(T)) == 0;
@@ -74,17 +102,20 @@ class BufferCache {
 
         const T *ptr = nullptr;
         size_t size = 0;
+        size_t hash;
     };
 
     // BufferCache::BufferHasher Definition
     struct BufferHasher {
-        size_t operator()(const Buffer &b) const { return HashBuffer(b.ptr, b.size); }
+        size_t operator()(const Buffer &b) const { return b.hash; }
     };
 
     // BufferCache Private Members
     Allocator alloc;
-    std::mutex mutex;
-    std::unordered_set<Buffer, BufferHasher> cache;
+    static constexpr int logShards = 6;
+    static constexpr int nShards = 1 << logShards;
+    std::shared_mutex mutex[nShards];
+    std::unordered_set<Buffer, BufferHasher> cache[nShards];
     size_t bytesUsed = 0;
 };
 
