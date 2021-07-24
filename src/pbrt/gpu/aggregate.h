@@ -118,7 +118,8 @@ class OptiXAggregate : public WavefrontAggregate {
     OptixProgramGroup createIntersectionPG(const char *closest, const char *any,
                                            const char *intersect) const;
 
-    OptixTraversableHandle buildBVH(const std::vector<OptixBuildInput> &buildInputs) const;
+    OptixTraversableHandle buildBVH(const std::vector<OptixBuildInput> &buildInputs,
+                                    cudaStream_t stream = 0);
 
     Allocator alloc;
     Bounds3f bounds;

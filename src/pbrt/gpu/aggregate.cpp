@@ -90,7 +90,7 @@ extern const unsigned char PBRT_EMBEDDED_PTX[];
 STAT_MEMORY_COUNTER("Memory/Acceleration structures", gpuBVHBytes);
 
 OptixTraversableHandle OptiXAggregate::buildBVH(
-    const std::vector<OptixBuildInput> &buildInputs) const {
+        const std::vector<OptixBuildInput> &buildInputs, cudaStream_t buildStream) {
     if (buildInputs.empty())
         return {};
 
@@ -121,16 +121,18 @@ OptixTraversableHandle OptiXAggregate::buildBVH(
     // Build.
     OptixTraversableHandle traversableHandle{0};
     OPTIX_CHECK(optixAccelBuild(
-        optixContext, cudaStream, &accelOptions, buildInputs.data(), buildInputs.size(),
+        optixContext, buildStream, &accelOptions, buildInputs.data(), buildInputs.size(),
         CUdeviceptr(tempBuffer), blasBufferSizes.tempSizeInBytes,
         CUdeviceptr(outputBuffer), blasBufferSizes.outputSizeInBytes, &traversableHandle,
         &emitDesc, 1));
 
     CUDA_CHECK(cudaFree(tempBuffer));
 
+    CUDA_CHECK(cudaStreamSynchronize(buildStream));
     uint64_t compactedSize;
-    CUDA_CHECK(cudaMemcpy(&compactedSize, compactedSizePtr, sizeof(uint64_t),
-                          cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpyAsync(&compactedSize, compactedSizePtr, sizeof(uint64_t),
+                               cudaMemcpyDeviceToHost, buildStream));
+    CUDA_CHECK(cudaStreamSynchronize(buildStream));
 
     if (compactedSize >= blasBufferSizes.outputSizeInBytes) {
         // No need to compact...
@@ -142,9 +144,10 @@ OptixTraversableHandle OptiXAggregate::buildBVH(
         void *asBuffer;
         CUDA_CHECK(cudaMalloc(&asBuffer, compactedSize));
 
-        OPTIX_CHECK(optixAccelCompact(optixContext, cudaStream, traversableHandle,
+        OPTIX_CHECK(optixAccelCompact(optixContext, buildStream, traversableHandle,
                                       CUdeviceptr(asBuffer), compactedSize,
                                       &traversableHandle));
+        CUDA_CHECK(cudaStreamSynchronize(buildStream));
 
         CUDA_CHECK(cudaFree(outputBuffer));
     }
@@ -1296,6 +1299,10 @@ OptiXAggregate::OptiXAggregate(
 
     LOG_VERBOSE("Starting to create IASes for %d instance definitions",
                 scene.instanceDefinitions.size());
+    std::vector<cudaStream_t> threadCUDAStreams(MaxThreadIndex());
+    for (int i = 0; i < threadCUDAStreams.size(); ++i)
+        cudaStreamCreate(&threadCUDAStreams[i]);
+
     std::unordered_map<std::string, Instance> instanceMap;
     std::mutex instanceMapMutex;
     ParallelFor(0, scene.instanceDefinitions.size(), [&](int64_t i) {
@@ -1319,7 +1326,7 @@ OptiXAggregate::OptiXAggregate(
             alloc);
         meshes.clear();
         if (triangleBuildInput) {
-            inst.handles[0] = buildBVH(triangleBuildInput.optixInputs);
+            inst.handles[0] = buildBVH(triangleBuildInput.optixInputs, threadCUDAStreams[ThreadIndex]);
             inst.sbtOffsets[0] = addHGRecords(triangleBuildInput);
             inst.bounds = triangleBuildInput.bounds;
         }
@@ -1329,7 +1336,7 @@ OptiXAggregate::OptiXAggregate(
                                     hitPGRandomHitBilinearPatch, textures.floatTextures, namedMaterials,
                                     materials, media, {}, alloc);
         if (bilinearBuildInput) {
-            inst.handles[1] = buildBVH(bilinearBuildInput.optixInputs);
+            inst.handles[1] = buildBVH(bilinearBuildInput.optixInputs, threadCUDAStreams[ThreadIndex]);
             inst.sbtOffsets[1] = addHGRecords(bilinearBuildInput);
             inst.bounds = Union(inst.bounds, bilinearBuildInput.bounds);
         }
@@ -1339,7 +1346,7 @@ OptiXAggregate::OptiXAggregate(
                                         hitPGRandomHitQuadric, textures.floatTextures, namedMaterials,
                                         materials, media, {}, alloc);
         if (quadricBuildInput) {
-            inst.handles[2] = buildBVH(quadricBuildInput.optixInputs);
+            inst.handles[2] = buildBVH(quadricBuildInput.optixInputs, threadCUDAStreams[ThreadIndex]);
             inst.sbtOffsets[2] = addHGRecords(quadricBuildInput);
             inst.bounds = Union(inst.bounds, quadricBuildInput.bounds);
         }
@@ -1347,6 +1354,9 @@ OptiXAggregate::OptiXAggregate(
         std::lock_guard<std::mutex> lock(instanceMapMutex);
         instanceMap[def.first] = inst;
     });
+
+    for (int i = 0; i < threadCUDAStreams.size(); ++i)
+        cudaStreamDestroy(threadCUDAStreams[i]);
     LOG_VERBOSE("Finished creating IASes for instance definitions");
 
     ///////////////////////////////////////////////////////////////////////////
