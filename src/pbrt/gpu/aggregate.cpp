@@ -23,6 +23,7 @@
 
 #include <atomic>
 #include <mutex>
+#include <unordered_map>
 
 #include <optix.h>
 #include <optix_function_table_definition.h>
@@ -1353,19 +1354,31 @@ OptiXAggregate::OptiXAggregate(
     LOG_VERBOSE("Starting to create %d OptixInstances", scene.instances.size());
 
     // Get the appropriate instanceMap iterator for each instance use, just
-    // once, and in parallel.
+    // once, and in parallel.  While we're at it, count the total number of
+    // OptixInstances that will be added to iasInstances.
     std::vector<std::unordered_map<std::string, Instance>::const_iterator> instanceMapIters(scene.instances.size());
-    ParallelFor(0, scene.instances.size(), [&](int64_t i) {
-        const auto &sceneInstance = scene.instances[i];
-        auto iter = instanceMap.find(sceneInstance.name);
-        instanceMapIters[i] = iter;
-    });
+    std::atomic<int> totalOptixInstances{0};
+    std::vector<int> numValidHandles(scene.instances.size());
+    ParallelFor(0, scene.instances.size(), [&](int64_t indexBegin, int64_t indexEnd) {
+        int localTotalInstances = 0;
 
-    // Count total number of OptixInstances that will be added to iasInstances
-    int totalOptixInstances = 0;
-    for (size_t i = 0; i < scene.instances.size(); ++i)
-        if (auto iter = instanceMapIters[i]; iter != instanceMap.end())
-            totalOptixInstances += iter->second.NumValidHandles();
+        for (int64_t i = indexBegin; i < indexEnd; ++i) {
+            const auto &sceneInstance = scene.instances[i];
+            auto iter = instanceMap.find(sceneInstance.name);
+            instanceMapIters[i] = iter;
+
+            if (iter != instanceMap.end()) {
+                int nHandles = iter->second.NumValidHandles();
+                localTotalInstances += nHandles;
+                numValidHandles[i] = nHandles;
+            } else
+                numValidHandles[0] = 0;
+        }
+
+        // Don't hammer the atomic; at least accumulate sums locally for a
+        // range of them before we add to it.
+        totalOptixInstances += localTotalInstances;
+    });
 
     // Resize iasInstances to make room for all of the OptixInstances to come
     size_t iasInstancesOffset = iasInstances.size();
@@ -1375,8 +1388,7 @@ OptiXAggregate::OptiXAggregate(
     std::vector<size_t> instanceIASOffset(scene.instances.size());
     for (size_t i = 0; i < scene.instances.size(); ++i) {
         instanceIASOffset[i] = iasInstancesOffset;
-        if (auto iter = instanceMapIters[i]; iter != instanceMap.end())
-            iasInstancesOffset += iter->second.NumValidHandles();
+        iasInstancesOffset += numValidHandles[i];
     }
 
     // Now loop over all of the instance uses in parallel.
@@ -1424,6 +1436,8 @@ OptiXAggregate::OptiXAggregate(
             }
         }
 
+        // As before with totalOptixInstances, try to limit how many times
+        // we update the global bounds so we're not hammering on it.
         std::lock_guard<std::mutex> lock(boundsMutex);
         bounds = Union(bounds, localBounds);
     });
