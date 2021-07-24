@@ -1277,23 +1277,9 @@ OptiXAggregate::OptiXAggregate(
 
     ///////////////////////////////////////////////////////////////////////////
     // Read (and possibly displace!) PLY meshes in parallel.
-    std::map<std::string, std::map<int, TriQuadMesh>> instancePLYMeshes;
     std::vector<std::string> allInstanceNames;
     for (const auto &def : scene.instanceDefinitions)
         allInstanceNames.push_back(def.first);
-
-    LOG_VERBOSE("Starting to read PLY meshes for instances");
-    std::mutex mutex;
-    ParallelFor(0, allInstanceNames.size(), [&](int64_t i) {
-        const std::string &name = allInstanceNames[i];
-        auto iter = scene.instanceDefinitions.find(name);
-        std::map<int, TriQuadMesh> meshes =
-            PreparePLYMeshes(iter->second.shapes, textures.floatTextures);
-
-        std::lock_guard<std::mutex> lock(mutex);
-        instancePLYMeshes[name] = std::move(meshes);
-    });
-    LOG_VERBOSE("Finished reading PLY meshes for instances");
 
     ///////////////////////////////////////////////////////////////////////////
     // Create IASes for instance definitions
@@ -1308,20 +1294,30 @@ OptiXAggregate::OptiXAggregate(
         }
     };
 
-    LOG_VERBOSE("Starting to create IASes for instance definitions");
+    LOG_VERBOSE("Starting to create IASes for %d instance definitions",
+                scene.instanceDefinitions.size());
     std::unordered_map<std::string, Instance> instanceMap;
-    for (const auto &def : scene.instanceDefinitions) {
+    std::mutex instanceMapMutex;
+    ParallelFor(0, scene.instanceDefinitions.size(), [&](int64_t i) {
+        const std::string &name = allInstanceNames[i];
+        auto iter = scene.instanceDefinitions.find(name);
+        CHECK(iter != scene.instanceDefinitions.end());
+        const auto &def = *iter;
+
         if (!def.second.animatedShapes.empty())
             Warning("Ignoring %d animated shapes in instance \"%s\".",
                     def.second.animatedShapes.size(), def.first);
 
         Instance inst;
 
+        std::map<int, TriQuadMesh> meshes =
+            PreparePLYMeshes(def.second.shapes, textures.floatTextures);
+
         ASBuildInput triangleBuildInput = createBuildInputForTriangles(
-            def.second.shapes, instancePLYMeshes[def.first], hitPGTriangle, anyhitPGShadowTriangle,
+            def.second.shapes, meshes, hitPGTriangle, anyhitPGShadowTriangle,
             hitPGRandomHitTriangle, textures.floatTextures, namedMaterials, materials, media, {},
             alloc);
-        instancePLYMeshes[def.first].clear();
+        meshes.clear();
         if (triangleBuildInput) {
             inst.handles[0] = buildBVH(triangleBuildInput.optixInputs);
             inst.sbtOffsets[0] = addHGRecords(triangleBuildInput);
@@ -1348,8 +1344,9 @@ OptiXAggregate::OptiXAggregate(
             inst.bounds = Union(inst.bounds, quadricBuildInput.bounds);
         }
 
+        std::lock_guard<std::mutex> lock(instanceMapMutex);
         instanceMap[def.first] = inst;
-    }
+    });
     LOG_VERBOSE("Finished creating IASes for instance definitions");
 
     ///////////////////////////////////////////////////////////////////////////
