@@ -912,6 +912,9 @@ int OptiXAggregate::addHGRecords(const ASBuildInput &buildInput) {
     if (buildInput.intersectHGRecords.empty())
         return -1;
 
+    static std::mutex mutex;
+    std::lock_guard<std::mutex> lock(mutex);
+
     int sbtOffset = intersectHGRecords.size();
     intersectHGRecords.insert(intersectHGRecords.end(),
                               buildInput.intersectHGRecords.begin(),
