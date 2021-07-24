@@ -28,24 +28,24 @@ void *CUDATrackedMemoryResource::do_allocate(size_t size, size_t alignment) {
     if (size == 0)
         return nullptr;
 
-    std::lock_guard<std::mutex> lock(mutex);
-
     // GPU cache line alignment to avoid false sharing...
     alignment = std::max<size_t>(128, alignment);
 
     if (bypassSlab(size))
         return cudaAllocate(size, alignment);
 
-    if ((slabOffset % alignment) != 0)
-        slabOffset += alignment - (slabOffset % alignment);
+    CHECK_LT(ThreadIndex, maxThreads);
+    Slab &slab = threadSlabs[ThreadIndex];
+    if ((slab.offset % alignment) != 0)
+        slab.offset += alignment - (slab.offset % alignment);
 
-    if (slabOffset + size > slabSize) {
-        currentSlab = (uint8_t *)cudaAllocate(slabSize, 128);
-        slabOffset = 0;
+    if (slab.offset + size > slabSize) {
+        slab.ptr = (uint8_t *)cudaAllocate(slabSize, 128);
+        slab.offset = 0;
     }
 
-    uint8_t *ptr = currentSlab + slabOffset;
-    slabOffset += size;
+    uint8_t *ptr = slab.ptr + slab.offset;
+    slab.offset += size;
     return ptr;
 }
 
@@ -54,8 +54,10 @@ void *CUDATrackedMemoryResource::cudaAllocate(size_t size, size_t alignment) {
     CUDA_CHECK(cudaMallocManaged(&ptr, size));
     DCHECK_EQ(0, intptr_t(ptr) % alignment);
 
+    std::lock_guard<std::mutex> lock(mutex);
     allocations[ptr] = size;
     bytesAllocated += size;
+
     return ptr;
 }
 

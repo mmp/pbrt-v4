@@ -11,6 +11,7 @@
 #include <pbrt/util/math.h>
 #include <pbrt/util/pstd.h>
 
+#include <atomic>
 #include <cstddef>
 #include <memory>
 #include <mutex>
@@ -53,11 +54,16 @@ class CUDATrackedMemoryResource : public CUDAMemoryResource {
 
     void *cudaAllocate(size_t size, size_t alignment);
 
-    size_t bytesAllocated = 0;
-    uint8_t *currentSlab = nullptr;
     static constexpr int slabSize = 1024 * 1024;
-    size_t slabOffset = slabSize;
+    struct alignas(64) Slab {
+        uint8_t *ptr = nullptr;
+        size_t offset = slabSize;
+    };
+    static constexpr int maxThreads = 256;
+    Slab threadSlabs[maxThreads];
+
     mutable std::mutex mutex;
+    std::atomic<size_t> bytesAllocated{};
     std::unordered_map<void *, size_t> allocations;
 };
 
