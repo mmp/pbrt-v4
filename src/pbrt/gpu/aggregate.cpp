@@ -406,78 +406,94 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForTriangles(
     if (nMeshes == 0)
         return {};
 
+    std::vector<int> meshIndexToShapeIndex(nMeshes);
+    int meshIndex = 0;
+    for (int shapeIndex = 0; shapeIndex < shapes.size(); ++shapeIndex) {
+        TriangleMesh *mesh = meshes[shapeIndex];
+        if (mesh) {
+            meshIndexToShapeIndex[meshIndex] = shapeIndex;
+            ++meshIndex;
+        }
+    }
+
     ASBuildInput buildInput(nMeshes);
     // FIXME: these leak, unfortunately...
     CUdeviceptr *pDeviceDevicePtrs = new CUdeviceptr[nMeshes];
     uint32_t *triangleInputFlags = new uint32_t[nMeshes];
 
-    int buildIndex = 0;
-    for (int shapeIndex = 0; shapeIndex < meshes.size(); ++shapeIndex) {
-        TriangleMesh *mesh = meshes[shapeIndex];
-        if (!mesh)
-            continue;
+    std::mutex boundsMutex;
+    ParallelFor(0, nMeshes, [&](int64_t startIndex, int64_t endIndex) {
+        Bounds3f localBounds;
 
-        const auto &shape = shapes[shapeIndex];
+        for (int meshIndex = startIndex; meshIndex < endIndex; ++meshIndex) {
+            int shapeIndex = meshIndexToShapeIndex[meshIndex];
+            // Remember: meshes is indexed shapeIndex...
+            TriangleMesh *mesh = meshes[shapeIndex];
 
-        OptixBuildInput input = {};
+            const auto &shape = shapes[shapeIndex];
 
-        input.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+            OptixBuildInput input = {};
 
-        input.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
-        input.triangleArray.vertexStrideInBytes = sizeof(Point3f);
-        input.triangleArray.numVertices = mesh->nVertices;
-        pDeviceDevicePtrs[buildIndex] = CUdeviceptr(mesh->p);
-        input.triangleArray.vertexBuffers = &pDeviceDevicePtrs[buildIndex];
+            input.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
 
-        input.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
-        input.triangleArray.indexStrideInBytes = 3 * sizeof(int);
-        input.triangleArray.numIndexTriplets = mesh->nTriangles;
-        input.triangleArray.indexBuffer = CUdeviceptr(mesh->vertexIndices);
+            input.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
+            input.triangleArray.vertexStrideInBytes = sizeof(Point3f);
+            input.triangleArray.numVertices = mesh->nVertices;
+            pDeviceDevicePtrs[meshIndex] = CUdeviceptr(mesh->p);
+            input.triangleArray.vertexBuffers = &pDeviceDevicePtrs[meshIndex];
 
-        FloatTexture alphaTexture = getAlphaTexture(shape, floatTextures, alloc);
-        Material material = getMaterial(shape, namedMaterials, materials);
-        triangleInputFlags[buildIndex] = getOptixGeometryFlags(true, alphaTexture);
-        input.triangleArray.flags = &triangleInputFlags[buildIndex];
+            input.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
+            input.triangleArray.indexStrideInBytes = 3 * sizeof(int);
+            input.triangleArray.numIndexTriplets = mesh->nTriangles;
+            input.triangleArray.indexBuffer = CUdeviceptr(mesh->vertexIndices);
 
-        input.triangleArray.numSbtRecords = 1;
-        input.triangleArray.sbtIndexOffsetBuffer = CUdeviceptr(nullptr);
-        input.triangleArray.sbtIndexOffsetSizeInBytes = 0;
-        input.triangleArray.sbtIndexOffsetStrideInBytes = 0;
+            FloatTexture alphaTexture = getAlphaTexture(shape, floatTextures, alloc);
+            Material material = getMaterial(shape, namedMaterials, materials);
+            triangleInputFlags[meshIndex] = getOptixGeometryFlags(true, alphaTexture);
+            input.triangleArray.flags = &triangleInputFlags[meshIndex];
 
-        buildInput.optixInputs[buildIndex] = input;
+            input.triangleArray.numSbtRecords = 1;
+            input.triangleArray.sbtIndexOffsetBuffer = CUdeviceptr(nullptr);
+            input.triangleArray.sbtIndexOffsetSizeInBytes = 0;
+            input.triangleArray.sbtIndexOffsetStrideInBytes = 0;
 
-        HitgroupRecord hgRecord;
-        OPTIX_CHECK(optixSbtRecordPackHeader(intersectPG, &hgRecord));
-        hgRecord.triRec.mesh = mesh;
-        hgRecord.triRec.material = material;
-        hgRecord.triRec.alphaTexture = alphaTexture;
-        hgRecord.triRec.areaLights = {};
-        if (shape.lightIndex != -1) {
-            if (!material)
-                Warning(&shape.loc, "Ignoring area light specification for shape with \"interface\" material.");
-            else {
-                // Note: this will hit if we try to have an instance as an area
-                // light.
-                auto iter = shapeIndexToAreaLights.find(shapeIndex);
-                CHECK(iter != shapeIndexToAreaLights.end());
-                CHECK_EQ(iter->second->size(), mesh->nTriangles);
-                hgRecord.triRec.areaLights = pstd::MakeSpan(*iter->second);
+            buildInput.optixInputs[meshIndex] = input;
+
+            HitgroupRecord hgRecord;
+            OPTIX_CHECK(optixSbtRecordPackHeader(intersectPG, &hgRecord));
+            hgRecord.triRec.mesh = mesh;
+            hgRecord.triRec.material = material;
+            hgRecord.triRec.alphaTexture = alphaTexture;
+            hgRecord.triRec.areaLights = {};
+            if (shape.lightIndex != -1) {
+                if (!material)
+                    Warning(&shape.loc, "Ignoring area light specification for shape with \"interface\" material.");
+                else {
+                    // Note: this will hit if we try to have an instance as an area
+                    // light.
+                    auto iter = shapeIndexToAreaLights.find(shapeIndex);
+                    CHECK(iter != shapeIndexToAreaLights.end());
+                    CHECK_EQ(iter->second->size(), mesh->nTriangles);
+                    hgRecord.triRec.areaLights = pstd::MakeSpan(*iter->second);
+                }
             }
+            hgRecord.triRec.mediumInterface = getMediumInterface(shape, media, alloc);
+
+            buildInput.intersectHGRecords[meshIndex] = hgRecord;
+
+            OPTIX_CHECK(optixSbtRecordPackHeader(randomHitPG, &hgRecord));
+            buildInput.randomHitHGRecords[meshIndex]= hgRecord;
+
+            OPTIX_CHECK(optixSbtRecordPackHeader(shadowPG, &hgRecord));
+            buildInput.shadowHGRecords[meshIndex] = hgRecord;
+
+            // Note: meshBounds is also indexed by the shape index..
+            localBounds = Union(localBounds, meshBounds[shapeIndex]);
         }
-        hgRecord.triRec.mediumInterface = getMediumInterface(shape, media, alloc);
 
-        buildInput.bounds = Union(buildInput.bounds, meshBounds[shapeIndex]);
-
-        buildInput.intersectHGRecords[buildIndex] = hgRecord;
-
-        OPTIX_CHECK(optixSbtRecordPackHeader(randomHitPG, &hgRecord));
-        buildInput.randomHitHGRecords[buildIndex]= hgRecord;
-
-        OPTIX_CHECK(optixSbtRecordPackHeader(shadowPG, &hgRecord));
-        buildInput.shadowHGRecords[buildIndex] = hgRecord;
-
-        ++buildIndex;
-    }
+        std::lock_guard<std::mutex> lock(boundsMutex);
+        buildInput.bounds = Union(buildInput.bounds, localBounds);
+    });
 
     return buildInput;
 }
