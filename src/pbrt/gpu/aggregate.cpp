@@ -716,7 +716,7 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForBLPs(
     std::vector<BilinearPatchMesh *> meshes(shapes.size(), nullptr);
     std::atomic<int> nPatches = 0, nMeshes = 0;
 
-    for (size_t shapeIndex = 0; shapeIndex < shapes.size(); ++shapeIndex) {
+    ParallelFor(0, shapes.size(), [&](int64_t shapeIndex) {
         const auto &shape = shapes[shapeIndex];
         if (shape.name == "bilinearmesh") {
             BilinearPatchMesh *mesh = BilinearPatch::CreateMesh(shape.renderFromObject, shape.reverseOrientation,
@@ -732,33 +732,47 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForBLPs(
                 meshes[shapeIndex] = curveMesh;
             }
         }
-    }
+    });
 
     if (nMeshes == 0)
         return {};
+
+    std::vector<int> meshIndexToShapeIndex(nMeshes);
+    std::vector<int> meshAABBStartIndex(nMeshes);
+    int meshIndex = 0, aabbIndex = 0;
+    for (size_t shapeIndex = 0; shapeIndex < shapes.size(); ++shapeIndex) {
+        if (meshes[shapeIndex]) {
+            meshIndexToShapeIndex[meshIndex] = shapeIndex;
+            meshAABBStartIndex[meshIndex] = aabbIndex;
+
+            ++meshIndex;
+            aabbIndex += meshes[shapeIndex]->nPatches;
+        }
+    }
 
     // Create build inputs
     ASBuildInput buildInput(nMeshes);
     int buildInputIndex = 0;
     // FIXME: leaks...
     OptixAabb *aabbs = alloc.allocate_object<OptixAabb>(nPatches);
-    int aabbIndex = 0;
     CUdeviceptr *aabbDevicePtrs = new CUdeviceptr[nMeshes];
     uint32_t *flags = new uint32_t[nMeshes];
 
-    for (size_t shapeIndex = 0; shapeIndex < meshes.size(); ++shapeIndex) {
+    std::mutex boundsMutex;
+    ParallelFor(0, nMeshes, [&](int64_t meshIndex) {
+        int shapeIndex = meshIndexToShapeIndex[meshIndex];
         BilinearPatchMesh *mesh = meshes[shapeIndex];
-        if (!mesh)
-            continue;
 
-        OptixBuildInput &input = buildInput.optixInputs[buildInputIndex];
+        OptixBuildInput &input = buildInput.optixInputs[meshIndex];
         input.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
         input.customPrimitiveArray.numSbtRecords = 1;
         input.customPrimitiveArray.numPrimitives = mesh->nPatches;
-        aabbDevicePtrs[buildInputIndex] = CUdeviceptr(&aabbs[aabbIndex]);
-        input.customPrimitiveArray.aabbBuffers = &aabbDevicePtrs[buildInputIndex];
-        input.customPrimitiveArray.flags = &flags[buildInputIndex];
+        int aabbIndex = meshAABBStartIndex[meshIndex];
+        aabbDevicePtrs[meshIndex] = CUdeviceptr(&aabbs[aabbIndex]);
+        input.customPrimitiveArray.aabbBuffers = &aabbDevicePtrs[meshIndex];
+        input.customPrimitiveArray.flags = &flags[meshIndex];
 
+        Bounds3f meshBounds;
         for (int patchIndex = 0; patchIndex < mesh->nPatches; ++patchIndex) {
             Bounds3f shapeBounds;
             for (int i = 0; i < 4; ++i)
@@ -768,14 +782,14 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForBLPs(
                               float(shapeBounds.pMax.x), float(shapeBounds.pMax.y), float(shapeBounds.pMax.z)};
             aabbs[aabbIndex++] = aabb;
 
-            buildInput.bounds = Union(buildInput.bounds, shapeBounds);
+            meshBounds = Union(meshBounds, shapeBounds);
         }
 
         const auto &shape = shapes[shapeIndex];
         Material material = getMaterial(shape, namedMaterials, materials);
         FloatTexture alphaTexture = getAlphaTexture(shape, floatTextures, alloc);
 
-        flags[buildInputIndex] = getOptixGeometryFlags(false, alphaTexture);
+        flags[meshIndex] = getOptixGeometryFlags(false, alphaTexture);
 
         HitgroupRecord hgRecord;
         OPTIX_CHECK(optixSbtRecordPackHeader(intersectPG, &hgRecord));
@@ -797,16 +811,17 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForBLPs(
         }
         hgRecord.bilinearRec.mediumInterface = getMediumInterface(shape, media, alloc);
 
-        buildInput.intersectHGRecords[buildInputIndex] = hgRecord;
+        buildInput.intersectHGRecords[meshIndex] = hgRecord;
 
         OPTIX_CHECK(optixSbtRecordPackHeader(randomHitPG, &hgRecord));
-        buildInput.randomHitHGRecords[buildInputIndex] = hgRecord;
+        buildInput.randomHitHGRecords[meshIndex] = hgRecord;
 
         OPTIX_CHECK(optixSbtRecordPackHeader(shadowPG, &hgRecord));
-        buildInput.shadowHGRecords[buildInputIndex] = hgRecord;
+        buildInput.shadowHGRecords[meshIndex] = hgRecord;
 
-        ++buildInputIndex;
-    };
+        std::lock_guard<std::mutex> lock(boundsMutex);
+        buildInput.bounds = Union(buildInput.bounds, meshBounds);
+    });
 
     return buildInput;
 }
