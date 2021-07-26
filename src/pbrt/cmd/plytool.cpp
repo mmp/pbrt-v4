@@ -288,7 +288,8 @@ int split(std::vector<std::string> args) {
         }
 
         TriangleMesh triMesh(Transform(), false /* reverse orientation */,
-                             indices, p, std::vector<Vector3f>(), n, uv, std::vector<int>());
+                             indices, p, std::vector<Vector3f>(), n, uv, std::vector<int>(),
+                             Allocator());
         if (!triMesh.WritePLY(StringPrintf("%s-%03d.ply", outPLYBase, i)))
             return 1;
     }

@@ -200,7 +200,8 @@ TEST(BVHLightSampling, OneTri) {
     std::vector<int> indices{0, 1, 2};
     // Light is illuminating points with z > 0
     std::vector<Point3f> p{Point3f(-1, -1, 0), Point3f(1, -1, 0), Point3f(0, 1, 0)};
-    TriangleMesh mesh(id, false /* rev orientation */, indices, p, {}, {}, {}, {});
+    TriangleMesh mesh(id, false /* rev orientation */, indices, p, {}, {}, {}, {},
+                      Allocator());
     auto tris = Triangle::CreateTriangles(&mesh, Allocator());
 
     ASSERT_EQ(1, tris.size());
@@ -250,7 +251,8 @@ static std::tuple<std::vector<Light>, std::vector<Shape>> randomLights(
                                    Point3f{r(), r(), r()}};
             // leaks...
             TriangleMesh *mesh = new TriangleMesh(id, false /* rev orientation */,
-                                                  indices, p, {}, {}, {}, {});
+                                                  indices, p, {}, {}, {}, {},
+                                                  Allocator());
             auto tris = Triangle::CreateTriangles(mesh, Allocator());
             CHECK_EQ(1, tris.size());  // EXPECT doesn't work since this is in a
                                        // function :-p

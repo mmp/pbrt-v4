@@ -202,7 +202,6 @@ void RenderCPU(ParsedScene &parsedScene) {
 
     PtexTextureBase::ReportStats();
     ImageTextureBase::ClearCache();
-    FreeBufferCaches();
 }
 
 }  // namespace pbrt

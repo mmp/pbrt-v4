@@ -389,7 +389,7 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForTriangles(
                 mesh = alloc.new_object<TriangleMesh>(
                     *shape.renderFromObject, shape.reverseOrientation, plyMesh.triIndices,
                     plyMesh.p, std::vector<Vector3f>(), plyMesh.n, plyMesh.uv,
-                    plyMesh.faceIndices);
+                    plyMesh.faceIndices, alloc);
             }
 
             Bounds3f bounds;
@@ -716,7 +716,7 @@ BilinearPatchMesh *OptiXAggregate::diceCurveToBLP(const ShapeSceneEntity &shape,
 
     return alloc.new_object<BilinearPatchMesh>(
         *shape.renderFromObject, shape.reverseOrientation, blpIndices, blpP, blpN,
-        blpUV, std::vector<int>(), nullptr);
+        blpUV, std::vector<int>(), nullptr, alloc);
 }
 
 OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForBLPs(

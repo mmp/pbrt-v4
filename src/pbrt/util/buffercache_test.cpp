@@ -14,27 +14,26 @@ using namespace pbrt;
 TEST(BufferCache, Basics) {
     ASSERT_FALSE(intBufferCache == nullptr);
 
-    FreeBufferCaches();
-
     std::vector<int> v{1,2,3,4,5};
 
-    EXPECT_EQ(0, intBufferCache->BytesUsed());
+    size_t baseMem = intBufferCache->BytesUsed();
 
-    const int *ptr = intBufferCache->LookupOrAdd(v);
+    Allocator alloc;
+    const int *ptr = intBufferCache->LookupOrAdd(v, alloc);
     for (size_t i = 0; i < v.size(); ++i)
         EXPECT_EQ(ptr[i], v[i]);
 
-    EXPECT_EQ(5 * sizeof(int), intBufferCache->BytesUsed());
+    EXPECT_EQ(5 * sizeof(int), intBufferCache->BytesUsed() - baseMem);
 
-    EXPECT_EQ(ptr, intBufferCache->LookupOrAdd(v));
+    EXPECT_EQ(ptr, intBufferCache->LookupOrAdd(v, alloc));
 
-    EXPECT_EQ(5 * sizeof(int), intBufferCache->BytesUsed());
+    EXPECT_EQ(5 * sizeof(int), intBufferCache->BytesUsed() - baseMem);
 
     std::vector<int> v2{1,2,3,4};
-    const int *ptr2 = intBufferCache->LookupOrAdd(v2);
+    const int *ptr2 = intBufferCache->LookupOrAdd(v2, alloc);
     EXPECT_NE(ptr, ptr2);
     for (size_t i = 0; i < v2.size(); ++i)
         EXPECT_EQ(ptr2[i], v2[i]);
 
-    EXPECT_EQ(9 * sizeof(int), intBufferCache->BytesUsed());
+    EXPECT_EQ(9 * sizeof(int), intBufferCache->BytesUsed() - baseMem);
 }

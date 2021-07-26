@@ -379,7 +379,8 @@ TriangleMesh *LoopSubdivide(const Transform *renderFromObject, bool reverseOrien
         }
         return alloc.new_object<TriangleMesh>(*renderFromObject, reverseOrientation,
                                               verts, pLimit, std::vector<Vector3f>(), Ns,
-                                              std::vector<Point2f>(), std::vector<int>());
+                                              std::vector<Point2f>(), std::vector<int>(),
+                                              alloc);
     }
 }
 

@@ -23,19 +23,20 @@ STAT_MEMORY_COUNTER("Memory/Triangles", triangleBytes);
 TriangleMesh::TriangleMesh(const Transform &renderFromObject, bool reverseOrientation,
                            std::vector<int> indices, std::vector<Point3f> p,
                            std::vector<Vector3f> s, std::vector<Normal3f> n,
-                           std::vector<Point2f> uv, std::vector<int> faceIndices)
+                           std::vector<Point2f> uv, std::vector<int> faceIndices,
+                           Allocator alloc)
     : nTriangles(indices.size() / 3), nVertices(p.size()) {
     CHECK_EQ((indices.size() % 3), 0);
     ++nTriMeshes;
     nTris += nTriangles;
     triangleBytes += sizeof(*this);
     // Initialize mesh _vertexIndices_
-    vertexIndices = intBufferCache->LookupOrAdd(indices);
+    vertexIndices = intBufferCache->LookupOrAdd(indices, alloc);
 
     // Transform mesh vertices to rendering space and initialize mesh _p_
     for (Point3f &pt : p)
         pt = renderFromObject(pt);
-    this->p = point3BufferCache->LookupOrAdd(p);
+    this->p = point3BufferCache->LookupOrAdd(p, alloc);
 
     // Remainder of _TriangleMesh_ constructor
     this->reverseOrientation = reverseOrientation;
@@ -43,7 +44,7 @@ TriangleMesh::TriangleMesh(const Transform &renderFromObject, bool reverseOrient
 
     if (!uv.empty()) {
         CHECK_EQ(nVertices, uv.size());
-        this->uv = point2BufferCache->LookupOrAdd(uv);
+        this->uv = point2BufferCache->LookupOrAdd(uv, alloc);
     }
     if (!n.empty()) {
         CHECK_EQ(nVertices, n.size());
@@ -52,18 +53,18 @@ TriangleMesh::TriangleMesh(const Transform &renderFromObject, bool reverseOrient
             if (reverseOrientation)
                 nn = -nn;
         }
-        this->n = normal3BufferCache->LookupOrAdd(n);
+        this->n = normal3BufferCache->LookupOrAdd(n, alloc);
     }
     if (!s.empty()) {
         CHECK_EQ(nVertices, s.size());
         for (Vector3f &ss : s)
             ss = renderFromObject(ss);
-        this->s = vector3BufferCache->LookupOrAdd(s);
+        this->s = vector3BufferCache->LookupOrAdd(s, alloc);
     }
 
     if (!faceIndices.empty()) {
         CHECK_EQ(nTriangles, faceIndices.size());
-        this->faceIndices = intBufferCache->LookupOrAdd(faceIndices);
+        this->faceIndices = intBufferCache->LookupOrAdd(faceIndices, alloc);
     }
 
     // Make sure that we don't have too much stuff to be using integers to
@@ -184,7 +185,7 @@ BilinearPatchMesh::BilinearPatchMesh(const Transform &renderFromObject,
                                      bool reverseOrientation, std::vector<int> indices,
                                      std::vector<Point3f> P, std::vector<Normal3f> N,
                                      std::vector<Point2f> UV, std::vector<int> fIndices,
-                                     PiecewiseConstant2D *imageDist)
+                                     PiecewiseConstant2D *imageDist, Allocator alloc)
     : reverseOrientation(reverseOrientation),
       transformSwapsHandedness(renderFromObject.SwapsHandedness()),
       nPatches(indices.size() / 4),
@@ -199,19 +200,19 @@ BilinearPatchMesh::BilinearPatchMesh(const Transform &renderFromObject,
     CHECK_LE(P.size(), std::numeric_limits<int>::max());
     CHECK_LE(indices.size(), std::numeric_limits<int>::max());
 
-    vertexIndices = intBufferCache->LookupOrAdd(indices);
+    vertexIndices = intBufferCache->LookupOrAdd(indices, alloc);
 
     blpBytes += sizeof(*this);
 
     // Transform mesh vertices to world space
     for (Point3f &p : P)
         p = renderFromObject(p);
-    p = point3BufferCache->LookupOrAdd(P);
+    p = point3BufferCache->LookupOrAdd(P, alloc);
 
     // Copy _UV_ and _N_ vertex data, if present
     if (!UV.empty()) {
         CHECK_EQ(nVertices, UV.size());
-        uv = point2BufferCache->LookupOrAdd(UV);
+        uv = point2BufferCache->LookupOrAdd(UV, alloc);
     }
     if (!N.empty()) {
         CHECK_EQ(nVertices, N.size());
@@ -220,12 +221,12 @@ BilinearPatchMesh::BilinearPatchMesh(const Transform &renderFromObject,
             if (reverseOrientation)
                 n = -n;
         }
-        n = normal3BufferCache->LookupOrAdd(N);
+        n = normal3BufferCache->LookupOrAdd(N, alloc);
     }
 
     if (!fIndices.empty()) {
         CHECK_EQ(nPatches, fIndices.size());
-        faceIndices = intBufferCache->LookupOrAdd(fIndices);
+        faceIndices = intBufferCache->LookupOrAdd(fIndices, alloc);
     }
 }
 

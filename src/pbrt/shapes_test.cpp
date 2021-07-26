@@ -146,7 +146,8 @@ Triangle *GetRandomTriangle(std::function<Float()> value) {
     int indices[3] = {0, 1, 2};
     // Leaks...
     TriangleMesh *mesh = new TriangleMesh(identity, false, {indices, indices + 3},
-                                          {v, v + 3}, {}, {}, {}, {});
+                                          {v, v + 3}, {}, {}, {}, {},
+                                          Allocator());
     pstd::vector<Shape> triVec = Triangle::CreateTriangles(mesh, Allocator());
     EXPECT_EQ(1, triVec.size());
     return triVec[0].CastOrNullptr<Triangle>();
@@ -437,7 +438,7 @@ TEST(Triangle, BadCases) {
     std::vector<Point3f> p{Point3f(-1113.45459, -79.049614, -56.2431908),
                            Point3f(-1113.45459, -87.0922699, -56.2431908),
                            Point3f(-1113.45459, -79.2090149, -56.2431908)};
-    TriangleMesh mesh(identity, false, indices, p, {}, {}, {}, {});
+    TriangleMesh mesh(identity, false, indices, p, {}, {}, {}, {}, Allocator());
     auto tris = Triangle::CreateTriangles(&mesh, Allocator());
     ASSERT_EQ(1, tris.size());
 

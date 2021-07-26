@@ -66,7 +66,6 @@ void InitPBRT(const PBRTOptions &opt) {
         RGBToSpectrumTable::Init(gpuMemoryAllocator);
 
         RGBColorSpace::Init(gpuMemoryAllocator);
-        InitBufferCaches(gpuMemoryAllocator);
         Triangle::Init(gpuMemoryAllocator);
         BilinearPatch::Init(gpuMemoryAllocator);
 #else
@@ -79,10 +78,11 @@ void InitPBRT(const PBRTOptions &opt) {
         RGBToSpectrumTable::Init(Allocator{});
 
         RGBColorSpace::Init(Allocator{});
-        InitBufferCaches({});
         Triangle::Init({});
         BilinearPatch::Init({});
     }
+
+    InitBufferCaches();
 
     if (!Options->displayServer.empty())
         ConnectToDisplayServer(Options->displayServer);

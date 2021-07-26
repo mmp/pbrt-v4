@@ -29,9 +29,7 @@ template <typename T>
 class BufferCache {
   public:
     // BufferCache Public Methods
-    BufferCache(Allocator alloc) : alloc(alloc) {}
-
-    const T *LookupOrAdd(pstd::span<const T> buf) {
+    const T *LookupOrAdd(pstd::span<const T> buf, Allocator alloc) {
         ++nBufferCacheLookups;
         // Return pointer to data if _buf_ contents is already in the cache
         Buffer lookupBuffer(buf.data(), buf.size());
@@ -74,17 +72,6 @@ class BufferCache {
         return ptr;
     }
 
-    void Clear() {
-        for (int i = 0; i < nShards; ++i) {
-            mutex[i].lock();
-            for (auto iter : cache[i])
-                alloc.deallocate_object(const_cast<T *>(iter.ptr), iter.size);
-            cache[i].clear();
-            mutex[i].unlock();
-        }
-        bytesUsed = 0;
-    }
-
     size_t BytesUsed() const { return bytesUsed; }
 
   private:
@@ -111,7 +98,6 @@ class BufferCache {
     };
 
     // BufferCache Private Members
-    Allocator alloc;
     static constexpr int logShards = 6;
     static constexpr int nShards = 1 << logShards;
     std::shared_mutex mutex[nShards];
@@ -126,8 +112,7 @@ extern BufferCache<Point3f> *point3BufferCache;
 extern BufferCache<Vector3f> *vector3BufferCache;
 extern BufferCache<Normal3f> *normal3BufferCache;
 
-void InitBufferCaches(Allocator alloc);
-void FreeBufferCaches();
+void InitBufferCaches();
 
 }  // namespace pbrt
 

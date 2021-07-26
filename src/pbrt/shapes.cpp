@@ -436,7 +436,7 @@ TriangleMesh *Triangle::CreateMesh(const Transform *renderFromObject,
 
     return alloc.new_object<TriangleMesh>(
         *renderFromObject, reverseOrientation, std::move(vi), std::move(P), std::move(S),
-        std::move(N), std::move(uvs), std::move(faceIndices));
+        std::move(N), std::move(uvs), std::move(faceIndices), alloc);
 }
 
 STAT_MEMORY_COUNTER("Memory/Curves", curveBytes);
@@ -996,7 +996,7 @@ BilinearPatchMesh *BilinearPatch::CreateMesh(const Transform *renderFromObject,
 
     return alloc.new_object<BilinearPatchMesh>(
         *renderFromObject, reverseOrientation, std::move(vertexIndices), std::move(P),
-        std::move(N), std::move(uv), std::move(faceIndices), imageDist);
+        std::move(N), std::move(uv), std::move(faceIndices), imageDist, alloc);
 }
 
 pstd::vector<Shape> BilinearPatch::CreatePatches(const BilinearPatchMesh *mesh,
@@ -1457,14 +1457,16 @@ pstd::vector<Shape> Shape::Create(
         if (!plyMesh.triIndices.empty()) {
             TriangleMesh *mesh = alloc.new_object<TriangleMesh>(
                 *renderFromObject, reverseOrientation, plyMesh.triIndices, plyMesh.p,
-                std::vector<Vector3f>(), plyMesh.n, plyMesh.uv, plyMesh.faceIndices);
+                std::vector<Vector3f>(), plyMesh.n, plyMesh.uv, plyMesh.faceIndices,
+                alloc);
             shapes = Triangle::CreateTriangles(mesh, alloc);
         }
 
         if (!plyMesh.quadIndices.empty()) {
             BilinearPatchMesh *mesh = alloc.new_object<BilinearPatchMesh>(
                 *renderFromObject, reverseOrientation, plyMesh.quadIndices, plyMesh.p,
-                plyMesh.n, plyMesh.uv, plyMesh.faceIndices, nullptr /* image dist */);
+                plyMesh.n, plyMesh.uv, plyMesh.faceIndices, nullptr /* image dist */,
+                alloc);
             pstd::vector<Shape> quadMesh = BilinearPatch::CreatePatches(mesh, alloc);
             shapes.insert(shapes.end(), quadMesh.begin(), quadMesh.end());
         }
