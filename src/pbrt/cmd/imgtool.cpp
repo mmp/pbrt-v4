@@ -191,6 +191,11 @@ static std::map<std::string, CommandUsage> commandUsage = {
     --ramp             Generate an image of the color ramp; <filename> is ignored
                        if specified.
 )")}},
+    {"info", {"info <filename>",
+              "Prints out image information including resolution, colorspace and pixel stats",
+              std::string(R"(
+    (No options)
+)")}},
     {"makeequiarea", {"makeequiarea [options] <filename>",
                       "Convert a equirectangular environment map (as used in pbrt-v3)\n"
                       "    to an equi-area parameterization (as used in pbrt-v4).",
@@ -381,6 +386,11 @@ int makesky(std::vector<std::string> args) {
 
     ImageMetadata metadata;
     metadata.colorSpace = colorSpace;
+    std::map<std::string, std::vector<std::string>> stringVectors;
+    stringVectors["makesky.albedo"] = { std::to_string(albedo) };
+    stringVectors["makesky.elevation"] = { std::to_string(elevation) };
+    stringVectors["makesky.turbidity"] = { std::to_string(turbidity) };
+    metadata.stringVectors = stringVectors;
     CHECK(img.Write(outfile, metadata));
 
     return 0;
