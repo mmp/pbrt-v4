@@ -872,14 +872,14 @@ int average(std::vector<std::string> args) {
     }
 
     // Compute average image
-    std::vector<Image> avgImages(MaxThreadIndex());
+    ThreadLocal<Image> avgImages;
     std::atomic<bool> failed{false};
 
     ParallelFor(0, filenames.size(), [&](size_t i) {
         ImageAndMetadata imRead = Image::Read(filenames[i]);
         Image &im = imRead.image;
 
-        Image &avg = avgImages[ThreadIndex];
+        Image &avg = avgImages.Get();
         if (avg.Resolution() == Point2i(0, 0))
             avg = Image(PixelFormat::Float, im.Resolution(), im.ChannelNames());
         else if (!checkImageCompatibility(filenames[i], im, filenames[0], avg)) {
@@ -904,10 +904,9 @@ int average(std::vector<std::string> args) {
 
     // Average per-thread average images
     Image avgImage;
-    for (const Image &im : avgImages) {
-        if (im.Resolution() == Point2i(0, 0))
-            continue;
-        else if (avgImage.Resolution() == Point2i(0, 0)) {
+    avgImages.ForAll([&](const Image &im) {
+        CHECK_NE(im.Resolution(), Point2i(0, 0));
+        if (avgImage.Resolution() == Point2i(0, 0)) {
             // First valid one
             avgImage = im;
         } else {
@@ -920,7 +919,7 @@ int average(std::vector<std::string> args) {
                                                 avgImage.GetChannel({x, y}, c) + v);
                     }
         }
-    }
+    });
 
     CHECK(avgImage.Write(avgFile));
 
@@ -981,15 +980,15 @@ int error(std::vector<std::string> args) {
 
     // Compute error and error image
     using MultiChannelVarianceEstimator = std::vector<VarianceEstimator<double>>;
-    std::vector<Array2D<MultiChannelVarianceEstimator>> pixelVariances(MaxThreadIndex());
-    for (auto &amcve : pixelVariances) {
-        amcve = Array2D<MultiChannelVarianceEstimator>(referenceImage.Resolution().x,
-                                                       referenceImage.Resolution().y);
+    ThreadLocal<Array2D<MultiChannelVarianceEstimator>> pixelVariances([&]() {
+        Array2D<MultiChannelVarianceEstimator> amcve(referenceImage.Resolution().x,
+                                                     referenceImage.Resolution().y);
         for (auto &mcve : amcve)
             mcve.resize(referenceImage.NChannels());
-    }
+        return amcve;
+    });
 
-    std::vector<double> sumErrors(MaxThreadIndex(), 0.);
+    ThreadLocal<double> sumErrors;
     std::vector<int> spp(filenames.size());
     std::atomic<bool> failed{false};
     ParallelFor(0, filenames.size(), [&](size_t i) {
@@ -1008,12 +1007,12 @@ int error(std::vector<std::string> args) {
             error = im.MSE(im.AllChannelsDesc(), referenceImage, &diffImage);
         else
             error = im.MRSE(im.AllChannelsDesc(), referenceImage, &diffImage);
-        sumErrors[ThreadIndex] += error.Average();
+        sumErrors.Get() += error.Average();
 
         for (int y = 0; y < im.Resolution().y; ++y)
             for (int x = 0; x < im.Resolution().x; ++x) {
                 MultiChannelVarianceEstimator &pixelVariance =
-                    pixelVariances[ThreadIndex](x, y);
+                    pixelVariances.Get()(x, y);
                 for (int c = 0; c < im.NChannels(); ++c)
                     if (metric == "MRSE")
                         pixelVariance[c].Add(
@@ -1035,18 +1034,20 @@ int error(std::vector<std::string> args) {
     if (failed)
         return 1;
 
-    double sumError = std::accumulate(sumErrors.begin(), sumErrors.end(), 0.);
+    double sumError = 0.;
+    sumErrors.ForAll([&sumError](double err) { sumError += err; });
 
     Array2D<MultiChannelVarianceEstimator> pixelVariance(referenceImage.Resolution().x,
                                                          referenceImage.Resolution().y);
     for (auto &mcve : pixelVariance)
         mcve.resize(referenceImage.NChannels());
 
-    for (const auto &pixVar : pixelVariances)
+    pixelVariances.ForAll([&](const auto &pixVar) {
         for (int y = 0; y < referenceImage.Resolution().y; ++y)
             for (int x = 0; x < referenceImage.Resolution().x; ++x)
                 for (int c = 0; c < referenceImage.NChannels(); ++c)
                     pixelVariance(x, y)[c].Merge(pixVar(x, y)[c]);
+    });
 
     Image errorImage(PixelFormat::Float,
                      {referenceImage.Resolution().x, referenceImage.Resolution().y},
