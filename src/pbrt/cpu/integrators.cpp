@@ -76,7 +76,7 @@ void ImageTileIntegrator::Render() {
         int sampleIndex = c[2];
 
         ScratchBuffer scratchBuffer(65536);
-        Sampler tileSampler = samplerPrototype.Clone(1, Allocator())[0];
+        Sampler tileSampler = samplerPrototype.Clone(Allocator());
         tileSampler.StartPixelSample(pPixel, sampleIndex);
 
         EvaluatePixelSample(pPixel, sampleIndex, tileSampler, scratchBuffer);
@@ -94,11 +94,8 @@ void ImageTileIntegrator::Render() {
     });
 
     // Declare common variables for rendering image in tiles
-    std::vector<ScratchBuffer> scratchBuffers;
-    for (int i = 0; i < MaxThreadIndex(); ++i)
-        scratchBuffers.push_back(ScratchBuffer(65536));
-
-    std::vector<Sampler> samplers = samplerPrototype.Clone(MaxThreadIndex());
+    ThreadLocal<ScratchBuffer> scratchBuffers([]() { return ScratchBuffer(65536); } );
+    ThreadLocal<Sampler> samplers([this]() { return samplerPrototype.Clone(); });
 
     Bounds2i pixelBounds = camera.GetFilm().PixelBounds();
     int spp = samplerPrototype.SamplesPerPixel();
@@ -163,8 +160,8 @@ void ImageTileIntegrator::Render() {
         // Render current wave's image tiles in parallel
         ParallelFor2D(pixelBounds, [&](Bounds2i tileBounds) {
             // Render image tile given by _tileBounds_
-            ScratchBuffer &scratchBuffer = scratchBuffers[ThreadIndex];
-            Sampler &sampler = samplers[ThreadIndex];
+            ScratchBuffer &scratchBuffer = scratchBuffers.Get();
+            Sampler &sampler = samplers.Get();
             PBRT_DBG("Starting image tile (%d,%d)-(%d,%d) waveStart %d, waveEnd %d\n",
                      tileBounds.pMin.x, tileBounds.pMin.y, tileBounds.pMax.x,
                      tileBounds.pMax.y, waveStart, waveEnd);
@@ -2542,14 +2539,12 @@ void MLTIntegrator::Render() {
     int nBootstrapSamples = nBootstrap * (maxDepth + 1);
     std::vector<Float> bootstrapWeights(nBootstrapSamples, 0);
     // Allocate scratch buffers for MLT samples
-    std::vector<ScratchBuffer> threadScratchBuffers;
-    for (int i = 0; i < MaxThreadIndex(); ++i)
-        threadScratchBuffers.push_back(ScratchBuffer(65536));
+    ThreadLocal<ScratchBuffer> threadScratchBuffers([]() { return ScratchBuffer(65536); });
 
     // Generate bootstrap samples in parallel
     ProgressReporter progress(nBootstrap, "Generating bootstrap paths", Options->quiet);
     ParallelFor(0, nBootstrap, [&](int64_t start, int64_t end) {
-        ScratchBuffer &buf = threadScratchBuffers[ThreadIndex];
+        ScratchBuffer &buf = threadScratchBuffers.Get();
         for (int64_t i = start; i < end; ++i) {
             // Generate _i_th bootstrap sample
             for (int depth = 0; depth <= maxDepth; ++depth) {
@@ -2608,7 +2603,7 @@ void MLTIntegrator::Render() {
     ProgressReporter progressRender(nChains, "Rendering", Options->quiet);
     // Run _nChains_ Markov chains in parallel
     ParallelFor(0, nChains, [&](int i) {
-        ScratchBuffer &scratchBuffer = threadScratchBuffers[ThreadIndex];
+        ScratchBuffer &scratchBuffer = threadScratchBuffers.Get();
         // Compute number of mutations to apply in current Markov chain
         int64_t nChainMutations =
             std::min((i + 1) * nTotalMutations / nChains, nTotalMutations) -
@@ -2794,15 +2789,15 @@ void SPPMIntegrator::Render() {
     PowerLightSampler shootLightSampler(lights, Allocator());
 
     // Allocate per-thread _ScratchBuffer_s for SPPM rendering
-    std::vector<ScratchBuffer> threadScratchBuffers;
-    for (int i = 0; i < MaxThreadIndex(); ++i) {
-        size_t allocSize = size_t(nPixels) * 4096 / MaxThreadIndex();
-        threadScratchBuffers.push_back(ScratchBuffer(allocSize));
-    }
+    ThreadLocal<ScratchBuffer> threadScratchBuffers([nPixels]() {
+        size_t allocSize = size_t(nPixels) * 4096 / RunningThreads();
+        return ScratchBuffer(allocSize);
+    });
 
     // Allocate samplers for SPPM rendering
-    std::vector<Sampler> threadSamplers =
-        samplerPrototype.Clone(MaxThreadIndex(), Allocator());
+    ThreadLocal<Sampler> threadSamplers([this]() {
+        return samplerPrototype.Clone(Allocator());
+    });
     pstd::vector<DigitPermutation> *digitPermutations(
         ComputeRadicalInversePermutations(digitPermutationsSeed));
 
@@ -2834,8 +2829,8 @@ void SPPMIntegrator::Render() {
 
         ParallelFor2D(pixelBounds, [&](Bounds2i tileBounds) {
             // Follow camera paths for _tileBounds_ in image for SPPM
-            ScratchBuffer &scratchBuffer = threadScratchBuffers[ThreadIndex];
-            Sampler sampler = threadSamplers[ThreadIndex];
+            ScratchBuffer &scratchBuffer = threadScratchBuffers.Get();
+            Sampler sampler = threadSamplers.Get();
             for (Point2i pPixel : tileBounds) {
                 sampler.StartPixelSample(pPixel, iter);
                 // Generate camera ray for pixel for SPPM
@@ -2982,7 +2977,7 @@ void SPPMIntegrator::Render() {
 
         // Add visible points to SPPM grid
         ParallelFor2D(pixelBounds, [&](Bounds2i tileBounds) {
-            ScratchBuffer &scratchBuffer = threadScratchBuffers[ThreadIndex];
+            ScratchBuffer &scratchBuffer = threadScratchBuffers.Get();
             for (Point2i pPixel : tileBounds) {
                 SPPMPixel &pixel = pixels[pPixel];
                 if (pixel.vp.beta) {
@@ -3018,14 +3013,12 @@ void SPPMIntegrator::Render() {
 
         // Trace photons and accumulate contributions
         // Create per-thread scratch buffers for photon shooting
-        std::vector<ScratchBuffer> photonShootScratchBuffers;
-        for (int i = 0; i < MaxThreadIndex(); ++i)
-            photonShootScratchBuffers.push_back(ScratchBuffer(65536));
+        ThreadLocal<ScratchBuffer> photonShootScratchBuffers([]() { return ScratchBuffer(65536); });
 
         ParallelFor(0, photonsPerIteration, [&](int64_t start, int64_t end) {
             // Follow photon paths for photon index range _start_ - _end_
-            ScratchBuffer &scratchBuffer = photonShootScratchBuffers[ThreadIndex];
-            Sampler sampler = threadSamplers[ThreadIndex];
+            ScratchBuffer &scratchBuffer = photonShootScratchBuffers.Get();
+            Sampler sampler = threadSamplers.Get();
             for (int64_t photonIndex = start; photonIndex < end; ++photonIndex) {
                 // Follow photon path for _photonIndex_
                 // Define sampling lambda functions for photon shooting
@@ -3148,8 +3141,9 @@ void SPPMIntegrator::Render() {
             }
         });
         // Reset _threadScratchBuffers_ after tracing photons
-        for (ScratchBuffer &scratchBuffer : threadScratchBuffers)
-            scratchBuffer.Reset();
+        threadScratchBuffers.ForAll([](ScratchBuffer &buffer) {
+            buffer.Reset();
+        });
 
         progress.Update();
         photonPaths += photonsPerIteration;
@@ -3412,7 +3406,7 @@ void FunctionIntegrator::Render() {
         }
     }
 
-    std::vector<Sampler> threadSamplers = baseSampler.Clone(MaxThreadIndex());
+    ThreadLocal<Sampler> threadSamplers([this]() { return baseSampler.Clone({}); });
     for (int sampleIndex = 0; sampleIndex < nSamples; ++sampleIndex) {
         if (isStratified) {
             int spp = sampleIndex + 1;
@@ -3440,7 +3434,7 @@ void FunctionIntegrator::Render() {
             });
         } else {
             ParallelFor2D(pixelBounds, [&](Point2i pPixel) {
-                Sampler &sampler = threadSamplers[ThreadIndex];
+                Sampler sampler = threadSamplers.Get();
                 sampler.StartPixelSample(pPixel, sampleIndex, 0);
 
                 Point2f u;

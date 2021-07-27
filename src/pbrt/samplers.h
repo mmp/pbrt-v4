@@ -91,7 +91,7 @@ class HaltonSampler {
                 RadicalInverse(1, haltonIndex / baseScales[1])};
     }
 
-    std::vector<Sampler> Clone(int n, Allocator alloc);
+    Sampler Clone(Allocator alloc);
     std::string ToString() const;
 
   private:
@@ -193,7 +193,7 @@ class PaddedSobolSampler {
     PBRT_CPU_GPU
     Point2f GetPixel2D() { return Get2D(); }
 
-    std::vector<Sampler> Clone(int n, Allocator alloc);
+    Sampler Clone(Allocator alloc);
     std::string ToString() const;
 
   private:
@@ -290,7 +290,7 @@ class ZSobolSampler {
     PBRT_CPU_GPU
     Point2f GetPixel2D() { return Get2D(); }
 
-    std::vector<Sampler> Clone(int n, Allocator alloc);
+    Sampler Clone(Allocator alloc);
     std::string ToString() const;
 
     PBRT_CPU_GPU
@@ -422,7 +422,7 @@ class PMJ02BNSampler {
         return {std::min(u.x, OneMinusEpsilon), std::min(u.y, OneMinusEpsilon)};
     }
 
-    std::vector<Sampler> Clone(int n, Allocator alloc);
+    Sampler Clone(Allocator alloc);
     std::string ToString() const;
 
   private:
@@ -462,7 +462,7 @@ class IndependentSampler {
     PBRT_CPU_GPU
     Point2f GetPixel2D() { return Get2D(); }
 
-    std::vector<Sampler> Clone(int n, Allocator alloc);
+    Sampler Clone(Allocator alloc);
     std::string ToString() const;
 
   private:
@@ -531,7 +531,7 @@ class SobolSampler {
         return u;
     }
 
-    std::vector<Sampler> Clone(int n, Allocator alloc);
+    Sampler Clone(Allocator alloc);
     std::string ToString() const;
 
   private:
@@ -614,7 +614,7 @@ class StratifiedSampler {
     PBRT_CPU_GPU
     Point2f GetPixel2D() { return Get2D(); }
 
-    std::vector<Sampler> Clone(int n, Allocator alloc);
+    Sampler Clone(Allocator alloc);
     std::string ToString() const;
 
   private:
@@ -668,7 +668,7 @@ class MLTSampler {
     PBRT_CPU_GPU
     Point2f GetPixel2D();
 
-    std::vector<Sampler> Clone(int n, Allocator alloc);
+    Sampler Clone(Allocator alloc);
 
     PBRT_CPU_GPU
     void Accept();
