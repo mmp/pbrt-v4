@@ -8,6 +8,7 @@
 #include <pbrt/pbrt.h>
 
 #include <pbrt/cpu/primitive.h>
+#include <pbrt/util/parallel.h>
 
 #include <atomic>
 #include <memory>
@@ -42,7 +43,7 @@ class BVHAggregate {
 
   private:
     // BVHAggregate Private Methods
-    BVHBuildNode *buildRecursive(std::vector<Allocator> &threadAllocators,
+    BVHBuildNode *buildRecursive(ThreadLocal<Allocator> &threadAllocators,
                                  pstd::span<BVHPrimitive> bvhPrimitives,
                                  std::atomic<int> *totalNodes,
                                  std::atomic<int> *orderedPrimsOffset,

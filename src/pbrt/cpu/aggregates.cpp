@@ -153,11 +153,12 @@ BVHAggregate::BVHAggregate(std::vector<Primitive> prims, int maxPrimsInNode,
     // Declare _Allocator_s used for BVH construction
     pstd::pmr::monotonic_buffer_resource resource;
     Allocator alloc(&resource);
-    int nThreads = MaxThreadIndex();
-    std::vector<pstd::pmr::monotonic_buffer_resource> threadResources(nThreads);
-    std::vector<Allocator> threadAllocators;
-    for (size_t i = 0; i < nThreads; ++i)
-        threadAllocators.push_back(Allocator(&threadResources[i]));
+    std::vector<std::unique_ptr<pstd::pmr::monotonic_buffer_resource>> threadBufferResources;
+    ThreadLocal<Allocator> threadAllocators([&threadBufferResources]() {
+        threadBufferResources.push_back(std::make_unique<pstd::pmr::monotonic_buffer_resource>());
+        auto ptr = threadBufferResources.back().get();
+        return Allocator(ptr);
+    });
 
     std::vector<Primitive> orderedPrims(primitives.size());
     BVHBuildNode *root;
@@ -186,13 +187,13 @@ BVHAggregate::BVHAggregate(std::vector<Primitive> prims, int maxPrimsInNode,
     CHECK_EQ(totalNodes.load(), offset);
 }
 
-BVHBuildNode *BVHAggregate::buildRecursive(std::vector<Allocator> &threadAllocators,
+BVHBuildNode *BVHAggregate::buildRecursive(ThreadLocal<Allocator> &threadAllocators,
                                            pstd::span<BVHPrimitive> bvhPrimitives,
                                            std::atomic<int> *totalNodes,
                                            std::atomic<int> *orderedPrimsOffset,
                                            std::vector<Primitive> &orderedPrims) {
     DCHECK_NE(bvhPrimitives.size(), 0);
-    Allocator alloc = threadAllocators[ThreadIndex];
+    Allocator alloc = threadAllocators.Get();
     BVHBuildNode *node = alloc.new_object<BVHBuildNode>();
     // Initialize _BVHBuildNode_ for primitive range
     ++*totalNodes;
