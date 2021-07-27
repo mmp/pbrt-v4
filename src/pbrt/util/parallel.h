@@ -254,16 +254,12 @@ inline void ParallelFor2D(const Bounds2i &extent, std::function<void(Point2i)> f
 
 void ForEachThread(std::function<void(void)> func);
 
-// ThreadIndex Declaration
-extern thread_local int ThreadIndex;
-
 // ParallelFunction Declarations
 void ParallelInit(int nThreads = -1);
 void ParallelCleanup();
 
 int AvailableCores();
 int RunningThreads();
-int MaxThreadIndex();
 
 }  // namespace pbrt
 

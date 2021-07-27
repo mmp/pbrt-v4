@@ -87,7 +87,7 @@ class ThreadPool {
 
   private:
     // ThreadPool Private Methods
-    void workerFunc(int tIndex);
+    void workerFunc(int index);
 
     // ThreadPool Private Members
     std::vector<std::thread> threads;
@@ -97,21 +97,16 @@ class ThreadPool {
     std::condition_variable jobListCondition;
 };
 
-thread_local int ThreadIndex;
-
 static std::unique_ptr<ThreadPool> threadPool;
-static bool maxThreadIndexCalled = false;
 
 // ThreadPool Method Definitions
 ThreadPool::ThreadPool(int nThreads) {
-    ThreadIndex = 0;
     for (int i = 0; i < nThreads - 1; ++i)
         threads.push_back(std::thread(&ThreadPool::workerFunc, this, i + 1));
 }
 
-void ThreadPool::workerFunc(int tIndex) {
-    LOG_VERBOSE("Started execution in worker thread %d", tIndex);
-    ThreadIndex = tIndex;
+void ThreadPool::workerFunc(int index) {
+    LOG_VERBOSE("Started execution in worker thread %d", index);
 
 #ifdef PBRT_BUILD_GPU_RENDERER
     GPUThreadInit();
@@ -121,7 +116,7 @@ void ThreadPool::workerFunc(int tIndex) {
     while (!shutdownThreads)
         WorkOrWait(&lock);
 
-    LOG_VERBOSE("Exiting worker thread %d", tIndex);
+    LOG_VERBOSE("Exiting worker thread %d", index);
 }
 
 std::unique_lock<std::mutex> ThreadPool::AddToJobList(ParallelJob *job) {
@@ -323,11 +318,6 @@ void ParallelFor(int64_t start, int64_t end, std::function<void(int64_t, int64_t
         threadPool->WorkOrWait(&lock);
 }
 
-int MaxThreadIndex() {
-    maxThreadIndexCalled = true;
-    return threadPool ? (1 + threadPool->size()) : 1;
-}
-
 void ParallelFor2D(const Bounds2i &extent, std::function<void(Bounds2i)> func) {
     CHECK(threadPool);
 
@@ -364,11 +354,6 @@ int RunningThreads() {
 }
 
 void ParallelInit(int nThreads) {
-    // This is risky: if the caller has allocated per-thread data
-    // structures before calling ParallelInit(), then we may end up having
-    // them accessed with a higher ThreadIndex than the caller expects.
-    CHECK(!maxThreadIndexCalled);
-
     CHECK(!threadPool);
     if (nThreads <= 0)
         nThreads = AvailableCores();
@@ -377,7 +362,6 @@ void ParallelInit(int nThreads) {
 
 void ParallelCleanup() {
     threadPool.reset();
-    maxThreadIndexCalled = false;
 }
 
 void ForEachThread(std::function<void(void)> func) {

@@ -40,7 +40,7 @@ TEST(Parallel, DoNothing) {
 }
 
 TEST(Parallel, ForEachThread) {
-    std::atomic<int> count{MaxThreadIndex()};
+    std::atomic<int> count{RunningThreads()};
     ForEachThread([&count] { --count; });
     EXPECT_EQ(0, count);
 }

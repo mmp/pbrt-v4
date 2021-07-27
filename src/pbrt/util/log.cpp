@@ -32,6 +32,7 @@
 #endif
 #ifdef PBRT_IS_LINUX
 #include <sys/types.h>
+#include <sys/syscall.h>
 #include <time.h>
 #include <unistd.h>
 #endif
@@ -56,8 +57,23 @@ float ElapsedSeconds() {
     return elapseduS / 1000000.;
 }
 
+uint32_t GetThreadIndex() {
+#ifdef PBRT_IS_LINUX
+    unsigned int tid = syscall(SYS_gettid);
+    return tid;
+#elif defined(PBRT_IS_WINDOWS)
+    return GetCurrentThreadId();
+#elif defined(PBRT_IS_OSX)
+    uint64_t tid;
+    CHECK_EQ(pthread_threadid_np(pthread_self(), &tid), 0);
+    return tid;
+#else
+#error "Need to define GetThreadIndex() for system"
+#endif
+}
+
 #define LOG_BASE_FMT "tid %03d @ %9.3fs"
-#define LOG_BASE_ARGS ThreadIndex, ElapsedSeconds()
+#define LOG_BASE_ARGS GetThreadIndex(), ElapsedSeconds()
 
 }  // namespace
 

@@ -768,7 +768,7 @@ void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
                     if (timport) {
                         ParsedScene *importScene = parsedScene->CopyForImport();
 
-                        static int maxThreads = MaxThreadIndex();
+                        static int maxThreads = RunningThreads();
                         if (maxThreads == 1) {
                             parse(importScene, std::move(timport));
                             parsedScene->MergeImported(importScene);
