@@ -83,7 +83,8 @@ class WavefrontPathIntegrator {
 
     void UpdateFilm();
 
-    WavefrontPathIntegrator(Allocator alloc, ParsedScene &scene);
+    WavefrontPathIntegrator(pstd::pmr::memory_resource *memoryResource,
+                            ParsedScene &scene);
 
     template <typename F>
     void ParallelFor(const char *description, int nItems, F &&func) {
@@ -117,6 +118,7 @@ class WavefrontPathIntegrator {
     }
 
     // WavefrontPathIntegrator Member Variables
+    pstd::pmr::memory_resource *memoryResource;
     bool initializeVisibleSurface;
     bool haveSubsurface;
     bool haveMedia;

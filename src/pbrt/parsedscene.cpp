@@ -88,7 +88,7 @@ STAT_PERCENT("Geometry/TransformCache hits", nTransformCacheHits, nTransformCach
 // TransformCache Method Definitions
 TransformCache::TransformCache()
 #ifdef PBRT_BUILD_GPU_RENDERER
-    : bufferResource(Options->useGPU ? gpuMemoryAllocator.resource()
+    : bufferResource(Options->useGPU ? &CUDATrackedMemoryResource::singleton
                                      : Allocator().resource()),
 #else
     : bufferResource(Allocator().resource()),
@@ -784,7 +784,7 @@ void ParsedScene::AreaLightSource(const std::string &name, ParsedParameterVector
 }
 
 void ParsedScene::CreateMaterials(
-    const NamedTextures &textures, Allocator alloc,
+    const NamedTextures &textures, const std::vector<Allocator> &threadAllocators,
     std::map<std::string, pbrt::Material> *namedMaterialsOut,
     std::vector<pbrt::Material> *materialsOut) const {
     // First, load all of the normal maps in parallel.
@@ -809,6 +809,8 @@ void ParsedScene::CreateMaterials(
     std::mutex mutex;
     ParallelFor(0, normalMapFilenameVector.size(), [&](int64_t index) {
         std::string filename = normalMapFilenameVector[index];
+        Allocator alloc = threadAllocators[ThreadIndex];
+
         ImageAndMetadata immeta =
             Image::Read(filename, Allocator(), ColorEncoding::Linear);
         Image &image = immeta.image;
@@ -827,6 +829,7 @@ void ParsedScene::CreateMaterials(
 
     // Named materials
     for (const auto &nm : namedMaterials) {
+        Allocator alloc = threadAllocators[ThreadIndex];
         const std::string &name = nm.first;
         const SceneEntity &mtl = nm.second;
         if (namedMaterialsOut->find(name) != namedMaterialsOut->end()) {
@@ -855,6 +858,7 @@ void ParsedScene::CreateMaterials(
     // Regular materials
     materialsOut->reserve(materials.size());
     for (const auto &mtl : materials) {
+        Allocator alloc = threadAllocators[ThreadIndex];
         std::string fn = mtl.parameters.GetOneString("normalmap", "");
         Image *normalMap = !fn.empty() ? normalMapCache[fn] : nullptr;
 
@@ -865,7 +869,8 @@ void ParsedScene::CreateMaterials(
     }
 }
 
-NamedTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
+NamedTextures ParsedScene::CreateTextures(const std::vector<Allocator> &threadAllocators,
+                                          bool gpu) const {
     NamedTextures textures;
 
     std::set<std::string> seenFloatTextureFilenames, seenSpectrumTextureFilenames;
@@ -946,6 +951,7 @@ NamedTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
 
     ParallelFor(0, parallelFloatTextures.size(), [&](int64_t i) {
         const auto &tex = floatTextures[parallelFloatTextures[i]];
+        Allocator alloc = threadAllocators[ThreadIndex];
 
         pbrt::Transform renderFromTexture = tex.second.renderFromObject.startTransform;
         // Pass nullptr for the textures, since they shouldn't be accessed
@@ -959,6 +965,7 @@ NamedTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
 
     ParallelFor(0, parallelSpectrumTextures.size(), [&](int64_t i) {
         const auto &tex = spectrumTextures[parallelSpectrumTextures[i]];
+        Allocator alloc = threadAllocators[ThreadIndex];
 
         pbrt::Transform renderFromTexture = tex.second.renderFromObject.startTransform;
         // nullptr for the textures, as above.
@@ -984,6 +991,7 @@ NamedTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
     // And do the rest serially
     for (size_t index : serialFloatTextures) {
         const auto &tex = floatTextures[index];
+        Allocator alloc = threadAllocators[ThreadIndex];
 
         pbrt::Transform renderFromTexture = tex.second.renderFromObject.startTransform;
         TextureParameterDictionary texDict(&tex.second.parameters, &textures);
@@ -993,6 +1001,7 @@ NamedTextures ParsedScene::CreateTextures(Allocator alloc, bool gpu) const {
     }
     for (size_t index : serialSpectrumTextures) {
         const auto &tex = spectrumTextures[index];
+        Allocator alloc = threadAllocators[ThreadIndex];
 
         if (tex.second.renderFromObject.IsAnimated())
             Warning(&tex.second.loc, "Animated world to texture transform not supported. "
@@ -1141,11 +1150,12 @@ std::vector<Light> ParsedScene::CreateLights(
 }
 
 Primitive ParsedScene::CreateAggregate(
-    Allocator alloc, const NamedTextures &textures,
+    const NamedTextures &textures,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
     const std::map<std::string, Medium> &media,
     const std::map<std::string, pbrt::Material> &namedMaterials,
     const std::vector<pbrt::Material> &materials) {
+    Allocator alloc;
     auto findMedium = [&media](const std::string &s, const FileLoc *loc) -> Medium {
         if (s.empty())
             return nullptr;

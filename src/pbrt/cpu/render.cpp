@@ -22,6 +22,7 @@ namespace pbrt {
 
 void RenderCPU(ParsedScene &parsedScene) {
     Allocator alloc;
+    std::vector<Allocator> threadAllocators(MaxThreadIndex());
 
     // Create media first (so have them for the camera...)
     std::map<std::string, Medium> media = parsedScene.CreateMedia(alloc);
@@ -72,7 +73,7 @@ void RenderCPU(ParsedScene &parsedScene) {
 
     // Textures
     LOG_VERBOSE("Starting textures");
-    NamedTextures textures = parsedScene.CreateTextures(alloc, false);
+    NamedTextures textures = parsedScene.CreateTextures(threadAllocators, false);
     LOG_VERBOSE("Finished textures");
 
     // Lights
@@ -83,10 +84,10 @@ void RenderCPU(ParsedScene &parsedScene) {
     LOG_VERBOSE("Starting materials");
     std::map<std::string, pbrt::Material> namedMaterials;
     std::vector<pbrt::Material> materials;
-    parsedScene.CreateMaterials(textures, alloc, &namedMaterials, &materials);
+    parsedScene.CreateMaterials(textures, threadAllocators, &namedMaterials, &materials);
     LOG_VERBOSE("Finished materials");
 
-    Primitive accel = parsedScene.CreateAggregate(alloc, textures, shapeIndexToAreaLights,
+    Primitive accel = parsedScene.CreateAggregate(textures, shapeIndexToAreaLights,
                                                   media, namedMaterials, materials);
 
     // Integrator

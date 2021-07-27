@@ -61,13 +61,18 @@ void InitPBRT(const PBRTOptions &opt) {
 
         CUDA_CHECK(cudaMemcpyToSymbol(OptionsGPU, Options, sizeof(OptionsGPU)));
 
-        ColorEncoding::Init(gpuMemoryAllocator);
-        Spectra::Init(gpuMemoryAllocator);
-        RGBToSpectrumTable::Init(gpuMemoryAllocator);
+        // Leak so things aren't freed
+        pstd::pmr::monotonic_buffer_resource *bufferResource = new
+            pstd::pmr::monotonic_buffer_resource(1024*1024, &CUDATrackedMemoryResource::singleton);
+        Allocator alloc(bufferResource);
 
-        RGBColorSpace::Init(gpuMemoryAllocator);
-        Triangle::Init(gpuMemoryAllocator);
-        BilinearPatch::Init(gpuMemoryAllocator);
+        ColorEncoding::Init(alloc);
+        Spectra::Init(alloc);
+        RGBToSpectrumTable::Init(alloc);
+
+        RGBColorSpace::Init(alloc);
+        Triangle::Init(alloc);
+        BilinearPatch::Init(alloc);
 #else
         LOG_FATAL("Options::useGPU set with non-GPU build");
 #endif

@@ -330,9 +330,11 @@ class ParsedScene : public SceneRepresentation {
 
     std::string ToString() const;
 
-    NamedTextures CreateTextures(Allocator alloc, bool gpu) const;
+    NamedTextures CreateTextures(const std::vector<Allocator> &threadAllocators,
+                                 bool gpu) const;
 
-    void CreateMaterials(const NamedTextures &sceneTextures, Allocator alloc,
+    void CreateMaterials(const NamedTextures &sceneTextures,
+                         const std::vector<Allocator> &threadAllocators,
                          std::map<std::string, pbrt::Material> *namedMaterials,
                          std::vector<pbrt::Material> *materials) const;
 
@@ -344,7 +346,7 @@ class ParsedScene : public SceneRepresentation {
         std::map<int, pstd::vector<Light> *> *shapeIndexToAreaLights);
 
     Primitive CreateAggregate(
-        Allocator alloc, const NamedTextures &textures,
+        const NamedTextures &textures,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
         const std::map<std::string, Medium> &media,
         const std::map<std::string, pbrt::Material> &namedMaterials,

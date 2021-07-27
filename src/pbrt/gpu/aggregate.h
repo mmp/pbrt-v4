@@ -8,6 +8,7 @@
 #include <pbrt/pbrt.h>
 
 #include <pbrt/gpu/optix.h>
+#include <pbrt/gpu/memory.h>
 #include <pbrt/parsedscene.h>
 #include <pbrt/util/containers.h>
 #include <pbrt/util/pstd.h>
@@ -28,11 +29,12 @@ namespace pbrt {
 
 class OptiXAggregate : public WavefrontAggregate {
   public:
-    OptiXAggregate(const ParsedScene &scene, Allocator alloc, NamedTextures &textures,
-             const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-             const std::map<std::string, Medium> &media,
-             const std::map<std::string, pbrt::Material> &namedMaterials,
-             const std::vector<pbrt::Material> &materials);
+    OptiXAggregate(const ParsedScene &scene, CUDATrackedMemoryResource *memoryResource,
+                   NamedTextures &textures,
+                   const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
+                   const std::map<std::string, Medium> &media,
+                   const std::map<std::string, pbrt::Material> &namedMaterials,
+                   const std::vector<pbrt::Material> &materials);
 
     Bounds3f Bounds() const { return bounds; }
 
@@ -83,7 +85,7 @@ class OptiXAggregate : public WavefrontAggregate {
         const std::vector<Material> &materials,
         const std::map<std::string, Medium> &media,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-        Allocator alloc);
+        const std::vector<Allocator> &threadAllocators);
 
     static BilinearPatchMesh *diceCurveToBLP(const ShapeSceneEntity &shape,
                                              int nDiceU, int nDiceV, Allocator alloc);
@@ -96,7 +98,7 @@ class OptiXAggregate : public WavefrontAggregate {
         const std::vector<Material> &materials,
         const std::map<std::string, Medium> &media,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-        Allocator alloc);
+        const std::vector<Allocator> &threadAllocators);
 
     static ASBuildInput createBuildInputForQuadrics(
         const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
@@ -106,7 +108,7 @@ class OptiXAggregate : public WavefrontAggregate {
         const std::vector<Material> &materials,
         const std::map<std::string, Medium> &media,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-        Allocator alloc);
+        const std::vector<Allocator> &threadAllocators);
 
     int addHGRecords(const ASBuildInput &buildInput);
 
@@ -121,7 +123,7 @@ class OptiXAggregate : public WavefrontAggregate {
     OptixTraversableHandle buildBVH(const std::vector<OptixBuildInput> &buildInputs,
                                     cudaStream_t stream = 0);
 
-    Allocator alloc;
+    CUDATrackedMemoryResource *memoryResource;
     Bounds3f bounds;
     CUstream cudaStream;
     OptixDeviceContext optixContext;

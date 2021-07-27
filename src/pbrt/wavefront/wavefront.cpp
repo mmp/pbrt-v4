@@ -23,17 +23,18 @@ void RenderWavefront(ParsedScene &scene) {
         // members (e.g. maxDepth) concurrently while the GPU is rendering.  In
         // turn, the lambda capture for GPU kernels has to capture *this by
         // value (see the definition of PBRT_CPU_GPU_LAMBDA in pbrt/pbrt.h.).
-        integrator = new WavefrontPathIntegrator(gpuMemoryAllocator, scene);
+        integrator = new WavefrontPathIntegrator(&CUDATrackedMemoryResource::singleton, scene);
 #else
         // With more capable unified memory, the WavefrontPathIntegrator can live in
-        // unified memory and some cudaMemAdvise calls, to come shortly, let us
+        // unified memory.  Some cudaMemAdvise calls, to come shortly, let us
         // have fast read-only access to it on the CPU.
-        integrator =
-            gpuMemoryAllocator.new_object<WavefrontPathIntegrator>(gpuMemoryAllocator, scene);
+        Allocator alloc(&CUDATrackedMemoryResource::singleton);
+        integrator = alloc.new_object<WavefrontPathIntegrator>(&CUDATrackedMemoryResource::singleton, scene);
 #endif
     } else
 #endif // PBRT_BUILD_GPU_RENDERER
-        integrator = new WavefrontPathIntegrator(Allocator(), scene);
+        integrator = new WavefrontPathIntegrator(pstd::pmr::get_default_resource(),
+                                                 scene);
 
     ///////////////////////////////////////////////////////////////////////////
     // Render!

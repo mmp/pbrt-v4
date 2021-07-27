@@ -43,31 +43,13 @@ class CUDATrackedMemoryResource : public CUDAMemoryResource {
     void PrefetchToGPU() const;
     size_t BytesAllocated() const { return bytesAllocated; }
 
-  private:
-    bool bypassSlab(size_t size) const {
-#ifdef PBRT_DEBUG_BUILD
-        return true;
-#else
-        return size > slabSize / 4;
-#endif
-    }
+    static CUDATrackedMemoryResource singleton;
 
-    void *cudaAllocate(size_t size, size_t alignment);
-
-    static constexpr int slabSize = 1024 * 1024;
-    struct alignas(64) Slab {
-        uint8_t *ptr = nullptr;
-        size_t offset = slabSize;
-    };
-    static constexpr int maxThreads = 256;
-    Slab threadSlabs[maxThreads];
-
+   private:
     mutable std::mutex mutex;
     std::atomic<size_t> bytesAllocated{};
     std::unordered_map<void *, size_t> allocations;
 };
-
-extern Allocator gpuMemoryAllocator;
 
 #endif
 

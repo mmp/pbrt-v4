@@ -21,12 +21,12 @@
 namespace pbrt {
 
 CPUAggregate::CPUAggregate(
-    ParsedScene &scene, Allocator alloc, NamedTextures &textures,
+    ParsedScene &scene, NamedTextures &textures,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
     const std::map<std::string, Medium> &media,
     const std::map<std::string, pbrt::Material> &namedMaterials,
     const std::vector<pbrt::Material> &materials) {
-    aggregate = scene.CreateAggregate(alloc, textures, shapeIndexToAreaLights, media,
+    aggregate = scene.CreateAggregate(textures, shapeIndexToAreaLights, media,
                                       namedMaterials, materials);
 }
 

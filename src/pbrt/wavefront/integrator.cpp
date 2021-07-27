@@ -75,7 +75,18 @@ static void updateMaterialNeeds(
         (*haveUniversalEvalMaterial)[m.Tag()] = true;
 }
 
-WavefrontPathIntegrator::WavefrontPathIntegrator(Allocator alloc, ParsedScene &scene) {
+WavefrontPathIntegrator::WavefrontPathIntegrator(pstd::pmr::memory_resource *memoryResource,
+                                                 ParsedScene &scene)
+    : memoryResource(memoryResource) {
+    std::vector<pstd::pmr::monotonic_buffer_resource *> threadBufferResources;
+    for (int i = 0; i < MaxThreadIndex(); ++i)
+        threadBufferResources.push_back(new pstd::pmr::monotonic_buffer_resource(1024*1024, memoryResource));
+    std::vector<Allocator> threadAllocators;
+    for (size_t i = 0; i < threadBufferResources.size(); ++i)
+        threadAllocators.push_back(Allocator(threadBufferResources[i]));
+
+    Allocator alloc = threadAllocators[ThreadIndex];
+
     // Allocate all of the data structures that represent the scene...
     std::map<std::string, Medium> media = scene.CreateMedia(alloc);
 
@@ -134,7 +145,7 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(Allocator alloc, ParsedScene &s
 
     // Textures
     LOG_VERBOSE("Starting to create textures");
-    NamedTextures textures = scene.CreateTextures(alloc, Options->useGPU);
+    NamedTextures textures = scene.CreateTextures(threadAllocators, Options->useGPU);
     LOG_VERBOSE("Done creating textures");
 
     LOG_VERBOSE("Starting to create lights");
@@ -235,7 +246,7 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(Allocator alloc, ParsedScene &s
     LOG_VERBOSE("Starting to create materials");
     std::map<std::string, pbrt::Material> namedMaterials;
     std::vector<pbrt::Material> materials;
-    scene.CreateMaterials(textures, alloc, &namedMaterials, &materials);
+    scene.CreateMaterials(textures, threadAllocators, &namedMaterials, &materials);
 
     haveBasicEvalMaterial.fill(false);
     haveUniversalEvalMaterial.fill(false);
@@ -250,13 +261,16 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(Allocator alloc, ParsedScene &s
 
     if (Options->useGPU) {
 #ifdef PBRT_BUILD_GPU_RENDERER
-        aggregate = new OptiXAggregate(scene, alloc, textures, shapeIndexToAreaLights,
+        CUDATrackedMemoryResource *mr =
+            dynamic_cast<CUDATrackedMemoryResource *>(memoryResource);
+        CHECK(mr);
+        aggregate = new OptiXAggregate(scene, mr, textures, shapeIndexToAreaLights,
                                        media, namedMaterials, materials);
 #else
         LOG_FATAL("Options->useGPU was set without PBRT_BUILD_GPU_RENDERER enabled");
 #endif
     } else
-        aggregate = new CPUAggregate(scene, alloc, textures, shapeIndexToAreaLights,
+        aggregate = new CPUAggregate(scene, textures, shapeIndexToAreaLights,
                                      media, namedMaterials, materials);
 
     // Preprocess the light sources
@@ -297,12 +311,12 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(Allocator alloc, ParsedScene &s
     if (!Options->mseReferenceOutput.empty())
         Warning("The wavefront integrator does not support --mse-reference-out.");
 
-        ///////////////////////////////////////////////////////////////////////////
-        // Allocate storage for all of the queues/buffers...
+    ///////////////////////////////////////////////////////////////////////////
+    // Allocate storage for all of the queues/buffers...
 
 #ifdef PBRT_BUILD_GPU_RENDERER
     CUDATrackedMemoryResource *mr =
-        dynamic_cast<CUDATrackedMemoryResource *>(gpuMemoryAllocator.resource());
+        dynamic_cast<CUDATrackedMemoryResource *>(memoryResource);
     CHECK(mr);
     size_t startSize = mr->BytesAllocated();
 #endif  // PBRT_BUILD_GPU_RENDERER
@@ -397,7 +411,7 @@ Float WavefrontPathIntegrator::Render() {
             // ensures that there isn't a big performance hitch for the first batch
             // of rays as that stuff is copied over on demand.
             CUDATrackedMemoryResource *mr =
-                dynamic_cast<CUDATrackedMemoryResource *>(gpuMemoryAllocator.resource());
+                dynamic_cast<CUDATrackedMemoryResource *>(memoryResource);
             CHECK(mr);
             mr->PrefetchToGPU();
         } else {

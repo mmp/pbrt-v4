@@ -508,7 +508,7 @@ memory_resource *new_delete_resource() noexcept;
 memory_resource *set_default_resource(memory_resource *r) noexcept;
 memory_resource *get_default_resource() noexcept;
 
-class monotonic_buffer_resource : public memory_resource {
+class alignas(64) monotonic_buffer_resource : public memory_resource {
   public:
     explicit monotonic_buffer_resource(memory_resource *upstream)
         : upstreamResource(upstream) {}
