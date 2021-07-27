@@ -17,12 +17,13 @@
 #include <pbrt/shapes.h>
 #include <pbrt/textures.h>
 #include <pbrt/util/colorspace.h>
+#include <pbrt/util/parallel.h>
 
 namespace pbrt {
 
 void RenderCPU(ParsedScene &parsedScene) {
     Allocator alloc;
-    std::vector<Allocator> threadAllocators(MaxThreadIndex());
+    ThreadLocal<Allocator> threadAllocators([]() { return Allocator(); });
 
     // Create media first (so have them for the camera...)
     std::map<std::string, Medium> media = parsedScene.CreateMedia(alloc);

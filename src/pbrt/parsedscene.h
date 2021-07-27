@@ -12,6 +12,7 @@
 #include <pbrt/paramdict.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/memory.h>
+#include <pbrt/util/parallel.h>
 #include <pbrt/util/print.h>
 #include <pbrt/util/transform.h>
 
@@ -330,11 +331,11 @@ class ParsedScene : public SceneRepresentation {
 
     std::string ToString() const;
 
-    NamedTextures CreateTextures(const std::vector<Allocator> &threadAllocators,
+    NamedTextures CreateTextures(ThreadLocal<Allocator> &threadAllocators,
                                  bool gpu) const;
 
     void CreateMaterials(const NamedTextures &sceneTextures,
-                         const std::vector<Allocator> &threadAllocators,
+                         ThreadLocal<Allocator> &threadAllocators,
                          std::map<std::string, pbrt::Material> *namedMaterials,
                          std::vector<pbrt::Material> *materials) const;
 

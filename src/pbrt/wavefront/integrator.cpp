@@ -78,14 +78,13 @@ static void updateMaterialNeeds(
 WavefrontPathIntegrator::WavefrontPathIntegrator(pstd::pmr::memory_resource *memoryResource,
                                                  ParsedScene &scene)
     : memoryResource(memoryResource) {
-    std::vector<pstd::pmr::monotonic_buffer_resource *> threadBufferResources;
-    for (int i = 0; i < MaxThreadIndex(); ++i)
-        threadBufferResources.push_back(new pstd::pmr::monotonic_buffer_resource(1024*1024, memoryResource));
-    std::vector<Allocator> threadAllocators;
-    for (size_t i = 0; i < threadBufferResources.size(); ++i)
-        threadAllocators.push_back(Allocator(threadBufferResources[i]));
+    ThreadLocal<Allocator> threadAllocators([memoryResource]() {
+        pstd::pmr::monotonic_buffer_resource *resource =
+            new pstd::pmr::monotonic_buffer_resource(1024*1024, memoryResource);
+        return Allocator(resource);
+    });
 
-    Allocator alloc = threadAllocators[ThreadIndex];
+    Allocator alloc = threadAllocators.Get();
 
     // Allocate all of the data structures that represent the scene...
     std::map<std::string, Medium> media = scene.CreateMedia(alloc);
