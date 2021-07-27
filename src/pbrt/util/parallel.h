@@ -16,9 +16,85 @@
 #include <functional>
 #include <initializer_list>
 #include <mutex>
+#include <shared_mutex>
 #include <string>
+#include <thread>
+#include <vector>
 
 namespace pbrt {
+
+template <typename T, int maxThreads = 256>
+class ThreadLocal {
+public:
+    ThreadLocal()
+        : hashTable(maxThreads), create([]() { return T(); }) {}
+    ThreadLocal(std::function<T(void)> &&c)
+        : hashTable(maxThreads), create(c) {}
+
+    T &Get() {
+        std::thread::id tid = std::this_thread::get_id();
+        uint32_t hash = std::hash<std::thread::id>()(tid);
+        hash %= hashTable.size();
+        int step = 1;
+
+        mutex.lock_shared();
+        while (true) {
+            if (hashTable[hash] && hashTable[hash]->tid == tid) {
+                // Found it
+                T &threadLocal = hashTable[hash]->value;
+                mutex.unlock_shared();
+                return threadLocal;
+            } else if (!hashTable[hash]) {
+                mutex.unlock_shared();
+                T newItem = create();
+                mutex.lock();
+
+                if (hashTable[hash]) {
+                    // someone else got there first--keep looking, but now
+                    // with a writer lock.
+                    while (true) {
+                        hash += step;
+                        ++step;
+                        if (hash >= hashTable.size())
+                            hash %= hashTable.size();
+
+                        if (!hashTable[hash])
+                            break;
+                    }
+                }
+
+                hashTable[hash] = Entry{tid, std::move(newItem)};
+                T &threadLocal = hashTable[hash]->value;
+                mutex.unlock();
+                return threadLocal;
+            }
+
+            hash += step;
+            ++step;
+            if (hash >= hashTable.size())
+                hash %= hashTable.size();
+        }
+    }
+
+    template <typename F>
+    void ForAll(F &&func) {
+        mutex.lock();
+        for (auto &entry : hashTable) {
+            if (entry)
+                func(entry->value);
+        }
+        mutex.unlock();
+    }
+
+private:
+    struct Entry {
+        std::thread::id tid;
+        T value;
+    };
+    std::shared_mutex mutex;
+    std::vector<pstd::optional<Entry>> hashTable;
+    std::function<T(void)> create;
+};
 
 // AtomicFloat Definition
 class AtomicFloat {
