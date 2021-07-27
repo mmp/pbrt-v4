@@ -90,7 +90,8 @@ extern const unsigned char PBRT_EMBEDDED_PTX[];
 STAT_MEMORY_COUNTER("Memory/Acceleration structures", gpuBVHBytes);
 
 OptixTraversableHandle OptiXAggregate::buildBVH(
-        const std::vector<OptixBuildInput> &buildInputs, cudaStream_t buildStream) {
+        const std::vector<OptixBuildInput> &buildInputs,
+        ThreadLocal<cudaStream_t> &threadCUDAStreams) {
     if (buildInputs.empty())
         return {};
 
@@ -119,6 +120,7 @@ OptixTraversableHandle OptiXAggregate::buildBVH(
     CUDA_CHECK(cudaMalloc(&outputBuffer, blasBufferSizes.outputSizeInBytes));
 
     // Build.
+    cudaStream_t buildStream = threadCUDAStreams.Get();
     OptixTraversableHandle traversableHandle{0};
     OPTIX_CHECK(optixAccelBuild(
         optixContext, buildStream, &accelOptions, buildInputs.data(), buildInputs.size(),
@@ -327,7 +329,7 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForTriangles(
     const std::vector<Material> &materials,
     const std::map<std::string, Medium> &media,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-    const std::vector<Allocator> &threadAllocators) {
+    ThreadLocal<Allocator> &threadAllocators) {
     // Allocate space for potentially all shapes being triangle meshes so
     // that we can write them in order (just potentially sparsely...)
     std::vector<TriangleMesh *> meshes(shapes.size(), nullptr);
@@ -335,7 +337,7 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForTriangles(
     std::atomic<int> meshesCreated{0};
 
     ParallelFor(0, shapes.size(), [&](int64_t shapeIndex) {
-        Allocator alloc = threadAllocators[ThreadIndex];
+        Allocator alloc = threadAllocators.Get();
         const auto &shape = shapes[shapeIndex];
         if (shape.name == "trianglemesh" || shape.name == "plymesh" ||
             shape.name == "loopsubdiv") {
@@ -424,7 +426,7 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForTriangles(
 
     std::mutex boundsMutex;
     ParallelFor(0, nMeshes, [&](int64_t startIndex, int64_t endIndex) {
-        Allocator alloc = threadAllocators[ThreadIndex];
+        Allocator alloc = threadAllocators.Get();
         Bounds3f localBounds;
 
         for (int meshIndex = startIndex; meshIndex < endIndex; ++meshIndex) {
@@ -729,14 +731,14 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForBLPs(
     const std::vector<Material> &materials,
     const std::map<std::string, Medium> &media,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-    const std::vector<Allocator> &threadAllocators) {
+    ThreadLocal<Allocator> &threadAllocators) {
     // Create meshes
     std::vector<BilinearPatchMesh *> meshes(shapes.size(), nullptr);
     std::atomic<int> nPatches = 0, nMeshes = 0;
 
     ParallelFor(0, shapes.size(), [&](int64_t shapeIndex) {
+        Allocator alloc = threadAllocators.Get();
         const auto &shape = shapes[shapeIndex];
-        Allocator alloc = threadAllocators[ThreadIndex];
         if (shape.name == "bilinearmesh") {
             BilinearPatchMesh *mesh = BilinearPatch::CreateMesh(shape.renderFromObject, shape.reverseOrientation,
                                                                 shape.parameters, &shape.loc, alloc);
@@ -772,7 +774,7 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForBLPs(
     // Create build inputs
     ASBuildInput buildInput(nMeshes);
     int buildInputIndex = 0;
-    Allocator aabbAlloc = threadAllocators[ThreadIndex];
+    Allocator aabbAlloc = threadAllocators.Get();
     // FIXME: leaks...
     OptixAabb *aabbs =
         (OptixAabb *)aabbAlloc.allocate_bytes(sizeof(OptixAabb) * nPatches,
@@ -782,7 +784,7 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForBLPs(
 
     std::mutex boundsMutex;
     ParallelFor(0, nMeshes, [&](int64_t meshIndex) {
-        Allocator alloc = threadAllocators[ThreadIndex];
+        Allocator alloc = threadAllocators.Get();
         int shapeIndex = meshIndexToShapeIndex[meshIndex];
         BilinearPatchMesh *mesh = meshes[shapeIndex];
 
@@ -857,7 +859,7 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForQuadrics(
     const std::vector<Material> &materials,
     const std::map<std::string, Medium> &media,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-    const std::vector<Allocator> &threadAllocators) {
+    ThreadLocal<Allocator> &threadAllocators) {
     int nQuadrics = 0;
     for (size_t shapeIndex = 0; shapeIndex < shapes.size(); ++shapeIndex) {
         const auto &s = shapes[shapeIndex];
@@ -868,7 +870,7 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForQuadrics(
     if (nQuadrics == 0)
         return {};
 
-    Allocator alloc = threadAllocators[ThreadIndex];
+    Allocator alloc = threadAllocators.Get();
     ASBuildInput buildInput(nQuadrics);
     // FIXME: leaks
     OptixAabb *shapeAABBs =
@@ -1094,6 +1096,12 @@ OptiXAggregate::OptiXAggregate(
     CU_CHECK(cuCtxGetCurrent(&cudaContext));
     CHECK(cudaContext != nullptr);
 
+    ThreadLocal<cudaStream_t> threadCUDAStreams([]() {
+        cudaStream_t stream;
+        cudaStreamCreate(&stream);
+        return stream;
+    });
+
     paramsPool.resize(256);  // should be plenty
     for (ParamBufferState &ps : paramsPool) {
         void *ptr;
@@ -1256,12 +1264,11 @@ OptiXAggregate::OptiXAggregate(
 
     // Note: do not delete the pointers in threadBufferResources, since doing
     // so would cause the memory they manage to be freed.
-    std::vector<pstd::pmr::monotonic_buffer_resource *> threadBufferResources;
-    for (int i = 0; i < MaxThreadIndex(); ++i)
-        threadBufferResources.push_back(new pstd::pmr::monotonic_buffer_resource(1024*1024, memoryResource));
-    std::vector<Allocator> threadAllocators;
-    for (size_t i = 0; i < threadBufferResources.size(); ++i)
-        threadAllocators.push_back(Allocator(threadBufferResources[i]));
+    ThreadLocal<Allocator> threadAllocators([memoryResource]() {
+        pstd::pmr::monotonic_buffer_resource *resource =
+            new pstd::pmr::monotonic_buffer_resource(1024*1024, memoryResource);
+        return Allocator(resource);
+    });
 
     ///////////////////////////////////////////////////////////////////////////
     // Build top-level acceleration structures for non-instanced shapes
@@ -1284,7 +1291,8 @@ OptiXAggregate::OptiXAggregate(
         threadAllocators);
     bounds = Union(bounds, triangleBuildInput.bounds);
     (void)addHGRecords(triangleBuildInput);
-    OptixTraversableHandle triangleGASTraversable = buildBVH(triangleBuildInput.optixInputs);
+    OptixTraversableHandle triangleGASTraversable = buildBVH(triangleBuildInput.optixInputs,
+                                                             threadCUDAStreams);
     LOG_VERBOSE("Finished creating GAS for top-level triangles");
 
     LOG_VERBOSE("Starting to create GAS for top-level blps/curves");
@@ -1294,7 +1302,8 @@ OptiXAggregate::OptiXAggregate(
                                 materials, media, shapeIndexToAreaLights, threadAllocators);
     bounds = Union(bounds, blpBuildInput.bounds);
     int bilinearSBTOffset = addHGRecords(blpBuildInput);
-    OptixTraversableHandle bilinearPatchGASTraversable = buildBVH(blpBuildInput.optixInputs);
+    OptixTraversableHandle bilinearPatchGASTraversable = buildBVH(blpBuildInput.optixInputs,
+                                                                  threadCUDAStreams);
     LOG_VERBOSE("Finished creating GAS for top-level blps/curves");
 
     LOG_VERBOSE("Starting to create GAS for top-level quadrics");
@@ -1305,7 +1314,8 @@ OptiXAggregate::OptiXAggregate(
 
     bounds = Union(bounds, quadricBuildInput.bounds);
     int quadricSBTOffset = addHGRecords(quadricBuildInput);
-    OptixTraversableHandle quadricGASTraversable = buildBVH(quadricBuildInput.optixInputs);
+    OptixTraversableHandle quadricGASTraversable = buildBVH(quadricBuildInput.optixInputs,
+                                                            threadCUDAStreams);
     LOG_VERBOSE("Finished creating GAS for top-level quadrics");
 
     Allocator iasAllocator(memoryResource);
@@ -1354,10 +1364,6 @@ OptiXAggregate::OptiXAggregate(
 
     LOG_VERBOSE("Starting to create IASes for %d instance definitions",
                 scene.instanceDefinitions.size());
-    std::vector<cudaStream_t> threadCUDAStreams(MaxThreadIndex());
-    for (int i = 0; i < threadCUDAStreams.size(); ++i)
-        cudaStreamCreate(&threadCUDAStreams[i]);
-
     std::unordered_map<std::string, Instance> instanceMap;
     std::mutex instanceMapMutex;
     ParallelFor(0, scene.instanceDefinitions.size(), [&](int64_t i) {
@@ -1381,7 +1387,7 @@ OptiXAggregate::OptiXAggregate(
             threadAllocators);
         meshes.clear();
         if (triangleBuildInput) {
-            inst.handles[0] = buildBVH(triangleBuildInput.optixInputs, threadCUDAStreams[ThreadIndex]);
+            inst.handles[0] = buildBVH(triangleBuildInput.optixInputs, threadCUDAStreams);
             inst.sbtOffsets[0] = addHGRecords(triangleBuildInput);
             inst.bounds = triangleBuildInput.bounds;
         }
@@ -1391,7 +1397,7 @@ OptiXAggregate::OptiXAggregate(
                                     hitPGRandomHitBilinearPatch, textures.floatTextures, namedMaterials,
                                     materials, media, {}, threadAllocators);
         if (bilinearBuildInput) {
-            inst.handles[1] = buildBVH(bilinearBuildInput.optixInputs, threadCUDAStreams[ThreadIndex]);
+            inst.handles[1] = buildBVH(bilinearBuildInput.optixInputs, threadCUDAStreams);
             inst.sbtOffsets[1] = addHGRecords(bilinearBuildInput);
             inst.bounds = Union(inst.bounds, bilinearBuildInput.bounds);
         }
@@ -1401,7 +1407,7 @@ OptiXAggregate::OptiXAggregate(
                                         hitPGRandomHitQuadric, textures.floatTextures, namedMaterials,
                                         materials, media, {}, threadAllocators);
         if (quadricBuildInput) {
-            inst.handles[2] = buildBVH(quadricBuildInput.optixInputs, threadCUDAStreams[ThreadIndex]);
+            inst.handles[2] = buildBVH(quadricBuildInput.optixInputs, threadCUDAStreams);
             inst.sbtOffsets[2] = addHGRecords(quadricBuildInput);
             inst.bounds = Union(inst.bounds, quadricBuildInput.bounds);
         }
@@ -1410,8 +1416,6 @@ OptiXAggregate::OptiXAggregate(
         instanceMap[def.first] = inst;
     });
 
-    for (int i = 0; i < threadCUDAStreams.size(); ++i)
-        cudaStreamDestroy(threadCUDAStreams[i]);
     LOG_VERBOSE("Finished creating IASes for instance definitions");
 
     ///////////////////////////////////////////////////////////////////////////
@@ -1457,7 +1461,6 @@ OptiXAggregate::OptiXAggregate(
     }
 
     // Now loop over all of the instance uses in parallel.
-    std::mutex boundsMutex;
     ParallelFor(0, scene.instances.size(), [&](int64_t indexBegin, int64_t indexEnd) {
         Bounds3f localBounds;
 
@@ -1516,7 +1519,7 @@ OptiXAggregate::OptiXAggregate(
     buildInput.instanceArray.instances = CUdeviceptr(iasInstances.data());
     buildInput.instanceArray.numInstances = iasInstances.size();
 
-    rootTraversable = buildBVH({buildInput});
+    rootTraversable = buildBVH({buildInput}, threadCUDAStreams);
     LOG_VERBOSE("Finished building top-level IAS");
 
     LOG_VERBOSE("Finished creating shapes and acceleration structures");

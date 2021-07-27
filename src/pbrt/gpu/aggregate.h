@@ -85,7 +85,7 @@ class OptiXAggregate : public WavefrontAggregate {
         const std::vector<Material> &materials,
         const std::map<std::string, Medium> &media,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-        const std::vector<Allocator> &threadAllocators);
+        ThreadLocal<Allocator> &threadAllocators);
 
     static BilinearPatchMesh *diceCurveToBLP(const ShapeSceneEntity &shape,
                                              int nDiceU, int nDiceV, Allocator alloc);
@@ -98,7 +98,7 @@ class OptiXAggregate : public WavefrontAggregate {
         const std::vector<Material> &materials,
         const std::map<std::string, Medium> &media,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-        const std::vector<Allocator> &threadAllocators);
+        ThreadLocal<Allocator> &threadAllocators);
 
     static ASBuildInput createBuildInputForQuadrics(
         const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
@@ -108,7 +108,7 @@ class OptiXAggregate : public WavefrontAggregate {
         const std::vector<Material> &materials,
         const std::map<std::string, Medium> &media,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-        const std::vector<Allocator> &threadAllocators);
+        ThreadLocal<Allocator> &threadAllocators);
 
     int addHGRecords(const ASBuildInput &buildInput);
 
@@ -121,9 +121,10 @@ class OptiXAggregate : public WavefrontAggregate {
                                            const char *intersect) const;
 
     OptixTraversableHandle buildBVH(const std::vector<OptixBuildInput> &buildInputs,
-                                    cudaStream_t stream = 0);
+                                    ThreadLocal<cudaStream_t> &threadCUDAStreams);
 
     CUDATrackedMemoryResource *memoryResource;
+    std::mutex boundsMutex;
     Bounds3f bounds;
     CUstream cudaStream;
     OptixDeviceContext optixContext;
