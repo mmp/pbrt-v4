@@ -152,11 +152,22 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization,
                 return;
             }
 #elif defined(PBRT_IS_OSX)
+        // possibly useful:
+        // https://stackoverflow.com/questions/63166/how-to-determine-cpu-and-memory-consumption-from-inside-a-process
             *user = *nice = *system = *idle = 0;
 #elif defined(PBRT_IS_WINDOWS)
-            // possibly useful: https://stackoverflow.com/questions/23143693/retrieving-cpu-load-percent-total-in-windows-with-c
-            // https://stackoverflow.com/questions/63166/how-to-determine-cpu-and-memory-consumption-from-inside-a-process
-            *user = *nice = *system = *idle = 0;
+            FILETIME idleTime, kernelTime, userTime;
+            if (GetSystemTimes(&idleTime, &kernelTime, &userTime)) {
+                auto FileTimeToInt64 = [](const FILETIME &ft) {
+                    return (((unsigned long long)(ft.dwHighDateTime)) << 32) |
+                           ((unsigned long long)ft.dwLowDateTime);
+                };
+                *idle = FileTimeToInt64(idleTime);
+                *system = FileTimeToInt64(kernelTime);
+                *nice = 0;
+                *user = FileTimeToInt64(userTime);
+            } else
+                *user = *nice = *system = *idle = 0;
 #else
 #error "Need to implement getCPUUsage for current platform"
 #endif
@@ -165,6 +176,12 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization,
         logUtilizationThread = std::thread([&]() {
             int64_t userPrev, nicePrev, systemPrev, idlePrev;
             getCPUUsage(&userPrev, &nicePrev, &systemPrev, &idlePrev);
+#ifdef PBRT_IS_WINDOWS
+            // It's necessary to increase this thread's priority a bit since otherwise
+            // the worker threads during rendering take all the cycles and it only
+            // runs once a second or so.
+            SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
+#endif
 
 #ifdef PBRT_USE_NVML
             // NOTE: per https://stackoverflow.com/a/64610732 apparently a
