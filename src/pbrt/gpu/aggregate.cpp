@@ -87,6 +87,15 @@ extern "C" {
 extern const unsigned char PBRT_EMBEDDED_PTX[];
 }
 
+template <typename T>
+static CUdeviceptr CopyToDevice(pstd::span<const T> buffer) {
+    void *ptr;
+    size_t size = buffer.size() * sizeof(buffer[0]);
+    CUDA_CHECK(cudaMalloc(&ptr, size));
+    CUDA_CHECK(cudaMemcpy(ptr, buffer.data(), size, cudaMemcpyHostToDevice));
+    return CUdeviceptr(ptr);
+}
+
 STAT_MEMORY_COUNTER("Memory/Acceleration structures", gpuBVHBytes);
 
 OptixTraversableHandle OptiXAggregate::buildBVH(
@@ -1088,10 +1097,7 @@ OptiXAggregate::OptiXAggregate(
     const std::map<std::string, pbrt::Material> &namedMaterials,
     const std::vector<pbrt::Material> &materials)
     : memoryResource(memoryResource),
-      cudaStream(nullptr),
-      intersectHGRecords(Allocator(memoryResource)),
-      shadowHGRecords(Allocator(memoryResource)),
-      randomHitHGRecords(Allocator(memoryResource)) {
+      cudaStream(nullptr) {
     CUcontext cudaContext;
     CU_CHECK(cuCtxGetCurrent(&cudaContext));
     CHECK(cudaContext != nullptr);
@@ -1318,8 +1324,7 @@ OptiXAggregate::OptiXAggregate(
                                                             threadCUDAStreams);
     LOG_VERBOSE("Finished creating GAS for top-level quadrics");
 
-    Allocator iasAllocator(memoryResource);
-    pstd::vector<OptixInstance> iasInstances(iasAllocator);
+    std::vector<OptixInstance> iasInstances;
 
     OptixInstance gasInstance = {};
     float identity[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
@@ -1516,10 +1521,13 @@ OptiXAggregate::OptiXAggregate(
     LOG_VERBOSE("Starting to build top-level IAS");
     OptixBuildInput buildInput = {};
     buildInput.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
-    buildInput.instanceArray.instances = CUdeviceptr(iasInstances.data());
+    CUdeviceptr instanceDevicePtr = CopyToDevice(pstd::MakeConstSpan(iasInstances));
+    buildInput.instanceArray.instances = instanceDevicePtr;
     buildInput.instanceArray.numInstances = iasInstances.size();
 
     rootTraversable = buildBVH({buildInput}, threadCUDAStreams);
+
+    CUDA_CHECK(cudaFree((void *)instanceDevicePtr));
     LOG_VERBOSE("Finished building top-level IAS");
 
     LOG_VERBOSE("Finished creating shapes and acceleration structures");
@@ -1529,20 +1537,23 @@ OptiXAggregate::OptiXAggregate(
 
     ///////////////////////////////////////////////////////////////////////////
     // Final SBT initialization
-    intersectSBT.hitgroupRecordBase = (CUdeviceptr)intersectHGRecords.data();
+    CUdeviceptr isectHGRBDevicePtr = CopyToDevice(pstd::MakeConstSpan(intersectHGRecords));
+    intersectSBT.hitgroupRecordBase = isectHGRBDevicePtr;
     intersectSBT.hitgroupRecordStrideInBytes = sizeof(HitgroupRecord);
     intersectSBT.hitgroupRecordCount = intersectHGRecords.size();
 
-    shadowSBT.hitgroupRecordBase = (CUdeviceptr)shadowHGRecords.data();
+    CUdeviceptr shadowHGRBDevicePtr = CopyToDevice(pstd::MakeConstSpan(shadowHGRecords));
+    shadowSBT.hitgroupRecordBase = shadowHGRBDevicePtr;
     shadowSBT.hitgroupRecordStrideInBytes = sizeof(HitgroupRecord);
     shadowSBT.hitgroupRecordCount = shadowHGRecords.size();
 
     // Still want to run the closest hit shaders...
-    shadowTrSBT.hitgroupRecordBase = (CUdeviceptr)intersectHGRecords.data();
+    shadowTrSBT.hitgroupRecordBase = isectHGRBDevicePtr;
     shadowTrSBT.hitgroupRecordStrideInBytes = sizeof(HitgroupRecord);
     shadowTrSBT.hitgroupRecordCount = intersectHGRecords.size();
 
-    randomHitSBT.hitgroupRecordBase = (CUdeviceptr)randomHitHGRecords.data();
+    CUdeviceptr randomHitHGRBDevicePtr = CopyToDevice(pstd::MakeConstSpan(randomHitHGRecords));
+    randomHitSBT.hitgroupRecordBase = randomHitHGRBDevicePtr;
     randomHitSBT.hitgroupRecordStrideInBytes = sizeof(HitgroupRecord);
     randomHitSBT.hitgroupRecordCount = randomHitHGRecords.size();
 }
