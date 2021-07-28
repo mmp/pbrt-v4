@@ -28,8 +28,6 @@ void *CUDATrackedMemoryResource::do_allocate(size_t size, size_t alignment) {
     if (size == 0)
         return nullptr;
 
-    alignment = std::max<size_t>(128, alignment);
-
     void *ptr;
     CUDA_CHECK(cudaMallocManaged(&ptr, size));
     DCHECK_EQ(0, intptr_t(ptr) % alignment);
