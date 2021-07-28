@@ -1602,7 +1602,7 @@ void OptiXAggregate::IntersectClosest(
     MediumSampleQueue *mediumSampleQueue,
     RayQueue *nextRayQueue) const {
     std::pair<cudaEvent_t, cudaEvent_t> events =
-        GetProfilerEvents("Tracing closest hit rays");
+        GetProfilerEvents("Trace closest hit rays");
 
     cudaEventRecord(events.first);
 
@@ -1645,7 +1645,7 @@ void OptiXAggregate::IntersectClosest(
 
 void OptiXAggregate::IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue,
                                SOA<PixelSampleState> *pixelSampleState) const {
-    std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents("Tracing shadow rays");
+    std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents("Trace shadow rays");
 
     cudaEventRecord(events.first);
 

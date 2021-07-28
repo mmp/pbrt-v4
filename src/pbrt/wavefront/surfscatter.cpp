@@ -73,7 +73,7 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
     // Get BSDF for items in _evalQueue_ and sample illumination
     // Construct _name_ for material/texture evaluator kernel
     std::string name = StringPrintf(
-        "%s + BxDF Eval (%s tex)", ConcreteMaterial::Name(),
+        "%s + BxDF eval (%s tex)", ConcreteMaterial::Name(),
         std::is_same_v<TextureEvaluator, BasicTextureEvaluator> ? "Basic" : "Universal");
 
     RayQueue *nextRayQueue = NextRayQueue(wavefrontDepth);

@@ -31,7 +31,7 @@ template <typename ConcreteSampler>
 void WavefrontPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
     RayQueue *rayQueue = CurrentRayQueue(0);
     ParallelFor(
-        "Generate Camera rays", maxQueueSize, PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
+        "Generate camera rays", maxQueueSize, PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
             // Enqueue camera ray and set pixel state for sample
             // Compute pixel coordinates for _pixelIndex_
             Bounds2i pixelBounds = film.PixelBounds();

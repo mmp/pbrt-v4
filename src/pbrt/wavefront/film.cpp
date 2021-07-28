@@ -12,7 +12,7 @@ namespace pbrt {
 // WavefrontPathIntegrator Film Methods
 void WavefrontPathIntegrator::UpdateFilm() {
     ParallelFor(
-        "Update Film", maxQueueSize, PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
+        "Update film", maxQueueSize, PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
             // Check pixel against film bounds
             Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
             if (!InsideExclusive(pPixel, film.PixelBounds()))
