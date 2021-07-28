@@ -51,8 +51,7 @@
 
 namespace pbrt {
 
-OptiXAggregate::ASBuildInput::ASBuildInput(size_t size) {
-    optixInputs.resize(size);
+OptiXAggregate::BVH::BVH(size_t size) {
     intersectHGRecords.resize(size);
     shadowHGRecords.resize(size);
     randomHitHGRecords.resize(size);
@@ -98,7 +97,8 @@ static CUdeviceptr CopyToDevice(pstd::span<const T> buffer) {
 
 STAT_MEMORY_COUNTER("Memory/Acceleration structures", gpuBVHBytes);
 
-OptixTraversableHandle OptiXAggregate::buildBVH(
+OptixTraversableHandle OptiXAggregate::buildOptixBVH(
+        OptixDeviceContext optixContext,
         const std::vector<OptixBuildInput> &buildInputs,
         ThreadLocal<cudaStream_t> &threadCUDAStreams) {
     if (buildInputs.empty())
@@ -328,9 +328,10 @@ OptiXAggregate::PreparePLYMeshes(const std::vector<ShapeSceneEntity> &shapes,
     return plyMeshes;
 }
 
-OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForTriangles(
+OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
     const std::vector<ShapeSceneEntity> &shapes,
     const std::map<int, TriQuadMesh> &plyMeshes,
+    OptixDeviceContext optixContext,
     const OptixProgramGroup &intersectPG,
     const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
     const std::map<std::string, FloatTexture> &floatTextures,
@@ -338,7 +339,8 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForTriangles(
     const std::vector<Material> &materials,
     const std::map<std::string, Medium> &media,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-    ThreadLocal<Allocator> &threadAllocators) {
+    ThreadLocal<Allocator> &threadAllocators,
+    ThreadLocal<cudaStream_t> &threadCUDAStreams) {
     // Allocate space for potentially all shapes being triangle meshes so
     // that we can write them in order (just potentially sparsely...)
     std::vector<TriangleMesh *> meshes(shapes.size(), nullptr);
@@ -428,10 +430,10 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForTriangles(
         }
     }
 
-    ASBuildInput buildInput(nMeshes);
-    // FIXME: these leak, unfortunately...
-    CUdeviceptr *pDeviceDevicePtrs = new CUdeviceptr[nMeshes];
-    uint32_t *triangleInputFlags = new uint32_t[nMeshes];
+    BVH bvh(nMeshes);
+    std::vector<OptixBuildInput> optixBuildInputs(nMeshes);
+    std::vector<CUdeviceptr> pDeviceDevicePtrs(nMeshes);
+    std::vector<uint32_t> triangleInputFlags(nMeshes);
 
     std::mutex boundsMutex;
     ParallelFor(0, nMeshes, [&](int64_t startIndex, int64_t endIndex) {
@@ -442,10 +444,9 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForTriangles(
             int shapeIndex = meshIndexToShapeIndex[meshIndex];
             // Remember: meshes is indexed shapeIndex...
             TriangleMesh *mesh = meshes[shapeIndex];
-
             const auto &shape = shapes[shapeIndex];
 
-            OptixBuildInput input = {};
+            OptixBuildInput &input = optixBuildInputs[meshIndex];
 
             input.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
 
@@ -470,8 +471,6 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForTriangles(
             input.triangleArray.sbtIndexOffsetSizeInBytes = 0;
             input.triangleArray.sbtIndexOffsetStrideInBytes = 0;
 
-            buildInput.optixInputs[meshIndex] = input;
-
             HitgroupRecord hgRecord;
             OPTIX_CHECK(optixSbtRecordPackHeader(intersectPG, &hgRecord));
             hgRecord.triRec.mesh = mesh;
@@ -492,23 +491,25 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForTriangles(
             }
             hgRecord.triRec.mediumInterface = getMediumInterface(shape, media, alloc);
 
-            buildInput.intersectHGRecords[meshIndex] = hgRecord;
+            bvh.intersectHGRecords[meshIndex] = hgRecord;
 
             OPTIX_CHECK(optixSbtRecordPackHeader(randomHitPG, &hgRecord));
-            buildInput.randomHitHGRecords[meshIndex]= hgRecord;
+            bvh.randomHitHGRecords[meshIndex]= hgRecord;
 
             OPTIX_CHECK(optixSbtRecordPackHeader(shadowPG, &hgRecord));
-            buildInput.shadowHGRecords[meshIndex] = hgRecord;
+            bvh.shadowHGRecords[meshIndex] = hgRecord;
 
             // Note: meshBounds is also indexed by the shape index..
             localBounds = Union(localBounds, meshBounds[shapeIndex]);
         }
 
         std::lock_guard<std::mutex> lock(boundsMutex);
-        buildInput.bounds = Union(buildInput.bounds, localBounds);
+        bvh.bounds = Union(bvh.bounds, localBounds);
     });
 
-    return buildInput;
+    bvh.traversableHandle = buildOptixBVH(optixContext, optixBuildInputs, threadCUDAStreams);
+
+    return bvh;
 }
 
 STAT_COUNTER("Geometry/Curves", nCurves);
@@ -732,15 +733,19 @@ BilinearPatchMesh *OptiXAggregate::diceCurveToBLP(const ShapeSceneEntity &shape,
         blpUV, std::vector<int>(), nullptr, alloc);
 }
 
-OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForBLPs(
-    const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
-    const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
+OptiXAggregate::BVH OptiXAggregate::buildBVHForBLPs(
+    const std::vector<ShapeSceneEntity> &shapes,
+    OptixDeviceContext optixContext,
+    const OptixProgramGroup &intersectPG,
+    const OptixProgramGroup &shadowPG,
+    const OptixProgramGroup &randomHitPG,
     const std::map<std::string, FloatTexture> &floatTextures,
     const std::map<std::string, Material> &namedMaterials,
     const std::vector<Material> &materials,
     const std::map<std::string, Medium> &media,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-    ThreadLocal<Allocator> &threadAllocators) {
+    ThreadLocal<Allocator> &threadAllocators,
+    ThreadLocal<cudaStream_t> &threadCUDAStreams) {
     // Create meshes
     std::vector<BilinearPatchMesh *> meshes(shapes.size(), nullptr);
     std::atomic<int> nPatches = 0, nMeshes = 0;
@@ -781,15 +786,14 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForBLPs(
     }
 
     // Create build inputs
-    ASBuildInput buildInput(nMeshes);
+    BVH bvh(nMeshes);
     int buildInputIndex = 0;
-    Allocator aabbAlloc = threadAllocators.Get();
-    // FIXME: leaks...
-    OptixAabb *aabbs =
-        (OptixAabb *)aabbAlloc.allocate_bytes(sizeof(OptixAabb) * nPatches,
-                                              OPTIX_AABB_BUFFER_BYTE_ALIGNMENT);
-    CUdeviceptr *aabbDevicePtrs = new CUdeviceptr[nMeshes];
-    uint32_t *flags = new uint32_t[nMeshes];
+    std::vector<OptixBuildInput> optixBuildInputs(nMeshes);
+    std::vector<OptixAabb> aabbs(nPatches);
+    OptixAabb *deviceAABBs;
+    CUDA_CHECK(cudaMalloc(&deviceAABBs, sizeof(OptixAabb) * nPatches));
+    std::vector<CUdeviceptr> aabbDevicePtrs(nMeshes);
+    std::vector<uint32_t> flags(nMeshes);
 
     std::mutex boundsMutex;
     ParallelFor(0, nMeshes, [&](int64_t meshIndex) {
@@ -797,12 +801,12 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForBLPs(
         int shapeIndex = meshIndexToShapeIndex[meshIndex];
         BilinearPatchMesh *mesh = meshes[shapeIndex];
 
-        OptixBuildInput &input = buildInput.optixInputs[meshIndex];
+        OptixBuildInput &input = optixBuildInputs[meshIndex];
         input.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
         input.customPrimitiveArray.numSbtRecords = 1;
         input.customPrimitiveArray.numPrimitives = mesh->nPatches;
         int aabbIndex = meshAABBStartIndex[meshIndex];
-        aabbDevicePtrs[meshIndex] = CUdeviceptr(&aabbs[aabbIndex]);
+        aabbDevicePtrs[meshIndex] = CUdeviceptr(&deviceAABBs[aabbIndex]);
         input.customPrimitiveArray.aabbBuffers = &aabbDevicePtrs[meshIndex];
         input.customPrimitiveArray.flags = &flags[meshIndex];
 
@@ -845,30 +849,41 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForBLPs(
         }
         hgRecord.bilinearRec.mediumInterface = getMediumInterface(shape, media, alloc);
 
-        buildInput.intersectHGRecords[meshIndex] = hgRecord;
+        bvh.intersectHGRecords[meshIndex] = hgRecord;
 
         OPTIX_CHECK(optixSbtRecordPackHeader(randomHitPG, &hgRecord));
-        buildInput.randomHitHGRecords[meshIndex] = hgRecord;
+        bvh.randomHitHGRecords[meshIndex] = hgRecord;
 
         OPTIX_CHECK(optixSbtRecordPackHeader(shadowPG, &hgRecord));
-        buildInput.shadowHGRecords[meshIndex] = hgRecord;
+        bvh.shadowHGRecords[meshIndex] = hgRecord;
 
         std::lock_guard<std::mutex> lock(boundsMutex);
-        buildInput.bounds = Union(buildInput.bounds, meshBounds);
+        bvh.bounds = Union(bvh.bounds, meshBounds);
     });
 
-    return buildInput;
+    CUDA_CHECK(cudaMemcpyAsync(deviceAABBs, aabbs.data(), aabbs.size() * sizeof(OptixAabb),
+                               cudaMemcpyHostToDevice, threadCUDAStreams.Get()));
+
+    bvh.traversableHandle = buildOptixBVH(optixContext, optixBuildInputs, threadCUDAStreams);
+
+    CUDA_CHECK(cudaFree(deviceAABBs));
+
+    return bvh;
 }
 
-OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForQuadrics(
-    const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
-    const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
+OptiXAggregate::BVH OptiXAggregate::buildBVHForQuadrics(
+    const std::vector<ShapeSceneEntity> &shapes,
+    OptixDeviceContext optixContext,
+    const OptixProgramGroup &intersectPG,
+    const OptixProgramGroup &shadowPG,
+    const OptixProgramGroup &randomHitPG,
     const std::map<std::string, FloatTexture> &floatTextures,
     const std::map<std::string, Material> &namedMaterials,
     const std::vector<Material> &materials,
     const std::map<std::string, Medium> &media,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-    ThreadLocal<Allocator> &threadAllocators) {
+    ThreadLocal<Allocator> &threadAllocators,
+    ThreadLocal<cudaStream_t> &threadCUDAStreams) {
     int nQuadrics = 0;
     for (size_t shapeIndex = 0; shapeIndex < shapes.size(); ++shapeIndex) {
         const auto &s = shapes[shapeIndex];
@@ -880,13 +895,13 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForQuadrics(
         return {};
 
     Allocator alloc = threadAllocators.Get();
-    ASBuildInput buildInput(nQuadrics);
-    // FIXME: leaks
-    OptixAabb *shapeAABBs =
-        (OptixAabb *)alloc.allocate_bytes(sizeof(OptixAabb) * nQuadrics,
-                                          OPTIX_AABB_BUFFER_BYTE_ALIGNMENT);
-    CUdeviceptr *aabbDevicePtrs = new CUdeviceptr[nQuadrics];
-    unsigned int *flags = new unsigned int[nQuadrics];
+    BVH bvh(nQuadrics);
+    std::vector<OptixBuildInput> optixBuildInputs(nQuadrics);
+    OptixAabb *deviceShapeAABBs;
+    CUDA_CHECK(cudaMalloc(&deviceShapeAABBs, sizeof(OptixAabb) * nQuadrics));
+    std::vector<OptixAabb> shapeAABBs(nQuadrics);
+    std::vector<CUdeviceptr> aabbDevicePtrs(nQuadrics);
+    std::vector<uint32_t> flags(nQuadrics);
 
     int quadricIndex = 0;
     for (size_t shapeIndex = 0; shapeIndex < shapes.size(); ++shapeIndex) {
@@ -902,7 +917,7 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForQuadrics(
         CHECK_EQ(1, shapes.size());
         Shape shape = shapes[0];
 
-        OptixBuildInput &input = buildInput.optixInputs[quadricIndex];
+        OptixBuildInput &input = optixBuildInputs[quadricIndex];
         input.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
         input.customPrimitiveArray.numSbtRecords = 1;
         input.customPrimitiveArray.numPrimitives = 1;
@@ -912,10 +927,10 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForQuadrics(
         OptixAabb aabb = {float(shapeBounds.pMin.x), float(shapeBounds.pMin.y), float(shapeBounds.pMin.z),
                           float(shapeBounds.pMax.x), float(shapeBounds.pMax.y), float(shapeBounds.pMax.z)};
         shapeAABBs[quadricIndex] = aabb;
-        aabbDevicePtrs[quadricIndex] = CUdeviceptr(&shapeAABBs[quadricIndex]);
+        aabbDevicePtrs[quadricIndex] = CUdeviceptr(&deviceShapeAABBs[quadricIndex]);
         input.customPrimitiveArray.aabbBuffers = &aabbDevicePtrs[quadricIndex];
 
-        buildInput.bounds = Union(buildInput.bounds, shapeBounds);
+        bvh.bounds = Union(bvh.bounds, shapeBounds);
 
         // Find alpha texture, if present.
         Material material = getMaterial(s, namedMaterials, materials);
@@ -942,18 +957,26 @@ OptiXAggregate::ASBuildInput OptiXAggregate::createBuildInputForQuadrics(
         }
         hgRecord.quadricRec.mediumInterface = getMediumInterface(s, media, alloc);
 
-        buildInput.intersectHGRecords[quadricIndex] = hgRecord;
+        bvh.intersectHGRecords[quadricIndex] = hgRecord;
 
         OPTIX_CHECK(optixSbtRecordPackHeader(randomHitPG, &hgRecord));
-        buildInput.randomHitHGRecords[quadricIndex] = hgRecord;
+        bvh.randomHitHGRecords[quadricIndex] = hgRecord;
 
         OPTIX_CHECK(optixSbtRecordPackHeader(shadowPG, &hgRecord));
-        buildInput.shadowHGRecords[quadricIndex] = hgRecord;
+        bvh.shadowHGRecords[quadricIndex] = hgRecord;
 
         ++quadricIndex;
     }
 
-    return buildInput;
+    CUDA_CHECK(cudaMemcpyAsync(deviceShapeAABBs, shapeAABBs.data(),
+                               shapeAABBs.size() * sizeof(shapeAABBs[0]),
+                               cudaMemcpyHostToDevice, threadCUDAStreams.Get()));
+
+    bvh.traversableHandle = buildOptixBVH(optixContext, optixBuildInputs, threadCUDAStreams);
+
+    CUDA_CHECK(cudaFree(deviceShapeAABBs));
+
+    return bvh;
 }
 
 static void logCallback(unsigned int level, const char *tag, const char *message, void *cbdata) {
@@ -963,8 +986,8 @@ static void logCallback(unsigned int level, const char *tag, const char *message
         LOG_VERBOSE("OptiX: %s: %s", tag, message);
 }
 
-int OptiXAggregate::addHGRecords(const ASBuildInput &buildInput) {
-    if (buildInput.intersectHGRecords.empty())
+int OptiXAggregate::addHGRecords(const BVH &bvh) {
+    if (bvh.intersectHGRecords.empty())
         return -1;
 
     static std::mutex mutex;
@@ -972,14 +995,14 @@ int OptiXAggregate::addHGRecords(const ASBuildInput &buildInput) {
 
     int sbtOffset = intersectHGRecords.size();
     intersectHGRecords.insert(intersectHGRecords.end(),
-                              buildInput.intersectHGRecords.begin(),
-                              buildInput.intersectHGRecords.end());
+                              bvh.intersectHGRecords.begin(),
+                              bvh.intersectHGRecords.end());
     shadowHGRecords.insert(shadowHGRecords.end(),
-                           buildInput.shadowHGRecords.begin(),
-                           buildInput.shadowHGRecords.end());
+                           bvh.shadowHGRecords.begin(),
+                           bvh.shadowHGRecords.end());
     randomHitHGRecords.insert(randomHitHGRecords.end(),
-                              buildInput.randomHitHGRecords.begin(),
-                              buildInput.randomHitHGRecords.end());
+                              bvh.randomHitHGRecords.begin(),
+                              bvh.randomHitHGRecords.end());
     return sbtOffset;
 }
 
@@ -1291,37 +1314,30 @@ OptiXAggregate::OptiXAggregate(
     LOG_VERBOSE("Finished reading PLY meshes");
 
     LOG_VERBOSE("Starting to create GAS for top-level triangles");
-    ASBuildInput triangleBuildInput = createBuildInputForTriangles(
-        scene.shapes, plyMeshes, hitPGTriangle, anyhitPGShadowTriangle, hitPGRandomHitTriangle,
+    BVH triangleBVH = buildBVHForTriangles(
+        scene.shapes, plyMeshes, optixContext, hitPGTriangle, anyhitPGShadowTriangle, hitPGRandomHitTriangle,
         textures.floatTextures, namedMaterials, materials, media, shapeIndexToAreaLights,
-        threadAllocators);
-    bounds = Union(bounds, triangleBuildInput.bounds);
-    (void)addHGRecords(triangleBuildInput);
-    OptixTraversableHandle triangleGASTraversable = buildBVH(triangleBuildInput.optixInputs,
-                                                             threadCUDAStreams);
+        threadAllocators, threadCUDAStreams);
+    bounds = Union(bounds, triangleBVH.bounds);
+    (void)addHGRecords(triangleBVH);
     LOG_VERBOSE("Finished creating GAS for top-level triangles");
 
     LOG_VERBOSE("Starting to create GAS for top-level blps/curves");
-    ASBuildInput blpBuildInput =
-        createBuildInputForBLPs(scene.shapes, hitPGBilinearPatch, anyhitPGShadowBilinearPatch,
-                                hitPGRandomHitBilinearPatch, textures.floatTextures, namedMaterials,
-                                materials, media, shapeIndexToAreaLights, threadAllocators);
-    bounds = Union(bounds, blpBuildInput.bounds);
-    int bilinearSBTOffset = addHGRecords(blpBuildInput);
-    OptixTraversableHandle bilinearPatchGASTraversable = buildBVH(blpBuildInput.optixInputs,
-                                                                  threadCUDAStreams);
+    BVH blpBVH =
+        buildBVHForBLPs(scene.shapes, optixContext, hitPGBilinearPatch, anyhitPGShadowBilinearPatch,
+                        hitPGRandomHitBilinearPatch, textures.floatTextures, namedMaterials,
+                        materials, media, shapeIndexToAreaLights, threadAllocators, threadCUDAStreams);
+    bounds = Union(bounds, blpBVH.bounds);
+    int bilinearSBTOffset = addHGRecords(blpBVH);
     LOG_VERBOSE("Finished creating GAS for top-level blps/curves");
 
     LOG_VERBOSE("Starting to create GAS for top-level quadrics");
-    ASBuildInput quadricBuildInput = createBuildInputForQuadrics(
-        scene.shapes, hitPGQuadric, anyhitPGShadowQuadric, hitPGRandomHitQuadric,
+    BVH quadricBVH = buildBVHForQuadrics(
+        scene.shapes, optixContext, hitPGQuadric, anyhitPGShadowQuadric, hitPGRandomHitQuadric,
         textures.floatTextures, namedMaterials, materials, media, shapeIndexToAreaLights,
-        threadAllocators);
-
-    bounds = Union(bounds, quadricBuildInput.bounds);
-    int quadricSBTOffset = addHGRecords(quadricBuildInput);
-    OptixTraversableHandle quadricGASTraversable = buildBVH(quadricBuildInput.optixInputs,
-                                                            threadCUDAStreams);
+        threadAllocators, threadCUDAStreams);
+    bounds = Union(bounds, quadricBVH.bounds);
+    int quadricSBTOffset = addHGRecords(quadricBVH);
     LOG_VERBOSE("Finished creating GAS for top-level quadrics");
 
     std::vector<OptixInstance> iasInstances;
@@ -1332,18 +1348,18 @@ OptiXAggregate::OptiXAggregate(
     gasInstance.visibilityMask = 255;
     gasInstance.flags =
         OPTIX_INSTANCE_FLAG_NONE;  // TODO: OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT
-    if (triangleGASTraversable) {
-        gasInstance.traversableHandle = triangleGASTraversable;
+    if (triangleBVH.traversableHandle) {
+        gasInstance.traversableHandle = triangleBVH.traversableHandle;
         gasInstance.sbtOffset = 0;
         iasInstances.push_back(gasInstance);
     }
-    if (bilinearPatchGASTraversable) {
-        gasInstance.traversableHandle = bilinearPatchGASTraversable;
+    if (blpBVH.traversableHandle) {
+        gasInstance.traversableHandle = blpBVH.traversableHandle;
         gasInstance.sbtOffset = bilinearSBTOffset;
         iasInstances.push_back(gasInstance);
     }
-    if (quadricGASTraversable) {
-        gasInstance.traversableHandle = quadricGASTraversable;
+    if (quadricBVH.traversableHandle) {
+        gasInstance.traversableHandle = quadricBVH.traversableHandle;
         gasInstance.sbtOffset = quadricSBTOffset;
         iasInstances.push_back(gasInstance);
     }
@@ -1386,35 +1402,35 @@ OptiXAggregate::OptiXAggregate(
         std::map<int, TriQuadMesh> meshes =
             PreparePLYMeshes(def.second.shapes, textures.floatTextures);
 
-        ASBuildInput triangleBuildInput = createBuildInputForTriangles(
-            def.second.shapes, meshes, hitPGTriangle, anyhitPGShadowTriangle,
+        BVH triangleBVH = buildBVHForTriangles(
+            def.second.shapes, meshes, optixContext, hitPGTriangle, anyhitPGShadowTriangle,
             hitPGRandomHitTriangle, textures.floatTextures, namedMaterials, materials, media, {},
-            threadAllocators);
+            threadAllocators, threadCUDAStreams);
         meshes.clear();
-        if (triangleBuildInput) {
-            inst.handles[0] = buildBVH(triangleBuildInput.optixInputs, threadCUDAStreams);
-            inst.sbtOffsets[0] = addHGRecords(triangleBuildInput);
-            inst.bounds = triangleBuildInput.bounds;
+        if (triangleBVH.traversableHandle) {
+            inst.handles[0] = triangleBVH.traversableHandle;
+            inst.sbtOffsets[0] = addHGRecords(triangleBVH);
+            inst.bounds = triangleBVH.bounds;
         }
 
-        ASBuildInput bilinearBuildInput =
-            createBuildInputForBLPs(def.second.shapes, hitPGBilinearPatch, anyhitPGShadowBilinearPatch,
-                                    hitPGRandomHitBilinearPatch, textures.floatTextures, namedMaterials,
-                                    materials, media, {}, threadAllocators);
-        if (bilinearBuildInput) {
-            inst.handles[1] = buildBVH(bilinearBuildInput.optixInputs, threadCUDAStreams);
-            inst.sbtOffsets[1] = addHGRecords(bilinearBuildInput);
-            inst.bounds = Union(inst.bounds, bilinearBuildInput.bounds);
+        BVH blpBVH =
+            buildBVHForBLPs(def.second.shapes, optixContext, hitPGBilinearPatch, anyhitPGShadowBilinearPatch,
+                            hitPGRandomHitBilinearPatch, textures.floatTextures, namedMaterials,
+                            materials, media, {}, threadAllocators, threadCUDAStreams);
+        if (blpBVH.traversableHandle) {
+            inst.handles[1] = blpBVH.traversableHandle;
+            inst.sbtOffsets[1] = addHGRecords(blpBVH);
+            inst.bounds = Union(inst.bounds, blpBVH.bounds);
         }
 
-        ASBuildInput quadricBuildInput =
-            createBuildInputForQuadrics(def.second.shapes, hitPGQuadric, anyhitPGShadowQuadric,
+        BVH quadricBVH =
+            buildBVHForQuadrics(def.second.shapes, optixContext, hitPGQuadric, anyhitPGShadowQuadric,
                                         hitPGRandomHitQuadric, textures.floatTextures, namedMaterials,
-                                        materials, media, {}, threadAllocators);
-        if (quadricBuildInput) {
-            inst.handles[2] = buildBVH(quadricBuildInput.optixInputs, threadCUDAStreams);
-            inst.sbtOffsets[2] = addHGRecords(quadricBuildInput);
-            inst.bounds = Union(inst.bounds, quadricBuildInput.bounds);
+                                        materials, media, {}, threadAllocators, threadCUDAStreams);
+        if (quadricBVH.traversableHandle) {
+            inst.handles[2] = quadricBVH.traversableHandle;
+            inst.sbtOffsets[2] = addHGRecords(quadricBVH);
+            inst.bounds = Union(inst.bounds, quadricBVH.bounds);
         }
 
         std::lock_guard<std::mutex> lock(instanceMapMutex);
@@ -1525,7 +1541,7 @@ OptiXAggregate::OptiXAggregate(
     buildInput.instanceArray.instances = instanceDevicePtr;
     buildInput.instanceArray.numInstances = iasInstances.size();
 
-    rootTraversable = buildBVH({buildInput}, threadCUDAStreams);
+    rootTraversable = buildOptixBVH(optixContext, {buildInput}, threadCUDAStreams);
 
     CUDA_CHECK(cudaFree((void *)instanceDevicePtr));
     LOG_VERBOSE("Finished building top-level IAS");

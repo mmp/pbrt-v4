@@ -62,22 +62,21 @@ class OptiXAggregate : public WavefrontAggregate {
   private:
     struct HitgroupRecord;
 
-    struct ASBuildInput {
-        ASBuildInput() = default;
-        ASBuildInput(size_t size);
+    struct BVH {
+        BVH() = default;
+        BVH(size_t size);
 
-        std::vector<OptixBuildInput> optixInputs;
+        OptixTraversableHandle traversableHandle = {};
         std::vector<HitgroupRecord> intersectHGRecords;
         std::vector<HitgroupRecord> shadowHGRecords;
         std::vector<HitgroupRecord> randomHitHGRecords;
         Bounds3f bounds;
-
-        operator bool() const { return !optixInputs.empty(); }
     };
 
-    static ASBuildInput createBuildInputForTriangles(
+    static BVH buildBVHForTriangles(
         const std::vector<ShapeSceneEntity> &shapes,
         const std::map<int, TriQuadMesh> &plyMeshes,
+        OptixDeviceContext optixContext,
         const OptixProgramGroup &intersectPG,
         const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
         const std::map<std::string, FloatTexture> &floatTextures,
@@ -85,32 +84,39 @@ class OptiXAggregate : public WavefrontAggregate {
         const std::vector<Material> &materials,
         const std::map<std::string, Medium> &media,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-        ThreadLocal<Allocator> &threadAllocators);
+        ThreadLocal<Allocator> &threadAllocators,
+        ThreadLocal<cudaStream_t> &threadCUDAStreams);
 
     static BilinearPatchMesh *diceCurveToBLP(const ShapeSceneEntity &shape,
                                              int nDiceU, int nDiceV, Allocator alloc);
 
-    static ASBuildInput createBuildInputForBLPs(
-        const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
+    static BVH buildBVHForBLPs(
+        const std::vector<ShapeSceneEntity> &shapes,
+        OptixDeviceContext optixContext,
+        const OptixProgramGroup &intersectPG,
         const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
         const std::map<std::string, FloatTexture> &floatTextures,
         const std::map<std::string, Material> &namedMaterials,
         const std::vector<Material> &materials,
         const std::map<std::string, Medium> &media,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-        ThreadLocal<Allocator> &threadAllocators);
+        ThreadLocal<Allocator> &threadAllocators,
+        ThreadLocal<cudaStream_t> &threadCUDAStreams);
 
-    static ASBuildInput createBuildInputForQuadrics(
-        const std::vector<ShapeSceneEntity> &shapes, const OptixProgramGroup &intersectPG,
+    static BVH buildBVHForQuadrics(
+        const std::vector<ShapeSceneEntity> &shapes,
+        OptixDeviceContext optixContext,
+        const OptixProgramGroup &intersectPG,
         const OptixProgramGroup &shadowPG, const OptixProgramGroup &randomHitPG,
         const std::map<std::string, FloatTexture> &floatTextures,
         const std::map<std::string, Material> &namedMaterials,
         const std::vector<Material> &materials,
         const std::map<std::string, Medium> &media,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-        ThreadLocal<Allocator> &threadAllocators);
+        ThreadLocal<Allocator> &threadAllocators,
+        ThreadLocal<cudaStream_t> &threadCUDAStreams);
 
-    int addHGRecords(const ASBuildInput &buildInput);
+    int addHGRecords(const BVH &bvh);
 
     static OptixModule createOptiXModule(OptixDeviceContext optixContext, const char *ptx);
     static OptixPipelineCompileOptions getPipelineCompileOptions();
@@ -120,8 +126,9 @@ class OptiXAggregate : public WavefrontAggregate {
     OptixProgramGroup createIntersectionPG(const char *closest, const char *any,
                                            const char *intersect) const;
 
-    OptixTraversableHandle buildBVH(const std::vector<OptixBuildInput> &buildInputs,
-                                    ThreadLocal<cudaStream_t> &threadCUDAStreams);
+    static OptixTraversableHandle buildOptixBVH(OptixDeviceContext optixContext,
+                                                const std::vector<OptixBuildInput> &buildInputs,
+                                                ThreadLocal<cudaStream_t> &threadCUDAStreams);
 
     CUDATrackedMemoryResource *memoryResource;
     std::mutex boundsMutex;
