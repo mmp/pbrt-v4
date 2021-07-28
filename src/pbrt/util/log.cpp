@@ -16,6 +16,7 @@
 #include <pbrt/util/string.h>
 
 #include <stdio.h>
+#include <string.h>
 #include <atomic>
 #include <ctime>
 #include <fstream>
@@ -206,7 +207,7 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization,
                 nvmlUtilization_t utilization;
                 if (nvmlDeviceGetMemoryInfo(device, &info) == NVML_SUCCESS &&
                     nvmlDeviceGetUtilizationRates(device, &utilization) == NVML_SUCCESS)
-                    LOG_VERBOSE("GPU: Memory used %d MB. SM activity: %d%% memory activity: %d%%",
+                    LOG_VERBOSE("GPU: Memory used %d MB. SM activity: %d memory activity: %d",
                                 info.used / (1024*1024), utilization.gpu, utilization.memory);
 #endif
             }
@@ -310,12 +311,17 @@ void Log(LogLevel level, const char *file, int line, const char *s) {
     if (len == 0)
         return;
     std::string levelString = (level == LogLevel::Verbose) ? "" : (ToString(level) + " ");
+
+    // cut off everything up to pbrt/
+    const char *fileStart = strstr(file, "pbrt/");
+    std::string shortfile(fileStart ? (fileStart + 5) : file);
+
     if (logging::logFile) {
         fprintf(logging::logFile, "[ " LOG_BASE_FMT " %s:%d ] %s%s\n", LOG_BASE_ARGS,
-                file, line, levelString.c_str(), s);
+                shortfile.c_str(), line, levelString.c_str(), s);
         fflush(logging::logFile);
     } else
-        fprintf(stderr, "[ " LOG_BASE_FMT " %s:%d ] %s%s\n", LOG_BASE_ARGS, file, line,
+        fprintf(stderr, "[ " LOG_BASE_FMT " %s:%d ] %s%s\n", LOG_BASE_ARGS, shortfile.c_str(), line,
                 levelString.c_str(), s);
 #endif
 }
@@ -329,8 +335,11 @@ void LogFatal(LogLevel level, const char *file, int line, const char *s) {
     static std::mutex mutex;
     std::lock_guard<std::mutex> lock(mutex);
 
-    fprintf(stderr, "[ " LOG_BASE_FMT " %s:%d ] %s %s\n", LOG_BASE_ARGS, file, line,
-            ToString(level).c_str(), s);
+    // cut off everything up to pbrt/
+    const char *fileStart = strstr(file, "pbrt/");
+    std::string shortfile(fileStart ? (fileStart + 5) : file);
+    fprintf(stderr, "[ " LOG_BASE_FMT " %s:%d ] %s %s\n", LOG_BASE_ARGS,
+            shortfile.c_str(), line, ToString(level).c_str(), s);
 
     CheckCallbackScope::Fail();
     abort();
