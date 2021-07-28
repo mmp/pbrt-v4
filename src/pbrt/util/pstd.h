@@ -348,10 +348,18 @@ class span {
     span(std::initializer_list<value_type> v) : span(v.begin(), v.size()) {}
 
     // Explicit reference constructor for a mutable `span<T>` type. Can be
-    // replaced with Makespan() to infer the type parameter.
+    // replaced with MakeSpan() to infer the type parameter.
     template <typename V, typename X = EnableIfConvertibleFrom<V>,
               typename Y = EnableIfMutableView<V>>
     PBRT_CPU_GPU explicit span(V &v) noexcept : span(v.data(), v.size()) {}
+
+    // Hack: explicit constructors for std::vector to work around warnings
+    // about calling a host function (e.g. vector::size()) form a
+    // host+device function (the regular span constructor.)
+    template <typename V>
+    span(std::vector<V> &v) noexcept : span(v.data(), v.size()) {}
+    template <typename V>
+    span(const std::vector<V> &v) noexcept : span(v.data(), v.size()) {}
 
     // Implicit reference constructor for a read-only `span<const T>` type
     template <typename V, typename X = EnableIfConvertibleFrom<V>,
@@ -425,6 +433,11 @@ PBRT_CPU_GPU inline span<T> MakeSpan(T *begin, T *end) noexcept {
     return span<T>(begin, end - begin);
 }
 
+template <int &...ExplicitArgumentBarrier, typename T>
+inline span<T> MakeSpan(std::vector<T> &v) noexcept {
+    return span<T>(v.data(), v.size());
+}
+
 template <int &...ExplicitArgumentBarrier, typename C>
 PBRT_CPU_GPU inline constexpr auto MakeSpan(C &c) noexcept
     -> decltype(MakeSpan(span_internal::GetData(c), c.size())) {
@@ -444,6 +457,11 @@ PBRT_CPU_GPU inline constexpr span<const T> MakeConstSpan(T *ptr, size_t size) n
 template <int &...ExplicitArgumentBarrier, typename T>
 PBRT_CPU_GPU inline span<const T> MakeConstSpan(T *begin, T *end) noexcept {
     return span<const T>(begin, end - begin);
+}
+
+template <int &...ExplicitArgumentBarrier, typename T>
+inline span<const T> MakeConstSpan(const std::vector<T> &v) noexcept {
+    return span<const T>(v.data(), v.size());
 }
 
 template <int &...ExplicitArgumentBarrier, typename C>

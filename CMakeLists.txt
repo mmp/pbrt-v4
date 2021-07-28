@@ -279,7 +279,7 @@ of CUDA installed, please update your PATH.")
           target_compile_options ("${lib_name}"
             PRIVATE
                 # disable "extern declaration... is treated as a static definition" warning
-                -Xcudafe=--display_error_number -Xcudafe=--diag_suppress=3089
+                -Xcudafe=--display_error_number -Xcudafe=--diag_suppress=20044
                 )
           # CUDA integration in Visual Studio seems broken as even if "Use
           # Host Preprocessor Definitions" is checked, the host preprocessor

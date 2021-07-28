@@ -343,6 +343,11 @@ void Log(LogLevel level, const char *file, int line, const char *s) {
 #endif
 }
 
+#ifdef __NVCC__
+// warning #1305-D: function declared with "noreturn" does return
+#pragma diag_suppress 1305
+#endif
+
 void LogFatal(LogLevel level, const char *file, int line, const char *s) {
 #ifdef PBRT_IS_GPU_CODE
     Log(LogLevel::Fatal, file, line, s);
