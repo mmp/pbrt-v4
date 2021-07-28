@@ -52,9 +52,7 @@ HaltonSampler::HaltonSampler(int samplesPerPixel, Point2i fullRes,
 }
 
 Sampler HaltonSampler::Clone(Allocator alloc) {
-    HaltonSampler *s = (HaltonSampler *)alloc.allocate_object<HaltonSampler>();
-    alloc.construct(s, *this);
-    return s;
+    return alloc.new_object<HaltonSampler>(*this);
 }
 
 std::string HaltonSampler::ToString() const {
@@ -95,9 +93,7 @@ HaltonSampler *HaltonSampler::Create(const ParameterDictionary &parameters,
 }
 
 Sampler SobolSampler::Clone(Allocator alloc) {
-    SobolSampler *s = (SobolSampler *)alloc.allocate_object<SobolSampler>();
-    alloc.construct(s, *this);
-    return s;
+    return alloc.new_object<SobolSampler>(*this);
 }
 
 std::string PaddedSobolSampler::ToString() const {
@@ -107,9 +103,7 @@ std::string PaddedSobolSampler::ToString() const {
 }
 
 Sampler PaddedSobolSampler::Clone(Allocator alloc) {
-    PaddedSobolSampler *s = (PaddedSobolSampler *)alloc.allocate_object<PaddedSobolSampler>();
-    alloc.construct(s, *this);
-    return s;
+    return alloc.new_object<PaddedSobolSampler>(*this);
 }
 
 PaddedSobolSampler *PaddedSobolSampler::Create(const ParameterDictionary &parameters,
@@ -140,9 +134,7 @@ PaddedSobolSampler *PaddedSobolSampler::Create(const ParameterDictionary &parame
 
 // ZSobolSampler Method Definitions
 Sampler ZSobolSampler::Clone(Allocator alloc) {
-    ZSobolSampler *s = (ZSobolSampler *)alloc.allocate_object<ZSobolSampler>();
-    alloc.construct(s, *this);
-    return s;
+    return alloc.new_object<ZSobolSampler>(*this);
 }
 
 std::string ZSobolSampler::ToString() const {
@@ -227,9 +219,7 @@ PMJ02BNSampler *PMJ02BNSampler::Create(const ParameterDictionary &parameters,
 }
 
 Sampler PMJ02BNSampler::Clone(Allocator alloc) {
-    PMJ02BNSampler *s = (PMJ02BNSampler *)alloc.allocate_object<PMJ02BNSampler>();
-    alloc.construct(s, *this);
-    return s;
+    return alloc.new_object<PMJ02BNSampler>(*this);
 }
 
 std::string PMJ02BNSampler::ToString() const {
@@ -245,9 +235,7 @@ std::string IndependentSampler::ToString() const {
 }
 
 Sampler IndependentSampler::Clone(Allocator alloc) {
-    IndependentSampler *s = (IndependentSampler *)alloc.allocate_object<IndependentSampler>();
-    alloc.construct(s, *this);
-    return s;
+    return alloc.new_object<IndependentSampler>(*this);
 }
 
 IndependentSampler *IndependentSampler::Create(const ParameterDictionary &parameters,
@@ -304,9 +292,7 @@ std::string StratifiedSampler::ToString() const {
 }
 
 Sampler StratifiedSampler::Clone(Allocator alloc) {
-    StratifiedSampler *s = (StratifiedSampler *)alloc.allocate_object<StratifiedSampler>();
-    alloc.construct(s, *this);
-    return s;
+    return alloc.new_object<StratifiedSampler>(*this);
 }
 
 StratifiedSampler *StratifiedSampler::Create(const ParameterDictionary &parameters,
@@ -348,7 +334,7 @@ Point2f MLTSampler::GetPixel2D() {
 }
 
 Sampler MLTSampler::Clone(Allocator alloc) {
-    LOG_FATAL("MLTSampler::Clone() mplemented");
+    LOG_FATAL("MLTSampler::Clone() is not implemented");
     return {};
 }
 

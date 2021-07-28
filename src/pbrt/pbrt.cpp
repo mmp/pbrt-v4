@@ -61,11 +61,11 @@ void InitPBRT(const PBRTOptions &opt) {
 
         CUDA_CHECK(cudaMemcpyToSymbol(OptionsGPU, Options, sizeof(OptionsGPU)));
 
-        // Leak so things aren't freed
-        pstd::pmr::monotonic_buffer_resource *bufferResource = new
-            pstd::pmr::monotonic_buffer_resource(1024*1024, &CUDATrackedMemoryResource::singleton);
+        // Leak this so memory it allocates isn't freed
+        pstd::pmr::monotonic_buffer_resource *bufferResource =
+            new pstd::pmr::monotonic_buffer_resource(
+                1024 * 1024, &CUDATrackedMemoryResource::singleton);
         Allocator alloc(bufferResource);
-
         ColorEncoding::Init(alloc);
         Spectra::Init(alloc);
         RGBToSpectrumTable::Init(alloc);

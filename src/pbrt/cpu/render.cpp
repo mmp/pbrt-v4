@@ -88,8 +88,8 @@ void RenderCPU(ParsedScene &parsedScene) {
     parsedScene.CreateMaterials(textures, threadAllocators, &namedMaterials, &materials);
     LOG_VERBOSE("Finished materials");
 
-    Primitive accel = parsedScene.CreateAggregate(textures, shapeIndexToAreaLights,
-                                                  media, namedMaterials, materials);
+    Primitive accel = parsedScene.CreateAggregate(textures, shapeIndexToAreaLights, media,
+                                                  namedMaterials, materials);
 
     // Integrator
     const RGBColorSpace *integratorColorSpace = parsedScene.film.parameters.ColorSpace();

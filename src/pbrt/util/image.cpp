@@ -197,7 +197,8 @@ pstd::vector<Image> Image::GeneratePyramid(Image image, WrapMode2D wrapMode,
 }
 
 bool Image::HasAnyInfinitePixels() const {
-    if (format == PixelFormat::U256) return false;
+    if (format == PixelFormat::U256)
+        return false;
 
     for (int y = 0; y < resolution.y; ++y)
         for (int x = 0; x < resolution.x; ++x)
@@ -208,7 +209,8 @@ bool Image::HasAnyInfinitePixels() const {
 }
 
 bool Image::HasAnyNaNPixels() const {
-    if (format == PixelFormat::U256) return false;
+    if (format == PixelFormat::U256)
+        return false;
 
     for (int y = 0; y < resolution.y; ++y)
         for (int x = 0; x < resolution.x; ++x)
@@ -1339,7 +1341,10 @@ Image Image::SelectChannels(const ImageChannelDesc &desc, Allocator alloc) const
                     dst[i] = src[desc.offset[i]];
             }
         break;
+    default:
+        LOG_FATAL("Unhandled PixelFormat");
     }
+
     return image;
 }
 

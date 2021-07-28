@@ -808,9 +808,8 @@ void ParsedScene::CreateMaterials(
     std::map<std::string, Image *> normalMapCache;
     std::mutex mutex;
     ParallelFor(0, normalMapFilenameVector.size(), [&](int64_t index) {
-        std::string filename = normalMapFilenameVector[index];
         Allocator alloc = threadAllocators.Get();
-
+        std::string filename = normalMapFilenameVector[index];
         ImageAndMetadata immeta =
             Image::Read(filename, Allocator(), ColorEncoding::Linear);
         Image &image = immeta.image;
@@ -829,9 +828,10 @@ void ParsedScene::CreateMaterials(
 
     // Named materials
     for (const auto &nm : namedMaterials) {
-        Allocator alloc = threadAllocators.Get();
         const std::string &name = nm.first;
         const SceneEntity &mtl = nm.second;
+        Allocator alloc = threadAllocators.Get();
+
         if (namedMaterialsOut->find(name) != namedMaterialsOut->end()) {
             ErrorExitDeferred(&mtl.loc, "%s: trying to redefine named material.", name);
             continue;
@@ -950,8 +950,8 @@ NamedTextures ParsedScene::CreateTextures(ThreadLocal<Allocator> &threadAllocato
     std::mutex mutex;
 
     ParallelFor(0, parallelFloatTextures.size(), [&](int64_t i) {
-        const auto &tex = floatTextures[parallelFloatTextures[i]];
         Allocator alloc = threadAllocators.Get();
+        const auto &tex = floatTextures[parallelFloatTextures[i]];
 
         pbrt::Transform renderFromTexture = tex.second.renderFromObject.startTransform;
         // Pass nullptr for the textures, since they shouldn't be accessed
@@ -964,8 +964,8 @@ NamedTextures ParsedScene::CreateTextures(ThreadLocal<Allocator> &threadAllocato
     });
 
     ParallelFor(0, parallelSpectrumTextures.size(), [&](int64_t i) {
-        const auto &tex = spectrumTextures[parallelSpectrumTextures[i]];
         Allocator alloc = threadAllocators.Get();
+        const auto &tex = spectrumTextures[parallelSpectrumTextures[i]];
 
         pbrt::Transform renderFromTexture = tex.second.renderFromObject.startTransform;
         // nullptr for the textures, as above.
@@ -990,8 +990,8 @@ NamedTextures ParsedScene::CreateTextures(ThreadLocal<Allocator> &threadAllocato
     LOG_VERBOSE("Loading serial textures");
     // And do the rest serially
     for (size_t index : serialFloatTextures) {
-        const auto &tex = floatTextures[index];
         Allocator alloc = threadAllocators.Get();
+        const auto &tex = floatTextures[index];
 
         pbrt::Transform renderFromTexture = tex.second.renderFromObject.startTransform;
         TextureParameterDictionary texDict(&tex.second.parameters, &textures);
@@ -1000,8 +1000,8 @@ NamedTextures ParsedScene::CreateTextures(ThreadLocal<Allocator> &threadAllocato
         textures.floatTextures[tex.first] = t;
     }
     for (size_t index : serialSpectrumTextures) {
-        const auto &tex = spectrumTextures[index];
         Allocator alloc = threadAllocators.Get();
+        const auto &tex = spectrumTextures[index];
 
         if (tex.second.renderFromObject.IsAnimated())
             Warning(&tex.second.loc, "Animated world to texture transform not supported. "

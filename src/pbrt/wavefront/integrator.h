@@ -118,7 +118,6 @@ class WavefrontPathIntegrator {
     }
 
     // WavefrontPathIntegrator Member Variables
-    pstd::pmr::memory_resource *memoryResource;
     bool initializeVisibleSurface;
     bool haveSubsurface;
     bool haveMedia;
@@ -135,6 +134,8 @@ class WavefrontPathIntegrator {
         pstd::vector<uint64_t> indirectRays, shadowRays;
     };
     Stats *stats;
+
+    pstd::pmr::memory_resource *memoryResource;
 
     Filter filter;
     Film film;

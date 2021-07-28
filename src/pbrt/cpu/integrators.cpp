@@ -94,7 +94,8 @@ void ImageTileIntegrator::Render() {
     });
 
     // Declare common variables for rendering image in tiles
-    ThreadLocal<ScratchBuffer> scratchBuffers([]() { return ScratchBuffer(65536); } );
+    ThreadLocal<ScratchBuffer> scratchBuffers([]() { return ScratchBuffer(65536); });
+
     ThreadLocal<Sampler> samplers([this]() { return samplerPrototype.Clone(); });
 
     Bounds2i pixelBounds = camera.GetFilm().PixelBounds();
@@ -2539,7 +2540,8 @@ void MLTIntegrator::Render() {
     int nBootstrapSamples = nBootstrap * (maxDepth + 1);
     std::vector<Float> bootstrapWeights(nBootstrapSamples, 0);
     // Allocate scratch buffers for MLT samples
-    ThreadLocal<ScratchBuffer> threadScratchBuffers([]() { return ScratchBuffer(65536); });
+    ThreadLocal<ScratchBuffer> threadScratchBuffers(
+        []() { return ScratchBuffer(65536); });
 
     // Generate bootstrap samples in parallel
     ProgressReporter progress(nBootstrap, "Generating bootstrap paths", Options->quiet);
@@ -2795,9 +2797,8 @@ void SPPMIntegrator::Render() {
     });
 
     // Allocate samplers for SPPM rendering
-    ThreadLocal<Sampler> threadSamplers([this]() {
-        return samplerPrototype.Clone(Allocator());
-    });
+    ThreadLocal<Sampler> threadSamplers(
+        [this]() { return samplerPrototype.Clone(Allocator()); });
     pstd::vector<DigitPermutation> *digitPermutations(
         ComputeRadicalInversePermutations(digitPermutationsSeed));
 
@@ -3013,7 +3014,8 @@ void SPPMIntegrator::Render() {
 
         // Trace photons and accumulate contributions
         // Create per-thread scratch buffers for photon shooting
-        ThreadLocal<ScratchBuffer> photonShootScratchBuffers([]() { return ScratchBuffer(65536); });
+        ThreadLocal<ScratchBuffer> photonShootScratchBuffers(
+            []() { return ScratchBuffer(65536); });
 
         ParallelFor(0, photonsPerIteration, [&](int64_t start, int64_t end) {
             // Follow photon paths for photon index range _start_ - _end_
@@ -3141,9 +3143,7 @@ void SPPMIntegrator::Render() {
             }
         });
         // Reset _threadScratchBuffers_ after tracing photons
-        threadScratchBuffers.ForAll([](ScratchBuffer &buffer) {
-            buffer.Reset();
-        });
+        threadScratchBuffers.ForAll([](ScratchBuffer &buffer) { buffer.Reset(); });
 
         progress.Update();
         photonPaths += photonsPerIteration;

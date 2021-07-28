@@ -838,14 +838,13 @@ class SampledGrid {
         Vector3f d = pSamples - (Point3f)pi;
 
         // Return trilinearly interpolated voxel values
-        auto d00 =
-            Lerp(d.x, Lookup(pi), Lookup(pi + Vector3i(1, 0, 0)));
-        auto d10 = Lerp(d.x, Lookup(pi + Vector3i(0, 1, 0)),
-                        Lookup(pi + Vector3i(1, 1, 0)));
-        auto d01 = Lerp(d.x, Lookup(pi + Vector3i(0, 0, 1)),
-                        Lookup(pi + Vector3i(1, 0, 1)));
-        auto d11 = Lerp(d.x, Lookup(pi + Vector3i(0, 1, 1)),
-                        Lookup(pi + Vector3i(1, 1, 1)));
+        auto d00 = Lerp(d.x, Lookup(pi), Lookup(pi + Vector3i(1, 0, 0)));
+        auto d10 =
+            Lerp(d.x, Lookup(pi + Vector3i(0, 1, 0)), Lookup(pi + Vector3i(1, 1, 0)));
+        auto d01 =
+            Lerp(d.x, Lookup(pi + Vector3i(0, 0, 1)), Lookup(pi + Vector3i(1, 0, 1)));
+        auto d11 =
+            Lerp(d.x, Lookup(pi + Vector3i(0, 1, 1)), Lookup(pi + Vector3i(1, 1, 1)));
         return Lerp(d.z, Lerp(d.y, d00, d10), Lerp(d.y, d01, d11));
     }
 

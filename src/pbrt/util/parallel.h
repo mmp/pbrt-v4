@@ -23,13 +23,12 @@
 
 namespace pbrt {
 
+// ThreadLocal Definition
 template <typename T, int maxThreads = 256>
 class ThreadLocal {
-public:
-    ThreadLocal()
-        : hashTable(maxThreads), create([]() { return T(); }) {}
-    ThreadLocal(std::function<T(void)> &&c)
-        : hashTable(maxThreads), create(c) {}
+  public:
+    ThreadLocal() : hashTable(maxThreads), create([]() { return T(); }) {}
+    ThreadLocal(std::function<T(void)> &&c) : hashTable(maxThreads), create(c) {}
 
     T &Get() {
         std::thread::id tid = std::this_thread::get_id();
@@ -86,7 +85,7 @@ public:
         mutex.unlock();
     }
 
-private:
+  private:
     struct Entry {
         std::thread::id tid;
         T value;

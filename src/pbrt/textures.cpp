@@ -1292,8 +1292,10 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
     texDesc.maxAnisotropy = Clamp(maxAniso, 1, 16);
     texDesc.maxMipmapLevelClamp = nMIPMapLevels - 1;
     texDesc.minMipmapLevelClamp = 0;
-    texDesc.mipmapFilterMode = (filter == "trilinear" || filter == "ewa" || filter == "EWA") ?
-        cudaFilterModeLinear : cudaFilterModePoint;
+    texDesc.mipmapFilterMode =
+        (filter == "trilinear" || filter == "ewa" || filter == "EWA")
+            ? cudaFilterModeLinear
+            : cudaFilterModePoint;
     texDesc.borderColor[0] = texDesc.borderColor[1] = texDesc.borderColor[2] =
         texDesc.borderColor[3] = 0.f;
     texDesc.sRGB = 1;
@@ -1415,8 +1417,10 @@ GPUFloatImageTexture *GPUFloatImageTexture::Create(
     texDesc.maxAnisotropy = Clamp(maxAniso, 1, 16);
     texDesc.maxMipmapLevelClamp = nMIPMapLevels - 1;
     texDesc.minMipmapLevelClamp = 0;
-    texDesc.mipmapFilterMode = (filter == "trilinear" || filter == "ewa" || filter == "EWA") ?
-        cudaFilterModeLinear : cudaFilterModePoint;
+    texDesc.mipmapFilterMode =
+        (filter == "trilinear" || filter == "ewa" || filter == "EWA")
+            ? cudaFilterModeLinear
+            : cudaFilterModePoint;
     texDesc.borderColor[0] = texDesc.borderColor[1] = texDesc.borderColor[2] =
         texDesc.borderColor[3] = 0.f;
     texDesc.sRGB = 1;

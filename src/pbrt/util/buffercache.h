@@ -33,40 +33,36 @@ class BufferCache {
         ++nBufferCacheLookups;
         // Return pointer to data if _buf_ contents is already in the cache
         Buffer lookupBuffer(buf.data(), buf.size());
-
         int shardIndex = uint32_t(lookupBuffer.hash) >> (32 - logShards);
-        CHECK(shardIndex >= 0 && shardIndex < nShards);
-
+        DCHECK(shardIndex >= 0 && shardIndex < nShards);
         mutex[shardIndex].lock_shared();
-        if (auto iter = cache[shardIndex].find(lookupBuffer); iter != cache[shardIndex].end()) {
-            DCHECK(std::memcmp(buf.data(), iter->ptr, buf.size() * sizeof(T)) == 0);
+        if (auto iter = cache[shardIndex].find(lookupBuffer);
+            iter != cache[shardIndex].end()) {
             const T *ptr = iter->ptr;
             mutex[shardIndex].unlock_shared();
-
+            DCHECK(std::memcmp(buf.data(), iter->ptr, buf.size() * sizeof(T)) == 0);
             ++nBufferCacheHits;
             redundantBufferBytes += buf.size() * sizeof(T);
             return ptr;
         }
 
-        mutex[shardIndex].unlock_shared();
-
         // Add _buf_ contents to cache and return pointer to cached copy
+        mutex[shardIndex].unlock_shared();
         T *ptr = alloc.allocate_object<T>(buf.size());
         std::copy(buf.begin(), buf.end(), ptr);
         bytesUsed += buf.size() * sizeof(T);
-
         mutex[shardIndex].lock();
-        if (auto iter = cache[shardIndex].find(lookupBuffer); iter != cache[shardIndex].end()) {
-            // Someone else got it in there in the meantime...
-            alloc.deallocate_object(ptr, buf.size());
-
-            const T *ptr = iter->ptr;
+        // Handle the case of another thread adding the buffer first
+        if (auto iter = cache[shardIndex].find(lookupBuffer);
+            iter != cache[shardIndex].end()) {
+            const T *cachePtr = iter->ptr;
             mutex[shardIndex].unlock();
-
+            alloc.deallocate_object(ptr, buf.size());
             ++nBufferCacheHits;
             redundantBufferBytes += buf.size() * sizeof(T);
-            return ptr;
+            return cachePtr;
         }
+
         cache[shardIndex].insert(Buffer(ptr, buf.size()));
         mutex[shardIndex].unlock();
         return ptr;
@@ -88,8 +84,7 @@ class BufferCache {
         }
 
         const T *ptr = nullptr;
-        size_t size = 0;
-        size_t hash;
+        size_t size = 0, hash;
     };
 
     // BufferCache::BufferHasher Definition

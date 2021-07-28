@@ -75,12 +75,12 @@ static void updateMaterialNeeds(
         (*haveUniversalEvalMaterial)[m.Tag()] = true;
 }
 
-WavefrontPathIntegrator::WavefrontPathIntegrator(pstd::pmr::memory_resource *memoryResource,
-                                                 ParsedScene &scene)
+WavefrontPathIntegrator::WavefrontPathIntegrator(
+    pstd::pmr::memory_resource *memoryResource, ParsedScene &scene)
     : memoryResource(memoryResource) {
     ThreadLocal<Allocator> threadAllocators([memoryResource]() {
         pstd::pmr::monotonic_buffer_resource *resource =
-            new pstd::pmr::monotonic_buffer_resource(1024*1024, memoryResource);
+            new pstd::pmr::monotonic_buffer_resource(1024 * 1024, memoryResource);
         return Allocator(resource);
     });
 
@@ -149,6 +149,7 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(pstd::pmr::memory_resource *mem
 
     LOG_VERBOSE("Starting to create lights");
     pstd::vector<Light> allLights;
+
     infiniteLights = alloc.new_object<pstd::vector<Light>>(alloc);
     for (const auto &light : scene.lights) {
         Medium outsideMedium = findMedium(light.medium, &light.loc);
@@ -171,11 +172,10 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(pstd::pmr::memory_resource *mem
     std::map<int, pstd::vector<Light> *> shapeIndexToAreaLights;
 
     std::set<std::string> namedMaterialsThatAreInterfaces;
-    for (auto iter = scene.namedMaterials.begin();
-         iter != scene.namedMaterials.end(); ++iter) {
+    for (auto iter = scene.namedMaterials.begin(); iter != scene.namedMaterials.end();
+         ++iter) {
         std::string materialName = iter->second.parameters.GetOneString("type", "");
-        if (materialName == "interface" || materialName == "none" ||
-            materialName.empty())
+        if (materialName == "interface" || materialName == "none" || materialName.empty())
             namedMaterialsThatAreInterfaces.insert(iter->first);
     }
 
@@ -263,14 +263,14 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(pstd::pmr::memory_resource *mem
         CUDATrackedMemoryResource *mr =
             dynamic_cast<CUDATrackedMemoryResource *>(memoryResource);
         CHECK(mr);
-        aggregate = new OptiXAggregate(scene, mr, textures, shapeIndexToAreaLights,
-                                       media, namedMaterials, materials);
+        aggregate = new OptiXAggregate(scene, mr, textures, shapeIndexToAreaLights, media,
+                                       namedMaterials, materials);
 #else
         LOG_FATAL("Options->useGPU was set without PBRT_BUILD_GPU_RENDERER enabled");
 #endif
     } else
-        aggregate = new CPUAggregate(scene, textures, shapeIndexToAreaLights,
-                                     media, namedMaterials, materials);
+        aggregate = new CPUAggregate(scene, textures, shapeIndexToAreaLights, media,
+                                     namedMaterials, materials);
 
     // Preprocess the light sources
     for (Light light : allLights)
@@ -310,8 +310,8 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(pstd::pmr::memory_resource *mem
     if (!Options->mseReferenceOutput.empty())
         Warning("The wavefront integrator does not support --mse-reference-out.");
 
-    ///////////////////////////////////////////////////////////////////////////
-    // Allocate storage for all of the queues/buffers...
+        ///////////////////////////////////////////////////////////////////////////
+        // Allocate storage for all of the queues/buffers...
 
 #ifdef PBRT_BUILD_GPU_RENDERER
     CUDATrackedMemoryResource *mr =

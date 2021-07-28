@@ -27,8 +27,7 @@ class TriangleMesh {
     TriangleMesh(const Transform &renderFromObject, bool reverseOrientation,
                  std::vector<int> vertexIndices, std::vector<Point3f> p,
                  std::vector<Vector3f> S, std::vector<Normal3f> N,
-                 std::vector<Point2f> uv, std::vector<int> faceIndices,
-                 Allocator alloc);
+                 std::vector<Point2f> uv, std::vector<int> faceIndices, Allocator alloc);
 
     std::string ToString() const;
 

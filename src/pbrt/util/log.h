@@ -18,9 +18,8 @@ enum class LogLevel { Verbose, Error, Fatal, Invalid };
 std::string ToString(LogLevel level);
 LogLevel LogLevelFromString(const std::string &s);
 
-void InitLogging(LogLevel level, std::string logFile, bool logUtilization,
-                 bool useGPU);
 void ShutdownLogging();
+void InitLogging(LogLevel level, std::string logFile, bool logUtilization, bool useGPU);
 
 #ifdef PBRT_BUILD_GPU_RENDERER
 

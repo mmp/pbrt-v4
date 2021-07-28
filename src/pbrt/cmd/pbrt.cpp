@@ -167,8 +167,9 @@ int main(int argc, char *argv[]) {
                      onError) ||
             ParseArg(&iter, args.end(), "format", &format, onError) ||
             ParseArg(&iter, args.end(), "log-level", &logLevel, onError) ||
+            ParseArg(&iter, args.end(), "log-utilization", &options.logUtilization,
+                     onError) ||
             ParseArg(&iter, args.end(), "log-file", &options.logFile, onError) ||
-            ParseArg(&iter, args.end(), "log-utilization", &options.logUtilization, onError) ||
             ParseArg(&iter, args.end(), "mse-reference-image", &options.mseReferenceImage,
                      onError) ||
             ParseArg(&iter, args.end(), "mse-reference-out", &options.mseReferenceOutput,
