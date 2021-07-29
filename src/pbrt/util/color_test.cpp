@@ -288,7 +288,7 @@ TEST(sRGB, Conversion) {
     for (int i = 0; i < 256; ++i) {
         Float x = LinearToSRGB(i * (1.f / 255.f));
         Float y = SRGBToLinear(x) * 255.f;
-        EXPECT_LT(std::abs(i - y), 3e-4) <<
-            StringPrintf("i = %d -> linear %f -> srgb %f", i, x, y);
+        EXPECT_LT(std::abs(i - y), 3e-4)
+            << StringPrintf("i = %d -> linear %f -> srgb %f", i, x, y);
     }
 }

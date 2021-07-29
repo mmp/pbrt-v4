@@ -35,7 +35,8 @@ TEST(StringPrintf, FancyPctS) {
     EXPECT_EQ(StringPrintf("%s", false), "false");
     EXPECT_EQ(StringPrintf("%s", true), "true");
 #ifdef PBRT_FLOAT_AS_DOUBLE
-    EXPECT_EQ(StringPrintf("%s", Vector3f(Pi, -2, 3.1)), "[ 3.141592653589793, -2, 3.1 ]");
+    EXPECT_EQ(StringPrintf("%s", Vector3f(Pi, -2, 3.1)),
+              "[ 3.141592653589793, -2, 3.1 ]");
 #else
     EXPECT_EQ(StringPrintf("%s", Vector3f(Pi, -2, 3.1)), "[ 3.1415927, -2, 3.1 ]");
 #endif

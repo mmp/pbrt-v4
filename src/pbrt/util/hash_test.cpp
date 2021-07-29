@@ -46,9 +46,9 @@ TEST(Hash, Collisions) {
 }
 
 TEST(Hash, Unaligned) {
-    uint64_t buf[] = { 0xfacebeef, 0x65028088, 0x13372048 };
+    uint64_t buf[] = {0xfacebeef, 0x65028088, 0x13372048};
     char cbuf[sizeof(buf) + 8];
-    for (int delta = 0; delta < 8; ++ delta) {
+    for (int delta = 0; delta < 8; ++delta) {
         memcpy(cbuf + delta, buf, sizeof(buf));
         EXPECT_EQ(HashBuffer(buf, sizeof(buf)), HashBuffer(cbuf + delta, sizeof(buf)));
     }

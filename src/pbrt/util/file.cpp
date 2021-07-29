@@ -129,7 +129,6 @@ std::string ReadFileContents(std::string filename) {
 }
 
 std::string ReadDecompressedFileContents(std::string filename) {
-
     std::string contents;
 
     gzFile f = gzopen(filename.c_str(), "rb");
@@ -137,16 +136,16 @@ std::string ReadDecompressedFileContents(std::string filename) {
         Error("%s: unable to open file", filename);
         return {};
     }
-    
+
     char buffer[4096];
     int bytesRead = 0;
     do {
         bytesRead = gzread(f, buffer, 4096);
         contents.append(buffer, bytesRead);
-    } while ( !gzeof(f) || bytesRead < 0);
-   
+    } while (!gzeof(f) || bytesRead < 0);
+
     int status = gzclose(f);
-    
+
     if (bytesRead < 0) {
         Error("%s: zlib read error", filename);
         return {};

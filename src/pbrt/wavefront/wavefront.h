@@ -15,4 +15,4 @@ void RenderWavefront(ParsedScene &);
 
 }
 
-#endif // PBRT_WAVEFRONT_WAVEFRONT_H
+#endif  // PBRT_WAVEFRONT_WAVEFRONT_H

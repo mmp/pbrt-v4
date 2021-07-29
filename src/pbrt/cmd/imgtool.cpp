@@ -16,12 +16,12 @@
 #include <pbrt/util/math.h>
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/print.h>
+#include <pbrt/util/progressreporter.h>
 #include <pbrt/util/rng.h>
 #include <pbrt/util/sampling.h>
 #include <pbrt/util/spectrum.h>
 #include <pbrt/util/string.h>
 #include <pbrt/util/vecmath.h>
-#include <pbrt/util/progressreporter.h>
 
 extern "C" {
 #include <skymodel/ArHosekSkyModel.h>
@@ -72,31 +72,34 @@ struct CommandUsage {
 };
 
 static std::map<std::string, CommandUsage> commandUsage = {
-    {"assemble", {"assemble [options] <filenames...>",
-                  "Assemble multiple images representing cropped regions of a larger\n"
-                  "    image into a single composite image.",
-                  std::string(R"(
+    {"assemble",
+     {"assemble [options] <filenames...>",
+      "Assemble multiple images representing cropped regions of a larger\n"
+      "    image into a single composite image.",
+      std::string(R"(
     --outfile          Output image filename.
 )")}},
-    {"average", {"average [options] <filename base>",
-                 "Generate an image that is the result of averaging multiple images.\n"
-                 "    The constituent images are specified with a path that gives their\n"
-                 "    prefix.",
-                 std::string(R"(
+    {"average",
+     {"average [options] <filename base>",
+      "Generate an image that is the result of averaging multiple images.\n"
+      "    The constituent images are specified with a path that gives their\n"
+      "    prefix.",
+      std::string(R"(
     --outfile          Output image filename.
 )")}},
-    {"cat", {"cat [options] <filename>",
-             "Print the pixel values of the specified image to standard output.",
-             std::string(R"(
+    {"cat",
+     {"cat [options] <filename>",
+      "Print the pixel values of the specified image to standard output.", std::string(R"(
     --csv              Output pixel values in CSV format.
     --list             Output pixel values in a brace-delimited list
                        (Mathematica-compatible).
     --sort             Sort output by pixel luminance.
 )")}},
-    {"bloom", {"bloom [options] <filename>",
-               "Apply a bloom effect to the specified image where pixels that are\n"
-               "    brighter than a threshold are blurred and added to nearby pixels.",
-               std::string(R"(
+    {"bloom",
+     {"bloom [options] <filename>",
+      "Apply a bloom effect to the specified image where pixels that are\n"
+      "    brighter than a threshold are blurred and added to nearby pixels.",
+      std::string(R"(
     --iterations <n>   Number of filtering iterations used to generate the bloom
                        image. Default: 5
     --level <n>        Minimum RGB value for a pixel for it to contribute to bloom.
@@ -107,10 +110,11 @@ static std::map<std::string, CommandUsage> commandUsage = {
     --width <w>        Width of Gaussian used to generate bloom images.
                        Default: 15
 )")}},
-    {"convert", {"convert [options] <filename>",
-                 "Convert an image, possibly going from one format to another.\n"
-                 "    A variety of image processing operations can be performed as well.",
-                 std::string(R"(
+    {"convert",
+     {"convert [options] <filename>",
+      "Convert an image, possibly going from one format to another.\n"
+      "    A variety of image processing operations can be performed as well.",
+      std::string(R"(
     --aces-filmic      Apply the ACES filmic s-curve to map values to [0,1].
     --bw               Convert to black and white (average channels)
     --channels <names> Process the provided comma-delineated set of channels.
@@ -138,11 +142,12 @@ static std::map<std::string, CommandUsage> commandUsage = {
     --tonemap          Apply tonemapping to the image (Reinhard et al.'s
                        photographic tone mapping operator)
 )")}},
-    {"diff", {"diff [options] <filename>",
-              "Compute the difference between an image and a reference image\n"
-              "    according to a variety of metrics and optionally output a\n"
-              "    difference image.",
-              std::string(R"(
+    {"diff",
+     {"diff [options] <filename>",
+      "Compute the difference between an image and a reference image\n"
+      "    according to a variety of metrics and optionally output a\n"
+      "    difference image.",
+      std::string(R"(
     --channels <names> Comma-separated list of channels to include in comparison.
                        Default: R,G,B.
     --crop <x0,x1,y0,y1> Crop images before performing diff.
@@ -153,19 +158,21 @@ static std::map<std::string, CommandUsage> commandUsage = {
                        absolute value of per-pixel differences.
     --reference <name> Filename for reference image
 )")}},
-    {"denoise", {"denoise [options] <filename>",
-                 "Applies a simple denoising algorithm to the provided image.\n"
-                 "    The image should be a multi-channel EXR as generated by pbrt's\n"
-                 "    \"gbuffer\" film.",
-                 std::string(R"( options:
+    {"denoise",
+     {"denoise [options] <filename>",
+      "Applies a simple denoising algorithm to the provided image.\n"
+      "    The image should be a multi-channel EXR as generated by pbrt's\n"
+      "    \"gbuffer\" film.",
+      std::string(R"( options:
     --outfile <name>   Filename to use for the denoised image.
 )")}},
 #ifdef PBRT_BUILD_GPU_RENDERER
-    {"denoise-optix", {"denoise-optix [options] <filename>",
-                       "Denoises the image using NVIDIA's OptiX denoiser which is\n"
-                       "    based on a deep neural network. The provided image should\n"
-                       "    be a multi-channel EXR as generated by pbrt's \"gbuffer\" film.",
-                       std::string(R"( options:
+    {"denoise-optix",
+     {"denoise-optix [options] <filename>",
+      "Denoises the image using NVIDIA's OptiX denoiser which is\n"
+      "    based on a deep neural network. The provided image should\n"
+      "    be a multi-channel EXR as generated by pbrt's \"gbuffer\" film.",
+      std::string(R"( options:
     --outfile <name>   Filename to use for the denoised image.
 )")}},
 #endif  // PBRT_BUILD_GPU_RENDERER
@@ -180,10 +187,11 @@ static std::map<std::string, CommandUsage> commandUsage = {
    --metric <name>      Error metric to use. (Options: "MAE", MSE", "MRSE")
    --reference <name>   Reference image filename.
 )")}},
-    {"falsecolor", {"falsecolor [options] <filename>",
-                    "Generate a false color image encoding the magnitude of the\n"
-                    "    average of the channels in each pixel in the provided image.",
-                    std::string(R"(
+    {"falsecolor",
+     {"falsecolor [options] <filename>",
+      "Generate a false color image encoding the magnitude of the\n"
+      "    average of the channels in each pixel in the provided image.",
+      std::string(R"(
     --maxvalue <v>     Value to map to the last value in the color ramp.
                        (Default: maximum pixel value in the image.)
     --outfile <name>   Filename for output image.
@@ -191,57 +199,62 @@ static std::map<std::string, CommandUsage> commandUsage = {
     --ramp             Generate an image of the color ramp; <filename> is ignored
                        if specified.
 )")}},
-    {"info", {"info <filename>",
-              "Prints out image information including resolution, colorspace and pixel stats",
-              std::string(R"(
+    {"info",
+     {"info <filename>",
+      "Prints out image information including resolution, colorspace and pixel stats",
+      std::string(R"(
     (No options)
 )")}},
-    {"makeequiarea", {"makeequiarea [options] <filename>",
-                      "Convert a equirectangular environment map (as used in pbrt-v3)\n"
-                      "    to an equi-area parameterization (as used in pbrt-v4).",
-                      std::string(R"(
+    {"makeequiarea",
+     {"makeequiarea [options] <filename>",
+      "Convert a equirectangular environment map (as used in pbrt-v3)\n"
+      "    to an equi-area parameterization (as used in pbrt-v4).",
+      std::string(R"(
     --outfile <name>   Filename of lat-long (equirect) environment map image.
     --resolution <n>   Resolution of output image. Default: calculated
                        from resolution of provided image.
 )")}},
-    {"makeemitters", {"makeemitters [options] <filename>",
-                      "Generate the description of a small quadrilateral emitter for\n"
-                      "    every pixel in the image.",
-                      std::string(R"(
+    {"makeemitters",
+     {"makeemitters [options] <filename>",
+      "Generate the description of a small quadrilateral emitter for\n"
+      "    every pixel in the image.",
+      std::string(R"(
     --downsample <n>   Downsample the image by a factor of n in both dimensions
                        (using simple box filtering). Default: 1.
 )")}},
-    {"makesky", {"makesky [options] <filename>",
-                 "Generate an environment map based on the Hosek-Wilkie sky model.",
-                 std::string(R"(
+    {"makesky",
+     {"makesky [options] <filename>",
+      "Generate an environment map based on the Hosek-Wilkie sky model.", std::string(R"(
     --albedo <a>       Albedo of ground-plane (range 0-1). Default: 0.5
     --elevation <e>    Elevation of the sun in degrees (range 0-90). Default: 10
     --outfile <name>   Filename to store environment map in.
     --turbidity <t>    Atmospheric turbidity (range 1.7-10). Default: 3
     --resolution <r>   Resolution of generated environment map. Default: 2048
 )")}},
-    {"splitn", {"splitn [options] <filenames>",
-                "Generate a composite image from the specified images by taking\n"
-                "    a strip of pixels from each image, in the order given. An additional\n"
-                "    image of cropped regions of each of the images may be optionally\n"
-                "    generated as well.",
-                std::string(R"(
+    {"splitn",
+     {"splitn [options] <filenames>",
+      "Generate a composite image from the specified images by taking\n"
+      "    a strip of pixels from each image, in the order given. An additional\n"
+      "    image of cropped regions of each of the images may be optionally\n"
+      "    generated as well.",
+      std::string(R"(
     --crop <x,y>       Upper-left coordinate of one of the crops. May be specified
                        multiple times.
     --cropsize <n>     Pixel extent of crops in x and y. Default: 96
     --outfile <name>   Filename to store final image in. Crop images are stored in
                        the file "crop-<name>".
 )")}},
-    {"scalenormalmap", {"scalenormalmap [options] <filename>",
-                        "Scale the provided normal map by applying the given factor for x and y\n"
-                        "    and output the resulting normal map.\n",
-                        std::string(R"(
+    {"scalenormalmap",
+     {"scalenormalmap [options] <filename>",
+      "Scale the provided normal map by applying the given factor for x and y\n"
+      "    and output the resulting normal map.\n",
+      std::string(R"(
     --scale <s>        Scale factor. Default: 1
     --outfile <name>   Filename to store final image in.
 )")}},
-    {"whitebalance", {"whitebalance [options] <filename>",
-                      "Apply white balancing to the specified image.",
-                      std::string(R"(
+    {"whitebalance",
+     {"whitebalance [options] <filename>",
+      "Apply white balancing to the specified image.", std::string(R"(
     --illuminant <n>   Apply white balance for the given standard illuminant
                        (e.g. D65, D50, A, F1, F2, ...)
     --outfile <name>   Filename to store result image
@@ -387,9 +400,9 @@ int makesky(std::vector<std::string> args) {
     ImageMetadata metadata;
     metadata.colorSpace = colorSpace;
     std::map<std::string, std::vector<std::string>> stringVectors;
-    stringVectors["makesky.albedo"] = { std::to_string(albedo) };
-    stringVectors["makesky.elevation"] = { std::to_string(elevation) };
-    stringVectors["makesky.turbidity"] = { std::to_string(turbidity) };
+    stringVectors["makesky.albedo"] = {std::to_string(albedo)};
+    stringVectors["makesky.elevation"] = {std::to_string(elevation)};
+    stringVectors["makesky.turbidity"] = {std::to_string(turbidity)};
     metadata.stringVectors = stringVectors;
     CHECK(img.Write(outfile, metadata));
 
@@ -536,9 +549,7 @@ int splitn(std::vector<std::string> args) {
 
     std::string crop;
     for (auto iter = args.begin(); iter != args.end(); ++iter) {
-        auto onError = [](const std::string &err) {
-            usage("splitn", "%s", err.c_str());
-        };
+        auto onError = [](const std::string &err) { usage("splitn", "%s", err.c_str()); };
         if (ParseArg(&iter, args.end(), "outfile", &outfile, onError) ||
             ParseArg(&iter, args.end(), "cropsize", &cropSize, onError))
             ;  // success
@@ -546,9 +557,8 @@ int splitn(std::vector<std::string> args) {
             std::vector<int> c = SplitStringToInts(crop, ',');
             if (c.size() != 2)
                 usage("splitn", "2 values not provided to --crop");
-            crops.push_back(Bounds2i({c[0], c[1]}, {c[0]+cropSize, c[1]+cropSize}));
-        }
-        else if ((*iter)[0] == '-')
+            crops.push_back(Bounds2i({c[0], c[1]}, {c[0] + cropSize, c[1] + cropSize}));
+        } else if ((*iter)[0] == '-')
             usage("splitn", "%s: unknown command flag", iter->c_str());
         else {
             infiles.push_back(*iter);
@@ -588,8 +598,9 @@ int splitn(std::vector<std::string> args) {
                     for (int c = 0; c < result.NChannels(); ++c)
                         result.SetChannel({x, y}, c, images[im].GetChannel({x, y}, c));
             else {
-                int x1 = (float(im+1)/float(images.size()) * result.Resolution().x +
-                          (2 * (float(y) /  float(result.Resolution().y)) - 1) * result.Resolution().x / -m);
+                int x1 = (float(im + 1) / float(images.size()) * result.Resolution().x +
+                          (2 * (float(y) / float(result.Resolution().y)) - 1) *
+                              result.Resolution().x / -m);
 
                 for (; x < x1 - pad / 2; ++x)
                     for (int c = 0; c < result.NChannels(); ++c)
@@ -602,14 +613,15 @@ int splitn(std::vector<std::string> args) {
     }
 
     // Crops
-    RGB edges[] = { RGB(0.8, .15, .15), RGB(.15, 0.8, .15), RGB(.15, .15, 0.8) };
+    RGB edges[] = {RGB(0.8, .15, .15), RGB(.15, 0.8, .15), RGB(.15, .15, 0.8)};
     int borderWidth = 5;
-    int xCropRes = (cropSize + 2 * borderWidth) * images.size() +
-        pad * (images.size() - 1);
-    int yCropRes = (cropSize + 2 * borderWidth) * crops.size() +
-        pad * (crops.size() - 1);
-    if (xCropRes < 1) xCropRes = 1;
-    if (yCropRes < 1) yCropRes = 1;
+    int xCropRes =
+        (cropSize + 2 * borderWidth) * images.size() + pad * (images.size() - 1);
+    int yCropRes = (cropSize + 2 * borderWidth) * crops.size() + pad * (crops.size() - 1);
+    if (xCropRes < 1)
+        xCropRes = 1;
+    if (yCropRes < 1)
+        yCropRes = 1;
     Image cropsImage(PixelFormat::Float, {xCropRes, yCropRes}, {"R", "G", "B"});
     for (int y = 0; y < yCropRes; ++y)
         for (int x = 0; x < xCropRes; ++x)
@@ -651,15 +663,17 @@ int splitn(std::vector<std::string> args) {
             // output start point
             int y0 = c * (cropSize + 2 * borderWidth + pad);
             int x0 = i * (cropSize + 2 * borderWidth + pad);
-            drawBox(Bounds2i({x0+borderWidth, y0+borderWidth},
-                             {x0+borderWidth+cropSize, y0+borderWidth+cropSize}),
+            drawBox(Bounds2i({x0 + borderWidth, y0 + borderWidth},
+                             {x0 + borderWidth + cropSize, y0 + borderWidth + cropSize}),
                     borderWidth, edges[c], cropsImage);
 
             ImageChannelDesc imageDesc = images[i].GetChannelDesc({"R", "G", "B"});
             CHECK(bool(imageDesc));
             for (Point2i p : crop) {
-                Point2i pOut = Point2i(x0 + borderWidth, y0 + borderWidth) + (p - crop.pMin);
-                cropsImage.SetChannels(pOut, cropDesc, images[i].GetChannels(p, imageDesc));
+                Point2i pOut =
+                    Point2i(x0 + borderWidth, y0 + borderWidth) + (p - crop.pMin);
+                cropsImage.SetChannels(pOut, cropDesc,
+                                       images[i].GetChannels(p, imageDesc));
             }
         }
     }
@@ -1011,8 +1025,7 @@ int error(std::vector<std::string> args) {
 
         for (int y = 0; y < im.Resolution().y; ++y)
             for (int x = 0; x < im.Resolution().x; ++x) {
-                MultiChannelVarianceEstimator &pixelVariance =
-                    pixelVariances.Get()(x, y);
+                MultiChannelVarianceEstimator &pixelVariance = pixelVariances.Get()(x, y);
                 for (int c = 0; c < im.NChannels(); ++c)
                     if (metric == "MRSE")
                         pixelVariance[c].Add(
@@ -1135,8 +1148,8 @@ int diff(std::vector<std::string> args) {
     refImage = refImage.SelectChannels(refDesc);
 
     if (imgDesc.size() != splitChannels.size()) {
-        fprintf(stderr, "%s: image does not have \"%s\" channels.\n",
-                imageFile.c_str(), channels.c_str());
+        fprintf(stderr, "%s: image does not have \"%s\" channels.\n", imageFile.c_str(),
+                channels.c_str());
         return 1;
     }
     image = image.SelectChannels(imgDesc);
@@ -1194,7 +1207,8 @@ int diff(std::vector<std::string> args) {
     else {
         // FLIP
         if (refImage.NChannels() != 3) {
-            fprintf(stderr, "%s: only 3 channel images are currently supported for FLIP.\n",
+            fprintf(stderr,
+                    "%s: only 3 channel images are currently supported for FLIP.\n",
                     referenceFile.c_str());
             return 1;
         }
@@ -1209,14 +1223,14 @@ int diff(std::vector<std::string> args) {
             for (int x = 0; x < image.Resolution().x; ++x)
                 for (int c = 0; c < image.NChannels(); ++c) {
                     image.SetChannel({x, y}, c, Clamp(image.GetChannel({x, y}, c), 0, 1));
-                    refImage.SetChannel({x, y}, c, Clamp(refImage.GetChannel({x, y}, c), 0, 1));
+                    refImage.SetChannel({x, y}, c,
+                                        Clamp(refImage.GetChannel({x, y}, c), 0, 1));
                 }
 
         ComputeFLIPError((float *)image.RawPointer({0, 0}),
                          (float *)refImage.RawPointer({0, 0}),
-                         (float *)errorImage.RawPointer({0, 0}),
-                         image.Resolution().x, image.Resolution().y,
-                         opt);
+                         (float *)errorImage.RawPointer({0, 0}), image.Resolution().x,
+                         image.Resolution().y, opt);
 
         for (int c = 0; c < image.NChannels(); ++c)
             error[c] = 0;
@@ -2466,13 +2480,17 @@ int denoise_optix(std::vector<std::string> args) {
         return 1;
     }
     if (!desc[1]) {
-        fprintf(stderr, "Warning: %s: image doesn't have Albedo.{R,G,B} channels. "
-                "Denoising quality may suffer.\n", inFilename.c_str());
+        fprintf(stderr,
+                "Warning: %s: image doesn't have Albedo.{R,G,B} channels. "
+                "Denoising quality may suffer.\n",
+                inFilename.c_str());
         nLayers = 1;
     }
     if (!desc[2]) {
-        fprintf(stderr, "Warning: %s: image doesn't have Nsx, Nsy, Nsz channels. "
-                "Denoising quality may suffer.\n", inFilename.c_str());
+        fprintf(stderr,
+                "Warning: %s: image doesn't have Nsx, Nsy, Nsz channels. "
+                "Denoising quality may suffer.\n",
+                inFilename.c_str());
         nLayers = 1;
     }
 
@@ -2482,11 +2500,11 @@ int denoise_optix(std::vector<std::string> args) {
         options.guideAlbedo = options.guideNormal = 1;
 
     OptixDenoiser denoiserHandle;
-    OPTIX_CHECK(optixDenoiserCreate(optixContext, OPTIX_DENOISER_MODEL_KIND_HDR,
-                                    &options, &denoiserHandle));
+    OPTIX_CHECK(optixDenoiserCreate(optixContext, OPTIX_DENOISER_MODEL_KIND_HDR, &options,
+                                    &denoiserHandle));
 #else
-    options.inputKind = (nLayers == 3) ? OPTIX_DENOISER_INPUT_RGB_ALBEDO_NORMAL :
-        OPTIX_DENOISER_INPUT_RGB;
+    options.inputKind = (nLayers == 3) ? OPTIX_DENOISER_INPUT_RGB_ALBEDO_NORMAL
+                                       : OPTIX_DENOISER_INPUT_RGB;
 
     OptixDenoiser denoiserHandle;
     OPTIX_CHECK(optixDenoiserCreate(optixContext, &options, &denoiserHandle));
@@ -2532,7 +2550,8 @@ int denoise_optix(std::vector<std::string> args) {
 
         void *bufGPU;
         CUDA_CHECK(cudaMalloc(&bufGPU, imageBytes));
-        CUDA_CHECK(cudaMemcpy(bufGPU, bufHost.data(), imageBytes, cudaMemcpyHostToDevice));
+        CUDA_CHECK(
+            cudaMemcpy(bufGPU, bufHost.data(), imageBytes, cudaMemcpyHostToDevice));
         inputLayers[i].data = CUdeviceptr(bufGPU);
     }
 
@@ -2568,23 +2587,21 @@ int denoise_optix(std::vector<std::string> args) {
 
     OPTIX_CHECK(optixDenoiserInvoke(
         denoiserHandle, 0 /* stream */, &params, CUdeviceptr(denoiserState),
-        memorySizes.stateSizeInBytes, &guideLayer, &layers,
-        1 /* # layers to denoise */, 0 /* offset x */, 0 /* offset y */,
-        CUdeviceptr(scratchBuffer),
+        memorySizes.stateSizeInBytes, &guideLayer, &layers, 1 /* # layers to denoise */,
+        0 /* offset x */, 0 /* offset y */, CUdeviceptr(scratchBuffer),
         memorySizes.withoutOverlapScratchSizeInBytes));
 #else
     OPTIX_CHECK(optixDenoiserInvoke(
         denoiserHandle, 0 /* stream */, &params, CUdeviceptr(denoiserState),
-        memorySizes.stateSizeInBytes, inputLayers.data(), nLayers,
-        0 /* offset x */, 0 /* offset y */,
-        &outputImage, CUdeviceptr(scratchBuffer),
+        memorySizes.stateSizeInBytes, inputLayers.data(), nLayers, 0 /* offset x */,
+        0 /* offset y */, &outputImage, CUdeviceptr(scratchBuffer),
         memorySizes.withoutOverlapScratchSizeInBytes));
 #endif
 
     CUDA_CHECK(cudaDeviceSynchronize());
 
     Image result(PixelFormat::Float, image.Resolution(), {"R", "G", "B"});
-    CUDA_CHECK(cudaMemcpy(result.RawPointer({0,0}), (const void *)outputImage.data,
+    CUDA_CHECK(cudaMemcpy(result.RawPointer({0, 0}), (const void *)outputImage.data,
                           imageBytes, cudaMemcpyDeviceToHost));
     CHECK(result.Write(outFilename));
 

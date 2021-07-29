@@ -88,8 +88,7 @@ options:
                     and a ".ply" suffix will be appended to <name>.
                     (Default: based on <source.ply>.)
 )");
-        }
-        else {
+        } else {
             usage("%s: command unknown", cmd.c_str());
             return 1;
         }
@@ -111,16 +110,17 @@ int cat(std::vector<std::string> args) {
             usage("%s: unexpected argument", iter->c_str());
     }
 
-    if (filename.empty()) usage("must specify PLY filename.");
+    if (filename.empty())
+        usage("must specify PLY filename.");
 
     TriQuadMesh mesh = TriQuadMesh::ReadPLY(filename);
 
     for (size_t i = 0; i < mesh.triIndices.size(); i += 3)
-        Printf("Triangle: %d %d %d\n", mesh.triIndices[i], mesh.triIndices[i+1],
-               mesh.triIndices[i+2]);
+        Printf("Triangle: %d %d %d\n", mesh.triIndices[i], mesh.triIndices[i + 1],
+               mesh.triIndices[i + 2]);
     for (size_t i = 0; i < mesh.quadIndices.size(); i += 4)
-        Printf("Quad: %d %d %d %d\n", mesh.quadIndices[i], mesh.quadIndices[i+1],
-               mesh.quadIndices[i+2], mesh.quadIndices[i+3]);
+        Printf("Quad: %d %d %d %d\n", mesh.quadIndices[i], mesh.quadIndices[i + 1],
+               mesh.quadIndices[i + 2], mesh.quadIndices[i + 3]);
     for (size_t i = 0; i < mesh.p.size(); ++i)
         Printf("Vertex position %d: %s\n", i, mesh.p[i]);
     for (size_t i = 0; i < mesh.n.size(); ++i)
@@ -186,25 +186,28 @@ int displace(std::vector<std::string> args) {
             usage("unexpected argument \"%s\"", iter->c_str());
     }
 
-    if (filename.empty()) usage("must specify source PLY filename.");
-    if (outFilename.empty()) usage("must specify output PLY filename.");
-    if (imageFilename.empty()) usage("must specify image displacement map.");
+    if (filename.empty())
+        usage("must specify source PLY filename.");
+    if (outFilename.empty())
+        usage("must specify output PLY filename.");
+    if (imageFilename.empty())
+        usage("must specify image displacement map.");
 
     TriQuadMesh mesh = TriQuadMesh::ReadPLY(filename);
     ImageAndMetadata immeta = Image::Read(imageFilename);
 
-    TriQuadMesh outputMesh =
-        mesh.Displace([](Point3f v0, Point3f v1) { return Distance(v0, v1); }, edgeLength,
-                      [&](Point3f *p, const Normal3f *n, const Point2f *uv, int nVertices) {
-                          ParallelFor(0, nVertices, [&](int64_t i) {
-                              Point2f uvp(uvScale * uv[i][0], 1 - uvScale * uv[i][1]);
-                              Float d = immeta.image.Bilerp(uvp, WrapMode::Repeat).Average();
-                              p[i] += Vector3f(d * scale * n[i]);
-                          });
-                      });
+    TriQuadMesh outputMesh = mesh.Displace(
+        [](Point3f v0, Point3f v1) { return Distance(v0, v1); }, edgeLength,
+        [&](Point3f *p, const Normal3f *n, const Point2f *uv, int nVertices) {
+            ParallelFor(0, nVertices, [&](int64_t i) {
+                Point2f uvp(uvScale * uv[i][0], 1 - uvScale * uv[i][1]);
+                Float d = immeta.image.Bilerp(uvp, WrapMode::Repeat).Average();
+                p[i] += Vector3f(d * scale * n[i]);
+            });
+        });
 
-    if (!WritePLY(outFilename, outputMesh.triIndices, {}, outputMesh.p,
-                  outputMesh.n, outputMesh.uv, {}))
+    if (!WritePLY(outFilename, outputMesh.triIndices, {}, outputMesh.p, outputMesh.n,
+                  outputMesh.uv, {}))
         return 1;
 
     return 0;
@@ -227,9 +230,11 @@ int split(std::vector<std::string> args) {
             usage("unexpected argument \"%s\"", iter->c_str());
     }
 
-    if (inPLY.empty()) usage("must specify source PLY filename.");
+    if (inPLY.empty())
+        usage("must specify source PLY filename.");
 
-    if (outPLYBase.empty()) outPLYBase = RemoveExtension(inPLY);
+    if (outPLYBase.empty())
+        outPLYBase = RemoveExtension(inPLY);
 
     TriQuadMesh mesh = TriQuadMesh::ReadPLY(inPLY);
 
@@ -263,15 +268,16 @@ int split(std::vector<std::string> args) {
     for (int i = 0; i < nMeshes; ++i) {
         int firstFaceIndex = i * nFacesPerMesh;
         int lastFaceIndex = (i + 1) * nFacesPerMesh;
-        if (i == nMeshes - 1) lastFaceIndex = nFaces;
+        if (i == nMeshes - 1)
+            lastFaceIndex = nFaces;
 
         std::map<int, int> vertexIndexRemap;
         std::vector<int> indices;
         std::vector<Point3f> p;
         std::vector<Normal3f> n;
         std::vector<Point2f> uv;
-        for (int vertexIndex = 3 * firstFaceIndex;
-             vertexIndex < 3 * lastFaceIndex; ++vertexIndex) {
+        for (int vertexIndex = 3 * firstFaceIndex; vertexIndex < 3 * lastFaceIndex;
+             ++vertexIndex) {
             int index = mesh.triIndices[vertexIndex];
             if (auto iter = vertexIndexRemap.find(index); iter != vertexIndexRemap.end())
                 indices.push_back(iter->second);
@@ -281,14 +287,16 @@ int split(std::vector<std::string> args) {
                 indices.push_back(newIndex);
 
                 p.push_back(mesh.p[index]);
-                if (!mesh.n.empty()) n.push_back(mesh.n[index]);
+                if (!mesh.n.empty())
+                    n.push_back(mesh.n[index]);
                 // TODO: there's no "s" in TriQuadMesh???
-                if (!mesh.uv.empty()) uv.push_back(mesh.uv[index]);
+                if (!mesh.uv.empty())
+                    uv.push_back(mesh.uv[index]);
             }
         }
 
-        TriangleMesh triMesh(Transform(), false /* reverse orientation */,
-                             indices, p, std::vector<Vector3f>(), n, uv, std::vector<int>(),
+        TriangleMesh triMesh(Transform(), false /* reverse orientation */, indices, p,
+                             std::vector<Vector3f>(), n, uv, std::vector<int>(),
                              Allocator());
         if (!triMesh.WritePLY(StringPrintf("%s-%03d.ply", outPLYBase, i)))
             return 1;

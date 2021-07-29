@@ -56,7 +56,8 @@ TEST(File, Success) {
     EXPECT_EQ(6, floats.size());
     const Float expected[] = {1.f, -2.5f, 300.f, -.475f, 5.25f, 6.f};
     for (int i = 0; i < PBRT_ARRAYSIZE(expected); ++i)
-        EXPECT_EQ(expected[i], floats[i]) << StringPrintf("%f %f", expected[i], floats[i]);
+        EXPECT_EQ(expected[i], floats[i])
+            << StringPrintf("%f %f", expected[i], floats[i]);
 
     EXPECT_EQ(0, remove(fn.c_str()));
 }

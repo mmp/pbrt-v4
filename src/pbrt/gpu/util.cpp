@@ -67,9 +67,12 @@ void GPUInit() {
 #ifdef PBRT_IS_WINDOWS
         if (deviceProperties.major != firstDeviceProperties.major)
             ErrorExit("Found multiple GPUs with different shader models.\n"
-                      "On Windows, this unfortunately causes a significant slowdown with pbrt.\n"
-                      "Please select a single GPU and use the --gpu-device command line option to specify it.\n"
-                      "Found devices:\n%s", devices);
+                      "On Windows, this unfortunately causes a significant slowdown with "
+                      "pbrt.\n"
+                      "Please select a single GPU and use the --gpu-device command line "
+                      "option to specify it.\n"
+                      "Found devices:\n%s",
+                      devices);
 #endif
     }
 
@@ -130,8 +133,7 @@ void GPUNameStream(cudaStream_t stream, const char *name) {
 }
 
 struct KernelStats {
-    KernelStats(const char *description)
-        : description(description) { }
+    KernelStats(const char *description) : description(description) {}
 
     std::string description;
     int numLaunches = 0;
@@ -232,9 +234,8 @@ void ReportKernelStats() {
             Printf("  %-49s %5d launches %9.2f ms / %5.1f%s (avg %6.3f, min "
                    "%6.3f, max %7.3f)\n",
                    stats->description, stats->numLaunches, stats->sumMS,
-                   100.f * stats->sumMS / totalMS, "%",
-                   stats->sumMS / stats->numLaunches, stats->minMS,
-                   stats->maxMS);
+                   100.f * stats->sumMS / totalMS, "%", stats->sumMS / stats->numLaunches,
+                   stats->minMS, stats->maxMS);
         else {
             otherMS += stats->sumMS;
             otherLaunches += stats->numLaunches;

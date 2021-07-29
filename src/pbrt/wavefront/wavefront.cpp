@@ -6,7 +6,7 @@
 
 #ifdef PBRT_BUILD_GPU_RENDERER
 #include <pbrt/gpu/memory.h>
-#endif // PBRT_BUILD_GPU_RENDERER
+#endif  // PBRT_BUILD_GPU_RENDERER
 #include <pbrt/wavefront/integrator.h>
 
 namespace pbrt {
@@ -23,18 +23,20 @@ void RenderWavefront(ParsedScene &scene) {
         // members (e.g. maxDepth) concurrently while the GPU is rendering.  In
         // turn, the lambda capture for GPU kernels has to capture *this by
         // value (see the definition of PBRT_CPU_GPU_LAMBDA in pbrt/pbrt.h.).
-        integrator = new WavefrontPathIntegrator(&CUDATrackedMemoryResource::singleton, scene);
+        integrator =
+            new WavefrontPathIntegrator(&CUDATrackedMemoryResource::singleton, scene);
 #else
         // With more capable unified memory, the WavefrontPathIntegrator can live in
         // unified memory.  Some cudaMemAdvise calls, to come shortly, let us
         // have fast read-only access to it on the CPU.
         Allocator alloc(&CUDATrackedMemoryResource::singleton);
-        integrator = alloc.new_object<WavefrontPathIntegrator>(&CUDATrackedMemoryResource::singleton, scene);
+        integrator = alloc.new_object<WavefrontPathIntegrator>(
+            &CUDATrackedMemoryResource::singleton, scene);
 #endif
     } else
-#endif // PBRT_BUILD_GPU_RENDERER
-        integrator = new WavefrontPathIntegrator(pstd::pmr::get_default_resource(),
-                                                 scene);
+#endif  // PBRT_BUILD_GPU_RENDERER
+        integrator =
+            new WavefrontPathIntegrator(pstd::pmr::get_default_resource(), scene);
 
     ///////////////////////////////////////////////////////////////////////////
     // Render!
@@ -46,7 +48,7 @@ void RenderWavefront(ParsedScene &scene) {
 #ifdef PBRT_BUILD_GPU_RENDERER
         if (Options->useGPU)
             ReportKernelStats();
-#endif // PBRT_BUILD_GPU_RENDERER
+#endif  // PBRT_BUILD_GPU_RENDERER
 
         Printf("Wavefront integrator statistics:\n");
         Printf("%s\n", integrator->stats->Print());
@@ -58,7 +60,7 @@ void RenderWavefront(ParsedScene &scene) {
         for (const auto &item : logs)
             Log(item.level, item.file, item.line, item.message);
     }
-#endif // PBRT_BUILD_GPU_RENDERER
+#endif  // PBRT_BUILD_GPU_RENDERER
 
     ImageMetadata metadata;
     metadata.samplesPerPixel = integrator->sampler.SamplesPerPixel();
@@ -68,4 +70,4 @@ void RenderWavefront(ParsedScene &scene) {
     integrator->film.WriteImage(metadata);
 }
 
-} // namespace pbrt
+}  // namespace pbrt

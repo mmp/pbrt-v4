@@ -40,7 +40,8 @@ TEST(Args, Multiple) {
     {
         int nthreads = 0;
         bool log = false;
-        std::vector<std::string> args = SplitStringsFromWhitespace("--log --nthreads 4 yolo");
+        std::vector<std::string> args =
+            SplitStringsFromWhitespace("--log --nthreads 4 yolo");
         auto iter = args.begin();
         EXPECT_TRUE(ParseArg(&iter, args.end(), "log", &log, expectNoError));
         ++iter;
@@ -69,7 +70,8 @@ TEST(Args, Bool) {
     bool log = true;
     bool benchmark = false;
     bool debug = false;
-    std::vector<std::string> args = SplitStringsFromWhitespace("--log=false --benchmark --debug=true");
+    std::vector<std::string> args =
+        SplitStringsFromWhitespace("--log=false --benchmark --debug=true");
     auto iter = args.begin();
     EXPECT_TRUE(ParseArg(&iter, args.end(), "log", &log, expectNoError));
     EXPECT_FALSE(log);

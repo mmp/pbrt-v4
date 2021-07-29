@@ -56,7 +56,7 @@ struct SOA<SampledSpectrum> {
             ptr1 = alloc.allocate_object<Float>(nAlloc);
         }
     }
-    SOA &operator=(const SOA& s) {
+    SOA &operator=(const SOA &s) {
         nAlloc = s.nAlloc;
         ptr4 = s.ptr4;
         ptr1 = s.ptr1;
@@ -122,8 +122,8 @@ struct SOA<SampledSpectrum> {
     static constexpr int n4 = (NSpectrumSamples + 3) / 4;
 
     int nAlloc;
-    Float4 * PBRT_RESTRICT ptr4 = nullptr;
-    Float * PBRT_RESTRICT ptr1 = nullptr;
+    Float4 *PBRT_RESTRICT ptr4 = nullptr;
+    Float *PBRT_RESTRICT ptr1 = nullptr;
 };
 
 template <>
@@ -140,7 +140,7 @@ struct SOA<SampledWavelengths> {
             pdf1 = alloc.allocate_object<Float>(nAlloc);
         }
     }
-    SOA &operator=(const SOA& s) {
+    SOA &operator=(const SOA &s) {
         nAlloc = s.nAlloc;
         lambda4 = s.lambda4;
         pdf4 = s.pdf4;
@@ -183,8 +183,9 @@ struct SOA<SampledWavelengths> {
             if constexpr ((NSpectrumSamples % 4) == 0) {
                 int offset = n4 * index;
                 for (int i = 0; i < n4; ++i, ++offset) {
-                    Store4(soa->lambda4 + offset, {s.lambda[4 * i], s.lambda[4 * i + 1],
-                                                   s.lambda[4 * i + 2], s.lambda[4 * i + 3]});
+                    Store4(soa->lambda4 + offset,
+                           {s.lambda[4 * i], s.lambda[4 * i + 1], s.lambda[4 * i + 2],
+                            s.lambda[4 * i + 3]});
                     Store4(soa->pdf4 + offset, {s.pdf[4 * i], s.pdf[4 * i + 1],
                                                 s.pdf[4 * i + 2], s.pdf[4 * i + 3]});
                 }
@@ -213,10 +214,10 @@ struct SOA<SampledWavelengths> {
     static constexpr int n4 = (NSpectrumSamples + 3) / 4;
 
     int nAlloc;
-    Float4 * PBRT_RESTRICT lambda4 = nullptr;
-    Float4 * PBRT_RESTRICT pdf4 = nullptr;
-    Float * PBRT_RESTRICT lambda1 = nullptr;
-    Float * PBRT_RESTRICT pdf1 = nullptr;
+    Float4 *PBRT_RESTRICT lambda4 = nullptr;
+    Float4 *PBRT_RESTRICT pdf4 = nullptr;
+    Float *PBRT_RESTRICT lambda1 = nullptr;
+    Float *PBRT_RESTRICT pdf1 = nullptr;
 };
 
 #include "pbrt_soa.h"

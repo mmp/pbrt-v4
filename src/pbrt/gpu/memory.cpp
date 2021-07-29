@@ -71,4 +71,4 @@ void CUDATrackedMemoryResource::PrefetchToGPU() const {
 
 CUDATrackedMemoryResource CUDATrackedMemoryResource::singleton;
 
-} // namespace pbrt
+}  // namespace pbrt

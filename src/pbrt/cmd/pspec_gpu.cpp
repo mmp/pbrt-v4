@@ -54,7 +54,8 @@ void UPSInit(int nPoints) {
 
 void UpdatePowerSpectrum(const std::vector<Point2f> &points, Image *pspec) {
     Buffer &b = bufferPool[nextBufferOffset];
-    if (++nextBufferOffset == bufferPool.size()) nextBufferOffset = 0;
+    if (++nextBufferOffset == bufferPool.size())
+        nextBufferOffset = 0;
     if (!b.used)
         b.used = true;
     else
@@ -64,31 +65,29 @@ void UpdatePowerSpectrum(const std::vector<Point2f> &points, Image *pspec) {
 
     // Copy the sample points to host-side pinned memory
     memcpy(b.hostPtr, points.data(), points.size() * sizeof(Point2f));
-    CUDA_CHECK(cudaMemcpyAsync((void *)b.ptr, b.hostPtr,
-                               points.size() * sizeof(Point2f),
+    CUDA_CHECK(cudaMemcpyAsync((void *)b.ptr, b.hostPtr, points.size() * sizeof(Point2f),
                                cudaMemcpyHostToDevice));
 
     int nPoints = points.size();
 
-    GPUParallelFor(
-        "Fourier transform", pspec->Resolution().x * pspec->Resolution().y,
-        [=] PBRT_GPU(int tid) {
-            int res = pspec->Resolution().x;
-            Point2i p(tid % res, tid / res);
-            Point2f uv(0, 0);
-            Float wx = p.x - res / 2, wy = p.y - res / 2;
+    GPUParallelFor("Fourier transform", pspec->Resolution().x * pspec->Resolution().y,
+                   [=] PBRT_GPU(int tid) {
+                       int res = pspec->Resolution().x;
+                       Point2i p(tid % res, tid / res);
+                       Point2f uv(0, 0);
+                       Float wx = p.x - res / 2, wy = p.y - res / 2;
 
-            const Point2f *pts = (const Point2f *)b.ptr;
-            for (int i = 0; i < nPoints; ++i) {
-                float exp = -2 * Pi * (wx * pts[i][0] + wy * pts[i][1]);
-                uv[0] += std::cos(exp);
-                uv[1] += std::sin(exp);
-            }
+                       const Point2f *pts = (const Point2f *)b.ptr;
+                       for (int i = 0; i < nPoints; ++i) {
+                           float exp = -2 * Pi * (wx * pts[i][0] + wy * pts[i][1]);
+                           uv[0] += std::cos(exp);
+                           uv[1] += std::sin(exp);
+                       }
 
-            // Update power spectrum
-            pspec->SetChannel(
-                p, 0, pspec->GetChannel(p, 0) + Sqr(uv[0]) + Sqr(uv[1]));
-        });
+                       // Update power spectrum
+                       pspec->SetChannel(
+                           p, 0, pspec->GetChannel(p, 0) + Sqr(uv[0]) + Sqr(uv[1]));
+                   });
 
     // Indicate that the buffer has been consumed and is safe for reuse.
     CUDA_CHECK(cudaEventRecord(b.finishedEvent));

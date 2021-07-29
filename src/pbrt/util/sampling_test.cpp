@@ -548,14 +548,14 @@ TEST(Sampling, SphericalQuadInverse) {
                   Lerp(rng.Uniform<Float>(), -10, 10));
         Float pdf;
         Point3f pq = SampleSphericalRectangle(p, v[a][b], v[!a][b] - v[a][b],
-                                         v[a][!b] - v[a][b], u, &pdf);
+                                              v[a][!b] - v[a][b], u, &pdf);
 
         Float solidAngle = 1 / pdf;
         if (solidAngle < .01)
             continue;
         ++nTested;
         Point2f ui = InvertSphericalRectangleSample(p, v[a][b], v[!a][b] - v[a][b],
-                                               v[a][!b] - v[a][b], pq);
+                                                    v[a][!b] - v[a][b], pq);
 
         auto err = [](Float a, Float ref) {
             if (ref < 1e-2)

@@ -23,8 +23,8 @@
 #include <iomanip>
 #include <iostream>
 #include <mutex>
-#include <thread>
 #include <sstream>
+#include <thread>
 
 #ifdef PBRT_IS_OSX
 #include <sys/syscall.h>
@@ -32,8 +32,8 @@
 #include <unistd.h>
 #endif
 #ifdef PBRT_IS_LINUX
-#include <sys/types.h>
 #include <sys/syscall.h>
+#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
 #endif
@@ -96,8 +96,7 @@ PBRT_GPU int nRawLogItems;
 static std::atomic<bool> shutdownLogUtilization;
 static std::thread logUtilizationThread;
 
-void InitLogging(LogLevel level, std::string logFile, bool logUtilization,
-                 bool useGPU) {
+void InitLogging(LogLevel level, std::string logFile, bool logUtilization, bool useGPU) {
     logging::logLevel = level;
     if (!logFile.empty()) {
         logging::logFile = FOpenWrite(logFile);
@@ -119,19 +118,20 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization,
         shutdownLogUtilization = false;
         auto sleepms = [](int64_t ms) {
 #if defined(PBRT_IS_LINUX) || defined(PBRT_IS_OSX)
-                struct timespec rec, rem;
-                rec.tv_sec = 0;
-                rec.tv_nsec = ms * 1000000;
-                nanosleep(&rec, &rem);
+            struct timespec rec, rem;
+            rec.tv_sec = 0;
+            rec.tv_nsec = ms * 1000000;
+            nanosleep(&rec, &rem);
 #elif defined(PBRT_IS_WINDOWS)
-                Sleep(ms);
+            Sleep(ms);
 #else
 #error "Need to implement sleepms() for current platform"
 #endif
         };
 
         // Return overall CPU usage in ticks
-        auto getCPUUsage = [&](int64_t *user, int64_t *nice, int64_t *system, int64_t *idle) {
+        auto getCPUUsage = [&](int64_t *user, int64_t *nice, int64_t *system,
+                               int64_t *idle) {
 #ifdef PBRT_IS_LINUX
             std::ifstream stat("/proc/stat");
             CHECK((bool)stat);
@@ -152,8 +152,8 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization,
                 return;
             }
 #elif defined(PBRT_IS_OSX)
-        // possibly useful:
-        // https://stackoverflow.com/questions/63166/how-to-determine-cpu-and-memory-consumption-from-inside-a-process
+            // possibly useful:
+            // https://stackoverflow.com/questions/63166/how-to-determine-cpu-and-memory-consumption-from-inside-a-process
             *user = *nice = *system = *idle = 0;
 #elif defined(PBRT_IS_WINDOWS)
             FILETIME idleTime, kernelTime, userTime;
@@ -205,10 +205,10 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization,
                 // Report activity since last logging event. A value of 1
                 // represents all cores running at 100% utilization.
                 int64_t delta = (userCur + niceCur + systemCur + idleCur) -
-                    (userPrev + nicePrev + systemPrev + idlePrev);
+                                (userPrev + nicePrev + systemPrev + idlePrev);
                 LOG_VERBOSE("CPU: Memory used %d MB. "
                             "Core activity: %.4f user %.4f nice %.4f system %.4f idle",
-                            GetCurrentRSS() / (1024*1024),
+                            GetCurrentRSS() / (1024 * 1024),
                             double(userCur - userPrev) / delta,
                             double(niceCur - nicePrev) / delta,
                             double(systemCur - systemPrev) / delta,
@@ -224,8 +224,9 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization,
                 nvmlUtilization_t utilization;
                 if (nvmlDeviceGetMemoryInfo(device, &info) == NVML_SUCCESS &&
                     nvmlDeviceGetUtilizationRates(device, &utilization) == NVML_SUCCESS)
-                    LOG_VERBOSE("GPU: Memory used %d MB. SM activity: %d memory activity: %d",
-                                info.used / (1024*1024), utilization.gpu, utilization.memory);
+                    LOG_VERBOSE(
+                        "GPU: Memory used %d MB. SM activity: %d memory activity: %d",
+                        info.used / (1024 * 1024), utilization.gpu, utilization.memory);
 #endif
             }
 #ifdef PBRT_USE_NVML
@@ -338,8 +339,8 @@ void Log(LogLevel level, const char *file, int line, const char *s) {
                 shortfile.c_str(), line, levelString.c_str(), s);
         fflush(logging::logFile);
     } else
-        fprintf(stderr, "[ " LOG_BASE_FMT " %s:%d ] %s%s\n", LOG_BASE_ARGS, shortfile.c_str(), line,
-                levelString.c_str(), s);
+        fprintf(stderr, "[ " LOG_BASE_FMT " %s:%d ] %s%s\n", LOG_BASE_ARGS,
+                shortfile.c_str(), line, levelString.c_str(), s);
 #endif
 }
 

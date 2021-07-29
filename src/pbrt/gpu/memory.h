@@ -45,7 +45,7 @@ class CUDATrackedMemoryResource : public CUDAMemoryResource {
 
     static CUDATrackedMemoryResource singleton;
 
-   private:
+  private:
     mutable std::mutex mutex;
     std::atomic<size_t> bytesAllocated{};
     std::unordered_map<void *, size_t> allocations;
@@ -53,6 +53,6 @@ class CUDATrackedMemoryResource : public CUDAMemoryResource {
 
 #endif
 
-} // namespace pbrt
+}  // namespace pbrt
 
-#endif // PBRT_GPU_MEMORY_H
+#endif  // PBRT_GPU_MEMORY_H

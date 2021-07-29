@@ -2,7 +2,6 @@
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
 
-
 // Copyright (c) 2012 Leonhard Gruenschloss (leonhard@gruenschloss.org)
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy

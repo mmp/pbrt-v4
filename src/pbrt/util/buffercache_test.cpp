@@ -14,7 +14,7 @@ using namespace pbrt;
 TEST(BufferCache, Basics) {
     ASSERT_FALSE(intBufferCache == nullptr);
 
-    std::vector<int> v{1,2,3,4,5};
+    std::vector<int> v{1, 2, 3, 4, 5};
 
     size_t baseMem = intBufferCache->BytesUsed();
 
@@ -29,7 +29,7 @@ TEST(BufferCache, Basics) {
 
     EXPECT_EQ(5 * sizeof(int), intBufferCache->BytesUsed() - baseMem);
 
-    std::vector<int> v2{1,2,3,4};
+    std::vector<int> v2{1, 2, 3, 4};
     const int *ptr2 = intBufferCache->LookupOrAdd(v2, alloc);
     EXPECT_NE(ptr, ptr2);
     for (size_t i = 0; i < v2.size(); ++i)

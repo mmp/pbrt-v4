@@ -357,7 +357,7 @@ TEST(Math, SumOfProducts) {
         EXPECT_LT(err, 2 * ulp);
     }
 }
-#endif // !PBRT_FLOAT_AS_DOUBLE
+#endif  // !PBRT_FLOAT_AS_DOUBLE
 
 TEST(FastExp, Accuracy) {
     EXPECT_EQ(1, FastExp(0));
@@ -979,7 +979,7 @@ TEST(PermutationElement, Valid) {
             std::vector<bool> seen(len, false);
 
             for (int i = 0; i < len; ++i) {
-                int offset = PermutationElement(i, len, MixBits(1+iter));
+                int offset = PermutationElement(i, len, MixBits(1 + iter));
                 ASSERT_TRUE(offset >= 0 && offset < seen.size()) << offset;
                 EXPECT_FALSE(seen[offset]) << StringPrintf("len %d index %d", len, i);
                 seen[offset] = true;
@@ -989,7 +989,7 @@ TEST(PermutationElement, Valid) {
 }
 
 TEST(PermutationElement, Uniform) {
-    for (int n : { 2, 3, 4, 5, 9, 14, 16, 22, 27, 36 }) {
+    for (int n : {2, 3, 4, 5, 9, 14, 16, 22, 27, 36}) {
         std::vector<int> count(n * n);
 
         int numIters = 60000 * n;
@@ -1006,16 +1006,17 @@ TEST(PermutationElement, Uniform) {
                 Float tol = 0.03f;
                 int offset = j * n + i;
                 EXPECT_TRUE(count[offset] >= (1 - tol) * numIters / n &&
-                            count[offset] <=(1 + tol) * numIters / n) <<
-                StringPrintf("Got count %d for %d -> %d (perm size %d). Expected +/- %d.\n",
-                                 count[offset], i, j, n, numIters / n);
+                            count[offset] <= (1 + tol) * numIters / n)
+                    << StringPrintf(
+                           "Got count %d for %d -> %d (perm size %d). Expected +/- %d.\n",
+                           count[offset], i, j, n, numIters / n);
             }
         }
     }
 }
 
 TEST(PermutationElement, UniformDelta) {
-    for (int n : { 2, 3, 4, 5, 9, 14, 16, 22, 27, 36 }) {
+    for (int n : {2, 3, 4, 5, 9, 14, 16, 22, 27, 36}) {
         std::vector<int> count(n * n);
 
         int numIters = 60000 * n;
@@ -1023,7 +1024,8 @@ TEST(PermutationElement, UniformDelta) {
             for (int i = 0; i < n; ++i) {
                 int ip = PermutationElement(i, n, MixBits(seed));
                 int delta = ip - i;
-                if (delta < 0) delta += n;
+                if (delta < 0)
+                    delta += n;
                 CHECK_LT(delta, n);
                 int offset = delta * n + i;
                 ++count[offset];
@@ -1035,9 +1037,10 @@ TEST(PermutationElement, UniformDelta) {
                 Float tol = 0.03f;
                 int offset = j * n + i;
                 EXPECT_TRUE(count[offset] >= (1 - tol) * numIters / n &&
-                            count[offset] <=(1 + tol) * numIters / n) <<
-                StringPrintf("Got count %d for %d -> %d (perm size %d). Expected +/- %d.\n",
-                                 count[offset], i, j, n, numIters / n);
+                            count[offset] <= (1 + tol) * numIters / n)
+                    << StringPrintf(
+                           "Got count %d for %d -> %d (perm size %d). Expected +/- %d.\n",
+                           count[offset], i, j, n, numIters / n);
             }
         }
     }

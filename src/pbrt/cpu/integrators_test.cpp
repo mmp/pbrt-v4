@@ -72,8 +72,8 @@ std::vector<TestScene> GetScenes() {
     {
         // Unit sphere, Kd = 0.5, point light I = 3.1415 at center
         // -> With GI, should have radiance of 1.
-        Shape sphere = new Sphere(&identity, &identity,
-                                        true /* reverse orientation */, 1, -1, 1, 360);
+        Shape sphere = new Sphere(&identity, &identity, true /* reverse orientation */, 1,
+                                  -1, 1, 360);
 
         static ConstantSpectrum cs(0.5);
         SpectrumTexture Kd = alloc.new_object<SpectrumConstantTexture>(&cs);
@@ -92,7 +92,8 @@ std::vector<TestScene> GetScenes() {
         ConstantSpectrum I(1);
         Float scale = Pi / SpectrumToPhotometric(&I);
         std::vector<Light> lights;
-        lights.push_back(new PointLight(identity, MediumInterface(), &I, scale, Allocator()));
+        lights.push_back(
+            new PointLight(identity, MediumInterface(), &I, scale, Allocator()));
 
         scenes.push_back({bvh, lights, "Sphere, 1 light, Kd = 0.5", 1.0});
     }
@@ -100,8 +101,8 @@ std::vector<TestScene> GetScenes() {
     {
         // Unit sphere, Kd = 0.5, 4 point lights I = 3.1415/4 at center
         // -> With GI, should have radiance of 1.
-        Shape sphere = new Sphere(&identity, &identity,
-                                        true /* reverse orientation */, 1, -1, 1, 360);
+        Shape sphere = new Sphere(&identity, &identity, true /* reverse orientation */, 1,
+                                  -1, 1, 360);
 
         static ConstantSpectrum cs(0.5);
         SpectrumTexture Kd = alloc.new_object<SpectrumConstantTexture>(&cs);
@@ -119,10 +120,14 @@ std::vector<TestScene> GetScenes() {
         ConstantSpectrum I(1);
         Float scale = Pi / (4 * SpectrumToPhotometric(&I));
         std::vector<Light> lights;
-        lights.push_back(new PointLight(identity, MediumInterface(), &I, scale, Allocator()));
-        lights.push_back(new PointLight(identity, MediumInterface(), &I, scale, Allocator()));
-        lights.push_back(new PointLight(identity, MediumInterface(), &I, scale, Allocator()));
-        lights.push_back(new PointLight(identity, MediumInterface(), &I, scale, Allocator()));
+        lights.push_back(
+            new PointLight(identity, MediumInterface(), &I, scale, Allocator()));
+        lights.push_back(
+            new PointLight(identity, MediumInterface(), &I, scale, Allocator()));
+        lights.push_back(
+            new PointLight(identity, MediumInterface(), &I, scale, Allocator()));
+        lights.push_back(
+            new PointLight(identity, MediumInterface(), &I, scale, Allocator()));
 
         scenes.push_back({bvh, lights, "Sphere, 1 light, Kd = 0.5", 1.0});
     }
@@ -130,8 +135,8 @@ std::vector<TestScene> GetScenes() {
     {
         // Unit sphere, Kd = 0.5, Le = 0.5
         // -> With GI, should have radiance of 1.
-        Shape sphere = new Sphere(&identity, &identity,
-                                        true /* reverse orientation */, 1, -1, 1, 360);
+        Shape sphere = new Sphere(&identity, &identity, true /* reverse orientation */, 1,
+                                  -1, 1, 360);
 
         static ConstantSpectrum cs(0.5);
         SpectrumTexture Kd = alloc.new_object<SpectrumConstantTexture>(&cs);
@@ -143,8 +148,8 @@ std::vector<TestScene> GetScenes() {
         ConstantSpectrum Le(1);
         Float scale = 0.5 / SpectrumToPhotometric(&Le);
         Light areaLight =
-            new DiffuseAreaLight(identity, MediumInterface(), &Le, scale, sphere, nullptr, Image(),
-                                 nullptr, false, Allocator());
+            new DiffuseAreaLight(identity, MediumInterface(), &Le, scale, sphere, nullptr,
+                                 Image(), nullptr, false, Allocator());
 
         std::vector<Light> lights;
         lights.push_back(areaLight);
@@ -240,21 +245,22 @@ std::vector<TestScene> GetScenes() {
     return scenes;
 }
 
-std::vector<std::pair<Sampler, std::string>> GetSamplers(
-    const Point2i &resolution) {
+std::vector<std::pair<Sampler, std::string>> GetSamplers(const Point2i &resolution) {
     std::vector<std::pair<Sampler, std::string>> samplers;
 
     samplers.push_back(std::make_pair(new HaltonSampler(256, resolution), "Halton 256"));
-    samplers.push_back(std::make_pair(new PaddedSobolSampler(256, RandomizeStrategy::PermuteDigits),
-                                      "Padded Sobol 256"));
-    samplers.push_back(std::make_pair(new ZSobolSampler(256, Point2i(16, 16), RandomizeStrategy::PermuteDigits),
-                                      "Z Sobol 256"));
+    samplers.push_back(
+        std::make_pair(new PaddedSobolSampler(256, RandomizeStrategy::PermuteDigits),
+                       "Padded Sobol 256"));
+    samplers.push_back(std::make_pair(
+        new ZSobolSampler(256, Point2i(16, 16), RandomizeStrategy::PermuteDigits),
+        "Z Sobol 256"));
     samplers.push_back(
         std::make_pair(new SobolSampler(256, resolution, RandomizeStrategy::None),
                        "Sobol 256 Not Randomized"));
-    samplers.push_back(
-        std::make_pair(new SobolSampler(256, resolution, RandomizeStrategy::PermuteDigits),
-                       "Sobol 256 XOR Scramble"));
+    samplers.push_back(std::make_pair(
+        new SobolSampler(256, resolution, RandomizeStrategy::PermuteDigits),
+        "Sobol 256 XOR Scramble"));
     samplers.push_back(
         std::make_pair(new SobolSampler(256, resolution, RandomizeStrategy::Owen),
                        "Sobol 256 Owen Scramble"));
@@ -276,12 +282,14 @@ std::vector<TestIntegrator> GetIntegrators() {
         // Path tracing integrators
         for (auto &sampler : GetSamplers(resolution)) {
             Filter filter = new BoxFilter(Vector2f(0.5, 0.5));
-            FilmBaseParameters fp(resolution, Bounds2i(Point2i(0, 0), resolution),
-                                  filter, 1., PixelSensor::CreateDefault(), inTestDir("test.exr"));
+            FilmBaseParameters fp(resolution, Bounds2i(Point2i(0, 0), resolution), filter,
+                                  1., PixelSensor::CreateDefault(),
+                                  inTestDir("test.exr"));
             RGBFilm *film = new RGBFilm(fp, RGBColorSpace::sRGB);
-            CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
-            PerspectiveCamera *camera = new PerspectiveCamera(cbp, 45,
-                Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10.);
+            CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {},
+                                     nullptr);
+            PerspectiveCamera *camera = new PerspectiveCamera(
+                cbp, 45, Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10.);
 
             const Film filmp = camera->GetFilm();
             Integrator *integrator = new PathIntegrator(8, camera, sampler.first,
@@ -294,12 +302,14 @@ std::vector<TestIntegrator> GetIntegrators() {
 
         for (auto &sampler : GetSamplers(resolution)) {
             Filter filter = new BoxFilter(Vector2f(0.5, 0.5));
-            FilmBaseParameters fp(resolution, Bounds2i(Point2i(0, 0), resolution),
-                                  filter, 1., PixelSensor::CreateDefault(), inTestDir("test.exr"));
+            FilmBaseParameters fp(resolution, Bounds2i(Point2i(0, 0), resolution), filter,
+                                  1., PixelSensor::CreateDefault(),
+                                  inTestDir("test.exr"));
             RGBFilm *film = new RGBFilm(fp, RGBColorSpace::sRGB);
-            CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
-            OrthographicCamera *camera = new OrthographicCamera(cbp,
-                Bounds2f(Point2f(-.1, -.1), Point2f(.1, .1)), 0., 10.);
+            CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {},
+                                     nullptr);
+            OrthographicCamera *camera = new OrthographicCamera(
+                cbp, Bounds2f(Point2f(-.1, -.1), Point2f(.1, .1)), 0., 10.);
             const Film filmp = camera->GetFilm();
 
             Integrator *integrator = new PathIntegrator(8, camera, sampler.first,
@@ -313,12 +323,14 @@ std::vector<TestIntegrator> GetIntegrators() {
         // Volume path tracing integrators
         for (auto &sampler : GetSamplers(resolution)) {
             Filter filter = new BoxFilter(Vector2f(0.5, 0.5));
-            FilmBaseParameters fp(resolution, Bounds2i(Point2i(0, 0), resolution),
-                                  filter, 1., PixelSensor::CreateDefault(), inTestDir("test.exr"));
+            FilmBaseParameters fp(resolution, Bounds2i(Point2i(0, 0), resolution), filter,
+                                  1., PixelSensor::CreateDefault(),
+                                  inTestDir("test.exr"));
             RGBFilm *film = new RGBFilm(fp, RGBColorSpace::sRGB);
-            CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
-            PerspectiveCamera *camera = new PerspectiveCamera(cbp, 45,
-                Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10.);
+            CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {},
+                                     nullptr);
+            PerspectiveCamera *camera = new PerspectiveCamera(
+                cbp, 45, Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10.);
             const Film filmp = camera->GetFilm();
 
             Integrator *integrator = new VolPathIntegrator(8, camera, sampler.first,
@@ -330,12 +342,14 @@ std::vector<TestIntegrator> GetIntegrators() {
         }
         for (auto &sampler : GetSamplers(resolution)) {
             Filter filter = new BoxFilter(Vector2f(0.5, 0.5));
-            FilmBaseParameters fp(resolution, Bounds2i(Point2i(0, 0), resolution),
-                                  filter, 1., PixelSensor::CreateDefault(), inTestDir("test.exr"));
+            FilmBaseParameters fp(resolution, Bounds2i(Point2i(0, 0), resolution), filter,
+                                  1., PixelSensor::CreateDefault(),
+                                  inTestDir("test.exr"));
             RGBFilm *film = new RGBFilm(fp, RGBColorSpace::sRGB);
-            CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
-            OrthographicCamera *camera = new OrthographicCamera(cbp,
-                Bounds2f(Point2f(-.1, -.1), Point2f(.1, .1)), 0., 10.);
+            CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {},
+                                     nullptr);
+            OrthographicCamera *camera = new OrthographicCamera(
+                cbp, Bounds2f(Point2f(-.1, -.1), Point2f(.1, .1)), 0., 10.);
             const Film filmp = camera->GetFilm();
 
             Integrator *integrator = new VolPathIntegrator(8, camera, sampler.first,
@@ -349,12 +363,14 @@ std::vector<TestIntegrator> GetIntegrators() {
         // Simple path (perspective only, still sample light and BSDFs). Yolo
         for (auto &sampler : GetSamplers(resolution)) {
             Filter filter = new BoxFilter(Vector2f(0.5, 0.5));
-            FilmBaseParameters fp(resolution, Bounds2i(Point2i(0, 0), resolution),
-                                  filter, 1., PixelSensor::CreateDefault(), inTestDir("test.exr"));
+            FilmBaseParameters fp(resolution, Bounds2i(Point2i(0, 0), resolution), filter,
+                                  1., PixelSensor::CreateDefault(),
+                                  inTestDir("test.exr"));
             RGBFilm *film = new RGBFilm(fp, RGBColorSpace::sRGB);
-            CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
-            PerspectiveCamera *camera = new PerspectiveCamera(cbp, 45,
-                Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10.);
+            CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {},
+                                     nullptr);
+            PerspectiveCamera *camera = new PerspectiveCamera(
+                cbp, 45, Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10.);
 
             const Film filmp = camera->GetFilm();
             Integrator *integrator = new SimplePathIntegrator(
@@ -368,12 +384,14 @@ std::vector<TestIntegrator> GetIntegrators() {
         // BDPT
         for (auto &sampler : GetSamplers(resolution)) {
             Filter filter = new BoxFilter(Vector2f(0.5, 0.5));
-            FilmBaseParameters fp(resolution, Bounds2i(Point2i(0, 0), resolution),
-                                  filter, 1., PixelSensor::CreateDefault(), inTestDir("test.exr"));
+            FilmBaseParameters fp(resolution, Bounds2i(Point2i(0, 0), resolution), filter,
+                                  1., PixelSensor::CreateDefault(),
+                                  inTestDir("test.exr"));
             RGBFilm *film = new RGBFilm(fp, RGBColorSpace::sRGB);
-            CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
-            PerspectiveCamera *camera = new PerspectiveCamera(cbp, 45,
-                Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10.);
+            CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {},
+                                     nullptr);
+            PerspectiveCamera *camera = new PerspectiveCamera(
+                cbp, 45, Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10.);
             const Film filmp = camera->GetFilm();
 
             Integrator *integrator =
@@ -388,12 +406,14 @@ std::vector<TestIntegrator> GetIntegrators() {
         // MLT
         {
             Filter filter = new BoxFilter(Vector2f(0.5, 0.5));
-            FilmBaseParameters fp(resolution, Bounds2i(Point2i(0, 0), resolution),
-                                  filter, 1., PixelSensor::CreateDefault(), inTestDir("test.exr"));
+            FilmBaseParameters fp(resolution, Bounds2i(Point2i(0, 0), resolution), filter,
+                                  1., PixelSensor::CreateDefault(),
+                                  inTestDir("test.exr"));
             RGBFilm *film = new RGBFilm(fp, RGBColorSpace::sRGB);
-            CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {}, nullptr);
-            PerspectiveCamera *camera = new PerspectiveCamera(cbp, 45,
-                Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10.);
+            CameraBaseParameters cbp(CameraTransform(identity), film, nullptr, {},
+                                     nullptr);
+            PerspectiveCamera *camera = new PerspectiveCamera(
+                cbp, 45, Bounds2f(Point2f(-1, -1), Point2f(1, 1)), 0., 10.);
             const Film filmp = camera->GetFilm();
 
             Integrator *integrator =

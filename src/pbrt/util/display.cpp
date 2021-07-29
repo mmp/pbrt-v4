@@ -130,11 +130,11 @@ void IPCChannel::Connect() {
         struct timeval timeout;
         timeout.tv_sec = 3;
         timeout.tv_usec = 0;
-        if (setsockopt(socketFd, SOL_SOCKET, SO_SNDTIMEO, &timeout,
-                       sizeof(timeout)) == SOCKET_ERROR) {
+        if (setsockopt(socketFd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) ==
+            SOCKET_ERROR) {
             LOG_VERBOSE("setsockopt() failed: %s", ErrorString());
         }
-#endif // PBRT_IS_LINUX
+#endif  // PBRT_IS_LINUX
 
         if (connect(socketFd, ptr->ai_addr, ptr->ai_addrlen) == SOCKET_ERROR) {
 #ifdef PBRT_IS_WINDOWS
@@ -190,7 +190,8 @@ bool IPCChannel::Send(pstd::span<const uint8_t> message) {
     int *startPtr = (int *)message.data();
     *startPtr = message.size();
 
-    int bytesSent = send(socketFd, (const char *)message.data(), message.size(), 0 /* flags */);
+    int bytesSent =
+        send(socketFd, (const char *)message.data(), message.size(), 0 /* flags */);
     if (bytesSent == message.size())
         return true;
 

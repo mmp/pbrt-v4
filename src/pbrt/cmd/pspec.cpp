@@ -22,8 +22,8 @@
 #include <pbrt/util/pstd.h>
 
 #ifdef PBRT_BUILD_GPU_RENDERER
-#include <pbrt/gpu/util.h>
 #include <pbrt/gpu/memory.h>
+#include <pbrt/gpu/util.h>
 #endif
 
 #include <string>
@@ -37,10 +37,10 @@ void UpdatePowerSpectrum(const std::vector<Point2f> &points, Image *pspec);
 
 using namespace pbrt;
 
-
 static void usage(const std::string &msg = {}) {
     fprintf(stderr, "\n");
-    if (!msg.empty()) fprintf(stderr, "pspec: %s\n\n", msg.c_str());
+    if (!msg.empty())
+        fprintf(stderr, "pspec: %s\n\n", msg.c_str());
 
     fprintf(stderr,
             R"(usage: pspec <sampler> [<options...>]
@@ -98,8 +98,8 @@ Options:
 )");
 }
 
-static pstd::optional<std::vector<Point2f>>
-GenerateSamples(std::string samplerName, int nPoints, int iter) {
+static pstd::optional<std::vector<Point2f>> GenerateSamples(std::string samplerName,
+                                                            int nPoints, int iter) {
     std::vector<Point2f> points;
     points.reserve(nPoints);
 
@@ -110,7 +110,8 @@ GenerateSamples(std::string samplerName, int nPoints, int iter) {
             if (n != 2) {
                 if (i > 1)
                     ErrorExit("Partial point set provided in standard input: "
-                              "have %d points at EOF.", i);
+                              "have %d points at EOF.",
+                              i);
                 return {};
             }
             points.push_back(Point2f(s[0], s[1]));
@@ -122,7 +123,8 @@ GenerateSamples(std::string samplerName, int nPoints, int iter) {
             if (n != 2) {
                 if (i > 1)
                     ErrorExit("Partial point set provided in standard input: "
-                              "have %d points at EOF.", i);
+                              "have %d points at EOF.",
+                              i);
                 return {};
             }
             points.push_back(Point2f(s[0], s[1]));
@@ -167,8 +169,7 @@ GenerateSamples(std::string samplerName, int nPoints, int iter) {
 
         for (int i = 0; i < sqrtSamples; ++i)
             for (int j = 0; j < sqrtSamples; ++j)
-                points.push_back(
-                    Point2f(Float(i) / sqrtSamples, Float(j) / sqrtSamples));
+                points.push_back(Point2f(Float(i) / sqrtSamples, Float(j) / sqrtSamples));
     } else if (samplerName == "lhs") {
         RNG rng(Options->seed, iter);
         // Sample points along the diagonal
@@ -182,8 +183,7 @@ GenerateSamples(std::string samplerName, int nPoints, int iter) {
         }
     } else if (samplerName == "halton") {
         for (int i = 0; i < nPoints; ++i)
-            points.push_back(
-                Point2f(RadicalInverse(0, i), RadicalInverse(1, i)));
+            points.push_back(Point2f(RadicalInverse(0, i), RadicalInverse(1, i)));
     } else if (samplerName == "halton.permutedigits") {
         RNG rng(Options->seed, iter);
         DigitPermutation perm2(2, rng.Uniform<uint32_t>(), {});
@@ -227,7 +227,8 @@ GenerateSamples(std::string samplerName, int nPoints, int iter) {
             } else if (samplerName == "pmj02bn") {
                 return new PMJ02BNSampler(nPoints, Options->seed);
             } else if (samplerName == "sobol") {
-                return new PaddedSobolSampler(nPoints, RandomizeStrategy::None, Options->seed);
+                return new PaddedSobolSampler(nPoints, RandomizeStrategy::None,
+                                              Options->seed);
             } else if (samplerName == "sobol.permutedigits") {
                 return new PaddedSobolSampler(nPoints, RandomizeStrategy::PermuteDigits,
                                               Options->seed);
@@ -298,7 +299,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (!(res & 1)) ++res;
+    if (!(res & 1))
+        ++res;
 
     PBRTOptions options;
     options.quiet = true;
@@ -310,14 +312,13 @@ int main(int argc, char *argv[]) {
 #ifdef PBRT_BUILD_GPU_RENDERER
     CUDAMemoryResource *memoryResource = new CUDAMemoryResource;
 #else
-    pstd::pmr::memory_resource *memoryResource =
-        pstd::pmr::get_default_resource();
+    pstd::pmr::memory_resource *memoryResource = pstd::pmr::get_default_resource();
 #endif
     Allocator alloc(memoryResource);
 
-    Image *pspec = alloc.new_object<Image>(
-        PixelFormat::Float, Point2i(res, res),
-        std::vector<std::string>{"power"}, nullptr, alloc);
+    Image *pspec =
+        alloc.new_object<Image>(PixelFormat::Float, Point2i(res, res),
+                                std::vector<std::string>{"power"}, nullptr, alloc);
 #ifdef PBRT_BUILD_GPU_RENDERER
     ProgressReporter progress(nSets, "Analyzing", nSets == 1, options.useGPU);
     GPUInit();
@@ -331,7 +332,8 @@ int main(int argc, char *argv[]) {
         Options->seed = MixBits(actualNSets);
 
         // Generate points
-        pstd::optional<std::vector<Point2f>> points = GenerateSamples(samplerName, nPoints, actualNSets);
+        pstd::optional<std::vector<Point2f>> points =
+            GenerateSamples(samplerName, nPoints, actualNSets);
         if (!points)
             break;
         ++actualNSets;
@@ -371,9 +373,9 @@ int main(int argc, char *argv[]) {
     ParallelFor(0, res, [&](int y) {
         for (int x = 0; x < res; ++x) {
             // Early float cast so no integer overflow...
-            pspec->SetChannel({x, y}, 0,
-                              (pspec->GetChannel({x, y}, 0) /
-                               (Float(nPoints) * Float(actualNSets))));
+            pspec->SetChannel(
+                {x, y}, 0,
+                (pspec->GetChannel({x, y}, 0) / (Float(nPoints) * Float(actualNSets))));
         }
     });
 
@@ -394,7 +396,7 @@ int main(int argc, char *argv[]) {
             if (dx == 0 && dy == 0)
                 // skip the central spike
                 continue;
-            int bucket = std::sqrt(dx*dx + dy*dy);
+            int bucket = std::sqrt(dx * dx + dy * dy);
             if (bucket >= sumPower.size())
                 continue;
             sumPower[bucket] += pspec->GetChannel({x, y}, 0);
