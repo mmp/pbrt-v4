@@ -143,9 +143,19 @@ std::string ReadDecompressedFileContents(std::string filename) {
     do {
         bytesRead = gzread(f, buffer, 4096);
         contents.append(buffer, bytesRead);
-    } while ( !gzeof(f) );
+    } while ( !gzeof(f) || bytesRead < 0);
+   
+    int status = gzclose(f);
     
-    gzclose(f);
+    if (bytesRead < 0) {
+        Error("%s: zlib read error", filename);
+        return {};
+    }
+
+    if (status == Z_BUF_ERROR) {
+        Error("%s: incomplete file", filename);
+        return {};
+    }
 
     return contents;
 }
