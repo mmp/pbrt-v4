@@ -15,6 +15,7 @@
 namespace pbrt {
 
 // File and Filename Function Declarations
+std::string ReadDecompressedFileContents(std::string filename);
 std::string ReadFileContents(std::string filename);
 bool WriteFileContents(std::string filename, const std::string &contents);
 
