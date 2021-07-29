@@ -137,6 +137,11 @@ std::unique_ptr<Tokenizer> Tokenizer::CreateFromFile(
         return std::make_unique<Tokenizer>(std::move(str), std::move(errorCallback));
     }
 
+    if (HasExtension(filename, ".gz")) {
+        std::string str = ReadDecompressedFileContents(filename);
+        return std::make_unique<Tokenizer>(std::move(str), std::move(errorCallback));
+    }
+
 #ifdef PBRT_HAVE_MMAP
     int fd = open(filename.c_str(), O_RDONLY);
     if (fd == -1) {
@@ -197,7 +202,7 @@ std::unique_ptr<Tokenizer> Tokenizer::CreateFromFile(
     return std::make_unique<Tokenizer>(ptr, len, filename, std::move(errorCallback));
 #else
     std::string str = ReadFileContents(filename);
-    return std::make_unique_ptr<Tokenizer>(std::move(str), std::move(errorCallback));
+    return std::make_unique<Tokenizer>(std::move(str), std::move(errorCallback));
 #endif
 }
 

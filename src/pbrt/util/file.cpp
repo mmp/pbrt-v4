@@ -8,6 +8,8 @@
 #include <pbrt/util/error.h>
 #include <pbrt/util/string.h>
 
+#include <zlib/zlib.h>
+
 #include <filesystem/path.h>
 #include <algorithm>
 #include <cctype>
@@ -124,6 +126,28 @@ std::string ReadFileContents(std::string filename) {
         ErrorExit("%s: %s", filename, ErrorString());
     return std::string((std::istreambuf_iterator<char>(ifs)),
                        (std::istreambuf_iterator<char>()));
+}
+
+std::string ReadDecompressedFileContents(std::string filename) {
+
+    std::string contents;
+
+    gzFile f = gzopen(filename.c_str(), "rb");
+    if (!f) {
+        Error("%s: unable to open file", filename);
+        return {};
+    }
+    
+    char buffer[4096];
+    int bytesRead = 0;
+    do {
+        bytesRead = gzread(f, buffer, 4096);
+        contents.append(buffer, bytesRead);
+    } while ( !gzeof(f) );
+    
+    gzclose(f);
+
+    return contents;
 }
 
 FILE *FOpenRead(std::string filename) {
