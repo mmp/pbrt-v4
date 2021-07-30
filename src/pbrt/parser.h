@@ -7,45 +7,19 @@
 
 #include <pbrt/pbrt.h>
 
+#include <pbrt/paramdict.h>
 #include <pbrt/util/check.h>
 #include <pbrt/util/containers.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/pstd.h>
 
 #include <functional>
+#include <map>
 #include <memory>
 #include <string>
 #include <string_view>
 
 namespace pbrt {
-
-// ParsedParameter Definition
-class ParsedParameter {
-  public:
-    // ParsedParameter Public Methods
-    ParsedParameter(FileLoc loc) : loc(loc) {}
-
-    void AddFloat(Float v);
-    void AddInt(int i);
-    void AddString(std::string_view str);
-    void AddBool(bool v);
-
-    std::string ToString() const;
-
-    // ParsedParameter Public Members
-    std::string type, name;
-    FileLoc loc;
-    pstd::vector<Float> floats;
-    pstd::vector<int> ints;
-    pstd::vector<std::string> strings;
-    pstd::vector<uint8_t> bools;
-    mutable bool lookedUp = false;
-    mutable const RGBColorSpace *colorSpace = nullptr;
-    bool mayBeUnused = false;
-};
-
-// ParsedParameterVector Definition
-using ParsedParameterVector = InlinedVector<ParsedParameter *, 8>;
 
 // ParserTarget Definition
 class ParserTarget {
@@ -222,6 +196,78 @@ class Tokenizer {
     // thence, std::string_views from previous calls to Next() must be invalid
     // after a subsequent call, since we may reuse sEscaped.)
     std::string sEscaped;
+};
+
+class FormattingParserTarget : public ParserTarget {
+  public:
+    FormattingParserTarget(bool toPly, bool upgrade) : toPly(toPly), upgrade(upgrade) {}
+    ~FormattingParserTarget();
+
+    void Option(const std::string &name, const std::string &value, FileLoc loc);
+    void Identity(FileLoc loc);
+    void Translate(Float dx, Float dy, Float dz, FileLoc loc);
+    void Rotate(Float angle, Float ax, Float ay, Float az, FileLoc loc);
+    void Scale(Float sx, Float sy, Float sz, FileLoc loc);
+    void LookAt(Float ex, Float ey, Float ez, Float lx, Float ly, Float lz, Float ux,
+                Float uy, Float uz, FileLoc loc);
+    void ConcatTransform(Float transform[16], FileLoc loc);
+    void Transform(Float transform[16], FileLoc loc);
+    void CoordinateSystem(const std::string &, FileLoc loc);
+    void CoordSysTransform(const std::string &, FileLoc loc);
+    void ActiveTransformAll(FileLoc loc);
+    void ActiveTransformEndTime(FileLoc loc);
+    void ActiveTransformStartTime(FileLoc loc);
+    void TransformTimes(Float start, Float end, FileLoc loc);
+    void TransformBegin(FileLoc loc);
+    void TransformEnd(FileLoc loc);
+    void ColorSpace(const std::string &n, FileLoc loc);
+    void PixelFilter(const std::string &name, ParsedParameterVector params, FileLoc loc);
+    void Film(const std::string &type, ParsedParameterVector params, FileLoc loc);
+    void Sampler(const std::string &name, ParsedParameterVector params, FileLoc loc);
+    void Accelerator(const std::string &name, ParsedParameterVector params, FileLoc loc);
+    void Integrator(const std::string &name, ParsedParameterVector params, FileLoc loc);
+    void Camera(const std::string &, ParsedParameterVector params, FileLoc loc);
+    void MakeNamedMedium(const std::string &name, ParsedParameterVector params,
+                         FileLoc loc);
+    void MediumInterface(const std::string &insideName, const std::string &outsideName,
+                         FileLoc loc);
+    void WorldBegin(FileLoc loc);
+    void AttributeBegin(FileLoc loc);
+    void AttributeEnd(FileLoc loc);
+    void Attribute(const std::string &target, ParsedParameterVector params, FileLoc loc);
+    void Texture(const std::string &name, const std::string &type,
+                 const std::string &texname, ParsedParameterVector params, FileLoc loc);
+    void Material(const std::string &name, ParsedParameterVector params, FileLoc loc);
+    void MakeNamedMaterial(const std::string &name, ParsedParameterVector params,
+                           FileLoc loc);
+    void NamedMaterial(const std::string &name, FileLoc loc);
+    void LightSource(const std::string &name, ParsedParameterVector params, FileLoc loc);
+    void AreaLightSource(const std::string &name, ParsedParameterVector params,
+                         FileLoc loc);
+    void Shape(const std::string &name, ParsedParameterVector params, FileLoc loc);
+    void ReverseOrientation(FileLoc loc);
+    void ObjectBegin(const std::string &name, FileLoc loc);
+    void ObjectEnd(FileLoc loc);
+    void ObjectInstance(const std::string &name, FileLoc loc);
+
+    void EndOfFiles();
+
+    std::string indent(int extra = 0) const {
+        return std::string(catIndentCount + 4 * extra, ' ');
+    }
+
+  private:
+    std::string upgradeMaterialIndex(const std::string &name, ParameterDictionary *dict,
+                                     FileLoc loc) const;
+    std::string upgradeMaterial(std::string *name, ParameterDictionary *dict,
+                                FileLoc loc) const;
+
+    int catIndentCount = 0;
+    bool toPly, upgrade;
+    std::map<std::string, std::string> definedTextures;
+    std::map<std::string, std::string> definedNamedMaterials;
+    std::map<std::string, ParameterDictionary> namedMaterialDictionaries;
+    std::map<std::string, std::string> definedObjectInstances;
 };
 
 }  // namespace pbrt
