@@ -1163,9 +1163,13 @@ std::vector<Light> ParsedScene::CreateLights(
         std::string alphaTexName = parameters.GetTexture("alpha");
         if (!alphaTexName.empty()) {
             if (auto iter = textures.floatTextures.find(alphaTexName);
-                iter != textures.floatTextures.end())
+                iter != textures.floatTextures.end()) {
+                if (Options->useGPU &&
+                    !BasicTextureEvaluator().CanEvaluate({iter->second}, {}))
+                    // A warning will be issued elsewhere...
+                    return nullptr;
                 return iter->second;
-            else
+            } else
                 ErrorExit(loc, "%s: couldn't find float texture for \"alpha\" parameter.",
                           alphaTexName);
         } else if (Float alpha = parameters.GetOneFloat("alpha", 1.f); alpha < 1.f)
