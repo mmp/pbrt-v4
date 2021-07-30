@@ -334,11 +334,9 @@ class ParsedScene : public SceneProcessor {
                          std::map<std::string, Material> *namedMaterials,
                          std::vector<Material> *materials) const;
 
-    std::map<std::string, Medium> CreateMedia() const;
+    std::map<std::string, Medium> CreateMedia();
 
-    std::vector<Light> CreateLights(
-        Allocator alloc, const std::map<std::string, Medium> &media,
-        const NamedTextures &textures,
+    std::vector<Light> CreateLights(const NamedTextures &textures,
         std::map<int, pstd::vector<Light> *> *shapeIndexToAreaLights);
 
     Primitive CreateAggregate(
@@ -359,8 +357,6 @@ class ParsedScene : public SceneProcessor {
     std::map<std::string, TransformedSceneEntity> media;
     std::vector<std::pair<std::string, TextureSceneEntity>> floatTextures;
     std::vector<std::pair<std::string, TextureSceneEntity>> spectrumTextures;
-    std::vector<LightSceneEntity> lights;
-    std::vector<SceneEntity> areaLights;
     std::vector<ShapeSceneEntity> shapes;
     std::vector<AnimatedShapeSceneEntity> animatedShapes;
     std::vector<InstanceSceneEntity> instances;
@@ -369,7 +365,12 @@ class ParsedScene : public SceneProcessor {
   private:
     ThreadLocal<Allocator> &threadAllocators;
 
-    mutable std::map<std::string, Future<Medium>> mediaFutures;
+    std::map<std::string, Future<Medium>> mediaFutures;
+    std::map<std::string, Medium> mediaMap;
+
+    std::vector<LightSceneEntity> lightsWithMedia;
+    std::vector<Future<Light>> lightFutures;
+    std::vector<SceneEntity> areaLights;
 
     std::mutex namedMaterialMutex, materialMutex, mediaMutex;
     std::mutex floatTextureMutex, spectrumTextureMutex;

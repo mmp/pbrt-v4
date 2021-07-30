@@ -797,7 +797,30 @@ void ParsedScene::AddSpectrumTexture(std::string name, TextureSceneEntity textur
 
 void ParsedScene::AddLight(LightSceneEntity light) {
     std::lock_guard<std::mutex> lock(lightMutex);
-    lights.push_back(std::move(light));
+    if (!light.medium.empty()) {
+        // If the light has a medium associated with it, punt for now since
+        // the Medium may not yet be initialized; these lights will be
+        // taken care of when CreateLights() is called.  At the cost of
+        // some complexity, we could check and see if it's already in the
+        // medium map and wait for its in-flight future if it's not yet
+        // ready, though the most important case here is probably infinite
+        // image lights and those can't have media associated with them
+        // anyway...
+        lightsWithMedia.push_back(std::move(light));
+        return;
+    }
+
+    if (light.renderFromObject.IsAnimated())
+        Warning(&light.loc,
+                "Animated lights aren't supported. Using the start transform.");
+
+    auto create = [this](LightSceneEntity light) {
+        return Light::Create(light.name, light.parameters,
+                             light.renderFromObject.startTransform,
+                             camera.cameraTransform, nullptr /* Medium */, &light.loc,
+                             threadAllocators.Get());
+    };
+    lightFutures.push_back(RunAsync(create, light));
 }
 
 int ParsedScene::AddAreaLight(SceneEntity light) {
@@ -875,10 +898,10 @@ void ParsedScene::Done() {
     }
 
     LOG_VERBOSE("Scene stats: %d shapes, %d animated shapes, %d instance definitions, "
-                "%d instance uses, %d lights, %d float textures, %d spectrum textures, "
+                "%d instance uses, %d float textures, %d spectrum textures, "
                 "%d named materials, %d materials",
                 shapes.size(), animatedShapes.size(), instanceDefinitions.size(),
-                instances.size(), lights.size(), floatTextures.size(),
+                instances.size(), floatTextures.size(),
                 spectrumTextures.size(), namedMaterials.size(), materials.size());
 
     // And complain about what's left.
@@ -1131,32 +1154,37 @@ NamedTextures ParsedScene::CreateTextures(ThreadLocal<Allocator> &threadAllocato
     return textures;
 }
 
-std::map<std::string, Medium> ParsedScene::CreateMedia() const {
-    std::map<std::string, Medium> mediaMap;
+std::map<std::string, Medium> ParsedScene::CreateMedia() {
+    std::lock_guard<std::mutex> lock(mediaMutex);
 
     LOG_VERBOSE("Consume media futures start");
-    for (auto &m : mediaFutures)
+    for (auto &m : mediaFutures) {
+        CHECK(mediaMap.find(m.first) == mediaMap.end());
         mediaMap[m.first] = m.second.Get();
-    LOG_VERBOSE("Consume media futures finished");
-
+    }
     mediaFutures.clear();
+    LOG_VERBOSE("Consume media futures finished");
 
     return mediaMap;
 }
 
 std::vector<Light> ParsedScene::CreateLights(
-    Allocator alloc, const std::map<std::string, Medium> &media,
     const NamedTextures &textures,
     std::map<int, pstd::vector<Light> *> *shapeIndexToAreaLights) {
-    auto findMedium = [&media](const std::string &s, const FileLoc *loc) -> Medium {
+    // Ensure that media are all ready
+    (void)CreateMedia();
+
+    auto findMedium = [this](const std::string &s, const FileLoc *loc) -> Medium {
         if (s.empty())
             return nullptr;
 
-        auto iter = media.find(s);
-        if (iter == media.end())
+        auto iter = mediaMap.find(s);
+        if (iter == mediaMap.end())
             ErrorExit(loc, "%s: medium not defined", s);
         return iter->second;
     };
+
+    Allocator alloc = threadAllocators.Get();
 
     auto getAlphaTexture = [&](const ParameterDictionary &parameters,
                                const FileLoc *loc) -> FloatTexture {
@@ -1178,11 +1206,11 @@ std::vector<Light> ParsedScene::CreateLights(
             return nullptr;
     };
 
-    // Lights (area lights will be done later, with shapes...)
-    LOG_VERBOSE("Starting lights");
+    LOG_VERBOSE("Starting non-future lights");
     std::vector<Light> lights;
-    lights.reserve(lights.size() + areaLights.size());
-    for (const auto &light : this->lights) {
+
+    // Lights with media (punted in AddLight() earlier.)
+    for (const auto &light : lightsWithMedia) {
         Medium outsideMedium = findMedium(light.medium, &light.loc);
         if (light.renderFromObject.IsAnimated())
             Warning(&light.loc,
@@ -1243,8 +1271,13 @@ std::vector<Light> ParsedScene::CreateLights(
 
         (*shapeIndexToAreaLights)[i] = shapeLights;
     }
+    LOG_VERBOSE("Finished non-future lights");
 
-    LOG_VERBOSE("Finished Lights");
+    LOG_VERBOSE("Starting to consume non-area light futures");
+    for (auto &fut : lightFutures)
+        lights.push_back(fut.Get());
+    LOG_VERBOSE("Finished consuming non-area light futures");
+
     return lights;
 }
 

@@ -79,8 +79,7 @@ void RenderCPU(ParsedScene &parsedScene) {
 
     // Lights
     std::map<int, pstd::vector<Light> *> shapeIndexToAreaLights;
-    std::vector<Light> lights =
-        parsedScene.CreateLights(alloc, media, textures, &shapeIndexToAreaLights);
+    std::vector<Light> lights = parsedScene.CreateLights(textures, &shapeIndexToAreaLights);
 
     LOG_VERBOSE("Starting materials");
     std::map<std::string, pbrt::Material> namedMaterials;

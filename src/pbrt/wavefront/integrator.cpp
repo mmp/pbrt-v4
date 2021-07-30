@@ -152,7 +152,7 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
     std::map<int, pstd::vector<Light> *> shapeIndexToAreaLights;
     infiniteLights = alloc.new_object<pstd::vector<Light>>(alloc);
 
-    for (Light l : scene.CreateLights(alloc, media, textures, &shapeIndexToAreaLights)) {
+    for (Light l : scene.CreateLights(textures, &shapeIndexToAreaLights)) {
         if (l.Is<UniformInfiniteLight>() || l.Is<ImageInfiniteLight>() ||
             l.Is<PortalImageInfiniteLight>())
             infiniteLights->push_back(l);
