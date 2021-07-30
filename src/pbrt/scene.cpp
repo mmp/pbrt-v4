@@ -1225,7 +1225,7 @@ std::vector<Light> ParsedScene::CreateLights(
         pbrt::MediumInterface mi(findMedium(sh.insideMedium, &sh.loc),
                                  findMedium(sh.outsideMedium, &sh.loc));
 
-        pstd::vector<Light> *shapeLights = new pstd::vector<Light>;
+        pstd::vector<Light> *shapeLights = new pstd::vector<Light>(alloc);
         const auto &areaLightEntity = areaLights[sh.lightIndex];
         for (pbrt::Shape ps : shapeObjects) {
             Light area = Light::CreateArea(
