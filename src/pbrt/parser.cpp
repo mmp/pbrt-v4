@@ -592,7 +592,7 @@ void parse(ParserTarget *target, std::unique_ptr<Tokenizer> t) {
 
     static std::atomic<bool> warnedTransformBeginEndDeprecated{false};
 
-    std::vector<std::pair<Future<void>, ParsedScene *>> imports;
+    std::vector<std::pair<Future<void>, SceneStateManager *>> imports;
 
     LOG_VERBOSE("Started parsing %s",
                 std::string(t->loc.filename.begin(), t->loc.filename.end()));
@@ -648,7 +648,7 @@ void parse(ParserTarget *target, std::unique_ptr<Tokenizer> t) {
 
     // Helper function for pbrt API entrypoints that take a single string
     // parameter and a ParameterVector (e.g. pbrtShape()).
-    // using BasicEntrypoint = void (ParsedScene::*)(const std::string &,
+    // using BasicEntrypoint = void (SceneStateManager::*)(const std::string &,
     // ParsedParameterVector, FileLoc);
     auto basicParamListEntrypoint =
         [&](void (ParserTarget::*apiFunc)(const std::string &,
@@ -762,34 +762,34 @@ void parse(ParserTarget *target, std::unique_ptr<Tokenizer> t) {
                     Printf("%sImport \"%s\"\n",
                            dynamic_cast<FormattingParserTarget *>(target)->indent(), filename);
                 else {
-                    ParsedScene *parsedScene = dynamic_cast<ParsedScene *>(target);
-                    CHECK(parsedScene);
+                    SceneStateManager *stateManager = dynamic_cast<SceneStateManager *>(target);
+                    CHECK(stateManager);
 
-                    if (parsedScene->currentBlock != ParsedScene::BlockState::WorldBlock)
+                    if (stateManager->currentBlock != SceneStateManager::BlockState::WorldBlock)
                         ErrorExit(&tok->loc, "Import statement only allowed inside world "
                                              "definition block.");
 
                     filename = ResolveFilename(filename);
-                    ParsedScene *importTarget = parsedScene->CopyForImport();
+                    SceneStateManager *importScene = stateManager->CopyForImport();
 
                     if (RunningThreads() == 1) {
                         std::unique_ptr<Tokenizer> timport =
                             Tokenizer::CreateFromFile(filename, parseError);
                         if (timport)
-                            parse(importTarget, std::move(timport));
-                        parsedScene->MergeImported(importTarget);
+                            parse(importScene, std::move(timport));
+                        stateManager->MergeImported(importScene);
                     } else {
                         auto job = [=](std::string filename) {
                             Timer timer;
                             std::unique_ptr<Tokenizer> timport =
                                 Tokenizer::CreateFromFile(filename, parseError);
                             if (timport)
-                                parse(importTarget, std::move(timport));
+                                parse(importScene, std::move(timport));
                             LOG_VERBOSE("Elapsed time to parse \"%s\": %.2fs", filename,
                                         timer.ElapsedSeconds());
                         };
                         Future<void> jobFinished = RunAsync(job, filename);
-                        imports.push_back(std::make_pair(std::move(jobFinished), importTarget));
+                        imports.push_back(std::make_pair(std::move(jobFinished), importScene));
                     }
                 }
             } else if (tok->token == "Identity")
@@ -973,9 +973,9 @@ void parse(ParserTarget *target, std::unique_ptr<Tokenizer> t) {
     for (auto &import : imports) {
         import.first.Wait();
 
-        ParsedScene *parsedScene = dynamic_cast<ParsedScene *>(target);
-        CHECK(parsedScene);
-        parsedScene->MergeImported(import.second);
+        SceneStateManager *stateManager = dynamic_cast<SceneStateManager *>(target);
+        CHECK(stateManager);
+        stateManager->MergeImported(import.second);
         // HACK: let import.second leak so that its TransformCache isn't deallocated...
     }
 }

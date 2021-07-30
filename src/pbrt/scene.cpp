@@ -43,18 +43,16 @@ static std::string ToString(const std::pair<T, U> &p) {
     return StringPrintf("[ std::pair first: %s second: %s ]", p.first, p.second);
 }
 
-std::string ParsedScene::ToString() const {
-    return StringPrintf("[ ParsedScene camera: %s film: %s sampler: %s integrator: %s "
-                        "filter: %s accelerator: %s namedMaterials: %s materials: %s "
-                        "media: %s floatTextures: %s spectrumTextures: %s "
-                        "instanceDefinitions: %s lights: %s "
-                        "shapes: %s instances: %s ]",
-                        camera, film, sampler, integrator, filter, accelerator,
-                        namedMaterials, materials, media, floatTextures, spectrumTextures,
-                        instanceDefinitions, lights, shapes, instances);
+SceneProcessor::~SceneProcessor() {}
+
+std::string SceneStateManager::ToString() const {
+    return StringPrintf(
+        "[ SceneStateManager camera: %s film: %s sampler: %s integrator: %s "
+        "filter: %s accelerator: %s ]",
+        camera, film, sampler, integrator, filter, accelerator);
 }
 
-ParsedScene::GraphicsState::GraphicsState() {
+SceneStateManager::GraphicsState::GraphicsState() {
     currentMaterialIndex = 0;
 }
 
@@ -124,8 +122,9 @@ TransformCache::~TransformCache() {
 STAT_COUNTER("Scene/Object instances created", nObjectInstancesCreated);
 STAT_COUNTER("Scene/Object instances used", nObjectInstancesUsed);
 
-// ParsedScene Method Definitions
-ParsedScene::ParsedScene() {
+// SceneStateManager Method Definitions
+SceneStateManager::SceneStateManager(SceneProcessor *sceneProcessor)
+    : sceneProcessor(sceneProcessor) {
     // Set scene defaults
     camera.name = "perspective";
     sampler.name = "zsobol";
@@ -133,46 +132,46 @@ ParsedScene::ParsedScene() {
     integrator.name = "volpath";
 
     ParameterDictionary dict({}, RGBColorSpace::sRGB);
-    materials.push_back(SceneEntity("diffuse", dict, {}));
+    currentMaterialIndex = sceneProcessor->AddMaterial(SceneEntity("diffuse", dict, {}));
     accelerator.name = "bvh";
     film.name = "rgb";
     film.parameters = ParameterDictionary({}, RGBColorSpace::sRGB);
 }
 
-void ParsedScene::ReverseOrientation(FileLoc loc) {
+void SceneStateManager::ReverseOrientation(FileLoc loc) {
     VERIFY_WORLD("ReverseOrientation");
     graphicsState.reverseOrientation = !graphicsState.reverseOrientation;
 }
 
-void ParsedScene::ColorSpace(const std::string &name, FileLoc loc) {
+void SceneStateManager::ColorSpace(const std::string &name, FileLoc loc) {
     if (const RGBColorSpace *cs = RGBColorSpace::GetNamed(name))
         graphicsState.colorSpace = cs;
     else
         Error(&loc, "%s: color space unknown", name);
 }
 
-void ParsedScene::Identity(FileLoc loc) {
+void SceneStateManager::Identity(FileLoc loc) {
     FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] = pbrt::Transform();)
 }
 
-void ParsedScene::Translate(Float dx, Float dy, Float dz, FileLoc loc) {
+void SceneStateManager::Translate(Float dx, Float dy, Float dz, FileLoc loc) {
     FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] = graphicsState.ctm[i] *
                                                  pbrt::Translate(Vector3f(dx, dy, dz));)
 }
 
-void ParsedScene::CoordinateSystem(const std::string &name, FileLoc loc) {
+void SceneStateManager::CoordinateSystem(const std::string &name, FileLoc loc) {
     namedCoordinateSystems[name] = graphicsState.ctm;
 }
 
-void ParsedScene::CoordSysTransform(const std::string &name, FileLoc loc) {
+void SceneStateManager::CoordSysTransform(const std::string &name, FileLoc loc) {
     if (namedCoordinateSystems.find(name) != namedCoordinateSystems.end())
         graphicsState.ctm = namedCoordinateSystems[name];
     else
         Warning(&loc, "Couldn't find named coordinate system \"%s\"", name);
 }
 
-void ParsedScene::Camera(const std::string &name, ParsedParameterVector params,
-                         FileLoc loc) {
+void SceneStateManager::Camera(const std::string &name, ParsedParameterVector params,
+                               FileLoc loc) {
     ParameterDictionary dict(std::move(params), graphicsState.colorSpace);
 
     VERIFY_OPTIONS("Camera");
@@ -190,13 +189,13 @@ void ParsedScene::Camera(const std::string &name, ParsedParameterVector params,
                                graphicsState.currentOutsideMedium);
 }
 
-void ParsedScene::AttributeBegin(FileLoc loc) {
+void SceneStateManager::AttributeBegin(FileLoc loc) {
     VERIFY_WORLD("AttributeBegin");
     pushedGraphicsStates.push_back(graphicsState);
     pushStack.push_back(std::make_pair('a', loc));
 }
 
-void ParsedScene::AttributeEnd(FileLoc loc) {
+void SceneStateManager::AttributeEnd(FileLoc loc) {
     VERIFY_WORLD("AttributeEnd");
     if (pushedGraphicsStates.empty()) {
         Error(&loc, "Unmatched AttributeEnd encountered. Ignoring it.");
@@ -215,8 +214,8 @@ void ParsedScene::AttributeEnd(FileLoc loc) {
     pushStack.pop_back();
 }
 
-void ParsedScene::Attribute(const std::string &target, ParsedParameterVector attrib,
-                            FileLoc loc) {
+void SceneStateManager::Attribute(const std::string &target, ParsedParameterVector attrib,
+                                  FileLoc loc) {
     ParsedParameterVector *currentAttributes = nullptr;
     if (target == "shape") {
         currentAttributes = &graphicsState.shapeAttributes;
@@ -246,26 +245,36 @@ void ParsedScene::Attribute(const std::string &target, ParsedParameterVector att
     }
 }
 
-void ParsedScene::WorldBegin(FileLoc loc) {
+void SceneStateManager::WorldBegin(FileLoc loc) {
     VERIFY_OPTIONS("WorldBegin");
     currentBlock = BlockState::WorldBlock;
     for (int i = 0; i < MaxTransforms; ++i)
         graphicsState.ctm[i] = pbrt::Transform();
     graphicsState.activeTransformBits = AllTransformsBits;
     namedCoordinateSystems["world"] = graphicsState.ctm;
+
+    // Pass these along now
+    sceneProcessor->SetFilm(std::move(film));
+    sceneProcessor->SetSampler(std::move(sampler));
+    sceneProcessor->SetIntegrator(std::move(integrator));
+    sceneProcessor->SetFilter(std::move(filter));
+    sceneProcessor->SetAccelerator(std::move(accelerator));
+    sceneProcessor->SetCamera(std::move(camera));
 }
 
-void ParsedScene::LightSource(const std::string &name, ParsedParameterVector params,
-                              FileLoc loc) {
+void SceneStateManager::LightSource(const std::string &name, ParsedParameterVector params,
+                                    FileLoc loc) {
     VERIFY_WORLD("LightSource");
+
     ParameterDictionary dict(std::move(params), graphicsState.lightAttributes,
                              graphicsState.colorSpace);
-    lights.push_back(LightSceneEntity(name, std::move(dict), loc, RenderFromObject(),
-                                      graphicsState.currentOutsideMedium));
+    sceneProcessor->AddLight(LightSceneEntity(name, std::move(dict), loc,
+                                              RenderFromObject(),
+                                              graphicsState.currentOutsideMedium));
 }
 
-void ParsedScene::Shape(const std::string &name, ParsedParameterVector params,
-                        FileLoc loc) {
+void SceneStateManager::Shape(const std::string &name, ParsedParameterVector params,
+                              FileLoc loc) {
     VERIFY_WORLD("Shape");
 
     ParameterDictionary dict(std::move(params), graphicsState.shapeAttributes,
@@ -273,79 +282,75 @@ void ParsedScene::Shape(const std::string &name, ParsedParameterVector params,
 
     int areaLightIndex = -1;
     if (!graphicsState.areaLightName.empty()) {
-        areaLights.push_back(SceneEntity(graphicsState.areaLightName,
-                                         graphicsState.areaLightParams,
-                                         graphicsState.areaLightLoc));
-        areaLightIndex = areaLights.size() - 1;
+        areaLightIndex = sceneProcessor->AddAreaLight(
+            SceneEntity(graphicsState.areaLightName, graphicsState.areaLightParams,
+                        graphicsState.areaLightLoc));
+        if (activeInstanceDefinition)
+            Warning(&loc, "Area lights not supported with object instancing");
     }
 
     if (CTMIsAnimated()) {
-        std::vector<AnimatedShapeSceneEntity> *as = &animatedShapes;
-        if (currentInstance) {
-            if (!graphicsState.areaLightName.empty())
-                Warning(&loc, "Area lights not supported with object instancing");
-            as = &currentInstance->animatedShapes;
-        }
-
         AnimatedTransform renderFromShape = RenderFromObject();
         const class Transform *identity = transformCache.Lookup(pbrt::Transform());
 
-        as->push_back(AnimatedShapeSceneEntity(
+        AnimatedShapeSceneEntity entity(
             {name, std::move(dict), loc, renderFromShape, identity,
              graphicsState.reverseOrientation, graphicsState.currentMaterialIndex,
              graphicsState.currentMaterialName, areaLightIndex,
-             graphicsState.currentInsideMedium, graphicsState.currentOutsideMedium}));
-    } else {
-        std::vector<ShapeSceneEntity> *s = &shapes;
-        if (currentInstance) {
-            if (!graphicsState.areaLightName.empty())
-                Warning(&loc, "Area lights not supported with object instancing");
-            s = &currentInstance->shapes;
-        }
+             graphicsState.currentInsideMedium, graphicsState.currentOutsideMedium});
 
+        if (activeInstanceDefinition)
+            activeInstanceDefinition->entity.animatedShapes.push_back(std::move(entity));
+        else
+            sceneProcessor->AddAnimatedShape(std::move(entity));
+    } else {
         const class Transform *renderFromObject =
             transformCache.Lookup(RenderFromObject(0));
         const class Transform *objectFromRender =
             transformCache.Lookup(Inverse(*renderFromObject));
 
-        s->push_back(ShapeSceneEntity(
+        ShapeSceneEntity entity(
             {name, std::move(dict), loc, renderFromObject, objectFromRender,
              graphicsState.reverseOrientation, graphicsState.currentMaterialIndex,
              graphicsState.currentMaterialName, areaLightIndex,
-             graphicsState.currentInsideMedium, graphicsState.currentOutsideMedium}));
+             graphicsState.currentInsideMedium, graphicsState.currentOutsideMedium});
+        if (activeInstanceDefinition)
+            activeInstanceDefinition->entity.shapes.push_back(std::move(entity));
+        else
+            shapes.push_back(std::move(entity));
     }
 }
 
-void ParsedScene::ObjectBegin(const std::string &name, FileLoc loc) {
+void SceneStateManager::ObjectBegin(const std::string &name, FileLoc loc) {
     VERIFY_WORLD("ObjectBegin");
     pushedGraphicsStates.push_back(graphicsState);
 
     pushStack.push_back(std::make_pair('o', loc));
 
-    if (currentInstance) {
+    if (activeInstanceDefinition) {
         ErrorExitDeferred(&loc, "ObjectBegin called inside of instance definition");
         return;
     }
 
-    if (instanceDefinitions.find(name) != instanceDefinitions.end()) {
+    if (instanceNames.find(name) != instanceNames.end()) {
         ErrorExitDeferred(&loc, "%s: trying to redefine an object instance", name);
         return;
     }
+    instanceNames.insert(name);
 
-    instanceDefinitions[name] = InstanceDefinitionSceneEntity(name, loc);
-    // This should be safe since we're not adding anything to
-    // instanceDefinitions until after ObjectEnd... (Still makes me
-    // nervous.)
-    currentInstance = &instanceDefinitions[name];
+    activeInstanceDefinition = new ActiveInstanceDefinition(name, loc);
 }
 
-void ParsedScene::ObjectEnd(FileLoc loc) {
+void SceneStateManager::ObjectEnd(FileLoc loc) {
     VERIFY_WORLD("ObjectEnd");
-    if (!currentInstance) {
+    if (!activeInstanceDefinition) {
         ErrorExitDeferred(&loc, "ObjectEnd called outside of instance definition");
         return;
     }
-    currentInstance = nullptr;
+    if (activeInstanceDefinition->parent) {
+        ErrorExitDeferred(&loc, "ObjectEnd called inside Import for instance definition");
+        return;
+    }
 
     // NOTE: Must keep the following consistent with AttributeEnd
     graphicsState = std::move(pushedGraphicsStates.back());
@@ -360,12 +365,21 @@ void ParsedScene::ObjectEnd(FileLoc loc) {
     else
         CHECK_EQ(pushStack.back().first, 'o');
     pushStack.pop_back();
+
+    // Otherwise it will be taken care of in MergeImported()
+    if (--activeInstanceDefinition->activeImports == 0) {
+        sceneProcessor->AddInstanceDefinition(
+            std::move(activeInstanceDefinition->entity));
+        delete activeInstanceDefinition;
+    }
+
+    activeInstanceDefinition = nullptr;
 }
 
-void ParsedScene::ObjectInstance(const std::string &name, FileLoc loc) {
+void SceneStateManager::ObjectInstance(const std::string &name, FileLoc loc) {
     VERIFY_WORLD("ObjectInstance");
 
-    if (currentInstance) {
+    if (activeInstanceDefinition) {
         ErrorExitDeferred(&loc,
                           "ObjectInstance can't be called inside instance definition");
         return;
@@ -378,16 +392,17 @@ void ParsedScene::ObjectInstance(const std::string &name, FileLoc loc) {
             RenderFromObject(0) * worldFromRender, graphicsState.transformStartTime,
             RenderFromObject(1) * worldFromRender, graphicsState.transformEndTime);
 
-        instances.push_back(InstanceSceneEntity(name, loc, animatedRenderFromInstance));
+        instanceUses.push_back(
+            InstanceSceneEntity(name, loc, animatedRenderFromInstance));
     } else {
         const class Transform *renderFromInstance =
             transformCache.Lookup(RenderFromObject(0) * worldFromRender);
 
-        instances.push_back(InstanceSceneEntity(name, loc, renderFromInstance));
+        instanceUses.push_back(InstanceSceneEntity(name, loc, renderFromInstance));
     }
 }
 
-void ParsedScene::EndOfFiles() {
+void SceneStateManager::EndOfFiles() {
     if (currentBlock != BlockState::WorldBlock)
         ErrorExitDeferred("End of files before \"WorldBegin\".");
 
@@ -400,101 +415,47 @@ void ParsedScene::EndOfFiles() {
     if (errorExit)
         ErrorExit("Fatal errors during scene construction");
 
-    // LOG_VERBOSE messages about any unused textures..
-    std::set<std::string> unusedFloatTextures, unusedSpectrumTextures;
-    for (const auto f : floatTextures) {
-        CHECK(unusedFloatTextures.find(f.first) == unusedFloatTextures.end());
-        unusedFloatTextures.insert(f.first);
-    }
-    for (const auto s : spectrumTextures) {
-        CHECK(unusedSpectrumTextures.find(s.first) == unusedSpectrumTextures.end());
-        unusedSpectrumTextures.insert(s.first);
-    }
+    if (!shapes.empty())
+        sceneProcessor->AddShapes(shapes);
+    if (!instanceUses.empty())
+        sceneProcessor->AddInstanceUses(instanceUses);
 
-    auto checkVec = [&](const ParsedParameterVector &vec) {
-        for (const ParsedParameter *p : vec) {
-            if (p->type == "texture") {
-                if (auto iter = unusedFloatTextures.find(p->strings[0]);
-                    iter != unusedFloatTextures.end())
-                    unusedFloatTextures.erase(iter);
-                else if (auto iter = unusedSpectrumTextures.find(p->strings[0]);
-                         iter != unusedSpectrumTextures.end())
-                    unusedSpectrumTextures.erase(iter);
-            }
-        }
-    };
-
-    // Walk through everything that uses textures..
-    for (const auto &nm : namedMaterials)
-        checkVec(nm.second.parameters.GetParameterVector());
-    for (const auto &m : materials)
-        checkVec(m.parameters.GetParameterVector());
-    for (const auto &ft : floatTextures)
-        checkVec(ft.second.parameters.GetParameterVector());
-    for (const auto &st : spectrumTextures)
-        checkVec(st.second.parameters.GetParameterVector());
-    for (const auto &s : shapes)
-        checkVec(s.parameters.GetParameterVector());
-    for (const auto &as : animatedShapes)
-        checkVec(as.parameters.GetParameterVector());
-    for (const auto &id : instanceDefinitions) {
-        for (const auto &s : id.second.shapes)
-            checkVec(s.parameters.GetParameterVector());
-        for (const auto &as : id.second.animatedShapes)
-            checkVec(as.parameters.GetParameterVector());
-    }
-
-    LOG_VERBOSE("Scene stats: %d shapes, %d animated shapes, %d instance definitions, "
-                "%d instance uses, %d lights, %d float textures, %d spectrum textures, "
-                "%d named materials, %d materials",
-                shapes.size(), animatedShapes.size(), instanceDefinitions.size(),
-                instances.size(), lights.size(), floatTextures.size(),
-                spectrumTextures.size(), namedMaterials.size(), materials.size());
-
-    // And complain about what's left.
-    for (const std::string &s : unusedFloatTextures)
-        LOG_VERBOSE("%s: float texture unused in scene", s);
-    for (const std::string &s : unusedSpectrumTextures)
-        LOG_VERBOSE("%s: spectrum texture unused in scene", s);
+    sceneProcessor->Done();
 }
 
-ParsedScene *ParsedScene::CopyForImport() {
-    ParsedScene *importScene = new ParsedScene;
+SceneStateManager *SceneStateManager::CopyForImport() {
+    SceneStateManager *importScene = new SceneStateManager(sceneProcessor);
     importScene->renderFromWorld = renderFromWorld;
     importScene->graphicsState = graphicsState;
     importScene->currentBlock = currentBlock;
-    if (currentInstance) {
-        importScene->currentInstance = new InstanceDefinitionSceneEntity;
-        importScene->currentInstance->name = currentInstance->name;
-        importScene->currentInstance->loc = currentInstance->loc;
+    if (activeInstanceDefinition) {
+        importScene->activeInstanceDefinition = new ActiveInstanceDefinition(
+            activeInstanceDefinition->entity.name, activeInstanceDefinition->entity.loc);
+
+        // In case of nested imports, go up to the true root parent since
+        // that's where we need to merge our shapes and that's where the
+        // refcount is.
+        ActiveInstanceDefinition *parent = activeInstanceDefinition;
+        while (parent->parent)
+            parent = parent->parent;
+        importScene->activeInstanceDefinition->parent = parent;
+        ++parent->activeImports;
     }
     return importScene;
 }
 
-void ParsedScene::MergeImported(ParsedScene *importScene) {
-    while (!importScene->pushedGraphicsStates.empty()) {
+void SceneStateManager::MergeImported(SceneStateManager *imported) {
+    while (!imported->pushedGraphicsStates.empty()) {
         ErrorExitDeferred("Missing end to AttributeBegin");
-        importScene->pushedGraphicsStates.pop_back();
+        imported->pushedGraphicsStates.pop_back();
     }
 
-    errorExit |= importScene->errorExit;
+    errorExit |= imported->errorExit;
 
-    // Reindex materials in shapes in importScene
-    size_t materialBase = materials.size(), lightBase = lights.size();
-    auto reindex = [materialBase, lightBase](auto &map) {
-        for (auto &shape : map) {
-            if (shape.materialName.empty())
-                shape.materialIndex += materialBase;
-            if (shape.lightIndex >= 0)
-                shape.lightIndex += lightBase;
-        }
-    };
-    reindex(importScene->shapes);
-    reindex(importScene->animatedShapes);
-    for (auto &inst : importScene->instanceDefinitions) {
-        reindex(inst.second.shapes);
-        reindex(inst.second.animatedShapes);
-    }
+    if (!imported->shapes.empty())
+        sceneProcessor->AddShapes(imported->shapes);
+    if (!imported->instanceUses.empty())
+        sceneProcessor->AddInstanceUses(imported->instanceUses);
 
     auto mergeVector = [](auto &base, auto &imported) {
         if (base.empty())
@@ -506,37 +467,22 @@ void ParsedScene::MergeImported(ParsedScene *importScene) {
             imported.shrink_to_fit();
         }
     };
+    if (imported->activeInstanceDefinition) {
+        ActiveInstanceDefinition *current = imported->activeInstanceDefinition;
+        ActiveInstanceDefinition *parent = current->parent;
+        CHECK(parent != nullptr);
 
-    if (importScene->currentInstance) {
-        reindex(importScene->currentInstance->shapes);
-        reindex(importScene->currentInstance->animatedShapes);
-        bool found = false;
-        for (auto &def : instanceDefinitions) {
-            if (def.second.name == importScene->currentInstance->name) {
-                found = true;
-                mergeVector(def.second.shapes, importScene->currentInstance->shapes);
-                mergeVector(def.second.animatedShapes,
-                            importScene->currentInstance->animatedShapes);
-                delete importScene->currentInstance;
-                importScene->currentInstance = nullptr;
-                break;
-            }
-        }
-        CHECK(found);
+        std::lock_guard<std::mutex> lock(parent->mutex);
+        mergeVector(parent->entity.shapes, current->entity.shapes);
+        mergeVector(parent->entity.animatedShapes, current->entity.animatedShapes);
+
+        delete current;
+
+        if (--parent->activeImports == 0)
+            sceneProcessor->AddInstanceDefinition(std::move(parent->entity));
+
+        parent->mutex.unlock();
     }
-
-    auto mergeMap = [this](auto &base, auto &imported, const char *name) {
-        for (const auto &item : imported) {
-            if (base.find(item.first) != base.end())
-                ErrorExitDeferred(&item.second.loc, "%s: multiply-defined %s.",
-                                  item.first, name);
-            base[item.first] = std::move(item.second);
-        }
-        imported.clear();
-    };
-    mergeMap(instanceDefinitions, importScene->instanceDefinitions, "object instance");
-    // mergeMap(namedCoordinateSystems, importScene->namedCoordinateSystems, "named
-    // coordinate system");
 
     auto mergeSet = [this](auto &base, auto &imported, const char *name) {
         for (const auto &item : imported) {
@@ -546,21 +492,13 @@ void ParsedScene::MergeImported(ParsedScene *importScene) {
         }
         imported.clear();
     };
-    mergeSet(namedMaterialNames, importScene->namedMaterialNames, "named material");
-    mergeSet(floatTextureNames, importScene->floatTextureNames, "texture");
-    mergeSet(spectrumTextureNames, importScene->spectrumTextureNames, "texture");
-
-    mergeVector(materials, importScene->materials);
-    mergeVector(namedMaterials, importScene->namedMaterials);
-    mergeVector(floatTextures, importScene->floatTextures);
-    mergeVector(spectrumTextures, importScene->spectrumTextures);
-    mergeVector(lights, importScene->lights);
-    mergeVector(shapes, importScene->shapes);
-    mergeVector(animatedShapes, importScene->animatedShapes);
-    mergeVector(instances, importScene->instances);
+    mergeSet(namedMaterialNames, imported->namedMaterialNames, "named material");
+    mergeSet(floatTextureNames, imported->floatTextureNames, "texture");
+    mergeSet(spectrumTextureNames, imported->spectrumTextureNames, "texture");
 }
 
-void ParsedScene::Option(const std::string &name, const std::string &value, FileLoc loc) {
+void SceneStateManager::Option(const std::string &name, const std::string &value,
+                               FileLoc loc) {
     std::string nName = normalizeArg(name);
 
     if (nName == "disablepixeljitter") {
@@ -609,113 +547,115 @@ void ParsedScene::Option(const std::string &name, const std::string &value, File
         ErrorExitDeferred(&loc, "%s: unknown option", name);
 }
 
-void ParsedScene::Transform(Float tr[16], FileLoc loc) {
+void SceneStateManager::Transform(Float tr[16], FileLoc loc) {
     FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] = Transpose(
                               pbrt::Transform(SquareMatrix<4>(pstd::MakeSpan(tr, 16))));)
 }
 
-void ParsedScene::ConcatTransform(Float tr[16], FileLoc loc) {
+void SceneStateManager::ConcatTransform(Float tr[16], FileLoc loc) {
     FOR_ACTIVE_TRANSFORMS(
         graphicsState.ctm[i] =
             graphicsState.ctm[i] *
             Transpose(pbrt::Transform(SquareMatrix<4>(pstd::MakeSpan(tr, 16))));)
 }
 
-void ParsedScene::Rotate(Float angle, Float dx, Float dy, Float dz, FileLoc loc) {
+void SceneStateManager::Rotate(Float angle, Float dx, Float dy, Float dz, FileLoc loc) {
     FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] =
                               graphicsState.ctm[i] *
                               pbrt::Rotate(angle, Vector3f(dx, dy, dz));)
 }
 
-void ParsedScene::Scale(Float sx, Float sy, Float sz, FileLoc loc) {
+void SceneStateManager::Scale(Float sx, Float sy, Float sz, FileLoc loc) {
     FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] =
                               graphicsState.ctm[i] * pbrt::Scale(sx, sy, sz);)
 }
 
-void ParsedScene::LookAt(Float ex, Float ey, Float ez, Float lx, Float ly, Float lz,
-                         Float ux, Float uy, Float uz, FileLoc loc) {
+void SceneStateManager::LookAt(Float ex, Float ey, Float ez, Float lx, Float ly, Float lz,
+                               Float ux, Float uy, Float uz, FileLoc loc) {
     class Transform lookAt =
         pbrt::LookAt(Point3f(ex, ey, ez), Point3f(lx, ly, lz), Vector3f(ux, uy, uz));
     FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] = graphicsState.ctm[i] * lookAt;);
 }
 
-void ParsedScene::ActiveTransformAll(FileLoc loc) {
+void SceneStateManager::ActiveTransformAll(FileLoc loc) {
     graphicsState.activeTransformBits = AllTransformsBits;
 }
 
-void ParsedScene::ActiveTransformEndTime(FileLoc loc) {
+void SceneStateManager::ActiveTransformEndTime(FileLoc loc) {
     graphicsState.activeTransformBits = EndTransformBits;
 }
 
-void ParsedScene::ActiveTransformStartTime(FileLoc loc) {
+void SceneStateManager::ActiveTransformStartTime(FileLoc loc) {
     graphicsState.activeTransformBits = StartTransformBits;
 }
 
-void ParsedScene::TransformTimes(Float start, Float end, FileLoc loc) {
+void SceneStateManager::TransformTimes(Float start, Float end, FileLoc loc) {
     VERIFY_OPTIONS("TransformTimes");
     graphicsState.transformStartTime = start;
     graphicsState.transformEndTime = end;
 }
 
-void ParsedScene::PixelFilter(const std::string &name, ParsedParameterVector params,
-                              FileLoc loc) {
+void SceneStateManager::PixelFilter(const std::string &name, ParsedParameterVector params,
+                                    FileLoc loc) {
     ParameterDictionary dict(std::move(params), graphicsState.colorSpace);
     VERIFY_OPTIONS("PixelFilter");
     filter = SceneEntity(name, std::move(dict), loc);
 }
 
-void ParsedScene::Film(const std::string &type, ParsedParameterVector params,
-                       FileLoc loc) {
+void SceneStateManager::Film(const std::string &type, ParsedParameterVector params,
+                             FileLoc loc) {
     ParameterDictionary dict(std::move(params), graphicsState.colorSpace);
     VERIFY_OPTIONS("Film");
     film = SceneEntity(type, std::move(dict), loc);
 }
 
-void ParsedScene::Sampler(const std::string &name, ParsedParameterVector params,
-                          FileLoc loc) {
+void SceneStateManager::Sampler(const std::string &name, ParsedParameterVector params,
+                                FileLoc loc) {
     ParameterDictionary dict(std::move(params), graphicsState.colorSpace);
 
     VERIFY_OPTIONS("Sampler");
     sampler = SceneEntity(name, std::move(dict), loc);
 }
 
-void ParsedScene::Accelerator(const std::string &name, ParsedParameterVector params,
-                              FileLoc loc) {
+void SceneStateManager::Accelerator(const std::string &name, ParsedParameterVector params,
+                                    FileLoc loc) {
     ParameterDictionary dict(std::move(params), graphicsState.colorSpace);
     VERIFY_OPTIONS("Accelerator");
     accelerator = SceneEntity(name, std::move(dict), loc);
 }
 
-void ParsedScene::Integrator(const std::string &name, ParsedParameterVector params,
-                             FileLoc loc) {
+void SceneStateManager::Integrator(const std::string &name, ParsedParameterVector params,
+                                   FileLoc loc) {
     ParameterDictionary dict(std::move(params), graphicsState.colorSpace);
 
     VERIFY_OPTIONS("Integrator");
     integrator = SceneEntity(name, std::move(dict), loc);
 }
 
-void ParsedScene::MakeNamedMedium(const std::string &name, ParsedParameterVector params,
-                                  FileLoc loc) {
+void SceneStateManager::MakeNamedMedium(const std::string &name,
+                                        ParsedParameterVector params, FileLoc loc) {
     ParameterDictionary dict(std::move(params), graphicsState.mediumAttributes,
                              graphicsState.colorSpace);
 
-    if (media.find(name) != media.end()) {
+    if (mediumNames.find(name) != mediumNames.end()) {
         ErrorExitDeferred(&loc, "Named medium \"%s\" redefined.", name);
         return;
     }
+    mediumNames.insert(name);
 
-    media[name] = TransformedSceneEntity(name, std::move(dict), loc, RenderFromObject());
+    sceneProcessor->AddMedium(
+        TransformedSceneEntity(name, std::move(dict), loc, RenderFromObject()));
 }
 
-void ParsedScene::MediumInterface(const std::string &insideName,
-                                  const std::string &outsideName, FileLoc loc) {
+void SceneStateManager::MediumInterface(const std::string &insideName,
+                                        const std::string &outsideName, FileLoc loc) {
     graphicsState.currentInsideMedium = insideName;
     graphicsState.currentOutsideMedium = outsideName;
 }
 
-void ParsedScene::Texture(const std::string &name, const std::string &type,
-                          const std::string &texname, ParsedParameterVector params,
-                          FileLoc loc) {
+void SceneStateManager::Texture(const std::string &name, const std::string &type,
+                                const std::string &texname, ParsedParameterVector params,
+                                FileLoc loc) {
     VERIFY_WORLD("Texture");
 
     ParameterDictionary dict(std::move(params), graphicsState.textureAttributes,
@@ -735,25 +675,28 @@ void ParsedScene::Texture(const std::string &name, const std::string &type,
     }
     names.insert(name);
 
-    std::vector<std::pair<std::string, TextureSceneEntity>> &textures =
-        (type == "float") ? floatTextures : spectrumTextures;
-
-    textures.push_back(std::make_pair(
-        name, TextureSceneEntity(texname, std::move(dict), loc, RenderFromObject())));
+    if (type == "float")
+        sceneProcessor->AddFloatTexture(
+            name, TextureSceneEntity(texname, std::move(dict), loc, RenderFromObject()));
+    else
+        sceneProcessor->AddSpectrumTexture(
+            name, TextureSceneEntity(texname, std::move(dict), loc, RenderFromObject()));
 }
 
-void ParsedScene::Material(const std::string &name, ParsedParameterVector params,
-                           FileLoc loc) {
+void SceneStateManager::Material(const std::string &name, ParsedParameterVector params,
+                                 FileLoc loc) {
     VERIFY_WORLD("Material");
+
     ParameterDictionary dict(std::move(params), graphicsState.materialAttributes,
                              graphicsState.colorSpace);
-    materials.push_back(SceneEntity(name, std::move(dict), loc));
-    graphicsState.currentMaterialIndex = materials.size() - 1;
+
+    graphicsState.currentMaterialIndex =
+        sceneProcessor->AddMaterial(SceneEntity(name, std::move(dict), loc));
     graphicsState.currentMaterialName.clear();
 }
 
-void ParsedScene::MakeNamedMaterial(const std::string &name, ParsedParameterVector params,
-                                    FileLoc loc) {
+void SceneStateManager::MakeNamedMaterial(const std::string &name,
+                                          ParsedParameterVector params, FileLoc loc) {
     VERIFY_WORLD("MakeNamedMaterial");
 
     ParameterDictionary dict(std::move(params), graphicsState.materialAttributes,
@@ -765,22 +708,166 @@ void ParsedScene::MakeNamedMaterial(const std::string &name, ParsedParameterVect
     }
     namedMaterialNames.insert(name);
 
-    namedMaterials.push_back(std::make_pair(name, SceneEntity("", std::move(dict), loc)));
+    sceneProcessor->AddNamedMaterial(name, SceneEntity("", std::move(dict), loc));
 }
 
-void ParsedScene::NamedMaterial(const std::string &name, FileLoc loc) {
+void SceneStateManager::NamedMaterial(const std::string &name, FileLoc loc) {
     VERIFY_WORLD("NamedMaterial");
     graphicsState.currentMaterialName = name;
     graphicsState.currentMaterialIndex = -1;
 }
 
-void ParsedScene::AreaLightSource(const std::string &name, ParsedParameterVector params,
-                                  FileLoc loc) {
+void SceneStateManager::AreaLightSource(const std::string &name,
+                                        ParsedParameterVector params, FileLoc loc) {
     VERIFY_WORLD("AreaLightSource");
     graphicsState.areaLightName = name;
     graphicsState.areaLightParams = ParameterDictionary(
         std::move(params), graphicsState.lightAttributes, graphicsState.colorSpace);
     graphicsState.areaLightLoc = loc;
+}
+
+// ParsedScene Method Definitions
+void ParsedScene::SetFilm(SceneEntity film) {
+    this->film = std::move(film);
+}
+
+void ParsedScene::SetSampler(SceneEntity sampler) {
+    this->sampler = std::move(sampler);
+}
+
+void ParsedScene::SetIntegrator(SceneEntity integrator) {
+    this->integrator = std::move(integrator);
+}
+
+void ParsedScene::SetFilter(SceneEntity filter) {
+    this->filter = std::move(filter);
+}
+
+void ParsedScene::SetAccelerator(SceneEntity accelerator) {
+    this->accelerator = std::move(accelerator);
+}
+
+void ParsedScene::SetCamera(CameraSceneEntity camera) {
+    this->camera = std::move(camera);
+}
+
+void ParsedScene::AddNamedMaterial(std::string name, SceneEntity material) {
+    std::lock_guard<std::mutex> lock(namedMaterialMutex);
+    namedMaterials.push_back(std::make_pair(std::move(name), std::move(material)));
+}
+
+int ParsedScene::AddMaterial(SceneEntity material) {
+    std::lock_guard<std::mutex> lock(materialMutex);
+    materials.push_back(std::move(material));
+    return materials.size() - 1;
+}
+
+void ParsedScene::AddMedium(TransformedSceneEntity medium) {
+    std::lock_guard<std::mutex> lock(mediaMutex);
+    media[medium.name] = std::move(medium);
+}
+
+void ParsedScene::AddFloatTexture(std::string name, TextureSceneEntity texture) {
+    std::lock_guard<std::mutex> lock(floatTextureMutex);
+    floatTextures.push_back(std::make_pair(std::move(name), std::move(texture)));
+}
+
+void ParsedScene::AddSpectrumTexture(std::string name, TextureSceneEntity texture) {
+    std::lock_guard<std::mutex> lock(spectrumTextureMutex);
+    spectrumTextures.push_back(std::make_pair(std::move(name), std::move(texture)));
+}
+
+void ParsedScene::AddLight(LightSceneEntity light) {
+    std::lock_guard<std::mutex> lock(lightMutex);
+    lights.push_back(std::move(light));
+}
+
+int ParsedScene::AddAreaLight(SceneEntity light) {
+    std::lock_guard<std::mutex> lock(areaLightMutex);
+    areaLights.push_back(std::move(light));
+    return areaLights.size() - 1;
+}
+
+void ParsedScene::AddShapes(pstd::span<ShapeSceneEntity> s) {
+    std::lock_guard<std::mutex> lock(shapeMutex);
+    std::move(std::begin(s), std::end(s), std::back_inserter(shapes));
+}
+
+void ParsedScene::AddAnimatedShape(AnimatedShapeSceneEntity shape) {
+    std::lock_guard<std::mutex> lock(animatedShapeMutex);
+    animatedShapes.push_back(std::move(shape));
+}
+
+void ParsedScene::AddInstanceDefinition(InstanceDefinitionSceneEntity instance) {
+    InstanceDefinitionSceneEntity *def =
+        new InstanceDefinitionSceneEntity(std::move(instance));
+
+    std::lock_guard<std::mutex> lock(instanceDefinitionMutex);
+    instanceDefinitions[def->name] = def;
+}
+
+void ParsedScene::AddInstanceUses(pstd::span<InstanceSceneEntity> in) {
+    std::lock_guard<std::mutex> lock(instanceUseMutex);
+    std::move(std::begin(in), std::end(in), std::back_inserter(instances));
+}
+
+void ParsedScene::Done() {
+    // LOG_VERBOSE messages about any unused textures..
+    std::set<std::string> unusedFloatTextures, unusedSpectrumTextures;
+    for (const auto f : floatTextures) {
+        CHECK(unusedFloatTextures.find(f.first) == unusedFloatTextures.end());
+        unusedFloatTextures.insert(f.first);
+    }
+    for (const auto s : spectrumTextures) {
+        CHECK(unusedSpectrumTextures.find(s.first) == unusedSpectrumTextures.end());
+        unusedSpectrumTextures.insert(s.first);
+    }
+
+    auto checkVec = [&](const ParsedParameterVector &vec) {
+        for (const ParsedParameter *p : vec) {
+            if (p->type == "texture") {
+                if (auto iter = unusedFloatTextures.find(p->strings[0]);
+                    iter != unusedFloatTextures.end())
+                    unusedFloatTextures.erase(iter);
+                else if (auto iter = unusedSpectrumTextures.find(p->strings[0]);
+                         iter != unusedSpectrumTextures.end())
+                    unusedSpectrumTextures.erase(iter);
+            }
+        }
+    };
+
+    // Walk through everything that uses textures..
+    for (const auto &nm : namedMaterials)
+        checkVec(nm.second.parameters.GetParameterVector());
+    for (const auto &m : materials)
+        checkVec(m.parameters.GetParameterVector());
+    for (const auto &ft : floatTextures)
+        checkVec(ft.second.parameters.GetParameterVector());
+    for (const auto &st : spectrumTextures)
+        checkVec(st.second.parameters.GetParameterVector());
+    for (const auto &s : shapes)
+        checkVec(s.parameters.GetParameterVector());
+    for (const auto &as : animatedShapes)
+        checkVec(as.parameters.GetParameterVector());
+    for (const auto &id : instanceDefinitions) {
+        for (const auto &s : id.second->shapes)
+            checkVec(s.parameters.GetParameterVector());
+        for (const auto &as : id.second->animatedShapes)
+            checkVec(as.parameters.GetParameterVector());
+    }
+
+    LOG_VERBOSE("Scene stats: %d shapes, %d animated shapes, %d instance definitions, "
+                "%d instance uses, %d lights, %d float textures, %d spectrum textures, "
+                "%d named materials, %d materials",
+                shapes.size(), animatedShapes.size(), instanceDefinitions.size(),
+                instances.size(), lights.size(), floatTextures.size(),
+                spectrumTextures.size(), namedMaterials.size(), materials.size());
+
+    // And complain about what's left.
+    for (const std::string &s : unusedFloatTextures)
+        LOG_VERBOSE("%s: float texture unused in scene", s);
+    for (const std::string &s : unusedSpectrumTextures)
+        LOG_VERBOSE("%s: spectrum texture unused in scene", s);
 }
 
 void ParsedScene::CreateMaterials(
@@ -815,8 +902,7 @@ void ParsedScene::CreateMaterials(
         Image &image = immeta.image;
         ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
         if (!rgbDesc)
-            ErrorExitDeferred("%s: normal map image must contain R, G, and B channels",
-                              filename);
+            ErrorExit("%s: normal map image must contain R, G, and B channels", filename);
         Image *normalMap = alloc.new_object<Image>(alloc);
         *normalMap = image.SelectChannels(rgbDesc);
 
@@ -833,16 +919,15 @@ void ParsedScene::CreateMaterials(
         Allocator alloc = threadAllocators.Get();
 
         if (namedMaterialsOut->find(name) != namedMaterialsOut->end()) {
-            ErrorExitDeferred(&mtl.loc, "%s: trying to redefine named material.", name);
+            ErrorExit(&mtl.loc, "%s: trying to redefine named material.", name);
             continue;
         }
 
         std::string type = mtl.parameters.GetOneString("type", "");
         if (type.empty()) {
-            ErrorExitDeferred(&mtl.loc,
-                              "%s: \"string type\" not provided in named material's "
-                              "parameters.",
-                              name);
+            ErrorExit(&mtl.loc,
+                      "%s: \"string type\" not provided in named material's parameters.",
+                      name);
             continue;
         }
 
@@ -1322,7 +1407,7 @@ Primitive ParsedScene::CreateAggregate(
     LOG_VERBOSE("Starting instances");
     std::map<std::string, Primitive> instanceDefinitions;
     std::mutex instanceDefinitionsMutex;
-    std::vector<std::map<std::string, InstanceDefinitionSceneEntity>::iterator>
+    std::vector<std::map<std::string, InstanceDefinitionSceneEntity *>::iterator>
         instanceDefinitionIterators;
     for (auto iter = this->instanceDefinitions.begin();
          iter != this->instanceDefinitions.end(); ++iter)
@@ -1331,9 +1416,9 @@ Primitive ParsedScene::CreateAggregate(
         auto &inst = *instanceDefinitionIterators[i];
 
         std::vector<Primitive> instancePrimitives =
-            CreatePrimitivesForShapes(inst.second.shapes);
+            CreatePrimitivesForShapes(inst.second->shapes);
         std::vector<Primitive> movingInstancePrimitives =
-            CreatePrimitivesForAnimatedShapes(inst.second.animatedShapes);
+            CreatePrimitivesForAnimatedShapes(inst.second->animatedShapes);
         instancePrimitives.insert(instancePrimitives.end(),
                                   movingInstancePrimitives.begin(),
                                   movingInstancePrimitives.end());
@@ -1350,7 +1435,8 @@ Primitive ParsedScene::CreateAggregate(
         else
             instanceDefinitions[inst.first] = instancePrimitives[0];
 
-        inst.second = InstanceDefinitionSceneEntity();
+        delete inst.second;
+        inst.second = nullptr;
     });
 
     this->instanceDefinitions.clear();

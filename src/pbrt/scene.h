@@ -275,11 +275,108 @@ struct TransformSet {
     Transform t[MaxTransforms];
 };
 
-// ParsedScene Definition
-class ParsedScene : public ParserTarget {
+class SceneProcessor {
   public:
-    // ParsedScene Public Methods
-    ParsedScene();
+    virtual ~SceneProcessor();
+
+    virtual void SetFilm(SceneEntity film) = 0;
+    virtual void SetSampler(SceneEntity sampler) = 0;
+    virtual void SetIntegrator(SceneEntity integrator) = 0;
+    virtual void SetFilter(SceneEntity filter) = 0;
+    virtual void SetAccelerator(SceneEntity accelerator) = 0;
+    virtual void SetCamera(CameraSceneEntity camera) = 0;
+
+    virtual void AddNamedMaterial(std::string name, SceneEntity material) = 0;
+    virtual int AddMaterial(SceneEntity material) = 0;
+    virtual void AddMedium(TransformedSceneEntity medium) = 0;
+    virtual void AddFloatTexture(std::string name, TextureSceneEntity texture) = 0;
+    virtual void AddSpectrumTexture(std::string name, TextureSceneEntity texture) = 0;
+    virtual void AddLight(LightSceneEntity light) = 0;
+    virtual int AddAreaLight(SceneEntity light) = 0;
+    virtual void AddShapes(pstd::span<ShapeSceneEntity> shape) = 0;
+    virtual void AddAnimatedShape(AnimatedShapeSceneEntity shape) = 0;
+    virtual void AddInstanceDefinition(InstanceDefinitionSceneEntity instance) = 0;
+    virtual void AddInstanceUses(pstd::span<InstanceSceneEntity> in) = 0;
+
+    virtual void Done() = 0;
+};
+
+class ParsedScene : public SceneProcessor {
+  public:
+    void SetFilm(SceneEntity film);
+    void SetSampler(SceneEntity sampler);
+    void SetIntegrator(SceneEntity integrator);
+    void SetFilter(SceneEntity filter);
+    void SetAccelerator(SceneEntity accelerator);
+    void SetCamera(CameraSceneEntity camera);
+
+    void AddNamedMaterial(std::string name, SceneEntity material);
+    int AddMaterial(SceneEntity material);
+    void AddMedium(TransformedSceneEntity medium);
+    void AddFloatTexture(std::string name, TextureSceneEntity texture);
+    void AddSpectrumTexture(std::string name, TextureSceneEntity texture);
+    void AddLight(LightSceneEntity light);
+    int AddAreaLight(SceneEntity light);
+    void AddShapes(pstd::span<ShapeSceneEntity> shape);
+    void AddAnimatedShape(AnimatedShapeSceneEntity shape);
+    void AddInstanceDefinition(InstanceDefinitionSceneEntity instance);
+    void AddInstanceUses(pstd::span<InstanceSceneEntity> in);
+
+    void Done();
+
+    NamedTextures CreateTextures(ThreadLocal<Allocator> &threadAllocators,
+                                 bool gpu) const;
+
+    void CreateMaterials(const NamedTextures &sceneTextures,
+                         ThreadLocal<Allocator> &threadAllocators,
+                         std::map<std::string, Material> *namedMaterials,
+                         std::vector<Material> *materials) const;
+
+    std::map<std::string, Medium> CreateMedia(Allocator alloc) const;
+
+    std::vector<Light> CreateLights(
+        Allocator alloc, const std::map<std::string, Medium> &media,
+        const NamedTextures &textures,
+        std::map<int, pstd::vector<Light> *> *shapeIndexToAreaLights);
+
+    Primitive CreateAggregate(
+        const NamedTextures &textures,
+        const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
+        const std::map<std::string, Medium> &media,
+        const std::map<std::string, Material> &namedMaterials,
+        const std::vector<Material> &materials);
+
+    // Public for now...
+  public:
+    // ParsedScene Public Members
+    SceneEntity film, sampler, integrator, filter, accelerator;
+    CameraSceneEntity camera;
+
+    std::vector<std::pair<std::string, SceneEntity>> namedMaterials;
+    std::vector<SceneEntity> materials;
+    std::map<std::string, TransformedSceneEntity> media;
+    std::vector<std::pair<std::string, TextureSceneEntity>> floatTextures;
+    std::vector<std::pair<std::string, TextureSceneEntity>> spectrumTextures;
+    std::vector<LightSceneEntity> lights;
+    std::vector<SceneEntity> areaLights;
+    std::vector<ShapeSceneEntity> shapes;
+    std::vector<AnimatedShapeSceneEntity> animatedShapes;
+    std::vector<InstanceSceneEntity> instances;
+    std::map<std::string, InstanceDefinitionSceneEntity *> instanceDefinitions;
+
+  private:
+    std::mutex namedMaterialMutex, materialMutex, mediaMutex;
+    std::mutex floatTextureMutex, spectrumTextureMutex;
+    std::mutex lightMutex, areaLightMutex, shapeMutex, animatedShapeMutex;
+    std::mutex instanceDefinitionMutex, instanceUseMutex;
+};
+
+// SceneStateManager Definition
+class SceneStateManager : public ParserTarget {
+  public:
+    // SceneStateManager Public Methods
+    SceneStateManager(SceneProcessor *sceneProcessor);
+
     void Option(const std::string &name, const std::string &value, FileLoc loc);
     void Identity(FileLoc loc);
     void Translate(Float dx, Float dy, Float dz, FileLoc loc);
@@ -327,52 +424,13 @@ class ParsedScene : public ParserTarget {
 
     void EndOfFiles();
 
-    ParsedScene *CopyForImport();
-    void MergeImported(ParsedScene *);
+    SceneStateManager *CopyForImport();
+    void MergeImported(SceneStateManager *);
 
     std::string ToString() const;
 
-    NamedTextures CreateTextures(ThreadLocal<Allocator> &threadAllocators,
-                                 bool gpu) const;
-
-    void CreateMaterials(const NamedTextures &sceneTextures,
-                         ThreadLocal<Allocator> &threadAllocators,
-                         std::map<std::string, pbrt::Material> *namedMaterials,
-                         std::vector<pbrt::Material> *materials) const;
-
-    std::map<std::string, Medium> CreateMedia(Allocator alloc) const;
-
-    std::vector<Light> CreateLights(
-        Allocator alloc, const std::map<std::string, Medium> &media,
-        const NamedTextures &textures,
-        std::map<int, pstd::vector<Light> *> *shapeIndexToAreaLights);
-
-    Primitive CreateAggregate(
-        const NamedTextures &textures,
-        const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
-        const std::map<std::string, Medium> &media,
-        const std::map<std::string, pbrt::Material> &namedMaterials,
-        const std::vector<pbrt::Material> &materials);
-
-    // ParsedScene Public Members
-    SceneEntity film, sampler, integrator, filter, accelerator;
-    CameraSceneEntity camera;
-    std::vector<std::pair<std::string, SceneEntity>> namedMaterials;
-    std::set<std::string> namedMaterialNames;
-    std::vector<SceneEntity> materials;
-    std::map<std::string, TransformedSceneEntity> media;
-    std::vector<std::pair<std::string, TextureSceneEntity>> floatTextures;
-    std::vector<std::pair<std::string, TextureSceneEntity>> spectrumTextures;
-    std::set<std::string> floatTextureNames, spectrumTextureNames;
-    std::vector<LightSceneEntity> lights;
-    std::vector<SceneEntity> areaLights;
-    std::vector<ShapeSceneEntity> shapes;
-    std::vector<AnimatedShapeSceneEntity> animatedShapes;
-    std::vector<InstanceSceneEntity> instances;
-    std::map<std::string, InstanceDefinitionSceneEntity> instanceDefinitions;
-
   private:
-    // ParsedScene::GraphicsState Definition
+    // SceneStateManager::GraphicsState Definition
     struct GraphicsState {
         // GraphicsState Public Methods
         GraphicsState();
@@ -400,7 +458,7 @@ class ParsedScene : public ParserTarget {
     };
 
     friend void parse(ParserTarget *scene, std::unique_ptr<Tokenizer> t);
-    // ParsedScene Private Methods
+    // SceneStateManager Private Methods
     class Transform RenderFromObject(int index) const {
         return pbrt::Transform((renderFromWorld * graphicsState.ctm[index]).GetMatrix());
     }
@@ -412,7 +470,8 @@ class ParsedScene : public ParserTarget {
 
     bool CTMIsAnimated() const { return graphicsState.ctm.IsAnimated(); }
 
-    // ParsedScene Private Members
+    // SceneStateManager Private Members
+    SceneProcessor *sceneProcessor;
     GraphicsState graphicsState;
     enum class BlockState { OptionsBlock, WorldBlock };
     BlockState currentBlock = BlockState::OptionsBlock;
@@ -424,7 +483,30 @@ class ParsedScene : public ParserTarget {
     TransformCache transformCache;
     std::vector<GraphicsState> pushedGraphicsStates;
     std::vector<std::pair<char, FileLoc>> pushStack;  // 'a': attribute, 'o': object
-    InstanceDefinitionSceneEntity *currentInstance = nullptr;
+
+    struct ActiveInstanceDefinition {
+        ActiveInstanceDefinition(std::string name, FileLoc loc) : entity(name, loc){};
+
+        std::mutex mutex;
+        std::atomic<int> activeImports{1};
+        InstanceDefinitionSceneEntity entity;
+        ActiveInstanceDefinition *parent = nullptr;
+    };
+    ActiveInstanceDefinition *activeInstanceDefinition = nullptr;
+
+    // Buffer these both to avoid mutex contention and so that they are
+    // consistently ordered across runs.
+    std::vector<ShapeSceneEntity> shapes;
+    std::vector<InstanceSceneEntity> instanceUses;
+
+    std::set<std::string> namedMaterialNames, mediumNames;
+    std::set<std::string> floatTextureNames, spectrumTextureNames, instanceNames;
+    int currentMaterialIndex = 0, currentLightIndex = -1;
+
+    // These have to wait until WorldBegin to be passed along since they
+    // may be updated until then.
+    SceneEntity film, sampler, integrator, filter, accelerator;
+    CameraSceneEntity camera;
 };
 
 }  // namespace pbrt

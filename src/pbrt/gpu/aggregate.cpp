@@ -1396,17 +1396,17 @@ OptiXAggregate::OptiXAggregate(
         CHECK(iter != scene.instanceDefinitions.end());
         const auto &def = *iter;
 
-        if (!def.second.animatedShapes.empty())
+        if (!def.second->animatedShapes.empty())
             Warning("Ignoring %d animated shapes in instance \"%s\".",
-                    def.second.animatedShapes.size(), def.first);
+                    def.second->animatedShapes.size(), def.first);
 
         Instance inst;
 
         std::map<int, TriQuadMesh> meshes =
-            PreparePLYMeshes(def.second.shapes, textures.floatTextures);
+            PreparePLYMeshes(def.second->shapes, textures.floatTextures);
 
         BVH triangleBVH = buildBVHForTriangles(
-            def.second.shapes, meshes, optixContext, hitPGTriangle,
+            def.second->shapes, meshes, optixContext, hitPGTriangle,
             anyhitPGShadowTriangle, hitPGRandomHitTriangle, textures.floatTextures,
             namedMaterials, materials, media, {}, threadAllocators, threadCUDAStreams);
         meshes.clear();
@@ -1417,7 +1417,7 @@ OptiXAggregate::OptiXAggregate(
         }
 
         BVH blpBVH =
-            buildBVHForBLPs(def.second.shapes, optixContext, hitPGBilinearPatch,
+            buildBVHForBLPs(def.second->shapes, optixContext, hitPGBilinearPatch,
                             anyhitPGShadowBilinearPatch, hitPGRandomHitBilinearPatch,
                             textures.floatTextures, namedMaterials, materials, media, {},
                             threadAllocators, threadCUDAStreams);
@@ -1428,7 +1428,7 @@ OptiXAggregate::OptiXAggregate(
         }
 
         BVH quadricBVH = buildBVHForQuadrics(
-            def.second.shapes, optixContext, hitPGQuadric, anyhitPGShadowQuadric,
+            def.second->shapes, optixContext, hitPGQuadric, anyhitPGShadowQuadric,
             hitPGRandomHitQuadric, textures.floatTextures, namedMaterials, materials,
             media, {}, threadAllocators, threadCUDAStreams);
         if (quadricBVH.traversableHandle) {

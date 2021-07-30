@@ -248,12 +248,13 @@ int main(int argc, char *argv[]) {
     InitPBRT(options);
 
     if (format || toPly || options.upgrade) {
-        FormattingParserTarget formattingScene(toPly, options.upgrade);
-        ParseFiles(&formattingScene, filenames);
+        FormattingParserTarget formattingTarget(toPly, options.upgrade);
+        ParseFiles(&formattingTarget, filenames);
     } else {
         // Parse provided scene description files
         ParsedScene scene;
-        ParseFiles(&scene, filenames);
+        SceneStateManager manager(&scene);
+        ParseFiles(&manager, filenames);
 
         // Render the scene
         if (options.useGPU || options.wavefront)
