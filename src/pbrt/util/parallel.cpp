@@ -40,32 +40,6 @@ bool Barrier::Block() {
     return --numToExit == 0;
 }
 
-// ParallelJob Definition
-class ParallelJob {
-  public:
-    // ParallelJob Public Methods
-    virtual ~ParallelJob() { DCHECK(removed); }
-
-    virtual bool HaveWork() const = 0;
-    virtual void RunStep(std::unique_lock<std::mutex> *lock) = 0;
-
-    bool Finished() const { return !HaveWork() && activeWorkers == 0; }
-
-    virtual std::string ToString() const = 0;
-
-  protected:
-    std::string BaseToString() const {
-        return StringPrintf("activeWorkers: %d removed: %s", activeWorkers, removed);
-    }
-
-  private:
-    // ParallelJob Private Members
-    friend class ThreadPool;
-    int activeWorkers = 0;
-    ParallelJob *prev = nullptr, *next = nullptr;
-    bool removed = false;
-};
-
 // ThreadPool Definition
 class ThreadPool {
   public:
@@ -80,6 +54,7 @@ class ThreadPool {
     void RemoveFromJobList(ParallelJob *job);
 
     void WorkOrWait(std::unique_lock<std::mutex> *lock);
+    bool WorkOrReturn();
 
     void ForEachThread(std::function<void(void)> func);
 
@@ -144,12 +119,37 @@ void ThreadPool::WorkOrWait(std::unique_lock<std::mutex> *lock) {
         DCHECK(!lock->owns_lock());
         lock->lock();
         job->activeWorkers--;
-        if (job->Finished())
+        if (job->Finished()) {
             jobListCondition.notify_all();
+            job->Cleanup();
+        }
 
     } else
         // Wait for new work to arrive or the job to finish
         jobListCondition.wait(*lock);
+}
+
+bool ThreadPool::WorkOrReturn() {
+    std::unique_lock<std::mutex> lock(mutex);
+
+    ParallelJob *job = jobList;
+    while (job && !job->HaveWork())
+        job = job->next;
+    if (!job)
+        return false;
+
+    // Execute work for _job_
+    job->activeWorkers++;
+    job->RunStep(&lock);
+    DCHECK(!lock.owns_lock());
+    lock.lock();
+    job->activeWorkers--;
+    if (job->Finished()) {
+        jobListCondition.notify_all();
+        job->Cleanup();
+    }
+
+    return true;
 }
 
 void ThreadPool::RemoveFromJobList(ParallelJob *job) {
@@ -206,6 +206,23 @@ std::string ThreadPool::ToString() const {
     } else
         s += "(job list mutex locked) ";
     return s + "]";
+}
+
+std::unique_lock<std::mutex> ParallelJob::AddToJobList() {
+    CHECK(threadPool && threadPool->size());
+    return threadPool->AddToJobList(this);
+}
+
+void ParallelJob::RemoveFromJobList() {
+    CHECK(threadPool && threadPool->size());
+    // lock should be held when this is called...
+    threadPool->RemoveFromJobList(this);
+}
+
+bool DoParallelWork() {
+    CHECK(threadPool && threadPool->size());
+    // lock should be held when this is called...
+    return threadPool->WorkOrReturn();
 }
 
 // ParallelForLoop1D Definition

@@ -11,14 +11,17 @@
 #include <pbrt/util/vecmath.h>
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <functional>
+#include <future>
 #include <initializer_list>
 #include <mutex>
 #include <shared_mutex>
 #include <string>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
 namespace pbrt {
@@ -249,6 +252,99 @@ inline void ParallelFor2D(const Bounds2i &extent, std::function<void(Point2i)> f
         for (Point2i p : b)
             func(p);
     });
+}
+
+// ParallelJob Definition
+class ParallelJob {
+  public:
+    // ParallelJob Public Methods
+    virtual ~ParallelJob() { DCHECK(removed); }
+
+    virtual bool HaveWork() const = 0;
+    virtual void RunStep(std::unique_lock<std::mutex> *lock) = 0;
+
+    bool Finished() const { return !HaveWork() && activeWorkers == 0; }
+
+    virtual std::string ToString() const = 0;
+
+    virtual void Cleanup() { }
+
+    void RemoveFromJobList();
+    std::unique_lock<std::mutex> AddToJobList();
+
+  protected:
+    std::string BaseToString() const {
+        return StringPrintf("activeWorkers: %d removed: %s", activeWorkers, removed);
+    }
+
+  private:
+    // ParallelJob Private Members
+    friend class ThreadPool;
+    int activeWorkers = 0;
+    ParallelJob *prev = nullptr, *next = nullptr;
+    bool removed = false;
+};
+
+bool DoParallelWork();
+
+template <typename T>
+class Future {
+public:
+    Future() = default;
+    Future(std::future<T> &&f) : fut(std::move(f)) {}
+    Future &operator=(std::future<T> &&f) { fut = std::move(f); return *this; }
+
+    template <typename R = typename std::enable_if<!std::is_void_v<T>, T>>
+    R &Get() {
+        Wait();
+        return fut.get();
+    }
+    void Wait() {
+        while (!IsReady() && DoParallelWork())
+            ;
+        fut.wait();
+    }
+    bool IsReady() const {
+        return fut.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+    }
+
+private:
+    std::future<T> fut;
+};
+
+template <typename T>
+class AsyncJob : public ParallelJob {
+public:
+    AsyncJob(std::function<T(void)> w) : work(std::move(w)) {}
+
+    bool HaveWork() const { return !started; }
+
+    void RunStep(std::unique_lock<std::mutex> *lock) {
+        // No need to stick around in the job list
+        RemoveFromJobList();
+        started = true;
+        lock->unlock();
+        work();
+    }
+
+    void Cleanup() { delete this; }
+
+    std::string ToString() const { return StringPrintf("[ AsyncJob started: %s ]", started); }
+
+    Future<T> GetFuture() { return work.get_future(); }
+
+private:
+    bool started = false;
+    std::packaged_task<T(void)> work;
+};
+
+template <typename F, typename... Args>
+inline auto RunAsync(F func, Args &&...args) {
+    auto fvoid = std::bind(func, std::forward<Args>(args)...);
+    using R = typename std::invoke_result_t<F, Args...>;
+    AsyncJob<R> *job = new AsyncJob<R>(std::move(fvoid));
+    std::unique_lock<std::mutex> lock = job->AddToJobList();
+    return job->GetFuture();
 }
 
 void ForEachThread(std::function<void(void)> func);
