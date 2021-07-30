@@ -144,7 +144,7 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
 
     // Textures
     LOG_VERBOSE("Starting to create textures");
-    NamedTextures textures = scene.CreateTextures(threadAllocators, Options->useGPU);
+    NamedTextures textures = scene.CreateTextures();
     LOG_VERBOSE("Done creating textures");
 
     LOG_VERBOSE("Starting to create lights");

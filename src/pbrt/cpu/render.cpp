@@ -74,7 +74,7 @@ void RenderCPU(ParsedScene &parsedScene) {
 
     // Textures
     LOG_VERBOSE("Starting textures");
-    NamedTextures textures = parsedScene.CreateTextures(threadAllocators, false);
+    NamedTextures textures = parsedScene.CreateTextures();
     LOG_VERBOSE("Finished textures");
 
     // Lights

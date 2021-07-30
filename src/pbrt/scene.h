@@ -326,8 +326,7 @@ class ParsedScene : public SceneProcessor {
 
     void Done();
 
-    NamedTextures CreateTextures(ThreadLocal<Allocator> &threadAllocators,
-                                 bool gpu) const;
+    NamedTextures CreateTextures();
 
     void CreateMaterials(const NamedTextures &sceneTextures,
                          ThreadLocal<Allocator> &threadAllocators,
@@ -354,8 +353,6 @@ class ParsedScene : public SceneProcessor {
 
     std::vector<std::pair<std::string, SceneEntity>> namedMaterials;
     std::vector<SceneEntity> materials;
-    std::vector<std::pair<std::string, TextureSceneEntity>> floatTextures;
-    std::vector<std::pair<std::string, TextureSceneEntity>> spectrumTextures;
     std::vector<ShapeSceneEntity> shapes;
     std::vector<AnimatedShapeSceneEntity> animatedShapes;
     std::vector<InstanceSceneEntity> instances;
@@ -381,7 +378,15 @@ class ParsedScene : public SceneProcessor {
     std::mutex areaLightMutex;
     std::vector<SceneEntity> areaLights;
 
-    std::mutex floatTextureMutex, spectrumTextureMutex;
+    std::mutex textureMutex;
+    std::vector<std::pair<std::string, TextureSceneEntity>> serialFloatTextures;
+    std::vector<std::pair<std::string, TextureSceneEntity>> serialSpectrumTextures;
+    std::vector<std::pair<std::string, TextureSceneEntity>> asyncSpectrumTextures;
+    std::set<std::string> loadingTextureFilenames;
+    std::map<std::string, Future<FloatTexture>> floatTextureFutures;
+    std::map<std::string, Future<SpectrumTexture>> spectrumTextureFutures;
+    int nMissingTextures = 0;
+
     std::mutex shapeMutex, animatedShapeMutex;
     std::mutex instanceDefinitionMutex, instanceUseMutex;
 };
