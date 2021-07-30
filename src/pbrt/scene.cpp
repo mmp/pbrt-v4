@@ -755,14 +755,42 @@ void ParsedScene::SetCamera(CameraSceneEntity camera) {
 }
 
 void ParsedScene::AddNamedMaterial(std::string name, SceneEntity material) {
-    std::lock_guard<std::mutex> lock(namedMaterialMutex);
+    std::lock_guard<std::mutex> lock(materialMutex);
+    startLoadingNormalMaps(material.parameters);
     namedMaterials.push_back(std::make_pair(std::move(name), std::move(material)));
 }
 
 int ParsedScene::AddMaterial(SceneEntity material) {
     std::lock_guard<std::mutex> lock(materialMutex);
     materials.push_back(std::move(material));
+    startLoadingNormalMaps(material.parameters);
     return materials.size() - 1;
+}
+
+void ParsedScene::startLoadingNormalMaps(const ParameterDictionary &parameters) {
+    std::string filename = parameters.GetOneString("normalmap", "");
+    if (filename.empty())
+        return;
+
+    // Overload materialMutex, which we already hold, for the futures...
+    if (normalMapFutures.find(filename) != normalMapFutures.end())
+        // It's already in flight.
+        return;
+
+    auto create = [=](std::string filename) {
+        Allocator alloc = threadAllocators.Get();
+        ImageAndMetadata immeta =
+            Image::Read(filename, Allocator(), ColorEncoding::Linear);
+        Image &image = immeta.image;
+        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
+        if (!rgbDesc)
+            ErrorExit("%s: normal map image must contain R, G, and B channels", filename);
+        Image *normalMap = alloc.new_object<Image>(alloc);
+        *normalMap = image.SelectChannels(rgbDesc);
+
+        return normalMap;
+    };
+    normalMapFutures[filename] = RunAsync(create, filename);
 }
 
 void ParsedScene::AddMedium(TransformedSceneEntity medium) {
@@ -914,44 +942,14 @@ void ParsedScene::Done() {
 void ParsedScene::CreateMaterials(
     const NamedTextures &textures, ThreadLocal<Allocator> &threadAllocators,
     std::map<std::string, pbrt::Material> *namedMaterialsOut,
-    std::vector<pbrt::Material> *materialsOut) const {
-    // First, load all of the normal maps in parallel.
-    std::set<std::string> normalMapFilenames;
-    for (const auto &nm : namedMaterials) {
-        std::string fn = nm.second.parameters.GetOneString("normalmap", "");
-        if (!fn.empty())
-            normalMapFilenames.insert(fn);
+    std::vector<pbrt::Material> *materialsOut) {
+    LOG_VERBOSE("Starting to consume normal map futures");
+    for (auto &fut : normalMapFutures) {
+        CHECK(normalMaps.find(fut.first) == normalMaps.end());
+        normalMaps[fut.first] = fut.second.Get();
     }
-    for (const auto &mtl : materials) {
-        std::string fn = mtl.parameters.GetOneString("normalmap", "");
-        if (!fn.empty())
-            normalMapFilenames.insert(fn);
-    }
-
-    std::vector<std::string> normalMapFilenameVector;
-    std::copy(normalMapFilenames.begin(), normalMapFilenames.end(),
-              std::back_inserter(normalMapFilenameVector));
-
-    LOG_VERBOSE("Reading %d normal maps in parallel", normalMapFilenameVector.size());
-    std::map<std::string, Image *> normalMapCache;
-    std::mutex mutex;
-    ParallelFor(0, normalMapFilenameVector.size(), [&](int64_t index) {
-        Allocator alloc = threadAllocators.Get();
-        std::string filename = normalMapFilenameVector[index];
-        ImageAndMetadata immeta =
-            Image::Read(filename, Allocator(), ColorEncoding::Linear);
-        Image &image = immeta.image;
-        ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
-        if (!rgbDesc)
-            ErrorExit("%s: normal map image must contain R, G, and B channels", filename);
-        Image *normalMap = alloc.new_object<Image>(alloc);
-        *normalMap = image.SelectChannels(rgbDesc);
-
-        mutex.lock();
-        normalMapCache[filename] = normalMap;
-        mutex.unlock();
-    });
-    LOG_VERBOSE("Done reading normal maps");
+    normalMapFutures.clear();
+    LOG_VERBOSE("Finished consuming normal map futures");
 
     // Named materials
     for (const auto &nm : namedMaterials) {
@@ -973,7 +971,7 @@ void ParsedScene::CreateMaterials(
         }
 
         std::string fn = nm.second.parameters.GetOneString("normalmap", "");
-        Image *normalMap = !fn.empty() ? normalMapCache[fn] : nullptr;
+        Image *normalMap = !fn.empty() ? normalMaps[fn] : nullptr;
 
         TextureParameterDictionary texDict(&mtl.parameters, &textures);
         class Material m = Material::Create(type, texDict, normalMap, *namedMaterialsOut,
@@ -986,7 +984,7 @@ void ParsedScene::CreateMaterials(
     for (const auto &mtl : materials) {
         Allocator alloc = threadAllocators.Get();
         std::string fn = mtl.parameters.GetOneString("normalmap", "");
-        Image *normalMap = !fn.empty() ? normalMapCache[fn] : nullptr;
+        Image *normalMap = !fn.empty() ? normalMaps[fn] : nullptr;
 
         TextureParameterDictionary texDict(&mtl.parameters, &textures);
         class Material m = Material::Create(mtl.name, texDict, normalMap,

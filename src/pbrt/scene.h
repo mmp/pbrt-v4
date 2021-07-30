@@ -332,7 +332,7 @@ class ParsedScene : public SceneProcessor {
     void CreateMaterials(const NamedTextures &sceneTextures,
                          ThreadLocal<Allocator> &threadAllocators,
                          std::map<std::string, Material> *namedMaterials,
-                         std::vector<Material> *materials) const;
+                         std::vector<Material> *materials);
 
     std::map<std::string, Medium> CreateMedia();
 
@@ -354,7 +354,6 @@ class ParsedScene : public SceneProcessor {
 
     std::vector<std::pair<std::string, SceneEntity>> namedMaterials;
     std::vector<SceneEntity> materials;
-    std::map<std::string, TransformedSceneEntity> media;
     std::vector<std::pair<std::string, TextureSceneEntity>> floatTextures;
     std::vector<std::pair<std::string, TextureSceneEntity>> spectrumTextures;
     std::vector<ShapeSceneEntity> shapes;
@@ -363,18 +362,27 @@ class ParsedScene : public SceneProcessor {
     std::map<std::string, InstanceDefinitionSceneEntity *> instanceDefinitions;
 
   private:
+    void startLoadingNormalMaps(const ParameterDictionary &parameters);
+
     ThreadLocal<Allocator> &threadAllocators;
 
+    std::mutex mediaMutex;
     std::map<std::string, Future<Medium>> mediaFutures;
     std::map<std::string, Medium> mediaMap;
 
+    std::mutex materialMutex;
+    std::map<std::string, Future<Image *>> normalMapFutures;
+    std::map<std::string, Image *> normalMaps;
+
+    std::mutex lightMutex;
     std::vector<LightSceneEntity> lightsWithMedia;
     std::vector<Future<Light>> lightFutures;
+
+    std::mutex areaLightMutex;
     std::vector<SceneEntity> areaLights;
 
-    std::mutex namedMaterialMutex, materialMutex, mediaMutex;
     std::mutex floatTextureMutex, spectrumTextureMutex;
-    std::mutex lightMutex, areaLightMutex, shapeMutex, animatedShapeMutex;
+    std::mutex shapeMutex, animatedShapeMutex;
     std::mutex instanceDefinitionMutex, instanceUseMutex;
 };
 
