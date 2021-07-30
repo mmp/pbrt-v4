@@ -294,8 +294,7 @@ public:
     Future(std::future<T> &&f) : fut(std::move(f)) {}
     Future &operator=(std::future<T> &&f) { fut = std::move(f); return *this; }
 
-    template <typename R = typename std::enable_if<!std::is_void_v<T>, T>>
-    R &Get() {
+    T Get() {
         Wait();
         return fut.get();
     }
