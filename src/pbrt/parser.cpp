@@ -590,7 +590,7 @@ void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
 
     static std::atomic<bool> warnedTransformBeginEndDeprecated{false};
 
-    std::vector<std::pair<std::thread, ParsedScene *>> imports;
+    std::vector<std::pair<Future<void>, ParsedScene *>> imports;
 
     LOG_VERBOSE("Started parsing %s",
                 std::string(t->loc.filename.begin(), t->loc.filename.end()));
@@ -768,43 +768,26 @@ void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
                                              "definition block.");
 
                     filename = ResolveFilename(filename);
-                    std::unique_ptr<Tokenizer> timport =
-                        Tokenizer::CreateFromFile(filename, parseError);
-                    if (timport) {
-                        ParsedScene *importScene = parsedScene->CopyForImport();
+                    ParsedScene *importScene = parsedScene->CopyForImport();
 
-                        static int maxThreads = RunningThreads();
-                        if (maxThreads == 1) {
+                    if (RunningThreads() == 1) {
+                        std::unique_ptr<Tokenizer> timport =
+                            Tokenizer::CreateFromFile(filename, parseError);
+                        if (timport)
                             parse(importScene, std::move(timport));
-                            parsedScene->MergeImported(importScene);
-                        } else {
-                            static std::mutex importThreadMutex;
-                            static std::condition_variable importThreadCV;
-                            static int nRunningImportThreads = 0;
-
-                            std::unique_lock<std::mutex> lock(importThreadMutex);
-                            while (nRunningImportThreads == maxThreads)
-                                importThreadCV.wait(lock);
-                            ++nRunningImportThreads;
-                            lock.unlock();
-
-                            std::thread importThread(
-                                [filename](ParsedScene *scene,
-                                           std::unique_ptr<Tokenizer> timport) {
-                                    Timer timer;
-                                    parse(scene, std::move(timport));
-                                    LOG_VERBOSE("Elapsed time to parse \"%s\": %.2fs",
-                                                filename, timer.ElapsedSeconds());
-
-                                    std::unique_lock<std::mutex> lock(importThreadMutex);
-                                    --nRunningImportThreads;
-                                    importThreadCV.notify_all();
-                                    lock.unlock();
-                                },
-                                importScene, std::move(timport));
-                            imports.push_back(
-                                std::make_pair(std::move(importThread), importScene));
-                        }
+                        parsedScene->MergeImported(importScene);
+                    } else {
+                        auto job = [=](std::string filename) {
+                            Timer timer;
+                            std::unique_ptr<Tokenizer> timport =
+                                Tokenizer::CreateFromFile(filename, parseError);
+                            if (timport)
+                                parse(importScene, std::move(timport));
+                            LOG_VERBOSE("Elapsed time to parse \"%s\": %.2fs", filename,
+                                        timer.ElapsedSeconds());
+                        };
+                        Future<void> jobFinished = RunAsync(job, filename);
+                        imports.push_back(std::make_pair(std::move(jobFinished), importScene));
                     }
                 }
             } else if (tok->token == "Identity")
@@ -986,7 +969,7 @@ void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t) {
     }
 
     for (auto &import : imports) {
-        import.first.join();
+        import.first.Wait();
 
         ParsedScene *parsedScene = dynamic_cast<ParsedScene *>(scene);
         CHECK(parsedScene);
