@@ -323,8 +323,10 @@ public:
         RemoveFromJobList();
         started = true;
         lock->unlock();
-        work();
+        DoWork();
     }
+
+    void DoWork() { work(); }
 
     void Cleanup() { delete this; }
 
@@ -337,15 +339,6 @@ private:
     std::packaged_task<T(void)> work;
 };
 
-template <typename F, typename... Args>
-inline auto RunAsync(F func, Args &&...args) {
-    auto fvoid = std::bind(func, std::forward<Args>(args)...);
-    using R = typename std::invoke_result_t<F, Args...>;
-    AsyncJob<R> *job = new AsyncJob<R>(std::move(fvoid));
-    std::unique_lock<std::mutex> lock = job->AddToJobList();
-    return job->GetFuture();
-}
-
 void ForEachThread(std::function<void(void)> func);
 
 // ParallelFunction Declarations
@@ -354,6 +347,21 @@ void ParallelCleanup();
 
 int AvailableCores();
 int RunningThreads();
+
+template <typename F, typename... Args>
+inline auto RunAsync(F func, Args &&...args) {
+    auto fvoid = std::bind(func, std::forward<Args>(args)...);
+    using R = typename std::invoke_result_t<F, Args...>;
+
+    AsyncJob<R> *job = new AsyncJob<R>(std::move(fvoid));
+    std::unique_lock<std::mutex> lock;
+    if (RunningThreads() == 1)
+        job->DoWork();
+    else
+        lock = job->AddToJobList();
+
+    return job->GetFuture();
+}
 
 }  // namespace pbrt
 
