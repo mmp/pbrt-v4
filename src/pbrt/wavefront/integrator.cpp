@@ -87,7 +87,7 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
     Allocator alloc = threadAllocators.Get();
 
     // Allocate all of the data structures that represent the scene...
-    std::map<std::string, Medium> media = scene.CreateMedia(alloc);
+    std::map<std::string, Medium> media = scene.CreateMedia();
 
     // "haveMedia" is a bit of a misnomer in that determines both whether
     // queues are allocated for the medium sampling kernels and they are

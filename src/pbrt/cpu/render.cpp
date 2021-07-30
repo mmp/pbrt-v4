@@ -26,7 +26,7 @@ void RenderCPU(ParsedScene &parsedScene) {
     ThreadLocal<Allocator> threadAllocators([]() { return Allocator(); });
 
     // Create media first (so have them for the camera...)
-    std::map<std::string, Medium> media = parsedScene.CreateMedia(alloc);
+    std::map<std::string, Medium> media = parsedScene.CreateMedia();
 
     bool haveScatteringMedia = false;
     auto findMedium = [&media, &haveScatteringMedia](const std::string &s,

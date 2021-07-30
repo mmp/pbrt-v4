@@ -303,6 +303,8 @@ class SceneProcessor {
 
 class ParsedScene : public SceneProcessor {
   public:
+    ParsedScene(ThreadLocal<Allocator> &threadAllocators);
+
     void SetFilm(SceneEntity film);
     void SetSampler(SceneEntity sampler);
     void SetIntegrator(SceneEntity integrator);
@@ -332,7 +334,7 @@ class ParsedScene : public SceneProcessor {
                          std::map<std::string, Material> *namedMaterials,
                          std::vector<Material> *materials) const;
 
-    std::map<std::string, Medium> CreateMedia(Allocator alloc) const;
+    std::map<std::string, Medium> CreateMedia() const;
 
     std::vector<Light> CreateLights(
         Allocator alloc, const std::map<std::string, Medium> &media,
@@ -365,6 +367,10 @@ class ParsedScene : public SceneProcessor {
     std::map<std::string, InstanceDefinitionSceneEntity *> instanceDefinitions;
 
   private:
+    ThreadLocal<Allocator> &threadAllocators;
+
+    mutable std::map<std::string, Future<Medium>> mediaFutures;
+
     std::mutex namedMaterialMutex, materialMutex, mediaMutex;
     std::mutex floatTextureMutex, spectrumTextureMutex;
     std::mutex lightMutex, areaLightMutex, shapeMutex, animatedShapeMutex;

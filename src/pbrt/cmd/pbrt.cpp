@@ -5,6 +5,9 @@
 #include <pbrt/pbrt.h>
 
 #include <pbrt/cpu/render.h>
+#ifdef PBRT_BUILD_GPU_RENDERER
+#include <pbrt/gpu/memory.h>
+#endif // PBRT_BUILD_GPU_RENDERER
 #include <pbrt/options.h>
 #include <pbrt/scene.h>
 #include <pbrt/parser.h>
@@ -252,7 +255,17 @@ int main(int argc, char *argv[]) {
         ParseFiles(&formattingTarget, filenames);
     } else {
         // Parse provided scene description files
-        ParsedScene scene;
+        ThreadLocal<Allocator> threadAllocators([=]() {
+            pstd::pmr::memory_resource *baseResource = pstd::pmr::get_default_resource();
+#ifdef PBRT_BUILD_GPU_RENDERER
+            if (options.useGPU) baseResource = &CUDATrackedMemoryResource::singleton;
+#endif
+            pstd::pmr::monotonic_buffer_resource *resource =
+                new pstd::pmr::monotonic_buffer_resource(1024 * 1024, baseResource);
+            return Allocator(resource);
+        });
+
+        ParsedScene scene(threadAllocators);
         SceneStateManager manager(&scene);
         ParseFiles(&manager, filenames);
 

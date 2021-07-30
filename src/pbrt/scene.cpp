@@ -727,6 +727,9 @@ void SceneStateManager::AreaLightSource(const std::string &name,
 }
 
 // ParsedScene Method Definitions
+ParsedScene::ParsedScene(ThreadLocal<Allocator> &threadAllocators)
+    : threadAllocators(threadAllocators) {}
+
 void ParsedScene::SetFilm(SceneEntity film) {
     this->film = std::move(film);
 }
@@ -764,7 +767,22 @@ int ParsedScene::AddMaterial(SceneEntity material) {
 
 void ParsedScene::AddMedium(TransformedSceneEntity medium) {
     std::lock_guard<std::mutex> lock(mediaMutex);
-    media[medium.name] = std::move(medium);
+
+    auto create = [=]() {
+        std::string type = medium.parameters.GetOneString("type", "");
+        if (type.empty())
+            ErrorExit(&medium.loc, "No parameter string \"type\" found for medium.");
+
+        if (medium.renderFromObject.IsAnimated())
+            Warning(&medium.loc,
+                    "Animated transformation provided for medium. Only the "
+                    "start transform will be used.");
+        return Medium::Create(type, medium.parameters,
+                              medium.renderFromObject.startTransform,
+                              &medium.loc, threadAllocators.Get());
+    };
+
+    mediaFutures[medium.name] = RunAsync(create);
 }
 
 void ParsedScene::AddFloatTexture(std::string name, TextureSceneEntity texture) {
@@ -1113,23 +1131,15 @@ NamedTextures ParsedScene::CreateTextures(ThreadLocal<Allocator> &threadAllocato
     return textures;
 }
 
-std::map<std::string, Medium> ParsedScene::CreateMedia(Allocator alloc) const {
+std::map<std::string, Medium> ParsedScene::CreateMedia() const {
     std::map<std::string, Medium> mediaMap;
 
-    for (const auto &m : media) {
-        std::string type = m.second.parameters.GetOneString("type", "");
-        if (type.empty())
-            ErrorExit(&m.second.loc, "No parameter string \"type\" found for medium.");
+    LOG_VERBOSE("Consume media futures start");
+    for (auto &m : mediaFutures)
+        mediaMap[m.first] = m.second.Get();
+    LOG_VERBOSE("Consume media futures finished");
 
-        if (m.second.renderFromObject.IsAnimated())
-            Warning(&m.second.loc,
-                    "Animated transformation provided for medium. Only the "
-                    "start transform will be used.");
-        Medium medium = Medium::Create(type, m.second.parameters,
-                                       m.second.renderFromObject.startTransform,
-                                       &m.second.loc, alloc);
-        mediaMap[m.first] = medium;
-    }
+    mediaFutures.clear();
 
     return mediaMap;
 }
