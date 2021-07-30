@@ -275,7 +275,7 @@ struct TransformSet {
 };
 
 // ParsedScene Definition
-class ParsedScene : public SceneRepresentation {
+class ParsedScene : public ParserTarget {
   public:
     // ParsedScene Public Methods
     ParsedScene();
@@ -398,7 +398,7 @@ class ParsedScene : public SceneRepresentation {
         Float transformStartTime = 0, transformEndTime = 1;
     };
 
-    friend void parse(SceneRepresentation *scene, std::unique_ptr<Tokenizer> t);
+    friend void parse(ParserTarget *scene, std::unique_ptr<Tokenizer> t);
     // ParsedScene Private Methods
     class Transform RenderFromObject(int index) const {
         return pbrt::Transform((renderFromWorld * graphicsState.ctm[index]).GetMatrix());
@@ -426,10 +426,10 @@ class ParsedScene : public SceneRepresentation {
     InstanceDefinitionSceneEntity *currentInstance = nullptr;
 };
 
-class FormattingScene : public SceneRepresentation {
+class FormattingParserTarget : public ParserTarget {
   public:
-    FormattingScene(bool toPly, bool upgrade) : toPly(toPly), upgrade(upgrade) {}
-    ~FormattingScene();
+    FormattingParserTarget(bool toPly, bool upgrade) : toPly(toPly), upgrade(upgrade) {}
+    ~FormattingParserTarget();
 
     void Option(const std::string &name, const std::string &value, FileLoc loc);
     void Identity(FileLoc loc);

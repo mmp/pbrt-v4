@@ -248,7 +248,7 @@ int main(int argc, char *argv[]) {
     InitPBRT(options);
 
     if (format || toPly || options.upgrade) {
-        FormattingScene formattingScene(toPly, options.upgrade);
+        FormattingParserTarget formattingScene(toPly, options.upgrade);
         ParseFiles(&formattingScene, filenames);
     } else {
         // Parse provided scene description files

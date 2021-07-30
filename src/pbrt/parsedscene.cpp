@@ -1389,13 +1389,13 @@ Primitive ParsedScene::CreateAggregate(
     return aggregate;
 }
 
-// FormattingScene Method Definitions
-FormattingScene::~FormattingScene() {
+// FormattingParserTarget Method Definitions
+FormattingParserTarget::~FormattingParserTarget() {
     if (errorExit)
         ErrorExit("Fatal errors during scene updating.");
 }
 
-void FormattingScene::Option(const std::string &name, const std::string &value,
+void FormattingParserTarget::Option(const std::string &name, const std::string &value,
                              FileLoc loc) {
     std::string nName = normalizeArg(name);
     if (nName == "msereferenceimage" || nName == "msereferenceout")
@@ -1404,71 +1404,71 @@ void FormattingScene::Option(const std::string &name, const std::string &value,
         Printf("%sOption \"%s\" %s\n", indent(), name, value);
 }
 
-void FormattingScene::Identity(FileLoc loc) {
+void FormattingParserTarget::Identity(FileLoc loc) {
     Printf("%sIdentity\n", indent());
 }
 
-void FormattingScene::Translate(Float dx, Float dy, Float dz, FileLoc loc) {
+void FormattingParserTarget::Translate(Float dx, Float dy, Float dz, FileLoc loc) {
     Printf("%sTranslate %f %f %f\n", indent(), dx, dy, dz);
 }
 
-void FormattingScene::Rotate(Float angle, Float ax, Float ay, Float az, FileLoc loc) {
+void FormattingParserTarget::Rotate(Float angle, Float ax, Float ay, Float az, FileLoc loc) {
     Printf("%sRotate %f %f %f %f\n", indent(), angle, ax, ay, az);
 }
 
-void FormattingScene::Scale(Float sx, Float sy, Float sz, FileLoc loc) {
+void FormattingParserTarget::Scale(Float sx, Float sy, Float sz, FileLoc loc) {
     Printf("%sScale %f %f %f\n", indent(), sx, sy, sz);
 }
 
-void FormattingScene::LookAt(Float ex, Float ey, Float ez, Float lx, Float ly, Float lz,
+void FormattingParserTarget::LookAt(Float ex, Float ey, Float ez, Float lx, Float ly, Float lz,
                              Float ux, Float uy, Float uz, FileLoc loc) {
     Printf("%sLookAt %f %f %f\n%s    %f %f %f\n%s    %f %f %f\n", indent(), ex, ey, ez,
            indent(), lx, ly, lz, indent(), ux, uy, uz);
 }
 
-void FormattingScene::ConcatTransform(Float transform[16], FileLoc loc) {
+void FormattingParserTarget::ConcatTransform(Float transform[16], FileLoc loc) {
     Printf("%sConcatTransform [ ", indent());
     for (int i = 0; i < 16; ++i)
         Printf("%f ", transform[i]);
     Printf(" ]\n");
 }
 
-void FormattingScene::Transform(Float transform[16], FileLoc loc) {
+void FormattingParserTarget::Transform(Float transform[16], FileLoc loc) {
     Printf("%sTransform [ ", indent());
     for (int i = 0; i < 16; ++i)
         Printf("%f ", transform[i]);
     Printf(" ]\n");
 }
 
-void FormattingScene::CoordinateSystem(const std::string &name, FileLoc loc) {
+void FormattingParserTarget::CoordinateSystem(const std::string &name, FileLoc loc) {
     Printf("%sCoordinateSystem \"%s\"\n", indent(), name);
 }
 
-void FormattingScene::CoordSysTransform(const std::string &name, FileLoc loc) {
+void FormattingParserTarget::CoordSysTransform(const std::string &name, FileLoc loc) {
     Printf("%sCoordSysTransform \"%s\"\n", indent(), name);
 }
 
-void FormattingScene::ActiveTransformAll(FileLoc loc) {
+void FormattingParserTarget::ActiveTransformAll(FileLoc loc) {
     Printf("%sActiveTransform All\n", indent());
 }
 
-void FormattingScene::ActiveTransformEndTime(FileLoc loc) {
+void FormattingParserTarget::ActiveTransformEndTime(FileLoc loc) {
     Printf("%sActiveTransform EndTime\n", indent());
 }
 
-void FormattingScene::ActiveTransformStartTime(FileLoc loc) {
+void FormattingParserTarget::ActiveTransformStartTime(FileLoc loc) {
     Printf("%sActiveTransform StartTime\n", indent());
 }
 
-void FormattingScene::TransformTimes(Float start, Float end, FileLoc loc) {
+void FormattingParserTarget::TransformTimes(Float start, Float end, FileLoc loc) {
     Printf("%sTransformTimes %f %f\n", indent(), start, end);
 }
 
-void FormattingScene::ColorSpace(const std::string &n, FileLoc loc) {
+void FormattingParserTarget::ColorSpace(const std::string &n, FileLoc loc) {
     Printf("%sColorSpace \"%s\"\n", indent(), n);
 }
 
-void FormattingScene::PixelFilter(const std::string &name, ParsedParameterVector params,
+void FormattingParserTarget::PixelFilter(const std::string &name, ParsedParameterVector params,
                                   FileLoc loc) {
     ParameterDictionary dict(std::move(params), RGBColorSpace::sRGB);
 
@@ -1499,7 +1499,7 @@ void FormattingScene::PixelFilter(const std::string &name, ParsedParameterVector
     std::cout << extra << dict.ToParameterList(catIndentCount);
 }
 
-void FormattingScene::Film(const std::string &type, ParsedParameterVector params,
+void FormattingParserTarget::Film(const std::string &type, ParsedParameterVector params,
                            FileLoc loc) {
     ParameterDictionary dict(std::move(params), RGBColorSpace::sRGB);
 
@@ -1525,7 +1525,7 @@ void FormattingScene::Film(const std::string &type, ParsedParameterVector params
     std::cout << extra << dict.ToParameterList(catIndentCount);
 }
 
-void FormattingScene::Sampler(const std::string &name, ParsedParameterVector params,
+void FormattingParserTarget::Sampler(const std::string &name, ParsedParameterVector params,
                               FileLoc loc) {
     ParameterDictionary dict(std::move(params), RGBColorSpace::sRGB);
 
@@ -1541,7 +1541,7 @@ void FormattingScene::Sampler(const std::string &name, ParsedParameterVector par
     std::cout << dict.ToParameterList(catIndentCount);
 }
 
-void FormattingScene::Accelerator(const std::string &name, ParsedParameterVector params,
+void FormattingParserTarget::Accelerator(const std::string &name, ParsedParameterVector params,
                                   FileLoc loc) {
     ParameterDictionary dict(std::move(params), RGBColorSpace::sRGB);
 
@@ -1549,7 +1549,7 @@ void FormattingScene::Accelerator(const std::string &name, ParsedParameterVector
            dict.ToParameterList(catIndentCount));
 }
 
-void FormattingScene::Integrator(const std::string &name, ParsedParameterVector params,
+void FormattingParserTarget::Integrator(const std::string &name, ParsedParameterVector params,
                                  FileLoc loc) {
     ParameterDictionary dict(std::move(params), RGBColorSpace::sRGB);
 
@@ -1584,7 +1584,7 @@ void FormattingScene::Integrator(const std::string &name, ParsedParameterVector 
     std::cout << extra << dict.ToParameterList(catIndentCount);
 }
 
-void FormattingScene::Camera(const std::string &name, ParsedParameterVector params,
+void FormattingParserTarget::Camera(const std::string &name, ParsedParameterVector params,
                              FileLoc loc) {
     ParameterDictionary dict(std::move(params), RGBColorSpace::sRGB);
 
@@ -1599,7 +1599,7 @@ void FormattingScene::Camera(const std::string &name, ParsedParameterVector para
     std::cout << dict.ToParameterList(catIndentCount);
 }
 
-void FormattingScene::MakeNamedMedium(const std::string &name,
+void FormattingParserTarget::MakeNamedMedium(const std::string &name,
                                       ParsedParameterVector params, FileLoc loc) {
     ParameterDictionary dict(params, RGBColorSpace::sRGB);
     if (upgrade && name == "heterogeneous")
@@ -1610,26 +1610,26 @@ void FormattingScene::MakeNamedMedium(const std::string &name,
                dict.ToParameterList(catIndentCount));
 }
 
-void FormattingScene::MediumInterface(const std::string &insideName,
+void FormattingParserTarget::MediumInterface(const std::string &insideName,
                                       const std::string &outsideName, FileLoc loc) {
     Printf("%sMediumInterface \"%s\" \"%s\"\n", indent(), insideName, outsideName);
 }
 
-void FormattingScene::WorldBegin(FileLoc loc) {
+void FormattingParserTarget::WorldBegin(FileLoc loc) {
     Printf("\n\nWorldBegin\n\n");
 }
 
-void FormattingScene::AttributeBegin(FileLoc loc) {
+void FormattingParserTarget::AttributeBegin(FileLoc loc) {
     Printf("\n%sAttributeBegin\n", indent());
     catIndentCount += 4;
 }
 
-void FormattingScene::AttributeEnd(FileLoc loc) {
+void FormattingParserTarget::AttributeEnd(FileLoc loc) {
     catIndentCount -= 4;
     Printf("%sAttributeEnd\n", indent());
 }
 
-void FormattingScene::Attribute(const std::string &target, ParsedParameterVector params,
+void FormattingParserTarget::Attribute(const std::string &target, ParsedParameterVector params,
                                 FileLoc loc) {
     ParameterDictionary dict(params, RGBColorSpace::sRGB);
     Printf("%sAttribute \"%s\" ", indent(), target);
@@ -1640,17 +1640,17 @@ void FormattingScene::Attribute(const std::string &target, ParsedParameterVector
         std::cout << '\n' << dict.ToParameterList(catIndentCount);
 }
 
-void FormattingScene::TransformBegin(FileLoc loc) {
+void FormattingParserTarget::TransformBegin(FileLoc loc) {
     Printf("%sTransformBegin\n", indent());
     catIndentCount += 4;
 }
 
-void FormattingScene::TransformEnd(FileLoc loc) {
+void FormattingParserTarget::TransformEnd(FileLoc loc) {
     catIndentCount -= 4;
     Printf("%sTransformEnd\n", indent());
 }
 
-void FormattingScene::Texture(const std::string &name, const std::string &type,
+void FormattingParserTarget::Texture(const std::string &name, const std::string &type,
                               const std::string &texname, ParsedParameterVector params,
                               FileLoc loc) {
     if (upgrade) {
@@ -1770,7 +1770,7 @@ void FormattingScene::Texture(const std::string &name, const std::string &type,
     std::cout << extra << dict.ToParameterList(catIndentCount);
 }
 
-std::string FormattingScene::upgradeMaterialIndex(const std::string &name,
+std::string FormattingParserTarget::upgradeMaterialIndex(const std::string &name,
                                                   ParameterDictionary *dict,
                                                   FileLoc loc) const {
     if (name != "glass" && name != "uber")
@@ -1806,7 +1806,7 @@ std::string FormattingScene::upgradeMaterialIndex(const std::string &name,
     }
 }
 
-std::string FormattingScene::upgradeMaterial(std::string *name, ParameterDictionary *dict,
+std::string FormattingParserTarget::upgradeMaterial(std::string *name, ParameterDictionary *dict,
                                              FileLoc loc) const {
     std::string extra = upgradeMaterialIndex(*name, dict, loc);
 
@@ -1947,7 +1947,7 @@ std::string FormattingScene::upgradeMaterial(std::string *name, ParameterDiction
     return extra;
 }
 
-void FormattingScene::Material(const std::string &name, ParsedParameterVector params,
+void FormattingParserTarget::Material(const std::string &name, ParsedParameterVector params,
                                FileLoc loc) {
     ParameterDictionary dict(params, RGBColorSpace::sRGB);
     if (upgrade)
@@ -1987,7 +1987,7 @@ void FormattingScene::Material(const std::string &name, ParsedParameterVector pa
     std::cout << extra << dict.ToParameterList(catIndentCount);
 }
 
-void FormattingScene::MakeNamedMaterial(const std::string &name,
+void FormattingParserTarget::MakeNamedMaterial(const std::string &name,
                                         ParsedParameterVector params, FileLoc loc) {
     ParameterDictionary dict(params, RGBColorSpace::sRGB);
 
@@ -2017,7 +2017,7 @@ void FormattingScene::MakeNamedMaterial(const std::string &name,
         namedMaterialDictionaries[definedNamedMaterials[name]] = std::move(dict);
 }
 
-void FormattingScene::NamedMaterial(const std::string &name, FileLoc loc) {
+void FormattingParserTarget::NamedMaterial(const std::string &name, FileLoc loc) {
     Printf("%sNamedMaterial \"%s\"\n", indent(), name);
 }
 
@@ -2036,7 +2036,7 @@ static bool upgradeRGBToScale(ParameterDictionary *dict, const char *name,
     return true;
 }
 
-static std::string upgradeMapname(const FormattingScene &scene,
+static std::string upgradeMapname(const FormattingParserTarget &scene,
                                   ParameterDictionary *dict) {
     std::string n = dict->GetOneString("mapname", "");
     if (n.empty())
@@ -2046,7 +2046,7 @@ static std::string upgradeMapname(const FormattingScene &scene,
     return scene.indent(1) + StringPrintf("\"string filename\" \"%s\"\n", n);
 }
 
-void FormattingScene::LightSource(const std::string &name, ParsedParameterVector params,
+void FormattingParserTarget::LightSource(const std::string &name, ParsedParameterVector params,
                                   FileLoc loc) {
     ParameterDictionary dict(params, RGBColorSpace::sRGB);
 
@@ -2101,7 +2101,7 @@ void FormattingScene::LightSource(const std::string &name, ParsedParameterVector
     std::cout << extra << dict.ToParameterList(catIndentCount);
 }
 
-void FormattingScene::AreaLightSource(const std::string &name,
+void FormattingParserTarget::AreaLightSource(const std::string &name,
                                       ParsedParameterVector params, FileLoc loc) {
     ParameterDictionary dict(params, RGBColorSpace::sRGB);
     std::string extra;
@@ -2130,7 +2130,7 @@ void FormattingScene::AreaLightSource(const std::string &name,
     std::cout << extra << dict.ToParameterList(catIndentCount);
 }
 
-static std::string upgradeTriMeshUVs(const FormattingScene &scene,
+static std::string upgradeTriMeshUVs(const FormattingParserTarget &scene,
                                      ParameterDictionary *dict) {
     std::vector<Point2f> uv = dict->GetPoint2fArray("st");
     if (!uv.empty())
@@ -2167,7 +2167,7 @@ static std::string upgradeTriMeshUVs(const FormattingScene &scene,
     return s;
 }
 
-void FormattingScene::Shape(const std::string &name, ParsedParameterVector params,
+void FormattingParserTarget::Shape(const std::string &name, ParsedParameterVector params,
                             FileLoc loc) {
     ParameterDictionary dict(params, RGBColorSpace::sRGB);
 
@@ -2244,11 +2244,11 @@ void FormattingScene::Shape(const std::string &name, ParsedParameterVector param
     std::cout << dict.ToParameterList(catIndentCount);
 }
 
-void FormattingScene::ReverseOrientation(FileLoc loc) {
+void FormattingParserTarget::ReverseOrientation(FileLoc loc) {
     Printf("%sReverseOrientation\n", indent());
 }
 
-void FormattingScene::ObjectBegin(const std::string &name, FileLoc loc) {
+void FormattingParserTarget::ObjectBegin(const std::string &name, FileLoc loc) {
     if (upgrade) {
         if (definedObjectInstances.find(name) != definedObjectInstances.end()) {
             static int count = 0;
@@ -2261,11 +2261,11 @@ void FormattingScene::ObjectBegin(const std::string &name, FileLoc loc) {
         Printf("%sObjectBegin \"%s\"\n", indent(), name);
 }
 
-void FormattingScene::ObjectEnd(FileLoc loc) {
+void FormattingParserTarget::ObjectEnd(FileLoc loc) {
     Printf("%sObjectEnd\n", indent());
 }
 
-void FormattingScene::ObjectInstance(const std::string &name, FileLoc loc) {
+void FormattingParserTarget::ObjectInstance(const std::string &name, FileLoc loc) {
     if (upgrade) {
         if (definedObjectInstances.find(name) == definedObjectInstances.end())
             // this is legit if we're upgrading multiple files separately...
@@ -2277,6 +2277,6 @@ void FormattingScene::ObjectInstance(const std::string &name, FileLoc loc) {
         Printf("%sObjectInstance \"%s\"\n", indent(), name);
 }
 
-void FormattingScene::EndOfFiles() {}
+void FormattingParserTarget::EndOfFiles() {}
 
 }  // namespace pbrt

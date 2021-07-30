@@ -47,16 +47,16 @@ class ParsedParameter {
 // ParsedParameterVector Definition
 using ParsedParameterVector = InlinedVector<ParsedParameter *, 8>;
 
-// SceneRepresentation Definition
-class SceneRepresentation {
+// ParserTarget Definition
+class ParserTarget {
   public:
-    // SceneRepresentation Interface
+    // ParserTarget Interface
     virtual void Scale(Float sx, Float sy, Float sz, FileLoc loc) = 0;
 
     virtual void Shape(const std::string &name, ParsedParameterVector params,
                        FileLoc loc) = 0;
 
-    virtual ~SceneRepresentation();
+    virtual ~ParserTarget();
 
     virtual void Option(const std::string &name, const std::string &value,
                         FileLoc loc) = 0;
@@ -118,7 +118,7 @@ class SceneRepresentation {
     virtual void EndOfFiles() = 0;
 
   protected:
-    // SceneRepresentation Protected Methods
+    // ParserTarget Protected Methods
     template <typename... Args>
     void ErrorExitDeferred(const char *fmt, Args &&...args) const {
         errorExit = true;
@@ -134,8 +134,8 @@ class SceneRepresentation {
 };
 
 // Scene Parsing Declarations
-void ParseFiles(SceneRepresentation *scene, pstd::span<const std::string> filenames);
-void ParseString(SceneRepresentation *scene, std::string str);
+void ParseFiles(ParserTarget *target, pstd::span<const std::string> filenames);
+void ParseString(ParserTarget *target, std::string str);
 
 // Token Definition
 struct Token {
