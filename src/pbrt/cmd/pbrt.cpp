@@ -6,7 +6,7 @@
 
 #include <pbrt/cpu/render.h>
 #include <pbrt/options.h>
-#include <pbrt/parsedscene.h>
+#include <pbrt/scene.h>
 #include <pbrt/parser.h>
 #include <pbrt/util/args.h>
 #include <pbrt/util/check.h>

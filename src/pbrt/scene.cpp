@@ -2,7 +2,7 @@
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
 
-#include <pbrt/parsedscene.h>
+#include <pbrt/scene.h>
 
 #include <pbrt/cpu/aggregates.h>
 #ifdef PBRT_BUILD_GPU_RENDERER

@@ -9,7 +9,7 @@
 
 #include <pbrt/gpu/memory.h>
 #include <pbrt/gpu/optix.h>
-#include <pbrt/parsedscene.h>
+#include <pbrt/scene.h>
 #include <pbrt/util/containers.h>
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/soa.h>

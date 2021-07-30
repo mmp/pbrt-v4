@@ -8,7 +8,7 @@
 #include <pbrt/gpu/util.h>
 #include <pbrt/lights.h>
 #include <pbrt/materials.h>
-#include <pbrt/parsedscene.h>
+#include <pbrt/scene.h>
 #include <pbrt/textures.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/file.h>

@@ -12,7 +12,7 @@
 #include <pbrt/lights.h>
 #include <pbrt/materials.h>
 #include <pbrt/media.h>
-#include <pbrt/parsedscene.h>
+#include <pbrt/scene.h>
 #include <pbrt/samplers.h>
 #include <pbrt/shapes.h>
 #include <pbrt/textures.h>

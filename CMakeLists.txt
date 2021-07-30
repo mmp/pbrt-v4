@@ -509,11 +509,11 @@ set (PBRT_SOURCE
   src/pbrt/media.cpp
   src/pbrt/options.cpp
   src/pbrt/paramdict.cpp
-  src/pbrt/parsedscene.cpp
   src/pbrt/parser.cpp
   src/pbrt/pbrt.cpp
   src/pbrt/ray.cpp
   src/pbrt/samplers.cpp
+  src/pbrt/scene.cpp
   src/pbrt/shapes.cpp
   src/pbrt/textures.cpp
 
@@ -534,12 +534,12 @@ set (PBRT_SOURCE_HEADERS
   src/pbrt/media.h
   src/pbrt/options.h
   src/pbrt/paramdict.h
-  src/pbrt/parsedscene.h
   src/pbrt/parser.h
   src/pbrt/pbrt.h
   src/pbrt/pbrt.soa
   src/pbrt/ray.h
   src/pbrt/samplers.h
+  src/pbrt/scene.h
   src/pbrt/shapes.h
   src/pbrt/textures.h
   )  
