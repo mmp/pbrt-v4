@@ -91,32 +91,58 @@ TransformCache::TransformCache()
 #else
     : bufferResource(Allocator().resource()),
 #endif
-      alloc(&bufferResource) {
+      alloc(&bufferResource), hashTable(256) {
 }
 
 const Transform *TransformCache::Lookup(const Transform &t) {
     ++nTransformCacheLookups;
 
-    if (!hashTable.empty()) {
-        size_t offset = t.Hash() % hashTable.bucket_count();
-        for (auto iter = hashTable.begin(offset); iter != hashTable.end(offset); ++iter) {
-            if (**iter == t) {
-                ++nTransformCacheHits;
-                return *iter;
+    size_t offset = t.Hash() % hashTable.size();
+    int step = 1;
+
+    while (true) {
+        if (!hashTable[offset]) {
+            // not in the hash table
+            if (4 * nEntries > hashTable.size()) {
+                // grow
+                std::vector<const Transform *> newHash(2 * hashTable.size());
+                for (const Transform *tr : hashTable) {
+                    if (tr) {
+                        size_t offset = tr->Hash() % newHash.size();
+                        int step = 1;
+                        while (newHash[offset]) {
+                            offset += step;
+                            ++step;
+                            offset %= newHash.size();
+                        }
+                        newHash[offset] = tr;
+                    }
+                }
+                hashTable.swap(newHash);
             }
+
+            Transform *tptr = alloc.new_object<Transform>(t);
+            transformCacheBytes += sizeof(Transform);
+            ++nEntries;
+            hashTable[offset] = tptr;
+            return tptr;
+        } else if (*hashTable[offset] == t) {
+            // found it
+            ++nTransformCacheHits;
+            return hashTable[offset];
+        } else {
+            // collision
+            offset += step;
+            ++step;
+            offset %= hashTable.size();
         }
     }
-    Transform *tptr = alloc.new_object<Transform>(t);
-    transformCacheBytes += sizeof(Transform);
-    hashTable.insert(tptr);
-    return tptr;
 }
 
 TransformCache::~TransformCache() {
-    for (const auto &iter : hashTable) {
-        Transform *tptr = iter;
-        alloc.delete_object(tptr);
-    }
+    for (const Transform *tr : hashTable)
+        if (tr)
+            alloc.delete_object((Transform *)tr);
 }
 
 STAT_COUNTER("Scene/Object instances created", nObjectInstancesCreated);

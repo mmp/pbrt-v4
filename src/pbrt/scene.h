@@ -241,7 +241,8 @@ class TransformCache {
     // TransformCache Private Members
     pstd::pmr::monotonic_buffer_resource bufferResource;
     Allocator alloc;
-    std::unordered_set<Transform *, TransformHash> hashTable;
+    int nEntries = 0;
+    std::vector<const Transform *> hashTable;
 };
 
 // MaxTransforms Definition
