@@ -1316,62 +1316,36 @@ OptiXAggregate::OptiXAggregate(
         PreparePLYMeshes(scene.shapes, textures.floatTextures);
     LOG_VERBOSE("Finished reading PLY meshes");
 
-    LOG_VERBOSE("Starting to create GAS for top-level triangles");
-    BVH triangleBVH = buildBVHForTriangles(
-        scene.shapes, plyMeshes, optixContext, hitPGTriangle, anyhitPGShadowTriangle,
-        hitPGRandomHitTriangle, textures.floatTextures, namedMaterials, materials, media,
-        shapeIndexToAreaLights, threadAllocators, threadCUDAStreams);
-    bounds = Union(bounds, triangleBVH.bounds);
-    (void)addHGRecords(triangleBVH);
-    LOG_VERBOSE("Finished creating GAS for top-level triangles");
+    struct GAS {
+        BVH bvh;
+        int sbtOffset;
+    };
+    Future<GAS> triFuture = RunAsync([&]() {
+        BVH triangleBVH = buildBVHForTriangles(
+            scene.shapes, plyMeshes, optixContext, hitPGTriangle, anyhitPGShadowTriangle,
+            hitPGRandomHitTriangle, textures.floatTextures, namedMaterials, materials, media,
+            shapeIndexToAreaLights, threadAllocators, threadCUDAStreams);
+        int sbtOffset = addHGRecords(triangleBVH);
+        return GAS{triangleBVH, sbtOffset};
+    });
 
-    LOG_VERBOSE("Starting to create GAS for top-level blps/curves");
-    BVH blpBVH = buildBVHForBLPs(
-        scene.shapes, optixContext, hitPGBilinearPatch, anyhitPGShadowBilinearPatch,
-        hitPGRandomHitBilinearPatch, textures.floatTextures, namedMaterials, materials,
-        media, shapeIndexToAreaLights, threadAllocators, threadCUDAStreams);
-    bounds = Union(bounds, blpBVH.bounds);
-    int bilinearSBTOffset = addHGRecords(blpBVH);
-    LOG_VERBOSE("Finished creating GAS for top-level blps/curves");
+    Future<GAS> blpFuture = RunAsync([&]() {
+        BVH blpBVH = buildBVHForBLPs(
+            scene.shapes, optixContext, hitPGBilinearPatch, anyhitPGShadowBilinearPatch,
+            hitPGRandomHitBilinearPatch, textures.floatTextures, namedMaterials, materials,
+            media, shapeIndexToAreaLights, threadAllocators, threadCUDAStreams);
+        int bilinearSBTOffset = addHGRecords(blpBVH);
+        return GAS{blpBVH, bilinearSBTOffset};
+    });
 
-    LOG_VERBOSE("Starting to create GAS for top-level quadrics");
-    BVH quadricBVH = buildBVHForQuadrics(
-        scene.shapes, optixContext, hitPGQuadric, anyhitPGShadowQuadric,
-        hitPGRandomHitQuadric, textures.floatTextures, namedMaterials, materials, media,
-        shapeIndexToAreaLights, threadAllocators, threadCUDAStreams);
-    bounds = Union(bounds, quadricBVH.bounds);
-    int quadricSBTOffset = addHGRecords(quadricBVH);
-    LOG_VERBOSE("Finished creating GAS for top-level quadrics");
-
-    std::vector<OptixInstance> iasInstances;
-
-    OptixInstance gasInstance = {};
-    float identity[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
-    memcpy(gasInstance.transform, identity, 12 * sizeof(float));
-    gasInstance.visibilityMask = 255;
-    gasInstance.flags =
-        OPTIX_INSTANCE_FLAG_NONE;  // TODO: OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT
-    if (triangleBVH.traversableHandle) {
-        gasInstance.traversableHandle = triangleBVH.traversableHandle;
-        gasInstance.sbtOffset = 0;
-        iasInstances.push_back(gasInstance);
-    }
-    if (blpBVH.traversableHandle) {
-        gasInstance.traversableHandle = blpBVH.traversableHandle;
-        gasInstance.sbtOffset = bilinearSBTOffset;
-        iasInstances.push_back(gasInstance);
-    }
-    if (quadricBVH.traversableHandle) {
-        gasInstance.traversableHandle = quadricBVH.traversableHandle;
-        gasInstance.sbtOffset = quadricSBTOffset;
-        iasInstances.push_back(gasInstance);
-    }
-
-    ///////////////////////////////////////////////////////////////////////////
-    // Read (and possibly displace!) PLY meshes in parallel.
-    std::vector<std::string> allInstanceNames;
-    for (const auto &def : scene.instanceDefinitions)
-        allInstanceNames.push_back(def.first);
+    Future<GAS> quadricFuture = RunAsync([&]() {
+        BVH quadricBVH = buildBVHForQuadrics(
+            scene.shapes, optixContext, hitPGQuadric, anyhitPGShadowQuadric,
+            hitPGRandomHitQuadric, textures.floatTextures, namedMaterials, materials, media,
+            shapeIndexToAreaLights, threadAllocators, threadCUDAStreams);
+        int quadricSBTOffset = addHGRecords(quadricBVH);
+        return GAS{quadricBVH, quadricSBTOffset};
+    });
 
     ///////////////////////////////////////////////////////////////////////////
     // Create IASes for instance definitions
@@ -1388,6 +1362,10 @@ OptiXAggregate::OptiXAggregate(
 
     LOG_VERBOSE("Starting to create IASes for %d instance definitions",
                 scene.instanceDefinitions.size());
+    std::vector<std::string> allInstanceNames;
+    for (const auto &def : scene.instanceDefinitions)
+        allInstanceNames.push_back(def.first);
+
     std::unordered_map<std::string, Instance> instanceMap;
     std::mutex instanceMapMutex;
     ParallelFor(0, scene.instanceDefinitions.size(), [&](int64_t i) {
@@ -1475,7 +1453,31 @@ OptiXAggregate::OptiXAggregate(
         totalOptixInstances += localTotalInstances;
     });
 
-    // Resize iasInstances to make room for all of the OptixInstances to come
+    std::vector<OptixInstance> iasInstances;
+    iasInstances.reserve(3 + totalOptixInstances);
+
+    // Consume futures for top-level non-instanced geometry acceleration structures.
+    OptixInstance gasInstance = {};
+    float identity[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
+    memcpy(gasInstance.transform, identity, 12 * sizeof(float));
+    gasInstance.visibilityMask = 255;
+    gasInstance.flags =
+        OPTIX_INSTANCE_FLAG_NONE;  // TODO: OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT
+    LOG_VERBOSE("Starting to consume top-level GAS futures");
+    for (Future<GAS> *fut : {&triFuture, &blpFuture, &quadricFuture}) {
+        GAS gas = fut->Get();
+        if (gas.bvh.traversableHandle) {
+            gasInstance.traversableHandle = gas.bvh.traversableHandle;
+            gasInstance.sbtOffset = gas.sbtOffset;
+            iasInstances.push_back(gasInstance);
+
+            bounds = Union(bounds, gas.bvh.bounds);
+        }
+    }
+    LOG_VERBOSE("Finished consuming top-level GAS futures");
+
+    // Resize iasInstances to be just the right size for the OptixInstances
+    // to come
     size_t iasInstancesOffset = iasInstances.size();
     iasInstances.resize(iasInstances.size() + totalOptixInstances);
 
