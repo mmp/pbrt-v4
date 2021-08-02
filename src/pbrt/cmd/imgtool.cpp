@@ -123,7 +123,7 @@ static std::map<std::string, CommandUsage> commandUsage = {
                        exceed <value>. Default: no clamping.
     --crop <x0,x1,y0,y1> Crop image to the given dimensions. Default: no crop.
     --colorspace <n>   Convert image to given colorspace.
-                       (Options: "ACES2065-1", "Rec2020", "sRGB")
+                       (Options: "ACES2065-1", "Rec2020", "DCI-P3", "sRGB")
     --despike <v>      For any pixels with a luminance value greater than <v>,
                        replace the pixel with the median of the 3x3 neighboring
                        pixels. Default: infinity (i.e., disabled).
