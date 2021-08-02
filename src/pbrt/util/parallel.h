@@ -267,7 +267,7 @@ class ParallelJob {
 
     virtual std::string ToString() const = 0;
 
-    virtual void Cleanup() { }
+    virtual void Cleanup() {}
 
     void RemoveFromJobList();
     std::unique_lock<std::mutex> AddToJobList();
@@ -287,12 +287,16 @@ class ParallelJob {
 
 bool DoParallelWork();
 
+// Future Definition
 template <typename T>
 class Future {
-public:
+  public:
     Future() = default;
     Future(std::future<T> &&f) : fut(std::move(f)) {}
-    Future &operator=(std::future<T> &&f) { fut = std::move(f); return *this; }
+    Future &operator=(std::future<T> &&f) {
+        fut = std::move(f);
+        return *this;
+    }
 
     T Get() {
         Wait();
@@ -307,13 +311,14 @@ public:
         return fut.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
     }
 
-private:
+  private:
     std::future<T> fut;
 };
 
+// AsyncJob Definition
 template <typename T>
 class AsyncJob : public ParallelJob {
-public:
+  public:
     AsyncJob(std::function<T(void)> w) : work(std::move(w)) {}
 
     bool HaveWork() const { return !started; }
@@ -330,11 +335,13 @@ public:
 
     void Cleanup() { delete this; }
 
-    std::string ToString() const { return StringPrintf("[ AsyncJob started: %s ]", started); }
+    std::string ToString() const {
+        return StringPrintf("[ AsyncJob started: %s ]", started);
+    }
 
     Future<T> GetFuture() { return work.get_future(); }
 
-private:
+  private:
     bool started = false;
     std::packaged_task<T(void)> work;
 };
@@ -348,6 +355,7 @@ void ParallelCleanup();
 int AvailableCores();
 int RunningThreads();
 
+// Asynchronous Task Launch Function Definitions
 template <typename F, typename... Args>
 inline auto RunAsync(F func, Args &&...args) {
     auto fvoid = std::bind(func, std::forward<Args>(args)...);

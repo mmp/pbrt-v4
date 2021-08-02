@@ -2,8 +2,8 @@
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
 
-#ifndef PBRT_PARSEDSCENE_H
-#define PBRT_PARSEDSCENE_H
+#ifndef PBRT_SCENE_H
+#define PBRT_SCENE_H
 
 #include <pbrt/pbrt.h>
 
@@ -201,7 +201,8 @@ struct InstanceSceneEntity {
     InstanceSceneEntity() = default;
     InstanceSceneEntity(const std::string &name, FileLoc loc,
                         const AnimatedTransform &renderFromInstanceAnim)
-        : name(name), loc(loc),
+        : name(name),
+          loc(loc),
           renderFromInstanceAnim(new AnimatedTransform(renderFromInstanceAnim)) {}
     InstanceSceneEntity(const std::string &name, FileLoc loc,
                         const Transform *renderFromInstance)
@@ -278,6 +279,7 @@ struct TransformSet {
     Transform t[MaxTransforms];
 };
 
+// SceneProcessor Definition
 class SceneProcessor {
   public:
     virtual ~SceneProcessor();
@@ -304,6 +306,7 @@ class SceneProcessor {
     virtual void Done() = 0;
 };
 
+// ParsedScene Definition
 class ParsedScene : public SceneProcessor {
   public:
     ParsedScene(ThreadLocal<Allocator> &threadAllocators);
@@ -338,7 +341,8 @@ class ParsedScene : public SceneProcessor {
 
     std::map<std::string, Medium> CreateMedia();
 
-    std::vector<Light> CreateLights(const NamedTextures &textures,
+    std::vector<Light> CreateLights(
+        const NamedTextures &textures,
         std::map<int, pstd::vector<Light> *> *shapeIndexToAreaLights);
 
     Primitive CreateAggregate(
@@ -399,7 +403,6 @@ class SceneStateManager : public ParserTarget {
   public:
     // SceneStateManager Public Methods
     SceneStateManager(SceneProcessor *sceneProcessor);
-
     void Option(const std::string &name, const std::string &value, FileLoc loc);
     void Identity(FileLoc loc);
     void Translate(Float dx, Float dy, Float dz, FileLoc loc);
@@ -506,7 +509,6 @@ class SceneStateManager : public ParserTarget {
     TransformCache transformCache;
     std::vector<GraphicsState> pushedGraphicsStates;
     std::vector<std::pair<char, FileLoc>> pushStack;  // 'a': attribute, 'o': object
-
     struct ActiveInstanceDefinition {
         ActiveInstanceDefinition(std::string name, FileLoc loc) : entity(name, loc){};
 
@@ -534,4 +536,4 @@ class SceneStateManager : public ParserTarget {
 
 }  // namespace pbrt
 
-#endif  // PBRT_PARSEDSCENE_H
+#endif  // PBRT_SCENE_H

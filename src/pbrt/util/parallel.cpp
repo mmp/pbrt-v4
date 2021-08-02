@@ -129,6 +129,21 @@ void ThreadPool::WorkOrWait(std::unique_lock<std::mutex> *lock) {
         jobListCondition.wait(*lock);
 }
 
+void ThreadPool::RemoveFromJobList(ParallelJob *job) {
+    DCHECK(!job->removed);
+
+    if (job->prev)
+        job->prev->next = job->next;
+    else {
+        DCHECK(jobList == job);
+        jobList = job->next;
+    }
+    if (job->next)
+        job->next->prev = job->prev;
+
+    job->removed = true;
+}
+
 bool ThreadPool::WorkOrReturn() {
     std::unique_lock<std::mutex> lock(mutex);
 
@@ -150,21 +165,6 @@ bool ThreadPool::WorkOrReturn() {
     }
 
     return true;
-}
-
-void ThreadPool::RemoveFromJobList(ParallelJob *job) {
-    DCHECK(!job->removed);
-
-    if (job->prev)
-        job->prev->next = job->next;
-    else {
-        DCHECK(jobList == job);
-        jobList = job->next;
-    }
-    if (job->next)
-        job->next->prev = job->prev;
-
-    job->removed = true;
 }
 
 void ThreadPool::ForEachThread(std::function<void(void)> func) {

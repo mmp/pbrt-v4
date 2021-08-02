@@ -12,8 +12,8 @@
 #include <pbrt/lights.h>
 #include <pbrt/materials.h>
 #include <pbrt/media.h>
-#include <pbrt/scene.h>
 #include <pbrt/samplers.h>
+#include <pbrt/scene.h>
 #include <pbrt/shapes.h>
 #include <pbrt/textures.h>
 #include <pbrt/util/colorspace.h>
@@ -79,7 +79,8 @@ void RenderCPU(ParsedScene &parsedScene) {
 
     // Lights
     std::map<int, pstd::vector<Light> *> shapeIndexToAreaLights;
-    std::vector<Light> lights = parsedScene.CreateLights(textures, &shapeIndexToAreaLights);
+    std::vector<Light> lights =
+        parsedScene.CreateLights(textures, &shapeIndexToAreaLights);
 
     LOG_VERBOSE("Starting materials");
     std::map<std::string, pbrt::Material> namedMaterials;

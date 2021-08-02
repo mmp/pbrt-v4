@@ -7,10 +7,10 @@
 #include <pbrt/cpu/render.h>
 #ifdef PBRT_BUILD_GPU_RENDERER
 #include <pbrt/gpu/memory.h>
-#endif // PBRT_BUILD_GPU_RENDERER
+#endif  // PBRT_BUILD_GPU_RENDERER
 #include <pbrt/options.h>
-#include <pbrt/scene.h>
 #include <pbrt/parser.h>
+#include <pbrt/scene.h>
 #include <pbrt/util/args.h>
 #include <pbrt/util/check.h>
 #include <pbrt/util/error.h>
@@ -258,7 +258,8 @@ int main(int argc, char *argv[]) {
         ThreadLocal<Allocator> threadAllocators([=]() {
             pstd::pmr::memory_resource *baseResource = pstd::pmr::get_default_resource();
 #ifdef PBRT_BUILD_GPU_RENDERER
-            if (options.useGPU) baseResource = &CUDATrackedMemoryResource::singleton;
+            if (options.useGPU)
+                baseResource = &CUDATrackedMemoryResource::singleton;
 #endif
             pstd::pmr::monotonic_buffer_resource *resource =
                 new pstd::pmr::monotonic_buffer_resource(1024 * 1024, baseResource);

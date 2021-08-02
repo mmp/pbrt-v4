@@ -91,7 +91,8 @@ TransformCache::TransformCache()
 #else
     : bufferResource(Allocator().resource()),
 #endif
-      alloc(&bufferResource), hashTable(256) {
+      alloc(&bufferResource),
+      hashTable(256) {
 }
 
 const Transform *TransformCache::Lookup(const Transform &t) {
@@ -120,7 +121,6 @@ const Transform *TransformCache::Lookup(const Transform &t) {
                 }
                 hashTable.swap(newHash);
             }
-
             Transform *tptr = alloc.new_object<Transform>(t);
             transformCacheBytes += sizeof(Transform);
             ++nEntries;
@@ -291,7 +291,6 @@ void SceneStateManager::WorldBegin(FileLoc loc) {
 void SceneStateManager::LightSource(const std::string &name, ParsedParameterVector params,
                                     FileLoc loc) {
     VERIFY_WORLD("LightSource");
-
     ParameterDictionary dict(std::move(params), graphicsState.lightAttributes,
                              graphicsState.colorSpace);
     sceneProcessor->AddLight(LightSceneEntity(name, std::move(dict), loc,
@@ -667,6 +666,7 @@ void SceneStateManager::MakeNamedMedium(const std::string &name,
         ErrorExitDeferred(&loc, "Named medium \"%s\" redefined.", name);
         return;
     }
+
     mediumNames.insert(name);
 
     sceneProcessor->AddMedium(
@@ -828,12 +828,11 @@ void ParsedScene::AddMedium(TransformedSceneEntity medium) {
             ErrorExit(&medium.loc, "No parameter string \"type\" found for medium.");
 
         if (medium.renderFromObject.IsAnimated())
-            Warning(&medium.loc,
-                    "Animated transformation provided for medium. Only the "
-                    "start transform will be used.");
+            Warning(&medium.loc, "Animated transformation provided for medium. Only the "
+                                 "start transform will be used.");
         return Medium::Create(type, medium.parameters,
-                              medium.renderFromObject.startTransform,
-                              &medium.loc, threadAllocators.Get());
+                              medium.renderFromObject.startTransform, &medium.loc,
+                              threadAllocators.Get());
     };
 
     mediaFutures[medium.name] = RunAsync(create);
@@ -841,14 +840,13 @@ void ParsedScene::AddMedium(TransformedSceneEntity medium) {
 
 void ParsedScene::AddFloatTexture(std::string name, TextureSceneEntity texture) {
     if (texture.renderFromObject.IsAnimated())
-        Warning(&texture.loc,
-                "Animated world to texture transforms are not supported. "
-                "Using start transform.");
+        Warning(&texture.loc, "Animated world to texture transforms are not supported. "
+                              "Using start transform.");
 
     std::lock_guard<std::mutex> lock(textureMutex);
     if (texture.texName != "imagemap" && texture.texName != "ptex") {
-        serialFloatTextures.push_back(std::make_pair(std::move(name),
-                                                     std::move(texture)));
+        serialFloatTextures.push_back(
+            std::make_pair(std::move(name), std::move(texture)));
         return;
     }
 
@@ -865,10 +863,9 @@ void ParsedScene::AddFloatTexture(std::string name, TextureSceneEntity texture) 
         return;
     }
 
-    if (loadingTextureFilenames.find(filename) !=
-        loadingTextureFilenames.end()) {
-        serialFloatTextures.push_back(std::make_pair(std::move(name),
-                                                     std::move(texture)));
+    if (loadingTextureFilenames.find(filename) != loadingTextureFilenames.end()) {
+        serialFloatTextures.push_back(
+            std::make_pair(std::move(name), std::move(texture)));
         return;
     }
     loadingTextureFilenames.insert(filename);
@@ -880,9 +877,8 @@ void ParsedScene::AddFloatTexture(std::string name, TextureSceneEntity texture) 
         // Pass nullptr for the textures, since they shouldn't be accessed
         // anyway.
         TextureParameterDictionary texDict(&texture.parameters, nullptr);
-        return FloatTexture::Create(texture.texName, renderFromTexture,
-                                    texDict, &texture.loc, alloc,
-                                    Options->useGPU);
+        return FloatTexture::Create(texture.texName, renderFromTexture, texDict,
+                                    &texture.loc, alloc, Options->useGPU);
     };
     LOG_VERBOSE("Async enqueue float for file %s", filename);
     floatTextureFutures[name] = RunAsync(create, texture);
@@ -892,8 +888,8 @@ void ParsedScene::AddSpectrumTexture(std::string name, TextureSceneEntity textur
     std::lock_guard<std::mutex> lock(textureMutex);
 
     if (texture.texName != "imagemap" && texture.texName != "ptex") {
-        serialSpectrumTextures.push_back(std::make_pair(std::move(name),
-                                                        std::move(texture)));
+        serialSpectrumTextures.push_back(
+            std::make_pair(std::move(name), std::move(texture)));
         return;
     }
 
@@ -910,10 +906,9 @@ void ParsedScene::AddSpectrumTexture(std::string name, TextureSceneEntity textur
         return;
     }
 
-    if (loadingTextureFilenames.find(filename) !=
-        loadingTextureFilenames.end()) {
-        serialSpectrumTextures.push_back(std::make_pair(std::move(name),
-                                                     std::move(texture)));
+    if (loadingTextureFilenames.find(filename) != loadingTextureFilenames.end()) {
+        serialSpectrumTextures.push_back(
+            std::make_pair(std::move(name), std::move(texture)));
         return;
     }
     loadingTextureFilenames.insert(filename);
@@ -1132,10 +1127,9 @@ NamedTextures ParsedScene::CreateTextures() {
         TextureParameterDictionary texDict(&tex.second.parameters, nullptr);
 
         // These should be fast since they should hit the texture cache
-        SpectrumTexture unboundedTex =
-            SpectrumTexture::Create(tex.second.texName, renderFromTexture, texDict,
-                                    SpectrumType::Unbounded, &tex.second.loc, alloc,
-                                    Options->useGPU);
+        SpectrumTexture unboundedTex = SpectrumTexture::Create(
+            tex.second.texName, renderFromTexture, texDict, SpectrumType::Unbounded,
+            &tex.second.loc, alloc, Options->useGPU);
         SpectrumTexture illumTex = SpectrumTexture::Create(
             tex.second.texName, renderFromTexture, texDict, SpectrumType::Illuminant,
             &tex.second.loc, alloc, Options->useGPU);
@@ -1150,9 +1144,9 @@ NamedTextures ParsedScene::CreateTextures() {
 
         pbrt::Transform renderFromTexture = tex.second.renderFromObject.startTransform;
         TextureParameterDictionary texDict(&tex.second.parameters, &textures);
-        FloatTexture t = FloatTexture::Create(tex.second.texName, renderFromTexture,
-                                              texDict, &tex.second.loc, alloc,
-                                              Options->useGPU);
+        FloatTexture t =
+            FloatTexture::Create(tex.second.texName, renderFromTexture, texDict,
+                                 &tex.second.loc, alloc, Options->useGPU);
         textures.floatTextures[tex.first] = t;
     }
 
@@ -1165,14 +1159,12 @@ NamedTextures ParsedScene::CreateTextures() {
 
         pbrt::Transform renderFromTexture = tex.second.renderFromObject.startTransform;
         TextureParameterDictionary texDict(&tex.second.parameters, &textures);
-        SpectrumTexture albedoTex =
-            SpectrumTexture::Create(tex.second.texName, renderFromTexture, texDict,
-                                    SpectrumType::Albedo, &tex.second.loc, alloc,
-                                    Options->useGPU);
-        SpectrumTexture unboundedTex =
-            SpectrumTexture::Create(tex.second.texName, renderFromTexture, texDict,
-                                    SpectrumType::Unbounded, &tex.second.loc, alloc,
-                                    Options->useGPU);
+        SpectrumTexture albedoTex = SpectrumTexture::Create(
+            tex.second.texName, renderFromTexture, texDict, SpectrumType::Albedo,
+            &tex.second.loc, alloc, Options->useGPU);
+        SpectrumTexture unboundedTex = SpectrumTexture::Create(
+            tex.second.texName, renderFromTexture, texDict, SpectrumType::Unbounded,
+            &tex.second.loc, alloc, Options->useGPU);
         SpectrumTexture illumTex = SpectrumTexture::Create(
             tex.second.texName, renderFromTexture, texDict, SpectrumType::Illuminant,
             &tex.second.loc, alloc, Options->useGPU);
@@ -1194,6 +1186,7 @@ std::map<std::string, Medium> ParsedScene::CreateMedia() {
         CHECK(mediaMap.find(m.first) == mediaMap.end());
         mediaMap[m.first] = m.second.Get();
     }
+
     mediaFutures.clear();
     LOG_VERBOSE("Consume media futures finished");
 
@@ -1240,7 +1233,6 @@ std::vector<Light> ParsedScene::CreateLights(
 
     LOG_VERBOSE("Starting non-future lights");
     std::vector<Light> lights;
-
     // Lights with media (punted in AddLight() earlier.)
     for (const auto &light : lightsWithMedia) {
         Medium outsideMedium = findMedium(light.medium, &light.loc);
@@ -1303,6 +1295,7 @@ std::vector<Light> ParsedScene::CreateLights(
 
         (*shapeIndexToAreaLights)[i] = shapeLights;
     }
+
     LOG_VERBOSE("Finished non-future lights");
 
     LOG_VERBOSE("Starting to consume non-area light futures");

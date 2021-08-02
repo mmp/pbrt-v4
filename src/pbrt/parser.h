@@ -198,6 +198,7 @@ class Tokenizer {
     std::string sEscaped;
 };
 
+// FormattingParserTarget Definition
 class FormattingParserTarget : public ParserTarget {
   public:
     FormattingParserTarget(bool toPly, bool upgrade) : toPly(toPly), upgrade(upgrade) {}

@@ -150,6 +150,7 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
     LOG_VERBOSE("Starting to create lights");
     pstd::vector<Light> allLights;
     std::map<int, pstd::vector<Light> *> shapeIndexToAreaLights;
+
     infiniteLights = alloc.new_object<pstd::vector<Light>>(alloc);
 
     for (Light l : scene.CreateLights(textures, &shapeIndexToAreaLights)) {
