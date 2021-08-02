@@ -447,3 +447,51 @@ TEST(Triangle, BadCases) {
 
     EXPECT_FALSE(tris[0].Intersect(ray).has_value());
 }
+
+#if 0
+TEST(BilinearPatch, Offset) {
+    RNG rng;
+    for (int i = 0; i < 100; ++i) {
+        Float height = -400 + 800 * rng.Uniform<Float>();
+        Float x0 = -400 + 800 * rng.Uniform<Float>();
+        Float x1 = x0 + 400  * rng.Uniform<Float>();
+        Float z0 = -400 + 800 * rng.Uniform<Float>();
+        Float z1 = x0 + 400  * rng.Uniform<Float>();
+        std::vector<Point3f> p{ Point3f(x0, height, z0), Point3f(x1, height, z0),
+                                Point3f(x0, height, x1), Point3f(x1, height, z1) };
+        std::vector<int> indices{ 0, 1, 2, 3 };
+
+        BilinearPatchMesh mesh(Transform(), false, indices, p,
+                               std::vector<Normal3f>(), std::vector<Point2f>(),
+                               std::vector<int>(), nullptr);
+        for (int j = 0; j < 100; ++j) {
+            Point3f o(-20 + 40 * rng.Uniform<Float>(),
+                      -20 + 40 * rng.Uniform<Float>(),
+                      -20 + 40 * rng.Uniform<Float>());
+
+            Point2f uv(rng.Uniform<Float>(), rng.Uniform<Float>());
+            Point3f pPatch = ((1-uv[0]) * (1-uv[1]) * p[0] +
+                              uv[0] * (1-uv[1]) * p[1] +
+                              (1-uv[0]) * uv[1] * p[2] +
+                              uv[0] * uv[1] * p[3]);
+            Ray r(o, pPatch - o);
+            auto isect = IntersectBilinearPatch(r, Infinity, p[0], p[1], p[2], p[3]);
+            if (!isect) {
+                printf("wow\n");
+                continue;
+            }
+
+            SurfaceInteraction intr =
+                BilinearPatch::InteractionFromIntersection(&mesh, 0, isect->uv,
+                                                           0.f, -r.d);
+
+            Ray spawned = intr.SpawnRay(r.d);
+            auto spawnedIsect = IntersectBilinearPatch(spawned, Infinity,
+                                                       p[0], p[1], p[2], p[3]);
+            if (spawnedIsect)
+                printf("doh!\n");
+            EXPECT_FALSE(spawnedIsect.has_value());
+        }
+    }
+}
+#endif
