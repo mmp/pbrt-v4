@@ -508,7 +508,7 @@ extern "C" __global__ void __raygen__randomHit() {
         PBRT_DBG("optix si p %f %f %f n %f %f %f\n", si.p().x, si.p().y, si.p().z, si.n.x,
             si.n.y, si.n.z);
 
-        params.subsurfaceScatterQueue->reservoirPDF[index] = payload.wrs.SamplePDF();
+        params.subsurfaceScatterQueue->reservoirPDF[index] = payload.wrs.SampleProbability();
         params.subsurfaceScatterQueue->ssi[index] = payload.wrs.GetSample();
     } else
         params.subsurfaceScatterQueue->reservoirPDF[index] = 0;
