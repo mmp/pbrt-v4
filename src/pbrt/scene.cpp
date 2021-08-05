@@ -757,7 +757,7 @@ ParsedScene::ParsedScene()
     : threadAllocators([]() {
           pstd::pmr::memory_resource *baseResource = pstd::pmr::get_default_resource();
 #ifdef PBRT_BUILD_GPU_RENDERER
-          if (options.useGPU)
+          if (Options->useGPU)
               baseResource = &CUDATrackedMemoryResource::singleton;
 #endif
           pstd::pmr::monotonic_buffer_resource *resource =
