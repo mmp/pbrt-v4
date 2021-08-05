@@ -125,7 +125,7 @@ class SphericalMapping2D {
   private:
     // SphericalMapping2D Private Methods
     PBRT_CPU_GPU
-    Point2f Sphere(const Point3f &p) const {
+    Point2f Sphere(Point3f p) const {
         Vector3f vec = Normalize(textureFromRender(p) - Point3f(0, 0, 0));
         Float theta = SphericalTheta(vec), phi = SphericalPhi(vec);
         return {theta * InvPi, phi * Inv2Pi};
@@ -167,7 +167,7 @@ class CylindricalMapping2D {
   private:
     // CylindricalMapping2D Private Methods
     PBRT_CPU_GPU
-    Point2f Cylinder(const Point3f &p) const {
+    Point2f Cylinder(Point3f p) const {
         Vector3f vec = textureFromRender(p) - Point3f(0, 0, 0);
         return Point2f((Pi + std::atan2(vec.y, vec.x)) * Inv2Pi, vec.z);
     }

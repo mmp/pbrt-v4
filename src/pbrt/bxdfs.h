@@ -690,7 +690,7 @@ class LayeredBxDF {
 
     PBRT_CPU_GPU
     pstd::optional<BSDFSample> Sample_f(
-        Vector3f wo, Float uc, const Point2f &u, TransportMode mode,
+        Vector3f wo, Float uc, Point2f u, TransportMode mode,
         BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
         CHECK(sampleFlags == BxDFReflTransFlags::All);  // for now
         // Set _wo_ for layered BSDF sampling
@@ -1111,8 +1111,8 @@ class NormalizedFresnelBxDF {
     NormalizedFresnelBxDF(Float eta) : eta(eta) {}
 
     PBRT_CPU_GPU
-    BSDFSample Sample_f(const Vector3f &wo, Float uc, const Point2f &u,
-                        TransportMode mode, BxDFReflTransFlags sampleFlags) const {
+    BSDFSample Sample_f(Vector3f wo, Float uc, Point2f u, TransportMode mode,
+                        BxDFReflTransFlags sampleFlags) const {
         if (!(sampleFlags & BxDFReflTransFlags::Reflection))
             return {};
 
@@ -1125,7 +1125,7 @@ class NormalizedFresnelBxDF {
     }
 
     PBRT_CPU_GPU
-    Float PDF(const Vector3f &wo, const Vector3f &wi, TransportMode mode,
+    Float PDF(Vector3f wo, Vector3f wi, TransportMode mode,
               BxDFReflTransFlags sampleFlags) const {
         if (!(sampleFlags & BxDFReflTransFlags::Reflection))
             return 0;
@@ -1146,7 +1146,7 @@ class NormalizedFresnelBxDF {
     }
 
     PBRT_CPU_GPU
-    SampledSpectrum f(const Vector3f &wo, const Vector3f &wi, TransportMode mode) const {
+    SampledSpectrum f(Vector3f wo, Vector3f wi, TransportMode mode) const {
         if (!SameHemisphere(wo, wi))
             return SampledSpectrum(0.f);
         // Compute $\Sw$ factor for BSSRDF value

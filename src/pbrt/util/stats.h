@@ -20,17 +20,16 @@ class StatRegisterer {
   public:
     // StatRegisterer Public Methods
     using AccumFunc = void (*)(StatsAccumulator &);
-    using PixelAccumFunc = void (*)(const Point2i &p, int counterIndex,
-                                    PixelStatsAccumulator &);
+    using PixelAccumFunc = void (*)(Point2i p, int counterIndex, PixelStatsAccumulator &);
     StatRegisterer(AccumFunc func, PixelAccumFunc = {});
 
     static void CallCallbacks(StatsAccumulator &accum);
-    static void CallPixelCallbacks(const Point2i &p, PixelStatsAccumulator &accum);
+    static void CallPixelCallbacks(Point2i p, PixelStatsAccumulator &accum);
 };
 
 void StatsEnablePixelStats(const Bounds2i &b, const std::string &baseName);
-void StatsReportPixelStart(const Point2i &p);
-void StatsReportPixelEnd(const Point2i &p);
+void StatsReportPixelStart(Point2i p);
+void StatsReportPixelEnd(Point2i p);
 
 void PrintStats(FILE *dest);
 void StatsWritePixelImages();
@@ -74,9 +73,9 @@ class PixelStatsAccumulator {
   public:
     PixelStatsAccumulator();
 
-    void ReportPixelMS(const Point2i &p, float ms);
-    void ReportCounter(const Point2i &p, int counterIndex, const char *name, int64_t val);
-    void ReportRatio(const Point2i &p, int counterIndex, const char *name, int64_t num,
+    void ReportPixelMS(Point2i p, float ms);
+    void ReportCounter(Point2i p, int counterIndex, const char *name, int64_t val);
+    void ReportRatio(Point2i p, int counterIndex, const char *name, int64_t num,
                      int64_t denom);
 
   private:
@@ -93,19 +92,19 @@ class PixelStatsAccumulator {
         var = 0;                                                       \
     });
 
-#define STAT_PIXEL_COUNTER(title, var)                                         \
-    static thread_local int64_t var, var##Sum;                                 \
-    static StatRegisterer STATS_REG##var(                                      \
-        [](StatsAccumulator &accum) {                                          \
-            /* report sum, since if disabled, it all just goes into var... */  \
-            accum.ReportCounter(title, var + var##Sum);                        \
-            var##Sum = 0;                                                      \
-            var = 0;                                                           \
-        },                                                                     \
-        [](const Point2i &p, int counterIndex, PixelStatsAccumulator &accum) { \
-            accum.ReportCounter(p, counterIndex, title, var);                  \
-            var##Sum += var;                                                   \
-            var = 0;                                                           \
+#define STAT_PIXEL_COUNTER(title, var)                                        \
+    static thread_local int64_t var, var##Sum;                                \
+    static StatRegisterer STATS_REG##var(                                     \
+        [](StatsAccumulator &accum) {                                         \
+            /* report sum, since if disabled, it all just goes into var... */ \
+            accum.ReportCounter(title, var + var##Sum);                       \
+            var##Sum = 0;                                                     \
+            var = 0;                                                          \
+        },                                                                    \
+        [](Point2i p, int counterIndex, PixelStatsAccumulator &accum) {       \
+            accum.ReportCounter(p, counterIndex, title, var);                 \
+            var##Sum += var;                                                  \
+            var = 0;                                                          \
         });
 
 #define STAT_MEMORY_COUNTER(title, var)                                \
@@ -179,7 +178,7 @@ struct StatIntDistribution {
             denomVar = 0;                                                             \
             denomVar##Sum = 0;                                                        \
         },                                                                            \
-        [](const Point2i &p, int counterIndex, PixelStatsAccumulator &accum) {        \
+        [](Point2i p, int counterIndex, PixelStatsAccumulator &accum) {               \
             accum.ReportRatio(p, counterIndex, title, numVar, denomVar);              \
             numVar##Sum += numVar;                                                    \
             denomVar##Sum += denomVar;                                                \

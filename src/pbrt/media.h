@@ -631,7 +631,7 @@ class NanoVDBMediumProvider {
     bool IsEmissive() const { return temperatureFloatGrid && LeScale > 0; }
 
     PBRT_CPU_GPU
-    SampledSpectrum Le(const Point3f &p, const SampledWavelengths &lambda) const {
+    SampledSpectrum Le(Point3f p, const SampledWavelengths &lambda) const {
         if (!temperatureFloatGrid)
             return SampledSpectrum(0.f);
         nanovdb::Vec3<float> pIndex =
@@ -708,7 +708,7 @@ class NanoVDBMediumProvider {
     }
 
     PBRT_CPU_GPU
-    MediumDensity Density(const Point3f &p, const SampledWavelengths &lambda) const {
+    MediumDensity Density(Point3f p, const SampledWavelengths &lambda) const {
         nanovdb::Vec3<float> pIndex =
             densityFloatGrid->worldToIndexF(nanovdb::Vec3<float>(p.x, p.y, p.z));
         using Sampler = nanovdb::SampleFromVoxels<nanovdb::FloatGrid::TreeType, 1, false>;

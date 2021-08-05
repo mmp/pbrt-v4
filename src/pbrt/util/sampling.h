@@ -236,8 +236,7 @@ inline Float InvertNormalSample(Float x, Float mu = 0, Float sigma = 1) {
     return 0.5f * (1 + std::erf((x - mu) / (sigma * Sqrt2)));
 }
 
-PBRT_CPU_GPU inline Point2f SampleTwoNormal(const Point2f &u, Float mu = 0,
-                                            Float sigma = 1) {
+PBRT_CPU_GPU inline Point2f SampleTwoNormal(Point2f u, Float mu = 0, Float sigma = 1) {
     Float r2 = -2 * std::log(1 - u[0]);
     return {mu + sigma * std::sqrt(r2 * std::cos(2 * Pi * u[1])),
             mu + sigma * std::sqrt(r2 * std::sin(2 * Pi * u[1]))};
@@ -452,7 +451,7 @@ inline Float InvertTrimmedExponentialSample(Float x, Float c, Float xMax) {
 }
 
 PBRT_CPU_GPU
-inline Vector3f SampleUniformHemisphereConcentric(const Point2f &u) {
+inline Vector3f SampleUniformHemisphereConcentric(Point2f u) {
     // Map uniform random numbers to $[-1,1]^2$
     Point2f uOffset = 2.f * u - Vector2f(1, 1);
 
@@ -563,7 +562,7 @@ class WeightedReservoirSampler {
     PBRT_CPU_GPU
     const T &GetSample() const { return reservoir; }
     PBRT_CPU_GPU
-    Float SamplePDF() const { return reservoirWeight / weightSum; }
+    Float SampleProbability() const { return reservoirWeight / weightSum; }
     PBRT_CPU_GPU
     Float WeightSum() const { return weightSum; }
 
@@ -643,7 +642,7 @@ class PiecewiseConstant1D {
     PBRT_CPU_GPU
     Float Integral() const { return funcInt; }
     PBRT_CPU_GPU
-    size_t Size() const { return func.size(); }
+    size_t size() const { return func.size(); }
 
     PBRT_CPU_GPU
     Float Sample(Float u, Float *pdf = nullptr, int *offset = nullptr) const {
@@ -663,7 +662,7 @@ class PiecewiseConstant1D {
             *pdf = (funcInt > 0) ? func[o] / funcInt : 0;
 
         // Return $x$ corresponding to sample
-        return Lerp((o + du) / Size(), min, max);
+        return Lerp((o + du) / size(), min, max);
     }
 
     PBRT_CPU_GPU
@@ -715,7 +714,7 @@ class PiecewiseConstant2D {
 
     PBRT_CPU_GPU
     Point2i Resolution() const {
-        return {int(pConditionalV[0].Size()), int(pMarginal.Size())};
+        return {int(pConditionalV[0].size()), int(pMarginal.size())};
     }
 
     std::string ToString() const {
@@ -765,13 +764,13 @@ class PiecewiseConstant2D {
     Float PDF(Point2f pr) const {
         Point2f p = Point2f(domain.Offset(pr));
         int iu =
-            Clamp(int(p[0] * pConditionalV[0].Size()), 0, pConditionalV[0].Size() - 1);
-        int iv = Clamp(int(p[1] * pMarginal.Size()), 0, pMarginal.Size() - 1);
+            Clamp(int(p[0] * pConditionalV[0].size()), 0, pConditionalV[0].size() - 1);
+        int iv = Clamp(int(p[1] * pMarginal.size()), 0, pMarginal.size() - 1);
         return pConditionalV[iv].func[iu] / pMarginal.Integral();
     }
 
     PBRT_CPU_GPU
-    pstd::optional<Point2f> Invert(const Point2f &p) const {
+    pstd::optional<Point2f> Invert(Point2f p) const {
         pstd::optional<Float> mInv = pMarginal.Invert(p[1]);
         if (!mInv)
             return {};
@@ -892,12 +891,10 @@ class WindowedPiecewiseConstant2D {
         : sat(f, alloc), func(f, alloc) {}
 
     PBRT_CPU_GPU
-    Point2f Sample(Point2f u, Bounds2f b, Float *pdf) const {
+    pstd::optional<Point2f> Sample(Point2f u, Bounds2f b, Float *pdf) const {
         // Handle zero-valued function for windowed sampling
-        if (sat.Integral(b) == 0) {
-            *pdf = 0;
+        if (sat.Integral(b) == 0)
             return {};
-        }
 
         // Define lambda function _Px_ for marginal cumulative distribution
         Float bInt = sat.Integral(b);
@@ -918,10 +915,8 @@ class WindowedPiecewiseConstant2D {
                        Point2f(pstd::ceil(p.x * nx) / nx, b.pMax.y));
         if (bCond.pMin.x == bCond.pMax.x)
             bCond.pMax.x += 1.f / nx;
-        if (sat.Integral(bCond) == 0) {
-            *pdf = 0;
+        if (sat.Integral(bCond) == 0)
             return {};
-        }
 
         // Define lambda function for conditional distribution and sample $y$
         Float condIntegral = sat.Integral(bCond);

@@ -16,7 +16,7 @@ namespace pbrt {
 // SampledLight Definition
 struct SampledLight {
     Light light;
-    Float pdf = 0;
+    Float p = 0;
     std::string ToString() const;
 };
 
@@ -40,10 +40,10 @@ class LightSampler : public TaggedPointer<UniformLightSampler, PowerLightSampler
     PBRT_CPU_GPU inline pstd::optional<SampledLight> Sample(const LightSampleContext &ctx,
                                                             Float u) const;
 
-    PBRT_CPU_GPU inline Float PDF(const LightSampleContext &ctx, Light light) const;
+    PBRT_CPU_GPU inline Float PMF(const LightSampleContext &ctx, Light light) const;
 
     PBRT_CPU_GPU inline pstd::optional<SampledLight> Sample(Float u) const;
-    PBRT_CPU_GPU inline Float PDF(Light light) const;
+    PBRT_CPU_GPU inline Float PMF(Light light) const;
 };
 
 }  // namespace pbrt

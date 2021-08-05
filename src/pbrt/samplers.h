@@ -654,7 +654,7 @@ class MLTSampler {
     int SamplesPerPixel() const { return mutationsPerPixel; }
 
     PBRT_CPU_GPU
-    void StartPixelSample(const Point2i &p, int sampleIndex, int dim) {
+    void StartPixelSample(Point2i p, int sampleIndex, int dim) {
         rng.SetSequence(Hash(p));
         rng.Advance(sampleIndex * 65536 + dim * 8192);
     }

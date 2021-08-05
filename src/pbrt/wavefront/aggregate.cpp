@@ -104,7 +104,7 @@ void CPUAggregate::IntersectOneRandom(
         }
 
         if (wrs.HasSample()) {
-            subsurfaceScatterQueue->reservoirPDF[index] = wrs.SamplePDF();
+            subsurfaceScatterQueue->reservoirPDF[index] = wrs.SampleProbability();
             subsurfaceScatterQueue->ssi[index] = wrs.GetSample();
         } else
             subsurfaceScatterQueue->reservoirPDF[index] = 0;

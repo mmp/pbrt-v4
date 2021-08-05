@@ -57,7 +57,7 @@ TEST(BVHLightSampling, OneSpot) {
         } else
             EXPECT_TRUE((bool)ls);
 
-        EXPECT_EQ(1, sampledLight->pdf);
+        EXPECT_EQ(1, sampledLight->p);
         EXPECT_TRUE(sampledLight->light == lights[0]);
         EXPECT_TRUE((bool)ls->L) << ls->L << " @ " << p;
     }
@@ -96,11 +96,11 @@ TEST(BVHLightSampling, Point) {
             // Can assume this because it's all point lights
             ASSERT_TRUE((bool)sampledLight);
 
-            EXPECT_GT(sampledLight->pdf, 0);
+            EXPECT_GT(sampledLight->p, 0);
             sumWt[lightToIndex[sampledLight->light]] +=
-                1 / (sampledLight->pdf * nSamples);
+                1 / (sampledLight->p * nSamples);
 
-            EXPECT_FLOAT_EQ(sampledLight->pdf, distrib.PDF(intr, sampledLight->light));
+            EXPECT_FLOAT_EQ(sampledLight->p, distrib.PMF(intr, sampledLight->light));
         }
 
         for (int i = 0; i < lights.size(); ++i) {
@@ -148,11 +148,11 @@ TEST(BVHLightSampling, PointVaryPower) {
             ASSERT_TRUE((bool)sampledLight);
 
             Light light = sampledLight->light;
-            Float pdf = sampledLight->pdf;
+            Float pdf = sampledLight->p;
             EXPECT_GT(pdf, 0);
             sumWt[lightToIndex[light]] += 1 / (pdf * nSamples);
 
-            EXPECT_LT(std::abs(distrib.PDF(intr, light) - pdf) / pdf, 1e-4);
+            EXPECT_LT(std::abs(distrib.PMF(intr, light) - pdf) / pdf, 1e-4);
         }
 
         for (int i = 0; i < lights.size(); ++i) {
@@ -179,11 +179,11 @@ TEST(BVHLightSampling, PointVaryPower) {
             pstd::optional<SampledLight> sampledLight = distrib.Sample(intr, u);
             ASSERT_TRUE((bool)sampledLight);
             Light light = sampledLight->light;
-            Float pdf = sampledLight->pdf;
+            Float pdf = sampledLight->p;
             EXPECT_GT(pdf, 0);
             ++counts[lightToIndex[light]];
 
-            EXPECT_FLOAT_EQ(pdf, distrib.PDF(intr, light));
+            EXPECT_FLOAT_EQ(pdf, distrib.PMF(intr, light));
         }
 
         for (int i = 0; i < lights.size(); ++i) {
@@ -295,7 +295,7 @@ TEST(BVHLightSampling, PdfMethod) {
             // It's actually legit to sometimes get no lights; as the bounds
             // tighten up as we get deeper in the tree, it may turn out that
             // the path we followed didn't have any lights after all.
-            EXPECT_FLOAT_EQ(sampledLight->pdf, distrib.PDF(intr, sampledLight->light));
+            EXPECT_FLOAT_EQ(sampledLight->p, distrib.PMF(intr, sampledLight->light));
     }
 }
 
@@ -314,7 +314,7 @@ TEST(ExhaustiveLightSampling, PdfMethod) {
         pstd::optional<SampledLight> sampledLight =
             distrib.Sample(intr, rng.Uniform<Float>());
         ASSERT_TRUE((bool)sampledLight) << i << " - " << p;
-        EXPECT_FLOAT_EQ(sampledLight->pdf, distrib.PDF(intr, sampledLight->light));
+        EXPECT_FLOAT_EQ(sampledLight->p, distrib.PMF(intr, sampledLight->light));
     }
 }
 
@@ -333,7 +333,7 @@ TEST(UniformLightSampling, PdfMethod) {
         pstd::optional<SampledLight> sampledLight =
             distrib.Sample(intr, rng.Uniform<Float>());
         ASSERT_TRUE((bool)sampledLight) << i << " - " << p;
-        EXPECT_FLOAT_EQ(sampledLight->pdf, distrib.PDF(intr, sampledLight->light));
+        EXPECT_FLOAT_EQ(sampledLight->p, distrib.PMF(intr, sampledLight->light));
     }
 }
 
@@ -352,6 +352,6 @@ TEST(PowerLightSampling, PdfMethod) {
         pstd::optional<SampledLight> sampledLight =
             distrib.Sample(intr, rng.Uniform<Float>());
         ASSERT_TRUE((bool)sampledLight) << i << " - " << p;
-        EXPECT_FLOAT_EQ(sampledLight->pdf, distrib.PDF(intr, sampledLight->light));
+        EXPECT_FLOAT_EQ(sampledLight->p, distrib.PMF(intr, sampledLight->light));
     }
 }

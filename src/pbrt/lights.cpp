@@ -721,7 +721,7 @@ DiffuseAreaLight::DiffuseAreaLight(const Transform &renderFromLight,
     // Warn if light has transformation with non-uniform scale, though not
     // for Triangles or bilinear patches, since this doesn't matter for them.
     if (renderFromLight.HasScale() && !shape.Is<Triangle>() && !shape.Is<BilinearPatch>())
-        Warning("Scaling detected in world to light transformation! "
+        Warning("Scaling detected in rendering to light space transformation! "
                 "The system has numerous assumptions, implicit and explicit, "
                 "that this transform will have no scale factors in it. "
                 "Proceed at your own risk; your image may have errors.");
@@ -1070,8 +1070,10 @@ pstd::optional<LightLeSample> ImageInfiniteLight::SampleLe(Point2f u1, Point2f u
                                                            Float time) const {
     // Sample infinite light image and compute ray direction _w_
     Float mapPDF;
-    Point2f uv = distribution.Sample(u1, &mapPDF);
-    Vector3f wLight = EqualAreaSquareToSphere(uv);
+    pstd::optional<Point2f> uv = distribution.Sample(u1, &mapPDF);
+    if (!uv)
+        return {};
+    Vector3f wLight = EqualAreaSquareToSphere(*uv);
     Vector3f w = -renderFromLight(wLight);
 
     // Compute infinite light sample ray
@@ -1084,7 +1086,7 @@ pstd::optional<LightLeSample> ImageInfiniteLight::SampleLe(Point2f u1, Point2f u
     Float pdfDir = mapPDF / (4 * Pi);
     Float pdfPos = 1 / (Pi * Sqr(sceneRadius));
 
-    return LightLeSample(ImageLe(uv, lambda), ray, pdfPos, pdfDir);
+    return LightLeSample(ImageLe(*uv, lambda), ray, pdfPos, pdfDir);
 }
 
 void ImageInfiniteLight::PDF_Le(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
@@ -1224,20 +1226,20 @@ pstd::optional<LightLiSample> PortalImageInfiniteLight::SampleLi(
     if (!b)
         return {};
     Float mapPDF;
-    Point2f uv = distribution.Sample(u, *b, &mapPDF);
-    if (mapPDF == 0)
+    pstd::optional<Point2f> uv = distribution.Sample(u, *b, &mapPDF);
+    if (!uv)
         return {};
 
     // Convert portal image sample point to direction and compute PDF
     Float duv_dw;
-    Vector3f wi = RenderFromImage(uv, &duv_dw);
+    Vector3f wi = RenderFromImage(*uv, &duv_dw);
     if (duv_dw == 0)
         return {};
     Float pdf = mapPDF / duv_dw;
     CHECK(!IsInf(pdf));
 
     // Compute radiance for portal light sample and return _LightLiSample_
-    SampledSpectrum L = ImageLookup(uv, lambda);
+    SampledSpectrum L = ImageLookup(*uv, lambda);
     Point3f pl = ctx.p() + 2 * sceneRadius * wi;
     return LightLiSample(L, wi, pdf, Interaction(pl, &mediumInterface));
 }
@@ -1262,15 +1264,15 @@ pstd::optional<LightLeSample> PortalImageInfiniteLight::SampleLe(
     Point2f u1, Point2f u2, SampledWavelengths &lambda, Float time) const {
     Float mapPDF;
     Bounds2f b(Point2f(0, 0), Point2f(1, 1));
-    Point2f uv = distribution.Sample(u1, b, &mapPDF);
-    if (mapPDF == 0)
+    pstd::optional<Point2f> uv = distribution.Sample(u1, b, &mapPDF);
+    if (!uv)
         return {};
 
     // Convert infinite light sample point to direction
     // Note: ignore WorldToLight since we already folded it in when we
     // resampled...
     Float duv_dw;
-    Vector3f w = -RenderFromImage(uv, &duv_dw);
+    Vector3f w = -RenderFromImage(*uv, &duv_dw);
     if (duv_dw == 0)
         return {};
 
@@ -1298,7 +1300,7 @@ pstd::optional<LightLeSample> PortalImageInfiniteLight::SampleLe(
     Float pdfPos = 1 / (Pi * Sqr(sceneRadius));
 #endif
 
-    SampledSpectrum L = ImageLookup(uv, lambda);
+    SampledSpectrum L = ImageLookup(*uv, lambda);
 
     return LightLeSample(L, ray, pdfPos, pdfDir);
 }
@@ -1433,7 +1435,7 @@ SpotLight *SpotLight::Create(const Transform &renderFromLight, Medium medium,
 
     Float coneangle = parameters.GetOneFloat("coneangle", 30.);
     Float conedelta = parameters.GetOneFloat("conedeltaangle", 5.);
-    // Compute spotlight world to light transformation
+    // Compute spotlight rendering to light transformation
     Point3f from = parameters.GetOnePoint3f("from", Point3f(0, 0, 0));
     Point3f to = parameters.GetOnePoint3f("to", Point3f(0, 0, 1));
 

@@ -215,12 +215,12 @@ TEST(Sobol, IntervalToIndexRandoms) {
 
 TEST(PiecewiseConstant1D, Continuous) {
     PiecewiseConstant1D dist({1.f, 1.f, 2.f, 4.f, 8.f});
-    EXPECT_EQ(5, dist.Size());
+    EXPECT_EQ(5, dist.size());
 
     Float pdf;
     int offset;
     EXPECT_EQ(0., dist.Sample(0., &pdf, &offset));
-    EXPECT_FLOAT_EQ(dist.Size() * 1. / 16., pdf);
+    EXPECT_FLOAT_EQ(dist.size() * 1. / 16., pdf);
     EXPECT_EQ(0, offset);
 
     // Right at the boundary between the 4 and the 8 segments.
@@ -228,7 +228,7 @@ TEST(PiecewiseConstant1D, Continuous) {
 
     // Middle of the 8 segment
     EXPECT_FLOAT_EQ(.9, dist.Sample(0.75, &pdf, &offset));
-    EXPECT_FLOAT_EQ(dist.Size() * 8. / 16., pdf);
+    EXPECT_FLOAT_EQ(dist.size() * 8. / 16., pdf);
     EXPECT_EQ(4, offset);
 
     EXPECT_FLOAT_EQ(0., dist.Sample(0., &pdf));

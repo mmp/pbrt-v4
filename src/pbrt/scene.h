@@ -309,7 +309,7 @@ class SceneProcessor {
 // ParsedScene Definition
 class ParsedScene : public SceneProcessor {
   public:
-    ParsedScene(ThreadLocal<Allocator> &threadAllocators);
+    ParsedScene();
 
     void SetFilm(SceneEntity film);
     void SetSampler(SceneEntity sampler);
@@ -368,7 +368,7 @@ class ParsedScene : public SceneProcessor {
   private:
     void startLoadingNormalMaps(const ParameterDictionary &parameters);
 
-    ThreadLocal<Allocator> &threadAllocators;
+    ThreadLocal<Allocator> threadAllocators;
 
     std::mutex mediaMutex;
     std::map<std::string, Future<Medium>> mediaFutures;

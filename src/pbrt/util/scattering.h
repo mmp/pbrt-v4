@@ -16,7 +16,7 @@ namespace pbrt {
 
 // Scattering Inline Functions
 PBRT_CPU_GPU
-inline Vector3f Reflect(const Vector3f &wo, const Vector3f &n) {
+inline Vector3f Reflect(Vector3f wo, Vector3f n) {
     return -wo + 2 * Dot(wo, n) * n;
 }
 
@@ -112,7 +112,7 @@ class TrowbridgeReitzDistribution {
     TrowbridgeReitzDistribution(Float alpha_x, Float alpha_y)
         : alpha_x(alpha_x), alpha_y(alpha_y) {}
 
-    PBRT_CPU_GPU inline Float D(const Vector3f &wm) const {
+    PBRT_CPU_GPU inline Float D(Vector3f wm) const {
         Float tan2Theta = Tan2Theta(wm);
         if (IsInf(tan2Theta))
             return 0;
@@ -127,10 +127,10 @@ class TrowbridgeReitzDistribution {
     bool EffectivelySmooth() const { return std::max(alpha_x, alpha_y) < 1e-3f; }
 
     PBRT_CPU_GPU
-    Float G1(const Vector3f &w) const { return 1 / (1 + Lambda(w)); }
+    Float G1(Vector3f w) const { return 1 / (1 + Lambda(w)); }
 
     PBRT_CPU_GPU
-    Float Lambda(const Vector3f &w) const {
+    Float Lambda(Vector3f w) const {
         Float tan2Theta = Tan2Theta(w);
         if (IsInf(tan2Theta))
             return 0;
@@ -139,12 +139,10 @@ class TrowbridgeReitzDistribution {
     }
 
     PBRT_CPU_GPU
-    Float G(const Vector3f &wo, const Vector3f &wi) const {
-        return 1 / (1 + Lambda(wo) + Lambda(wi));
-    }
+    Float G(Vector3f wo, Vector3f wi) const { return 1 / (1 + Lambda(wo) + Lambda(wi)); }
 
     PBRT_CPU_GPU
-    Float D(const Vector3f &w, const Vector3f &wm) const {
+    Float D(Vector3f w, Vector3f wm) const {
         return D(wm) * G1(w) * std::abs(Dot(w, wm) / CosTheta(w));
     }
 

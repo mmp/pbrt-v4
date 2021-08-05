@@ -175,8 +175,7 @@ void ParameterDictionary::checkParameterTypes() {
 }
 
 // ParameterDictionary Method Definitions
-Point3f ParameterDictionary::GetOnePoint3f(const std::string &name,
-                                           const Point3f &def) const {
+Point3f ParameterDictionary::GetOnePoint3f(const std::string &name, Point3f def) const {
     return lookupSingle<ParameterType::Point3f>(name, def);
 }
 
@@ -225,23 +224,22 @@ bool ParameterDictionary::GetOneBool(const std::string &name, bool def) const {
     return lookupSingle<ParameterType::Boolean>(name, def);
 }
 
-Point2f ParameterDictionary::GetOnePoint2f(const std::string &name,
-                                           const Point2f &def) const {
+Point2f ParameterDictionary::GetOnePoint2f(const std::string &name, Point2f def) const {
     return lookupSingle<ParameterType::Point2f>(name, def);
 }
 
 Vector2f ParameterDictionary::GetOneVector2f(const std::string &name,
-                                             const Vector2f &def) const {
+                                             Vector2f def) const {
     return lookupSingle<ParameterType::Vector2f>(name, def);
 }
 
 Vector3f ParameterDictionary::GetOneVector3f(const std::string &name,
-                                             const Vector3f &def) const {
+                                             Vector3f def) const {
     return lookupSingle<ParameterType::Vector3f>(name, def);
 }
 
 Normal3f ParameterDictionary::GetOneNormal3f(const std::string &name,
-                                             const Normal3f &def) const {
+                                             Normal3f def) const {
     return lookupSingle<ParameterType::Normal3f>(name, def);
 }
 
@@ -692,27 +690,27 @@ bool TextureParameterDictionary::GetOneBool(const std::string &name, bool def) c
 }
 
 Point2f TextureParameterDictionary::GetOnePoint2f(const std::string &name,
-                                                  const Point2f &def) const {
+                                                  Point2f def) const {
     return dict->GetOnePoint2f(name, def);
 }
 
 Vector2f TextureParameterDictionary::GetOneVector2f(const std::string &name,
-                                                    const Vector2f &def) const {
+                                                    Vector2f def) const {
     return dict->GetOneVector2f(name, def);
 }
 
 Point3f TextureParameterDictionary::GetOnePoint3f(const std::string &name,
-                                                  const Point3f &def) const {
+                                                  Point3f def) const {
     return dict->GetOnePoint3f(name, def);
 }
 
 Vector3f TextureParameterDictionary::GetOneVector3f(const std::string &name,
-                                                    const Vector3f &def) const {
+                                                    Vector3f def) const {
     return dict->GetOneVector3f(name, def);
 }
 
 Normal3f TextureParameterDictionary::GetOneNormal3f(const std::string &name,
-                                                    const Normal3f &def) const {
+                                                    Normal3f def) const {
     return dict->GetOneNormal3f(name, def);
 }
 

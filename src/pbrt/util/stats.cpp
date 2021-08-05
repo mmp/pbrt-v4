@@ -55,7 +55,7 @@ void ReportThreadStats() {
     }
 }
 
-void StatsReportPixelStart(const Point2i &p) {
+void StatsReportPixelStart(Point2i p) {
     if (!pixelStatsEnabled)
         return;
     CHECK(threadStatsState.active == false);
@@ -64,7 +64,7 @@ void StatsReportPixelStart(const Point2i &p) {
     threadStatsState.start = std::chrono::steady_clock::now();
 }
 
-void StatsReportPixelEnd(const Point2i &p) {
+void StatsReportPixelEnd(Point2i p) {
     if (!pixelStatsEnabled)
         return;
 
@@ -107,7 +107,7 @@ StatRegisterer::StatRegisterer(AccumFunc func, PixelAccumFunc pfunc) {
         pixelStatFuncs->push_back(pfunc);
 }
 
-void StatRegisterer::CallPixelCallbacks(const Point2i &p, PixelStatsAccumulator &accum) {
+void StatRegisterer::CallPixelCallbacks(Point2i p, PixelStatsAccumulator &accum) {
     for (size_t i = 0; i < pixelStatFuncs->size(); ++i)
         (*pixelStatFuncs)[i](p, i, accum);
 }
@@ -126,7 +126,7 @@ PixelStatsAccumulator::PixelStatsAccumulator() {
 }
 
 // PixelStatsAccumulator Method Definitions
-void PixelStatsAccumulator::ReportPixelMS(const Point2i &p, float ms) {
+void PixelStatsAccumulator::ReportPixelMS(Point2i p, float ms) {
     Point2i res = Point2i(imageBounds.Diagonal());
     if (stats->time.Resolution() != res)
         stats->time = Image(PixelFormat::Float, res, {"ms"});
@@ -135,8 +135,8 @@ void PixelStatsAccumulator::ReportPixelMS(const Point2i &p, float ms) {
     stats->time.SetChannel(pp, 0, stats->time.GetChannel(pp, 0) + ms);
 }
 
-void PixelStatsAccumulator::ReportCounter(const Point2i &p, int statIndex,
-                                          const char *name, int64_t val) {
+void PixelStatsAccumulator::ReportCounter(Point2i p, int statIndex, const char *name,
+                                          int64_t val) {
     if (statIndex >= stats->counterImages.size()) {
         stats->counterImages.resize(statIndex + 1);
         stats->counterNames.resize(statIndex + 1);
@@ -152,7 +152,7 @@ void PixelStatsAccumulator::ReportCounter(const Point2i &p, int statIndex,
     im.SetChannel(pp, 0, im.GetChannel(pp, 0) + val);
 }
 
-void PixelStatsAccumulator::ReportRatio(const Point2i &p, int statIndex, const char *name,
+void PixelStatsAccumulator::ReportRatio(Point2i p, int statIndex, const char *name,
                                         int64_t num, int64_t denom) {
     if (statIndex >= stats->ratioImages.size()) {
         stats->ratioImages.resize(statIndex + 1);

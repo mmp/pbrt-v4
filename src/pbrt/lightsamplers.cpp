@@ -24,8 +24,8 @@
 namespace pbrt {
 
 std::string SampledLight::ToString() const {
-    return StringPrintf("[ SampledLight light: %s pdf: %f ]",
-                        light ? light.ToString().c_str() : "(nullptr)", pdf);
+    return StringPrintf("[ SampledLight light: %s p: %f ]",
+                        light ? light.ToString().c_str() : "(nullptr)", p);
 }
 
 std::string CompactLightBounds::ToString() const {
@@ -285,12 +285,12 @@ pstd::optional<SampledLight> ExhaustiveLightSampler::Sample(const LightSampleCon
         if (!wrs.HasSample())
             return {};
 
-        Float pdf = (1.f - pInfinite) * wrs.SamplePDF();
+        Float pdf = (1.f - pInfinite) * wrs.SampleProbability();
         return SampledLight{wrs.GetSample(), pdf};
     }
 }
 
-Float ExhaustiveLightSampler::PDF(const LightSampleContext &ctx, Light light) const {
+Float ExhaustiveLightSampler::PMF(const LightSampleContext &ctx, Light light) const {
     if (!lightToBoundedIndex.HasKey(light))
         return 1.f / (infiniteLights.size() + (!lightBounds.empty() ? 1 : 0));
 

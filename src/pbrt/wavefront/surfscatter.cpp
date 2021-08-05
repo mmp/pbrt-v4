@@ -297,7 +297,7 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
                     w.pixelIndex, w.depth, T_hat[0], T_hat[1], T_hat[2], T_hat[3], f[0],
                     f[1], f[2], f[3], ls->L[0], ls->L[1], ls->L[2], ls->L[3], ls->pdf);
 
-                Float lightPDF = ls->pdf * sampledLight->pdf;
+                Float lightPDF = ls->pdf * sampledLight->p;
                 // This causes uniPathPDF to be zero for the shadow ray, so that
                 // part of MIS just becomes a no-op.
                 Float bsdfPDF =

@@ -43,7 +43,7 @@ class UniformLightSampler {
     }
 
     PBRT_CPU_GPU
-    Float PDF(Light light) const {
+    Float PMF(Light light) const {
         if (lights.empty())
             return 0;
         return 1.f / lights.size();
@@ -55,7 +55,7 @@ class UniformLightSampler {
     }
 
     PBRT_CPU_GPU
-    Float PDF(const LightSampleContext &ctx, Light light) const { return PDF(light); }
+    Float PMF(const LightSampleContext &ctx, Light light) const { return PMF(light); }
 
     std::string ToString() const { return "UniformLightSampler"; }
 
@@ -80,7 +80,7 @@ class PowerLightSampler {
     }
 
     PBRT_CPU_GPU
-    Float PDF(Light light) const {
+    Float PMF(Light light) const {
         if (!aliasTable.size())
             return 0;
         return aliasTable.PMF(lightToIndex[light]);
@@ -92,7 +92,7 @@ class PowerLightSampler {
     }
 
     PBRT_CPU_GPU
-    Float PDF(const LightSampleContext &ctx, Light light) const { return PDF(light); }
+    Float PMF(const LightSampleContext &ctx, Light light) const { return PMF(light); }
 
     std::string ToString() const;
 
@@ -325,7 +325,7 @@ class BVHLightSampler {
     }
 
     PBRT_CPU_GPU
-    Float PDF(const LightSampleContext &ctx, Light light) const {
+    Float PMF(const LightSampleContext &ctx, Light light) const {
         // Handle infinite _light_ PDF computation
         if (!lightToBitTrail.HasKey(light))
             return 1.f / (infiniteLights.size() + (nodes.empty() ? 0 : 1));
@@ -371,7 +371,7 @@ class BVHLightSampler {
     }
 
     PBRT_CPU_GPU
-    Float PDF(Light light) const {
+    Float PMF(Light light) const {
         if (lights.empty())
             return 0;
         return 1.f / lights.size();
@@ -417,7 +417,7 @@ class ExhaustiveLightSampler {
     pstd::optional<SampledLight> Sample(const LightSampleContext &ctx, Float u) const;
 
     PBRT_CPU_GPU
-    Float PDF(const LightSampleContext &ctx, Light light) const;
+    Float PMF(const LightSampleContext &ctx, Light light) const;
 
     PBRT_CPU_GPU
     pstd::optional<SampledLight> Sample(Float u) const {
@@ -429,7 +429,7 @@ class ExhaustiveLightSampler {
     }
 
     PBRT_CPU_GPU
-    Float PDF(Light light) const {
+    Float PMF(Light light) const {
         if (lights.empty())
             return 0;
         return 1.f / lights.size();
@@ -449,8 +449,8 @@ inline pstd::optional<SampledLight> LightSampler::Sample(const LightSampleContex
     return Dispatch(s);
 }
 
-inline Float LightSampler::PDF(const LightSampleContext &ctx, Light light) const {
-    auto pdf = [&](auto ptr) { return ptr->PDF(ctx, light); };
+inline Float LightSampler::PMF(const LightSampleContext &ctx, Light light) const {
+    auto pdf = [&](auto ptr) { return ptr->PMF(ctx, light); };
     return Dispatch(pdf);
 }
 
@@ -459,8 +459,8 @@ inline pstd::optional<SampledLight> LightSampler::Sample(Float u) const {
     return Dispatch(sample);
 }
 
-inline Float LightSampler::PDF(Light light) const {
-    auto pdf = [&](auto ptr) { return ptr->PDF(light); };
+inline Float LightSampler::PMF(Light light) const {
+    auto pdf = [&](auto ptr) { return ptr->PMF(light); };
     return Dispatch(pdf);
 }
 

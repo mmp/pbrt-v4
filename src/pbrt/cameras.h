@@ -55,12 +55,12 @@ class CameraTransform {
     bool CameraFromRenderHasScale() const { return renderFromCamera.HasScale(); }
 
     PBRT_CPU_GPU
-    Vector3f RenderFromCamera(const Vector3f &v, Float time) const {
+    Vector3f RenderFromCamera(Vector3f v, Float time) const {
         return renderFromCamera(v, time);
     }
 
     PBRT_CPU_GPU
-    Normal3f RenderFromCamera(const Normal3f &n, Float time) const {
+    Normal3f RenderFromCamera(Normal3f n, Float time) const {
         return renderFromCamera(n, time);
     }
 
@@ -73,12 +73,12 @@ class CameraTransform {
     }
 
     PBRT_CPU_GPU
-    Vector3f CameraFromRender(const Vector3f &v, Float time) const {
+    Vector3f CameraFromRender(Vector3f v, Float time) const {
         return renderFromCamera.ApplyInverse(v, time);
     }
 
     PBRT_CPU_GPU
-    Normal3f CameraFromRender(const Normal3f &v, Float time) const {
+    Normal3f CameraFromRender(Normal3f v, Float time) const {
         return renderFromCamera.ApplyInverse(v, time);
     }
 
@@ -210,12 +210,12 @@ class CameraBase {
     }
 
     PBRT_CPU_GPU
-    Vector3f RenderFromCamera(const Vector3f &v, Float time) const {
+    Vector3f RenderFromCamera(Vector3f v, Float time) const {
         return cameraTransform.RenderFromCamera(v, time);
     }
 
     PBRT_CPU_GPU
-    Normal3f RenderFromCamera(const Normal3f &v, Float time) const {
+    Normal3f RenderFromCamera(Normal3f v, Float time) const {
         return cameraTransform.RenderFromCamera(v, time);
     }
 
@@ -225,12 +225,12 @@ class CameraBase {
     }
 
     PBRT_CPU_GPU
-    Vector3f CameraFromRender(const Vector3f &v, Float time) const {
+    Vector3f CameraFromRender(Vector3f v, Float time) const {
         return cameraTransform.CameraFromRender(v, time);
     }
 
     PBRT_CPU_GPU
-    Normal3f CameraFromRender(const Normal3f &v, Float time) const {
+    Normal3f CameraFromRender(Normal3f v, Float time) const {
         return cameraTransform.CameraFromRender(v, time);
     }
 

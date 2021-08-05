@@ -21,7 +21,7 @@ class BSDF {
     // BSDF Public Methods
     BSDF() = default;
     PBRT_CPU_GPU
-    BSDF(const Normal3f &ns, const Vector3f &dpdus, BxDF bxdf)
+    BSDF(Normal3f ns, Vector3f dpdus, BxDF bxdf)
         : bxdf(bxdf), shadingFrame(Frame::FromXZ(Normalize(dpdus), Vector3f(ns))) {}
 
     PBRT_CPU_GPU
@@ -30,9 +30,9 @@ class BSDF {
     BxDFFlags Flags() const { return bxdf.Flags(); }
 
     PBRT_CPU_GPU
-    Vector3f RenderToLocal(const Vector3f &v) const { return shadingFrame.ToLocal(v); }
+    Vector3f RenderToLocal(Vector3f v) const { return shadingFrame.ToLocal(v); }
     PBRT_CPU_GPU
-    Vector3f LocalToRender(const Vector3f &v) const { return shadingFrame.FromLocal(v); }
+    Vector3f LocalToRender(Vector3f v) const { return shadingFrame.FromLocal(v); }
 
     PBRT_CPU_GPU
     SampledSpectrum f(Vector3f woRender, Vector3f wiRender,
@@ -136,7 +136,7 @@ class BSDF {
         return bxdf.rho(u1, uc, u2);
     }
     PBRT_CPU_GPU
-    SampledSpectrum rho(const Vector3f &woRender, pstd::span<const Float> uc,
+    SampledSpectrum rho(Vector3f woRender, pstd::span<const Float> uc,
                         pstd::span<const Point2f> u) const {
         Vector3f wo = RenderToLocal(woRender);
         return bxdf.rho(wo, uc, u);

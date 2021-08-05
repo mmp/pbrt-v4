@@ -812,7 +812,7 @@ class SampledGrid {
     const_iterator end() const { return values.end(); }
 
     template <typename F>
-    PBRT_CPU_GPU auto Lookup(const Point3f &p, F convert) const {
+    PBRT_CPU_GPU auto Lookup(Point3f p, F convert) const {
         // Compute voxel coordinates and offsets for _p_
         Point3f pSamples(p.x * nx - .5f, p.y * ny - .5f, p.z * nz - .5f);
         Point3i pi = (Point3i)Floor(pSamples);
@@ -831,7 +831,7 @@ class SampledGrid {
     }
 
     PBRT_CPU_GPU
-    T Lookup(const Point3f &p) const {
+    T Lookup(Point3f p) const {
         // Compute voxel coordinates and offsets for _p_
         Point3f pSamples(p.x * nx - .5f, p.y * ny - .5f, p.z * nz - .5f);
         Point3i pi = (Point3i)Floor(pSamples);

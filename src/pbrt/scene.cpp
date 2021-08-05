@@ -753,8 +753,18 @@ void SceneStateManager::AreaLightSource(const std::string &name,
 }
 
 // ParsedScene Method Definitions
-ParsedScene::ParsedScene(ThreadLocal<Allocator> &threadAllocators)
-    : threadAllocators(threadAllocators) {}
+ParsedScene::ParsedScene()
+    : threadAllocators([]() {
+          pstd::pmr::memory_resource *baseResource = pstd::pmr::get_default_resource();
+#ifdef PBRT_BUILD_GPU_RENDERER
+          if (options.useGPU)
+              baseResource = &CUDATrackedMemoryResource::singleton;
+#endif
+          pstd::pmr::monotonic_buffer_resource *resource =
+              new pstd::pmr::monotonic_buffer_resource(1024 * 1024, baseResource);
+          return Allocator(resource);
+      }) {
+}
 
 void ParsedScene::SetFilm(SceneEntity film) {
     this->film = std::move(film);

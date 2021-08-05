@@ -204,7 +204,7 @@ BilinearPatchMesh::BilinearPatchMesh(const Transform &renderFromObject,
 
     blpBytes += sizeof(*this);
 
-    // Transform mesh vertices to world space
+    // Transform mesh vertices to rendering space
     for (Point3f &p : P)
         p = renderFromObject(p);
     p = point3BufferCache->LookupOrAdd(P, alloc);

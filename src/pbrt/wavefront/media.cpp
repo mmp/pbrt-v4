@@ -312,7 +312,7 @@ void WavefrontPathIntegrator::SampleMediumScattering(int wavefrontDepth) {
                              T_hat[2], T_hat[3]);
 
                     // Compute PDFs for direct lighting MIS calculation.
-                    Float lightPDF = ls->pdf * sampledLight->pdf;
+                    Float lightPDF = ls->pdf * sampledLight->p;
                     Float phasePDF =
                         IsDeltaLight(light.Type()) ? 0.f : w.phase->PDF(wo, wi);
                     SampledSpectrum uniPathPDF = w.uniPathPDF * phasePDF;

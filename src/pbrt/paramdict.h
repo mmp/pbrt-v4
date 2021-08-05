@@ -143,11 +143,11 @@ class ParameterDictionary {
     int GetOneInt(const std::string &name, int def) const;
     bool GetOneBool(const std::string &name, bool def) const;
 
-    Point2f GetOnePoint2f(const std::string &name, const Point2f &def) const;
-    Vector2f GetOneVector2f(const std::string &name, const Vector2f &def) const;
-    Point3f GetOnePoint3f(const std::string &name, const Point3f &def) const;
-    Vector3f GetOneVector3f(const std::string &name, const Vector3f &def) const;
-    Normal3f GetOneNormal3f(const std::string &name, const Normal3f &def) const;
+    Point2f GetOnePoint2f(const std::string &name, Point2f def) const;
+    Vector2f GetOneVector2f(const std::string &name, Vector2f def) const;
+    Point3f GetOnePoint3f(const std::string &name, Point3f def) const;
+    Vector3f GetOneVector3f(const std::string &name, Vector3f def) const;
+    Normal3f GetOneNormal3f(const std::string &name, Normal3f def) const;
     std::string GetOneString(const std::string &name, const std::string &def) const;
 
     Spectrum GetOneSpectrum(const std::string &name, Spectrum def,
@@ -212,11 +212,11 @@ class TextureParameterDictionary {
     Float GetOneFloat(const std::string &name, Float def) const;
     int GetOneInt(const std::string &name, int def) const;
     bool GetOneBool(const std::string &name, bool def) const;
-    Point2f GetOnePoint2f(const std::string &name, const Point2f &def) const;
-    Vector2f GetOneVector2f(const std::string &name, const Vector2f &def) const;
-    Point3f GetOnePoint3f(const std::string &name, const Point3f &def) const;
-    Vector3f GetOneVector3f(const std::string &name, const Vector3f &def) const;
-    Normal3f GetOneNormal3f(const std::string &name, const Normal3f &def) const;
+    Point2f GetOnePoint2f(const std::string &name, Point2f def) const;
+    Vector2f GetOneVector2f(const std::string &name, Vector2f def) const;
+    Point3f GetOnePoint3f(const std::string &name, Point3f def) const;
+    Vector3f GetOneVector3f(const std::string &name, Vector3f def) const;
+    Normal3f GetOneNormal3f(const std::string &name, Normal3f def) const;
     Spectrum GetOneSpectrum(const std::string &name, Spectrum def,
                             SpectrumType spectrumType, Allocator alloc) const;
     std::string GetOneString(const std::string &name, const std::string &def) const;
