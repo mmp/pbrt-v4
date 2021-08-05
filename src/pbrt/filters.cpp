@@ -135,10 +135,10 @@ FilterSampler::FilterSampler(Filter filter, Allocator alloc)
       f(int(32 * filter.Radius().x), int(32 * filter.Radius().y), alloc),
       distrib(alloc) {
     // Tabularize unnormalized filter function in _f_
-    for (int y = 0; y < f.ySize(); ++y)
-        for (int x = 0; x < f.xSize(); ++x) {
+    for (int y = 0; y < f.YSize(); ++y)
+        for (int x = 0; x < f.XSize(); ++x) {
             Point2f p =
-                domain.Lerp(Point2f((x + 0.5f) / f.xSize(), (y + 0.5f) / f.ySize()));
+                domain.Lerp(Point2f((x + 0.5f) / f.XSize(), (y + 0.5f) / f.YSize()));
             f(x, y) = filter.Evaluate(p);
         }
 

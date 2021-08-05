@@ -687,7 +687,7 @@ class PortalImageInfiniteLight : public LightBase {
     }
 
     PBRT_CPU_GPU
-    pstd::optional<Bounds2f> ImageBounds(const Point3f &p) const {
+    pstd::optional<Bounds2f> ImageBounds(Point3f p) const {
         pstd::optional<Point2f> p0 = ImageFromRender(Normalize(portal[0] - p));
         pstd::optional<Point2f> p1 = ImageFromRender(Normalize(portal[2] - p));
         if (!p0 || !p1)

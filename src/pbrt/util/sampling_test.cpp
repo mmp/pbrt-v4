@@ -215,12 +215,12 @@ TEST(Sobol, IntervalToIndexRandoms) {
 
 TEST(PiecewiseConstant1D, Continuous) {
     PiecewiseConstant1D dist({1.f, 1.f, 2.f, 4.f, 8.f});
-    EXPECT_EQ(5, dist.size());
+    EXPECT_EQ(5, dist.Size());
 
     Float pdf;
     int offset;
     EXPECT_EQ(0., dist.Sample(0., &pdf, &offset));
-    EXPECT_FLOAT_EQ(dist.size() * 1. / 16., pdf);
+    EXPECT_FLOAT_EQ(dist.Size() * 1. / 16., pdf);
     EXPECT_EQ(0, offset);
 
     // Right at the boundary between the 4 and the 8 segments.
@@ -228,7 +228,7 @@ TEST(PiecewiseConstant1D, Continuous) {
 
     // Middle of the 8 segment
     EXPECT_FLOAT_EQ(.9, dist.Sample(0.75, &pdf, &offset));
-    EXPECT_FLOAT_EQ(dist.size() * 8. / 16., pdf);
+    EXPECT_FLOAT_EQ(dist.Size() * 8. / 16., pdf);
     EXPECT_EQ(4, offset);
 
     EXPECT_FLOAT_EQ(0., dist.Sample(0., &pdf));
@@ -1212,8 +1212,8 @@ TEST(AliasTable, Varying) {
 TEST(SummedArea, Constant) {
     Array2D<Float> v(4, 4);
 
-    for (int y = 0; y < v.ySize(); ++y)
-        for (int x = 0; x < v.xSize(); ++x)
+    for (int y = 0; y < v.YSize(); ++y)
+        for (int x = 0; x < v.XSize(); ++x)
             v(x, y) = 1;
 
     SummedAreaTable sat(v);
@@ -1228,25 +1228,25 @@ TEST(SummedArea, Constant) {
 TEST(SummedArea, Rect) {
     Array2D<Float> v(8, 4);
 
-    for (int y = 0; y < v.ySize(); ++y)
-        for (int x = 0; x < v.xSize(); ++x)
+    for (int y = 0; y < v.YSize(); ++y)
+        for (int x = 0; x < v.XSize(); ++x)
             v(x, y) = x + y;
 
     SummedAreaTable sat(v);
 
     // All boxes that line up with boundaries exactly
-    for (int y0 = 0; y0 < v.ySize(); ++y0)
-        for (int x0 = 0; x0 < v.xSize(); ++x0)
-            for (int y1 = y0; y1 < v.ySize(); ++y1)
-                for (int x1 = x0; x1 < v.xSize(); ++x1) {
+    for (int y0 = 0; y0 < v.YSize(); ++y0)
+        for (int x0 = 0; x0 < v.XSize(); ++x0)
+            for (int y1 = y0; y1 < v.YSize(); ++y1)
+                for (int x1 = x0; x1 < v.XSize(); ++x1) {
                     Float mySum = 0;
                     for (int y = y0; y < y1; ++y)
                         for (int x = x0; x < x1; ++x)
                             mySum += v(x, y);
 
-                    Bounds2f b(Point2f(Float(x0) / v.xSize(), Float(y0) / v.ySize()),
-                               Point2f(Float(x1) / v.xSize(), Float(y1) / v.ySize()));
-                    EXPECT_EQ(mySum / (v.xSize() * v.ySize()), sat.Integral(b));
+                    Bounds2f b(Point2f(Float(x0) / v.XSize(), Float(y0) / v.YSize()),
+                               Point2f(Float(x1) / v.XSize(), Float(y1) / v.YSize()));
+                    EXPECT_EQ(mySum / (v.XSize() * v.YSize()), sat.Integral(b));
                 }
 }
 
@@ -1256,24 +1256,24 @@ TEST(SummedArea, Randoms) {
     for (const auto d : dims) {
         Array2D<Float> v(d[0], d[1]);
 
-        for (int y = 0; y < v.ySize(); ++y)
-            for (int x = 0; x < v.xSize(); ++x)
+        for (int y = 0; y < v.YSize(); ++y)
+            for (int x = 0; x < v.XSize(); ++x)
                 v(x, y) = rng.Uniform<int>(32);
 
         SummedAreaTable sat(v);
 
         for (int i = 0; i < 100; ++i) {
-            Bounds2i bi({rng.Uniform<int>(v.xSize()), rng.Uniform<int>(v.ySize())},
-                        {rng.Uniform<int>(v.xSize()), rng.Uniform<int>(v.ySize())});
-            Bounds2f bf(Point2f(Float(bi.pMin.x) / Float(v.xSize()),
-                                Float(bi.pMin.y) / Float(v.ySize())),
-                        Point2f(Float(bi.pMax.x) / Float(v.xSize()),
-                                Float(bi.pMax.y) / Float(v.ySize())));
+            Bounds2i bi({rng.Uniform<int>(v.XSize()), rng.Uniform<int>(v.YSize())},
+                        {rng.Uniform<int>(v.XSize()), rng.Uniform<int>(v.YSize())});
+            Bounds2f bf(Point2f(Float(bi.pMin.x) / Float(v.XSize()),
+                                Float(bi.pMin.y) / Float(v.YSize())),
+                        Point2f(Float(bi.pMax.x) / Float(v.XSize()),
+                                Float(bi.pMax.y) / Float(v.YSize())));
             double ref = 0;
 
             for (Point2i p : bi)
                 ref += v[p];
-            ref /= v.xSize() * v.ySize();
+            ref /= v.XSize() * v.YSize();
 
             double s = sat.Integral(bf);
             if (ref != s)
@@ -1289,8 +1289,8 @@ TEST(SummedArea, NonCellAligned) {
     for (const auto d : dims) {
         Array2D<Float> v(d[0], d[1]);
 
-        for (int y = 0; y < v.ySize(); ++y)
-            for (int x = 0; x < v.xSize(); ++x)
+        for (int y = 0; y < v.YSize(); ++y)
+            for (int x = 0; x < v.XSize(); ++x)
                 v(x, y) = rng.Uniform<int>(32);
 
         SummedAreaTable sat(v);
@@ -1302,7 +1302,7 @@ TEST(SummedArea, NonCellAligned) {
         int nSamples = 100000;
         for (Point2f u : Hammersley2D(nSamples)) {
             Point2f p = b.Lerp(u);
-            Point2i pi(p.x * v.xSize(), p.y * v.ySize());
+            Point2i pi(p.x * v.XSize(), p.y * v.YSize());
             sampledSum += v[pi];
         }
         Float sampledResult = sampledSum * b.Area() / nSamples;

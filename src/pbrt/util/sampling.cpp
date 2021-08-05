@@ -369,7 +369,7 @@ Point2f RejectionSampleDisk(RNG &rng) {
     do {
         p.x = 1 - 2 * rng.Uniform<Float>();
         p.y = 1 - 2 * rng.Uniform<Float>();
-    } while (p.x * p.x + p.y * p.y > 1);
+    } while (Sqr(p.x) + Sqr(p.y) > 1);
     return p;
 }
 
@@ -557,7 +557,7 @@ AliasTable::AliasTable(pstd::span<const Float> weights, Allocator alloc)
     Float sum = std::accumulate(weights.begin(), weights.end(), 0.);
     CHECK_GT(sum, 0);
     for (size_t i = 0; i < weights.size(); ++i)
-        bins[i].pdf = weights[i] / sum;
+        bins[i].p = weights[i] / sum;
 
     // Create alias table work lists
     struct Outcome {
@@ -567,7 +567,7 @@ AliasTable::AliasTable(pstd::span<const Float> weights, Allocator alloc)
     std::vector<Outcome> under, over;
     for (size_t i = 0; i < bins.size(); ++i) {
         // Add outcome _i_ to an alias table work list
-        Float pHat = bins[i].pdf * bins.size();
+        Float pHat = bins[i].p * bins.size();
         if (pHat < 1)
             under.push_back(Outcome{pHat, i});
         else
@@ -608,16 +608,16 @@ AliasTable::AliasTable(pstd::span<const Float> weights, Allocator alloc)
     }
 }
 
-int AliasTable::Sample(Float u, Float *pdfOut, Float *uRemapped) const {
+int AliasTable::Sample(Float u, Float *pmf, Float *uRemapped) const {
     // Compute alias table _offset_ and remapped random sample _up_
     int offset = std::min<int>(u * bins.size(), bins.size() - 1);
     Float up = std::min<Float>(u * bins.size() - offset, OneMinusEpsilon);
 
     if (up < bins[offset].q) {
         // Return sample for alias table at _offset_
-        DCHECK_GT(bins[offset].pdf, 0);
-        if (pdfOut)
-            *pdfOut = bins[offset].pdf;
+        DCHECK_GT(bins[offset].p, 0);
+        if (pmf)
+            *pmf = bins[offset].p;
         if (uRemapped)
             *uRemapped = std::min<Float>(up / bins[offset].q, OneMinusEpsilon);
         return offset;
@@ -626,9 +626,9 @@ int AliasTable::Sample(Float u, Float *pdfOut, Float *uRemapped) const {
         // Return sample for alias table at _alias[offset]_
         int alias = bins[offset].alias;
         DCHECK_GE(alias, 0);
-        DCHECK_GT(bins[alias].pdf, 0);
-        if (pdfOut)
-            *pdfOut = bins[alias].pdf;
+        DCHECK_GT(bins[alias].p, 0);
+        if (pmf)
+            *pmf = bins[alias].p;
         if (uRemapped)
             *uRemapped = std::min<Float>((up - bins[offset].q) / (1 - bins[offset].q),
                                          OneMinusEpsilon);
@@ -639,7 +639,7 @@ int AliasTable::Sample(Float u, Float *pdfOut, Float *uRemapped) const {
 std::string AliasTable::ToString() const {
     std::string s = "[ AliasTable bins: [ ";
     for (const auto &b : bins)
-        s += StringPrintf("[ Bin q: %f pdf: %f alias: %d ] ", b.q, b.pdf, b.alias);
+        s += StringPrintf("[ Bin q: %f p: %f alias: %d ] ", b.q, b.p, b.alias);
     return s + "] ]";
 }
 

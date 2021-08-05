@@ -17,8 +17,8 @@ TEST(Array2D, Basics) {
     const int nx = 5, ny = 9;
     Array2D<Float> a(nx, ny);
 
-    EXPECT_EQ(nx, a.xSize());
-    EXPECT_EQ(ny, a.ySize());
+    EXPECT_EQ(nx, a.XSize());
+    EXPECT_EQ(ny, a.YSize());
     EXPECT_EQ(nx * ny, a.size());
 
     for (int y = 0; y < ny; ++y)
@@ -34,8 +34,8 @@ TEST(Array2D, Bounds) {
     Bounds2i b(Point2i(-4, 3), Point2i(10, 7));
     Array2D<Point2f> a(b);
 
-    EXPECT_EQ(b.pMax.x - b.pMin.x, a.xSize());
-    EXPECT_EQ(b.pMax.y - b.pMin.y, a.ySize());
+    EXPECT_EQ(b.pMax.x - b.pMin.x, a.XSize());
+    EXPECT_EQ(b.pMax.y - b.pMin.y, a.YSize());
 
     for (Point2i p : b)
         a[p] = Point2f(p.y, p.x);

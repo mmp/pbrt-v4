@@ -48,8 +48,9 @@ RGBSigmoidPolynomial RGBToSpectrumTable::operator()(const RGB &rgb) const {
             i = j;
 
     // Compute floating-point offsets into polynomial coefficient table
-    float z = rgb[i], x = rgb[(i + 1) % 3] * (res - 1) / z,
-        y = rgb[(i + 2) % 3] * (res - 1) / z;
+    float z = rgb[i];
+    float x = rgb[(i + 1) % 3] * (res - 1) / z;
+    float y = rgb[(i + 2) % 3] * (res - 1) / z;
 
     // Compute integer indices and offsets for coefficient interpolation
     constexpr int nCoeffs = 3;

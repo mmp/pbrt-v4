@@ -83,7 +83,7 @@ class PowerLightSampler {
     Float PDF(Light light) const {
         if (!aliasTable.size())
             return 0;
-        return aliasTable.PDF(lightToIndex[light]);
+        return aliasTable.PMF(lightToIndex[light]);
     }
 
     PBRT_CPU_GPU

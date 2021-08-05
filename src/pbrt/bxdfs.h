@@ -217,7 +217,6 @@ class DielectricBxDF {
 
     PBRT_CPU_GPU
     SampledSpectrum f(Vector3f wo, Vector3f wi, TransportMode mode) const;
-
     PBRT_CPU_GPU
     Float PDF(Vector3f wo, Vector3f wi, TransportMode mode,
               BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const;
@@ -336,26 +335,25 @@ class ConductorBxDF {
             return BSDFSample(f, wi, 1, BxDFFlags::SpecularReflection);
         }
         // Sample rough conductor BRDF
-        // Sample microfacet orientation $\wh$ and reflected direction $\wi$
+        // Sample microfacet normal $\wm$ and reflected direction $\wi$
         if (wo.z == 0)
             return {};
-        Vector3f wh = mfDistrib.Sample_wm(wo, u);
-        Vector3f wi = Reflect(wo, wh);
+        Vector3f wm = mfDistrib.Sample_wm(wo, u);
+        Vector3f wi = Reflect(wo, wm);
         if (!SameHemisphere(wo, wi))
             return {};
 
         // Compute PDF of _wi_ for microfacet reflection
-        Float pdf = mfDistrib.PDF(wo, wh) / (4 * AbsDot(wo, wh));
+        Float pdf = mfDistrib.PDF(wo, wm) / (4 * AbsDot(wo, wm));
 
         Float cosTheta_o = AbsCosTheta(wo), cosTheta_i = AbsCosTheta(wi);
         if (cosTheta_i == 0 || cosTheta_o == 0)
             return {};
         // Evaluate Fresnel factor _F_ for conductor BRDF
-        Float frCosTheta_i = AbsDot(wi, wh);
-        SampledSpectrum F = FrComplex(frCosTheta_i, eta, k);
+        SampledSpectrum F = FrComplex(AbsDot(wo, wm), eta, k);
 
         SampledSpectrum f =
-            mfDistrib.D(wh) * mfDistrib.G(wo, wi) * F / (4 * cosTheta_i * cosTheta_o);
+            mfDistrib.D(wm) * mfDistrib.G(wo, wi) * F / (4 * cosTheta_i * cosTheta_o);
         return BSDFSample(f, wi, pdf, BxDFFlags::GlossyReflection);
     }
 
@@ -366,20 +364,19 @@ class ConductorBxDF {
         if (mfDistrib.EffectivelySmooth())
             return {};
         // Evaluate rough conductor BRDF
-        // Compute cosines and $\wh$ for conductor BRDF
+        // Compute cosines and $\wm$ for conductor BRDF
         Float cosTheta_o = AbsCosTheta(wo), cosTheta_i = AbsCosTheta(wi);
         if (cosTheta_i == 0 || cosTheta_o == 0)
             return {};
-        Vector3f wh = wi + wo;
-        if (wh.x == 0 && wh.y == 0 && wh.z == 0)
+        Vector3f wm = wi + wo;
+        if (wm.x == 0 && wm.y == 0 && wm.z == 0)
             return {};
-        wh = Normalize(wh);
+        wm = Normalize(wm);
 
         // Evaluate Fresnel factor _F_ for conductor BRDF
-        Float frCosTheta_i = AbsDot(wi, wh);
-        SampledSpectrum F = FrComplex(frCosTheta_i, eta, k);
+        SampledSpectrum F = FrComplex(AbsDot(wo, wm), eta, k);
 
-        return mfDistrib.D(wh) * mfDistrib.G(wo, wi) * F / (4 * cosTheta_i * cosTheta_o);
+        return mfDistrib.D(wm) * mfDistrib.G(wo, wi) * F / (4 * cosTheta_i * cosTheta_o);
     }
 
     PBRT_CPU_GPU

@@ -213,7 +213,7 @@ class Array2D {
     Array2D(int nx, int ny, T def, allocator_type allocator = {})
         : Array2D({{0, 0}, {nx, ny}}, def, allocator) {}
     Array2D(const Array2D &a, allocator_type allocator = {})
-        : Array2D(a.begin(), a.end(), a.xSize(), a.ySize(), allocator) {}
+        : Array2D(a.begin(), a.end(), a.XSize(), a.YSize(), allocator) {}
 
     ~Array2D() {
         int n = extent.Area();
@@ -282,9 +282,9 @@ class Array2D {
     PBRT_CPU_GPU
     int size() const { return extent.Area(); }
     PBRT_CPU_GPU
-    int xSize() const { return extent.pMax.x - extent.pMin.x; }
+    int XSize() const { return extent.pMax.x - extent.pMin.x; }
     PBRT_CPU_GPU
-    int ySize() const { return extent.pMax.y - extent.pMin.y; }
+    int YSize() const { return extent.pMax.y - extent.pMin.y; }
 
     PBRT_CPU_GPU
     iterator begin() { return values; }
@@ -804,8 +804,8 @@ class SampledGrid {
     }
 
     size_t BytesAllocated() const { return values.size() * sizeof(T); }
-    int xSize() const { return nx; }
-    int ySize() const { return ny; }
+    int XSize() const { return nx; }
+    int YSize() const { return ny; }
     int zSize() const { return nz; }
 
     const_iterator begin() const { return values.begin(); }

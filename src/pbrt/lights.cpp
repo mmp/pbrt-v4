@@ -1164,7 +1164,7 @@ PortalImageInfiniteLight::PortalImageInfiniteLight(
     });
 
     // Initialize sampling distribution for portal image infinite light
-    auto duv_dw = [&](const Point2f &p) {
+    auto duv_dw = [&](Point2f p) {
         Float duv_dw;
         (void)RenderFromImage(p, &duv_dw);
         return duv_dw;
