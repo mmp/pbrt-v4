@@ -129,9 +129,17 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization, bool 
 #endif
         };
 
+        struct Usage {
+            // CPU usage in ticks
+            int64_t user = 0, nice = 0, system = 0, idle = 0;
+            // I/O in bytes: requested by process
+            int64_t readRequest = 0, writeRequest = 0;
+            // I/O in bytes: how much actually came from/went to storage
+            int64_t readActual = 0, writeActual = 0;
+        };
         // Return overall CPU usage in ticks
-        auto getCPUUsage = [&](int64_t *user, int64_t *nice, int64_t *system,
-                               int64_t *idle) {
+        auto getCPUUsage = [&]() -> Usage {
+            Usage usage;
 #ifdef PBRT_IS_LINUX
             std::ifstream stat("/proc/stat");
             CHECK((bool)stat);
@@ -145,16 +153,29 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization, bool 
                 std::vector<int64_t> values = SplitStringToInt64s(tail, ' ');
 
                 CHECK_GE(values.size(), 4);
-                *user = values[0];
-                *nice = values[1];
-                *system = values[2];
-                *idle = values[3];
-                return;
+                usage.user = values[0];
+                usage.nice = values[1];
+                usage.system = values[2];
+                usage.idle = values[3];
+
+                break;
+            }
+
+            std::ifstream io("/proc/self/io");
+            CHECK((bool)io);
+            while (std::getline(io, line)) {
+                if (line.compare(0, 7, "rchar: ") == 0)
+                    CHECK(Atoi(line.data() + 7, &usage.readRequest));
+                if (line.compare(0, 7, "wchar: ") == 0)
+                    CHECK(Atoi(line.data() + 7, &usage.writeRequest));
+                if (line.compare(0, 12, "read_bytes: ") == 0)
+                    CHECK(Atoi(line.data() + 12, &usage.readActual));
+                if (line.compare(0, 13, "write_bytes: ") == 0)
+                    CHECK(Atoi(line.data() + 13, &usage.writeActual));
             }
 #elif defined(PBRT_IS_OSX)
             // possibly useful:
             // https://stackoverflow.com/questions/63166/how-to-determine-cpu-and-memory-consumption-from-inside-a-process
-            *user = *nice = *system = *idle = 0;
 #elif defined(PBRT_IS_WINDOWS)
             FILETIME idleTime, kernelTime, userTime;
             if (GetSystemTimes(&idleTime, &kernelTime, &userTime)) {
@@ -162,20 +183,30 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization, bool 
                     return (((unsigned long long)(ft.dwHighDateTime)) << 32) |
                            ((unsigned long long)ft.dwLowDateTime);
                 };
-                *idle = FileTimeToInt64(idleTime);
-                *system = FileTimeToInt64(kernelTime);
-                *nice = 0;
-                *user = FileTimeToInt64(userTime);
-            } else
-                *user = *nice = *system = *idle = 0;
+                usage.idle = FileTimeToInt64(idleTime);
+                usage.system = FileTimeToInt64(kernelTime);
+                usage.nice = 0;
+                usage.user = FileTimeToInt64(userTime);
+            }
+
+            /* UNTESTED, so commented out for now:
+            IO_COUNTERS ioCounters;
+            if (GetProcessIoCounters(GetCurrentProcess(), &ioCounters)) {
+                // Windows doesn't seem to distinguish between I/O that hit
+                // the buffer cache and I/O that didn't...
+                usage.readRequest = ioCounters.ReadTransferCount;
+                usage.writeRequest = ioCounters.WriteTransferCount;
+            }
+            */
 #else
 #error "Need to implement getCPUUsage for current platform"
 #endif
+            return usage;
         };
 
         logUtilizationThread = std::thread([&]() {
-            int64_t userPrev, nicePrev, systemPrev, idlePrev;
-            getCPUUsage(&userPrev, &nicePrev, &systemPrev, &idlePrev);
+            Usage prevUsage = getCPUUsage();
+
 #ifdef PBRT_IS_WINDOWS
             // It's necessary to increase this thread's priority a bit since otherwise
             // the worker threads during rendering take all the cycles and it only
@@ -199,25 +230,28 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization, bool 
             while (!shutdownLogUtilization) {
                 sleepms(100);
 
-                int64_t userCur, niceCur, systemCur, idleCur;
-                getCPUUsage(&userCur, &niceCur, &systemCur, &idleCur);
+                Usage currentUsage = getCPUUsage();
 
                 // Report activity since last logging event. A value of 1
                 // represents all cores running at 100% utilization.
-                int64_t delta = (userCur + niceCur + systemCur + idleCur) -
-                                (userPrev + nicePrev + systemPrev + idlePrev);
+                int64_t delta = (currentUsage.user + currentUsage.nice +
+                                 currentUsage.system + currentUsage.idle) -
+                                (prevUsage.user + prevUsage.nice +
+                                 prevUsage.system + prevUsage.idle);
                 LOG_VERBOSE("CPU: Memory used %d MB. "
                             "Core activity: %.4f user %.4f nice %.4f system %.4f idle",
                             GetCurrentRSS() / (1024 * 1024),
-                            double(userCur - userPrev) / delta,
-                            double(niceCur - nicePrev) / delta,
-                            double(systemCur - systemPrev) / delta,
-                            double(idleCur - idlePrev) / delta);
+                            double(currentUsage.user - prevUsage.user) / delta,
+                            double(currentUsage.nice - prevUsage.nice) / delta,
+                            double(currentUsage.system - prevUsage.system) / delta,
+                            double(currentUsage.idle - prevUsage.idle) / delta);
+                LOG_VERBOSE("IO: read request %d read actual %d write request %d write actual %d",
+                            currentUsage.readRequest - prevUsage.readRequest,
+                            currentUsage.readActual - prevUsage.readActual,
+                            currentUsage.writeRequest - prevUsage.writeRequest,
+                            currentUsage.writeActual - prevUsage.writeActual);
 
-                userPrev = userCur;
-                nicePrev = niceCur;
-                systemPrev = systemCur;
-                idlePrev = idleCur;
+                prevUsage = currentUsage;
 
 #ifdef PBRT_USE_NVML
                 nvmlMemory_t info;
