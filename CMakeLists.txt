@@ -30,7 +30,8 @@ endif ()
 function (CHECK_EXT NAME DIR HASH)
   if (NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/ext/${DIR}")
     message (FATAL_ERROR "The ${NAME} submodule directory is missing! "
-      "You probably did not clone the project with --recursive. It is possible to recover by running:\n"
+      "Either that submodule was recently added to pbrt or you did not clone the project with --recursive. "
+      "In order to update the submodules, run:\n"
       "  \"git submodule update --init --recursive\"")
   endif ()
 
