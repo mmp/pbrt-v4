@@ -21,6 +21,8 @@
 #include <pbrt/util/spectrum.h>
 #include <pbrt/util/stats.h>
 
+#include <ImfThreading.h>
+
 #include <stdlib.h>
 
 namespace pbrt {
@@ -29,6 +31,8 @@ namespace pbrt {
 void InitPBRT(const PBRTOptions &opt) {
     Options = new PBRTOptions(opt);
     // API Initialization
+
+    Imf::setGlobalThreadCount(opt.nThreads ? opt.nThreads : AvailableCores());
 
 #if defined(PBRT_IS_WINDOWS) && defined(PBRT_BUILD_GPU_RENDERER)
     if (Options->useGPU && Options->gpuDevice && !getenv("CUDA_VISIBLE_DEVICES")) {
