@@ -6,9 +6,10 @@
 
 #include <pbrt/util/check.h>
 #include <pbrt/util/error.h>
+#include <pbrt/util/parallel.h>
 #include <pbrt/util/string.h>
 
-#include <zlib/zlib.h>
+#include <libdeflate.h>
 
 #include <filesystem/path.h>
 #include <algorithm>
@@ -129,34 +130,64 @@ std::string ReadFileContents(std::string filename) {
 }
 
 std::string ReadDecompressedFileContents(std::string filename) {
-    std::string contents;
+    std::string compressed = ReadFileContents(filename);
 
-    gzFile f = gzopen(filename.c_str(), "rb");
-    if (!f) {
-        Error("%s: unable to open file", filename);
-        return {};
+    // Get the size of the uncompressed file: with gzip, it's stored in the
+    // last 4 bytes of the file.  (One nit is that only 4 bytes are used,
+    // so it's actually the uncompressed size mod 2^32.)
+    CHECK_GT(compressed.size(), 4);
+    size_t sizeOffset = compressed.size() - 4;
+
+    // It's stored in little-endian, so manually reconstruct the value to
+    // be sure that it ends up in the right order for the target system.
+    const unsigned char *s = (const unsigned char *)compressed.data() + sizeOffset;
+    size_t size = (uint32_t(s[0]) | (uint32_t(s[1]) << 8) | (uint32_t(s[2]) << 16) |
+                   (uint32_t(s[3]) << 24));
+
+    // A single libdeflate_decompressor * can't be used by multiple threads
+    // concurrently, so make sure to do per-thread allocations of them.
+    static ThreadLocal<libdeflate_decompressor *> decompressors([]() {
+        return libdeflate_alloc_decompressor();
+    });
+
+    libdeflate_decompressor *d = decompressors.Get();
+    std::string decompressed(size, '\0');
+    int retries = 0;
+    while (true) {
+        size_t actualOut;
+        libdeflate_result result =
+            libdeflate_gzip_decompress(d, compressed.data(), compressed.size(),
+                                       decompressed.data(), decompressed.size(),
+                                       &actualOut);
+        switch (result) {
+        case LIBDEFLATE_SUCCESS:
+            CHECK_EQ(actualOut, decompressed.size());
+            LOG_VERBOSE("Decompressed %s from %d to %d bytes", filename, compressed.size(),
+                        decompressed.size());
+            return decompressed;
+
+        case LIBDEFLATE_BAD_DATA:
+            ErrorExit("%s: invalid or corrupt compressed data", filename);
+
+        case LIBDEFLATE_INSUFFICIENT_SPACE:
+            // Assume that the decompressed contents are > 4GB and that
+            // thus the size reported in the file didn't tell the whole
+            // story.  Since the stored size is mod 2^32, try increasing
+            // the allocation by that much.
+            decompressed.resize(decompressed.size() + (1ull << 32));
+
+            // But if we keep going around in circles, then fail eventually
+            // since there is probably some other problem.
+            CHECK_LT(++retries, 10);
+            break;
+
+        default:
+        case LIBDEFLATE_SHORT_OUTPUT:
+            // This should never be returned by libdeflate, since we are
+            // passing a non-null actualOut pointer...
+            LOG_FATAL("Unexpected return value from libdeflate");
+        }
     }
-
-    char buffer[4096];
-    int bytesRead = 0;
-    do {
-        bytesRead = gzread(f, buffer, 4096);
-        contents.append(buffer, bytesRead);
-    } while (!gzeof(f) || bytesRead < 0);
-
-    int status = gzclose(f);
-
-    if (bytesRead < 0) {
-        Error("%s: zlib read error", filename);
-        return {};
-    }
-
-    if (status == Z_BUF_ERROR) {
-        Error("%s: incomplete file", filename);
-        return {};
-    }
-
-    return contents;
 }
 
 FILE *FOpenRead(std::string filename) {
