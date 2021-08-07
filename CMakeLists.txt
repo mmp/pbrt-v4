@@ -56,11 +56,12 @@ function (CHECK_EXT NAME DIR HASH)
 endfunction ()
 
 check_ext ("OpenEXR" "openexr/OpenEXR" 5cfb5dab6dfada731586b0281bdb15ee75e26782)
+check_ext ("OpenVDB" "openvdb/nanovdb" 1c306bcaf7e9f7d52525bab716202bd4f7fff5d1)
 check_ext ("Ptex" "ptex/src" 4cd8e9a6db2b06e478dfbbd8c26eb6df97f84483)
 check_ext ("double-conversion" "double-conversion/cmake" cc1f75a114aca8d2af69f73a5a959aecbab0e87a)
 check_ext ("filesystem" "filesystem/filesystem" f45da753728cde9b1c380b343e41c8b1ca6498d7)
+check_ext ("libdeflate" "libdeflate/common" 1fd0bea6ca2073c68493632dafc4b1ddda1bcbc3)
 check_ext ("stb" "stb/tools" b42009b3b9d4ca35bc703f5310eedc74f584be58)
-check_ext ("OpenVDB" "openvdb/nanovdb" 1c306bcaf7e9f7d52525bab716202bd4f7fff5d1)
 check_ext ("zlib" "zlib/doc" 54d591eabf9fe0e84c725638f8d5d8d202a093fa)
 
 add_compile_definitions ("$<$<CONFIG:DEBUG>:PBRT_DEBUG_BUILD>")
@@ -821,6 +822,7 @@ target_include_directories (pbrt_lib PUBLIC
   ${STB_INCLUDE}
   ${OPENEXR_INCLUDE}
   ${ZLIB_INCLUDE_DIRS}
+  ${LIBDEFLATE_INCLUDE_DIRS}
   ${FILESYSTEM_INCLUDE}
   ${PTEX_INCLUDE}
   ${DOUBLE_CONVERSION_INCLUDE}
@@ -848,6 +850,7 @@ set (ALL_PBRT_LIBS
   ${OPENEXR_LIBS}
   Ptex_static
   ${ZLIB_LIBRARIES}
+  ${LIBDEFLATE_LIBRARIES}
   double-conversion
   ${PBRT_CUDA_LIB}
 )
