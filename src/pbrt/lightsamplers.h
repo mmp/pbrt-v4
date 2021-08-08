@@ -275,7 +275,7 @@ class BVHLightSampler {
 
         if (u < pInfinite) {
             // Sample infinite lights with uniform probability
-            u *= pInfinite;
+            u /= pInfinite;
             int index =
                 std::min<int>(u * infiniteLights.size(), infiniteLights.size() - 1);
             Float pdf = pInfinite / infiniteLights.size();

@@ -269,7 +269,7 @@ pstd::optional<SampledLight> ExhaustiveLightSampler::Sample(const LightSampleCon
 
     // Note: shared with BVH light sampler...
     if (u < pInfinite) {
-        u = std::min<Float>(u * pInfinite, OneMinusEpsilon);
+        u /= pInfinite;
         int index = std::min<int>(u * infiniteLights.size(), infiniteLights.size() - 1);
         Float pdf = pInfinite * 1.f / infiniteLights.size();
         return SampledLight{infiniteLights[index], pdf};
