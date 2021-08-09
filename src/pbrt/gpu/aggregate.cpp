@@ -523,7 +523,7 @@ STAT_COUNTER("Geometry/Bilinear patches created for diced curves", nBLPsForCurve
 BilinearPatchMesh *OptiXAggregate::diceCurveToBLP(const ShapeSceneEntity &shape,
                                                   int nDiceU, int nDiceV,
                                                   Allocator alloc) {
-    CHECK_EQ("curve", shape.name);
+    CHECK_EQ(shape.name, "curve");
     const ParameterDictionary &parameters = shape.parameters;
     const FileLoc *loc = &shape.loc;
 
@@ -1362,14 +1362,14 @@ OptiXAggregate::OptiXAggregate(
 
     LOG_VERBOSE("Starting to create IASes for %d instance definitions",
                 scene.instanceDefinitions.size());
-    std::vector<std::string> allInstanceNames;
+    std::vector<InternedString> allInstanceNames;
     for (const auto &def : scene.instanceDefinitions)
         allInstanceNames.push_back(def.first);
 
-    std::unordered_map<std::string, Instance> instanceMap;
+    std::unordered_map<InternedString, Instance, InternedStringHash> instanceMap;
     std::mutex instanceMapMutex;
     ParallelFor(0, scene.instanceDefinitions.size(), [&](int64_t i) {
-        const std::string &name = allInstanceNames[i];
+        InternedString name = allInstanceNames[i];
         auto iter = scene.instanceDefinitions.find(name);
         CHECK(iter != scene.instanceDefinitions.end());
         const auto &def = *iter;
@@ -1428,7 +1428,7 @@ OptiXAggregate::OptiXAggregate(
     // Get the appropriate instanceMap iterator for each instance use, just
     // once, and in parallel.  While we're at it, count the total number of
     // OptixInstances that will be added to iasInstances.
-    std::vector<std::unordered_map<std::string, Instance>::const_iterator>
+    std::vector<std::unordered_map<InternedString, Instance, InternedStringHash>::const_iterator>
         instanceMapIters(scene.instances.size());
     std::atomic<int> totalOptixInstances{0};
     std::vector<int> numValidHandles(scene.instances.size());
@@ -1437,7 +1437,7 @@ OptiXAggregate::OptiXAggregate(
 
         for (int64_t i = indexBegin; i < indexEnd; ++i) {
             const auto &sceneInstance = scene.instances[i];
-            auto iter = instanceMap.find(*sceneInstance.name);
+            auto iter = instanceMap.find(sceneInstance.name);
             instanceMapIters[i] = iter;
 
             if (iter != instanceMap.end()) {

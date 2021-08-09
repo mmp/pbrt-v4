@@ -18,6 +18,7 @@
 #include <pbrt/util/print.h>
 #include <pbrt/util/transform.h>
 
+#include <functional>
 #include <map>
 #include <set>
 #include <string>
@@ -26,12 +27,38 @@
 
 namespace pbrt {
 
+class InternedString {
+public:
+    InternedString() = default;
+    InternedString(const std::string *str) : str(str) {}
+
+    operator const std::string &() const { return *str; }
+
+    bool operator==(const char *s) const { return *str == s; }
+    bool operator==(const std::string &s) const { return *str == s; }
+    bool operator!=(const char *s) const { return *str != s; }
+    bool operator!=(const std::string &s) const { return *str != s; }
+    bool operator<(const char *s) const { return *str < s; }
+    bool operator<(const std::string &s) const { return *str < s; }
+
+    std::string ToString() const { return *str; }
+
+private:
+    const std::string *str = nullptr;
+};
+
+struct InternedStringHash {
+    size_t operator()(const InternedString &s) const {
+        return std::hash<std::string>()(s);
+    }
+};
+
 // SceneEntity Definition
 struct SceneEntity {
     // SceneEntity Public Methods
     SceneEntity() = default;
     SceneEntity(const std::string &name, ParameterDictionary parameters, FileLoc loc)
-        : name(name), parameters(parameters), loc(loc) {}
+        : name(internedStrings.Lookup(name)), parameters(parameters), loc(loc) {}
 
     std::string ToString() const {
         return StringPrintf("[ SceneEntity name: %s parameters: %s loc: %s ]", name,
@@ -40,7 +67,7 @@ struct SceneEntity {
 
     static InternCache<std::string> internedStrings;
 
-    std::string name;
+    InternedString name;
     FileLoc loc;
     ParameterDictionary parameters;
 };
@@ -136,7 +163,7 @@ struct AnimatedShapeSceneEntity : public TransformedSceneEntity {
 
     std::string ToString() const {
         return StringPrintf(
-            "[ ShapeSeneEntity name: %s parameters: %s loc: %s "
+            "[ AnimatedShapeSeneEntity name: %s parameters: %s loc: %s "
             "renderFromObject: %s reverseOrientation: %s materialIndex: %d "
             "materialName: %s insideMedium: %s outsideMedium: %s]",
             name, parameters, loc, renderFromObject, reverseOrientation, materialIndex,
@@ -154,7 +181,7 @@ struct AnimatedShapeSceneEntity : public TransformedSceneEntity {
 struct InstanceDefinitionSceneEntity {
     InstanceDefinitionSceneEntity() = default;
     InstanceDefinitionSceneEntity(const std::string &name, FileLoc loc)
-        : name(name), loc(loc) {}
+        : name(ShapeSceneEntity::internedStrings.Lookup(name)), loc(loc) {}
 
     std::string ToString() const {
         return StringPrintf("[ InstanceDefinitionSceneEntity name: %s loc: %s "
@@ -162,7 +189,7 @@ struct InstanceDefinitionSceneEntity {
                             name, loc, shapes, animatedShapes);
     }
 
-    std::string name;
+    InternedString name;
     FileLoc loc;
     std::vector<ShapeSceneEntity> shapes;
     std::vector<AnimatedShapeSceneEntity> animatedShapes;
@@ -217,13 +244,13 @@ struct InstanceSceneEntity {
         return StringPrintf(
             "[ InstanceSeneEntity name: %s loc: %s "
             "renderFromInstanceAnim: %s renderFromInstance: %s ]",
-            *name, loc,
+            name, loc,
             renderFromInstanceAnim ? renderFromInstanceAnim->ToString()
                                    : std::string("nullptr"),
             renderFromInstance ? renderFromInstance->ToString() : std::string("nullptr"));
     }
 
-    const std::string *name;
+    InternedString name;
     FileLoc loc;
     AnimatedTransform *renderFromInstanceAnim = nullptr;
     const Transform *renderFromInstance = nullptr;
@@ -351,7 +378,7 @@ class ParsedScene : public SceneProcessor {
     std::vector<ShapeSceneEntity> shapes;
     std::vector<AnimatedShapeSceneEntity> animatedShapes;
     std::vector<InstanceSceneEntity> instances;
-    std::map<std::string, InstanceDefinitionSceneEntity *> instanceDefinitions;
+    std::map<InternedString, InstanceDefinitionSceneEntity *> instanceDefinitions;
 
   private:
     void startLoadingNormalMaps(const ParameterDictionary &parameters);

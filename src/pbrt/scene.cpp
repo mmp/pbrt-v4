@@ -91,15 +91,15 @@ SceneStateManager::SceneStateManager(SceneProcessor *sceneProcessor)
       transformCache(Options->useGPU ? Allocator(&CUDATrackedMemoryResource::singleton) :
                                        Allocator()) {
     // Set scene defaults
-    camera.name = "perspective";
-    sampler.name = "zsobol";
-    filter.name = "gaussian";
-    integrator.name = "volpath";
+    camera.name = SceneEntity::internedStrings.Lookup("perspective");
+    sampler.name = SceneEntity::internedStrings.Lookup("zsobol");
+    filter.name = SceneEntity::internedStrings.Lookup("gaussian");
+    integrator.name = SceneEntity::internedStrings.Lookup("volpath");
 
     ParameterDictionary dict({}, RGBColorSpace::sRGB);
     currentMaterialIndex = sceneProcessor->AddMaterial(SceneEntity("diffuse", dict, {}));
-    accelerator.name = "bvh";
-    film.name = "rgb";
+    accelerator.name = SceneEntity::internedStrings.Lookup("bvh");
+    film.name = SceneEntity::internedStrings.Lookup("rgb");
     film.parameters = ParameterDictionary({}, RGBColorSpace::sRGB);
 }
 
@@ -1424,9 +1424,9 @@ Primitive ParsedScene::CreateAggregate(
 
     // Instance definitions
     LOG_VERBOSE("Starting instances");
-    std::map<std::string, Primitive> instanceDefinitions;
+    std::map<InternedString, Primitive> instanceDefinitions;
     std::mutex instanceDefinitionsMutex;
-    std::vector<std::map<std::string, InstanceDefinitionSceneEntity *>::iterator>
+    std::vector<std::map<InternedString, InstanceDefinitionSceneEntity *>::iterator>
         instanceDefinitionIterators;
     for (auto iter = this->instanceDefinitions.begin();
          iter != this->instanceDefinitions.end(); ++iter)
@@ -1462,7 +1462,7 @@ Primitive ParsedScene::CreateAggregate(
 
     // Instances
     for (const auto &inst : instances) {
-        auto iter = instanceDefinitions.find(*inst.name);
+        auto iter = instanceDefinitions.find(inst.name);
         if (iter == instanceDefinitions.end())
             ErrorExit(&inst.loc, "%s: object instance not defined", inst.name);
 
