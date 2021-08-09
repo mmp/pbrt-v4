@@ -1437,7 +1437,7 @@ OptiXAggregate::OptiXAggregate(
 
         for (int64_t i = indexBegin; i < indexEnd; ++i) {
             const auto &sceneInstance = scene.instances[i];
-            auto iter = instanceMap.find(sceneInstance.name);
+            auto iter = instanceMap.find(*sceneInstance.name);
             instanceMapIters[i] = iter;
 
             if (iter != instanceMap.end()) {

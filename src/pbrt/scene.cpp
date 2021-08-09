@@ -29,6 +29,8 @@
 
 namespace pbrt {
 
+InternCache<std::string> SceneEntity::internedStrings(Allocator{});
+
 template <typename T, typename U>
 static std::string ToString(const std::map<T, U> &m) {
     std::string s = "[ ";
@@ -827,7 +829,6 @@ void ParsedScene::AddFloatTexture(std::string name, TextureSceneEntity texture) 
         return FloatTexture::Create(texture.texName, renderFromTexture, texDict,
                                     &texture.loc, alloc, Options->useGPU);
     };
-    LOG_VERBOSE("Async enqueue float for file %s", filename);
     floatTextureFutures[name] = RunAsync(create, texture);
 }
 
@@ -874,7 +875,6 @@ void ParsedScene::AddSpectrumTexture(std::string name, TextureSceneEntity textur
                                        SpectrumType::Albedo, &texture.loc, alloc,
                                        Options->useGPU);
     };
-    LOG_VERBOSE("Async enqueue spectrum for file %s", filename);
     spectrumTextureFutures[name] = RunAsync(create, texture);
 }
 
@@ -1462,7 +1462,7 @@ Primitive ParsedScene::CreateAggregate(
 
     // Instances
     for (const auto &inst : instances) {
-        auto iter = instanceDefinitions.find(inst.name);
+        auto iter = instanceDefinitions.find(*inst.name);
         if (iter == instanceDefinitions.end())
             ErrorExit(&inst.loc, "%s: object instance not defined", inst.name);
 

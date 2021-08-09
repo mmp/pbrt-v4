@@ -38,6 +38,8 @@ struct SceneEntity {
                             parameters, loc);
     }
 
+    static InternCache<std::string> internedStrings;
+
     std::string name;
     FileLoc loc;
     ParameterDictionary parameters;
@@ -200,26 +202,28 @@ struct LightSceneEntity : public TransformedSceneEntity {
 
 struct InstanceSceneEntity {
     InstanceSceneEntity() = default;
-    InstanceSceneEntity(const std::string &name, FileLoc loc,
+    InstanceSceneEntity(const std::string &n, FileLoc loc,
                         const AnimatedTransform &renderFromInstanceAnim)
-        : name(name),
+        : name(SceneEntity::internedStrings.Lookup(n)),
           loc(loc),
           renderFromInstanceAnim(new AnimatedTransform(renderFromInstanceAnim)) {}
-    InstanceSceneEntity(const std::string &name, FileLoc loc,
+    InstanceSceneEntity(const std::string &n, FileLoc loc,
                         const Transform *renderFromInstance)
-        : name(name), loc(loc), renderFromInstance(renderFromInstance) {}
+        : name(SceneEntity::internedStrings.Lookup(n)),
+          loc(loc),
+          renderFromInstance(renderFromInstance) {}
 
     std::string ToString() const {
         return StringPrintf(
             "[ InstanceSeneEntity name: %s loc: %s "
             "renderFromInstanceAnim: %s renderFromInstance: %s ]",
-            name, loc,
+            *name, loc,
             renderFromInstanceAnim ? renderFromInstanceAnim->ToString()
                                    : std::string("nullptr"),
             renderFromInstance ? renderFromInstance->ToString() : std::string("nullptr"));
     }
 
-    std::string name;
+    const std::string *name;
     FileLoc loc;
     AnimatedTransform *renderFromInstanceAnim = nullptr;
     const Transform *renderFromInstance = nullptr;
