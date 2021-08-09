@@ -160,7 +160,18 @@ std::unique_ptr<Tokenizer> Tokenizer::CreateFromFile(
     }
 
     size_t len = stat.st_size;
-    void *ptr = mmap(nullptr, len, PROT_READ, MAP_FILE | MAP_SHARED, fd, 0);
+    if (len < 16 * 1024 * 1024) {
+        close(fd);
+
+        std::string str = ReadFileContents(filename);
+        return std::make_unique<Tokenizer>(std::move(str), filename,
+                                           std::move(errorCallback));
+    }
+
+    void *ptr = mmap(nullptr, len, PROT_READ, MAP_PRIVATE | MAP_NORESERVE, fd, 0);
+    if (ptr == MAP_FAILED)
+        errorCallback(StringPrintf("%s: %s", filename, ErrorString()).c_str(), nullptr);
+
     if (close(fd) != 0) {
         errorCallback(StringPrintf("%s: %s", filename, ErrorString()).c_str(), nullptr);
         return nullptr;
