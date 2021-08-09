@@ -14,8 +14,10 @@
 
 #include <algorithm>
 #include <cstring>
+#include <functional>
 #include <iterator>
 #include <memory>
+#include <shared_mutex>
 #include <string>
 #include <tuple>
 #include <type_traits>
@@ -896,6 +898,101 @@ class SampledGrid {
     // SampledGrid Private Members
     pstd::vector<T> values;
     int nx, ny, nz;
+};
+
+template <typename T, typename Hash = std::hash<T>>
+class InternCache {
+  public:
+    // InternCache Public Methods
+    InternCache(Allocator alloc = {})
+        : hashTable(256, alloc), bufferResource(alloc.resource()),
+          itemAlloc(&bufferResource) {}
+
+    const T *Lookup(const T &item) {
+        size_t offset = Hash()(item) % hashTable.size();
+        int step = 1;
+
+        mutex.lock_shared();
+        while (true) {
+            if (!hashTable[offset]) {
+                // not in the hash table
+                mutex.unlock_shared();
+                mutex.lock();
+
+                // Look for it again, starting from scratch: another thread
+                // may have inserted it before we got the write lock and/or
+                // may have expanded the hash table.
+                size_t offset = Hash()(item) % hashTable.size();
+                int step = 1;
+                while (true) {
+                    if (!hashTable[offset])
+                        // fine--it's definitely not there
+                        break;
+                    else if (*hashTable[offset] == item) {
+                        // Another thread inserted it
+                        const T *ret = hashTable[offset];
+                        mutex.unlock();
+                        return ret;
+                    } else {
+                        // collision
+                        offset += step;
+                        ++step;
+                        offset %= hashTable.size();
+                    }
+                }
+
+                // Grow the hash table if needed
+                if (4 * nEntries > hashTable.size()) {
+                    pstd::vector<const T *> newHash(2 * hashTable.size(),
+                                                    hashTable.get_allocator());
+                    for (const T *ptr : hashTable)
+                        if (ptr)
+                            Insert(ptr, &newHash);
+
+                    hashTable.swap(newHash);
+                }
+
+                ++nEntries;
+                T *newPtr = itemAlloc.new_object<T>(item);
+                Insert(newPtr, &hashTable);
+                mutex.unlock();
+                return newPtr;
+            } else if (*hashTable[offset] == item) {
+                // found it
+                const T *ret = hashTable[offset];
+                mutex.unlock_shared();
+                return ret;
+            } else {
+                // collision
+                offset += step;
+                ++step;
+                offset %= hashTable.size();
+            }
+        }
+    }
+
+    size_t size() const { return nEntries; }
+    size_t capacity() const { return hashTable.size(); }
+
+  private:
+    // InternCache Private Methods
+    void Insert(const T *ptr, pstd::vector<const T *> *table) {
+        size_t offset = Hash()(*ptr) % table->size();
+        int step = 1;
+        while ((*table)[offset]) {
+            offset += step;
+            ++step;
+            offset %= table->size();
+        }
+        (*table)[offset] = ptr;
+    }
+
+    // InternCache Private Members
+    pstd::pmr::monotonic_buffer_resource bufferResource;
+    Allocator itemAlloc;
+    size_t nEntries = 0;
+    pstd::vector<const T *> hashTable;
+    std::shared_mutex mutex;
 };
 
 }  // namespace pbrt

@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <pbrt/util/containers.h>
+#include <pbrt/util/math.h>
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/rng.h>
 
@@ -168,4 +169,46 @@ TEST(TypePack, Filter) {
         std::is_same_v<
             TypePack<double>,
             typename TakeFirstN<1, typename RemoveFirstN<1, FilteredPack>::type>::type>);
+}
+
+TEST(InternCache, BasicString) {
+    InternCache<std::string> cache;
+
+    const std::string *one = cache.Lookup(std::string("one"));
+    EXPECT_EQ(1, cache.size());
+    EXPECT_EQ("one", *one);
+
+    const std::string *two = cache.Lookup(std::string("two"));
+    EXPECT_NE(one, two);
+    EXPECT_EQ("two", *two);
+
+    const std::string *anotherOne = cache.Lookup(std::string("one"));
+    EXPECT_EQ(2, cache.size());
+    EXPECT_EQ("one", *anotherOne);
+    EXPECT_EQ(one, anotherOne);
+}
+
+TEST(InternCache, BadHash) {
+    struct BadIntHash {
+        size_t operator()(int i) { return i % 7; }
+    };
+
+    InternCache<int, BadIntHash> cache;
+
+    int n = 10000;
+    std::vector<const int *> firstPass(n);
+    for (int i = 0; i < n; ++i) {
+        int ii = PermutationElement(i, n, 0xfeed00f5);
+        const int *p = cache.Lookup(ii);
+        EXPECT_EQ(*p, ii);
+        firstPass[ii] = p;
+        EXPECT_EQ(i+1, cache.size());
+    }
+    for (int i = 0; i < n; ++i) {
+        int ii = PermutationElement(i, n, 0xfeed00f5);
+        const int *p = cache.Lookup(ii);
+        EXPECT_EQ(*p, ii);
+        EXPECT_EQ(p, firstPass[ii]);
+        EXPECT_EQ(n, cache.size());
+    }
 }
