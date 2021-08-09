@@ -987,8 +987,10 @@ class vector {
     }
 
     void swap(vector &other) {
-        // TODO
-        LOG_FATAL("TODO");
+        DCHECK(alloc == other.alloc); // TODO: handle this
+        std::swap(ptr, other.ptr);
+        std::swap(nAlloc, other.nAlloc);
+        std::swap(nStored, other.nStored);
     }
 
   private:
