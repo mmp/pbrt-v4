@@ -80,77 +80,14 @@ SceneStateManager::GraphicsState::GraphicsState() {
             expr                                            \
         }
 
-STAT_MEMORY_COUNTER("Memory/TransformCache", transformCacheBytes);
-STAT_PERCENT("Geometry/TransformCache hits", nTransformCacheHits, nTransformCacheLookups);
-
-// TransformCache Method Definitions
-TransformCache::TransformCache()
-#ifdef PBRT_BUILD_GPU_RENDERER
-    : bufferResource(Options->useGPU ? &CUDATrackedMemoryResource::singleton
-                                     : Allocator().resource()),
-#else
-    : bufferResource(Allocator().resource()),
-#endif
-      alloc(&bufferResource),
-      hashTable(256) {
-}
-
-const Transform *TransformCache::Lookup(const Transform &t) {
-    ++nTransformCacheLookups;
-
-    size_t offset = t.Hash() % hashTable.size();
-    int step = 1;
-
-    while (true) {
-        if (!hashTable[offset]) {
-            // not in the hash table
-            if (4 * nEntries > hashTable.size()) {
-                // grow
-                std::vector<const Transform *> newHash(2 * hashTable.size());
-                for (const Transform *tr : hashTable) {
-                    if (tr) {
-                        size_t offset = tr->Hash() % newHash.size();
-                        int step = 1;
-                        while (newHash[offset]) {
-                            offset += step;
-                            ++step;
-                            offset %= newHash.size();
-                        }
-                        newHash[offset] = tr;
-                    }
-                }
-                hashTable.swap(newHash);
-            }
-            Transform *tptr = alloc.new_object<Transform>(t);
-            transformCacheBytes += sizeof(Transform);
-            ++nEntries;
-            hashTable[offset] = tptr;
-            return tptr;
-        } else if (*hashTable[offset] == t) {
-            // found it
-            ++nTransformCacheHits;
-            return hashTable[offset];
-        } else {
-            // collision
-            offset += step;
-            ++step;
-            offset %= hashTable.size();
-        }
-    }
-}
-
-TransformCache::~TransformCache() {
-    for (const Transform *tr : hashTable)
-        if (tr)
-            alloc.delete_object((Transform *)tr);
-}
-
 STAT_COUNTER("Scene/Object instances created", nObjectInstancesCreated);
 STAT_COUNTER("Scene/Object instances used", nObjectInstancesUsed);
 
 // SceneStateManager Method Definitions
 SceneStateManager::SceneStateManager(SceneProcessor *sceneProcessor)
-    : sceneProcessor(sceneProcessor) {
+    : sceneProcessor(sceneProcessor),
+      transformCache(Options->useGPU ? Allocator(&CUDATrackedMemoryResource::singleton) :
+                                       Allocator()) {
     // Set scene defaults
     camera.name = "perspective";
     sampler.name = "zsobol";

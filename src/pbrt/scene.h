@@ -11,6 +11,7 @@
 #include <pbrt/cpu/primitive.h>
 #include <pbrt/paramdict.h>
 #include <pbrt/parser.h>
+#include <pbrt/util/containers.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/memory.h>
 #include <pbrt/util/parallel.h>
@@ -226,24 +227,7 @@ struct InstanceSceneEntity {
 
 // TransformHash Definition
 struct TransformHash {
-    size_t operator()(const Transform *t) const { return t->Hash(); }
-};
-
-// TransformCache Definition
-class TransformCache {
-  public:
-    // TransformCache Public Methods
-    TransformCache();
-    ~TransformCache();
-
-    const Transform *Lookup(const Transform &t);
-
-  private:
-    // TransformCache Private Members
-    pstd::pmr::monotonic_buffer_resource bufferResource;
-    Allocator alloc;
-    int nEntries = 0;
-    std::vector<const Transform *> hashTable;
+    size_t operator()(const Transform &t) const { return t.Hash(); }
 };
 
 // MaxTransforms Definition
@@ -506,7 +490,7 @@ class SceneStateManager : public ParserTarget {
     static constexpr int AllTransformsBits = (1 << MaxTransforms) - 1;
     std::map<std::string, TransformSet> namedCoordinateSystems;
     class Transform renderFromWorld;
-    TransformCache transformCache;
+    InternCache<class Transform, TransformHash> transformCache;
     std::vector<GraphicsState> pushedGraphicsStates;
     std::vector<std::pair<char, FileLoc>> pushStack;  // 'a': attribute, 'o': object
     struct ActiveInstanceDefinition {
