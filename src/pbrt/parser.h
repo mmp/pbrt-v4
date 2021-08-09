@@ -124,7 +124,7 @@ struct Token {
 class Tokenizer {
   public:
     // Tokenizer Public Methods
-    Tokenizer(std::string str,
+    Tokenizer(std::string str, std::string filename,
               std::function<void(const char *, const FileLoc *)> errorCallback);
 #if defined(PBRT_HAVE_MMAP) || defined(PBRT_IS_WINDOWS)
     Tokenizer(void *ptr, size_t len, std::string filename,

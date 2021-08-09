@@ -136,12 +136,14 @@ std::unique_ptr<Tokenizer> Tokenizer::CreateFromFile(
         int ch;
         while ((ch = getchar()) != EOF)
             str.push_back((char)ch);
-        return std::make_unique<Tokenizer>(std::move(str), std::move(errorCallback));
+        return std::make_unique<Tokenizer>(std::move(str), "<stdin>",
+                                           std::move(errorCallback));
     }
 
     if (HasExtension(filename, ".gz")) {
         std::string str = ReadDecompressedFileContents(filename);
-        return std::make_unique<Tokenizer>(std::move(str), std::move(errorCallback));
+        return std::make_unique<Tokenizer>(std::move(str), filename,
+                                           std::move(errorCallback));
     }
 
 #ifdef PBRT_HAVE_MMAP
@@ -182,40 +184,38 @@ std::unique_ptr<Tokenizer> Tokenizer::CreateFromFile(
     HANDLE fileHandle =
         CreateFileW(WStringFromUTF8(filename).c_str(), GENERIC_READ, FILE_SHARE_READ, 0,
                     OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-    if (!fileHandle) {
+    if (!fileHandle)
         return errorReportLambda();
-    }
 
     size_t len = GetFileSize(fileHandle, 0);
 
     HANDLE mapping = CreateFileMapping(fileHandle, 0, PAGE_READONLY, 0, 0, 0);
     CloseHandle(fileHandle);
-    if (mapping == 0) {
+    if (mapping == 0)
         return errorReportLambda();
-    }
 
     LPVOID ptr = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, 0);
     CloseHandle(mapping);
     if (!ptr)
         return errorReportLambda();
 
-    std::string str(static_cast<const char *>(ptr), len);
-
     return std::make_unique<Tokenizer>(ptr, len, filename, std::move(errorCallback));
 #else
     std::string str = ReadFileContents(filename);
-    return std::make_unique<Tokenizer>(std::move(str), std::move(errorCallback));
+    return std::make_unique<Tokenizer>(std::move(str), filename,
+                                       std::move(errorCallback));
 #endif
 }
 
 std::unique_ptr<Tokenizer> Tokenizer::CreateFromString(
     std::string str, std::function<void(const char *, const FileLoc *)> errorCallback) {
-    return std::make_unique<Tokenizer>(std::move(str), std::move(errorCallback));
+    return std::make_unique<Tokenizer>(std::move(str), "<stdin>", std::move(errorCallback));
 }
 
-Tokenizer::Tokenizer(std::string str,
+Tokenizer::Tokenizer(std::string str, std::string filename,
                      std::function<void(const char *, const FileLoc *)> errorCallback)
-    : loc("<stdin>"), errorCallback(std::move(errorCallback)), contents(std::move(str)) {
+    : errorCallback(std::move(errorCallback)), contents(std::move(str)) {
+    loc = FileLoc(*new std::string(filename));
     pos = contents.data();
     end = pos + contents.size();
     tokenizerMemory += contents.size();
