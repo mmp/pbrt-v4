@@ -21,8 +21,11 @@
 #include <fstream>
 #ifndef PBRT_IS_WINDOWS
 #include <dirent.h>
+#include <fcntl.h>
 #include <sys/dir.h>
+#include <sys/stat.h>
 #include <sys/types.h>
+#include <unistd.h>
 #endif
 
 namespace pbrt {
@@ -120,13 +123,26 @@ bool RemoveFile(std::string filename) {
 std::string ReadFileContents(std::string filename) {
 #ifdef PBRT_IS_WINDOWS
     std::ifstream ifs(WStringFromUTF8(filename).c_str(), std::ios::binary);
-#else
-    std::ifstream ifs(filename, std::ios::binary);
-#endif
     if (!ifs)
         ErrorExit("%s: %s", filename, ErrorString());
     return std::string((std::istreambuf_iterator<char>(ifs)),
                        (std::istreambuf_iterator<char>()));
+#else
+    int fd = open(filename.c_str(), O_RDONLY);
+    if (fd == -1)
+        ErrorExit("%s: %s", filename, ErrorString());
+
+    struct stat stat;
+    if (fstat(fd, &stat) != 0)
+        ErrorExit("%s: %s", filename, ErrorString());
+
+    std::string contents(stat.st_size, '\0');
+    if (read(fd, contents.data(), stat.st_size) == -1)
+        ErrorExit("%s: %s", filename, ErrorString());
+
+    close(fd);
+    return contents;
+#endif
 }
 
 std::string ReadDecompressedFileContents(std::string filename) {
