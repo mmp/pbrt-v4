@@ -18,6 +18,7 @@
 #include <pbrt/util/splines.h>
 #include <pbrt/util/stats.h>
 
+#include <algorithm>
 #include <mutex>
 
 #include <Ptexture.h>

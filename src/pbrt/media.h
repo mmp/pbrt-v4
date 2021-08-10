@@ -28,6 +28,7 @@
 #include <nanovdb/util/CudaDeviceBuffer.h>
 #endif  // PBRT_BUILD_GPU_RENDERER
 
+#include <algorithm>
 #include <limits>
 #include <memory>
 #include <vector>

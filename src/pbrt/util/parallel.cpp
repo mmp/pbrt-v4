@@ -10,6 +10,7 @@
 #include <pbrt/gpu/util.h>
 #endif  // PBRT_BUILD_GPU_RENDERER
 
+#include <algorithm>
 #include <iterator>
 #include <list>
 #include <thread>

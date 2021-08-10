@@ -29,6 +29,8 @@
 #include <cuda.h>
 #endif
 
+#include <algorithm>
+
 namespace pbrt {
 
 // Sphere Method Definitions

@@ -12,6 +12,7 @@
 #include <pbrt/util/transform.h>
 #include <pbrt/util/vecmath.h>
 
+#include <algorithm>
 #include <map>
 #include <set>
 

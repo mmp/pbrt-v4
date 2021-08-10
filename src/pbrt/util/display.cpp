@@ -10,6 +10,7 @@
 #include <pbrt/util/print.h>
 #include <pbrt/util/string.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <mutex>

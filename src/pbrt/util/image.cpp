@@ -32,6 +32,7 @@
 #include <ImfStringVectorAttribute.h>
 #endif
 
+#include <algorithm>
 #include <cmath>
 #include <numeric>
 

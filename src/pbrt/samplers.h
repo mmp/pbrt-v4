@@ -22,6 +22,7 @@
 #include <pbrt/util/rng.h>
 #include <pbrt/util/vecmath.h>
 
+#include <algorithm>
 #include <limits>
 #include <memory>
 #include <string>

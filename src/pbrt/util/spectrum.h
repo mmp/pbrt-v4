@@ -19,6 +19,7 @@
 #include <pbrt/util/sampling.h>
 #include <pbrt/util/taggedptr.h>
 
+#include <algorithm>
 #include <cmath>
 #include <memory>
 #include <numeric>

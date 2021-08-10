@@ -16,6 +16,7 @@
 #include <pbrt/util/image.h>
 #include <pbrt/util/scattering.h>
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>

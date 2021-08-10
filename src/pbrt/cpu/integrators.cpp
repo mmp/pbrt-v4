@@ -40,6 +40,8 @@
 #include <pbrt/util/stats.h>
 #include <pbrt/util/string.h>
 
+#include <algorithm>
+
 namespace pbrt {
 
 STAT_COUNTER("Integrator/Camera rays traced", nCameraRays);

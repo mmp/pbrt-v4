@@ -28,6 +28,8 @@
 #include <pbrt/util/stats.h>
 #include <pbrt/util/transform.h>
 
+#include <algorithm>
+
 namespace pbrt {
 
 void Film::AddSplat(Point2f p, SampledSpectrum v, const SampledWavelengths &lambda) {

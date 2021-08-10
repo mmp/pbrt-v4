@@ -25,6 +25,8 @@
 #include <pbrt/util/spectrum.h>
 #include <pbrt/util/stats.h>
 
+#include <algorithm>
+
 namespace pbrt {
 
 STAT_COUNTER("Scene/Lights", numLights);

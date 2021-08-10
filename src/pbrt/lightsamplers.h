@@ -16,6 +16,7 @@
 #include <pbrt/util/sampling.h>
 #include <pbrt/util/vecmath.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 
