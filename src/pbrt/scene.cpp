@@ -87,9 +87,12 @@ STAT_COUNTER("Scene/Object instances used", nObjectInstancesUsed);
 
 // SceneStateManager Method Definitions
 SceneStateManager::SceneStateManager(SceneProcessor *sceneProcessor)
-    : sceneProcessor(sceneProcessor),
-      transformCache(Options->useGPU ? Allocator(&CUDATrackedMemoryResource::singleton) :
-                                       Allocator()) {
+    : sceneProcessor(sceneProcessor)
+#ifdef PBRT_BUILD_GPU_RENDERER
+    , transformCache(Options->useGPU ? Allocator(&CUDATrackedMemoryResource::singleton) :
+                                       Allocator())
+#endif
+{
     // Set scene defaults
     camera.name = SceneEntity::internedStrings.Lookup("perspective");
     sampler.name = SceneEntity::internedStrings.Lookup("zsobol");
