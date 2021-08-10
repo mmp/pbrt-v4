@@ -386,8 +386,7 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
             mesh = LoopSubdivide(shape.renderFromObject, shape.reverseOrientation,
                                  nLevels, vertexIndices, P, alloc);
             CHECK(mesh != nullptr);
-        } else {
-            CHECK_EQ(shape.name, "plymesh");
+        } else if (shape.name == "plymesh") {
             auto plyIter = plyMeshes.find(shapeIndex);
             CHECK(plyIter != plyMeshes.end());
             const TriQuadMesh &plyMesh = plyIter->second;
@@ -416,7 +415,10 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
                                                   *shape.renderFromObject, shape.reverseOrientation, plyMesh.triIndices,
                                                   plyMesh.p, std::vector<Vector3f>(), plyMesh.n, plyMesh.uv,
                                                   plyMesh.faceIndices, alloc);
-        }
+        } else
+              LOG_FATAL("Logic error in GPUAggregate::buildBVHForTriangles()");
+
+        shape.parameters.ReportUnused();
 
         Bounds3f bounds;
         for (size_t i = 0; i < mesh->nVertices; ++i)
@@ -763,11 +765,13 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForBLPs(
             BilinearPatchMesh *mesh = BilinearPatch::CreateMesh(
                 shape.renderFromObject, shape.reverseOrientation, shape.parameters,
                 &shape.loc, alloc);
+            shape.parameters.ReportUnused();
             meshes[meshIndex] = mesh;
             nPatches += mesh->nPatches;
         } else if (shape.name == "curve") {
             BilinearPatchMesh *curveMesh =
                 diceCurveToBLP(shape, 5 /* nseg */, 5 /* nvert */, alloc);
+            shape.parameters.ReportUnused();
             if (curveMesh) {
                 meshes[meshIndex] = curveMesh;
                 nPatches += curveMesh->nPatches;
