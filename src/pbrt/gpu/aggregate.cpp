@@ -341,97 +341,91 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
     ThreadLocal<Allocator> &threadAllocators,
     ThreadLocal<cudaStream_t> &threadCUDAStreams) {
-    // Allocate space for potentially all shapes being triangle meshes so
-    // that we can write them in order (just potentially sparsely...)
-    std::vector<TriangleMesh *> meshes(shapes.size(), nullptr);
-    std::vector<Bounds3f> meshBounds(shapes.size());
-    std::atomic<int> meshesCreated{0};
-
-    ParallelFor(0, shapes.size(), [&](int64_t shapeIndex) {
-        Allocator alloc = threadAllocators.Get();
-        const auto &shape = shapes[shapeIndex];
+    // Count how many of the shapes are triangle meshes
+    std::vector<size_t> meshIndexToShapeIndex;
+    for (size_t i = 0; i < shapes.size(); ++i) {
+        const auto &shape = shapes[i];
         if (shape.name == "trianglemesh" || shape.name == "plymesh" ||
-            shape.name == "loopsubdiv") {
-            TriangleMesh *mesh = nullptr;
-            if (shape.name == "trianglemesh") {
-                mesh =
-                    Triangle::CreateMesh(shape.renderFromObject, shape.reverseOrientation,
-                                         shape.parameters, &shape.loc, alloc);
-                CHECK(mesh != nullptr);
-            } else if (shape.name == "loopsubdiv") {
-                // Copied from pbrt/shapes.cpp... :-p
-                int nLevels = shape.parameters.GetOneInt("levels", 3);
-                std::vector<int> vertexIndices = shape.parameters.GetIntArray("indices");
-                if (vertexIndices.empty())
-                    ErrorExit(&shape.loc, "Vertex indices \"indices\" not "
-                                          "provided for LoopSubdiv shape.");
+            shape.name == "loopsubdiv")
+            meshIndexToShapeIndex.push_back(i);
+    }
 
-                std::vector<Point3f> P = shape.parameters.GetPoint3fArray("P");
-                if (P.empty())
-                    ErrorExit(&shape.loc, "Vertex positions \"P\" not provided "
-                                          "for LoopSubdiv shape.");
-
-                // don't actually use this for now...
-                std::string scheme = shape.parameters.GetOneString("scheme", "loop");
-
-                mesh = LoopSubdivide(shape.renderFromObject, shape.reverseOrientation,
-                                     nLevels, vertexIndices, P, alloc);
-                CHECK(mesh != nullptr);
-            } else {
-                CHECK_EQ(shape.name, "plymesh");
-                auto plyIter = plyMeshes.find(shapeIndex);
-                CHECK(plyIter != plyMeshes.end());
-                const TriQuadMesh &plyMesh = plyIter->second;
-
-                if (!plyMesh.quadIndices.empty() && shape.lightIndex != -1) {
-#if 0
-                    // If you'd like to know what they are...
-                    for (int i = 0; i < plyMesh.quadIndices.size(); ++i)
-                        Printf("%s\n", plyMesh.p[plyMesh.quadIndices[i]]);
-#endif
-                    // This would be nice to fix, but it involves some
-                    // plumbing and it's a rare case. The underlying issue
-                    // is that when we create AreaLights for emissive
-                    // shapes earlier, we're not expecting this..
-                    std::string filename =
-                        ResolveFilename(shape.parameters.GetOneString("filename", ""));
-                    ErrorExit(&shape.loc,
-                              "%s: PLY file being used as an area light has quads--"
-                              "this is currently unsupported. Please replace them with "
-                              "\"bilinearmesh\" "
-                              "shapes as a workaround. (Sorry!).",
-                              filename);
-                }
-
-                mesh = alloc.new_object<TriangleMesh>(
-                    *shape.renderFromObject, shape.reverseOrientation, plyMesh.triIndices,
-                    plyMesh.p, std::vector<Vector3f>(), plyMesh.n, plyMesh.uv,
-                    plyMesh.faceIndices, alloc);
-            }
-
-            Bounds3f bounds;
-            for (size_t i = 0; i < mesh->nVertices; ++i)
-                bounds = Union(bounds, mesh->p[i]);
-
-            meshes[shapeIndex] = mesh;
-            meshBounds[shapeIndex] = bounds;
-            ++meshesCreated;
-        }
-    });
-
-    int nMeshes = meshesCreated.load();
+    size_t nMeshes = meshIndexToShapeIndex.size();
     if (nMeshes == 0)
         return {};
 
-    std::vector<int> meshIndexToShapeIndex(nMeshes);
-    int meshIndex = 0;
-    for (int shapeIndex = 0; shapeIndex < shapes.size(); ++shapeIndex) {
-        TriangleMesh *mesh = meshes[shapeIndex];
-        if (mesh) {
-            meshIndexToShapeIndex[meshIndex] = shapeIndex;
-            ++meshIndex;
+    std::vector<TriangleMesh *> meshes(nMeshes, nullptr);
+    std::vector<Bounds3f> meshBounds(nMeshes);
+    ParallelFor(0, nMeshes, [&](int64_t meshIndex) {
+        Allocator alloc = threadAllocators.Get();
+        size_t shapeIndex = meshIndexToShapeIndex[meshIndex];
+        const auto &shape = shapes[shapeIndex];
+
+        TriangleMesh *mesh = nullptr;
+        if (shape.name == "trianglemesh") {
+            mesh =
+                Triangle::CreateMesh(shape.renderFromObject, shape.reverseOrientation,
+                                     shape.parameters, &shape.loc, alloc);
+            CHECK(mesh != nullptr);
+        } else if (shape.name == "loopsubdiv") {
+            // Copied from pbrt/shapes.cpp... :-p
+            int nLevels = shape.parameters.GetOneInt("levels", 3);
+            std::vector<int> vertexIndices = shape.parameters.GetIntArray("indices");
+            if (vertexIndices.empty())
+                ErrorExit(&shape.loc, "Vertex indices \"indices\" not "
+                          "provided for LoopSubdiv shape.");
+
+            std::vector<Point3f> P = shape.parameters.GetPoint3fArray("P");
+            if (P.empty())
+                ErrorExit(&shape.loc, "Vertex positions \"P\" not provided "
+                          "for LoopSubdiv shape.");
+
+            // don't actually use this for now...
+            std::string scheme = shape.parameters.GetOneString("scheme", "loop");
+
+            mesh = LoopSubdivide(shape.renderFromObject, shape.reverseOrientation,
+                                 nLevels, vertexIndices, P, alloc);
+            CHECK(mesh != nullptr);
+        } else {
+            CHECK_EQ(shape.name, "plymesh");
+            auto plyIter = plyMeshes.find(shapeIndex);
+            CHECK(plyIter != plyMeshes.end());
+            const TriQuadMesh &plyMesh = plyIter->second;
+
+            if (!plyMesh.quadIndices.empty() && shape.lightIndex != -1) {
+#if 0
+                // If you'd like to know what they are...
+                for (int i = 0; i < plyMesh.quadIndices.size(); ++i)
+                    Printf("%s\n", plyMesh.p[plyMesh.quadIndices[i]]);
+#endif
+                // This would be nice to fix, but it involves some
+                // plumbing and it's a rare case. The underlying issue
+                // is that when we create AreaLights for emissive
+                // shapes earlier, we're not expecting this..
+                std::string filename =
+                    ResolveFilename(shape.parameters.GetOneString("filename", ""));
+                ErrorExit(&shape.loc,
+                          "%s: PLY file being used as an area light has quads--"
+                          "this is currently unsupported. Please replace them with "
+                          "\"bilinearmesh\" "
+                          "shapes as a workaround. (Sorry!).",
+                          filename);
+            }
+
+            mesh = alloc.new_object<TriangleMesh>(
+                                                  *shape.renderFromObject, shape.reverseOrientation, plyMesh.triIndices,
+                                                  plyMesh.p, std::vector<Vector3f>(), plyMesh.n, plyMesh.uv,
+                                                  plyMesh.faceIndices, alloc);
         }
-    }
+
+        Bounds3f bounds;
+        for (size_t i = 0; i < mesh->nVertices; ++i)
+            bounds = Union(bounds, mesh->p[i]);
+
+        meshes[meshIndex] = mesh;
+        meshBounds[meshIndex] = bounds;
+    });
+
 
     BVH bvh(nMeshes);
     std::vector<OptixBuildInput> optixBuildInputs(nMeshes);
@@ -445,8 +439,7 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
 
         for (int meshIndex = startIndex; meshIndex < endIndex; ++meshIndex) {
             int shapeIndex = meshIndexToShapeIndex[meshIndex];
-            // Remember: meshes is indexed shapeIndex...
-            TriangleMesh *mesh = meshes[shapeIndex];
+            TriangleMesh *mesh = meshes[meshIndex];
             const auto &shape = shapes[shapeIndex];
 
             OptixBuildInput &input = optixBuildInputs[meshIndex];
@@ -503,8 +496,7 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
             OPTIX_CHECK(optixSbtRecordPackHeader(shadowPG, &hgRecord));
             bvh.shadowHGRecords[meshIndex] = hgRecord;
 
-            // Note: meshBounds is also indexed by the shape index..
-            localBounds = Union(localBounds, meshBounds[shapeIndex]);
+            localBounds = Union(localBounds, meshBounds[meshIndex]);
         }
 
         std::lock_guard<std::mutex> lock(boundsMutex);
@@ -746,45 +738,49 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForBLPs(
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
     ThreadLocal<Allocator> &threadAllocators,
     ThreadLocal<cudaStream_t> &threadCUDAStreams) {
-    // Create meshes
-    std::vector<BilinearPatchMesh *> meshes(shapes.size(), nullptr);
-    std::atomic<int> nPatches = 0, nMeshes = 0;
+    // Count how many BLP meshes there are in shapes
+    std::vector<size_t> meshIndexToShapeIndex;
+    for (size_t i = 0; i < shapes.size(); ++i) {
+        const auto &shape = shapes[i];
+        if (shape.name == "bilinearmesh" || shape.name == "curve")
+            meshIndexToShapeIndex.push_back(i);
+    }
 
-    ParallelFor(0, shapes.size(), [&](int64_t shapeIndex) {
+    size_t nMeshes = meshIndexToShapeIndex.size();
+    if (nMeshes == 0)
+        return {};
+
+    // Create meshes
+    std::vector<BilinearPatchMesh *> meshes(nMeshes, nullptr);
+    std::atomic<int> nPatches = 0;
+
+    ParallelFor(0, nMeshes, [&](int64_t meshIndex) {
         Allocator alloc = threadAllocators.Get();
+        size_t shapeIndex = meshIndexToShapeIndex[meshIndex];
         const auto &shape = shapes[shapeIndex];
+
         if (shape.name == "bilinearmesh") {
             BilinearPatchMesh *mesh = BilinearPatch::CreateMesh(
                 shape.renderFromObject, shape.reverseOrientation, shape.parameters,
                 &shape.loc, alloc);
-            meshes[shapeIndex] = mesh;
+            meshes[meshIndex] = mesh;
             nPatches += mesh->nPatches;
-            ++nMeshes;
         } else if (shape.name == "curve") {
             BilinearPatchMesh *curveMesh =
                 diceCurveToBLP(shape, 5 /* nseg */, 5 /* nvert */, alloc);
             if (curveMesh) {
+                meshes[meshIndex] = curveMesh;
                 nPatches += curveMesh->nPatches;
-                ++nMeshes;
-                meshes[shapeIndex] = curveMesh;
             }
         }
     });
 
-    if (nMeshes == 0)
-        return {};
-
-    std::vector<int> meshIndexToShapeIndex(nMeshes);
+    // Figure out where each mesh starts using entries of the aabb array
     std::vector<int> meshAABBStartIndex(nMeshes);
-    int meshIndex = 0, aabbIndex = 0;
-    for (size_t shapeIndex = 0; shapeIndex < shapes.size(); ++shapeIndex) {
-        if (meshes[shapeIndex]) {
-            meshIndexToShapeIndex[meshIndex] = shapeIndex;
-            meshAABBStartIndex[meshIndex] = aabbIndex;
-
-            ++meshIndex;
-            aabbIndex += meshes[shapeIndex]->nPatches;
-        }
+    int aabbIndex = 0;
+    for (size_t meshIndex = 0; meshIndex < meshes.size(); ++meshIndex) {
+        meshAABBStartIndex[meshIndex] = aabbIndex;
+        aabbIndex += meshes[meshIndex]->nPatches;
     }
 
     // Create build inputs
@@ -800,8 +796,7 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForBLPs(
     std::mutex boundsMutex;
     ParallelFor(0, nMeshes, [&](int64_t meshIndex) {
         Allocator alloc = threadAllocators.Get();
-        int shapeIndex = meshIndexToShapeIndex[meshIndex];
-        BilinearPatchMesh *mesh = meshes[shapeIndex];
+        BilinearPatchMesh *mesh = meshes[meshIndex];
 
         OptixBuildInput &input = optixBuildInputs[meshIndex];
         input.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
@@ -814,19 +809,20 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForBLPs(
 
         Bounds3f meshBounds;
         for (int patchIndex = 0; patchIndex < mesh->nPatches; ++patchIndex) {
-            Bounds3f shapeBounds;
+            Bounds3f patchBounds;
             for (int i = 0; i < 4; ++i)
-                shapeBounds =
-                    Union(shapeBounds, mesh->p[mesh->vertexIndices[4 * patchIndex + i]]);
+                patchBounds =
+                    Union(patchBounds, mesh->p[mesh->vertexIndices[4 * patchIndex + i]]);
 
-            OptixAabb aabb = {float(shapeBounds.pMin.x), float(shapeBounds.pMin.y),
-                              float(shapeBounds.pMin.z), float(shapeBounds.pMax.x),
-                              float(shapeBounds.pMax.y), float(shapeBounds.pMax.z)};
+            OptixAabb aabb = {float(patchBounds.pMin.x), float(patchBounds.pMin.y),
+                              float(patchBounds.pMin.z), float(patchBounds.pMax.x),
+                              float(patchBounds.pMax.y), float(patchBounds.pMax.z)};
             aabbs[aabbIndex++] = aabb;
 
-            meshBounds = Union(meshBounds, shapeBounds);
+            meshBounds = Union(meshBounds, patchBounds);
         }
 
+        size_t shapeIndex = meshIndexToShapeIndex[meshIndex];
         const auto &shape = shapes[shapeIndex];
         Material material = getMaterial(shape, namedMaterials, materials);
         FloatTexture alphaTexture = getAlphaTexture(shape, floatTextures, alloc);
