@@ -1444,8 +1444,7 @@ OptiXAggregate::OptiXAggregate(
                 int nHandles = iter->second.NumValidHandles();
                 localTotalInstances += nHandles;
                 numValidHandles[i] = nHandles;
-            } else
-                numValidHandles[0] = 0;
+            }
         }
 
         // Don't hammer the atomic; at least accumulate sums locally for a
