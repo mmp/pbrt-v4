@@ -16,6 +16,7 @@
 #include <pbrt/util/memory.h>
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/print.h>
+#include <pbrt/util/string.h>
 #include <pbrt/util/transform.h>
 
 #include <functional>
@@ -26,32 +27,6 @@
 #include <vector>
 
 namespace pbrt {
-
-class InternedString {
-public:
-    InternedString() = default;
-    InternedString(const std::string *str) : str(str) {}
-
-    operator const std::string &() const { return *str; }
-
-    bool operator==(const char *s) const { return *str == s; }
-    bool operator==(const std::string &s) const { return *str == s; }
-    bool operator!=(const char *s) const { return *str != s; }
-    bool operator!=(const std::string &s) const { return *str != s; }
-    bool operator<(const char *s) const { return *str < s; }
-    bool operator<(const std::string &s) const { return *str < s; }
-
-    std::string ToString() const { return *str; }
-
-private:
-    const std::string *str = nullptr;
-};
-
-struct InternedStringHash {
-    size_t operator()(const InternedString &s) const {
-        return std::hash<std::string>()(s);
-    }
-};
 
 // SceneEntity Definition
 struct SceneEntity {
