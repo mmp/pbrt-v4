@@ -40,11 +40,11 @@ struct SceneEntity {
                             parameters, loc);
     }
 
-    static InternCache<std::string> internedStrings;
-
+    // SceneEntity Public Members
     InternedString name;
     FileLoc loc;
     ParameterDictionary parameters;
+    static InternCache<std::string> internedStrings;
 };
 
 struct TransformedSceneEntity : public SceneEntity {
@@ -156,7 +156,7 @@ struct AnimatedShapeSceneEntity : public TransformedSceneEntity {
 struct InstanceDefinitionSceneEntity {
     InstanceDefinitionSceneEntity() = default;
     InstanceDefinitionSceneEntity(const std::string &name, FileLoc loc)
-        : name(ShapeSceneEntity::internedStrings.Lookup(name)), loc(loc) {}
+        : name(SceneEntity::internedStrings.Lookup(name)), loc(loc) {}
 
     std::string ToString() const {
         return StringPrintf("[ InstanceDefinitionSceneEntity name: %s loc: %s "

@@ -36,9 +36,9 @@ std::wstring WStringFromUTF8(std::string str);
 std::string UTF8FromWString(std::wstring str);
 #endif  // PBRT_IS_WINDOWS
 
-// InterenedString Definition
+// InternedString Definition
 class InternedString {
-public:
+  public:
     // InterenedString Public Methods
     InternedString() = default;
     InternedString(const std::string *str) : str(str) {}
@@ -54,11 +54,12 @@ public:
 
     std::string ToString() const { return *str; }
 
-private:
+  private:
     // InterenedString Private Members
     const std::string *str = nullptr;
 };
 
+// InternedStringHash Definition
 struct InternedStringHash {
     size_t operator()(const InternedString &s) const {
         return std::hash<std::string>()(s);

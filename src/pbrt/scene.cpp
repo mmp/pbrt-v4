@@ -89,8 +89,9 @@ STAT_COUNTER("Scene/Object instances used", nObjectInstancesUsed);
 SceneStateManager::SceneStateManager(SceneProcessor *sceneProcessor)
     : sceneProcessor(sceneProcessor)
 #ifdef PBRT_BUILD_GPU_RENDERER
-    , transformCache(Options->useGPU ? Allocator(&CUDATrackedMemoryResource::singleton) :
-                                       Allocator())
+      ,
+      transformCache(Options->useGPU ? Allocator(&CUDATrackedMemoryResource::singleton)
+                                     : Allocator())
 #endif
 {
     // Set scene defaults
@@ -454,7 +455,7 @@ void SceneStateManager::MergeImported(SceneStateManager *imported) {
     auto mergeSet = [this](auto &base, auto &imported, const char *name) {
         for (const auto &item : imported) {
             if (base.find(item) != base.end())
-                ErrorExitDeferred("%s: multiply-defined %s.", item, name);
+                ErrorExitDeferred("%s: multiply defined %s.", item, name);
             base.insert(std::move(item));
         }
         imported.clear();
