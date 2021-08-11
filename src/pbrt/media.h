@@ -197,6 +197,7 @@ class CuboidMedium {
         SampledSpectrum sigma_s = sigScale * sigma_s_spec.Sample(lambda);
         SampledSpectrum sigma_t = sigma_a + sigma_s;
 
+        p = renderFromMedium.ApplyInverse(p);
         MediumDensity d = provider->Density(p, lambda);
         SampledSpectrum Le = provider->Le(p, lambda);
         return MediumProperties{sigma_a * d.sigma_a, sigma_s * d.sigma_s, &phase, Le};
