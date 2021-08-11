@@ -1223,7 +1223,7 @@ SampledSpectrum PortalImageInfiniteLight::ImageLookup(
 pstd::optional<LightLiSample> PortalImageInfiniteLight::SampleLi(
     LightSampleContext ctx, Point2f u, SampledWavelengths lambda,
     bool allowIncompletePDF) const {
-    // Sample $(u,v)$ in potentially-visible region of light image
+    // Sample $(u,v)$ in potentially visible region of light image
     pstd::optional<Bounds2f> b = ImageBounds(ctx.p());
     if (!b)
         return {};

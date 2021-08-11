@@ -535,7 +535,7 @@ void LightPathIntegrator::EvaluatePixelSample(Point2i pPixel, int sampleIndex,
     if (!les || les->pdfPos == 0 || les->pdfDir == 0 || !les->L)
         return;
 
-    // Add contribution of directly-visible light source
+    // Add contribution of directly visible light source
     if (les->intr) {
         pstd::optional<CameraWiSample> cs =
             camera.SampleWi(*les->intr, sampler.Get2D(), lambda);
@@ -642,7 +642,7 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
     while (true) {
         // Trace ray and find closest path vertex and its BSDF
         pstd::optional<ShapeIntersection> si = Intersect(ray);
-        // Add emitted light at path vertex or from the environment
+        // Add emitted light at intersection point or from the environment
         if (!si) {
             // Incorporate emission from infinite lights for escaped ray
             for (const auto &light : infiniteLights) {
@@ -653,9 +653,9 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
                     // Compute MIS weight for infinite light
                     Float lightPDF = lightSampler.PMF(prevIntrCtx, light) *
                                      light.PDF_Li(prevIntrCtx, ray.d, true);
-                    Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
+                    Float w_b = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
 
-                    L += beta * weight * Le;
+                    L += beta * w_b * Le;
                 }
             }
 
@@ -671,9 +671,9 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
                 Light areaLight(si->intr.areaLight);
                 Float lightPDF = lightSampler.PMF(prevIntrCtx, areaLight) *
                                  areaLight.PDF_Li(prevIntrCtx, ray.d, true);
-                Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
+                Float w_l = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
 
-                L += beta * weight * Le;
+                L += beta * w_l * Le;
             }
         }
 
@@ -795,13 +795,13 @@ SampledSpectrum PathIntegrator::SampleLd(const SurfaceInteraction &intr, const B
         return {};
 
     // Return light's contribution to reflected radiance
-    Float lightPDF = sampledLight->p * ls->pdf;
+    Float p_l = sampledLight->p * ls->pdf;
     if (IsDeltaLight(light.Type()))
-        return f * ls->L / lightPDF;
+        return ls->L * f / p_l;
     else {
-        Float bsdfPDF = bsdf->PDF(wo, wi);
-        Float weight = PowerHeuristic(1, lightPDF, 1, bsdfPDF);
-        return f * ls->L * weight / lightPDF;
+        Float p_b = bsdf->PDF(wo, wi);
+        Float w_l = PowerHeuristic(1, p_l, 1, p_b);
+        return w_l * ls->L * f / p_l;
     }
 }
 
@@ -2773,7 +2773,7 @@ void SPPMIntegrator::Render() {
     if (Options->recordPixelStatistics)
         StatsEnablePixelStats(camera.GetFilm().PixelBounds(),
                               RemoveExtension(camera.GetFilm().GetFilename()));
-    // Define variables for commonly-used values in SPPM rendering
+    // Define variables for commonly used values in SPPM rendering
     int nIterations = samplerPrototype.SamplesPerPixel();
     ProgressReporter progress(2 * nIterations, "Rendering", Options->quiet);
     const Float invSqrtSPP = 1.f / std::sqrt(nIterations);
@@ -2869,9 +2869,9 @@ void SPPMIntegrator::Render() {
                                 // Compute MIS weight for infinite light
                                 Float lightPDF = lightSampler.PMF(prevIntrCtx, light) *
                                                  light.PDF_Li(prevIntrCtx, ray.d, true);
-                                Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
+                                Float w_b = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
 
-                                L += beta * weight * Le;
+                                L += beta * w_b * Le;
                             }
                         }
 
@@ -2903,9 +2903,9 @@ void SPPMIntegrator::Render() {
                             Light areaLight(si->intr.areaLight);
                             Float lightPDF = lightSampler.PMF(prevIntrCtx, areaLight) *
                                              areaLight.PDF_Li(prevIntrCtx, ray.d, true);
-                            Float weight = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
+                            Float w_l = PowerHeuristic(1, bsdfPDF, 1, lightPDF);
 
-                            L += beta * weight * Le;
+                            L += beta * w_l * Le;
                         }
                     }
 
@@ -3272,13 +3272,13 @@ SampledSpectrum SPPMIntegrator::SampleLd(const SurfaceInteraction &intr, const B
         return {};
 
     // Return light's contribution to reflected radiance
-    Float lightPDF = sampledLight->p * ls->pdf;
+    Float p_l = sampledLight->p * ls->pdf;
     if (IsDeltaLight(light.Type()))
-        return f * ls->L / lightPDF;
+        return ls->L * f / p_l;
     else {
-        Float bsdfPDF = bsdf->PDF(wo, wi);
-        Float weight = PowerHeuristic(1, lightPDF, 1, bsdfPDF);
-        return f * ls->L * weight / lightPDF;
+        Float p_b = bsdf->PDF(wo, wi);
+        Float w_l = PowerHeuristic(1, p_l, 1, p_b);
+        return w_l * ls->L * f / p_l;
     }
 }
 

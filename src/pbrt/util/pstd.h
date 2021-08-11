@@ -987,7 +987,7 @@ class vector {
     }
 
     void swap(vector &other) {
-        DCHECK(alloc == other.alloc); // TODO: handle this
+        CHECK(alloc == other.alloc);  // TODO: handle this
         std::swap(ptr, other.ptr);
         std::swap(nAlloc, other.nAlloc);
         std::swap(nStored, other.nStored);

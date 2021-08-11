@@ -900,12 +900,14 @@ class SampledGrid {
     int nx, ny, nz;
 };
 
+// InternCache Definition
 template <typename T, typename Hash = std::hash<T>>
 class InternCache {
   public:
     // InternCache Public Methods
     InternCache(Allocator alloc = {})
-        : hashTable(256, alloc), bufferResource(alloc.resource()),
+        : hashTable(256, alloc),
+          bufferResource(alloc.resource()),
           itemAlloc(&bufferResource) {}
 
     const T *Lookup(const T &item) {
