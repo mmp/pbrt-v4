@@ -51,18 +51,19 @@ std::string RayMajorantIterator::ToString() const {
 }
 
 std::string HomogeneousMajorantIterator::ToString() const {
-    return StringPrintf("[ HomogeneousMajorantIterator seg: %s called: %s ]", seg, called);
+    return StringPrintf("[ HomogeneousMajorantIterator seg: %s called: %s ]", seg,
+                        called);
 }
 
 std::string DDAMajorantIterator::ToString() const {
-    return StringPrintf("[ DDAMajorantIterator t0: %f tMax: %f sigma_t: %s "
+    return StringPrintf("[ DDAMajorantIterator tMin: %f tMax: %f sigma_t: %s "
                         "nextCrossingT: [ %f %f %f ] deltaT: [ %f %f %f ] "
                         "step: [ %d %d %d ] voxelLimit: [ %d %d %d ] voxel: [ %d %d %d ] "
-                        "maxDensityGrid: %p gridResolution: %s ]",
-                        t0, tMax, sigma_t, nextCrossingT[0], nextCrossingT[1],
+                        "grid: %p res: %s ]",
+                        tMin, tMax, sigma_t, nextCrossingT[0], nextCrossingT[1],
                         nextCrossingT[2], deltaT[0], deltaT[1], deltaT[2], step[0],
                         step[1], step[2], voxelLimit[0], voxelLimit[1], voxelLimit[2],
-                        voxel[0], voxel[1], voxel[2], maxDensityGrid, gridResolution);
+                        voxel[0], voxel[1], voxel[2], grid, res);
 }
 
 std::string MediumSample::ToString() const {

@@ -82,7 +82,7 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
             Float uDist = raySamples.media.uDist;
             Float uMode = raySamples.media.uMode;
 
-            SampledSpectrum T_maj = ray.medium.SampleT_maj(
+            SampledSpectrum T_maj = SampleT_maj(
                 ray, tMax, uDist, rng, lambda, [&](const MediumSample &mediumSample) {
                     rescale(T_hat, uniPathPDF, lightPathPDF);
 

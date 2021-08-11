@@ -218,7 +218,7 @@ inline PBRT_CPU_GPU void TraceTransmittance(ShadowRayWorkItem sr,
             Float tEnd = !result.hit
                              ? tMax
                              : (Distance(ray.o, Point3f(result.pHit)) / Length(ray.d));
-            SampledSpectrum T_maj = ray.medium.SampleT_maj(
+            SampledSpectrum T_maj = SampleT_maj(
                 ray, tEnd, rng.Uniform<Float>(), rng, lambda,
                 [&](const MediumSample &mediumSample) {
                     const SampledSpectrum &T_maj = mediumSample.T_maj;

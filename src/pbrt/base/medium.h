@@ -74,7 +74,6 @@ struct MediumDensity {
 struct RayMajorantSegment {
     Float tMin, tMax;
     SampledSpectrum sigma_maj;
-
     std::string ToString() const;
 };
 
@@ -82,10 +81,11 @@ struct RayMajorantSegment {
 class HomogeneousMajorantIterator;
 class DDAMajorantIterator;
 
-class RayMajorantIterator : public TaggedPointer<HomogeneousMajorantIterator, DDAMajorantIterator> {
+class RayMajorantIterator
+    : public TaggedPointer<HomogeneousMajorantIterator, DDAMajorantIterator> {
   public:
     using TaggedPointer::TaggedPointer;
-    // RayMajorantIterator Interface
+
     PBRT_CPU_GPU
     pstd::optional<RayMajorantSegment> Next();
 
@@ -112,12 +112,7 @@ class Medium : public TaggedPointer<HomogeneousMedium, UniformGridMedium, CloudM
 
     PBRT_CPU_GPU
     RayMajorantIterator SampleRay(Ray ray, Float tMax, const SampledWavelengths &lambda,
-                                ScratchBuffer &buf) const;
-
-    template <typename F>
-    PBRT_CPU_GPU SampledSpectrum SampleT_maj(Ray ray, Float tMax, Float u, RNG &rng,
-                                             const SampledWavelengths &lambda,
-                                             F callback) const;
+                                  ScratchBuffer &buf) const;
 };
 
 // MediumInterface Definition
