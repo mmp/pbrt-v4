@@ -190,7 +190,6 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization, bool 
                 usage.user = FileTimeToInt64(userTime);
             }
 
-            /* UNTESTED, so commented out for now:
             IO_COUNTERS ioCounters;
             if (GetProcessIoCounters(GetCurrentProcess(), &ioCounters)) {
                 // Windows doesn't seem to distinguish between I/O that hit
@@ -198,7 +197,6 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization, bool 
                 usage.readRequest = ioCounters.ReadTransferCount;
                 usage.writeRequest = ioCounters.WriteTransferCount;
             }
-            */
 #else
 #error "Need to implement getCPUUsage for current platform"
 #endif
