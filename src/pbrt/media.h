@@ -821,7 +821,7 @@ SampledSpectrum Medium::SampleT_maj(Ray ray, Float tMax, Float u, RNG &rng,
 inline MediumRayIterator Medium::SampleRay(Ray ray, Float tMax,
                                            const SampledWavelengths &lambda,
                                            ScratchBuffer &buf) const {
-    auto sample = [&](auto medium) -> MediumRayIterator {
+    auto sample = [ray,tMax,lambda,&buf](auto medium) -> MediumRayIterator {
         using Medium = typename std::remove_reference_t<decltype(*medium)>;
         using Iter = typename Medium::RayIterator;
         Iter *iter = (Iter *)buf.Alloc(sizeof(Iter), alignof(Iter));
