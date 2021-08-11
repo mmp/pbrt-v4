@@ -90,6 +90,7 @@ struct MediumProperties {
     SampledSpectrum Le;
 };
 
+// HomogeneousRayIterator Definition
 class HomogeneousRayIterator {
   public:
     HomogeneousRayIterator() = default;
@@ -112,6 +113,7 @@ class HomogeneousRayIterator {
     bool called;
 };
 
+// DDARayIterator Definition
 class DDARayIterator {
   public:
     DDARayIterator() = default;
@@ -129,7 +131,6 @@ class DDARayIterator {
         Ray rayGrid(Point3f(bounds.Offset(ray.o)),
                     Vector3f(ray.d.x / diag.x, ray.d.y / diag.y, ray.d.z / diag.z));
         Point3f gridIntersect = rayGrid(tMin);
-
         for (int axis = 0; axis < 3; ++axis) {
             // Initialize ray stepping parameters for _axis_
             // Compute current voxel for axis and handle negative zero direction
@@ -207,6 +208,7 @@ class DDARayIterator {
 // HomogeneousMedium Definition
 class HomogeneousMedium {
   public:
+    // HomogeneousMedium Public Type Definitions
     using RayIterator = HomogeneousRayIterator;
 
     // HomogeneousMedium Public Methods
@@ -239,7 +241,6 @@ class HomogeneousMedium {
                    HomogeneousRayIterator *iter) const {
         SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
         SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
-
         *iter = HomogeneousRayIterator(tMax, sigma_a + sigma_s);
     }
 
@@ -255,6 +256,7 @@ class HomogeneousMedium {
 template <typename CuboidProvider>
 class CuboidMedium {
   public:
+    // CuboidMedium Public Type Definitions
     using RayIterator = DDARayIterator;
 
     // CuboidMedium Public Methods
@@ -284,25 +286,6 @@ class CuboidMedium {
     bool IsEmissive() const { return provider->IsEmissive(); }
 
     PBRT_CPU_GPU
-    void SampleRay(Ray ray, Float raytMax, const SampledWavelengths &lambda,
-                   DDARayIterator *iter) const {
-        // Transform ray to grid density's space and compute bounds overlap
-        ray = renderFromMedium.ApplyInverse(ray, &raytMax);
-        Float tMin, tMax;
-        if (!mediumBounds.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax))
-            return;  // leave iter default initialized -> no segments returned
-        DCHECK_LE(tMax, raytMax);
-
-        // Sample spectra for grid medium scattering
-        SampledSpectrum sigma_a = sigScale * sigma_a_spec.Sample(lambda);
-        SampledSpectrum sigma_s = sigScale * sigma_s_spec.Sample(lambda);
-        SampledSpectrum sigma_t = sigma_a + sigma_s;
-
-        *iter = DDARayIterator(ray, mediumBounds, sigma_t, tMin, tMax, &maxDensityGrid,
-                               gridResolution);
-    }
-
-    PBRT_CPU_GPU
     MediumProperties SamplePoint(Point3f p, const SampledWavelengths &lambda) const {
         // Sample spectra for grid medium scattering
         SampledSpectrum sigma_a = sigScale * sigma_a_spec.Sample(lambda);
@@ -312,8 +295,26 @@ class CuboidMedium {
         p = renderFromMedium.ApplyInverse(p);
         MediumDensity d = provider->Density(p, lambda);
         SampledSpectrum Le = provider->Le(p, lambda);
-
         return MediumProperties{sigma_a * d.sigma_a, sigma_s * d.sigma_s, &phase, Le};
+    }
+
+    PBRT_CPU_GPU
+    void SampleRay(Ray ray, Float raytMax, const SampledWavelengths &lambda,
+                   DDARayIterator *iter) const {
+        // Transform ray to grid density's space and compute bounds overlap
+        ray = renderFromMedium.ApplyInverse(ray, &raytMax);
+        Float tMin, tMax;
+        if (!mediumBounds.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax))
+            return;
+        DCHECK_LE(tMax, raytMax);
+
+        // Sample spectra for grid medium scattering
+        SampledSpectrum sigma_a = sigScale * sigma_a_spec.Sample(lambda);
+        SampledSpectrum sigma_s = sigScale * sigma_s_spec.Sample(lambda);
+        SampledSpectrum sigma_t = sigma_a + sigma_s;
+
+        *iter = DDARayIterator(ray, mediumBounds, sigma_t, tMin, tMax, &maxDensityGrid,
+                               gridResolution);
     }
 
     static CuboidMedium<CuboidProvider> *Create(const CuboidProvider *provider,
@@ -748,6 +749,7 @@ inline MediumProperties Medium::SamplePoint(Point3f p,
     return Dispatch(sample);
 }
 
+// Medium Majorant Sampling Function Definition
 template <typename ConcreteMedium, typename F>
 PBRT_CPU_GPU SampledSpectrum SampleT_maj(Ray ray, Float tMax, Float u, RNG &rng,
                                          const SampledWavelengths &lambda, F func) {
@@ -786,9 +788,8 @@ PBRT_CPU_GPU SampledSpectrum SampleT_maj(Ray ray, Float tMax, Float u, RNG &rng,
                     T_majAccum * FastExp(-(t - tMin) * seg->sigma_maj);
                 MediumProperties mp = medium->SamplePoint(ray(t), lambda);
 
-                MediumInteraction intr(ray(t), -ray.d, ray.time, mp.sigma_a,
-                                       mp.sigma_s, seg->sigma_maj, mp.Le, medium,
-                                       mp.phase);
+                MediumInteraction intr(ray(t), -ray.d, ray.time, mp.sigma_a, mp.sigma_s,
+                                       seg->sigma_maj, mp.Le, medium, mp.phase);
                 if (!func(MediumSample(intr, T_maj))) {
                     // returning out of doubly-nested while loop is not as
                     // good perf. wise on the GPU vs using "done" here.
@@ -821,7 +822,8 @@ SampledSpectrum Medium::SampleT_maj(Ray ray, Float tMax, Float u, RNG &rng,
 inline MediumRayIterator Medium::SampleRay(Ray ray, Float tMax,
                                            const SampledWavelengths &lambda,
                                            ScratchBuffer &buf) const {
-    auto sample = [ray,tMax,lambda,&buf](auto medium) -> MediumRayIterator {
+    // Explicit capture to work around MSVC weirdness; it doesn't see |buf| otherwise...
+    auto sample = [ray, tMax, lambda, &buf](auto medium) -> MediumRayIterator {
         using Medium = typename std::remove_reference_t<decltype(*medium)>;
         using Iter = typename Medium::RayIterator;
         Iter *iter = (Iter *)buf.Alloc(sizeof(Iter), alignof(Iter));
