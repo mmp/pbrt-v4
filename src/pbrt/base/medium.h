@@ -70,6 +70,27 @@ struct MediumDensity {
     SampledSpectrum sigma_a, sigma_s;
 };
 
+class HomogeneousRayIterator;
+class DDARayIterator;
+
+struct MediumRaySegment {
+    Float tMin, tMax;
+    SampledSpectrum sigma_maj;
+
+    std::string ToString() const;
+};
+
+class MediumRayIterator : public TaggedPointer<HomogeneousRayIterator, DDARayIterator> {
+  public:
+    // MediumRayIterator Interface
+    using TaggedPointer::TaggedPointer;
+
+    PBRT_CPU_GPU
+    pstd::optional<MediumRaySegment> Next();
+
+    std::string ToString() const;
+};
+
 // Medium Definition
 class Medium : public TaggedPointer<HomogeneousMedium, UniformGridMedium, CloudMedium,
                                     NanoVDBMedium> {
@@ -81,12 +102,16 @@ class Medium : public TaggedPointer<HomogeneousMedium, UniformGridMedium, CloudM
                          const Transform &renderFromMedium, const FileLoc *loc,
                          Allocator alloc);
 
+    PBRT_CPU_GPU MediumRayIterator SampleRay(Ray ray, Float tMax,
+                                             const SampledWavelengths &lambda,
+                                             ScratchBuffer &buf) const;
+
     std::string ToString() const;
 
     bool IsEmissive() const;
 
     PBRT_CPU_GPU
-    MediumProperties Sample(Point3f p, const SampledWavelengths &lambda) const;
+    MediumProperties SamplePoint(Point3f p, const SampledWavelengths &lambda) const;
 
     template <typename F>
     PBRT_CPU_GPU SampledSpectrum SampleT_maj(Ray ray, Float tMax, Float u, RNG &rng,

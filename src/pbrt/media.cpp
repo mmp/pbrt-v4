@@ -40,6 +40,31 @@ std::string PhaseFunction::ToString() const {
     return DispatchCPU(ts);
 }
 
+std::string MediumRaySegment::ToString() const {
+    return StringPrintf("[ MediumRaySegment tMin: %f tMax: %f sigma_maj: %s ]", tMin,
+                        tMax, sigma_maj);
+}
+
+std::string MediumRayIterator::ToString() const {
+    auto tostr = [](auto ptr) { return ptr->ToString(); };
+    return DispatchCPU(tostr);
+}
+
+std::string HomogeneousRayIterator::ToString() const {
+    return StringPrintf("[ HomogeneousRayIterator seg: %s called: %s ]", seg, called);
+}
+
+std::string DDARayIterator::ToString() const {
+    return StringPrintf("[ DDARayIterator t0: %f tMax: %f sigma_t: %s "
+                        "nextCrossingT: [ %f %f %f ] deltaT: [ %f %f %f ] "
+                        "step: [ %d %d %d ] voxelLimit: [ %d %d %d ] voxel: [ %d %d %d ] "
+                        "maxDensityGrid: %p gridResolution: %s ]",
+                        t0, tMax, sigma_t, nextCrossingT[0], nextCrossingT[1],
+                        nextCrossingT[2], deltaT[0], deltaT[1], deltaT[2], step[0],
+                        step[1], step[2], voxelLimit[0], voxelLimit[1], voxelLimit[2],
+                        voxel[0], voxel[1], voxel[2], maxDensityGrid, gridResolution);
+}
+
 std::string MediumSample::ToString() const {
     return StringPrintf("[ MediumSample intr: %s T_maj: %s ]", intr, T_maj);
 }
