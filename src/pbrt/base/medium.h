@@ -70,24 +70,24 @@ struct MediumDensity {
     SampledSpectrum sigma_a, sigma_s;
 };
 
-// MediumRaySegment Definition
-struct MediumRaySegment {
+// RayMajorantSegment Definition
+struct RayMajorantSegment {
     Float tMin, tMax;
     SampledSpectrum sigma_maj;
 
     std::string ToString() const;
 };
 
-// MediumRayIterator Definition
-class HomogeneousRayIterator;
-class DDARayIterator;
+// RayMajorantIterator Definition
+class HomogeneousMajorantIterator;
+class DDAMajorantIterator;
 
-class MediumRayIterator : public TaggedPointer<HomogeneousRayIterator, DDARayIterator> {
+class RayMajorantIterator : public TaggedPointer<HomogeneousMajorantIterator, DDAMajorantIterator> {
   public:
     using TaggedPointer::TaggedPointer;
-    // MediumRayIterator Interface
+    // RayMajorantIterator Interface
     PBRT_CPU_GPU
-    pstd::optional<MediumRaySegment> Next();
+    pstd::optional<RayMajorantSegment> Next();
 
     std::string ToString() const;
 };
@@ -111,7 +111,7 @@ class Medium : public TaggedPointer<HomogeneousMedium, UniformGridMedium, CloudM
     MediumProperties SamplePoint(Point3f p, const SampledWavelengths &lambda) const;
 
     PBRT_CPU_GPU
-    MediumRayIterator SampleRay(Ray ray, Float tMax, const SampledWavelengths &lambda,
+    RayMajorantIterator SampleRay(Ray ray, Float tMax, const SampledWavelengths &lambda,
                                 ScratchBuffer &buf) const;
 
     template <typename F>

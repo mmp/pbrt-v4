@@ -40,22 +40,22 @@ std::string PhaseFunction::ToString() const {
     return DispatchCPU(ts);
 }
 
-std::string MediumRaySegment::ToString() const {
-    return StringPrintf("[ MediumRaySegment tMin: %f tMax: %f sigma_maj: %s ]", tMin,
+std::string RayMajorantSegment::ToString() const {
+    return StringPrintf("[ RayMajorantSegment tMin: %f tMax: %f sigma_maj: %s ]", tMin,
                         tMax, sigma_maj);
 }
 
-std::string MediumRayIterator::ToString() const {
+std::string RayMajorantIterator::ToString() const {
     auto tostr = [](auto ptr) { return ptr->ToString(); };
     return DispatchCPU(tostr);
 }
 
-std::string HomogeneousRayIterator::ToString() const {
-    return StringPrintf("[ HomogeneousRayIterator seg: %s called: %s ]", seg, called);
+std::string HomogeneousMajorantIterator::ToString() const {
+    return StringPrintf("[ HomogeneousMajorantIterator seg: %s called: %s ]", seg, called);
 }
 
-std::string DDARayIterator::ToString() const {
-    return StringPrintf("[ DDARayIterator t0: %f tMax: %f sigma_t: %s "
+std::string DDAMajorantIterator::ToString() const {
+    return StringPrintf("[ DDAMajorantIterator t0: %f tMax: %f sigma_t: %s "
                         "nextCrossingT: [ %f %f %f ] deltaT: [ %f %f %f ] "
                         "step: [ %d %d %d ] voxelLimit: [ %d %d %d ] voxel: [ %d %d %d ] "
                         "maxDensityGrid: %p gridResolution: %s ]",
