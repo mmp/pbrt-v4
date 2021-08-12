@@ -220,14 +220,14 @@ inline PBRT_CPU_GPU void TraceTransmittance(ShadowRayWorkItem sr,
                              : (Distance(ray.o, Point3f(result.pHit)) / Length(ray.d));
             SampledSpectrum T_maj = SampleT_maj(
                 ray, tEnd, rng.Uniform<Float>(), rng, lambda,
-                [&](const MediumSample &mediumSample) {
-                    const SampledSpectrum &T_maj = mediumSample.T_maj;
-                    const MediumInteraction &intr = mediumSample.intr;
-                    SampledSpectrum sigma_n = intr.sigma_n();
+                [&](Point3f p, MediumProperties mp, SampledSpectrum sigma_maj,
+                    SampledSpectrum T_maj) {
+                    SampledSpectrum sigma_n =
+                        ClampZero(sigma_maj - mp.sigma_a - mp.sigma_s);
 
                     // ratio-tracking: only evaluate null scattering
                     T_ray *= T_maj * sigma_n;
-                    lightPathPDF *= T_maj * intr.sigma_maj;
+                    lightPathPDF *= T_maj * sigma_maj;
                     uniPathPDF *= T_maj * sigma_n;
 
                     // Possibly terminate transmittance computation using Russian roulette

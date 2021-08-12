@@ -58,7 +58,6 @@ class NanoVDBMediumProvider;
 using NanoVDBMedium = CuboidMedium<NanoVDBMediumProvider>;
 
 struct MediumProperties;
-struct MediumSample;
 
 // MediumDensity Definition
 struct MediumDensity {
@@ -105,11 +104,13 @@ class Medium : public TaggedPointer<HomogeneousMedium, UniformGridMedium, CloudM
 
     std::string ToString() const;
 
+    PBRT_CPU_GPU
     bool IsEmissive() const;
 
     PBRT_CPU_GPU
     MediumProperties SamplePoint(Point3f p, const SampledWavelengths &lambda) const;
 
+    // Medium Public Methods
     PBRT_CPU_GPU
     RayMajorantIterator SampleRay(Ray ray, Float tMax, const SampledWavelengths &lambda,
                                   ScratchBuffer &buf) const;

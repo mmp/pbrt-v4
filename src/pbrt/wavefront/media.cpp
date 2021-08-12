@@ -83,31 +83,28 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
             Float uMode = raySamples.media.uMode;
 
             SampledSpectrum T_maj = SampleT_maj(
-                ray, tMax, uDist, rng, lambda, [&](const MediumSample &mediumSample) {
+                ray, tMax, uDist, rng, lambda,
+                [&](Point3f p, MediumProperties mp, SampledSpectrum sigma_maj,
+                    SampledSpectrum T_maj) {
                     rescale(T_hat, uniPathPDF, lightPathPDF);
-
-                    const MediumInteraction &intr = mediumSample.intr;
-                    const SampledSpectrum &sigma_a = intr.sigma_a;
-                    const SampledSpectrum &sigma_s = intr.sigma_s;
-                    const SampledSpectrum &T_maj = mediumSample.T_maj;
 
                     PBRT_DBG("Medium event T_maj %f %f %f %f sigma_a %f %f %f %f sigma_s "
                              "%f %f "
                              "%f %f\n",
-                             T_maj[0], T_maj[1], T_maj[2], T_maj[3], sigma_a[0],
-                             sigma_a[1], sigma_a[2], sigma_a[3], sigma_s[0], sigma_s[1],
-                             sigma_s[2], sigma_s[3]);
+                             T_maj[0], T_maj[1], T_maj[2], T_maj[3], mp.sigma_a[0],
+                             mp.sigma_a[1], mp.sigma_a[2], mp.sigma_a[3], mp.sigma_s[0],
+                             mp.sigma_s[1], mp.sigma_s[2], mp.sigma_s[3]);
 
                     // Add emission, if present.  Always do this and scale
                     // by sigma_a/sigma_maj rather than only doing it
                     // (without scaling) at absorption events.
-                    if (w.depth < maxDepth && intr.Le)
-                        L += T_hat * intr.Le * sigma_a /
-                             (intr.sigma_maj[0] * uniPathPDF.Average());
+                    if (w.depth < maxDepth && mp.Le)
+                        L += T_hat * mp.Le * mp.sigma_a /
+                             (sigma_maj[0] * uniPathPDF.Average());
 
                     // Compute probabilities for each type of scattering.
-                    Float pAbsorb = sigma_a[0] / intr.sigma_maj[0];
-                    Float pScatter = sigma_s[0] / intr.sigma_maj[0];
+                    Float pAbsorb = mp.sigma_a[0] / sigma_maj[0];
+                    Float pScatter = mp.sigma_s[0] / sigma_maj[0];
                     Float pNull = std::max<Float>(0, 1 - pAbsorb - pScatter);
                     PBRT_DBG("Medium scattering probabilities: %f %f %f\n", pAbsorb,
                              pScatter, pNull);
@@ -124,20 +121,20 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
                     } else if (mode == 1) {
                         // Scattering.
                         PBRT_DBG("scattered\n");
-                        T_hat *= T_maj * sigma_s;
-                        uniPathPDF *= T_maj * sigma_s;
+                        T_hat *= T_maj * mp.sigma_s;
+                        uniPathPDF *= T_maj * mp.sigma_s;
 
                         // Enqueue medium scattering work.
                         auto enqueue = [=](auto ptr) {
                             using PhaseFunction = typename std::remove_const_t<
                                 std::remove_reference_t<decltype(*ptr)>>;
                             mediumScatterQueue->Push(MediumScatterWorkItem<PhaseFunction>{
-                                intr.p(), w.depth, lambda, T_hat, uniPathPDF, ptr, -ray.d,
+                                p, w.depth, lambda, T_hat, uniPathPDF, ptr, -ray.d,
                                 ray.time, w.etaScale, ray.medium, w.pixelIndex});
                         };
                         DCHECK_RARE(1e-6f, !T_hat);
                         if (T_hat)
-                            intr.phase.Dispatch(enqueue);
+                            mp.phase.Dispatch(enqueue);
 
                         scattered = true;
 
@@ -145,11 +142,12 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
                     } else {
                         // Null scattering.
                         PBRT_DBG("null-scattered\n");
-                        SampledSpectrum sigma_n = intr.sigma_n();
+                        SampledSpectrum sigma_n =
+                            ClampZero(sigma_maj - mp.sigma_a - mp.sigma_s);
 
                         T_hat *= T_maj * sigma_n;
                         uniPathPDF *= T_maj * sigma_n;
-                        lightPathPDF *= T_maj * intr.sigma_maj;
+                        lightPathPDF *= T_maj * sigma_maj;
 
                         uMode = rng.Uniform<Float>();
 

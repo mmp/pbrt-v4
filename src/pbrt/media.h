@@ -69,20 +69,6 @@ class HGPhaseFunction {
     Float g;
 };
 
-// MediumSample Definition
-struct MediumSample {
-    PBRT_CPU_GPU
-    MediumSample(const MediumInteraction &intr, SampledSpectrum T_maj)
-        : intr(intr), T_maj(T_maj) {}
-    // MediumSample Public Methods
-    MediumSample() = default;
-
-    std::string ToString() const;
-
-    MediumInteraction intr;
-    SampledSpectrum T_maj;
-};
-
 // MediumProperties Definition
 struct MediumProperties {
     SampledSpectrum sigma_a, sigma_s;
@@ -120,11 +106,10 @@ class DDAMajorantIterator {
     // DDAMajorantIterator Public Methods
     DDAMajorantIterator() = default;
     PBRT_CPU_GPU
-    DDAMajorantIterator(Ray ray, const Bounds3f &bounds, SampledSpectrum sigma_t,
-                        Float tMin, Float tMax, const pstd::vector<Float> *grid,
-                        Point3i res)
+    DDAMajorantIterator(Ray ray, Bounds3f bounds, SampledSpectrum sigma_t, Float tMin,
+                        Float tMax, const pstd::vector<Float> *grid, Point3i res)
         : sigma_t(sigma_t), tMin(tMin), tMax(tMax), grid(grid), res(res) {
-        // Set up 3D DDA for ray through grid
+        // Set up 3D DDA for ray through the majorant grid
         Vector3f diag = bounds.Diagonal();
         Ray rayGrid(Point3f(bounds.Offset(ray.o)),
                     Vector3f(ray.d.x / diag.x, ray.d.y / diag.y, ray.d.z / diag.z));
@@ -133,7 +118,7 @@ class DDAMajorantIterator {
             // Initialize ray stepping parameters for _axis_
             // Compute current voxel for axis and handle negative zero direction
             voxel[axis] = Clamp(gridIntersect[axis] * res[axis], 0, res[axis] - 1);
-            deltaT[axis] = 1 / std::abs(rayGrid.d[axis] * res[axis]);
+            deltaT[axis] = 1 / (std::abs(rayGrid.d[axis]) * res[axis]);
             if (rayGrid.d[axis] == -0.f)
                 rayGrid.d[axis] = 0.f;
 
@@ -168,7 +153,7 @@ class DDAMajorantIterator {
         int stepAxis = cmpToAxis[bits];
         Float tVoxelExit = std::min(tMax, nextCrossingT[stepAxis]);
 
-        // Get _maxDensity_ for current voxel initialize _RayMajorantSegment_, _seg_
+        // Get _maxDensity_ for current voxel and initialize _RayMajorantSegment_, _seg_
         int offset = voxel[0] + res.x * (voxel[1] + res.y * voxel[2]);
         Float maxDensity = (*grid)[offset];
         SampledSpectrum sigma_maj = sigma_t * maxDensity;
@@ -219,6 +204,7 @@ class HomogeneousMedium {
     static HomogeneousMedium *Create(const ParameterDictionary &parameters,
                                      const FileLoc *loc, Allocator alloc);
 
+    PBRT_CPU_GPU
     bool IsEmissive() const { return Le_spec.MaxValue() > 0; }
 
     PBRT_CPU_GPU
@@ -276,6 +262,7 @@ class CuboidMedium {
                             phase, maxDensityGrid, gridResolution);
     }
 
+    PBRT_CPU_GPU
     bool IsEmissive() const { return provider->IsEmissive(); }
 
     PBRT_CPU_GPU
@@ -378,6 +365,7 @@ class UniformGridMediumProvider {
     PBRT_CPU_GPU
     const Bounds3f &Bounds() const { return bounds; }
 
+    PBRT_CPU_GPU
     bool IsEmissive() const { return Le_spec.MaxValue() > 0; }
 
     PBRT_CPU_GPU
@@ -622,6 +610,7 @@ class NanoVDBMediumProvider {
     PBRT_CPU_GPU
     const Bounds3f &Bounds() const { return bounds; }
 
+    PBRT_CPU_GPU
     bool IsEmissive() const { return temperatureFloatGrid && LeScale > 0; }
 
     PBRT_CPU_GPU
@@ -751,55 +740,53 @@ inline MediumProperties Medium::SamplePoint(Point3f p,
 template <typename ConcreteMedium, typename F>
 PBRT_CPU_GPU SampledSpectrum SampleT_maj(Ray ray, Float tMax, Float u, RNG &rng,
                                          const SampledWavelengths &lambda, F func) {
+    // Normalize ray direction and update _tMax_ accordingly
     tMax *= Length(ray.d);
     ray.d = Normalize(ray.d);
 
+    // Initialize _MajorantIterator_ for ray majorant sampling
     ConcreteMedium *medium = ray.medium.Cast<ConcreteMedium>();
-
     typename ConcreteMedium::MajorantIterator iter;
     medium->SampleRay(ray, tMax, lambda, &iter);
 
-    SampledSpectrum T_majAccum(1.f);
+    // Generate ray majorant samples until termination event
+    SampledSpectrum T_maj(1.f);
     bool done = false;
-    // for each segment
     while (!done) {
+        // Get next majorant segment from iterator and sample it
         pstd::optional<RayMajorantSegment> seg = iter.Next();
         if (!seg)
-            return T_majAccum;
-
+            return T_maj;
+        // Handle cases that skip majorant segment sampling
         Float dt = seg->tMax - seg->tMin;
         if (IsInf(dt))
             dt = std::numeric_limits<Float>::max();
         if (seg->sigma_maj[0] == 0) {
-            T_majAccum *= FastExp(-dt * seg->sigma_maj);
+            T_maj *= FastExp(-dt * seg->sigma_maj);
             continue;
         }
 
-        // generate 0, 1, or more samples along the segment
         Float tMin = seg->tMin;
         while (true) {
+            // Try to generate sample along current majorant segment
             Float t = tMin + SampleExponential(u, seg->sigma_maj[0]);
             u = rng.Uniform<Float>();
-
             if (t < seg->tMax) {
-                SampledSpectrum T_maj =
-                    T_majAccum * FastExp(-(t - tMin) * seg->sigma_maj);
+                // Call callback function for sample along majorant segment
+                T_maj *= FastExp(-(t - tMin) * seg->sigma_maj);
                 MediumProperties mp = medium->SamplePoint(ray(t), lambda);
-
-                MediumInteraction intr(ray(t), -ray.d, ray.time, mp.sigma_a, mp.sigma_s,
-                                       seg->sigma_maj, mp.Le, medium, mp.phase);
-                if (!func(MediumSample(intr, T_maj))) {
-                    // returning out of doubly-nested while loop is not as
-                    // good perf. wise on the GPU vs using "done" here.
-                    // return SampledSpectrum(1.f);
+                if (!func(ray(t), mp, seg->sigma_maj, T_maj)) {
+                    // Returning out of doubly-nested while loop is not as good perf. wise
+                    // on the GPU vs using "done" here.
                     done = true;
                     break;
                 }
-
-                T_majAccum = SampledSpectrum(1.f);
+                T_maj = SampledSpectrum(1.f);
                 tMin = t;
+
             } else {
-                T_majAccum *= FastExp(-dt * seg->sigma_maj);
+                // Handle sample past end of majorant segment
+                T_maj *= FastExp(-dt * seg->sigma_maj);
                 break;
             }
         }
@@ -808,13 +795,13 @@ PBRT_CPU_GPU SampledSpectrum SampleT_maj(Ray ray, Float tMax, Float u, RNG &rng,
 }
 
 template <typename F>
-SampledSpectrum SampleT_maj(Ray ray, Float tMax, Float u, RNG &rng,
-                            const SampledWavelengths &lambda, F func) {
-    auto sampletn = [&](auto medium) {
+PBRT_CPU_GPU SampledSpectrum SampleT_maj(Ray ray, Float tMax, Float u, RNG &rng,
+                                         const SampledWavelengths &lambda, F func) {
+    auto sample = [&](auto medium) {
         using Medium = typename std::remove_reference_t<decltype(*medium)>;
         return SampleT_maj<Medium>(ray, tMax, u, rng, lambda, func);
     };
-    return ray.medium.Dispatch(sampletn);
+    return ray.medium.Dispatch(sample);
 }
 
 inline RayMajorantIterator Medium::SampleRay(Ray ray, Float tMax,

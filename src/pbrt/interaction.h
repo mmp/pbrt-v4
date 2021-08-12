@@ -144,29 +144,14 @@ class MediumInteraction : public Interaction {
     PBRT_CPU_GPU
     MediumInteraction() : phase(nullptr) {}
     PBRT_CPU_GPU
-    MediumInteraction(Point3f p, Vector3f wo, Float time, SampledSpectrum sigma_a,
-                      SampledSpectrum sigma_s, SampledSpectrum sigma_maj,
-                      SampledSpectrum Le, Medium medium, PhaseFunction phase)
-        : Interaction(p, wo, time, medium),
-          phase(phase),
-          sigma_a(sigma_a),
-          sigma_s(sigma_s),
-          sigma_maj(sigma_maj),
-          Le(Le) {}
-
-    PBRT_CPU_GPU
-    SampledSpectrum sigma_n() const {
-        SampledSpectrum sigma_t = sigma_a + sigma_s;
-        SampledSpectrum sigma_n = sigma_maj - sigma_t;
-        CHECK_RARE(1e-5, sigma_n.MinComponentValue() < 0);
-        return ClampZero(sigma_n);
-    }
+    MediumInteraction(Point3f p, Vector3f wo, Float time, Medium medium,
+                      PhaseFunction phase)
+        : Interaction(p, wo, time, medium), phase(phase) {}
 
     std::string ToString() const;
 
     // MediumInteraction Public Members
     PhaseFunction phase;
-    SampledSpectrum sigma_a, sigma_s, sigma_maj, Le;
 };
 
 // SurfaceInteraction Definition

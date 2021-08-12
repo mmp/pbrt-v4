@@ -31,10 +31,8 @@ std::string Interaction::ToString() const {
 std::string MediumInteraction::ToString() const {
     return StringPrintf(
         "[ MediumInteraction pi: %s n: %s uv: %s wo: %s time: %s "
-        "sigma_a: %s sigma_s: %s sigma_maj: %s Le: %s medium: %s mediumInterface: %s "
-        "phase: %s ]",
-        pi, n, uv, wo, time, sigma_a, sigma_s, sigma_maj, Le,
-        medium ? medium.ToString().c_str() : "(nullptr)",
+        "medium: %s mediumInterface: %s phase: %s ]",
+        pi, n, uv, wo, time, medium ? medium.ToString().c_str() : "(nullptr)",
         mediumInterface ? mediumInterface->ToString().c_str() : "(nullptr)",
         phase ? phase.ToString().c_str() : "(nullptr)");
 }

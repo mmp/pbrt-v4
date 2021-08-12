@@ -66,10 +66,6 @@ std::string DDAMajorantIterator::ToString() const {
                         voxel[0], voxel[1], voxel[2], grid, res);
 }
 
-std::string MediumSample::ToString() const {
-    return StringPrintf("[ MediumSample intr: %s T_maj: %s ]", intr, T_maj);
-}
-
 // HenyeyGreenstein Method Definitions
 std::string HGPhaseFunction::ToString() const {
     return StringPrintf("[ HGPhaseFunction g: %f ]", g);
