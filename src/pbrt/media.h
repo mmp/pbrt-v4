@@ -757,11 +757,13 @@ PBRT_CPU_GPU SampledSpectrum SampleT_maj(Ray ray, Float tMax, Float u, RNG &rng,
         pstd::optional<RayMajorantSegment> seg = iter.Next();
         if (!seg)
             return T_maj;
-        // Handle cases that skip majorant segment sampling
-        Float dt = seg->tMax - seg->tMin;
-        if (IsInf(dt))
-            dt = std::numeric_limits<Float>::max();
+        // Handle zero-valued majorant for current segment
         if (seg->sigma_maj[0] == 0) {
+            Float dt = seg->tMax - seg->tMin;
+            // Handle infinite _dt_ for ray majorant segment
+            if (IsInf(dt))
+                dt = std::numeric_limits<Float>::max();
+
             T_maj *= FastExp(-dt * seg->sigma_maj);
             continue;
         }
@@ -786,6 +788,11 @@ PBRT_CPU_GPU SampledSpectrum SampleT_maj(Ray ray, Float tMax, Float u, RNG &rng,
 
             } else {
                 // Handle sample past end of majorant segment
+                Float dt = seg->tMax - tMin;
+                // Handle infinite _dt_ for ray majorant segment
+                if (IsInf(dt))
+                    dt = std::numeric_limits<Float>::max();
+
                 T_maj *= FastExp(-dt * seg->sigma_maj);
                 break;
             }
