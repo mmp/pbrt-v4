@@ -8,27 +8,21 @@
 
 namespace pbrt {
 
-// It's not unususal for these values to have very large or very small
-// magnitudes after multiple (null) scattering events, even though in the
-// end ratios like T_hat/uniPathPDF are generally around 1.  To avoid overflow,
-// we rescale all three of them by the same factor when they become large.
 PBRT_CPU_GPU
-static inline void rescale(SampledSpectrum &T_hat, SampledSpectrum &lightPathPDF,
-                           SampledSpectrum &uniPathPDF) {
-    // Note that no precision is lost in the rescaling since we're always
-    // multiplying by an exact power of 2.
-    if (T_hat.MaxComponentValue() > 0x1p24f ||
-        lightPathPDF.MaxComponentValue() > 0x1p24f ||
-        uniPathPDF.MaxComponentValue() > 0x1p24f) {
-        T_hat *= 1.f / 0x1p24f;
-        lightPathPDF *= 1.f / 0x1p24f;
-        uniPathPDF *= 1.f / 0x1p24f;
-    } else if (T_hat.MaxComponentValue() < 0x1p-24f ||
-               lightPathPDF.MaxComponentValue() < 0x1p-24f ||
-               uniPathPDF.MaxComponentValue() < 0x1p-24f) {
-        T_hat *= 0x1p24f;
-        lightPathPDF *= 0x1p24f;
-        uniPathPDF *= 0x1p24f;
+static inline void rescale(SampledSpectrum *T_hat, SampledSpectrum *lightPathPDF,
+                           SampledSpectrum *uniPathPDF) {
+    if (T_hat->MaxComponentValue() > 0x1p24f ||
+        lightPathPDF->MaxComponentValue() > 0x1p24f ||
+        uniPathPDF->MaxComponentValue() > 0x1p24f) {
+        *T_hat *= 1.f / 0x1p24f;
+        *lightPathPDF *= 1.f / 0x1p24f;
+        *uniPathPDF *= 1.f / 0x1p24f;
+    } else if (T_hat->MaxComponentValue() < 0x1p-24f ||
+               lightPathPDF->MaxComponentValue() < 0x1p-24f ||
+               uniPathPDF->MaxComponentValue() < 0x1p-24f) {
+        *T_hat *= 0x1p24f;
+        *lightPathPDF *= 0x1p24f;
+        *uniPathPDF *= 0x1p24f;
     }
 }
 
@@ -86,7 +80,7 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
                 ray, tMax, uDist, rng, lambda,
                 [&](Point3f p, MediumProperties mp, SampledSpectrum sigma_maj,
                     SampledSpectrum T_maj) {
-                    rescale(T_hat, uniPathPDF, lightPathPDF);
+                    rescale(&T_hat, &uniPathPDF, &lightPathPDF);
 
                     PBRT_DBG("Medium event T_maj %f %f %f %f sigma_a %f %f %f %f sigma_s "
                              "%f %f "

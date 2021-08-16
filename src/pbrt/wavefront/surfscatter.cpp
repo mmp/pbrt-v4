@@ -22,20 +22,20 @@
 namespace pbrt {
 
 PBRT_CPU_GPU
-static inline void rescale(SampledSpectrum &T_hat, SampledSpectrum &lightPathPDF,
-                           SampledSpectrum &uniPathPDF) {
-    if (T_hat.MaxComponentValue() > 0x1p24f ||
-        lightPathPDF.MaxComponentValue() > 0x1p24f ||
-        uniPathPDF.MaxComponentValue() > 0x1p24f) {
-        T_hat *= 1.f / 0x1p24f;
-        lightPathPDF *= 1.f / 0x1p24f;
-        uniPathPDF *= 1.f / 0x1p24f;
-    } else if (T_hat.MaxComponentValue() < 0x1p-24f ||
-               lightPathPDF.MaxComponentValue() < 0x1p-24f ||
-               uniPathPDF.MaxComponentValue() < 0x1p-24f) {
-        T_hat *= 0x1p24f;
-        lightPathPDF *= 0x1p24f;
-        uniPathPDF *= 0x1p24f;
+static inline void rescale(SampledSpectrum *T_hat, SampledSpectrum *lightPathPDF,
+                           SampledSpectrum *uniPathPDF) {
+    if (T_hat->MaxComponentValue() > 0x1p24f ||
+        lightPathPDF->MaxComponentValue() > 0x1p24f ||
+        uniPathPDF->MaxComponentValue() > 0x1p24f) {
+        *T_hat *= 1.f / 0x1p24f;
+        *lightPathPDF *= 1.f / 0x1p24f;
+        *uniPathPDF *= 1.f / 0x1p24f;
+    } else if (T_hat->MaxComponentValue() < 0x1p-24f ||
+               lightPathPDF->MaxComponentValue() < 0x1p-24f ||
+               uniPathPDF->MaxComponentValue() < 0x1p-24f) {
+        *T_hat *= 0x1p24f;
+        *lightPathPDF *= 0x1p24f;
+        *uniPathPDF *= 0x1p24f;
     }
 }
 
@@ -199,7 +199,7 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
                 } else
                     uniPathPDF *= bsdfSample->pdf;
 
-                rescale(T_hat, uniPathPDF, lightPathPDF);
+                rescale(&T_hat, &uniPathPDF, &lightPathPDF);
                 // Update _etaScale_ accounting for BSDF scattering
                 Float etaScale = w.etaScale;
                 if (bsdfSample->IsTransmission())

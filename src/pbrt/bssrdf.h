@@ -233,7 +233,7 @@ class TabulatedBSSRDF {
 
     PBRT_CPU_GPU
     SampledSpectrum PDF_Sp(Point3f pi, Normal3f ni) const {
-        // Express $\pti-\pto$ and $\bold{n}_i$ with respect to local coordinates at
+        // Express $\pti-\pto$ and $\N{}_\roman{i}$ with respect to local coordinates at
         // $\pto$
         Vector3f d = pi - po;
         Frame f = Frame::FromZ(ns);

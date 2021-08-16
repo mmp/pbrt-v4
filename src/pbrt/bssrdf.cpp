@@ -50,7 +50,7 @@ Float BeamDiffusionMS(Float sigma_s, Float sigma_a, Float g, Float eta, Float r)
 
     for (int i = 0; i < nSamples; ++i) {
         // Sample real point source depth $\depthreal$
-        Float zr = -std::log(1 - (i + 0.5f) / nSamples) / sigmap_t;
+        Float zr = SampleExponential((i + 0.5f) / nSamples, sigmap_t);
 
         // Evaluate dipole integrand $E_{\roman{d}}$ at $\depthreal$ and add to _Ed_
         Float zv = -zr + 2 * ze;
@@ -83,7 +83,7 @@ Float BeamDiffusionSS(Float sigma_s, Float sigma_a, Float g, Float eta, Float r)
     const int nSamples = 100;
     for (int i = 0; i < nSamples; ++i) {
         // Evaluate single-scattering integrand and add to _Ess_
-        Float ti = tCrit - std::log(1 - (i + 0.5f) / nSamples) / sigma_t;
+        Float ti = tCrit + SampleExponential((i + 0.5f) / nSamples, sigma_t);
         // Determine length $d$ of connecting segment and $\cos\theta_\roman{o}$
         Float d = std::sqrt(Sqr(r) + Sqr(ti));
         Float cosTheta_o = ti / d;
