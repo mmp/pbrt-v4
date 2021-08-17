@@ -443,7 +443,7 @@ Float WavefrontPathIntegrator::Render() {
          ++sampleIndex) {
         // Attempt to work around issue #145.
 #if !(defined(PBRT_IS_WINDOWS) && defined(PBRT_BUILD_GPU_RENDERER) && \
-      __CUDACC_VER_MAJOR__ == 11 && __CUDACC_VER_MINIOR__ == 1)
+      __CUDACC_VER_MAJOR__ == 11 && __CUDACC_VER_MINOR__ == 1)
         CheckCallbackScope _([&]() {
             return StringPrintf("Wavefront rendering failed at sample %d. Debug with "
                                 "\"--debugstart %d\"\n",
