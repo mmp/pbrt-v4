@@ -28,9 +28,9 @@ inline PBRT_CPU_GPU void EnqueueWorkAfterMiss(RayWorkItem r,
     }
 }
 
-inline PBRT_CPU_GPU void RecordShadowRayIntersection(
-    const ShadowRayWorkItem w, SOA<PixelSampleState> *pixelSampleState,
-    bool foundIntersection) {
+inline PBRT_CPU_GPU void RecordShadowRayResult(const ShadowRayWorkItem w,
+                                               SOA<PixelSampleState> *pixelSampleState,
+                                               bool foundIntersection) {
     if (foundIntersection) {
         PBRT_DBG("Shadow ray was occluded\n");
         return;
@@ -66,7 +66,7 @@ inline PBRT_CPU_GPU void EnqueueWorkAfterIntersection(
                                                      r.lightPathPDF,
                                                      r.pixelIndex,
                                                      r.prevIntrCtx,
-                                                     r.isSpecularBounce,
+                                                     r.specularBounce,
                                                      r.anyNonSpecularBounces,
                                                      r.etaScale,
                                                      intr.areaLight,
@@ -103,7 +103,7 @@ inline PBRT_CPU_GPU void EnqueueWorkAfterIntersection(
         Ray newRay = intr.SpawnRay(r.ray.d);
         nextRayQueue->PushIndirectRay(newRay, r.depth, r.prevIntrCtx, r.T_hat,
                                       r.uniPathPDF, r.lightPathPDF, r.lambda, r.etaScale,
-                                      r.isSpecularBounce, r.anyNonSpecularBounces,
+                                      r.specularBounce, r.anyNonSpecularBounces,
                                       r.pixelIndex);
         return;
     }
@@ -116,7 +116,7 @@ inline PBRT_CPU_GPU void EnqueueWorkAfterIntersection(
         hitAreaLightQueue->Push(
             HitAreaLightWorkItem{intr.areaLight, intr.p(), intr.n, intr.uv, intr.wo,
                                  r.lambda, r.depth, r.T_hat, r.uniPathPDF, r.lightPathPDF,
-                                 r.prevIntrCtx, (int)r.isSpecularBounce, r.pixelIndex});
+                                 r.prevIntrCtx, (int)r.specularBounce, r.pixelIndex});
     }
 
     FloatTexture displacement = material.GetDisplacement();

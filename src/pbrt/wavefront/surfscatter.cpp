@@ -71,15 +71,15 @@ template <typename ConcreteMaterial, typename TextureEvaluator>
 void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQueue,
                                                       int wavefrontDepth) {
     // Get BSDF for items in _evalQueue_ and sample illumination
-    // Construct _name_ for material/texture evaluator kernel
-    std::string name = StringPrintf(
+    // Construct _desc_ for material/texture evaluation kernel
+    std::string desc = StringPrintf(
         "%s + BxDF eval (%s tex)", ConcreteMaterial::Name(),
         std::is_same_v<TextureEvaluator, BasicTextureEvaluator> ? "Basic" : "Universal");
 
     RayQueue *nextRayQueue = NextRayQueue(wavefrontDepth);
     auto queue = evalQueue->Get<MaterialEvalWorkItem<ConcreteMaterial>>();
     ForAllQueued(
-        name.c_str(), queue, maxQueueSize,
+        desc.c_str(), queue, maxQueueSize,
         PBRT_CPU_GPU_LAMBDA(const MaterialEvalWorkItem<ConcreteMaterial> w) {
             // Evaluate material and BSDF for ray intersection
             TextureEvaluator texEval;
@@ -116,6 +116,7 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
             FloatTexture displacement = w.material->GetDisplacement();
             const Image *normalMap = w.material->GetNormalMap();
             if (displacement || normalMap) {
+                // Call _Bump()_ to find shading geometry
                 if (displacement)
                     DCHECK(texEval.CanEvaluate({displacement}, {}));
                 BumpEvalContext bctx = w.GetBumpEvalContext(dudx, dudy, dvdx, dvdy);

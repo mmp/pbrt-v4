@@ -630,7 +630,7 @@ void WavefrontPathIntegrator::HandleEmissiveIntersection() {
 
             // Compute area light's weighted radiance contribution to the path
             SampledSpectrum L(0.f);
-            if (w.depth == 0 || w.isSpecularBounce) {
+            if (w.depth == 0 || w.specularBounce) {
                 L = w.T_hat * Le / w.uniPathPDF.Average();
             } else {
                 // Compute MIS-weighted radiance contribution from area light

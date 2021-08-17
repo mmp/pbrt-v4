@@ -45,7 +45,7 @@ soa RayWorkItem {
     SampledSpectrum T_hat, uniPathPDF, lightPathPDF;
     LightSampleContext prevIntrCtx;
     Float etaScale;
-    int isSpecularBounce;
+    int specularBounce;
     int anyNonSpecularBounces;
 };
 
@@ -70,7 +70,7 @@ soa HitAreaLightWorkItem {
     Vector3f wo;
     int depth;
     LightSampleContext prevIntrCtx;
-    int isSpecularBounce;
+    int specularBounce;
     int pixelIndex;
 };
 
@@ -131,7 +131,7 @@ soa MediumSampleWorkItem {
     Vector3f wo;
     Point2f uv;
     LightSampleContext prevIntrCtx;
-    int isSpecularBounce;
+    int specularBounce;
     Material material;
     Normal3f ns;
     Vector3f dpdus, dpdvs;

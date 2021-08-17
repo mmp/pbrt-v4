@@ -59,7 +59,7 @@ void CPUAggregate::IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue,
     ParallelFor(0, shadowRayQueue->Size(), [=](int index) {
         const ShadowRayWorkItem w = (*shadowRayQueue)[index];
         bool hit = aggregate.IntersectP(w.ray, w.tMax);
-        RecordShadowRayIntersection(w, pixelSampleState, hit);
+        RecordShadowRayResult(w, pixelSampleState, hit);
     });
 }
 

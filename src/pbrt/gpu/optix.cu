@@ -258,7 +258,7 @@ extern "C" __global__ void __raygen__shadow() {
     Trace(params.traversable, sr.ray, 1e-5f /* tMin */, sr.tMax, OPTIX_RAY_FLAG_NONE,
           missed);
 
-    RecordShadowRayIntersection(sr, &params.pixelSampleState, !missed);
+    RecordShadowRayResult(sr, &params.pixelSampleState, !missed);
 }
 
 extern "C" __global__ void __miss__shadow() {
