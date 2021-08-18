@@ -418,8 +418,6 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
         } else
               LOG_FATAL("Logic error in GPUAggregate::buildBVHForTriangles()");
 
-        shape.parameters.ReportUnused();
-
         Bounds3f bounds;
         for (size_t i = 0; i < mesh->nVertices; ++i)
             bounds = Union(bounds, mesh->p[i]);
@@ -463,6 +461,9 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
             Material material = getMaterial(shape, namedMaterials, materials);
             triangleInputFlags[meshIndex] = getOptixGeometryFlags(true, alphaTexture);
             input.triangleArray.flags = &triangleInputFlags[meshIndex];
+
+            // Do this here, after the alpha texture has been consumed.
+            shape.parameters.ReportUnused();
 
             input.triangleArray.numSbtRecords = 1;
             input.triangleArray.sbtIndexOffsetBuffer = CUdeviceptr(nullptr);
@@ -765,13 +766,11 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForBLPs(
             BilinearPatchMesh *mesh = BilinearPatch::CreateMesh(
                 shape.renderFromObject, shape.reverseOrientation, shape.parameters,
                 &shape.loc, alloc);
-            shape.parameters.ReportUnused();
             meshes[meshIndex] = mesh;
             nPatches += mesh->nPatches;
         } else if (shape.name == "curve") {
             BilinearPatchMesh *curveMesh =
                 diceCurveToBLP(shape, 5 /* nseg */, 5 /* nvert */, alloc);
-            shape.parameters.ReportUnused();
             if (curveMesh) {
                 meshes[meshIndex] = curveMesh;
                 nPatches += curveMesh->nPatches;
@@ -830,6 +829,9 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForBLPs(
         const auto &shape = shapes[shapeIndex];
         Material material = getMaterial(shape, namedMaterials, materials);
         FloatTexture alphaTexture = getAlphaTexture(shape, floatTextures, alloc);
+
+        // After "alpha" has been consumed...
+        shape.parameters.ReportUnused();
 
         flags[meshIndex] = getOptixGeometryFlags(false, alphaTexture);
 
@@ -941,6 +943,9 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForQuadrics(
         Material material = getMaterial(s, namedMaterials, materials);
         FloatTexture alphaTexture = getAlphaTexture(s, floatTextures, alloc);
         flags[quadricIndex] = getOptixGeometryFlags(false, alphaTexture);
+
+        // Once again, after any alpha texture is created...
+        s.parameters.ReportUnused();
 
         HitgroupRecord hgRecord;
         OPTIX_CHECK(optixSbtRecordPackHeader(intersectPG, &hgRecord));
