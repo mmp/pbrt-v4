@@ -115,7 +115,7 @@ class alignas(PBRT_L1_CACHE_LINE_SIZE) ScratchBuffer {
 
     template <typename T>
     PBRT_CPU_GPU typename AllocationTraits<T>::Array Alloc(size_t n = 1) {
-        using ElementType = typename std::remove_extent<T>::type;
+        using ElementType = typename std::remove_extent_t<T>;
         ElementType *ret =
             (ElementType *)Alloc(n * sizeof(ElementType), alignof(ElementType));
         for (size_t i = 0; i < n; ++i)

@@ -905,7 +905,7 @@ inline BSDF Material::GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
                               ScratchBuffer &scratchBuffer) const {
     // Define _getBSDF_ lamba function for _Material::GetBSDF()_
     auto getBSDF = [&](auto mtl) -> BSDF {
-        using Material = typename std::remove_reference<decltype(*mtl)>::type;
+        using Material = typename std::remove_reference_t<decltype(*mtl)>;
         using BxDF = typename Material::BxDF;
         BxDF *bxdf = (BxDF *)scratchBuffer.Alloc(sizeof(BxDF), alignof(BxDF));
         return mtl->GetBSDF(texEval, ctx, lambda, bxdf);
@@ -925,7 +925,7 @@ inline BSSRDF Material::GetBSSRDF(TextureEvaluator texEval, MaterialEvalContext 
                                   SampledWavelengths &lambda,
                                   ScratchBuffer &scratchBuffer) const {
     auto get = [&](auto ptr) -> BSSRDF {
-        using Material = typename std::remove_reference<decltype(*ptr)>::type;
+        using Material = typename std::remove_reference_t<decltype(*ptr)>;
         using BSSRDF = typename Material::BSSRDF;
         if constexpr (std::is_same_v<BSSRDF, void>)
             return nullptr;

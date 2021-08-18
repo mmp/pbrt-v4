@@ -299,7 +299,7 @@ PBRT_CPU_GPU inline constexpr auto GetData(C &c) noexcept -> decltype(GetDataImp
 // Detection idioms for size() and data().
 template <typename C>
 using HasSize =
-    std::is_integral<typename std::decay<decltype(std::declval<C &>().size())>::type>;
+    std::is_integral<typename std::decay_t<decltype(std::declval<C &>().size())>>;
 
 // We want to enable conversion from vector<T*> to span<const T* const> but
 // disable conversion from vector<Derived> to span<Base>. Here we use
@@ -309,7 +309,7 @@ using HasSize =
 // which returns a reference.
 template <typename T, typename C>
 using HasData = std::is_convertible<
-    typename std::decay<decltype(GetData(std::declval<C &>()))>::type *, T *const *>;
+    typename std::decay_t<decltype(GetData(std::declval<C &>()))> *, T *const *>;
 
 }  // namespace span_internal
 
@@ -334,7 +334,7 @@ class span {
     template <typename U>
     using EnableIfMutableView = typename std::enable_if_t<!std::is_const<T>::value, U>;
 
-    using value_type = typename std::remove_cv<T>::type;
+    using value_type = typename std::remove_cv_t<T>;
     using iterator = T *;
     using const_iterator = const T *;
 
