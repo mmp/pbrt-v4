@@ -234,10 +234,13 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
         // Allocate storage for all of the queues/buffers...
 
 #ifdef PBRT_BUILD_GPU_RENDERER
-    CUDATrackedMemoryResource *mr =
-        dynamic_cast<CUDATrackedMemoryResource *>(memoryResource);
-    CHECK(mr);
-    size_t startSize = mr->BytesAllocated();
+    size_t startSize = 0;
+    if (Options->useGPU) {
+        CUDATrackedMemoryResource *mr =
+            dynamic_cast<CUDATrackedMemoryResource *>(memoryResource);
+        CHECK(mr);
+        startSize = mr->BytesAllocated();
+    }
 #endif  // PBRT_BUILD_GPU_RENDERER
 
     // Compute number of scanlines to render per pass
@@ -292,8 +295,13 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
     stats = alloc.new_object<Stats>(maxDepth, alloc);
 
 #ifdef PBRT_BUILD_GPU_RENDERER
-    size_t endSize = mr->BytesAllocated();
-    pathIntegratorBytes += endSize - startSize;
+    if (Options->useGPU) {
+        CUDATrackedMemoryResource *mr =
+            dynamic_cast<CUDATrackedMemoryResource *>(memoryResource);
+        CHECK(mr);
+        size_t endSize = mr->BytesAllocated();
+        pathIntegratorBytes += endSize - startSize;
+    }
 #endif  // PBRT_BUILD_GPU_RENDERER
 }
 
