@@ -41,6 +41,11 @@ void CPUAggregate::IntersectClosest(int maxRays, const RayQueue *rayQueue,
     // _CPUAggregate::IntersectClosest()_ method implementation
     ParallelFor(0, rayQueue->Size(), [=](int index) {
         const RayWorkItem r = (*rayQueue)[index];
+        if (!aggregate) {
+            EnqueueWorkAfterMiss(r, mediumSampleQueue, escapedRayQueue);
+            return;
+        }
+
         // Intersect _r_'s ray with the scene and enqueue resulting work
         pstd::optional<ShapeIntersection> si = aggregate.Intersect(r.ray);
         if (!si)

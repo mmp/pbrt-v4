@@ -30,7 +30,7 @@ class CPUAggregate : public WavefrontAggregate {
                  const std::map<std::string, pbrt::Material> &namedMaterials,
                  const std::vector<pbrt::Material> &materials);
 
-    Bounds3f Bounds() const { return aggregate.Bounds(); }
+    Bounds3f Bounds() const { return aggregate ? aggregate.Bounds() : Bounds3f(); }
 
     void IntersectClosest(int maxRays, const RayQueue *rayQueue,
                           EscapedRayQueue *escapedRayQueue,
