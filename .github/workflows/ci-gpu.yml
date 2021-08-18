@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         optix: [ optix-7.1.0, optix-7.2.0, optix-7.3.0 ]
-        cuda: [ '11.0', '11.1', '11.2' ]
+        cuda: [ '11.0', '11.1', '11.2', '11.3', '11.4' ]
 
     name: GPU Build Only (CUDA ${{ matrix.cuda }}, ${{ matrix.optix }})
 
