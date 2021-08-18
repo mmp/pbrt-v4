@@ -44,10 +44,12 @@ class NewDeleteResource : public memory_resource {
     }
 };
 
-static NewDeleteResource ndr;
+static NewDeleteResource *ndr;
 
 memory_resource *new_delete_resource() noexcept {
-    return &ndr;
+    if (!ndr)
+        ndr = new NewDeleteResource;
+    return ndr;
 }
 
 static memory_resource *defaultMemoryResource = new_delete_resource();
