@@ -245,8 +245,8 @@ inline PBRT_CPU_GPU void TraceTransmittance(ShadowRayWorkItem sr,
                     PBRT_DBG(
                         "T_maj %f %f %f %f sigma_n %f %f %f %f sigma_maj %f %f %f %f\n",
                         T_maj[0], T_maj[1], T_maj[2], T_maj[3], sigma_n[0], sigma_n[1],
-                        sigma_n[2], sigma_n[3], intr.sigma_maj[0], intr.sigma_maj[1],
-                        intr.sigma_maj[2], intr.sigma_maj[3]);
+                        sigma_n[2], sigma_n[3], sigma_maj[0], sigma_maj[1], sigma_maj[2],
+                        sigma_maj[3]);
                     PBRT_DBG("T_ray %f %f %f %f lightPathPDF %f %f %f %f uniPathPDF %f "
                              "%f %f %f\n",
                              T_ray[0], T_ray[1], T_ray[2], T_ray[3], lightPathPDF[0],
