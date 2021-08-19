@@ -16,6 +16,7 @@ jobs:
 
     strategy:
       matrix:
+        config: [ '', '-DPBRT_DBG_LOGGING=True' ]
         os: [ ubuntu-20.04, macos-latest, windows-latest ]
       fail-fast: false
 
@@ -49,7 +50,7 @@ jobs:
     - name: Configure
       run: |
         cd build
-        cmake .. -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True
+        cmake .. -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True ${{ matrix.config }}
       
     - name: Build
       run: cmake --build build --parallel --config Release
