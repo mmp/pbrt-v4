@@ -488,8 +488,8 @@ extern "C" __global__ void __raygen__randomHit() {
 
     uint32_t ptr0 = packPointer0(&payload), ptr1 = packPointer1(&payload);
 
-    PBRT_DBG("Randomhit raygen ray.o %f %f %f ray.d %f %f %f tMax %f\n", ray.o.x, ray.o.y,
-        ray.o.z, ray.d.x, ray.d.y, ray.d.z, tMax);
+    PBRT_DBG("Randomhit raygen ray.o %f %f %f ray.d %f %f %f\n", ray.o.x, ray.o.y,
+        ray.o.z, ray.d.x, ray.d.y, ray.d.z);
 
     while (true) {
         Trace(params.traversable, ray, 0.f /* tMin */, 1.f /* tMax */,
