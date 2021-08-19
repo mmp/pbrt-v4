@@ -16,6 +16,7 @@ jobs:
 
     strategy:
       matrix:
+        config: [ '', '-DPBRT_DBG_LOGGING=True', '-DPBRT_FLOAT_AS_DOUBLE=True' ]
         os: [ ubuntu-20.04, macos-latest, windows-latest ]
       fail-fast: false
 
@@ -49,17 +50,17 @@ jobs:
     - name: Configure
       run: |
         cd build
-        cmake .. -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True
+        cmake .. -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True ${{ matrix.config }}
       
     - name: Build
       run: cmake --build build --parallel --config Release
       
     - name: Test (Ubuntu/MacOS)
-      if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'macos-latest' }}
+      if: ${{ (matrix.os == 'ubuntu-20.04' || matrix.os == 'macos-latest') && matrix.config == '' }}
       run: ./pbrt_test
       working-directory: build
 
     - name: Test (Windows)
-      if: ${{ matrix.os == 'windows-latest' }}
+      if: ${{ matrix.os == 'windows-latest' && matrix.config == '' }}
       run: .\Release\pbrt_test.exe
       working-directory: build
