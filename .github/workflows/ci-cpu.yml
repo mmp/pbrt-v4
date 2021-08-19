@@ -16,7 +16,7 @@ jobs:
 
     strategy:
       matrix:
-        config: [ '', '-DPBRT_DBG_LOGGING=True' ]
+        config: [ '', '-DPBRT_DBG_LOGGING=True', '-DPBRT_FLOAT_AS_DOUBLE=True' ]
         os: [ ubuntu-20.04, macos-latest, windows-latest ]
       fail-fast: false
 
