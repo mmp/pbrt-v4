@@ -999,7 +999,8 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                         SampledSpectrum emitPDF = uniPathPDF * sigma_maj * T_maj;
 
                         // Update _L_ for medium emission
-                        L += P_hat / emitPDF.Average();
+                        if (emitPDF)
+                            L += P_hat / emitPDF.Average();
                     }
 
                     // Compute medium event probabilities for interaction
@@ -1026,27 +1027,29 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
 
                         T_hat *= T_maj * mp.sigma_s;
                         uniPathPDF *= T_maj * mp.sigma_s;
-                        // Sample direct lighting at volume scattering event
-                        MediumInteraction intr(p, -ray.d, ray.time, ray.medium, mp.phase);
-                        L += SampleLd(intr, nullptr, lambda, sampler, T_hat, uniPathPDF);
+                        if (T_hat && uniPathPDF) {
+                            // Sample direct lighting at volume scattering event
+                            MediumInteraction intr(p, -ray.d, ray.time, ray.medium, mp.phase);
+                            L += SampleLd(intr, nullptr, lambda, sampler, T_hat, uniPathPDF);
 
-                        // Sample new direction at real scattering event
-                        Point2f u = sampler.Get2D();
-                        pstd::optional<PhaseFunctionSample> ps =
-                            intr.phase.Sample_p(-ray.d, u);
-                        if (!ps || ps->pdf == 0)
-                            terminated = true;
-                        else {
-                            // Update ray path state for indirect volume scattering
-                            T_hat *= ps->p;
-                            lightPathPDF = uniPathPDF;
-                            uniPathPDF *= ps->pdf;
-                            prevIntrContext = LightSampleContext(intr);
-                            scattered = true;
-                            ray.o = p;
-                            ray.d = ps->wi;
-                            specularBounce = false;
-                            anyNonSpecularBounces = true;
+                            // Sample new direction at real scattering event
+                            Point2f u = sampler.Get2D();
+                            pstd::optional<PhaseFunctionSample> ps =
+                                intr.phase.Sample_p(-ray.d, u);
+                            if (!ps || ps->pdf == 0)
+                                terminated = true;
+                            else {
+                                // Update ray path state for indirect volume scattering
+                                T_hat *= ps->p;
+                                lightPathPDF = uniPathPDF;
+                                uniPathPDF *= ps->pdf;
+                                prevIntrContext = LightSampleContext(intr);
+                                scattered = true;
+                                ray.o = p;
+                                ray.d = ps->wi;
+                                specularBounce = false;
+                                anyNonSpecularBounces = true;
+                            }
                         }
                         return false;
 
@@ -1059,11 +1062,11 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                         lightPathPDF *= T_maj * sigma_maj;
                         Rescale(&T_hat, &uniPathPDF, &lightPathPDF);
 
-                        return true;
+                        return T_hat && uniPathPDF;
                     }
                 });
             // Handle terminated, scattered, and unscattered rays after medium sampling
-            if (terminated)
+            if (terminated || !T_hat || !uniPathPDF)
                 return L;
             if (scattered)
                 continue;

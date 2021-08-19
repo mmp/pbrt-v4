@@ -127,7 +127,7 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
                                 ray.time, w.etaScale, ray.medium, w.pixelIndex});
                         };
                         DCHECK_RARE(1e-6f, !T_hat);
-                        if (T_hat)
+                        if (T_hat && uniPathPDF)
                             mp.phase.Dispatch(enqueue);
 
                         scattered = true;
@@ -145,7 +145,7 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
 
                         uMode = rng.Uniform<Float>();
 
-                        return true;
+                        return T_hat && uniPathPDF;
                     }
                 });
             if (!scattered && T_hat) {
@@ -171,7 +171,7 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
 
             // There's no more work to do if there was a scattering event in
             // the medium.
-            if (scattered || !T_hat || w.depth == maxDepth)
+            if (scattered || !T_hat || !uniPathPDF || w.depth == maxDepth)
                 return;
 
             // Otherwise, enqueue bump and medium stuff...
