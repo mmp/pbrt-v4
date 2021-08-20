@@ -616,7 +616,7 @@ class Point2 : public Tuple2<Point2, T> {
 };
 
 // Point2 Inline Functions
-PBRT_CPU_GPU inline Point2f InvertBilinear(Point2f p, pstd::span<const Point2f> vert);
+PBRT_CPU_GPU inline Point2f InvertBilinear(Point2f p, pstd::span<const Point2f> v);
 
 // https://www.iquilezles.org/www/articles/ibilinear/ibilinear.htm,
 // with a fix for perfect quads

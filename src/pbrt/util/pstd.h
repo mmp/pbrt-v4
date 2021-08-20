@@ -308,8 +308,9 @@ using HasSize =
 // data() to avoid problems with classes which have a member function data()
 // which returns a reference.
 template <typename T, typename C>
-using HasData = std::is_convertible<
-    typename std::decay_t<decltype(GetData(std::declval<C &>()))> *, T *const *>;
+using HasData =
+    std::is_convertible<typename std::decay_t<decltype(GetData(std::declval<C &>()))> *,
+                        T *const *>;
 
 }  // namespace span_internal
 

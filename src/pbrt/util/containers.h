@@ -913,17 +913,14 @@ class InternCache {
     const T *Lookup(const T &item) {
         size_t offset = Hash()(item) % hashTable.size();
         int step = 1;
-
         mutex.lock_shared();
         while (true) {
+            // Check _hashTable[offset]_ for provided item
             if (!hashTable[offset]) {
-                // not in the hash table
+                // Insert item into open hash table entry
                 mutex.unlock_shared();
                 mutex.lock();
-
-                // Look for it again, starting from scratch: another thread
-                // may have inserted it before we got the write lock and/or
-                // may have expanded the hash table.
+                // Double check that another thread hasn't inserted _item_
                 size_t offset = Hash()(item) % hashTable.size();
                 int step = 1;
                 while (true) {
@@ -954,18 +951,21 @@ class InternCache {
                     hashTable.swap(newHash);
                 }
 
+                // Allocate new hash table entry and add it to the hash table
                 ++nEntries;
                 T *newPtr = itemAlloc.new_object<T>(item);
                 Insert(newPtr, &hashTable);
                 mutex.unlock();
                 return newPtr;
+
             } else if (*hashTable[offset] == item) {
-                // found it
+                // Return pointer for found _item_ in hash table
                 const T *ret = hashTable[offset];
                 mutex.unlock_shared();
                 return ret;
+
             } else {
-                // collision
+                // Advance _offset_ after hash table collision
                 offset += step;
                 ++step;
                 offset %= hashTable.size();
@@ -981,11 +981,13 @@ class InternCache {
     void Insert(const T *ptr, pstd::vector<const T *> *table) {
         size_t offset = Hash()(*ptr) % table->size();
         int step = 1;
+        // Advance _offset_ to next free entry in hash table
         while ((*table)[offset]) {
             offset += step;
             ++step;
             offset %= table->size();
         }
+
         (*table)[offset] = ptr;
     }
 

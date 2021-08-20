@@ -316,7 +316,8 @@ class FloatBilerpTexture {
     Float Evaluate(TextureEvalContext ctx) const {
         Vector2f dstdx, dstdy;
         Point2f st = mapping.Map(ctx, &dstdx, &dstdy);
-        return Bilerp({st[0], st[1]}, {v00, v10, v01, v11});
+        return (1 - st[0]) * (1 - st[1]) * v00 + st[0] * (1 - st[1]) * v10 +
+               (1 - st[0]) * st[1] * v01 + st[0] * st[1] * v11;
     }
 
     static FloatBilerpTexture *Create(const Transform &renderFromTexture,

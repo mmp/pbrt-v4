@@ -33,12 +33,12 @@ class RNG {
     PBRT_CPU_GPU
     RNG() : state(PCG32_DEFAULT_STATE), inc(PCG32_DEFAULT_STREAM) {}
     PBRT_CPU_GPU
-    RNG(uint64_t seqIndex, uint64_t start) { SetSequence(seqIndex, start); }
+    RNG(uint64_t seqIndex, uint64_t offset) { SetSequence(seqIndex, offset); }
     PBRT_CPU_GPU
     RNG(uint64_t seqIndex) { SetSequence(seqIndex); }
 
     PBRT_CPU_GPU
-    void SetSequence(uint64_t sequenceIndex, uint64_t seed);
+    void SetSequence(uint64_t sequenceIndex, uint64_t offset);
     PBRT_CPU_GPU
     void SetSequence(uint64_t sequenceIndex) {
         SetSequence(sequenceIndex, MixBits(sequenceIndex));

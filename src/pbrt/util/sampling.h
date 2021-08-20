@@ -134,7 +134,10 @@ PBRT_CPU_GPU inline Float BilinearPDF(Point2f p, pstd::span<const Float> w) {
         return 0;
     if (w[0] + w[1] + w[2] + w[3] == 0)
         return 1;
-    return 4 * Bilerp({p[0], p[1]}, w) / (w[0] + w[1] + w[2] + w[3]);
+    return 4 *
+           ((1 - p[0]) * (1 - p[1]) * w[0] + p[0] * (1 - p[1]) * w[1] +
+            (1 - p[0]) * p[1] * w[2] + p[0] * p[1] * w[3]) /
+           (w[0] + w[1] + w[2] + w[3]);
 }
 
 PBRT_CPU_GPU inline Point2f SampleBilinear(Point2f u, pstd::span<const Float> w) {

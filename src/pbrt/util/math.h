@@ -265,12 +265,6 @@ PBRT_CPU_GPU inline Float Mod(Float a, Float b) {
     return std::fmod(a, b);
 }
 
-// (0,0): v[0], (1, 0): v[1], (0, 1): v[2], (1, 1): v[3]
-PBRT_CPU_GPU inline Float Bilerp(pstd::array<Float, 2> p, pstd::span<const Float> v) {
-    return ((1 - p[0]) * (1 - p[1]) * v[0] + p[0] * (1 - p[1]) * v[1] +
-            (1 - p[0]) * p[1] * v[2] + p[0] * p[1] * v[3]);
-}
-
 PBRT_CPU_GPU inline Float Radians(Float deg) {
     return (Pi / 180) * deg;
 }
@@ -352,16 +346,15 @@ PBRT_CPU_GPU inline float SafeASin(float x) {
     DCHECK(x >= -1.0001 && x <= 1.0001);
     return std::asin(Clamp(x, -1, 1));
 }
+PBRT_CPU_GPU inline float SafeACos(float x) {
+    DCHECK(x >= -1.0001 && x <= 1.0001);
+    return std::acos(Clamp(x, -1, 1));
+}
 
 PBRT_CPU_GPU
 inline double SafeASin(double x) {
     DCHECK(x >= -1.0001 && x <= 1.0001);
     return std::asin(Clamp(x, -1, 1));
-}
-
-PBRT_CPU_GPU inline float SafeACos(float x) {
-    DCHECK(x >= -1.0001 && x <= 1.0001);
-    return std::acos(Clamp(x, -1, 1));
 }
 
 PBRT_CPU_GPU
@@ -375,8 +368,7 @@ PBRT_CPU_GPU inline Float Log2(Float x) {
     return std::log(x) * invLog2;
 }
 
-PBRT_CPU_GPU
-inline int Log2Int(float v) {
+PBRT_CPU_GPU inline int Log2Int(float v) {
     DCHECK_GT(v, 0);
     if (v < 1)
         return -Log2Int(1 / v);
@@ -405,8 +397,7 @@ inline int Log2Int(double v) {
     return Exponent(v) + ((Significand(v) >= midsignif) ? 1 : 0);
 }
 
-PBRT_CPU_GPU
-inline int Log2Int(uint32_t v) {
+PBRT_CPU_GPU inline int Log2Int(uint32_t v) {
 #ifdef PBRT_IS_GPU_CODE
     return 31 - __clz(v);
 #elif defined(PBRT_HAS_INTRIN_H)
@@ -509,12 +500,9 @@ PBRT_CPU_GPU inline Float TrimmedLogistic(Float x, Float s, Float a, Float b) {
     return Logistic(x, s) / (LogisticCDF(b, s) - LogisticCDF(a, s));
 }
 
-PBRT_CPU_GPU
-inline Float ErfInv(Float a);
-PBRT_CPU_GPU
-inline Float I0(Float x);
-PBRT_CPU_GPU
-inline Float LogI0(Float x);
+PBRT_CPU_GPU inline Float ErfInv(Float a);
+PBRT_CPU_GPU inline Float I0(Float x);
+PBRT_CPU_GPU inline Float LogI0(Float x);
 
 template <typename Predicate>
 PBRT_CPU_GPU inline size_t FindInterval(size_t sz, const Predicate &pred) {
@@ -1357,9 +1345,6 @@ class SquareMatrix {
     PBRT_CPU_GPU
     pstd::span<Float> operator[](int i) { return pstd::span<Float>(m[i]); }
 
-    PBRT_CPU_GPU
-    Float Determinant() const;
-
   private:
     Float m[N][N];
 };
@@ -1378,6 +1363,7 @@ inline bool SquareMatrix<N>::IsIdentity() const {
     return true;
 }
 
+// SquareMatrix Inline Functions
 template <int N>
 PBRT_CPU_GPU inline SquareMatrix<N> operator*(Float s, const SquareMatrix<N> &m) {
     return m * s;
@@ -1394,8 +1380,11 @@ PBRT_CPU_GPU inline Tresult Mul(const SquareMatrix<N> &m, const T &v) {
     return result;
 }
 
+template <int N>
+PBRT_CPU_GPU Float Determinant(const SquareMatrix<N> &m);
+
 template <>
-PBRT_CPU_GPU inline Float SquareMatrix<3>::Determinant() const {
+PBRT_CPU_GPU inline Float Determinant(const SquareMatrix<3> &m) {
     Float minor12 = DifferenceOfProducts(m[1][1], m[2][2], m[1][2], m[2][1]);
     Float minor02 = DifferenceOfProducts(m[1][0], m[2][2], m[1][2], m[2][0]);
     Float minor01 = DifferenceOfProducts(m[1][0], m[2][1], m[1][1], m[2][0]);
@@ -1426,7 +1415,7 @@ PBRT_CPU_GPU inline SquareMatrix<N> Transpose(const SquareMatrix<N> &m) {
 
 template <>
 PBRT_CPU_GPU inline pstd::optional<SquareMatrix<3>> Inverse(const SquareMatrix<3> &m) {
-    Float det = m.Determinant();
+    Float det = Determinant(m);
     if (det == 0)
         return {};
     Float invDet = 1 / det;
@@ -1498,17 +1487,17 @@ PBRT_CPU_GPU SquareMatrix<N> operator*(const SquareMatrix<N> &m1,
                                        const SquareMatrix<N> &m2);
 
 template <>
-PBRT_CPU_GPU inline Float SquareMatrix<1>::Determinant() const {
+PBRT_CPU_GPU inline Float Determinant(const SquareMatrix<1> &m) {
     return m[0][0];
 }
 
 template <>
-PBRT_CPU_GPU inline Float SquareMatrix<2>::Determinant() const {
+PBRT_CPU_GPU inline Float Determinant(const SquareMatrix<2> &m) {
     return DifferenceOfProducts(m[0][0], m[1][1], m[0][1], m[1][0]);
 }
 
 template <>
-PBRT_CPU_GPU inline Float SquareMatrix<4>::Determinant() const {
+PBRT_CPU_GPU inline Float Determinant(const SquareMatrix<4> &m) {
     Float s0 = DifferenceOfProducts(m[0][0], m[1][1], m[1][0], m[0][1]);
     Float s1 = DifferenceOfProducts(m[0][0], m[1][2], m[1][0], m[0][2]);
     Float s2 = DifferenceOfProducts(m[0][0], m[1][3], m[1][0], m[0][3]);
@@ -1530,7 +1519,7 @@ PBRT_CPU_GPU inline Float SquareMatrix<4>::Determinant() const {
 }
 
 template <int N>
-PBRT_CPU_GPU inline Float SquareMatrix<N>::Determinant() const {
+PBRT_CPU_GPU inline Float Determinant(const SquareMatrix<N> &m) {
     SquareMatrix<N - 1> sub;
     Float det = 0;
     // Inefficient, but we don't currently use N>4 anyway..
@@ -1541,7 +1530,7 @@ PBRT_CPU_GPU inline Float SquareMatrix<N>::Determinant() const {
                 sub[j][k] = m[j + 1][k < i ? k : k + 1];
 
         Float sign = (i & 1) ? -1 : 1;
-        det += sign * m[0][i] * sub.Determinant();
+        det += sign * m[0][i] * Determinant(sub);
     }
     return det;
 }

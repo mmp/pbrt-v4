@@ -148,7 +148,7 @@ bool Transform::SwapsHandedness() const {
                       m[1][0], m[1][1], m[1][2],
                       m[2][0], m[2][1], m[2][2]);
     // clang-format on
-    return s.Determinant() < 0;
+    return Determinant(s) < 0;
 }
 
 Transform::operator Quaternion() const {

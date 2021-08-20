@@ -30,6 +30,7 @@ namespace pbrt {
 template <typename T, int maxThreads = 256>
 class ThreadLocal {
   public:
+    // ThreadLocal Public Methods
     ThreadLocal() : hashTable(maxThreads), create([]() { return T(); }) {}
     ThreadLocal(std::function<T(void)> &&c) : hashTable(maxThreads), create(c) {}
 
@@ -89,6 +90,7 @@ class ThreadLocal {
     }
 
   private:
+    // ThreadLocal Private Members
     struct Entry {
         std::thread::id tid;
         T value;
@@ -291,6 +293,7 @@ bool DoParallelWork();
 template <typename T>
 class Future {
   public:
+    // Future Public Methods
     Future() = default;
     Future(std::future<T> &&f) : fut(std::move(f)) {}
     Future &operator=(std::future<T> &&f) {
@@ -302,11 +305,13 @@ class Future {
         Wait();
         return fut.get();
     }
+
     void Wait() {
         while (!IsReady() && DoParallelWork())
             ;
         fut.wait();
     }
+
     bool IsReady() const {
         return fut.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
     }
@@ -319,6 +324,7 @@ class Future {
 template <typename T>
 class AsyncJob : public ParallelJob {
   public:
+    // AsyncJob Public Methods
     AsyncJob(std::function<T(void)> w) : work(std::move(w)) {}
 
     bool HaveWork() const { return !started; }

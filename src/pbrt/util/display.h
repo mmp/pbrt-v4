@@ -24,18 +24,16 @@ void ConnectToDisplayServer(const std::string &host);
 void DisconnectFromDisplayServer();
 
 void DisplayStatic(
-    const std::string &title, const Point2i &resolution,
-    std::vector<std::string> channelNames,
+    std::string title, Point2i resolution, std::vector<std::string> channelNames,
     std::function<void(Bounds2i, pstd::span<pstd::span<Float>>)> getValues);
 
 void DisplayDynamic(
-    const std::string &title, const Point2i &resolution,
-    std::vector<std::string> channelNames,
+    std::string title, Point2i resolution, std::vector<std::string> channelNames,
     std::function<void(Bounds2i, pstd::span<pstd::span<Float>>)> getValues);
 
-void DisplayStatic(const std::string &title, const Image &image,
+void DisplayStatic(std::string title, const Image &image,
                    pstd::optional<ImageChannelDesc> channelDesc = {});
-void DisplayDynamic(const std::string &title, const Image &image,
+void DisplayDynamic(std::string title, const Image &image,
                     pstd::optional<ImageChannelDesc> channelDesc = {});
 
 template <typename T>
