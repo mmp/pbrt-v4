@@ -256,6 +256,8 @@ inline void ParallelFor2D(const Bounds2i &extent, std::function<void(Point2i)> f
     });
 }
 
+class ThreadPool;
+
 // ParallelJob Definition
 class ParallelJob {
   public:
@@ -271,8 +273,8 @@ class ParallelJob {
 
     virtual void Cleanup() {}
 
-    void RemoveFromJobList();
-    std::unique_lock<std::mutex> AddToJobList();
+    // ParallelJob Public Members
+    static ThreadPool *threadPool;
 
   protected:
     std::string BaseToString() const {
@@ -285,6 +287,38 @@ class ParallelJob {
     int activeWorkers = 0;
     ParallelJob *prev = nullptr, *next = nullptr;
     bool removed = false;
+};
+
+// ThreadPool Definition
+class ThreadPool {
+  public:
+    // ThreadPool Public Methods
+    explicit ThreadPool(int nThreads);
+
+    ~ThreadPool();
+
+    size_t size() const { return threads.size(); }
+
+    std::unique_lock<std::mutex> AddToJobList(ParallelJob *job);
+    void RemoveFromJobList(ParallelJob *job);
+
+    void WorkOrWait(std::unique_lock<std::mutex> *lock);
+    bool WorkOrReturn();
+
+    void ForEachThread(std::function<void(void)> func);
+
+    std::string ToString() const;
+
+  private:
+    // ThreadPool Private Methods
+    void worker();
+
+    // ThreadPool Private Members
+    std::vector<std::thread> threads;
+    mutable std::mutex mutex;
+    bool shutdownThreads = false;
+    ParallelJob *jobList = nullptr;
+    std::condition_variable jobListCondition;
 };
 
 bool DoParallelWork();
@@ -331,7 +365,7 @@ class AsyncJob : public ParallelJob {
 
     void RunStep(std::unique_lock<std::mutex> *lock) {
         // No need to stick around in the job list
-        RemoveFromJobList();
+        threadPool->RemoveFromJobList(this);
         started = true;
         lock->unlock();
         DoWork();
@@ -372,7 +406,7 @@ inline auto RunAsync(F func, Args &&...args) {
     if (RunningThreads() == 1)
         job->DoWork();
     else
-        lock = job->AddToJobList();
+        lock = ParallelJob::threadPool->AddToJobList(job);
 
     return job->GetFuture();
 }
