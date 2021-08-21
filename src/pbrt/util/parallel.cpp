@@ -46,10 +46,10 @@ ThreadPool *ParallelJob::threadPool;
 // ThreadPool Method Definitions
 ThreadPool::ThreadPool(int nThreads) {
     for (int i = 0; i < nThreads - 1; ++i)
-        threads.push_back(std::thread(&ThreadPool::worker, this));
+        threads.push_back(std::thread(&ThreadPool::Worker, this));
 }
 
-void ThreadPool::worker() {
+void ThreadPool::Worker() {
     LOG_VERBOSE("Started execution in worker thread");
 
 #ifdef PBRT_BUILD_GPU_RENDERER
@@ -85,6 +85,7 @@ void ThreadPool::WorkOrWait(std::unique_lock<std::mutex> *lock) {
         // Execute work for _job_
         job->activeWorkers++;
         job->RunStep(lock);
+        // Handle post-job-execution details
         DCHECK(!lock->owns_lock());
         lock->lock();
         job->activeWorkers--;
@@ -277,12 +278,10 @@ void ParallelForLoop2D::RunStep(std::unique_lock<std::mutex> *lock) {
 // Parallel Function Definitions
 void ParallelFor(int64_t start, int64_t end, std::function<void(int64_t, int64_t)> func) {
     CHECK(ParallelJob::threadPool);
-    // Compute chunk size and possibly run entire loop on current thread
-    int64_t chunkSize = std::max<int64_t>(1, (end - start) / (8 * RunningThreads()));
-    if (end - start < chunkSize) {
-        func(start, end);
+    if (start == end)
         return;
-    }
+    // Compute chunk size for parallel loop
+    int64_t chunkSize = std::max<int64_t>(1, (end - start) / (8 * RunningThreads()));
 
     // Create and enqueue _ParallelForLoop1D_ for this loop
     ParallelForLoop1D loop(start, end, chunkSize, std::move(func));

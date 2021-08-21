@@ -26,68 +26,26 @@
 
 namespace pbrt {
 
+// Parallel Function Declarations
+void ParallelInit(int nThreads = -1);
+void ParallelCleanup();
+
+int AvailableCores();
+int RunningThreads();
+
 // ThreadLocal Definition
-template <typename T, int maxThreads = 256>
+template <typename T>
 class ThreadLocal {
   public:
     // ThreadLocal Public Methods
-    ThreadLocal() : hashTable(maxThreads), create([]() { return T(); }) {}
-    ThreadLocal(std::function<T(void)> &&c) : hashTable(maxThreads), create(c) {}
+    ThreadLocal() : hashTable(4 * RunningThreads()), create([]() { return T(); }) {}
+    ThreadLocal(std::function<T(void)> &&c)
+        : hashTable(4 * RunningThreads()), create(c) {}
 
-    T &Get() {
-        std::thread::id tid = std::this_thread::get_id();
-        uint32_t hash = std::hash<std::thread::id>()(tid);
-        hash %= hashTable.size();
-        int step = 1;
-
-        mutex.lock_shared();
-        while (true) {
-            if (hashTable[hash] && hashTable[hash]->tid == tid) {
-                // Found it
-                T &threadLocal = hashTable[hash]->value;
-                mutex.unlock_shared();
-                return threadLocal;
-            } else if (!hashTable[hash]) {
-                mutex.unlock_shared();
-                T newItem = create();
-                mutex.lock();
-
-                if (hashTable[hash]) {
-                    // someone else got there first--keep looking, but now
-                    // with a writer lock.
-                    while (true) {
-                        hash += step;
-                        ++step;
-                        if (hash >= hashTable.size())
-                            hash %= hashTable.size();
-
-                        if (!hashTable[hash])
-                            break;
-                    }
-                }
-
-                hashTable[hash] = Entry{tid, std::move(newItem)};
-                T &threadLocal = hashTable[hash]->value;
-                mutex.unlock();
-                return threadLocal;
-            }
-
-            hash += step;
-            ++step;
-            if (hash >= hashTable.size())
-                hash %= hashTable.size();
-        }
-    }
+    T &Get();
 
     template <typename F>
-    void ForAll(F &&func) {
-        mutex.lock();
-        for (auto &entry : hashTable) {
-            if (entry)
-                func(entry->value);
-        }
-        mutex.unlock();
-    }
+    void ForAll(F &&func);
 
   private:
     // ThreadLocal Private Members
@@ -99,6 +57,67 @@ class ThreadLocal {
     std::vector<pstd::optional<Entry>> hashTable;
     std::function<T(void)> create;
 };
+
+// ThreadLocal Inline Methods
+template <typename T>
+inline T &ThreadLocal<T>::Get() {
+    std::thread::id tid = std::this_thread::get_id();
+    uint32_t hash = std::hash<std::thread::id>()(tid);
+    hash %= hashTable.size();
+    int step = 1;
+    int tries = 0;
+
+    mutex.lock_shared();
+    while (true) {
+        CHECK_LT(++tries, hashTable.size());  // full hash table
+
+        if (hashTable[hash] && hashTable[hash]->tid == tid) {
+            // Found it
+            T &threadLocal = hashTable[hash]->value;
+            mutex.unlock_shared();
+            return threadLocal;
+        } else if (!hashTable[hash]) {
+            mutex.unlock_shared();
+            T newItem = create();
+            mutex.lock();
+
+            if (hashTable[hash]) {
+                // someone else got there first--keep looking, but now
+                // with a writer lock.
+                while (true) {
+                    hash += step;
+                    ++step;
+                    if (hash >= hashTable.size())
+                        hash %= hashTable.size();
+
+                    if (!hashTable[hash])
+                        break;
+                }
+            }
+
+            hashTable[hash] = Entry{tid, std::move(newItem)};
+            T &threadLocal = hashTable[hash]->value;
+            mutex.unlock();
+            return threadLocal;
+        }
+
+        hash += step;
+        ++step;
+        if (hash >= hashTable.size())
+            hash %= hashTable.size();
+    }
+}
+
+template <typename T>
+template <typename F>
+inline void ThreadLocal<T>::ForAll(F &&func) {
+    mutex.lock();
+    for (auto &entry : hashTable) {
+        if (entry)
+            func(entry->value);
+    }
+    mutex.unlock();
+}
 
 // AtomicFloat Definition
 class AtomicFloat {
@@ -311,7 +330,7 @@ class ThreadPool {
 
   private:
     // ThreadPool Private Methods
-    void worker();
+    void Worker();
 
     // ThreadPool Private Members
     std::vector<std::thread> threads;
@@ -364,22 +383,20 @@ class AsyncJob : public ParallelJob {
     bool HaveWork() const { return !started; }
 
     void RunStep(std::unique_lock<std::mutex> *lock) {
-        // No need to stick around in the job list
         threadPool->RemoveFromJobList(this);
         started = true;
         lock->unlock();
-        DoWork();
+        work();
     }
 
     void DoWork() { work(); }
-
     void Cleanup() { delete this; }
+
+    Future<T> GetFuture() { return work.get_future(); }
 
     std::string ToString() const {
         return StringPrintf("[ AsyncJob started: %s ]", started);
     }
-
-    Future<T> GetFuture() { return work.get_future(); }
 
   private:
     bool started = false;
@@ -388,20 +405,15 @@ class AsyncJob : public ParallelJob {
 
 void ForEachThread(std::function<void(void)> func);
 
-// ParallelFunction Declarations
-void ParallelInit(int nThreads = -1);
-void ParallelCleanup();
-
-int AvailableCores();
-int RunningThreads();
-
 // Asynchronous Task Launch Function Definitions
 template <typename F, typename... Args>
 inline auto RunAsync(F func, Args &&...args) {
+    // Create _AsyncJob_ for _func_ and _args_
     auto fvoid = std::bind(func, std::forward<Args>(args)...);
     using R = typename std::invoke_result_t<F, Args...>;
-
     AsyncJob<R> *job = new AsyncJob<R>(std::move(fvoid));
+
+    // Enqueue _job_ or run it immediately
     std::unique_lock<std::mutex> lock;
     if (RunningThreads() == 1)
         job->DoWork();

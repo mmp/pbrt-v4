@@ -1029,8 +1029,10 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                         uniPathPDF *= T_maj * mp.sigma_s;
                         if (T_hat && uniPathPDF) {
                             // Sample direct lighting at volume scattering event
-                            MediumInteraction intr(p, -ray.d, ray.time, ray.medium, mp.phase);
-                            L += SampleLd(intr, nullptr, lambda, sampler, T_hat, uniPathPDF);
+                            MediumInteraction intr(p, -ray.d, ray.time, ray.medium,
+                                                   mp.phase);
+                            L += SampleLd(intr, nullptr, lambda, sampler, T_hat,
+                                          uniPathPDF);
 
                             // Sample new direction at real scattering event
                             Point2f u = sampler.Get2D();
@@ -1061,7 +1063,6 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                         uniPathPDF *= T_maj * sigma_n;
                         lightPathPDF *= T_maj * sigma_maj;
                         Rescale(&T_hat, &uniPathPDF, &lightPathPDF);
-
                         return T_hat && uniPathPDF;
                     }
                 });

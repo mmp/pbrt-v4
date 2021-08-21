@@ -42,7 +42,6 @@ class InternedString {
     // InternedString Public Methods
     InternedString() = default;
     InternedString(const std::string *str) : str(str) {}
-
     operator const std::string &() const { return *str; }
 
     bool operator==(const char *s) const { return *str == s; }

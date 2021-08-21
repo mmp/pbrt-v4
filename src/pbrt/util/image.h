@@ -49,7 +49,7 @@ struct ResampleWeight {
 };
 
 // WrapMode Definitions
-enum class WrapMode { Repeat, Black, Clamp, OctahedralSphere };
+enum class WrapMode { Black, Clamp, Repeat, OctahedralSphere };
 struct WrapMode2D {
     PBRT_CPU_GPU
     WrapMode2D(WrapMode w) : wrap{w, w} {}
