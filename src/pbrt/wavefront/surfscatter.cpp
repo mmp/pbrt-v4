@@ -184,23 +184,23 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
             if (bsdfSample) {
                 // Compute updated path throughput and PDFs and enqueue indirect ray
                 Vector3f wi = bsdfSample->wi;
-                SampledSpectrum T_hat = w.T_hat * bsdfSample->f * AbsDot(wi, ns);
-                SampledSpectrum uniPathPDF = w.uniPathPDF, lightPathPDF = w.uniPathPDF;
+                SampledSpectrum beta = w.beta * bsdfSample->f * AbsDot(wi, ns);
+                SampledSpectrum inv_w_u = w.inv_w_u, inv_w_l = w.inv_w_u;
 
                 PBRT_DBG("%s f*cos[0] %f bsdfSample->pdf %f f*cos/pdf %f\n",
                          ConcreteBxDF::Name(), bsdfSample->f[0] * AbsDot(wi, ns),
                          bsdfSample->pdf,
                          bsdfSample->f[0] * AbsDot(wi, ns) / bsdfSample->pdf);
 
-                // Update _uniPathPDF_ based on BSDF sample PDF
+                // Update _inv_w_u_ based on BSDF sample PDF
                 if (bsdfSample->pdfIsProportional) {
                     Float pdf = bsdf.PDF<ConcreteBxDF>(wo, wi);
-                    T_hat *= pdf / bsdfSample->pdf;
-                    uniPathPDF *= pdf;
+                    beta *= pdf / bsdfSample->pdf;
+                    inv_w_u *= pdf;
                 } else
-                    uniPathPDF *= bsdfSample->pdf;
+                    inv_w_u *= bsdfSample->pdf;
 
-                rescale(&T_hat, &uniPathPDF, &lightPathPDF);
+                rescale(&beta, &inv_w_u, &inv_w_l);
                 // Update _etaScale_ accounting for BSDF scattering
                 Float etaScale = w.etaScale;
                 if (bsdfSample->IsTransmission())
@@ -208,24 +208,24 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
 
                 // Apply Russian roulette to indirect ray based on weighted path
                 // throughput
-                SampledSpectrum rrBeta = T_hat * etaScale / uniPathPDF.Average();
+                SampledSpectrum rrBeta = beta * etaScale / inv_w_u.Average();
                 // Note: depth >= 1 here to match VolPathIntegrator (which increments
                 // depth earlier).
                 if (rrBeta.MaxComponentValue() < 1 && w.depth >= 1) {
                     Float q = std::max<Float>(0, 1 - rrBeta.MaxComponentValue());
                     if (raySamples.indirect.rr < q) {
-                        T_hat = SampledSpectrum(0.f);
+                        beta = SampledSpectrum(0.f);
                         PBRT_DBG("Path terminated with RR\n");
                     }
-                    uniPathPDF *= 1 - q;
-                    lightPathPDF *= 1 - q;
+                    inv_w_u *= 1 - q;
+                    inv_w_l *= 1 - q;
                 }
 
-                if (T_hat) {
+                if (beta) {
                     // Enqueue ray in indirect ray queue or BSSRDF queue, as appropriate
                     if (bsdfSample->IsTransmission() &&
                         w.material->HasSubsurfaceScattering()) {
-                        bssrdfEvalQueue->Push(w.material, lambda, T_hat, uniPathPDF,
+                        bssrdfEvalQueue->Push(w.material, lambda, beta, inv_w_u,
                                               Point3f(w.pi), wo, w.n, ns, dpdus, w.uv,
                                               w.depth, w.mediumInterface, etaScale,
                                               w.pixelIndex);
@@ -242,21 +242,21 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
                         // NOTE: slightly different than context below. Problem?
                         LightSampleContext ctx(w.pi, w.n, ns);
                         nextRayQueue->PushIndirectRay(
-                            ray, w.depth + 1, ctx, T_hat, uniPathPDF, lightPathPDF,
+                            ray, w.depth + 1, ctx, beta, inv_w_u, inv_w_l,
                             lambda, etaScale, bsdfSample->IsSpecular(),
                             anyNonSpecularBounces, w.pixelIndex);
 
                         PBRT_DBG(
                             "Spawned indirect ray at depth %d from w.index %d. "
-                            "Specular %d T_Hat %f %f %f %f uniPathPDF %f %f %f %f "
-                            "lightPathPDF %f "
-                            "%f %f %f T_hat/uniPathPDF %f %f %f %f\n",
+                            "Specular %d T_Hat %f %f %f %f inv_w_u %f %f %f %f "
+                            "inv_w_l %f "
+                            "%f %f %f beta/inv_w_u %f %f %f %f\n",
                             w.depth + 1, w.pixelIndex, int(bsdfSample->IsSpecular()),
-                            T_hat[0], T_hat[1], T_hat[2], T_hat[3], uniPathPDF[0],
-                            uniPathPDF[1], uniPathPDF[2], uniPathPDF[3], lightPathPDF[0],
-                            lightPathPDF[1], lightPathPDF[2], lightPathPDF[3],
-                            SafeDiv(T_hat, uniPathPDF)[0], SafeDiv(T_hat, uniPathPDF)[1],
-                            SafeDiv(T_hat, uniPathPDF)[2], SafeDiv(T_hat, uniPathPDF)[3]);
+                            beta[0], beta[1], beta[2], beta[3], inv_w_u[0],
+                            inv_w_u[1], inv_w_u[2], inv_w_u[3], inv_w_l[0],
+                            inv_w_l[1], inv_w_l[2], inv_w_l[3],
+                            SafeDiv(beta, inv_w_u)[0], SafeDiv(beta, inv_w_u)[1],
+                            SafeDiv(beta, inv_w_u)[2], SafeDiv(beta, inv_w_u)[3]);
                     }
                 }
             }
@@ -287,27 +287,27 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
                     return;
 
                 // Compute path throughput and path PDFs for light sample
-                SampledSpectrum T_hat = w.T_hat * f * AbsDot(wi, ns);
-                PBRT_DBG("w.T_hat %f %f %f %f f %f %f %f %f dot %f\n", w.T_hat[0],
-                         w.T_hat[1], w.T_hat[2], w.T_hat[3], f[0], f[1], f[2], f[3],
+                SampledSpectrum beta = w.beta * f * AbsDot(wi, ns);
+                PBRT_DBG("w.beta %f %f %f %f f %f %f %f %f dot %f\n", w.beta[0],
+                         w.beta[1], w.beta[2], w.beta[3], f[0], f[1], f[2], f[3],
                          AbsDot(wi, ns));
 
                 PBRT_DBG(
-                    "me index %d depth %d T_hat %f %f %f %f f %f %f %f %f ls.L %f %f %f "
+                    "me index %d depth %d beta %f %f %f %f f %f %f %f %f ls.L %f %f %f "
                     "%f ls.pdf %f\n",
-                    w.pixelIndex, w.depth, T_hat[0], T_hat[1], T_hat[2], T_hat[3], f[0],
+                    w.pixelIndex, w.depth, beta[0], beta[1], beta[2], beta[3], f[0],
                     f[1], f[2], f[3], ls->L[0], ls->L[1], ls->L[2], ls->L[3], ls->pdf);
 
                 Float lightPDF = ls->pdf * sampledLight->p;
-                // This causes uniPathPDF to be zero for the shadow ray, so that
+                // This causes inv_w_u to be zero for the shadow ray, so that
                 // part of MIS just becomes a no-op.
                 Float bsdfPDF =
                     IsDeltaLight(light.Type()) ? 0.f : bsdf.PDF<ConcreteBxDF>(wo, wi);
-                SampledSpectrum uniPathPDF = w.uniPathPDF * bsdfPDF;
-                SampledSpectrum lightPathPDF = w.uniPathPDF * lightPDF;
+                SampledSpectrum inv_w_u = w.inv_w_u * bsdfPDF;
+                SampledSpectrum inv_w_l = w.inv_w_u * lightPDF;
 
                 // Enqueue shadow ray with tentative radiance contribution
-                SampledSpectrum Ld = T_hat * ls->L;
+                SampledSpectrum Ld = beta * ls->L;
                 Ray ray = SpawnRayTo(w.pi, w.n, w.time, ls->pLight.pi, ls->pLight.n);
                 // Initialize _ray_ medium if media are present
                 if (haveMedia)
@@ -315,18 +315,18 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
                                                      : w.mediumInterface.inside;
 
                 shadowRayQueue->Push(ShadowRayWorkItem{ray, 1 - ShadowEpsilon, lambda, Ld,
-                                                       uniPathPDF, lightPathPDF,
+                                                       inv_w_u, inv_w_l,
                                                        w.pixelIndex});
 
                 PBRT_DBG(
                     "w.index %d spawned shadow ray depth %d Ld %f %f %f %f "
-                    "new T_hat %f %f %f %f T_hat/uni %f %f %f %f Ld/uni %f %f %f %f\n",
-                    w.pixelIndex, w.depth, Ld[0], Ld[1], Ld[2], Ld[3], T_hat[0], T_hat[1],
-                    T_hat[2], T_hat[3], SafeDiv(T_hat, uniPathPDF)[0],
-                    SafeDiv(T_hat, uniPathPDF)[1], SafeDiv(T_hat, uniPathPDF)[2],
-                    SafeDiv(T_hat, uniPathPDF)[3], SafeDiv(Ld, uniPathPDF)[0],
-                    SafeDiv(Ld, uniPathPDF)[1], SafeDiv(Ld, uniPathPDF)[2],
-                    SafeDiv(Ld, uniPathPDF)[3]);
+                    "new beta %f %f %f %f beta/uni %f %f %f %f Ld/uni %f %f %f %f\n",
+                    w.pixelIndex, w.depth, Ld[0], Ld[1], Ld[2], Ld[3], beta[0], beta[1],
+                    beta[2], beta[3], SafeDiv(beta, inv_w_u)[0],
+                    SafeDiv(beta, inv_w_u)[1], SafeDiv(beta, inv_w_u)[2],
+                    SafeDiv(beta, inv_w_u)[3], SafeDiv(Ld, inv_w_u)[0],
+                    SafeDiv(Ld, inv_w_u)[1], SafeDiv(Ld, inv_w_u)[2],
+                    SafeDiv(Ld, inv_w_u)[3]);
             }
         });
 }

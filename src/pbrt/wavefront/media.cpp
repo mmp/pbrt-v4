@@ -55,18 +55,18 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
                      ray.d.z, tMax);
 
             SampledWavelengths lambda = w.lambda;
-            SampledSpectrum T_hat = w.T_hat;
-            SampledSpectrum uniPathPDF = w.uniPathPDF;
-            SampledSpectrum lightPathPDF = w.lightPathPDF;
+            SampledSpectrum beta = w.beta;
+            SampledSpectrum inv_w_u = w.inv_w_u;
+            SampledSpectrum inv_w_l = w.inv_w_l;
             SampledSpectrum L(0.f);
             RNG rng(Hash(tMax), Hash(ray.d));
 
             PBRT_DBG("Lambdas %f %f %f %f\n", lambda[0], lambda[1], lambda[2], lambda[3]);
-            PBRT_DBG("Medium sample T_hat %f %f %f %f uniPathPDF %f %f %f %f "
-                     "lightPathPDF %f %f %f %f\n",
-                     T_hat[0], T_hat[1], T_hat[2], T_hat[3], uniPathPDF[0], uniPathPDF[1],
-                     uniPathPDF[2], uniPathPDF[3], lightPathPDF[0], lightPathPDF[1],
-                     lightPathPDF[2], lightPathPDF[3]);
+            PBRT_DBG("Medium sample beta %f %f %f %f inv_w_u %f %f %f %f "
+                     "inv_w_l %f %f %f %f\n",
+                     beta[0], beta[1], beta[2], beta[3], inv_w_u[0], inv_w_u[1],
+                     inv_w_u[2], inv_w_u[3], inv_w_l[0], inv_w_l[1],
+                     inv_w_l[2], inv_w_l[3]);
 
             // Sample the medium according to T_maj, the homogeneous
             // transmission function based on the majorant.
@@ -80,7 +80,7 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
                 ray, tMax, uDist, rng, lambda,
                 [&](Point3f p, MediumProperties mp, SampledSpectrum sigma_maj,
                     SampledSpectrum T_maj) {
-                    rescale(&T_hat, &uniPathPDF, &lightPathPDF);
+                    rescale(&beta, &inv_w_u, &inv_w_l);
 
                     PBRT_DBG("Medium event T_maj %f %f %f %f sigma_a %f %f %f %f sigma_s "
                              "%f %f "
@@ -93,8 +93,8 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
                     // by sigma_a/sigma_maj rather than only doing it
                     // (without scaling) at absorption events.
                     if (w.depth < maxDepth && mp.Le)
-                        L += T_hat * mp.Le * mp.sigma_a /
-                             (sigma_maj[0] * uniPathPDF.Average());
+                        L += beta * mp.Le * mp.sigma_a /
+                             (sigma_maj[0] * inv_w_u.Average());
 
                     // Compute probabilities for each type of scattering.
                     Float pAbsorb = mp.sigma_a[0] / sigma_maj[0];
@@ -109,25 +109,25 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
                     if (mode == 0) {
                         // Absorption--done.
                         PBRT_DBG("absorbed\n");
-                        T_hat = SampledSpectrum(0.f);
+                        beta = SampledSpectrum(0.f);
                         // Tell the medium to stop traversal.
                         return false;
                     } else if (mode == 1) {
                         // Scattering.
                         PBRT_DBG("scattered\n");
-                        T_hat *= T_maj * mp.sigma_s;
-                        uniPathPDF *= T_maj * mp.sigma_s;
+                        beta *= T_maj * mp.sigma_s;
+                        inv_w_u *= T_maj * mp.sigma_s;
 
                         // Enqueue medium scattering work.
                         auto enqueue = [=](auto ptr) {
                             using PhaseFunction = typename std::remove_const_t<
                                 std::remove_reference_t<decltype(*ptr)>>;
                             mediumScatterQueue->Push(MediumScatterWorkItem<PhaseFunction>{
-                                p, w.depth, lambda, T_hat, uniPathPDF, ptr, -ray.d,
+                                p, w.depth, lambda, beta, inv_w_u, ptr, -ray.d,
                                 ray.time, w.etaScale, ray.medium, w.pixelIndex});
                         };
-                        DCHECK_RARE(1e-6f, !T_hat);
-                        if (T_hat && uniPathPDF)
+                        DCHECK_RARE(1e-6f, !beta);
+                        if (beta && inv_w_u)
                             mp.phase.Dispatch(enqueue);
 
                         scattered = true;
@@ -139,27 +139,27 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
                         SampledSpectrum sigma_n =
                             ClampZero(sigma_maj - mp.sigma_a - mp.sigma_s);
 
-                        T_hat *= T_maj * sigma_n;
-                        uniPathPDF *= T_maj * sigma_n;
-                        lightPathPDF *= T_maj * sigma_maj;
+                        beta *= T_maj * sigma_n;
+                        inv_w_u *= T_maj * sigma_n;
+                        inv_w_l *= T_maj * sigma_maj;
 
                         uMode = rng.Uniform<Float>();
 
-                        return T_hat && uniPathPDF;
+                        return beta && inv_w_u;
                     }
                 });
-            if (!scattered && T_hat) {
-                T_hat *= T_maj;
-                uniPathPDF *= T_maj;
-                lightPathPDF *= T_maj;
+            if (!scattered && beta) {
+                beta *= T_maj;
+                inv_w_u *= T_maj;
+                inv_w_l *= T_maj;
             }
 
-            PBRT_DBG("Post ray medium sample L %f %f %f %f T_hat %f %f %f %f\n", L[0],
-                     L[1], L[2], L[3], T_hat[0], T_hat[1], T_hat[2], T_hat[3]);
-            PBRT_DBG("Post ray medium sample uniPathPDF %f %f %f %f lightPathPDF %f %f "
+            PBRT_DBG("Post ray medium sample L %f %f %f %f beta %f %f %f %f\n", L[0],
+                     L[1], L[2], L[3], beta[0], beta[1], beta[2], beta[3]);
+            PBRT_DBG("Post ray medium sample inv_w_u %f %f %f %f inv_w_l %f %f "
                      "%f %f\n",
-                     uniPathPDF[0], uniPathPDF[1], uniPathPDF[2], uniPathPDF[3],
-                     lightPathPDF[0], lightPathPDF[1], lightPathPDF[2], lightPathPDF[3]);
+                     inv_w_u[0], inv_w_u[1], inv_w_u[2], inv_w_u[3],
+                     inv_w_l[0], inv_w_l[1], inv_w_l[2], inv_w_l[3]);
 
             // Add any emission found to its pixel sample's L value.
             if (L) {
@@ -171,7 +171,7 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
 
             // There's no more work to do if there was a scattering event in
             // the medium.
-            if (scattered || !T_hat || !uniPathPDF || w.depth == maxDepth)
+            if (scattered || !beta || !inv_w_u || w.depth == maxDepth)
                 return;
 
             // Otherwise, enqueue bump and medium stuff...
@@ -182,8 +182,8 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
                     PBRT_DBG("Adding ray to escapedRayQueue pixel index %d depth %d\n",
                              w.pixelIndex, w.depth);
                     escapedRayQueue->Push(EscapedRayWorkItem{
-                        ray.o, ray.d, w.depth, lambda, w.pixelIndex, T_hat,
-                        (int)w.specularBounce, uniPathPDF, lightPathPDF, w.prevIntrCtx});
+                        ray.o, ray.d, w.depth, lambda, w.pixelIndex, beta,
+                        (int)w.specularBounce, inv_w_u, inv_w_l, w.prevIntrCtx});
                 }
                 return;
             }
@@ -204,8 +204,8 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
                 Interaction intr(w.pi, w.n);
                 intr.mediumInterface = &w.mediumInterface;
                 Ray newRay = intr.SpawnRay(ray.d);
-                nextRayQueue->PushIndirectRay(newRay, w.depth, w.prevIntrCtx, T_hat,
-                                              uniPathPDF, lightPathPDF, lambda,
+                nextRayQueue->PushIndirectRay(newRay, w.depth, w.prevIntrCtx, beta,
+                                              inv_w_u, inv_w_l, lambda,
                                               w.etaScale, w.specularBounce,
                                               w.anyNonSpecularBounces, w.pixelIndex);
                 return;
@@ -218,7 +218,7 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
                     w.pixelIndex, w.depth);
                 hitAreaLightQueue->Push(
                     HitAreaLightWorkItem{w.areaLight, Point3f(w.pi), w.n, w.uv, -ray.d,
-                                         lambda, w.depth, T_hat, uniPathPDF, lightPathPDF,
+                                         lambda, w.depth, beta, inv_w_u, inv_w_l,
                                          w.prevIntrCtx, w.specularBounce, w.pixelIndex});
             }
 
@@ -254,8 +254,8 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
                                                    w.pixelIndex,
                                                    w.anyNonSpecularBounces,
                                                    -ray.d,
-                                                   T_hat,
-                                                   uniPathPDF,
+                                                   beta,
+                                                   inv_w_u,
                                                    w.etaScale,
                                                    w.mediumInterface});
             };
@@ -297,32 +297,32 @@ void WavefrontPathIntegrator::SampleMediumScattering(int wavefrontDepth) {
                     light.SampleLi(ctx, raySamples.direct.u, w.lambda, true);
                 if (ls && ls->L && ls->pdf > 0) {
                     Vector3f wi = ls->wi;
-                    SampledSpectrum T_hat = w.T_hat * w.phase->p(wo, wi);
+                    SampledSpectrum beta = w.beta * w.phase->p(wo, wi);
 
-                    PBRT_DBG("Phase phase T_hat %f %f %f %f\n", T_hat[0], T_hat[1],
-                             T_hat[2], T_hat[3]);
+                    PBRT_DBG("Phase phase beta %f %f %f %f\n", beta[0], beta[1],
+                             beta[2], beta[3]);
 
                     // Compute PDFs for direct lighting MIS calculation.
                     Float lightPDF = ls->pdf * sampledLight->p;
                     Float phasePDF =
                         IsDeltaLight(light.Type()) ? 0.f : w.phase->PDF(wo, wi);
-                    SampledSpectrum uniPathPDF = w.uniPathPDF * phasePDF;
-                    SampledSpectrum lightPathPDF = w.uniPathPDF * lightPDF;
+                    SampledSpectrum inv_w_u = w.inv_w_u * phasePDF;
+                    SampledSpectrum inv_w_l = w.inv_w_u * lightPDF;
 
-                    SampledSpectrum Ld = T_hat * ls->L;
+                    SampledSpectrum Ld = beta * ls->L;
                     Ray ray(w.p, ls->pLight.p() - w.p, w.time, w.medium);
 
                     // Enqueue shadow ray
                     shadowRayQueue->Push(ShadowRayWorkItem{ray, 1 - ShadowEpsilon,
-                                                           w.lambda, Ld, uniPathPDF,
-                                                           lightPathPDF, w.pixelIndex});
+                                                           w.lambda, Ld, inv_w_u,
+                                                           inv_w_l, w.pixelIndex});
 
                     PBRT_DBG("Enqueued medium shadow ray depth %d "
-                             "Ld %f %f %f %f uniPathPDF %f %f %f %f "
-                             "lightPathPDF %f %f %f %f pixel index %d\n",
-                             w.depth, Ld[0], Ld[1], Ld[2], Ld[3], uniPathPDF[0],
-                             uniPathPDF[1], uniPathPDF[2], uniPathPDF[3], lightPathPDF[0],
-                             lightPathPDF[1], lightPathPDF[2], lightPathPDF[3],
+                             "Ld %f %f %f %f inv_w_u %f %f %f %f "
+                             "inv_w_l %f %f %f %f pixel index %d\n",
+                             w.depth, Ld[0], Ld[1], Ld[2], Ld[3], inv_w_u[0],
+                             inv_w_u[1], inv_w_u[2], inv_w_u[3], inv_w_l[0],
+                             inv_w_l[1], inv_w_l[2], inv_w_l[3],
                              w.pixelIndex);
                 }
             }
@@ -333,15 +333,15 @@ void WavefrontPathIntegrator::SampleMediumScattering(int wavefrontDepth) {
             if (!phaseSample || phaseSample->pdf == 0)
                 return;
 
-            SampledSpectrum T_hat = w.T_hat * phaseSample->p;
-            SampledSpectrum uniPathPDF = w.uniPathPDF * phaseSample->pdf;
-            SampledSpectrum lightPathPDF = w.uniPathPDF;
+            SampledSpectrum beta = w.beta * phaseSample->p;
+            SampledSpectrum inv_w_u = w.inv_w_u * phaseSample->pdf;
+            SampledSpectrum inv_w_l = w.inv_w_u;
 
             // Russian roulette
-            // TODO: should we even bother? Generally T_hat/uniPathPDF is one here,
+            // TODO: should we even bother? Generally beta/inv_w_u is one here,
             // due to the way scattering events are scattered and because we're
             // sampling exactly from the phase function's distribution...
-            SampledSpectrum rrBeta = T_hat * w.etaScale / uniPathPDF.Average();
+            SampledSpectrum rrBeta = beta * w.etaScale / inv_w_u.Average();
             if (rrBeta.MaxComponentValue() < 1 && w.depth >= 1) {
                 Float q = std::max<Float>(0, 1 - rrBeta.MaxComponentValue());
                 if (raySamples.indirect.rr < q) {
@@ -349,8 +349,8 @@ void WavefrontPathIntegrator::SampleMediumScattering(int wavefrontDepth) {
                              q, w.pixelIndex);
                     return;
                 }
-                uniPathPDF *= 1 - q;
-                lightPathPDF *= 1 - q;
+                inv_w_u *= 1 - q;
+                inv_w_l *= 1 - q;
             }
 
             Ray ray(w.p, phaseSample->wi, w.time, w.medium);
@@ -359,7 +359,7 @@ void WavefrontPathIntegrator::SampleMediumScattering(int wavefrontDepth) {
 
             // Spawn indirect ray.
             nextRayQueue->PushIndirectRay(
-                ray, w.depth + 1, ctx, T_hat, uniPathPDF, lightPathPDF, w.lambda,
+                ray, w.depth + 1, ctx, beta, inv_w_u, inv_w_l, w.lambda,
                 w.etaScale, specularBounce, anyNonSpecularBounces, w.pixelIndex);
             PBRT_DBG("Enqueuing indirect medium ray at depth %d pixel index %d\n",
                      w.depth + 1, w.pixelIndex);

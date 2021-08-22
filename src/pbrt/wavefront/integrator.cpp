@@ -593,23 +593,23 @@ void WavefrontPathIntegrator::HandleEscapedRays() {
             for (const auto &light : *infiniteLights) {
                 if (SampledSpectrum Le = light.Le(Ray(w.rayo, w.rayd), w.lambda); Le) {
                     // Compute path radiance contribution from infinite light
-                    PBRT_DBG("L %f %f %f %f T_hat %f %f %f %f Le %f %f %f %f", L[0], L[1],
-                             L[2], L[3], w.T_hat[0], w.T_hat[1], w.T_hat[2], w.T_hat[3],
+                    PBRT_DBG("L %f %f %f %f beta %f %f %f %f Le %f %f %f %f", L[0], L[1],
+                             L[2], L[3], w.beta[0], w.beta[1], w.beta[2], w.beta[3],
                              Le[0], Le[1], Le[2], Le[3]);
-                    PBRT_DBG("pdf uni %f %f %f %f pdf nee %f %f %f %f", w.uniPathPDF[0],
-                             w.uniPathPDF[1], w.uniPathPDF[2], w.uniPathPDF[3],
-                             w.lightPathPDF[0], w.lightPathPDF[1], w.lightPathPDF[2],
-                             w.lightPathPDF[3]);
+                    PBRT_DBG("pdf uni %f %f %f %f pdf nee %f %f %f %f", w.inv_w_u[0],
+                             w.inv_w_u[1], w.inv_w_u[2], w.inv_w_u[3],
+                             w.inv_w_l[0], w.inv_w_l[1], w.inv_w_l[2],
+                             w.inv_w_l[3]);
 
                     if (w.depth == 0 || w.specularBounce) {
-                        L += w.T_hat * Le / w.uniPathPDF.Average();
+                        L += w.beta * Le / w.inv_w_u.Average();
                     } else {
                         // Compute MIS-weighted radiance contribution from infinite light
                         LightSampleContext ctx = w.prevIntrCtx;
                         Float lightChoicePDF = lightSampler.PMF(ctx, light);
-                        SampledSpectrum lightPathPDF = w.lightPathPDF * lightChoicePDF *
+                        SampledSpectrum inv_w_l = w.inv_w_l * lightChoicePDF *
                                                        light.PDF_Li(ctx, w.rayd, true);
-                        L += w.T_hat * Le / (w.uniPathPDF + lightPathPDF).Average();
+                        L += w.beta * Le / (w.inv_w_u + inv_w_l).Average();
                     }
                 }
             }
@@ -639,7 +639,7 @@ void WavefrontPathIntegrator::HandleEmissiveIntersection() {
             // Compute area light's weighted radiance contribution to the path
             SampledSpectrum L(0.f);
             if (w.depth == 0 || w.specularBounce) {
-                L = w.T_hat * Le / w.uniPathPDF.Average();
+                L = w.beta * Le / w.inv_w_u.Average();
             } else {
                 // Compute MIS-weighted radiance contribution from area light
                 Vector3f wi = -w.wo;
@@ -647,9 +647,9 @@ void WavefrontPathIntegrator::HandleEmissiveIntersection() {
                 Float lightChoicePDF = lightSampler.PMF(ctx, w.areaLight);
                 Float lightPDF = lightChoicePDF * w.areaLight.PDF_Li(ctx, wi, true);
 
-                SampledSpectrum uniPathPDF = w.uniPathPDF;
-                SampledSpectrum lightPathPDF = w.lightPathPDF * lightPDF;
-                L = w.T_hat * Le / (uniPathPDF + lightPathPDF).Average();
+                SampledSpectrum inv_w_u = w.inv_w_u;
+                SampledSpectrum inv_w_l = w.inv_w_l * lightPDF;
+                L = w.beta * Le / (inv_w_u + inv_w_l).Average();
             }
 
             PBRT_DBG("Added L %f %f %f %f for pixel index %d\n", L[0], L[1], L[2], L[3],
