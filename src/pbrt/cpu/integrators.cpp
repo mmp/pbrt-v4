@@ -318,17 +318,10 @@ SampledSpectrum Integrator::Tr(const Interaction &p0, const Interaction &p1,
                                const SampledWavelengths &lambda) const {
     RNG rng(Hash(p0.p()), Hash(p1.p()));
 
-    auto rescale = [](SampledSpectrum &Tr, SampledSpectrum &pdf) {
-        if (Tr.MaxComponentValue() > 0x1p24f || pdf.MaxComponentValue() > 0x1p24f) {
-            Tr /= 0x1p24f;
-            pdf /= 0x1p24f;
-        }
-    };
-
     // :-(
     Ray ray =
         p0.IsSurfaceInteraction() ? p0.AsSurface().SpawnRayTo(p1) : p0.SpawnRayTo(p1);
-    SampledSpectrum Tr(1.f), pdf(1.f);
+    SampledSpectrum Tr(1.f), inv_w(1.f);
     if (LengthSquared(ray.d) == 0)
         return Tr;
 
@@ -343,22 +336,25 @@ SampledSpectrum Integrator::Tr(const Interaction &p0, const Interaction &p1,
             Point3f pExit = ray(si ? si->tHit : (1 - ShadowEpsilon));
             ray.d = pExit - ray.o;
 
-            SampleT_maj(ray, 1.f, rng.Uniform<Float>(), rng, lambda,
+            SampledSpectrum T_maj =
+                SampleT_maj(ray, 1.f, rng.Uniform<Float>(), rng, lambda,
                         [&](Point3f p, MediumProperties mp, SampledSpectrum sigma_maj,
                             SampledSpectrum T_maj) {
                             SampledSpectrum sigma_n =
                                 ClampZero(sigma_maj - mp.sigma_a - mp.sigma_s);
 
+                            Float pr = T_maj[0] * sigma_maj[0];
                             // ratio-tracking: only evaluate null scattering
-                            Tr *= T_maj * sigma_n;
-                            pdf *= T_maj * sigma_maj;
+                            Tr *= T_maj * sigma_n / pr;
+                            inv_w *= T_maj * sigma_maj / pr;
 
-                            if (!Tr)
+                            if (!Tr || !inv_w)
                                 return false;
 
-                            rescale(Tr, pdf);
                             return true;
                         });
+            Tr *= T_maj / T_maj[0];
+            inv_w *= T_maj / T_maj[0];
         }
 
         // Generate next ray segment or return final transmittance
@@ -367,7 +363,7 @@ SampledSpectrum Integrator::Tr(const Interaction &p0, const Interaction &p1,
         ray = si->intr.SpawnRayTo(p1);
     }
     PBRT_DBG("%s\n", StringPrintf("Tr from %s to %s = %s", p0.pi, p1.pi, Tr).c_str());
-    return Tr / pdf.Average();
+    return Tr / inv_w.Average();
 }
 
 std::string Integrator::ToString() const {
