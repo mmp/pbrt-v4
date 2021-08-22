@@ -166,7 +166,8 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
             if (bsdfSample) {
                 // Compute updated path throughput and PDFs and enqueue indirect ray
                 Vector3f wi = bsdfSample->wi;
-                SampledSpectrum beta = w.beta * bsdfSample->f * AbsDot(wi, ns) / bsdfSample->pdf;
+                SampledSpectrum beta =
+                    w.beta * bsdfSample->f * AbsDot(wi, ns) / bsdfSample->pdf;
                 SampledSpectrum inv_w_u = w.inv_w_u, inv_w_l;
 
                 PBRT_DBG("%s f*cos[0] %f bsdfSample->pdf %f f*cos/pdf %f\n",
@@ -220,18 +221,17 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
                         // NOTE: slightly different than context below. Problem?
                         LightSampleContext ctx(w.pi, w.n, ns);
                         nextRayQueue->PushIndirectRay(
-                            ray, w.depth + 1, ctx, beta, inv_w_u, inv_w_l,
-                            lambda, etaScale, bsdfSample->IsSpecular(),
-                            anyNonSpecularBounces, w.pixelIndex);
+                            ray, w.depth + 1, ctx, beta, inv_w_u, inv_w_l, lambda,
+                            etaScale, bsdfSample->IsSpecular(), anyNonSpecularBounces,
+                            w.pixelIndex);
 
-                        PBRT_DBG(
-                            "Spawned indirect ray at depth %d from w.index %d. "
-                            "Specular %d beta %f %f %f %f inv_w_u %f %f %f %f "
-                            "inv_w_l %f %f %f %f\n",
-                            w.depth + 1, w.pixelIndex, int(bsdfSample->IsSpecular()),
-                            beta[0], beta[1], beta[2], beta[3], inv_w_u[0],
-                            inv_w_u[1], inv_w_u[2], inv_w_u[3], inv_w_l[0],
-                            inv_w_l[1], inv_w_l[2], inv_w_l[3]);
+                        PBRT_DBG("Spawned indirect ray at depth %d from w.index %d. "
+                                 "Specular %d beta %f %f %f %f inv_w_u %f %f %f %f "
+                                 "inv_w_l %f %f %f %f\n",
+                                 w.depth + 1, w.pixelIndex, int(bsdfSample->IsSpecular()),
+                                 beta[0], beta[1], beta[2], beta[3], inv_w_u[0],
+                                 inv_w_u[1], inv_w_u[2], inv_w_u[3], inv_w_l[0],
+                                 inv_w_l[1], inv_w_l[2], inv_w_l[3]);
                     }
                 }
             }
@@ -270,8 +270,8 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
                 PBRT_DBG(
                     "me index %d depth %d beta %f %f %f %f f %f %f %f %f ls.L %f %f %f "
                     "%f ls.pdf %f\n",
-                    w.pixelIndex, w.depth, beta[0], beta[1], beta[2], beta[3], f[0],
-                    f[1], f[2], f[3], ls->L[0], ls->L[1], ls->L[2], ls->L[3], ls->pdf);
+                    w.pixelIndex, w.depth, beta[0], beta[1], beta[2], beta[3], f[0], f[1],
+                    f[2], f[3], ls->L[0], ls->L[1], ls->L[2], ls->L[3], ls->pdf);
 
                 Float lightPDF = ls->pdf * sampledLight->p;
                 // This causes inv_w_u to be zero for the shadow ray, so that
@@ -290,14 +290,12 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
                                                      : w.mediumInterface.inside;
 
                 shadowRayQueue->Push(ShadowRayWorkItem{ray, 1 - ShadowEpsilon, lambda, Ld,
-                                                       inv_w_u, inv_w_l,
-                                                       w.pixelIndex});
+                                                       inv_w_u, inv_w_l, w.pixelIndex});
 
-                PBRT_DBG(
-                    "w.index %d spawned shadow ray depth %d Ld %f %f %f %f "
-                    "new beta %f %f %f %f\n",
-                    w.pixelIndex, w.depth, Ld[0], Ld[1], Ld[2], Ld[3], beta[0], beta[1],
-                    beta[2], beta[3]);
+                PBRT_DBG("w.index %d spawned shadow ray depth %d Ld %f %f %f %f "
+                         "new beta %f %f %f %f\n",
+                         w.pixelIndex, w.depth, Ld[0], Ld[1], Ld[2], Ld[3], beta[0],
+                         beta[1], beta[2], beta[3]);
             }
         });
 }

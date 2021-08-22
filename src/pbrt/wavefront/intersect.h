@@ -38,9 +38,9 @@ inline PBRT_CPU_GPU void RecordShadowRayResult(const ShadowRayWorkItem w,
     SampledSpectrum Ld = w.Ld / (w.inv_w_u + w.inv_w_l).Average();
     PBRT_DBG("Unoccluded shadow ray. Final Ld %f %f %f %f "
              "(sr.Ld %f %f %f %f inv_w_u %f %f %f %f inv_w_l %f %f %f %f)\n",
-             Ld[0], Ld[1], Ld[2], Ld[3], w.Ld[0], w.Ld[1], w.Ld[2], w.Ld[3],
-             w.inv_w_u[0], w.inv_w_u[1], w.inv_w_u[2], w.inv_w_u[3],
-             w.inv_w_l[0], w.inv_w_l[1], w.inv_w_l[2], w.inv_w_l[3]);
+             Ld[0], Ld[1], Ld[2], Ld[3], w.Ld[0], w.Ld[1], w.Ld[2], w.Ld[3], w.inv_w_u[0],
+             w.inv_w_u[1], w.inv_w_u[2], w.inv_w_u[3], w.inv_w_l[0], w.inv_w_l[1],
+             w.inv_w_l[2], w.inv_w_l[3]);
 
     SampledSpectrum Lpixel = pixelSampleState->L[w.pixelIndex];
     pixelSampleState->L[w.pixelIndex] = Lpixel + Ld;
@@ -101,10 +101,9 @@ inline PBRT_CPU_GPU void EnqueueWorkAfterIntersection(
         PBRT_DBG("Enqueuing into medium transition queue: pixel index %d \n",
                  r.pixelIndex);
         Ray newRay = intr.SpawnRay(r.ray.d);
-        nextRayQueue->PushIndirectRay(newRay, r.depth, r.prevIntrCtx, r.beta,
-                                      r.inv_w_u, r.inv_w_l, r.lambda, r.etaScale,
-                                      r.specularBounce, r.anyNonSpecularBounces,
-                                      r.pixelIndex);
+        nextRayQueue->PushIndirectRay(newRay, r.depth, r.prevIntrCtx, r.beta, r.inv_w_u,
+                                      r.inv_w_l, r.lambda, r.etaScale, r.specularBounce,
+                                      r.anyNonSpecularBounces, r.pixelIndex);
         return;
     }
 
@@ -113,10 +112,9 @@ inline PBRT_CPU_GPU void EnqueueWorkAfterIntersection(
                  r.pixelIndex);
         Ray ray = r.ray;
         // TODO: intr.wo == -ray.d?
-        hitAreaLightQueue->Push(
-            HitAreaLightWorkItem{intr.areaLight, intr.p(), intr.n, intr.uv, intr.wo,
-                                 r.lambda, r.depth, r.beta, r.inv_w_u, r.inv_w_l,
-                                 r.prevIntrCtx, (int)r.specularBounce, r.pixelIndex});
+        hitAreaLightQueue->Push(HitAreaLightWorkItem{
+            intr.areaLight, intr.p(), intr.n, intr.uv, intr.wo, r.lambda, r.depth, r.beta,
+            r.inv_w_u, r.inv_w_l, r.prevIntrCtx, (int)r.specularBounce, r.pixelIndex});
     }
 
     FloatTexture displacement = material.GetDisplacement();
@@ -232,8 +230,8 @@ inline PBRT_CPU_GPU void TraceTransmittance(ShadowRayWorkItem sr,
                     PBRT_DBG("T_ray %f %f %f %f inv_w_l %f %f %f %f inv_w_u %f "
                              "%f %f %f\n",
                              T_ray[0], T_ray[1], T_ray[2], T_ray[3], inv_w_l[0],
-                             inv_w_l[1], inv_w_l[2], inv_w_l[3],
-                             inv_w_u[0], inv_w_u[1], inv_w_u[2], inv_w_u[3]);
+                             inv_w_l[1], inv_w_l[2], inv_w_l[3], inv_w_u[0], inv_w_u[1],
+                             inv_w_u[2], inv_w_u[3]);
 
                     if (!T_ray)
                         return false;
@@ -255,27 +253,21 @@ inline PBRT_CPU_GPU void TraceTransmittance(ShadowRayWorkItem sr,
     PBRT_DBG("Final T_ray %.9g %.9g %.9g %.9g sr.inv_w_u %.9g %.9g %.9g %.9g "
              "inv_w_u %.9g %.9g %.9g %.9g\n",
              T_ray[0], T_ray[1], T_ray[2], T_ray[3], sr.inv_w_u[0], sr.inv_w_u[1],
-             sr.inv_w_u[2], sr.inv_w_u[3], inv_w_u[0], inv_w_u[1],
-             inv_w_u[2], inv_w_u[3]);
+             sr.inv_w_u[2], sr.inv_w_u[3], inv_w_u[0], inv_w_u[1], inv_w_u[2],
+             inv_w_u[3]);
     PBRT_DBG("sr.inv_w_l %.9g %.9g %.9g %.9g inv_w_l %.9g %.9g %.9g %.9g\n",
-             sr.inv_w_l[0], sr.inv_w_l[1], sr.inv_w_l[2],
-             sr.inv_w_l[3], inv_w_l[0], inv_w_l[1], inv_w_l[2],
-             inv_w_l[3]);
+             sr.inv_w_l[0], sr.inv_w_l[1], sr.inv_w_l[2], sr.inv_w_l[3], inv_w_l[0],
+             inv_w_l[1], inv_w_l[2], inv_w_l[3]);
     PBRT_DBG("scaled throughput %.9g %.9g %.9g %.9g\n",
-             T_ray[0] /
-                 (sr.inv_w_u * inv_w_u + sr.inv_w_l * inv_w_l).Average(),
-             T_ray[1] /
-                 (sr.inv_w_u * inv_w_u + sr.inv_w_l * inv_w_l).Average(),
-             T_ray[2] /
-                 (sr.inv_w_u * inv_w_u + sr.inv_w_l * inv_w_l).Average(),
-             T_ray[3] /
-                 (sr.inv_w_u * inv_w_u + sr.inv_w_l * inv_w_l).Average());
+             T_ray[0] / (sr.inv_w_u * inv_w_u + sr.inv_w_l * inv_w_l).Average(),
+             T_ray[1] / (sr.inv_w_u * inv_w_u + sr.inv_w_l * inv_w_l).Average(),
+             T_ray[2] / (sr.inv_w_u * inv_w_u + sr.inv_w_l * inv_w_l).Average(),
+             T_ray[3] / (sr.inv_w_u * inv_w_u + sr.inv_w_l * inv_w_l).Average());
 
     if (T_ray) {
         // FIXME/reconcile: this takes inv_w_l as input while
         // e.g. VolPathIntegrator::SampleLd() does not...
-        Ld *= T_ray /
-              (sr.inv_w_u * inv_w_u + sr.inv_w_l * inv_w_l).Average();
+        Ld *= T_ray / (sr.inv_w_u * inv_w_u + sr.inv_w_l * inv_w_l).Average();
 
         PBRT_DBG("Setting final Ld for shadow ray pixel index %d = as %f %f %f %f\n",
                  sr.pixelIndex, Ld[0], Ld[1], Ld[2], Ld[3]);

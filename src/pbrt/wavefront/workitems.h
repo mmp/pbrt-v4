@@ -351,9 +351,9 @@ class RayQueue : public WorkQueue<RayWorkItem> {
     PBRT_CPU_GPU
     int PushIndirectRay(const Ray &ray, int depth, const LightSampleContext &prevIntrCtx,
                         const SampledSpectrum &beta, const SampledSpectrum &inv_w_u,
-                        const SampledSpectrum &inv_w_l,
-                        const SampledWavelengths &lambda, Float etaScale,
-                        bool specularBounce, bool anyNonSpecularBounces, int pixelIndex);
+                        const SampledSpectrum &inv_w_l, const SampledWavelengths &lambda,
+                        Float etaScale, bool specularBounce, bool anyNonSpecularBounces,
+                        int pixelIndex);
 };
 
 // RayQueue Inline Methods
@@ -413,8 +413,8 @@ class EscapedRayQueue : public WorkQueue<EscapedRayWorkItem> {
 
 inline int EscapedRayQueue::Push(RayWorkItem r) {
     return Push(EscapedRayWorkItem{r.ray.o, r.ray.d, r.depth, r.lambda, r.pixelIndex,
-                                   r.beta, (int)r.specularBounce, r.inv_w_u,
-                                   r.inv_w_l, r.prevIntrCtx});
+                                   r.beta, (int)r.specularBounce, r.inv_w_u, r.inv_w_l,
+                                   r.prevIntrCtx});
 }
 
 // GetBSSRDFAndProbeRayQueue Definition
@@ -500,9 +500,8 @@ class MediumSampleQueue : public WorkQueue<MediumSampleWorkItem> {
 
     PBRT_CPU_GPU
     int Push(RayWorkItem r, Float tMax) {
-        return Push(r.ray, tMax, r.lambda, r.beta, r.inv_w_u, r.inv_w_l,
-                    r.pixelIndex, r.prevIntrCtx, r.specularBounce,
-                    r.anyNonSpecularBounces, r.etaScale);
+        return Push(r.ray, tMax, r.lambda, r.beta, r.inv_w_u, r.inv_w_l, r.pixelIndex,
+                    r.prevIntrCtx, r.specularBounce, r.anyNonSpecularBounces, r.etaScale);
     }
 };
 
