@@ -120,9 +120,7 @@ soa MediumSampleWorkItem {
     int depth;
     Float tMax;
     SampledWavelengths lambda;
-    SampledSpectrum beta;
-    SampledSpectrum inv_w_u;
-    SampledSpectrum inv_w_l;
+    SampledSpectrum beta, inv_w_u, inv_w_l;
     int pixelIndex;
     Light areaLight;
     Point3fi pi;

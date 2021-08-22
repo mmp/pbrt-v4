@@ -8,24 +8,6 @@
 
 namespace pbrt {
 
-PBRT_CPU_GPU
-static inline void rescale(SampledSpectrum *T_hat, SampledSpectrum *lightPathPDF,
-                           SampledSpectrum *uniPathPDF) {
-    if (T_hat->MaxComponentValue() > 0x1p24f ||
-        lightPathPDF->MaxComponentValue() > 0x1p24f ||
-        uniPathPDF->MaxComponentValue() > 0x1p24f) {
-        *T_hat *= 1.f / 0x1p24f;
-        *lightPathPDF *= 1.f / 0x1p24f;
-        *uniPathPDF *= 1.f / 0x1p24f;
-    } else if (T_hat->MaxComponentValue() < 0x1p-24f ||
-               lightPathPDF->MaxComponentValue() < 0x1p-24f ||
-               uniPathPDF->MaxComponentValue() < 0x1p-24f) {
-        *T_hat *= 0x1p24f;
-        *lightPathPDF *= 0x1p24f;
-        *uniPathPDF *= 0x1p24f;
-    }
-}
-
 // SampleMediumScatteringCallback Definition
 struct SampleMediumScatteringCallback {
     int wavefrontDepth;
@@ -80,8 +62,6 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
                 ray, tMax, uDist, rng, lambda,
                 [&](Point3f p, MediumProperties mp, SampledSpectrum sigma_maj,
                     SampledSpectrum T_maj) {
-                    rescale(&beta, &inv_w_u, &inv_w_l);
-
                     PBRT_DBG("Medium event T_maj %f %f %f %f sigma_a %f %f %f %f sigma_s "
                              "%f %f "
                              "%f %f\n",
@@ -92,9 +72,15 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
                     // Add emission, if present.  Always do this and scale
                     // by sigma_a/sigma_maj rather than only doing it
                     // (without scaling) at absorption events.
-                    if (w.depth < maxDepth && mp.Le)
-                        L += beta * mp.Le * mp.sigma_a /
-                             (sigma_maj[0] * inv_w_u.Average());
+                    if (w.depth < maxDepth && mp.Le) {
+                        Float pr = sigma_maj[0] * T_maj[0];
+                        SampledSpectrum inv_w_e = inv_w_u * sigma_maj * T_maj / pr;
+
+                        // Update _L_ for medium emission
+                        if (inv_w_e)
+                            L += beta * mp.sigma_a * T_maj * mp.Le /
+                                (pr * inv_w_e.Average());
+                    }
 
                     // Compute probabilities for each type of scattering.
                     Float pAbsorb = mp.sigma_a[0] / sigma_maj[0];
@@ -115,8 +101,9 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
                     } else if (mode == 1) {
                         // Scattering.
                         PBRT_DBG("scattered\n");
-                        beta *= T_maj * mp.sigma_s;
-                        inv_w_u *= T_maj * mp.sigma_s;
+                        Float pr = T_maj[0] * mp.sigma_s[0];
+                        beta *= T_maj * mp.sigma_s / pr;
+                        inv_w_u *= T_maj * mp.sigma_s / pr;
 
                         // Enqueue medium scattering work.
                         auto enqueue = [=](auto ptr) {
@@ -139,9 +126,10 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
                         SampledSpectrum sigma_n =
                             ClampZero(sigma_maj - mp.sigma_a - mp.sigma_s);
 
-                        beta *= T_maj * sigma_n;
-                        inv_w_u *= T_maj * sigma_n;
-                        inv_w_l *= T_maj * sigma_maj;
+                        Float pr = T_maj[0] * sigma_n[0];
+                        beta *= T_maj * sigma_n / pr;
+                        inv_w_u *= T_maj * sigma_n / pr;
+                        inv_w_l *= T_maj * sigma_maj / pr;
 
                         uMode = rng.Uniform<Float>();
 
@@ -149,9 +137,9 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
                     }
                 });
             if (!scattered && beta) {
-                beta *= T_maj;
-                inv_w_u *= T_maj;
-                inv_w_l *= T_maj;
+                beta *= T_maj / T_maj[0];
+                inv_w_u *= T_maj / T_maj[0];
+                inv_w_l *= T_maj / T_maj[0];
             }
 
             PBRT_DBG("Post ray medium sample L %f %f %f %f beta %f %f %f %f\n", L[0],
@@ -333,9 +321,9 @@ void WavefrontPathIntegrator::SampleMediumScattering(int wavefrontDepth) {
             if (!phaseSample || phaseSample->pdf == 0)
                 return;
 
-            SampledSpectrum beta = w.beta * phaseSample->p;
-            SampledSpectrum inv_w_u = w.inv_w_u * phaseSample->pdf;
-            SampledSpectrum inv_w_l = w.inv_w_u;
+            SampledSpectrum beta = w.beta * phaseSample->p / phaseSample->pdf;
+            SampledSpectrum inv_w_u = w.inv_w_u;
+            SampledSpectrum inv_w_l = w.inv_w_u / phaseSample->pdf;
 
             // Russian roulette
             // TODO: should we even bother? Generally beta/inv_w_u is one here,
@@ -348,9 +336,8 @@ void WavefrontPathIntegrator::SampleMediumScattering(int wavefrontDepth) {
                     PBRT_DBG("RR terminated medium indirect with q %f pixel index %d\n",
                              q, w.pixelIndex);
                     return;
-                }
-                inv_w_u *= 1 - q;
-                inv_w_l *= 1 - q;
+                } else
+                    beta /= 1 - q;
             }
 
             Ray ray(w.p, phaseSample->wi, w.time, w.medium);

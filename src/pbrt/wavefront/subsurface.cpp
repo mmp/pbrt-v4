@@ -62,8 +62,10 @@ void WavefrontPathIntegrator::SampleSubsurface(int wavefrontDepth) {
             if (!bssrdfSample.Sp || !bssrdfSample.pdf)
                 return;
 
-            SampledSpectrum betap = w.beta * bssrdfSample.Sp;
-            SampledSpectrum inv_w_u = w.inv_w_u * w.reservoirPDF * bssrdfSample.pdf;
+            Float pr = w.reservoirPDF * bssrdfSample.pdf[0];
+            SampledSpectrum betap = w.beta * bssrdfSample.Sp / pr;
+            SampledSpectrum inv_w_u = w.inv_w_u * bssrdfSample.pdf / bssrdfSample.pdf[0];
+
             SampledWavelengths lambda = w.lambda;
             RaySamples raySamples = pixelSampleState.samples[w.pixelIndex];
             Vector3f wo = bssrdfSample.wo;
@@ -82,37 +84,33 @@ void WavefrontPathIntegrator::SampleSubsurface(int wavefrontDepth) {
                     bsdf.Sample_f<ConcreteBxDF>(wo, uc, u);
                 if (bsdfSample) {
                     Vector3f wi = bsdfSample->wi;
-                    SampledSpectrum beta = betap * bsdfSample->f * AbsDot(wi, intr.ns);
-                    SampledSpectrum indirUniPathPDF = inv_w_u,
-                                    inv_w_l = inv_w_u;
+                    SampledSpectrum beta = betap * bsdfSample->f * AbsDot(wi, intr.ns) / bsdfSample->pdf;
+                    SampledSpectrum indir_inv_w_u = inv_w_u;
 
                     PBRT_DBG("%s f*cos[0] %f bsdfSample->pdf %f f*cos/pdf %f\n",
                              ConcreteBxDF::Name(), bsdfSample->f[0] * AbsDot(wi, intr.ns),
                              bsdfSample->pdf,
                              bsdfSample->f[0] * AbsDot(wi, intr.ns) / bsdfSample->pdf);
 
-                    if (bsdfSample->pdfIsProportional) {
-                        Float pdf = bsdf.PDF(wo, wi);
-                        beta *= pdf / bsdfSample->pdf;
-                        indirUniPathPDF *= pdf;
-                        PBRT_DBG("Sampled PDF is proportional: pdf %f\n", pdf);
-                    } else
-                        indirUniPathPDF *= bsdfSample->pdf;
+                    SampledSpectrum inv_w_l;
+                    if (bsdfSample->pdfIsProportional)
+                        inv_w_l = inv_w_u / bsdf.PDF<ConcreteBxDF>(wo, bsdfSample->wi);
+                    else
+                        inv_w_l = inv_w_u / bsdfSample->pdf;
 
                     Float etaScale = w.etaScale;
                     if (bsdfSample->IsTransmission())
                         etaScale *= Sqr(bsdfSample->eta);
 
                     // Russian roulette
-                    SampledSpectrum rrBeta = beta * etaScale / indirUniPathPDF.Average();
+                    SampledSpectrum rrBeta = beta * etaScale / indir_inv_w_u.Average();
                     if (rrBeta.MaxComponentValue() < 1 && w.depth > 1) {
                         Float q = std::max<Float>(0, 1 - rrBeta.MaxComponentValue());
                         if (raySamples.indirect.rr < q) {
                             beta = SampledSpectrum(0.f);
                             PBRT_DBG("Path terminated with RR\n");
-                        }
-                        indirUniPathPDF *= 1 - q;
-                        inv_w_l *= 1 - q;
+                        } else
+                            beta /= 1 - q;
                     }
 
                     if (beta) {
@@ -129,24 +127,24 @@ void WavefrontPathIntegrator::SampleSubsurface(int wavefrontDepth) {
 
                         LightSampleContext ctx(intr.pi, intr.n, intr.ns);
                         nextRayQueue->PushIndirectRay(
-                            ray, w.depth + 1, ctx, beta, indirUniPathPDF, inv_w_l,
+                            ray, w.depth + 1, ctx, beta, indir_inv_w_u, inv_w_l,
                             lambda, etaScale, bsdfSample->IsSpecular(),
                             anyNonSpecularBounces, w.pixelIndex);
 
                         PBRT_DBG("Spawned indirect ray at depth %d. "
-                                 "Specular %d T_Hat %f %f %f %f indirUniPathPDF %f %f %f "
+                                 "Specular %d T_Hat %f %f %f %f indir_inv_w_u %f %f %f "
                                  "%f inv_w_l %f "
                                  "%f %f %f "
-                                 "beta/indirUniPathPDF %f %f %f %f\n",
+                                 "beta/indir_inv_w_u %f %f %f %f\n",
                                  w.depth + 1, int(bsdfSample->IsSpecular()), beta[0],
-                                 beta[1], beta[2], beta[3], indirUniPathPDF[0],
-                                 indirUniPathPDF[1], indirUniPathPDF[2],
-                                 indirUniPathPDF[3], inv_w_l[0], inv_w_l[1],
+                                 beta[1], beta[2], beta[3], indir_inv_w_u[0],
+                                 indir_inv_w_u[1], indir_inv_w_u[2],
+                                 indir_inv_w_u[3], inv_w_l[0], inv_w_l[1],
                                  inv_w_l[2], inv_w_l[3],
-                                 SafeDiv(beta, indirUniPathPDF)[0],
-                                 SafeDiv(beta, indirUniPathPDF)[1],
-                                 SafeDiv(beta, indirUniPathPDF)[2],
-                                 SafeDiv(beta, indirUniPathPDF)[3]);
+                                 SafeDiv(beta, indir_inv_w_u)[0],
+                                 SafeDiv(beta, indir_inv_w_u)[1],
+                                 SafeDiv(beta, indir_inv_w_u)[2],
+                                 SafeDiv(beta, indir_inv_w_u)[3]);
                     }
                 }
             }

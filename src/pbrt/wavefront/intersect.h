@@ -165,23 +165,6 @@ struct TransmittanceTraceResult {
     Material material;
 };
 
-inline PBRT_CPU_GPU void rescale(SampledSpectrum &T_hat, SampledSpectrum &lightPathPDF,
-                                 SampledSpectrum &uniPathPDF) {
-    if (T_hat.MaxComponentValue() > 0x1p24f ||
-        lightPathPDF.MaxComponentValue() > 0x1p24f ||
-        uniPathPDF.MaxComponentValue() > 0x1p24f) {
-        T_hat *= 1.f / 0x1p24f;
-        lightPathPDF *= 1.f / 0x1p24f;
-        uniPathPDF *= 1.f / 0x1p24f;
-    } else if (T_hat.MaxComponentValue() < 0x1p-24f ||
-               lightPathPDF.MaxComponentValue() < 0x1p-24f ||
-               uniPathPDF.MaxComponentValue() < 0x1p-24f) {
-        T_hat *= 0x1p24f;
-        lightPathPDF *= 0x1p24f;
-        uniPathPDF *= 0x1p24f;
-    }
-}
-
 template <typename T, typename S>
 inline PBRT_CPU_GPU void TraceTransmittance(ShadowRayWorkItem sr,
                                             SOA<PixelSampleState> *pixelSampleState,
@@ -226,9 +209,10 @@ inline PBRT_CPU_GPU void TraceTransmittance(ShadowRayWorkItem sr,
                         ClampZero(sigma_maj - mp.sigma_a - mp.sigma_s);
 
                     // ratio-tracking: only evaluate null scattering
-                    T_ray *= T_maj * sigma_n;
-                    inv_w_l *= T_maj * sigma_maj;
-                    inv_w_u *= T_maj * sigma_n;
+                    Float pr = T_maj[0] * sigma_maj[0];
+                    T_ray *= T_maj * sigma_n / pr;
+                    inv_w_l *= T_maj * sigma_maj / pr;
+                    inv_w_u *= T_maj * sigma_n / pr;
 
                     // Possibly terminate transmittance computation using Russian roulette
                     SampledSpectrum Tr = T_ray / (inv_w_l + inv_w_u).Average();
@@ -236,10 +220,8 @@ inline PBRT_CPU_GPU void TraceTransmittance(ShadowRayWorkItem sr,
                         Float q = 0.75f;
                         if (rng.Uniform<Float>() < q)
                             T_ray = SampledSpectrum(0.);
-                        else {
-                            inv_w_l *= 1 - q;
-                            inv_w_u *= 1 - q;
-                        }
+                        else
+                            T_ray /= 1 - q;
                     }
 
                     PBRT_DBG(
@@ -256,13 +238,11 @@ inline PBRT_CPU_GPU void TraceTransmittance(ShadowRayWorkItem sr,
                     if (!T_ray)
                         return false;
 
-                    rescale(T_ray, inv_w_l, inv_w_u);
-
                     return true;
                 });
-            T_ray *= T_maj;
-            inv_w_l *= T_maj;
-            inv_w_u *= T_maj;
+            T_ray *= T_maj / T_maj[0];
+            inv_w_l *= T_maj / T_maj[0];
+            inv_w_u *= T_maj / T_maj[0];
         }
 
         if (!result.hit || !T_ray)
