@@ -338,21 +338,21 @@ SampledSpectrum Integrator::Tr(const Interaction &p0, const Interaction &p1,
 
             SampledSpectrum T_maj =
                 SampleT_maj(ray, 1.f, rng.Uniform<Float>(), rng, lambda,
-                        [&](Point3f p, MediumProperties mp, SampledSpectrum sigma_maj,
-                            SampledSpectrum T_maj) {
-                            SampledSpectrum sigma_n =
-                                ClampZero(sigma_maj - mp.sigma_a - mp.sigma_s);
+                            [&](Point3f p, MediumProperties mp, SampledSpectrum sigma_maj,
+                                SampledSpectrum T_maj) {
+                                SampledSpectrum sigma_n =
+                                    ClampZero(sigma_maj - mp.sigma_a - mp.sigma_s);
 
-                            Float pr = T_maj[0] * sigma_maj[0];
-                            // ratio-tracking: only evaluate null scattering
-                            Tr *= T_maj * sigma_n / pr;
-                            inv_w *= T_maj * sigma_maj / pr;
+                                // ratio-tracking: only evaluate null scattering
+                                Float pr = T_maj[0] * sigma_maj[0];
+                                Tr *= T_maj * sigma_n / pr;
+                                inv_w *= T_maj * sigma_maj / pr;
 
-                            if (!Tr || !inv_w)
-                                return false;
+                                if (!Tr || !inv_w)
+                                    return false;
 
-                            return true;
-                        });
+                                return true;
+                            });
             Tr *= T_maj / T_maj[0];
             inv_w *= T_maj / T_maj[0];
         }
@@ -959,10 +959,9 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
 
     while (true) {
         // Sample segment of volumetric scattering path
-        PBRT_DBG("%s\n",
-                 StringPrintf("Path tracer depth %d, current L = %s, beta = %s\n", depth,
-                              L, beta)
-                     .c_str());
+        PBRT_DBG("%s\n", StringPrintf("Path tracer depth %d, current L = %s, beta = %s\n",
+                                      depth, L, beta)
+                             .c_str());
         pstd::optional<ShapeIntersection> si = Intersect(ray);
         if (ray.medium) {
             // Sample the participating medium
@@ -983,12 +982,13 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                         return false;
                     }
                     ++volumeInteractions;
-
                     // Add emission from medium scattering event
                     if (depth < maxDepth && mp.Le) {
+                        // Compute $\hat{P}$ at new path vertex
                         Float pdf = sigma_maj[0] * T_maj[0];
                         SampledSpectrum betap = beta * T_maj * mp.sigma_a / pdf;
 
+                        // Compute PDF for absorption at path vertex
                         SampledSpectrum inv_w_e = inv_w_u * sigma_maj * T_maj / pdf;
 
                         // Update _L_ for medium emission
@@ -1025,8 +1025,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                             // Sample direct lighting at volume scattering event
                             MediumInteraction intr(p, -ray.d, ray.time, ray.medium,
                                                    mp.phase);
-                            L += SampleLd(intr, nullptr, lambda, sampler, beta,
-                                          inv_w_u);
+                            L += SampleLd(intr, nullptr, lambda, sampler, beta, inv_w_u);
 
                             // Sample new direction at real scattering event
                             Point2f u = sampler.Get2D();
@@ -1217,7 +1216,6 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             Float pdf = interactionSampler.SampleProbability() * bssrdfSample.pdf[0];
             beta *= bssrdfSample.Sp / pdf;
             inv_w_u *= bssrdfSample.pdf / bssrdfSample.pdf[0];
-
             SurfaceInteraction pi = ssi;
             pi.wo = bssrdfSample.wo;
             prevIntrContext = LightSampleContext(pi);

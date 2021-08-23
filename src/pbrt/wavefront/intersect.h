@@ -227,11 +227,11 @@ inline PBRT_CPU_GPU void TraceTransmittance(ShadowRayWorkItem sr,
                         T_maj[0], T_maj[1], T_maj[2], T_maj[3], sigma_n[0], sigma_n[1],
                         sigma_n[2], sigma_n[3], sigma_maj[0], sigma_maj[1], sigma_maj[2],
                         sigma_maj[3]);
-                    PBRT_DBG("T_ray %f %f %f %f inv_w_l %f %f %f %f inv_w_u %f "
-                             "%f %f %f\n",
-                             T_ray[0], T_ray[1], T_ray[2], T_ray[3], inv_w_l[0],
-                             inv_w_l[1], inv_w_l[2], inv_w_l[3], inv_w_u[0], inv_w_u[1],
-                             inv_w_u[2], inv_w_u[3]);
+                    PBRT_DBG(
+                        "T_ray %f %f %f %f inv_w_l %f %f %f %f inv_w_u %f %f %f %f\n",
+                        T_ray[0], T_ray[1], T_ray[2], T_ray[3], inv_w_l[0], inv_w_l[1],
+                        inv_w_l[2], inv_w_l[3], inv_w_u[0], inv_w_u[1], inv_w_u[2],
+                        inv_w_u[3]);
 
                     if (!T_ray)
                         return false;
@@ -250,8 +250,8 @@ inline PBRT_CPU_GPU void TraceTransmittance(ShadowRayWorkItem sr,
         ray = spawnTo(pLight);
     }
 
-    PBRT_DBG("Final T_ray %.9g %.9g %.9g %.9g sr.inv_w_u %.9g %.9g %.9g %.9g "
-             "inv_w_u %.9g %.9g %.9g %.9g\n",
+    PBRT_DBG("Final T_ray %.9g %.9g %.9g %.9g sr.inv_w_u %.9g %.9g %.9g %.9g inv_w_u "
+             "%.9g %.9g %.9g %.9g\n",
              T_ray[0], T_ray[1], T_ray[2], T_ray[3], sr.inv_w_u[0], sr.inv_w_u[1],
              sr.inv_w_u[2], sr.inv_w_u[3], inv_w_u[0], inv_w_u[1], inv_w_u[2],
              inv_w_u[3]);

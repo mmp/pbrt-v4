@@ -225,13 +225,16 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
                             etaScale, bsdfSample->IsSpecular(), anyNonSpecularBounces,
                             w.pixelIndex);
 
-                        PBRT_DBG("Spawned indirect ray at depth %d from w.index %d. "
-                                 "Specular %d beta %f %f %f %f inv_w_u %f %f %f %f "
-                                 "inv_w_l %f %f %f %f\n",
-                                 w.depth + 1, w.pixelIndex, int(bsdfSample->IsSpecular()),
-                                 beta[0], beta[1], beta[2], beta[3], inv_w_u[0],
-                                 inv_w_u[1], inv_w_u[2], inv_w_u[3], inv_w_l[0],
-                                 inv_w_l[1], inv_w_l[2], inv_w_l[3]);
+                        PBRT_DBG(
+                            "Spawned indirect ray at depth %d from w.index %d. "
+                            "Specular %d beta %f %f %f %f inv_w_u %f %f %f %f inv_w_l %f "
+                            "%f %f %f beta/inv_w_u %f %f %f %f\n",
+                            w.depth + 1, w.pixelIndex, int(bsdfSample->IsSpecular()),
+                            beta[0], beta[1], beta[2], beta[3], inv_w_u[0], inv_w_u[1],
+                            inv_w_u[2], inv_w_u[3], inv_w_l[0], inv_w_l[1], inv_w_l[2],
+                            inv_w_l[3], SafeDiv(beta, inv_w_u)[0],
+                            SafeDiv(beta, inv_w_u)[1], SafeDiv(beta, inv_w_u)[2],
+                            SafeDiv(beta, inv_w_u)[3]);
                     }
                 }
             }
@@ -293,9 +296,13 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
                                                        inv_w_u, inv_w_l, w.pixelIndex});
 
                 PBRT_DBG("w.index %d spawned shadow ray depth %d Ld %f %f %f %f "
-                         "new beta %f %f %f %f\n",
+                         "new beta %f %f %f %f beta/uni %f %f %f %f Ld/uni %f %f %f %f\n",
                          w.pixelIndex, w.depth, Ld[0], Ld[1], Ld[2], Ld[3], beta[0],
-                         beta[1], beta[2], beta[3]);
+                         beta[1], beta[2], beta[3], SafeDiv(beta, inv_w_u)[0],
+                         SafeDiv(beta, inv_w_u)[1], SafeDiv(beta, inv_w_u)[2],
+                         SafeDiv(beta, inv_w_u)[3], SafeDiv(Ld, inv_w_u)[0],
+                         SafeDiv(Ld, inv_w_u)[1], SafeDiv(Ld, inv_w_u)[2],
+                         SafeDiv(Ld, inv_w_u)[3]);
             }
         });
 }

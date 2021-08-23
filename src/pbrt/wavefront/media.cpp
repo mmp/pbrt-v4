@@ -44,8 +44,8 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
             RNG rng(Hash(tMax), Hash(ray.d));
 
             PBRT_DBG("Lambdas %f %f %f %f\n", lambda[0], lambda[1], lambda[2], lambda[3]);
-            PBRT_DBG("Medium sample beta %f %f %f %f inv_w_u %f %f %f %f "
-                     "inv_w_l %f %f %f %f\n",
+            PBRT_DBG("Medium sample beta %f %f %f %f inv_w_u %f %f %f %f inv_w_l %f %f "
+                     "%f %f\n",
                      beta[0], beta[1], beta[2], beta[3], inv_w_u[0], inv_w_u[1],
                      inv_w_u[2], inv_w_u[3], inv_w_l[0], inv_w_l[1], inv_w_l[2],
                      inv_w_l[3]);
@@ -144,8 +144,7 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
 
             PBRT_DBG("Post ray medium sample L %f %f %f %f beta %f %f %f %f\n", L[0],
                      L[1], L[2], L[3], beta[0], beta[1], beta[2], beta[3]);
-            PBRT_DBG("Post ray medium sample inv_w_u %f %f %f %f inv_w_l %f %f "
-                     "%f %f\n",
+            PBRT_DBG("Post ray medium sample inv_w_u %f %f %f %f inv_w_l %f %f %f %f\n",
                      inv_w_u[0], inv_w_u[1], inv_w_u[2], inv_w_u[3], inv_w_l[0],
                      inv_w_l[1], inv_w_l[2], inv_w_l[3]);
 
@@ -323,7 +322,7 @@ void WavefrontPathIntegrator::SampleMediumScattering(int wavefrontDepth) {
             SampledSpectrum inv_w_l = w.inv_w_u / phaseSample->pdf;
 
             // Russian roulette
-            // TODO: should we even bother? Generally beta/inv_w_u is one here,
+            // TODO: should we even bother? Generally beta is one here,
             // due to the way scattering events are scattered and because we're
             // sampling exactly from the phase function's distribution...
             SampledSpectrum rrBeta = beta * w.etaScale / inv_w_u.Average();
@@ -333,8 +332,8 @@ void WavefrontPathIntegrator::SampleMediumScattering(int wavefrontDepth) {
                     PBRT_DBG("RR terminated medium indirect with q %f pixel index %d\n",
                              q, w.pixelIndex);
                     return;
-                } else
-                    beta /= 1 - q;
+                }
+                beta /= 1 - q;
             }
 
             Ray ray(w.p, phaseSample->wi, w.time, w.medium);
