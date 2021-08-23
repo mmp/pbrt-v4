@@ -132,18 +132,18 @@ void WavefrontPathIntegrator::SampleSubsurface(int wavefrontDepth) {
                             w.pixelIndex);
 
                         PBRT_DBG("Spawned indirect ray at depth %d. "
-                                 "Specular %d beta %f %f %f %f indirUniPathPDF %f %f %f "
-                                 "%f inv_w_l %f "
+                                 "Specular %d beta %f %f %f %f indir_inv_w_u %f %f %f %f "
+                                 "inv_w_l %f "
                                  "%f %f %f "
-                                 "beta/indirUniPathPDF %f %f %f %f\n",
+                                 "beta/indir_inv_w_u %f %f %f %f\n",
                                  w.depth + 1, int(bsdfSample->IsSpecular()), beta[0],
-                                 beta[1], beta[2], beta[3], indirUniPathPDF[0],
-                                 indirUniPathPDF[1], indirUniPathPDF[2],
-                                 indirUniPathPDF[3], inv_w_l[0], inv_w_l[1], inv_w_l[2],
-                                 inv_w_l[3], SafeDiv(beta, indirUniPathPDF)[0],
-                                 SafeDiv(beta, indirUniPathPDF)[1],
-                                 SafeDiv(beta, indirUniPathPDF)[2],
-                                 SafeDiv(beta, indirUniPathPDF)[3]);
+                                 beta[1], beta[2], beta[3], indir_inv_w_u[0],
+                                 indir_inv_w_u[1], indir_inv_w_u[2], indir_inv_w_u[3],
+                                 inv_w_l[0], inv_w_l[1], inv_w_l[2], inv_w_l[3],
+                                 SafeDiv(beta, indir_inv_w_u)[0],
+                                 SafeDiv(beta, indir_inv_w_u)[1],
+                                 SafeDiv(beta, indir_inv_w_u)[2],
+                                 SafeDiv(beta, indir_inv_w_u)[3]);
                     }
                 }
             }
