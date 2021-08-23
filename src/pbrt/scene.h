@@ -269,37 +269,10 @@ struct TransformSet {
     Transform t[MaxTransforms];
 };
 
-// SceneProcessor Definition
-class SceneProcessor {
+// BasicScene Definition
+class BasicScene {
   public:
-    virtual ~SceneProcessor();
-
-    virtual void SetFilm(SceneEntity film) = 0;
-    virtual void SetSampler(SceneEntity sampler) = 0;
-    virtual void SetIntegrator(SceneEntity integrator) = 0;
-    virtual void SetFilter(SceneEntity filter) = 0;
-    virtual void SetAccelerator(SceneEntity accelerator) = 0;
-    virtual void SetCamera(CameraSceneEntity camera) = 0;
-
-    virtual void AddNamedMaterial(std::string name, SceneEntity material) = 0;
-    virtual int AddMaterial(SceneEntity material) = 0;
-    virtual void AddMedium(TransformedSceneEntity medium) = 0;
-    virtual void AddFloatTexture(std::string name, TextureSceneEntity texture) = 0;
-    virtual void AddSpectrumTexture(std::string name, TextureSceneEntity texture) = 0;
-    virtual void AddLight(LightSceneEntity light) = 0;
-    virtual int AddAreaLight(SceneEntity light) = 0;
-    virtual void AddShapes(pstd::span<ShapeSceneEntity> shape) = 0;
-    virtual void AddAnimatedShape(AnimatedShapeSceneEntity shape) = 0;
-    virtual void AddInstanceDefinition(InstanceDefinitionSceneEntity instance) = 0;
-    virtual void AddInstanceUses(pstd::span<InstanceSceneEntity> in) = 0;
-
-    virtual void Done() = 0;
-};
-
-// ParsedScene Definition
-class ParsedScene : public SceneProcessor {
-  public:
-    ParsedScene();
+    BasicScene();
 
     void SetFilm(SceneEntity film);
     void SetSampler(SceneEntity sampler);
@@ -344,7 +317,7 @@ class ParsedScene : public SceneProcessor {
 
     // Public for now...
   public:
-    // ParsedScene Public Members
+    // BasicScene Public Members
     SceneEntity film, sampler, integrator, filter, accelerator;
     CameraSceneEntity camera;
 
@@ -392,7 +365,7 @@ class ParsedScene : public SceneProcessor {
 class SceneStateManager : public ParserTarget {
   public:
     // SceneStateManager Public Methods
-    SceneStateManager(SceneProcessor *sceneProcessor);
+    SceneStateManager(BasicScene *scene);
     void Option(const std::string &name, const std::string &value, FileLoc loc);
     void Identity(FileLoc loc);
     void Translate(Float dx, Float dy, Float dz, FileLoc loc);
@@ -487,7 +460,7 @@ class SceneStateManager : public ParserTarget {
     bool CTMIsAnimated() const { return graphicsState.ctm.IsAnimated(); }
 
     // SceneStateManager Private Members
-    SceneProcessor *sceneProcessor;
+    BasicScene *scene;
     GraphicsState graphicsState;
     enum class BlockState { OptionsBlock, WorldBlock };
     BlockState currentBlock = BlockState::OptionsBlock;
@@ -500,7 +473,7 @@ class SceneStateManager : public ParserTarget {
     std::vector<GraphicsState> pushedGraphicsStates;
     std::vector<std::pair<char, FileLoc>> pushStack;  // 'a': attribute, 'o': object
     struct ActiveInstanceDefinition {
-        ActiveInstanceDefinition(std::string name, FileLoc loc) : entity(name, loc){};
+        ActiveInstanceDefinition(std::string name, FileLoc loc) : entity(name, loc) {}
 
         std::mutex mutex;
         std::atomic<int> activeImports{1};

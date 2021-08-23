@@ -25,7 +25,7 @@
 
 namespace pbrt {
 
-class ParsedScene;
+class BasicScene;
 
 // WavefrontAggregate Definition
 class WavefrontAggregate {
@@ -84,7 +84,7 @@ class WavefrontPathIntegrator {
     void UpdateFilm();
 
     WavefrontPathIntegrator(pstd::pmr::memory_resource *memoryResource,
-                            ParsedScene &scene);
+                            BasicScene &scene);
 
     template <typename F>
     void ParallelFor(const char *description, int nItems, F &&func) {

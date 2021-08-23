@@ -21,7 +21,7 @@
 namespace pbrt {
 
 CPUAggregate::CPUAggregate(
-    ParsedScene &scene, NamedTextures &textures,
+    BasicScene &scene, NamedTextures &textures,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
     const std::map<std::string, Medium> &media,
     const std::map<std::string, pbrt::Material> &namedMaterials,

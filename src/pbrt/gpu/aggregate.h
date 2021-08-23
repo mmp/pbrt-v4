@@ -29,7 +29,7 @@ namespace pbrt {
 
 class OptiXAggregate : public WavefrontAggregate {
   public:
-    OptiXAggregate(const ParsedScene &scene, CUDATrackedMemoryResource *memoryResource,
+    OptiXAggregate(const BasicScene &scene, CUDATrackedMemoryResource *memoryResource,
                    NamedTextures &textures,
                    const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
                    const std::map<std::string, Medium> &media,

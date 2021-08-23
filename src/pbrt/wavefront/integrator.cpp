@@ -76,7 +76,7 @@ static void updateMaterialNeeds(
 }
 
 WavefrontPathIntegrator::WavefrontPathIntegrator(
-    pstd::pmr::memory_resource *memoryResource, ParsedScene &scene)
+    pstd::pmr::memory_resource *memoryResource, BasicScene &scene)
     : memoryResource(memoryResource) {
     ThreadLocal<Allocator> threadAllocators([memoryResource]() {
         pstd::pmr::monotonic_buffer_resource *resource =

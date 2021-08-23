@@ -11,7 +11,7 @@
 
 namespace pbrt {
 
-void RenderWavefront(ParsedScene &scene) {
+void RenderWavefront(BasicScene &scene) {
     WavefrontPathIntegrator *integrator = nullptr;
 
 #ifdef PBRT_BUILD_GPU_RENDERER

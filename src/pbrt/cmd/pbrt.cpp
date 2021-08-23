@@ -255,7 +255,7 @@ int main(int argc, char *argv[]) {
         ParseFiles(&formattingTarget, filenames);
     } else {
         // Parse provided scene description files
-        ParsedScene scene;
+        BasicScene scene;
         SceneStateManager manager(&scene);
         ParseFiles(&manager, filenames);
 

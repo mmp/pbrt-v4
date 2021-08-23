@@ -21,7 +21,7 @@
 
 namespace pbrt {
 
-void RenderCPU(ParsedScene &parsedScene) {
+void RenderCPU(BasicScene &parsedScene) {
     Allocator alloc;
     ThreadLocal<Allocator> threadAllocators([]() { return Allocator(); });
 

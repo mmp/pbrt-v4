@@ -45,8 +45,6 @@ static std::string ToString(const std::pair<T, U> &p) {
     return StringPrintf("[ std::pair first: %s second: %s ]", p.first, p.second);
 }
 
-SceneProcessor::~SceneProcessor() {}
-
 std::string SceneStateManager::ToString() const {
     return StringPrintf(
         "[ SceneStateManager camera: %s film: %s sampler: %s integrator: %s "
@@ -86,8 +84,8 @@ STAT_COUNTER("Scene/Object instances created", nObjectInstancesCreated);
 STAT_COUNTER("Scene/Object instances used", nObjectInstancesUsed);
 
 // SceneStateManager Method Definitions
-SceneStateManager::SceneStateManager(SceneProcessor *sceneProcessor)
-    : sceneProcessor(sceneProcessor)
+SceneStateManager::SceneStateManager(BasicScene *scene)
+    : scene(scene)
 #ifdef PBRT_BUILD_GPU_RENDERER
       ,
       transformCache(Options->useGPU ? Allocator(&CUDATrackedMemoryResource::singleton)
@@ -101,7 +99,7 @@ SceneStateManager::SceneStateManager(SceneProcessor *sceneProcessor)
     integrator.name = SceneEntity::internedStrings.Lookup("volpath");
 
     ParameterDictionary dict({}, RGBColorSpace::sRGB);
-    currentMaterialIndex = sceneProcessor->AddMaterial(SceneEntity("diffuse", dict, {}));
+    currentMaterialIndex = scene->AddMaterial(SceneEntity("diffuse", dict, {}));
     accelerator.name = SceneEntity::internedStrings.Lookup("bvh");
     film.name = SceneEntity::internedStrings.Lookup("rgb");
     film.parameters = ParameterDictionary({}, RGBColorSpace::sRGB);
@@ -223,12 +221,12 @@ void SceneStateManager::WorldBegin(FileLoc loc) {
     namedCoordinateSystems["world"] = graphicsState.ctm;
 
     // Pass these along now
-    sceneProcessor->SetFilm(std::move(film));
-    sceneProcessor->SetSampler(std::move(sampler));
-    sceneProcessor->SetIntegrator(std::move(integrator));
-    sceneProcessor->SetFilter(std::move(filter));
-    sceneProcessor->SetAccelerator(std::move(accelerator));
-    sceneProcessor->SetCamera(std::move(camera));
+    scene->SetFilm(std::move(film));
+    scene->SetSampler(std::move(sampler));
+    scene->SetIntegrator(std::move(integrator));
+    scene->SetFilter(std::move(filter));
+    scene->SetAccelerator(std::move(accelerator));
+    scene->SetCamera(std::move(camera));
 }
 
 void SceneStateManager::LightSource(const std::string &name, ParsedParameterVector params,
@@ -236,9 +234,8 @@ void SceneStateManager::LightSource(const std::string &name, ParsedParameterVect
     VERIFY_WORLD("LightSource");
     ParameterDictionary dict(std::move(params), graphicsState.lightAttributes,
                              graphicsState.colorSpace);
-    sceneProcessor->AddLight(LightSceneEntity(name, std::move(dict), loc,
-                                              RenderFromObject(),
-                                              graphicsState.currentOutsideMedium));
+    scene->AddLight(LightSceneEntity(name, std::move(dict), loc, RenderFromObject(),
+                                     graphicsState.currentOutsideMedium));
 }
 
 void SceneStateManager::Shape(const std::string &name, ParsedParameterVector params,
@@ -250,9 +247,9 @@ void SceneStateManager::Shape(const std::string &name, ParsedParameterVector par
 
     int areaLightIndex = -1;
     if (!graphicsState.areaLightName.empty()) {
-        areaLightIndex = sceneProcessor->AddAreaLight(
-            SceneEntity(graphicsState.areaLightName, graphicsState.areaLightParams,
-                        graphicsState.areaLightLoc));
+        areaLightIndex = scene->AddAreaLight(SceneEntity(graphicsState.areaLightName,
+                                                         graphicsState.areaLightParams,
+                                                         graphicsState.areaLightLoc));
         if (activeInstanceDefinition)
             Warning(&loc, "Area lights not supported with object instancing");
     }
@@ -270,7 +267,7 @@ void SceneStateManager::Shape(const std::string &name, ParsedParameterVector par
         if (activeInstanceDefinition)
             activeInstanceDefinition->entity.animatedShapes.push_back(std::move(entity));
         else
-            sceneProcessor->AddAnimatedShape(std::move(entity));
+            scene->AddAnimatedShape(std::move(entity));
     } else {
         const class Transform *renderFromObject =
             transformCache.Lookup(RenderFromObject(0));
@@ -336,8 +333,7 @@ void SceneStateManager::ObjectEnd(FileLoc loc) {
 
     // Otherwise it will be taken care of in MergeImported()
     if (--activeInstanceDefinition->activeImports == 0) {
-        sceneProcessor->AddInstanceDefinition(
-            std::move(activeInstanceDefinition->entity));
+        scene->AddInstanceDefinition(std::move(activeInstanceDefinition->entity));
         delete activeInstanceDefinition;
     }
 
@@ -384,20 +380,20 @@ void SceneStateManager::EndOfFiles() {
         ErrorExit("Fatal errors during scene construction");
 
     if (!shapes.empty())
-        sceneProcessor->AddShapes(shapes);
+        scene->AddShapes(shapes);
     if (!instanceUses.empty())
-        sceneProcessor->AddInstanceUses(instanceUses);
+        scene->AddInstanceUses(instanceUses);
 
-    sceneProcessor->Done();
+    scene->Done();
 }
 
 SceneStateManager *SceneStateManager::CopyForImport() {
-    SceneStateManager *importScene = new SceneStateManager(sceneProcessor);
-    importScene->renderFromWorld = renderFromWorld;
-    importScene->graphicsState = graphicsState;
-    importScene->currentBlock = currentBlock;
+    SceneStateManager *importManager = new SceneStateManager(scene);
+    importManager->renderFromWorld = renderFromWorld;
+    importManager->graphicsState = graphicsState;
+    importManager->currentBlock = currentBlock;
     if (activeInstanceDefinition) {
-        importScene->activeInstanceDefinition = new ActiveInstanceDefinition(
+        importManager->activeInstanceDefinition = new ActiveInstanceDefinition(
             activeInstanceDefinition->entity.name, activeInstanceDefinition->entity.loc);
 
         // In case of nested imports, go up to the true root parent since
@@ -406,10 +402,10 @@ SceneStateManager *SceneStateManager::CopyForImport() {
         ActiveInstanceDefinition *parent = activeInstanceDefinition;
         while (parent->parent)
             parent = parent->parent;
-        importScene->activeInstanceDefinition->parent = parent;
+        importManager->activeInstanceDefinition->parent = parent;
         ++parent->activeImports;
     }
-    return importScene;
+    return importManager;
 }
 
 void SceneStateManager::MergeImported(SceneStateManager *imported) {
@@ -421,9 +417,9 @@ void SceneStateManager::MergeImported(SceneStateManager *imported) {
     errorExit |= imported->errorExit;
 
     if (!imported->shapes.empty())
-        sceneProcessor->AddShapes(imported->shapes);
+        scene->AddShapes(imported->shapes);
     if (!imported->instanceUses.empty())
-        sceneProcessor->AddInstanceUses(imported->instanceUses);
+        scene->AddInstanceUses(imported->instanceUses);
 
     auto mergeVector = [](auto &base, auto &imported) {
         if (base.empty())
@@ -447,7 +443,7 @@ void SceneStateManager::MergeImported(SceneStateManager *imported) {
         delete current;
 
         if (--parent->activeImports == 0)
-            sceneProcessor->AddInstanceDefinition(std::move(parent->entity));
+            scene->AddInstanceDefinition(std::move(parent->entity));
 
         parent->mutex.unlock();
     }
@@ -612,7 +608,7 @@ void SceneStateManager::MakeNamedMedium(const std::string &name,
 
     mediumNames.insert(name);
 
-    sceneProcessor->AddMedium(
+    scene->AddMedium(
         TransformedSceneEntity(name, std::move(dict), loc, RenderFromObject()));
 }
 
@@ -645,10 +641,10 @@ void SceneStateManager::Texture(const std::string &name, const std::string &type
     names.insert(name);
 
     if (type == "float")
-        sceneProcessor->AddFloatTexture(
+        scene->AddFloatTexture(
             name, TextureSceneEntity(texname, std::move(dict), loc, RenderFromObject()));
     else
-        sceneProcessor->AddSpectrumTexture(
+        scene->AddSpectrumTexture(
             name, TextureSceneEntity(texname, std::move(dict), loc, RenderFromObject()));
 }
 
@@ -660,7 +656,7 @@ void SceneStateManager::Material(const std::string &name, ParsedParameterVector 
                              graphicsState.colorSpace);
 
     graphicsState.currentMaterialIndex =
-        sceneProcessor->AddMaterial(SceneEntity(name, std::move(dict), loc));
+        scene->AddMaterial(SceneEntity(name, std::move(dict), loc));
     graphicsState.currentMaterialName.clear();
 }
 
@@ -677,7 +673,7 @@ void SceneStateManager::MakeNamedMaterial(const std::string &name,
     }
     namedMaterialNames.insert(name);
 
-    sceneProcessor->AddNamedMaterial(name, SceneEntity("", std::move(dict), loc));
+    scene->AddNamedMaterial(name, SceneEntity("", std::move(dict), loc));
 }
 
 void SceneStateManager::NamedMaterial(const std::string &name, FileLoc loc) {
@@ -695,8 +691,8 @@ void SceneStateManager::AreaLightSource(const std::string &name,
     graphicsState.areaLightLoc = loc;
 }
 
-// ParsedScene Method Definitions
-ParsedScene::ParsedScene()
+// BasicScene Method Definitions
+BasicScene::BasicScene()
     : threadAllocators([]() {
           pstd::pmr::memory_resource *baseResource = pstd::pmr::get_default_resource();
 #ifdef PBRT_BUILD_GPU_RENDERER
@@ -709,44 +705,44 @@ ParsedScene::ParsedScene()
       }) {
 }
 
-void ParsedScene::SetFilm(SceneEntity film) {
+void BasicScene::SetFilm(SceneEntity film) {
     this->film = std::move(film);
 }
 
-void ParsedScene::SetSampler(SceneEntity sampler) {
+void BasicScene::SetSampler(SceneEntity sampler) {
     this->sampler = std::move(sampler);
 }
 
-void ParsedScene::SetIntegrator(SceneEntity integrator) {
+void BasicScene::SetIntegrator(SceneEntity integrator) {
     this->integrator = std::move(integrator);
 }
 
-void ParsedScene::SetFilter(SceneEntity filter) {
+void BasicScene::SetFilter(SceneEntity filter) {
     this->filter = std::move(filter);
 }
 
-void ParsedScene::SetAccelerator(SceneEntity accelerator) {
+void BasicScene::SetAccelerator(SceneEntity accelerator) {
     this->accelerator = std::move(accelerator);
 }
 
-void ParsedScene::SetCamera(CameraSceneEntity camera) {
+void BasicScene::SetCamera(CameraSceneEntity camera) {
     this->camera = std::move(camera);
 }
 
-void ParsedScene::AddNamedMaterial(std::string name, SceneEntity material) {
+void BasicScene::AddNamedMaterial(std::string name, SceneEntity material) {
     std::lock_guard<std::mutex> lock(materialMutex);
     startLoadingNormalMaps(material.parameters);
     namedMaterials.push_back(std::make_pair(std::move(name), std::move(material)));
 }
 
-int ParsedScene::AddMaterial(SceneEntity material) {
+int BasicScene::AddMaterial(SceneEntity material) {
     std::lock_guard<std::mutex> lock(materialMutex);
     materials.push_back(std::move(material));
     startLoadingNormalMaps(material.parameters);
     return materials.size() - 1;
 }
 
-void ParsedScene::startLoadingNormalMaps(const ParameterDictionary &parameters) {
+void BasicScene::startLoadingNormalMaps(const ParameterDictionary &parameters) {
     std::string filename = parameters.GetOneString("normalmap", "");
     if (filename.empty())
         return;
@@ -772,7 +768,7 @@ void ParsedScene::startLoadingNormalMaps(const ParameterDictionary &parameters) 
     normalMapFutures[filename] = RunAsync(create, filename);
 }
 
-void ParsedScene::AddMedium(TransformedSceneEntity medium) {
+void BasicScene::AddMedium(TransformedSceneEntity medium) {
     std::lock_guard<std::mutex> lock(mediaMutex);
 
     auto create = [=]() {
@@ -791,7 +787,7 @@ void ParsedScene::AddMedium(TransformedSceneEntity medium) {
     mediaFutures[medium.name] = RunAsync(create);
 }
 
-void ParsedScene::AddFloatTexture(std::string name, TextureSceneEntity texture) {
+void BasicScene::AddFloatTexture(std::string name, TextureSceneEntity texture) {
     if (texture.renderFromObject.IsAnimated())
         Warning(&texture.loc, "Animated world to texture transforms are not supported. "
                               "Using start transform.");
@@ -836,7 +832,7 @@ void ParsedScene::AddFloatTexture(std::string name, TextureSceneEntity texture) 
     floatTextureFutures[name] = RunAsync(create, texture);
 }
 
-void ParsedScene::AddSpectrumTexture(std::string name, TextureSceneEntity texture) {
+void BasicScene::AddSpectrumTexture(std::string name, TextureSceneEntity texture) {
     std::lock_guard<std::mutex> lock(textureMutex);
 
     if (texture.texName != "imagemap" && texture.texName != "ptex") {
@@ -882,7 +878,7 @@ void ParsedScene::AddSpectrumTexture(std::string name, TextureSceneEntity textur
     spectrumTextureFutures[name] = RunAsync(create, texture);
 }
 
-void ParsedScene::AddLight(LightSceneEntity light) {
+void BasicScene::AddLight(LightSceneEntity light) {
     std::lock_guard<std::mutex> lock(lightMutex);
     if (!light.medium.empty()) {
         // If the light has a medium associated with it, punt for now since
@@ -910,23 +906,23 @@ void ParsedScene::AddLight(LightSceneEntity light) {
     lightFutures.push_back(RunAsync(create, light));
 }
 
-int ParsedScene::AddAreaLight(SceneEntity light) {
+int BasicScene::AddAreaLight(SceneEntity light) {
     std::lock_guard<std::mutex> lock(areaLightMutex);
     areaLights.push_back(std::move(light));
     return areaLights.size() - 1;
 }
 
-void ParsedScene::AddShapes(pstd::span<ShapeSceneEntity> s) {
+void BasicScene::AddShapes(pstd::span<ShapeSceneEntity> s) {
     std::lock_guard<std::mutex> lock(shapeMutex);
     std::move(std::begin(s), std::end(s), std::back_inserter(shapes));
 }
 
-void ParsedScene::AddAnimatedShape(AnimatedShapeSceneEntity shape) {
+void BasicScene::AddAnimatedShape(AnimatedShapeSceneEntity shape) {
     std::lock_guard<std::mutex> lock(animatedShapeMutex);
     animatedShapes.push_back(std::move(shape));
 }
 
-void ParsedScene::AddInstanceDefinition(InstanceDefinitionSceneEntity instance) {
+void BasicScene::AddInstanceDefinition(InstanceDefinitionSceneEntity instance) {
     InstanceDefinitionSceneEntity *def =
         new InstanceDefinitionSceneEntity(std::move(instance));
 
@@ -934,12 +930,12 @@ void ParsedScene::AddInstanceDefinition(InstanceDefinitionSceneEntity instance) 
     instanceDefinitions[def->name] = def;
 }
 
-void ParsedScene::AddInstanceUses(pstd::span<InstanceSceneEntity> in) {
+void BasicScene::AddInstanceUses(pstd::span<InstanceSceneEntity> in) {
     std::lock_guard<std::mutex> lock(instanceUseMutex);
     std::move(std::begin(in), std::end(in), std::back_inserter(instances));
 }
 
-void ParsedScene::Done() {
+void BasicScene::Done() {
 #if 0
     // LOG_VERBOSE messages about any unused textures..
     std::set<std::string> unusedFloatTextures, unusedSpectrumTextures;
@@ -1000,10 +996,10 @@ void ParsedScene::Done() {
 #endif
 }
 
-void ParsedScene::CreateMaterials(
-    const NamedTextures &textures, ThreadLocal<Allocator> &threadAllocators,
-    std::map<std::string, pbrt::Material> *namedMaterialsOut,
-    std::vector<pbrt::Material> *materialsOut) {
+void BasicScene::CreateMaterials(const NamedTextures &textures,
+                                 ThreadLocal<Allocator> &threadAllocators,
+                                 std::map<std::string, pbrt::Material> *namedMaterialsOut,
+                                 std::vector<pbrt::Material> *materialsOut) {
     LOG_VERBOSE("Starting to consume normal map futures");
     for (auto &fut : normalMapFutures) {
         CHECK(normalMaps.find(fut.first) == normalMaps.end());
@@ -1054,7 +1050,7 @@ void ParsedScene::CreateMaterials(
     }
 }
 
-NamedTextures ParsedScene::CreateTextures() {
+NamedTextures BasicScene::CreateTextures() {
     NamedTextures textures;
 
     if (nMissingTextures > 0)
@@ -1129,7 +1125,7 @@ NamedTextures ParsedScene::CreateTextures() {
     return textures;
 }
 
-std::map<std::string, Medium> ParsedScene::CreateMedia() {
+std::map<std::string, Medium> BasicScene::CreateMedia() {
     std::lock_guard<std::mutex> lock(mediaMutex);
 
     LOG_VERBOSE("Consume media futures start");
@@ -1144,7 +1140,7 @@ std::map<std::string, Medium> ParsedScene::CreateMedia() {
     return mediaMap;
 }
 
-std::vector<Light> ParsedScene::CreateLights(
+std::vector<Light> BasicScene::CreateLights(
     const NamedTextures &textures,
     std::map<int, pstd::vector<Light> *> *shapeIndexToAreaLights) {
     // Ensure that media are all ready
@@ -1257,7 +1253,7 @@ std::vector<Light> ParsedScene::CreateLights(
     return lights;
 }
 
-Primitive ParsedScene::CreateAggregate(
+Primitive BasicScene::CreateAggregate(
     const NamedTextures &textures,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
     const std::map<std::string, Medium> &media,

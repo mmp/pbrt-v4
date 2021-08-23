@@ -11,7 +11,7 @@
 
 namespace pbrt {
 
-void RenderWavefront(ParsedScene &);
+void RenderWavefront(BasicScene &);
 
 }
 

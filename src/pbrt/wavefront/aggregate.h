@@ -24,7 +24,7 @@ namespace pbrt {
 
 class CPUAggregate : public WavefrontAggregate {
   public:
-    CPUAggregate(ParsedScene &scene, NamedTextures &textures,
+    CPUAggregate(BasicScene &scene, NamedTextures &textures,
                  const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
                  const std::map<std::string, Medium> &media,
                  const std::map<std::string, pbrt::Material> &namedMaterials,

@@ -9,9 +9,9 @@
 
 namespace pbrt {
 
-class ParsedScene;
+class BasicScene;
 
-void RenderCPU(ParsedScene &scene);
+void RenderCPU(BasicScene &scene);
 
 }  // namespace pbrt
 

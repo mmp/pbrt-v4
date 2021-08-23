@@ -1126,7 +1126,7 @@ OptixProgramGroup OptiXAggregate::createIntersectionPG(const char *closest,
 }
 
 OptiXAggregate::OptiXAggregate(
-    const ParsedScene &scene, CUDATrackedMemoryResource *memoryResource,
+    const BasicScene &scene, CUDATrackedMemoryResource *memoryResource,
     NamedTextures &textures,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
     const std::map<std::string, Medium> &media,
