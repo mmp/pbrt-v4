@@ -15,6 +15,7 @@ memory_resource::~memory_resource() {}
 
 class NewDeleteResource : public memory_resource {
     void *do_allocate(size_t size, size_t alignment) {
+
 #if defined(PBRT_HAVE__ALIGNED_MALLOC)
         return _aligned_malloc(size, alignment);
 #elif defined(PBRT_HAVE_POSIX_MEMALIGN)
@@ -62,6 +63,50 @@ memory_resource *set_default_resource(memory_resource *r) noexcept {
 
 memory_resource *get_default_resource() noexcept {
     return defaultMemoryResource;
+}
+
+void *monotonic_buffer_resource::do_allocate(size_t bytes, size_t align) {
+#ifndef NDEBUG
+    // Ensures that the monotonic_buffer_resource is used in the same
+    // thread that originally created it. This is an attempt to catch race
+    // conditions, since the class is, by design, not thread safe. Note
+    // that this CHECK effectively assumes that these are being allocated
+    // via something like ThreadLocal; there are perfectly reasonably ways
+    // of allocating these in one thread and using them in another thread,
+    // so this is tied to pbrt's current usage of them...
+    CHECK(constructTID == std::this_thread::get_id());
+#endif
+
+    if (bytes > blockSize) {
+        // We've got a big allocation; let the current block be so that
+        // smaller allocations have a chance at using up more of it.
+        usedBlocks.push_back(
+                             MemoryBlock{upstreamResource->allocate(bytes, align), bytes});
+        return usedBlocks.back().ptr;
+    }
+
+    if ((currentBlockPos % align) != 0) {
+        CHECK_GT(align - (currentBlockPos % align), 0);
+        currentBlockPos += align - (currentBlockPos % align);
+    }
+    DCHECK_EQ(0, currentBlockPos % align);
+
+    if (currentBlockPos + bytes > currentBlock.size) {
+        // Add current block to _usedBlocks_ list
+        if (currentBlock.size) {
+            usedBlocks.push_back(currentBlock);
+            currentBlock = {};
+        }
+
+        currentBlock = {
+                        upstreamResource->allocate(blockSize, alignof(std::max_align_t)),
+                        blockSize};
+        currentBlockPos = 0;
+    }
+
+    void *ptr = (char *)currentBlock.ptr + currentBlockPos;
+    currentBlockPos += bytes;
+    return ptr;
 }
 
 }  // namespace pmr

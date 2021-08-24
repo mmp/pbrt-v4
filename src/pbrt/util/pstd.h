@@ -18,6 +18,7 @@
 #include <list>
 #include <new>
 #include <string>
+#include <thread>
 #include <type_traits>
 #include <typeinfo>
 #include <utility>
@@ -530,9 +531,17 @@ memory_resource *get_default_resource() noexcept;
 class alignas(64) monotonic_buffer_resource : public memory_resource {
   public:
     explicit monotonic_buffer_resource(memory_resource *upstream)
-        : upstreamResource(upstream) {}
+        : upstreamResource(upstream) {
+#ifndef NDEBUG
+        constructTID = std::this_thread::get_id();
+#endif
+    }
     monotonic_buffer_resource(size_t blockSize, memory_resource *upstream)
-        : blockSize(blockSize), upstreamResource(upstream) {}
+        : blockSize(blockSize), upstreamResource(upstream) {
+#ifndef NDEBUG
+        constructTID = std::this_thread::get_id();
+#endif
+    }
 #if 0
     // TODO
     monotonic_buffer_resource(void *buffer, size_t buffer_size,
@@ -564,36 +573,7 @@ class alignas(64) monotonic_buffer_resource : public memory_resource {
     memory_resource *upstream_resource() const { return upstreamResource; }
 
   protected:
-    void *do_allocate(size_t bytes, size_t align) override {
-        if (bytes > blockSize) {
-            // We've got a big allocation; let the current block be so that
-            // smaller allocations have a chance at using up more of it.
-            usedBlocks.push_back(
-                MemoryBlock{upstreamResource->allocate(bytes, align), bytes});
-            return usedBlocks.back().ptr;
-        }
-
-        if ((currentBlockPos % align) != 0)
-            currentBlockPos += align - (currentBlockPos % align);
-        DCHECK_EQ(0, currentBlockPos % align);
-
-        if (currentBlockPos + bytes > currentBlock.size) {
-            // Add current block to _usedBlocks_ list
-            if (currentBlock.size) {
-                usedBlocks.push_back(currentBlock);
-                currentBlock = {};
-            }
-
-            currentBlock = {
-                upstreamResource->allocate(blockSize, alignof(std::max_align_t)),
-                blockSize};
-            currentBlockPos = 0;
-        }
-
-        void *ptr = (char *)currentBlock.ptr + currentBlockPos;
-        currentBlockPos += bytes;
-        return ptr;
-    }
+    void *do_allocate(size_t bytes, size_t align) override;
 
     void do_deallocate(void *p, size_t bytes, size_t alignment) override {
         // no-op
@@ -604,6 +584,9 @@ class alignas(64) monotonic_buffer_resource : public memory_resource {
     }
 
   private:
+#ifndef NDEBUG
+    std::thread::id constructTID;
+#endif
     struct MemoryBlock {
         void *ptr = nullptr;
         size_t size = 0;
