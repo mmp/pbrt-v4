@@ -50,9 +50,8 @@ pstd::vector<DigitPermutation> *ComputeRadicalInversePermutations(uint32_t seed,
     pstd::vector<DigitPermutation> *perms =
         alloc.new_object<pstd::vector<DigitPermutation>>(alloc);
     perms->resize(PrimeTableSize);
-    ParallelFor(0, PrimeTableSize, [&perms, &alloc, seed](int64_t i) {
+    for (int i = 0; i < PrimeTableSize; ++i)
         (*perms)[i] = DigitPermutation(Primes[i], seed, alloc);
-    });
     return perms;
 }
 
