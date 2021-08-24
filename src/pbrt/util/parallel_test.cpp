@@ -5,7 +5,9 @@
 #include <gtest/gtest.h>
 #include <pbrt/pbrt.h>
 #include <pbrt/util/parallel.h>
+
 #include <atomic>
+#include <cmath>
 
 using namespace pbrt;
 
@@ -43,4 +45,38 @@ TEST(Parallel, ForEachThread) {
     std::atomic<int> count{RunningThreads()};
     ForEachThread([&count] { --count; });
     EXPECT_EQ(0, count);
+}
+
+TEST(ThreadLocal, Consistency) {
+    ThreadLocal<std::thread::id> tids([]() { return std::this_thread::get_id(); });
+
+    auto busywork = [](int64_t index) {
+        // Do some busy work to burn some time
+        Float f = 1.141;
+        for (int i = 0; i <= index; ++i)
+            for (int j = 0; j <= index; ++j)
+                f *= std::sqrt(f);
+        EXPECT_NE(f, 1.141f); // make sure it isn't optimized out
+    };
+
+    ParallelFor(0, 1000, [&](int64_t index) {
+        EXPECT_EQ(std::this_thread::get_id(), tids.Get());
+        busywork(index);
+    });
+
+    std::vector<Future<int>> futures;
+    for (int i = 0; i < 100; ++i) {
+        futures.push_back(RunAsync([&]() {
+            EXPECT_EQ(std::this_thread::get_id(), tids.Get());
+            busywork(i);
+            return i;
+        }));
+    }
+    for (int i = 0; i < 100; ++i)
+        (void)futures[i].Get();
+
+    ParallelFor(0, 1000, [&](int64_t index) {
+        EXPECT_EQ(std::this_thread::get_id(), tids.Get());
+        busywork(index);
+    });
 }
