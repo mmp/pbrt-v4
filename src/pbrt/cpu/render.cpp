@@ -42,8 +42,7 @@ void RenderCPU(BasicScene &parsedScene) {
     };
 
     // Filter
-    Filter filter = Filter::Create(parsedScene.filter.name, parsedScene.filter.parameters,
-                                   &parsedScene.filter.loc, alloc);
+    Filter filter = parsedScene.CreateFilter();
 
     // Film
     // It's a little ugly to poke into the camera's parameters here, but we
@@ -56,21 +55,14 @@ void RenderCPU(BasicScene &parsedScene) {
         ErrorExit(&parsedScene.camera.loc,
                   "The specified camera shutter times imply that the shutter "
                   "does not open.  A black image will result.");
-    Film film = Film::Create(parsedScene.film.name, parsedScene.film.parameters,
-                             exposureTime, parsedScene.camera.cameraTransform, filter,
-                             &parsedScene.film.loc, alloc);
+    Film film = parsedScene.CreateFilm(exposureTime, filter);
 
     // Camera
     Medium cameraMedium = findMedium(parsedScene.camera.medium, &parsedScene.camera.loc);
-    Camera camera = Camera::Create(parsedScene.camera.name, parsedScene.camera.parameters,
-                                   cameraMedium, parsedScene.camera.cameraTransform, film,
-                                   &parsedScene.camera.loc, alloc);
+    Camera camera = parsedScene.CreateCamera(cameraMedium, film);
 
-    // Create _Sampler_ for rendering
     Point2i fullImageResolution = camera.GetFilm().FullResolution();
-    Sampler sampler =
-        Sampler::Create(parsedScene.sampler.name, parsedScene.sampler.parameters,
-                        fullImageResolution, &parsedScene.sampler.loc, alloc);
+    Sampler sampler = parsedScene.CreateSampler(fullImageResolution);
 
     // Textures
     LOG_VERBOSE("Starting textures");
@@ -85,17 +77,15 @@ void RenderCPU(BasicScene &parsedScene) {
     LOG_VERBOSE("Starting materials");
     std::map<std::string, pbrt::Material> namedMaterials;
     std::vector<pbrt::Material> materials;
-    parsedScene.CreateMaterials(textures, threadAllocators, &namedMaterials, &materials);
+    parsedScene.CreateMaterials(textures, &namedMaterials, &materials);
     LOG_VERBOSE("Finished materials");
 
     Primitive accel = parsedScene.CreateAggregate(textures, shapeIndexToAreaLights, media,
                                                   namedMaterials, materials);
 
     // Integrator
-    const RGBColorSpace *integratorColorSpace = parsedScene.film.parameters.ColorSpace();
-    std::unique_ptr<Integrator> integrator(Integrator::Create(
-        parsedScene.integrator.name, parsedScene.integrator.parameters, camera, sampler,
-        accel, lights, integratorColorSpace, &parsedScene.integrator.loc));
+    std::unique_ptr<Integrator> integrator(
+        parsedScene.CreateIntegrator(camera, sampler, accel, lights));
 
     // Helpful warnings
     for (const auto &sh : parsedScene.shapes)

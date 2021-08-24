@@ -21,12 +21,15 @@
 
 #include <functional>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <unordered_set>
 #include <vector>
 
 namespace pbrt {
+
+class Integrator;
 
 // SceneEntity Definition
 struct SceneEntity {
@@ -170,21 +173,7 @@ struct InstanceDefinitionSceneEntity {
     std::vector<AnimatedShapeSceneEntity> animatedShapes;
 };
 
-struct TextureSceneEntity : public TransformedSceneEntity {
-    TextureSceneEntity() = default;
-    TextureSceneEntity(const std::string &texName, ParameterDictionary parameters,
-                       FileLoc loc, const AnimatedTransform &renderFromObject)
-        : TransformedSceneEntity("", std::move(parameters), loc, renderFromObject),
-          texName(texName) {}
-
-    std::string ToString() const {
-        return StringPrintf("[ TextureSeneEntity name: %s parameters: %s loc: %s "
-                            "renderFromObject: %s texName: %s ]",
-                            name, parameters, loc, renderFromObject, texName);
-    }
-
-    std::string texName;
-};
+using TextureSceneEntity = TransformedSceneEntity;
 
 struct LightSceneEntity : public TransformedSceneEntity {
     LightSceneEntity() = default;
@@ -272,10 +261,12 @@ struct TransformSet {
 // BasicScene Definition
 class BasicScene {
   public:
+    // BasicScene Public Methods
     BasicScene();
 
-    void SetFilm(SceneEntity film);
     void SetSampler(SceneEntity sampler);
+
+    void SetFilm(SceneEntity film);
     void SetIntegrator(SceneEntity integrator);
     void SetFilter(SceneEntity filter);
     void SetAccelerator(SceneEntity accelerator);
@@ -295,18 +286,15 @@ class BasicScene {
 
     void Done();
 
-    NamedTextures CreateTextures();
-
     void CreateMaterials(const NamedTextures &sceneTextures,
-                         ThreadLocal<Allocator> &threadAllocators,
                          std::map<std::string, Material> *namedMaterials,
                          std::vector<Material> *materials);
-
-    std::map<std::string, Medium> CreateMedia();
 
     std::vector<Light> CreateLights(
         const NamedTextures &textures,
         std::map<int, pstd::vector<Light> *> *shapeIndexToAreaLights);
+
+    std::map<std::string, Medium> CreateMedia();
 
     Primitive CreateAggregate(
         const NamedTextures &textures,
@@ -315,12 +303,20 @@ class BasicScene {
         const std::map<std::string, Material> &namedMaterials,
         const std::vector<Material> &materials);
 
-    // Public for now...
-  public:
+    Sampler CreateSampler(Point2i res) const;
+
+    Filter CreateFilter() const;
+    Film CreateFilm(Float exposureTime, Filter filter) const;
+    Camera CreateCamera(Medium cameraMedium, Film film) const;
+    std::unique_ptr<Integrator> CreateIntegrator(Camera camera, Sampler sampler,
+                                                 Primitive accel,
+                                                 std::vector<Light> lights) const;
+
+    NamedTextures CreateTextures();
+
     // BasicScene Public Members
     SceneEntity film, sampler, integrator, filter, accelerator;
     CameraSceneEntity camera;
-
     std::vector<std::pair<std::string, SceneEntity>> namedMaterials;
     std::vector<SceneEntity> materials;
     std::vector<ShapeSceneEntity> shapes;
@@ -329,14 +325,14 @@ class BasicScene {
     std::map<InternedString, InstanceDefinitionSceneEntity *> instanceDefinitions;
 
   private:
+    // BasicScene Private Methods
     void startLoadingNormalMaps(const ParameterDictionary &parameters);
 
-    ThreadLocal<Allocator> threadAllocators;
-
+    // BasicScene Private Members
     std::mutex mediaMutex;
     std::map<std::string, Future<Medium>> mediaFutures;
+    mutable ThreadLocal<Allocator> threadAllocators;
     std::map<std::string, Medium> mediaMap;
-
     std::mutex materialMutex;
     std::map<std::string, Future<Image *>> normalMapFutures;
     std::map<std::string, Image *> normalMaps;
@@ -361,11 +357,11 @@ class BasicScene {
     std::mutex instanceDefinitionMutex, instanceUseMutex;
 };
 
-// SceneStateManager Definition
-class SceneStateManager : public ParserTarget {
+// BasicSceneBuilder Definition
+class BasicSceneBuilder : public ParserTarget {
   public:
-    // SceneStateManager Public Methods
-    SceneStateManager(BasicScene *scene);
+    // BasicSceneBuilder Public Methods
+    BasicSceneBuilder(BasicScene *scene);
     void Option(const std::string &name, const std::string &value, FileLoc loc);
     void Identity(FileLoc loc);
     void Translate(Float dx, Float dy, Float dz, FileLoc loc);
@@ -413,13 +409,13 @@ class SceneStateManager : public ParserTarget {
 
     void EndOfFiles();
 
-    SceneStateManager *CopyForImport();
-    void MergeImported(SceneStateManager *);
+    BasicSceneBuilder *CopyForImport();
+    void MergeImported(BasicSceneBuilder *);
 
     std::string ToString() const;
 
   private:
-    // SceneStateManager::GraphicsState Definition
+    // BasicSceneBuilder::GraphicsState Definition
     struct GraphicsState {
         // GraphicsState Public Methods
         GraphicsState();
@@ -447,7 +443,7 @@ class SceneStateManager : public ParserTarget {
     };
 
     friend void parse(ParserTarget *scene, std::unique_ptr<Tokenizer> t);
-    // SceneStateManager Private Methods
+    // BasicSceneBuilder Private Methods
     class Transform RenderFromObject(int index) const {
         return pbrt::Transform((renderFromWorld * graphicsState.ctm[index]).GetMatrix());
     }
@@ -459,7 +455,7 @@ class SceneStateManager : public ParserTarget {
 
     bool CTMIsAnimated() const { return graphicsState.ctm.IsAnimated(); }
 
-    // SceneStateManager Private Members
+    // BasicSceneBuilder Private Members
     BasicScene *scene;
     GraphicsState graphicsState;
     enum class BlockState { OptionsBlock, WorldBlock };
@@ -490,9 +486,6 @@ class SceneStateManager : public ParserTarget {
     std::set<std::string> namedMaterialNames, mediumNames;
     std::set<std::string> floatTextureNames, spectrumTextureNames, instanceNames;
     int currentMaterialIndex = 0, currentLightIndex = -1;
-
-    // These have to wait until WorldBegin to be passed along since they
-    // may be updated until then.
     SceneEntity film, sampler, integrator, filter, accelerator;
     CameraSceneEntity camera;
 };

@@ -5,6 +5,7 @@
 #include <pbrt/scene.h>
 
 #include <pbrt/cpu/aggregates.h>
+#include <pbrt/cpu/integrators.h>
 #ifdef PBRT_BUILD_GPU_RENDERER
 #include <pbrt/gpu/memory.h>
 #endif  // PBRT_BUILD_GPU_RENDERER
@@ -45,14 +46,14 @@ static std::string ToString(const std::pair<T, U> &p) {
     return StringPrintf("[ std::pair first: %s second: %s ]", p.first, p.second);
 }
 
-std::string SceneStateManager::ToString() const {
+std::string BasicSceneBuilder::ToString() const {
     return StringPrintf(
-        "[ SceneStateManager camera: %s film: %s sampler: %s integrator: %s "
+        "[ BasicSceneBuilder camera: %s film: %s sampler: %s integrator: %s "
         "filter: %s accelerator: %s ]",
         camera, film, sampler, integrator, filter, accelerator);
 }
 
-SceneStateManager::GraphicsState::GraphicsState() {
+BasicSceneBuilder::GraphicsState::GraphicsState() {
     currentMaterialIndex = 0;
 }
 
@@ -83,8 +84,8 @@ SceneStateManager::GraphicsState::GraphicsState() {
 STAT_COUNTER("Scene/Object instances created", nObjectInstancesCreated);
 STAT_COUNTER("Scene/Object instances used", nObjectInstancesUsed);
 
-// SceneStateManager Method Definitions
-SceneStateManager::SceneStateManager(BasicScene *scene)
+// BasicSceneBuilder Method Definitions
+BasicSceneBuilder::BasicSceneBuilder(BasicScene *scene)
     : scene(scene)
 #ifdef PBRT_BUILD_GPU_RENDERER
       ,
@@ -97,47 +98,48 @@ SceneStateManager::SceneStateManager(BasicScene *scene)
     sampler.name = SceneEntity::internedStrings.Lookup("zsobol");
     filter.name = SceneEntity::internedStrings.Lookup("gaussian");
     integrator.name = SceneEntity::internedStrings.Lookup("volpath");
+    accelerator.name = SceneEntity::internedStrings.Lookup("bvh");
+
+    film.name = SceneEntity::internedStrings.Lookup("rgb");
+    film.parameters = ParameterDictionary({}, RGBColorSpace::sRGB);
 
     ParameterDictionary dict({}, RGBColorSpace::sRGB);
     currentMaterialIndex = scene->AddMaterial(SceneEntity("diffuse", dict, {}));
-    accelerator.name = SceneEntity::internedStrings.Lookup("bvh");
-    film.name = SceneEntity::internedStrings.Lookup("rgb");
-    film.parameters = ParameterDictionary({}, RGBColorSpace::sRGB);
 }
 
-void SceneStateManager::ReverseOrientation(FileLoc loc) {
+void BasicSceneBuilder::ReverseOrientation(FileLoc loc) {
     VERIFY_WORLD("ReverseOrientation");
     graphicsState.reverseOrientation = !graphicsState.reverseOrientation;
 }
 
-void SceneStateManager::ColorSpace(const std::string &name, FileLoc loc) {
+void BasicSceneBuilder::ColorSpace(const std::string &name, FileLoc loc) {
     if (const RGBColorSpace *cs = RGBColorSpace::GetNamed(name))
         graphicsState.colorSpace = cs;
     else
         Error(&loc, "%s: color space unknown", name);
 }
 
-void SceneStateManager::Identity(FileLoc loc) {
+void BasicSceneBuilder::Identity(FileLoc loc) {
     FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] = pbrt::Transform();)
 }
 
-void SceneStateManager::Translate(Float dx, Float dy, Float dz, FileLoc loc) {
+void BasicSceneBuilder::Translate(Float dx, Float dy, Float dz, FileLoc loc) {
     FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] = graphicsState.ctm[i] *
                                                  pbrt::Translate(Vector3f(dx, dy, dz));)
 }
 
-void SceneStateManager::CoordinateSystem(const std::string &name, FileLoc loc) {
+void BasicSceneBuilder::CoordinateSystem(const std::string &name, FileLoc loc) {
     namedCoordinateSystems[name] = graphicsState.ctm;
 }
 
-void SceneStateManager::CoordSysTransform(const std::string &name, FileLoc loc) {
+void BasicSceneBuilder::CoordSysTransform(const std::string &name, FileLoc loc) {
     if (namedCoordinateSystems.find(name) != namedCoordinateSystems.end())
         graphicsState.ctm = namedCoordinateSystems[name];
     else
         Warning(&loc, "Couldn't find named coordinate system \"%s\"", name);
 }
 
-void SceneStateManager::Camera(const std::string &name, ParsedParameterVector params,
+void BasicSceneBuilder::Camera(const std::string &name, ParsedParameterVector params,
                                FileLoc loc) {
     ParameterDictionary dict(std::move(params), graphicsState.colorSpace);
 
@@ -156,18 +158,20 @@ void SceneStateManager::Camera(const std::string &name, ParsedParameterVector pa
                                graphicsState.currentOutsideMedium);
 }
 
-void SceneStateManager::AttributeBegin(FileLoc loc) {
+void BasicSceneBuilder::AttributeBegin(FileLoc loc) {
     VERIFY_WORLD("AttributeBegin");
     pushedGraphicsStates.push_back(graphicsState);
     pushStack.push_back(std::make_pair('a', loc));
 }
 
-void SceneStateManager::AttributeEnd(FileLoc loc) {
+void BasicSceneBuilder::AttributeEnd(FileLoc loc) {
     VERIFY_WORLD("AttributeEnd");
+    // Issue error on unmatched _AttributeEnd_
     if (pushedGraphicsStates.empty()) {
         Error(&loc, "Unmatched AttributeEnd encountered. Ignoring it.");
         return;
     }
+
     // NOTE: must keep the following consistent with code in ObjectEnd
     graphicsState = std::move(pushedGraphicsStates.back());
     pushedGraphicsStates.pop_back();
@@ -181,7 +185,7 @@ void SceneStateManager::AttributeEnd(FileLoc loc) {
     pushStack.pop_back();
 }
 
-void SceneStateManager::Attribute(const std::string &target, ParsedParameterVector attrib,
+void BasicSceneBuilder::Attribute(const std::string &target, ParsedParameterVector attrib,
                                   FileLoc loc) {
     ParsedParameterVector *currentAttributes = nullptr;
     if (target == "shape") {
@@ -212,24 +216,48 @@ void SceneStateManager::Attribute(const std::string &target, ParsedParameterVect
     }
 }
 
-void SceneStateManager::WorldBegin(FileLoc loc) {
+void BasicSceneBuilder::Sampler(const std::string &name, ParsedParameterVector params,
+                                FileLoc loc) {
+    ParameterDictionary dict(std::move(params), graphicsState.colorSpace);
+    VERIFY_OPTIONS("Sampler");
+    sampler = SceneEntity(name, std::move(dict), loc);
+}
+
+void BasicSceneBuilder::WorldBegin(FileLoc loc) {
     VERIFY_OPTIONS("WorldBegin");
+    // Reset graphics state for _WorldBegin_
     currentBlock = BlockState::WorldBlock;
     for (int i = 0; i < MaxTransforms; ++i)
         graphicsState.ctm[i] = pbrt::Transform();
     graphicsState.activeTransformBits = AllTransformsBits;
     namedCoordinateSystems["world"] = graphicsState.ctm;
 
-    // Pass these along now
-    scene->SetFilm(std::move(film));
+    // Pass pre-_WorldBegin_ entities to _scene_
     scene->SetSampler(std::move(sampler));
+
+    scene->SetFilm(std::move(film));
     scene->SetIntegrator(std::move(integrator));
     scene->SetFilter(std::move(filter));
     scene->SetAccelerator(std::move(accelerator));
     scene->SetCamera(std::move(camera));
 }
 
-void SceneStateManager::LightSource(const std::string &name, ParsedParameterVector params,
+void BasicSceneBuilder::MakeNamedMedium(const std::string &name,
+                                        ParsedParameterVector params, FileLoc loc) {
+    ParameterDictionary dict(std::move(params), graphicsState.mediumAttributes,
+                             graphicsState.colorSpace);
+    // Issue error if medium _name_ is multiply-defined
+    if (mediumNames.find(name) != mediumNames.end()) {
+        ErrorExitDeferred(&loc, "Named medium \"%s\" redefined.", name);
+        return;
+    }
+    mediumNames.insert(name);
+
+    scene->AddMedium(
+        TransformedSceneEntity(name, std::move(dict), loc, RenderFromObject()));
+}
+
+void BasicSceneBuilder::LightSource(const std::string &name, ParsedParameterVector params,
                                     FileLoc loc) {
     VERIFY_WORLD("LightSource");
     ParameterDictionary dict(std::move(params), graphicsState.lightAttributes,
@@ -238,7 +266,7 @@ void SceneStateManager::LightSource(const std::string &name, ParsedParameterVect
                                      graphicsState.currentOutsideMedium));
 }
 
-void SceneStateManager::Shape(const std::string &name, ParsedParameterVector params,
+void BasicSceneBuilder::Shape(const std::string &name, ParsedParameterVector params,
                               FileLoc loc) {
     VERIFY_WORLD("Shape");
 
@@ -286,7 +314,7 @@ void SceneStateManager::Shape(const std::string &name, ParsedParameterVector par
     }
 }
 
-void SceneStateManager::ObjectBegin(const std::string &name, FileLoc loc) {
+void BasicSceneBuilder::ObjectBegin(const std::string &name, FileLoc loc) {
     VERIFY_WORLD("ObjectBegin");
     pushedGraphicsStates.push_back(graphicsState);
 
@@ -306,7 +334,7 @@ void SceneStateManager::ObjectBegin(const std::string &name, FileLoc loc) {
     activeInstanceDefinition = new ActiveInstanceDefinition(name, loc);
 }
 
-void SceneStateManager::ObjectEnd(FileLoc loc) {
+void BasicSceneBuilder::ObjectEnd(FileLoc loc) {
     VERIFY_WORLD("ObjectEnd");
     if (!activeInstanceDefinition) {
         ErrorExitDeferred(&loc, "ObjectEnd called outside of instance definition");
@@ -340,7 +368,7 @@ void SceneStateManager::ObjectEnd(FileLoc loc) {
     activeInstanceDefinition = nullptr;
 }
 
-void SceneStateManager::ObjectInstance(const std::string &name, FileLoc loc) {
+void BasicSceneBuilder::ObjectInstance(const std::string &name, FileLoc loc) {
     VERIFY_WORLD("ObjectInstance");
 
     if (activeInstanceDefinition) {
@@ -366,7 +394,7 @@ void SceneStateManager::ObjectInstance(const std::string &name, FileLoc loc) {
     }
 }
 
-void SceneStateManager::EndOfFiles() {
+void BasicSceneBuilder::EndOfFiles() {
     if (currentBlock != BlockState::WorldBlock)
         ErrorExitDeferred("End of files before \"WorldBegin\".");
 
@@ -387,13 +415,13 @@ void SceneStateManager::EndOfFiles() {
     scene->Done();
 }
 
-SceneStateManager *SceneStateManager::CopyForImport() {
-    SceneStateManager *importManager = new SceneStateManager(scene);
-    importManager->renderFromWorld = renderFromWorld;
-    importManager->graphicsState = graphicsState;
-    importManager->currentBlock = currentBlock;
+BasicSceneBuilder *BasicSceneBuilder::CopyForImport() {
+    BasicSceneBuilder *importBuilder = new BasicSceneBuilder(scene);
+    importBuilder->renderFromWorld = renderFromWorld;
+    importBuilder->graphicsState = graphicsState;
+    importBuilder->currentBlock = currentBlock;
     if (activeInstanceDefinition) {
-        importManager->activeInstanceDefinition = new ActiveInstanceDefinition(
+        importBuilder->activeInstanceDefinition = new ActiveInstanceDefinition(
             activeInstanceDefinition->entity.name, activeInstanceDefinition->entity.loc);
 
         // In case of nested imports, go up to the true root parent since
@@ -402,13 +430,13 @@ SceneStateManager *SceneStateManager::CopyForImport() {
         ActiveInstanceDefinition *parent = activeInstanceDefinition;
         while (parent->parent)
             parent = parent->parent;
-        importManager->activeInstanceDefinition->parent = parent;
+        importBuilder->activeInstanceDefinition->parent = parent;
         ++parent->activeImports;
     }
-    return importManager;
+    return importBuilder;
 }
 
-void SceneStateManager::MergeImported(SceneStateManager *imported) {
+void BasicSceneBuilder::MergeImported(BasicSceneBuilder *imported) {
     while (!imported->pushedGraphicsStates.empty()) {
         ErrorExitDeferred("Missing end to AttributeBegin");
         imported->pushedGraphicsStates.pop_back();
@@ -461,7 +489,7 @@ void SceneStateManager::MergeImported(SceneStateManager *imported) {
     mergeSet(spectrumTextureNames, imported->spectrumTextureNames, "texture");
 }
 
-void SceneStateManager::Option(const std::string &name, const std::string &value,
+void BasicSceneBuilder::Option(const std::string &name, const std::string &value,
                                FileLoc loc) {
     std::string nName = normalizeArg(name);
 
@@ -511,84 +539,76 @@ void SceneStateManager::Option(const std::string &name, const std::string &value
         ErrorExitDeferred(&loc, "%s: unknown option", name);
 }
 
-void SceneStateManager::Transform(Float tr[16], FileLoc loc) {
+void BasicSceneBuilder::Transform(Float tr[16], FileLoc loc) {
     FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] = Transpose(
                               pbrt::Transform(SquareMatrix<4>(pstd::MakeSpan(tr, 16))));)
 }
 
-void SceneStateManager::ConcatTransform(Float tr[16], FileLoc loc) {
+void BasicSceneBuilder::ConcatTransform(Float tr[16], FileLoc loc) {
     FOR_ACTIVE_TRANSFORMS(
         graphicsState.ctm[i] =
             graphicsState.ctm[i] *
             Transpose(pbrt::Transform(SquareMatrix<4>(pstd::MakeSpan(tr, 16))));)
 }
 
-void SceneStateManager::Rotate(Float angle, Float dx, Float dy, Float dz, FileLoc loc) {
+void BasicSceneBuilder::Rotate(Float angle, Float dx, Float dy, Float dz, FileLoc loc) {
     FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] =
                               graphicsState.ctm[i] *
                               pbrt::Rotate(angle, Vector3f(dx, dy, dz));)
 }
 
-void SceneStateManager::Scale(Float sx, Float sy, Float sz, FileLoc loc) {
+void BasicSceneBuilder::Scale(Float sx, Float sy, Float sz, FileLoc loc) {
     FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] =
                               graphicsState.ctm[i] * pbrt::Scale(sx, sy, sz);)
 }
 
-void SceneStateManager::LookAt(Float ex, Float ey, Float ez, Float lx, Float ly, Float lz,
+void BasicSceneBuilder::LookAt(Float ex, Float ey, Float ez, Float lx, Float ly, Float lz,
                                Float ux, Float uy, Float uz, FileLoc loc) {
     class Transform lookAt =
         pbrt::LookAt(Point3f(ex, ey, ez), Point3f(lx, ly, lz), Vector3f(ux, uy, uz));
     FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] = graphicsState.ctm[i] * lookAt;);
 }
 
-void SceneStateManager::ActiveTransformAll(FileLoc loc) {
+void BasicSceneBuilder::ActiveTransformAll(FileLoc loc) {
     graphicsState.activeTransformBits = AllTransformsBits;
 }
 
-void SceneStateManager::ActiveTransformEndTime(FileLoc loc) {
+void BasicSceneBuilder::ActiveTransformEndTime(FileLoc loc) {
     graphicsState.activeTransformBits = EndTransformBits;
 }
 
-void SceneStateManager::ActiveTransformStartTime(FileLoc loc) {
+void BasicSceneBuilder::ActiveTransformStartTime(FileLoc loc) {
     graphicsState.activeTransformBits = StartTransformBits;
 }
 
-void SceneStateManager::TransformTimes(Float start, Float end, FileLoc loc) {
+void BasicSceneBuilder::TransformTimes(Float start, Float end, FileLoc loc) {
     VERIFY_OPTIONS("TransformTimes");
     graphicsState.transformStartTime = start;
     graphicsState.transformEndTime = end;
 }
 
-void SceneStateManager::PixelFilter(const std::string &name, ParsedParameterVector params,
+void BasicSceneBuilder::PixelFilter(const std::string &name, ParsedParameterVector params,
                                     FileLoc loc) {
     ParameterDictionary dict(std::move(params), graphicsState.colorSpace);
     VERIFY_OPTIONS("PixelFilter");
     filter = SceneEntity(name, std::move(dict), loc);
 }
 
-void SceneStateManager::Film(const std::string &type, ParsedParameterVector params,
+void BasicSceneBuilder::Film(const std::string &type, ParsedParameterVector params,
                              FileLoc loc) {
     ParameterDictionary dict(std::move(params), graphicsState.colorSpace);
     VERIFY_OPTIONS("Film");
     film = SceneEntity(type, std::move(dict), loc);
 }
 
-void SceneStateManager::Sampler(const std::string &name, ParsedParameterVector params,
-                                FileLoc loc) {
-    ParameterDictionary dict(std::move(params), graphicsState.colorSpace);
-
-    VERIFY_OPTIONS("Sampler");
-    sampler = SceneEntity(name, std::move(dict), loc);
-}
-
-void SceneStateManager::Accelerator(const std::string &name, ParsedParameterVector params,
+void BasicSceneBuilder::Accelerator(const std::string &name, ParsedParameterVector params,
                                     FileLoc loc) {
     ParameterDictionary dict(std::move(params), graphicsState.colorSpace);
     VERIFY_OPTIONS("Accelerator");
     accelerator = SceneEntity(name, std::move(dict), loc);
 }
 
-void SceneStateManager::Integrator(const std::string &name, ParsedParameterVector params,
+void BasicSceneBuilder::Integrator(const std::string &name, ParsedParameterVector params,
                                    FileLoc loc) {
     ParameterDictionary dict(std::move(params), graphicsState.colorSpace);
 
@@ -596,29 +616,13 @@ void SceneStateManager::Integrator(const std::string &name, ParsedParameterVecto
     integrator = SceneEntity(name, std::move(dict), loc);
 }
 
-void SceneStateManager::MakeNamedMedium(const std::string &name,
-                                        ParsedParameterVector params, FileLoc loc) {
-    ParameterDictionary dict(std::move(params), graphicsState.mediumAttributes,
-                             graphicsState.colorSpace);
-
-    if (mediumNames.find(name) != mediumNames.end()) {
-        ErrorExitDeferred(&loc, "Named medium \"%s\" redefined.", name);
-        return;
-    }
-
-    mediumNames.insert(name);
-
-    scene->AddMedium(
-        TransformedSceneEntity(name, std::move(dict), loc, RenderFromObject()));
-}
-
-void SceneStateManager::MediumInterface(const std::string &insideName,
+void BasicSceneBuilder::MediumInterface(const std::string &insideName,
                                         const std::string &outsideName, FileLoc loc) {
     graphicsState.currentInsideMedium = insideName;
     graphicsState.currentOutsideMedium = outsideName;
 }
 
-void SceneStateManager::Texture(const std::string &name, const std::string &type,
+void BasicSceneBuilder::Texture(const std::string &name, const std::string &type,
                                 const std::string &texname, ParsedParameterVector params,
                                 FileLoc loc) {
     VERIFY_WORLD("Texture");
@@ -648,7 +652,7 @@ void SceneStateManager::Texture(const std::string &name, const std::string &type
             name, TextureSceneEntity(texname, std::move(dict), loc, RenderFromObject()));
 }
 
-void SceneStateManager::Material(const std::string &name, ParsedParameterVector params,
+void BasicSceneBuilder::Material(const std::string &name, ParsedParameterVector params,
                                  FileLoc loc) {
     VERIFY_WORLD("Material");
 
@@ -660,7 +664,7 @@ void SceneStateManager::Material(const std::string &name, ParsedParameterVector 
     graphicsState.currentMaterialName.clear();
 }
 
-void SceneStateManager::MakeNamedMaterial(const std::string &name,
+void BasicSceneBuilder::MakeNamedMaterial(const std::string &name,
                                           ParsedParameterVector params, FileLoc loc) {
     VERIFY_WORLD("MakeNamedMaterial");
 
@@ -676,13 +680,13 @@ void SceneStateManager::MakeNamedMaterial(const std::string &name,
     scene->AddNamedMaterial(name, SceneEntity("", std::move(dict), loc));
 }
 
-void SceneStateManager::NamedMaterial(const std::string &name, FileLoc loc) {
+void BasicSceneBuilder::NamedMaterial(const std::string &name, FileLoc loc) {
     VERIFY_WORLD("NamedMaterial");
     graphicsState.currentMaterialName = name;
     graphicsState.currentMaterialIndex = -1;
 }
 
-void SceneStateManager::AreaLightSource(const std::string &name,
+void BasicSceneBuilder::AreaLightSource(const std::string &name,
                                         ParsedParameterVector params, FileLoc loc) {
     VERIFY_WORLD("AreaLightSource");
     graphicsState.areaLightName = name;
@@ -692,6 +696,73 @@ void SceneStateManager::AreaLightSource(const std::string &name,
 }
 
 // BasicScene Method Definitions
+void BasicScene::SetSampler(SceneEntity sampler) {
+    this->sampler = std::move(sampler);
+}
+
+void BasicScene::AddMedium(TransformedSceneEntity medium) {
+    std::lock_guard<std::mutex> lock(mediaMutex);
+    // Define _create_ lambda function for _Medium_ creation
+    auto create = [=]() {
+        std::string type = medium.parameters.GetOneString("type", "");
+        // Check for missing medium ``type'' or animated medium transform
+        if (type.empty())
+            ErrorExit(&medium.loc, "No parameter string \"type\" found for medium.");
+        if (medium.renderFromObject.IsAnimated())
+            Warning(&medium.loc, "Animated transformation provided for medium. Only the "
+                                 "start transform will be used.");
+
+        return Medium::Create(type, medium.parameters,
+                              medium.renderFromObject.startTransform, &medium.loc,
+                              threadAllocators.Get());
+    };
+
+    mediaFutures[medium.name] = RunAsync(create);
+}
+
+std::map<std::string, Medium> BasicScene::CreateMedia() {
+    std::lock_guard<std::mutex> lock(mediaMutex);
+    // Consume futures for asynchronously-created _Medium_ objects
+    LOG_VERBOSE("Consume media futures start");
+    for (auto &m : mediaFutures) {
+        CHECK(mediaMap.find(m.first) == mediaMap.end());
+        mediaMap[m.first] = m.second.Get();
+    }
+    mediaFutures.clear();
+    LOG_VERBOSE("Consume media futures finished");
+
+    return mediaMap;
+}
+
+Sampler BasicScene::CreateSampler(Point2i res) const {
+    Allocator alloc = threadAllocators.Get();
+    return Sampler::Create(sampler.name, sampler.parameters, res, &sampler.loc, alloc);
+}
+
+Filter BasicScene::CreateFilter() const {
+    Allocator alloc = threadAllocators.Get();
+    return Filter::Create(filter.name, filter.parameters, &filter.loc, alloc);
+}
+
+Film BasicScene::CreateFilm(Float exposureTime, Filter filter) const {
+    Allocator alloc = threadAllocators.Get();
+    return Film::Create(film.name, film.parameters, exposureTime, camera.cameraTransform,
+                        filter, &film.loc, alloc);
+}
+
+Camera BasicScene::CreateCamera(Medium cameraMedium, Film film) const {
+    Allocator alloc = threadAllocators.Get();
+    return Camera::Create(camera.name, camera.parameters, cameraMedium,
+                          camera.cameraTransform, film, &camera.loc, alloc);
+}
+
+std::unique_ptr<Integrator> BasicScene::CreateIntegrator(
+    Camera camera, Sampler sampler, Primitive accel, std::vector<Light> lights) const {
+    const RGBColorSpace *integratorColorSpace = film.parameters.ColorSpace();
+    return Integrator::Create(integrator.name, integrator.parameters, camera, sampler,
+                              accel, lights, integratorColorSpace, &integrator.loc);
+}
+
 BasicScene::BasicScene()
     : threadAllocators([]() {
           pstd::pmr::memory_resource *baseResource = pstd::pmr::get_default_resource();
@@ -707,10 +778,6 @@ BasicScene::BasicScene()
 
 void BasicScene::SetFilm(SceneEntity film) {
     this->film = std::move(film);
-}
-
-void BasicScene::SetSampler(SceneEntity sampler) {
-    this->sampler = std::move(sampler);
 }
 
 void BasicScene::SetIntegrator(SceneEntity integrator) {
@@ -768,32 +835,13 @@ void BasicScene::startLoadingNormalMaps(const ParameterDictionary &parameters) {
     normalMapFutures[filename] = RunAsync(create, filename);
 }
 
-void BasicScene::AddMedium(TransformedSceneEntity medium) {
-    std::lock_guard<std::mutex> lock(mediaMutex);
-
-    auto create = [=]() {
-        std::string type = medium.parameters.GetOneString("type", "");
-        if (type.empty())
-            ErrorExit(&medium.loc, "No parameter string \"type\" found for medium.");
-
-        if (medium.renderFromObject.IsAnimated())
-            Warning(&medium.loc, "Animated transformation provided for medium. Only the "
-                                 "start transform will be used.");
-        return Medium::Create(type, medium.parameters,
-                              medium.renderFromObject.startTransform, &medium.loc,
-                              threadAllocators.Get());
-    };
-
-    mediaFutures[medium.name] = RunAsync(create);
-}
-
 void BasicScene::AddFloatTexture(std::string name, TextureSceneEntity texture) {
     if (texture.renderFromObject.IsAnimated())
         Warning(&texture.loc, "Animated world to texture transforms are not supported. "
                               "Using start transform.");
 
     std::lock_guard<std::mutex> lock(textureMutex);
-    if (texture.texName != "imagemap" && texture.texName != "ptex") {
+    if (texture.name != "imagemap" && texture.name != "ptex") {
         serialFloatTextures.push_back(
             std::make_pair(std::move(name), std::move(texture)));
         return;
@@ -826,7 +874,7 @@ void BasicScene::AddFloatTexture(std::string name, TextureSceneEntity texture) {
         // Pass nullptr for the textures, since they shouldn't be accessed
         // anyway.
         TextureParameterDictionary texDict(&texture.parameters, nullptr);
-        return FloatTexture::Create(texture.texName, renderFromTexture, texDict,
+        return FloatTexture::Create(texture.name, renderFromTexture, texDict,
                                     &texture.loc, alloc, Options->useGPU);
     };
     floatTextureFutures[name] = RunAsync(create, texture);
@@ -835,7 +883,7 @@ void BasicScene::AddFloatTexture(std::string name, TextureSceneEntity texture) {
 void BasicScene::AddSpectrumTexture(std::string name, TextureSceneEntity texture) {
     std::lock_guard<std::mutex> lock(textureMutex);
 
-    if (texture.texName != "imagemap" && texture.texName != "ptex") {
+    if (texture.name != "imagemap" && texture.name != "ptex") {
         serialSpectrumTextures.push_back(
             std::make_pair(std::move(name), std::move(texture)));
         return;
@@ -871,7 +919,7 @@ void BasicScene::AddSpectrumTexture(std::string name, TextureSceneEntity texture
         TextureParameterDictionary texDict(&texture.parameters, nullptr);
         // Only create SpectrumType::Albedo for now; will get the other two
         // types in CreateTextures().
-        return SpectrumTexture::Create(texture.texName, renderFromTexture, texDict,
+        return SpectrumTexture::Create(texture.name, renderFromTexture, texDict,
                                        SpectrumType::Albedo, &texture.loc, alloc,
                                        Options->useGPU);
     };
@@ -997,7 +1045,6 @@ void BasicScene::Done() {
 }
 
 void BasicScene::CreateMaterials(const NamedTextures &textures,
-                                 ThreadLocal<Allocator> &threadAllocators,
                                  std::map<std::string, pbrt::Material> *namedMaterialsOut,
                                  std::vector<pbrt::Material> *materialsOut) {
     LOG_VERBOSE("Starting to consume normal map futures");
@@ -1075,10 +1122,10 @@ NamedTextures BasicScene::CreateTextures() {
 
         // These should be fast since they should hit the texture cache
         SpectrumTexture unboundedTex = SpectrumTexture::Create(
-            tex.second.texName, renderFromTexture, texDict, SpectrumType::Unbounded,
+            tex.second.name, renderFromTexture, texDict, SpectrumType::Unbounded,
             &tex.second.loc, alloc, Options->useGPU);
         SpectrumTexture illumTex = SpectrumTexture::Create(
-            tex.second.texName, renderFromTexture, texDict, SpectrumType::Illuminant,
+            tex.second.name, renderFromTexture, texDict, SpectrumType::Illuminant,
             &tex.second.loc, alloc, Options->useGPU);
 
         textures.unboundedSpectrumTextures[tex.first] = unboundedTex;
@@ -1091,9 +1138,8 @@ NamedTextures BasicScene::CreateTextures() {
 
         pbrt::Transform renderFromTexture = tex.second.renderFromObject.startTransform;
         TextureParameterDictionary texDict(&tex.second.parameters, &textures);
-        FloatTexture t =
-            FloatTexture::Create(tex.second.texName, renderFromTexture, texDict,
-                                 &tex.second.loc, alloc, Options->useGPU);
+        FloatTexture t = FloatTexture::Create(tex.second.name, renderFromTexture, texDict,
+                                              &tex.second.loc, alloc, Options->useGPU);
         textures.floatTextures[tex.first] = t;
     }
 
@@ -1107,13 +1153,13 @@ NamedTextures BasicScene::CreateTextures() {
         pbrt::Transform renderFromTexture = tex.second.renderFromObject.startTransform;
         TextureParameterDictionary texDict(&tex.second.parameters, &textures);
         SpectrumTexture albedoTex = SpectrumTexture::Create(
-            tex.second.texName, renderFromTexture, texDict, SpectrumType::Albedo,
+            tex.second.name, renderFromTexture, texDict, SpectrumType::Albedo,
             &tex.second.loc, alloc, Options->useGPU);
         SpectrumTexture unboundedTex = SpectrumTexture::Create(
-            tex.second.texName, renderFromTexture, texDict, SpectrumType::Unbounded,
+            tex.second.name, renderFromTexture, texDict, SpectrumType::Unbounded,
             &tex.second.loc, alloc, Options->useGPU);
         SpectrumTexture illumTex = SpectrumTexture::Create(
-            tex.second.texName, renderFromTexture, texDict, SpectrumType::Illuminant,
+            tex.second.name, renderFromTexture, texDict, SpectrumType::Illuminant,
             &tex.second.loc, alloc, Options->useGPU);
 
         textures.albedoSpectrumTextures[tex.first] = albedoTex;
@@ -1123,21 +1169,6 @@ NamedTextures BasicScene::CreateTextures() {
 
     LOG_VERBOSE("Done creating textures");
     return textures;
-}
-
-std::map<std::string, Medium> BasicScene::CreateMedia() {
-    std::lock_guard<std::mutex> lock(mediaMutex);
-
-    LOG_VERBOSE("Consume media futures start");
-    for (auto &m : mediaFutures) {
-        CHECK(mediaMap.find(m.first) == mediaMap.end());
-        mediaMap[m.first] = m.second.Get();
-    }
-
-    mediaFutures.clear();
-    LOG_VERBOSE("Consume media futures finished");
-
-    return mediaMap;
 }
 
 std::vector<Light> BasicScene::CreateLights(

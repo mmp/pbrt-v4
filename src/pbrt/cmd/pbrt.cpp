@@ -256,8 +256,8 @@ int main(int argc, char *argv[]) {
     } else {
         // Parse provided scene description files
         BasicScene scene;
-        SceneStateManager manager(&scene);
-        ParseFiles(&manager, filenames);
+        BasicSceneBuilder builder(&scene);
+        ParseFiles(&builder, filenames);
 
         // Render the scene
         if (options.useGPU || options.wavefront)

@@ -120,8 +120,7 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
         return iter->second;
     };
 
-    filter = Filter::Create(scene.filter.name, scene.filter.parameters, &scene.filter.loc,
-                            alloc);
+    filter = scene.CreateFilter();
 
     Float exposureTime = scene.camera.parameters.GetOneFloat("shutterclose", 1.f) -
                          scene.camera.parameters.GetOneFloat("shutteropen", 0.f);
@@ -130,17 +129,14 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
                   "The specified camera shutter times imply that the shutter "
                   "does not open.  A black image will result.");
 
-    film = Film::Create(scene.film.name, scene.film.parameters, exposureTime,
-                        scene.camera.cameraTransform, filter, &scene.film.loc, alloc);
+    film = scene.CreateFilm(exposureTime, filter);
     initializeVisibleSurface = film.UsesVisibleSurface();
 
-    sampler = Sampler::Create(scene.sampler.name, scene.sampler.parameters,
-                              film.FullResolution(), &scene.sampler.loc, alloc);
+    sampler = scene.CreateSampler(film.FullResolution());
     samplesPerPixel = sampler.SamplesPerPixel();
 
     Medium cameraMedium = findMedium(scene.camera.medium, &scene.camera.loc);
-    camera = Camera::Create(scene.camera.name, scene.camera.parameters, cameraMedium,
-                            scene.camera.cameraTransform, film, &scene.camera.loc, alloc);
+    camera = scene.CreateCamera(cameraMedium, film);
 
     // Textures
     LOG_VERBOSE("Starting to create textures");
@@ -165,7 +161,7 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
     LOG_VERBOSE("Starting to create materials");
     std::map<std::string, pbrt::Material> namedMaterials;
     std::vector<pbrt::Material> materials;
-    scene.CreateMaterials(textures, threadAllocators, &namedMaterials, &materials);
+    scene.CreateMaterials(textures, &namedMaterials, &materials);
 
     haveBasicEvalMaterial.fill(false);
     haveUniversalEvalMaterial.fill(false);

@@ -67,7 +67,7 @@ enum class ParameterType {
 };
 
 // SpectrumType Definition
-enum class SpectrumType { Albedo, Unbounded, Illuminant };
+enum class SpectrumType { Illuminant, Albedo, Unbounded };
 
 inline std::string ToString(SpectrumType t) {
     switch (t) {
