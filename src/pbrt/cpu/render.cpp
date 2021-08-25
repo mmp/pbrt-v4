@@ -102,20 +102,17 @@ void RenderCPU(BasicScene &parsedScene) {
         parsedScene.integrator.name != "aov")
         Warning("No light sources defined in scene; rendering a black image.");
 
-    if (parsedScene.film.name == "gbuffer" && !(parsedScene.integrator.name == "path" ||
-                                                parsedScene.integrator.name == "volpath"))
-        Warning(&parsedScene.film.loc,
-                "GBufferFilm is not supported by the \"%s\" integrator. The channels "
+    if (film.Is<GBufferFilm>() && !(parsedScene.integrator.name == "path" ||
+                                    parsedScene.integrator.name == "volpath"))
+        Warning("GBufferFilm is not supported by the \"%s\" integrator. The channels "
                 "other than R, G, B will be zero.",
                 parsedScene.integrator.name);
 
     bool haveSubsurface = false;
-    for (const auto &mtl : parsedScene.materials)
-        if (mtl.name == "subsurface")
-            haveSubsurface = true;
-    for (const auto &namedMtl : parsedScene.namedMaterials)
-        if (namedMtl.second.name == "subsurface")
-            haveSubsurface = true;
+    for (pbrt::Material mtl : materials)
+        haveSubsurface |= mtl.HasSubsurfaceScattering();
+    for (const auto &namedMtl : namedMaterials)
+        haveSubsurface |= namedMtl.second.HasSubsurfaceScattering();
 
     if (haveSubsurface && parsedScene.integrator.name != "volpath")
         Warning("Some objects in the scene have subsurface scattering, which is "

@@ -46,7 +46,7 @@ STAT_MEMORY_COUNTER("Memory/Wavefront integrator pixel state", pathIntegratorByt
 static void updateMaterialNeeds(
     Material m, pstd::array<bool, Material::NumTags()> *haveBasicEvalMaterial,
     pstd::array<bool, Material::NumTags()> *haveUniversalEvalMaterial,
-    bool *haveSubsurface) {
+    bool *haveSubsurface, bool *haveMedia) {
     if (!m)
         return;
 
@@ -59,13 +59,14 @@ static void updateMaterialNeeds(
                       *mix);
 
         updateMaterialNeeds(mix->GetMaterial(0), haveBasicEvalMaterial,
-                            haveUniversalEvalMaterial, haveSubsurface);
+                            haveUniversalEvalMaterial, haveSubsurface, haveMedia);
         updateMaterialNeeds(mix->GetMaterial(1), haveBasicEvalMaterial,
-                            haveUniversalEvalMaterial, haveSubsurface);
+                            haveUniversalEvalMaterial, haveSubsurface, haveMedia);
         return;
     }
 
     *haveSubsurface |= m.HasSubsurfaceScattering();
+    *haveMedia |= (m == nullptr); // interface material
 
     FloatTexture displace = m.GetDisplacement();
     if (m.CanEvaluateTextures(BasicTextureEvaluator()) &&
@@ -101,12 +102,6 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
             haveMedia = true;
     for (const auto &shape : scene.animatedShapes)
         if (!shape.insideMedium.empty() || !shape.outsideMedium.empty())
-            haveMedia = true;
-    for (const auto &mtl : scene.materials)
-        if (mtl.name == "interface")
-            haveMedia = true;
-    for (const auto &namedMtl : scene.namedMaterials)
-        if (namedMtl.second.name == "interface")
             haveMedia = true;
 
     auto findMedium = [&](const std::string &s, const FileLoc *loc) -> Medium {
@@ -161,10 +156,10 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
     haveSubsurface = false;
     for (Material m : materials)
         updateMaterialNeeds(m, &haveBasicEvalMaterial, &haveUniversalEvalMaterial,
-                            &haveSubsurface);
+                            &haveSubsurface, &haveMedia);
     for (const auto &m : namedMaterials)
         updateMaterialNeeds(m.second, &haveBasicEvalMaterial, &haveUniversalEvalMaterial,
-                            &haveSubsurface);
+                            &haveSubsurface, &haveMedia);
     LOG_VERBOSE("Finished creating materials");
 
     if (Options->useGPU) {
