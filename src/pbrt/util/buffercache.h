@@ -80,7 +80,8 @@ class BufferCache {
         }
 
         bool operator==(const Buffer &b) const {
-            return size == b.size && std::memcmp(ptr, b.ptr, size * sizeof(T)) == 0;
+            return size == b.size && hash == b.hash &&
+                   std::memcmp(ptr, b.ptr, size * sizeof(T)) == 0;
         }
 
         const T *ptr = nullptr;
