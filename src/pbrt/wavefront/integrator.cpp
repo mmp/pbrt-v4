@@ -122,14 +122,7 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
 
     filter = scene.CreateFilter();
 
-    Float exposureTime = scene.camera.parameters.GetOneFloat("shutterclose", 1.f) -
-                         scene.camera.parameters.GetOneFloat("shutteropen", 0.f);
-    if (exposureTime <= 0)
-        ErrorExit(&scene.camera.loc,
-                  "The specified camera shutter times imply that the shutter "
-                  "does not open.  A black image will result.");
-
-    film = scene.CreateFilm(exposureTime, filter);
+    film = scene.CreateFilm(filter);
     initializeVisibleSurface = film.UsesVisibleSurface();
 
     sampler = scene.CreateSampler(film.FullResolution());

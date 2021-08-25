@@ -434,10 +434,10 @@ Sampler Sampler::Create(const std::string &name, const ParameterDictionary &para
         sampler = StratifiedSampler::Create(parameters, loc, alloc);
     else
         ErrorExit(loc, "%s: sampler type unknown.", name);
-
     if (!sampler)
         ErrorExit(loc, "%s: unable to create sampler.", name);
     parameters.ReportUnused();
+
     return sampler;
 }
 

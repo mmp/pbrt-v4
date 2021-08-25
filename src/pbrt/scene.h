@@ -173,6 +173,7 @@ struct InstanceDefinitionSceneEntity {
     std::vector<AnimatedShapeSceneEntity> animatedShapes;
 };
 
+using MediumSceneEntity = TransformedSceneEntity;
 using TextureSceneEntity = TransformedSceneEntity;
 
 struct LightSceneEntity : public TransformedSceneEntity {
@@ -274,7 +275,7 @@ class BasicScene {
 
     void AddNamedMaterial(std::string name, SceneEntity material);
     int AddMaterial(SceneEntity material);
-    void AddMedium(TransformedSceneEntity medium);
+    void AddMedium(MediumSceneEntity medium);
     void AddFloatTexture(std::string name, TextureSceneEntity texture);
     void AddSpectrumTexture(std::string name, TextureSceneEntity texture);
     void AddLight(LightSceneEntity light);
@@ -285,6 +286,8 @@ class BasicScene {
     void AddInstanceUses(pstd::span<InstanceSceneEntity> in);
 
     void Done();
+
+    Sampler CreateSampler(Point2i res) const;
 
     void CreateMaterials(const NamedTextures &sceneTextures,
                          std::map<std::string, Material> *namedMaterials,
@@ -303,10 +306,8 @@ class BasicScene {
         const std::map<std::string, Material> &namedMaterials,
         const std::vector<Material> &materials);
 
-    Sampler CreateSampler(Point2i res) const;
-
     Filter CreateFilter() const;
-    Film CreateFilm(Float exposureTime, Filter filter) const;
+    Film CreateFilm(Filter filter) const;
     Camera CreateCamera(Medium cameraMedium, Film film) const;
     std::unique_ptr<Integrator> CreateIntegrator(Camera camera, Sampler sampler,
                                                  Primitive accel,
@@ -315,7 +316,8 @@ class BasicScene {
     NamedTextures CreateTextures();
 
     // BasicScene Public Members
-    SceneEntity film, sampler, integrator, filter, accelerator;
+    SceneEntity sampler;
+    SceneEntity film, integrator, filter, accelerator;
     CameraSceneEntity camera;
     std::vector<std::pair<std::string, SceneEntity>> namedMaterials;
     std::vector<SceneEntity> materials;
@@ -420,6 +422,13 @@ class BasicSceneBuilder : public ParserTarget {
         // GraphicsState Public Methods
         GraphicsState();
 
+        template <typename F>
+        void ForActiveTransforms(F func) {
+            for (int i = 0; i < MaxTransforms; ++i)
+                if (activeTransformBits & (1 << i))
+                    ctm[i] = func(ctm[i]);
+        }
+
         // GraphicsState Public Members
         std::string currentInsideMedium, currentOutsideMedium;
 
@@ -457,9 +466,9 @@ class BasicSceneBuilder : public ParserTarget {
 
     // BasicSceneBuilder Private Members
     BasicScene *scene;
-    GraphicsState graphicsState;
     enum class BlockState { OptionsBlock, WorldBlock };
     BlockState currentBlock = BlockState::OptionsBlock;
+    GraphicsState graphicsState;
     static constexpr int StartTransformBits = 1 << 0;
     static constexpr int EndTransformBits = 1 << 1;
     static constexpr int AllTransformsBits = (1 << MaxTransforms) - 1;

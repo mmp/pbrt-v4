@@ -191,12 +191,12 @@ typename ParameterTypeTraits<PT>::ReturnType ParameterDictionary::lookupSingle(
         // Extract parameter values from _p_
         const auto &values = traits::GetValues(*p);
 
-        // Issue error if incorrect number of parameter values were provided
+        // Issue error if an incorrect number of parameter values were provided
         if (values.empty())
             ErrorExit(&p->loc, "No values provided for parameter \"%s\".", name);
         if (values.size() > traits::nPerItem)
-            ErrorExit(&p->loc, "More than one value provided for parameter \"%s\".",
-                      name);
+            ErrorExit(&p->loc, "Expected %d values for parameter \"%s\".",
+                      traits::nPerItem, name);
 
         // Return parameter values as _ReturnType_
         p->lookedUp = true;

@@ -45,22 +45,13 @@ void RenderCPU(BasicScene &parsedScene) {
     Filter filter = parsedScene.CreateFilter();
 
     // Film
-    // It's a little ugly to poke into the camera's parameters here, but we
-    // have this circular dependency that Camera::Create() expects a
-    // Film, yet now the film needs to know the exposure time from
-    // the camera....
-    Float exposureTime = parsedScene.camera.parameters.GetOneFloat("shutterclose", 1.f) -
-                         parsedScene.camera.parameters.GetOneFloat("shutteropen", 0.f);
-    if (exposureTime <= 0)
-        ErrorExit(&parsedScene.camera.loc,
-                  "The specified camera shutter times imply that the shutter "
-                  "does not open.  A black image will result.");
-    Film film = parsedScene.CreateFilm(exposureTime, filter);
+    Film film = parsedScene.CreateFilm(filter);
 
     // Camera
     Medium cameraMedium = findMedium(parsedScene.camera.medium, &parsedScene.camera.loc);
     Camera camera = parsedScene.CreateCamera(cameraMedium, film);
 
+    // Sampler
     Point2i fullImageResolution = camera.GetFilm().FullResolution();
     Sampler sampler = parsedScene.CreateSampler(fullImageResolution);
 

@@ -75,12 +75,6 @@ BasicSceneBuilder::GraphicsState::GraphicsState() {
         return;                                                    \
     } else /* swallow trailing semicolon */
 
-#define FOR_ACTIVE_TRANSFORMS(expr)                         \
-    for (int i = 0; i < MaxTransforms; ++i)                 \
-        if (graphicsState.activeTransformBits & (1 << i)) { \
-            expr                                            \
-        }
-
 STAT_COUNTER("Scene/Object instances created", nObjectInstancesCreated);
 STAT_COUNTER("Scene/Object instances used", nObjectInstancesUsed);
 
@@ -120,12 +114,12 @@ void BasicSceneBuilder::ColorSpace(const std::string &name, FileLoc loc) {
 }
 
 void BasicSceneBuilder::Identity(FileLoc loc) {
-    FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] = pbrt::Transform();)
+    graphicsState.ForActiveTransforms([](auto t) { return pbrt::Transform(); });
 }
 
 void BasicSceneBuilder::Translate(Float dx, Float dy, Float dz, FileLoc loc) {
-    FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] = graphicsState.ctm[i] *
-                                                 pbrt::Translate(Vector3f(dx, dy, dz));)
+    graphicsState.ForActiveTransforms(
+        [=](auto t) { return t * pbrt::Translate(Vector3f(dx, dy, dz)); });
 }
 
 void BasicSceneBuilder::CoordinateSystem(const std::string &name, FileLoc loc) {
@@ -253,8 +247,7 @@ void BasicSceneBuilder::MakeNamedMedium(const std::string &name,
     }
     mediumNames.insert(name);
 
-    scene->AddMedium(
-        TransformedSceneEntity(name, std::move(dict), loc, RenderFromObject()));
+    scene->AddMedium(MediumSceneEntity(name, std::move(dict), loc, RenderFromObject()));
 }
 
 void BasicSceneBuilder::LightSource(const std::string &name, ParsedParameterVector params,
@@ -540,33 +533,32 @@ void BasicSceneBuilder::Option(const std::string &name, const std::string &value
 }
 
 void BasicSceneBuilder::Transform(Float tr[16], FileLoc loc) {
-    FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] = Transpose(
-                              pbrt::Transform(SquareMatrix<4>(pstd::MakeSpan(tr, 16))));)
+    graphicsState.ForActiveTransforms([=](auto t) {
+        return Transpose(pbrt::Transform(SquareMatrix<4>(pstd::MakeSpan(tr, 16))));
+    });
 }
 
 void BasicSceneBuilder::ConcatTransform(Float tr[16], FileLoc loc) {
-    FOR_ACTIVE_TRANSFORMS(
-        graphicsState.ctm[i] =
-            graphicsState.ctm[i] *
-            Transpose(pbrt::Transform(SquareMatrix<4>(pstd::MakeSpan(tr, 16))));)
+    graphicsState.ForActiveTransforms([=](auto t) {
+        return t * Transpose(pbrt::Transform(SquareMatrix<4>(pstd::MakeSpan(tr, 16))));
+    });
 }
 
 void BasicSceneBuilder::Rotate(Float angle, Float dx, Float dy, Float dz, FileLoc loc) {
-    FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] =
-                              graphicsState.ctm[i] *
-                              pbrt::Rotate(angle, Vector3f(dx, dy, dz));)
+    graphicsState.ForActiveTransforms(
+        [=](auto t) { return t * pbrt::Rotate(angle, Vector3f(dx, dy, dz)); });
 }
 
 void BasicSceneBuilder::Scale(Float sx, Float sy, Float sz, FileLoc loc) {
-    FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] =
-                              graphicsState.ctm[i] * pbrt::Scale(sx, sy, sz);)
+    graphicsState.ForActiveTransforms(
+        [=](auto t) { return t * pbrt::Scale(sx, sy, sz); });
 }
 
 void BasicSceneBuilder::LookAt(Float ex, Float ey, Float ez, Float lx, Float ly, Float lz,
                                Float ux, Float uy, Float uz, FileLoc loc) {
     class Transform lookAt =
         pbrt::LookAt(Point3f(ex, ey, ez), Point3f(lx, ly, lz), Vector3f(ux, uy, uz));
-    FOR_ACTIVE_TRANSFORMS(graphicsState.ctm[i] = graphicsState.ctm[i] * lookAt;);
+    graphicsState.ForActiveTransforms([=](auto t) { return t * lookAt; });
 }
 
 void BasicSceneBuilder::ActiveTransformAll(FileLoc loc) {
@@ -700,14 +692,18 @@ void BasicScene::SetSampler(SceneEntity sampler) {
     this->sampler = std::move(sampler);
 }
 
-void BasicScene::AddMedium(TransformedSceneEntity medium) {
-    std::lock_guard<std::mutex> lock(mediaMutex);
+Sampler BasicScene::CreateSampler(Point2i res) const {
+    Allocator alloc = threadAllocators.Get();
+    return Sampler::Create(sampler.name, sampler.parameters, res, &sampler.loc, alloc);
+}
+
+void BasicScene::AddMedium(MediumSceneEntity medium) {
     // Define _create_ lambda function for _Medium_ creation
     auto create = [=]() {
         std::string type = medium.parameters.GetOneString("type", "");
         // Check for missing medium ``type'' or animated medium transform
         if (type.empty())
-            ErrorExit(&medium.loc, "No parameter string \"type\" found for medium.");
+            ErrorExit(&medium.loc, "No parameter \"string type\" found for medium.");
         if (medium.renderFromObject.IsAnimated())
             Warning(&medium.loc, "Animated transformation provided for medium. Only the "
                                  "start transform will be used.");
@@ -717,6 +713,7 @@ void BasicScene::AddMedium(TransformedSceneEntity medium) {
                               threadAllocators.Get());
     };
 
+    std::lock_guard<std::mutex> lock(mediaMutex);
     mediaFutures[medium.name] = RunAsync(create);
 }
 
@@ -734,18 +731,25 @@ std::map<std::string, Medium> BasicScene::CreateMedia() {
     return mediaMap;
 }
 
-Sampler BasicScene::CreateSampler(Point2i res) const {
-    Allocator alloc = threadAllocators.Get();
-    return Sampler::Create(sampler.name, sampler.parameters, res, &sampler.loc, alloc);
-}
-
 Filter BasicScene::CreateFilter() const {
     Allocator alloc = threadAllocators.Get();
     return Filter::Create(filter.name, filter.parameters, &filter.loc, alloc);
 }
 
-Film BasicScene::CreateFilm(Float exposureTime, Filter filter) const {
+Film BasicScene::CreateFilm(Filter filter) const {
     Allocator alloc = threadAllocators.Get();
+
+    // It's a little ugly to poke into the camera's parameters here, but we
+    // have this circular dependency that Camera::Create() expects a
+    // Film, yet now the film needs to know the exposure time from
+    // the camera....
+    Float exposureTime = camera.parameters.GetOneFloat("shutterclose", 1.f) -
+                         camera.parameters.GetOneFloat("shutteropen", 0.f);
+    if (exposureTime <= 0)
+        ErrorExit(&camera.loc,
+                  "The specified camera shutter times imply that the shutter "
+                  "does not open.  A black image will result.");
+
     return Film::Create(film.name, film.parameters, exposureTime, camera.cameraTransform,
                         filter, &film.loc, alloc);
 }
