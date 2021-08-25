@@ -246,7 +246,9 @@ std::vector<TestScene> GetScenes() {
 }
 
 std::vector<std::pair<Sampler, std::string>> GetSamplers(const Point2i &resolution) {
-    std::vector<std::pair<Sampler, std::string>> samplers;
+    static std::vector<std::pair<Sampler, std::string>> samplers;
+    if (!samplers.empty())
+        return samplers;
 
     samplers.push_back(std::make_pair(new HaltonSampler(256, resolution), "Halton 256"));
     samplers.push_back(
