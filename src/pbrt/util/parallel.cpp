@@ -58,7 +58,7 @@ void ThreadPool::Worker() {
 
     std::unique_lock<std::mutex> lock(mutex);
     while (!shutdownThreads)
-        WorkOrWait(&lock);
+        WorkOrWait(&lock, false);
 
     LOG_VERBOSE("Exiting worker thread");
 }
@@ -75,8 +75,13 @@ std::unique_lock<std::mutex> ThreadPool::AddToJobList(ParallelJob *job) {
     return lock;
 }
 
-void ThreadPool::WorkOrWait(std::unique_lock<std::mutex> *lock) {
+void ThreadPool::WorkOrWait(std::unique_lock<std::mutex> *lock, bool isEnqueuingThread) {
     DCHECK(lock->owns_lock());
+
+    if (!isEnqueuingThread && disabled) {
+        jobListCondition.wait(*lock);
+        return;
+    }
 
     ParallelJob *job = jobList;
     while (job && !job->HaveWork())
@@ -145,6 +150,17 @@ void ThreadPool::ForEachThread(std::function<void(void)> func) {
         if (barrier->Block())
             delete barrier;
     });
+}
+
+void ThreadPool::Disable() {
+    CHECK(!disabled);
+    disabled = true;
+    CHECK(jobList == nullptr); // Nothing should be running when Disable() is called.
+}
+
+void ThreadPool::Reenable() {
+    CHECK(disabled);
+    disabled = false;
 }
 
 ThreadPool::~ThreadPool() {
@@ -289,7 +305,7 @@ void ParallelFor(int64_t start, int64_t end, std::function<void(int64_t, int64_t
 
     // Help out with parallel loop iterations in the current thread
     while (!loop.Finished())
-        ParallelJob::threadPool->WorkOrWait(&lock);
+        ParallelJob::threadPool->WorkOrWait(&lock, true);
 }
 
 void ParallelFor2D(const Bounds2i &extent, std::function<void(Bounds2i)> func) {
@@ -314,7 +330,7 @@ void ParallelFor2D(const Bounds2i &extent, std::function<void(Bounds2i)> func) {
 
     // Help out with parallel loop iterations in the current thread
     while (!loop.Finished())
-        ParallelJob::threadPool->WorkOrWait(&lock);
+        ParallelJob::threadPool->WorkOrWait(&lock, true);
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -344,4 +360,14 @@ void ForEachThread(std::function<void(void)> func) {
         ParallelJob::threadPool->ForEachThread(std::move(func));
 }
 
+void DisableThreadPool() {
+    CHECK(ParallelJob::threadPool);
+    ParallelJob::threadPool->Disable();
+}
+
+void ReenableThreadPool() {
+    CHECK(ParallelJob::threadPool);
+    ParallelJob::threadPool->Reenable();
+};
+  
 }  // namespace pbrt

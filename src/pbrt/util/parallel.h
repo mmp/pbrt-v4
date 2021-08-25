@@ -321,8 +321,11 @@ class ThreadPool {
     std::unique_lock<std::mutex> AddToJobList(ParallelJob *job);
     void RemoveFromJobList(ParallelJob *job);
 
-    void WorkOrWait(std::unique_lock<std::mutex> *lock);
+    void WorkOrWait(std::unique_lock<std::mutex> *lock, bool isEnqueuingThread);
     bool WorkOrReturn();
+
+    void Disable();
+    void Reenable();
 
     void ForEachThread(std::function<void(void)> func);
 
@@ -338,6 +341,7 @@ class ThreadPool {
     bool shutdownThreads = false;
     ParallelJob *jobList = nullptr;
     std::condition_variable jobListCondition;
+    bool disabled = false;
 };
 
 bool DoParallelWork();
@@ -404,6 +408,9 @@ class AsyncJob : public ParallelJob {
 };
 
 void ForEachThread(std::function<void(void)> func);
+
+void DisableThreadPool();
+void ReenableThreadPool();
 
 // Asynchronous Task Launch Function Definitions
 template <typename F, typename... Args>

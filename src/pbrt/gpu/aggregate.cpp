@@ -1137,6 +1137,18 @@ OptiXAggregate::OptiXAggregate(
     CU_CHECK(cuCtxGetCurrent(&cudaContext));
     CHECK(cudaContext != nullptr);
 
+#ifdef PBRT_IS_WINDOWS
+    // On Windows, it is unfortunately necessary to disable
+    // multithreading here.  The issue is that GPU managed memory can
+    // only be accessed by one of the CPU or the GPU at a time; the
+    // program crashes if this is restriction is violated.  Thus, it's
+    // bad news if we are simultaneously, say, reading PLY files on
+    // the CPU and storing them in managed memory while an OptiX
+    // kernel is running on the GPU to build a BVH... (Issue #164).
+    if (Options->useGPU)
+        DisableThreadPool();
+#endif // PBRT_IS_WINDOWS
+
     ThreadLocal<cudaStream_t> threadCUDAStreams([]() {
         cudaStream_t stream;
         cudaStreamCreate(&stream);
@@ -1588,6 +1600,11 @@ OptiXAggregate::OptiXAggregate(
     randomHitSBT.hitgroupRecordBase = randomHitHGRBDevicePtr;
     randomHitSBT.hitgroupRecordStrideInBytes = sizeof(HitgroupRecord);
     randomHitSBT.hitgroupRecordCount = randomHitHGRecords.size();
+
+#ifdef PBRT_IS_WINDOWS
+    if (Options->useGPU)
+      ReenableThreadPool();
+#endif // PBRT_IS_WINDOWS
 }
 
 OptiXAggregate::ParamBufferState &OptiXAggregate::getParamBuffer(
