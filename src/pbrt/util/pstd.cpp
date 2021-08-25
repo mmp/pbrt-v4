@@ -15,7 +15,6 @@ memory_resource::~memory_resource() {}
 
 class NewDeleteResource : public memory_resource {
     void *do_allocate(size_t size, size_t alignment) {
-
 #if defined(PBRT_HAVE__ALIGNED_MALLOC)
         return _aligned_malloc(size, alignment);
 #elif defined(PBRT_HAVE_POSIX_MEMALIGN)
@@ -77,35 +76,22 @@ void *monotonic_buffer_resource::do_allocate(size_t bytes, size_t align) {
     CHECK(constructTID == std::this_thread::get_id());
 #endif
 
-    if (bytes > blockSize) {
+    if (bytes > block_size)
         // We've got a big allocation; let the current block be so that
         // smaller allocations have a chance at using up more of it.
-        usedBlocks.push_back(
-                             MemoryBlock{upstreamResource->allocate(bytes, align), bytes});
-        return usedBlocks.back().ptr;
+        return allocate_block(bytes)->ptr;
+
+    if ((current_pos % align) != 0)
+        current_pos += align - (current_pos % align);
+    DCHECK_EQ(0, current_pos % align);
+
+    if (!current || current_pos + bytes > current->size) {
+        current = allocate_block(block_size);
+        current_pos = 0;
     }
 
-    if ((currentBlockPos % align) != 0) {
-        CHECK_GT(align - (currentBlockPos % align), 0);
-        currentBlockPos += align - (currentBlockPos % align);
-    }
-    DCHECK_EQ(0, currentBlockPos % align);
-
-    if (currentBlockPos + bytes > currentBlock.size) {
-        // Add current block to _usedBlocks_ list
-        if (currentBlock.size) {
-            usedBlocks.push_back(currentBlock);
-            currentBlock = {};
-        }
-
-        currentBlock = {
-                        upstreamResource->allocate(blockSize, alignof(std::max_align_t)),
-                        blockSize};
-        currentBlockPos = 0;
-    }
-
-    void *ptr = (char *)currentBlock.ptr + currentBlockPos;
-    currentBlockPos += bytes;
+    void *ptr = (char *)current->ptr + current_pos;
+    current_pos += bytes;
     return ptr;
 }
 

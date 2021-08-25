@@ -15,7 +15,6 @@
 #include <cstring>
 #include <initializer_list>
 #include <iterator>
-#include <list>
 #include <new>
 #include <string>
 #include <thread>
@@ -530,14 +529,13 @@ memory_resource *get_default_resource() noexcept;
 
 class alignas(64) monotonic_buffer_resource : public memory_resource {
   public:
-    explicit monotonic_buffer_resource(memory_resource *upstream)
-        : upstreamResource(upstream) {
+    explicit monotonic_buffer_resource(memory_resource *upstream) : upstream(upstream) {
 #ifndef NDEBUG
         constructTID = std::this_thread::get_id();
 #endif
     }
-    monotonic_buffer_resource(size_t blockSize, memory_resource *upstream)
-        : blockSize(blockSize), upstreamResource(upstream) {
+    monotonic_buffer_resource(size_t block_size, memory_resource *upstream)
+        : block_size(block_size), upstream(upstream) {
 #ifndef NDEBUG
         constructTID = std::this_thread::get_id();
 #endif
@@ -562,15 +560,17 @@ class alignas(64) monotonic_buffer_resource : public memory_resource {
     monotonic_buffer_resource operator=(const monotonic_buffer_resource &) = delete;
 
     void release() {
-        for (const auto &block : usedBlocks)
-            upstreamResource->deallocate(block.ptr, block.size);
-        usedBlocks.clear();
-
-        upstreamResource->deallocate(currentBlock.ptr, currentBlock.size);
-        currentBlock = MemoryBlock();
+        block *b = block_list;
+        while (b) {
+            block *next = b->next;
+            free_block(b);
+            b = next;
+        }
+        block_list = nullptr;
+        current = nullptr;
     }
 
-    memory_resource *upstream_resource() const { return upstreamResource; }
+    memory_resource *upstream_resource() const { return upstream; }
 
   protected:
     void *do_allocate(size_t bytes, size_t align) override;
@@ -584,20 +584,35 @@ class alignas(64) monotonic_buffer_resource : public memory_resource {
     }
 
   private:
+    struct block {
+        void *ptr;
+        size_t size;
+        block *next;
+    };
+    block *allocate_block(size_t size) {
+        // Single allocation for both the block and its memory. This means
+        // that strictly speaking MemoryBlock::ptr is redundant, but let's not get too
+        // fancy here...
+        block *b = static_cast<block *>(
+            upstream->allocate(sizeof(block) + size, alignof(block)));
+
+        b->ptr = reinterpret_cast<char *>(b) + sizeof(block);
+        b->size = size;
+        b->next = block_list;
+        block_list = b;
+
+        return b;
+    }
+    void free_block(block *b) { upstream->deallocate(b, sizeof(block) + b->size); }
+
 #ifndef NDEBUG
     std::thread::id constructTID;
 #endif
-    struct MemoryBlock {
-        void *ptr = nullptr;
-        size_t size = 0;
-    };
-
-    memory_resource *upstreamResource;
-    size_t blockSize = 256 * 1024;
-    MemoryBlock currentBlock;
-    size_t currentBlockPos = 0;
-    // TODO: should use the memory_resource for this list's allocations...
-    std::list<MemoryBlock> usedBlocks;
+    memory_resource *upstream;
+    size_t block_size = 256 * 1024;
+    block *current = nullptr;
+    size_t current_pos = 0;
+    block *block_list = nullptr;
 };
 
 template <class Tp = std::byte>
