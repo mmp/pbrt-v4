@@ -329,6 +329,7 @@ class BasicScene {
   private:
     // BasicScene Private Methods
     void startLoadingNormalMaps(const ParameterDictionary &parameters);
+    Medium GetMedium(const std::string &name, const FileLoc *loc);
 
     // BasicScene Private Members
     std::mutex mediaMutex;
@@ -340,7 +341,6 @@ class BasicScene {
     std::map<std::string, Image *> normalMaps;
 
     std::mutex lightMutex;
-    std::vector<LightSceneEntity> lightsWithMedia;
     std::vector<Future<Light>> lightFutures;
 
     std::mutex areaLightMutex;

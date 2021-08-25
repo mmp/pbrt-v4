@@ -717,6 +717,25 @@ void BasicScene::AddMedium(MediumSceneEntity medium) {
     mediaFutures[medium.name] = RunAsync(create);
 }
 
+Medium BasicScene::GetMedium(const std::string &name, const FileLoc *loc) {
+    if (name.empty())
+        return nullptr;
+
+    std::lock_guard<std::mutex> lock(mediaMutex);
+    if (auto iter = mediaMap.find(name); iter != mediaMap.end())
+        return iter->second;
+    else {
+        auto fiter = mediaFutures.find(name);
+        if (fiter == mediaFutures.end())
+            ErrorExit(loc, "%s: medium is not defined.", name);
+
+        Medium m = fiter->second.Get();
+        mediaMap[name] = m;
+        mediaFutures.erase(fiter);
+        return m;
+    }
+}
+
 std::map<std::string, Medium> BasicScene::CreateMedia() {
     std::lock_guard<std::mutex> lock(mediaMutex);
     // Consume futures for asynchronously-created _Medium_ objects
@@ -932,30 +951,19 @@ void BasicScene::AddSpectrumTexture(std::string name, TextureSceneEntity texture
 
 void BasicScene::AddLight(LightSceneEntity light) {
     std::lock_guard<std::mutex> lock(lightMutex);
-    if (!light.medium.empty()) {
-        // If the light has a medium associated with it, punt for now since
-        // the Medium may not yet be initialized; these lights will be
-        // taken care of when CreateLights() is called.  At the cost of
-        // some complexity, we could check and see if it's already in the
-        // medium map and wait for its in-flight future if it's not yet
-        // ready, though the most important case here is probably infinite
-        // image lights and those can't have media associated with them
-        // anyway...
-        lightsWithMedia.push_back(std::move(light));
-        return;
-    }
+    Medium lightMedium = GetMedium(light.medium, &light.loc);
 
     if (light.renderFromObject.IsAnimated())
         Warning(&light.loc,
                 "Animated lights aren't supported. Using the start transform.");
 
-    auto create = [this](LightSceneEntity light) {
+    auto create = [this,light,lightMedium]() {
         return Light::Create(light.name, light.parameters,
                              light.renderFromObject.startTransform,
-                             camera.cameraTransform, nullptr /* Medium */, &light.loc,
-                             threadAllocators.Get());
+                             camera.cameraTransform, lightMedium,
+                             &light.loc, threadAllocators.Get());
     };
-    lightFutures.push_back(RunAsync(create, light));
+    lightFutures.push_back(RunAsync(create));
 }
 
 int BasicScene::AddAreaLight(SceneEntity light) {
@@ -1213,20 +1221,8 @@ std::vector<Light> BasicScene::CreateLights(
             return nullptr;
     };
 
-    LOG_VERBOSE("Starting non-future lights");
+    LOG_VERBOSE("Starting area lights");
     std::vector<Light> lights;
-    // Lights with media (punted in AddLight() earlier.)
-    for (const auto &light : lightsWithMedia) {
-        Medium outsideMedium = findMedium(light.medium, &light.loc);
-        if (light.renderFromObject.IsAnimated())
-            Warning(&light.loc,
-                    "Animated lights aren't supported. Using the start transform.");
-        Light l = Light::Create(light.name, light.parameters,
-                                light.renderFromObject.startTransform,
-                                camera.cameraTransform, outsideMedium, &light.loc, alloc);
-
-        lights.push_back(l);
-    }
 
     // Area Lights
     for (size_t i = 0; i < shapes.size(); ++i) {
@@ -1278,7 +1274,7 @@ std::vector<Light> BasicScene::CreateLights(
         (*shapeIndexToAreaLights)[i] = shapeLights;
     }
 
-    LOG_VERBOSE("Finished non-future lights");
+    LOG_VERBOSE("Finished area lights");
 
     LOG_VERBOSE("Starting to consume non-area light futures");
     for (auto &fut : lightFutures)
