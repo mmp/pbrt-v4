@@ -41,20 +41,6 @@ void RenderCPU(BasicScene &parsedScene) {
         return iter->second;
     };
 
-    // Filter
-    Filter filter = parsedScene.CreateFilter();
-
-    // Film
-    Film film = parsedScene.CreateFilm(filter);
-
-    // Camera
-    Medium cameraMedium = findMedium(parsedScene.camera.medium, &parsedScene.camera.loc);
-    Camera camera = parsedScene.CreateCamera(cameraMedium, film);
-
-    // Sampler
-    Point2i fullImageResolution = camera.GetFilm().FullResolution();
-    Sampler sampler = parsedScene.CreateSampler(fullImageResolution);
-
     // Textures
     LOG_VERBOSE("Starting textures");
     NamedTextures textures = parsedScene.CreateTextures();
@@ -73,6 +59,10 @@ void RenderCPU(BasicScene &parsedScene) {
 
     Primitive accel = parsedScene.CreateAggregate(textures, shapeIndexToAreaLights, media,
                                                   namedMaterials, materials);
+
+    Camera camera = parsedScene.GetCamera();
+    Film film = camera.GetFilm();
+    Sampler sampler = parsedScene.GetSampler();
 
     // Integrator
     std::unique_ptr<Integrator> integrator(

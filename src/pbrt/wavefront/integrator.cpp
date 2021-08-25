@@ -115,17 +115,6 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
         return iter->second;
     };
 
-    filter = scene.CreateFilter();
-
-    film = scene.CreateFilm(filter);
-    initializeVisibleSurface = film.UsesVisibleSurface();
-
-    sampler = scene.CreateSampler(film.FullResolution());
-    samplesPerPixel = sampler.SamplesPerPixel();
-
-    Medium cameraMedium = findMedium(scene.camera.medium, &scene.camera.loc);
-    camera = scene.CreateCamera(cameraMedium, film);
-
     // Textures
     LOG_VERBOSE("Starting to create textures");
     NamedTextures textures = scene.CreateTextures();
@@ -201,6 +190,14 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
     // Integrator parameters
     regularize = scene.integrator.parameters.GetOneBool("regularize", false);
     maxDepth = scene.integrator.parameters.GetOneInt("maxdepth", 5);
+
+    camera = scene.GetCamera();
+    film = camera.GetFilm();
+    filter = film.GetFilter();
+    sampler = scene.GetSampler();
+
+    initializeVisibleSurface = film.UsesVisibleSurface();
+    samplesPerPixel = sampler.SamplesPerPixel();
 
     // Warn about unsupported stuff...
     if (Options->forceDiffuse)

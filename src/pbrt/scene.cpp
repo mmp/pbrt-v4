@@ -227,13 +227,9 @@ void BasicSceneBuilder::WorldBegin(FileLoc loc) {
     namedCoordinateSystems["world"] = graphicsState.ctm;
 
     // Pass pre-_WorldBegin_ entities to _scene_
-    scene->SetSampler(std::move(sampler));
-
-    scene->SetFilm(std::move(film));
-    scene->SetIntegrator(std::move(integrator));
-    scene->SetFilter(std::move(filter));
-    scene->SetAccelerator(std::move(accelerator));
-    scene->SetCamera(std::move(camera));
+    scene->SetOptions(std::move(filter), std::move(film), std::move(camera),
+                      std::move(sampler), std::move(integrator),
+                      std::move(accelerator));
 }
 
 void BasicSceneBuilder::MakeNamedMedium(const std::string &name,
@@ -688,13 +684,56 @@ void BasicSceneBuilder::AreaLightSource(const std::string &name,
 }
 
 // BasicScene Method Definitions
-void BasicScene::SetSampler(SceneEntity sampler) {
-    this->sampler = std::move(sampler);
-}
+void BasicScene::SetOptions(SceneEntity filter, SceneEntity film,
+                            CameraSceneEntity camera, SceneEntity sampler,
+                            SceneEntity integ, SceneEntity accel) {
+    integratorColorSpace = film.parameters.ColorSpace();
+    integrator = integ;
+    accelerator = accel;
 
-Sampler BasicScene::CreateSampler(Point2i res) const {
-    Allocator alloc = threadAllocators.Get();
-    return Sampler::Create(sampler.name, sampler.parameters, res, &sampler.loc, alloc);
+    filmFuture = RunAsync([filter,film,camera,this]() {
+        LOG_VERBOSE("Starting to create filter and film");
+        Allocator alloc = threadAllocators.Get();
+        Filter filt = Filter::Create(filter.name, filter.parameters, &filter.loc, alloc);
+
+        // It's a little ugly to poke into the camera's parameters here, but we
+        // have this circular dependency that Camera::Create() expects a
+        // Film, yet now the film needs to know the exposure time from
+        // the camera....
+        Float exposureTime = camera.parameters.GetOneFloat("shutterclose", 1.f) -
+            camera.parameters.GetOneFloat("shutteropen", 0.f);
+        if (exposureTime <= 0)
+            ErrorExit(&camera.loc,
+                      "The specified camera shutter times imply that the shutter "
+                      "does not open.  A black image will result.");
+
+        Film f = Film::Create(film.name, film.parameters, exposureTime, camera.cameraTransform,
+                              filt, &film.loc, alloc);
+        LOG_VERBOSE("Finished creating filter and film");
+        return f;
+    });
+
+    samplerFuture = RunAsync([sampler,this]() {
+        LOG_VERBOSE("Starting to create sampler");
+        Allocator alloc = threadAllocators.Get();
+        Film film = GetFilm();
+        Sampler s = Sampler::Create(sampler.name, sampler.parameters, film.FullResolution(),
+                                    &sampler.loc, alloc);
+        LOG_VERBOSE("Finished creating sampler");
+        return s;
+    });
+
+    cameraFuture = RunAsync([camera,this]() {
+        LOG_VERBOSE("Starting to create camera");
+        Allocator alloc = threadAllocators.Get();
+        Film film = GetFilm();
+        Medium cameraMedium = GetMedium(camera.medium, &camera.loc);
+
+        Camera c = Camera::Create(camera.name, camera.parameters, cameraMedium,
+                                  camera.cameraTransform, film, &camera.loc, alloc);
+        LOG_VERBOSE("Finished creating camera");
+        return c;
+    });
 }
 
 void BasicScene::AddMedium(MediumSceneEntity medium) {
@@ -738,6 +777,9 @@ Medium BasicScene::GetMedium(const std::string &name, const FileLoc *loc) {
 
 std::map<std::string, Medium> BasicScene::CreateMedia() {
     std::lock_guard<std::mutex> lock(mediaMutex);
+    if (mediaFutures.empty())
+        return mediaMap;
+
     // Consume futures for asynchronously-created _Medium_ objects
     LOG_VERBOSE("Consume media futures start");
     for (auto &m : mediaFutures) {
@@ -750,38 +792,8 @@ std::map<std::string, Medium> BasicScene::CreateMedia() {
     return mediaMap;
 }
 
-Filter BasicScene::CreateFilter() const {
-    Allocator alloc = threadAllocators.Get();
-    return Filter::Create(filter.name, filter.parameters, &filter.loc, alloc);
-}
-
-Film BasicScene::CreateFilm(Filter filter) const {
-    Allocator alloc = threadAllocators.Get();
-
-    // It's a little ugly to poke into the camera's parameters here, but we
-    // have this circular dependency that Camera::Create() expects a
-    // Film, yet now the film needs to know the exposure time from
-    // the camera....
-    Float exposureTime = camera.parameters.GetOneFloat("shutterclose", 1.f) -
-                         camera.parameters.GetOneFloat("shutteropen", 0.f);
-    if (exposureTime <= 0)
-        ErrorExit(&camera.loc,
-                  "The specified camera shutter times imply that the shutter "
-                  "does not open.  A black image will result.");
-
-    return Film::Create(film.name, film.parameters, exposureTime, camera.cameraTransform,
-                        filter, &film.loc, alloc);
-}
-
-Camera BasicScene::CreateCamera(Medium cameraMedium, Film film) const {
-    Allocator alloc = threadAllocators.Get();
-    return Camera::Create(camera.name, camera.parameters, cameraMedium,
-                          camera.cameraTransform, film, &camera.loc, alloc);
-}
-
 std::unique_ptr<Integrator> BasicScene::CreateIntegrator(
     Camera camera, Sampler sampler, Primitive accel, std::vector<Light> lights) const {
-    const RGBColorSpace *integratorColorSpace = film.parameters.ColorSpace();
     return Integrator::Create(integrator.name, integrator.parameters, camera, sampler,
                               accel, lights, integratorColorSpace, &integrator.loc);
 }
@@ -797,26 +809,6 @@ BasicScene::BasicScene()
               new pstd::pmr::monotonic_buffer_resource(1024 * 1024, baseResource);
           return Allocator(resource);
       }) {
-}
-
-void BasicScene::SetFilm(SceneEntity film) {
-    this->film = std::move(film);
-}
-
-void BasicScene::SetIntegrator(SceneEntity integrator) {
-    this->integrator = std::move(integrator);
-}
-
-void BasicScene::SetFilter(SceneEntity filter) {
-    this->filter = std::move(filter);
-}
-
-void BasicScene::SetAccelerator(SceneEntity accelerator) {
-    this->accelerator = std::move(accelerator);
-}
-
-void BasicScene::SetCamera(CameraSceneEntity camera) {
-    this->camera = std::move(camera);
 }
 
 void BasicScene::AddNamedMaterial(std::string name, SceneEntity material) {
@@ -960,7 +952,7 @@ void BasicScene::AddLight(LightSceneEntity light) {
     auto create = [this,light,lightMedium]() {
         return Light::Create(light.name, light.parameters,
                              light.renderFromObject.startTransform,
-                             camera.cameraTransform, lightMedium,
+                             GetCamera().GetCameraTransform(), lightMedium,
                              &light.loc, threadAllocators.Get());
     };
     lightFutures.push_back(RunAsync(create));

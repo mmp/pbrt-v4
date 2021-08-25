@@ -265,13 +265,9 @@ class BasicScene {
     // BasicScene Public Methods
     BasicScene();
 
-    void SetSampler(SceneEntity sampler);
-
-    void SetFilm(SceneEntity film);
-    void SetIntegrator(SceneEntity integrator);
-    void SetFilter(SceneEntity filter);
-    void SetAccelerator(SceneEntity accelerator);
-    void SetCamera(CameraSceneEntity camera);
+    void SetOptions(SceneEntity filter, SceneEntity film,
+                    CameraSceneEntity camera, SceneEntity sampler,
+                    SceneEntity integrator, SceneEntity accelerator);
 
     void AddNamedMaterial(std::string name, SceneEntity material);
     int AddMaterial(SceneEntity material);
@@ -287,7 +283,36 @@ class BasicScene {
 
     void Done();
 
-    Sampler CreateSampler(Point2i res) const;
+    Camera GetCamera() {
+        std::lock_guard<std::mutex> lock(cameraFutureMutex);
+        if (!camera) {
+            if (!cameraFuture.IsReady())
+                LOG_VERBOSE("Waiting for camera future");
+            camera = cameraFuture.Get();
+            LOG_VERBOSE("Got camera future");
+        }
+        return camera;
+    }
+    Film GetFilm() {
+        std::lock_guard<std::mutex> lock(filmFutureMutex);
+        if (!film) {
+            if (!filmFuture.IsReady())
+                LOG_VERBOSE("Waiting for film future");
+            film = filmFuture.Get();
+            LOG_VERBOSE("Got film future");
+        }
+        return film;
+    }
+    Sampler GetSampler() {
+        std::lock_guard<std::mutex> lock(samplerFutureMutex);
+        if (!sampler) {
+            if (!samplerFuture.IsReady())
+                LOG_VERBOSE("Waiting for sampler future");
+            sampler = samplerFuture.Get();
+            LOG_VERBOSE("Got sampler future");
+        }
+        return sampler;
+    }
 
     void CreateMaterials(const NamedTextures &sceneTextures,
                          std::map<std::string, Material> *namedMaterials,
@@ -306,9 +331,6 @@ class BasicScene {
         const std::map<std::string, Material> &namedMaterials,
         const std::vector<Material> &materials);
 
-    Filter CreateFilter() const;
-    Film CreateFilm(Filter filter) const;
-    Camera CreateCamera(Medium cameraMedium, Film film) const;
     std::unique_ptr<Integrator> CreateIntegrator(Camera camera, Sampler sampler,
                                                  Primitive accel,
                                                  std::vector<Light> lights) const;
@@ -316,20 +338,29 @@ class BasicScene {
     NamedTextures CreateTextures();
 
     // BasicScene Public Members
-    SceneEntity sampler;
-    SceneEntity film, integrator, filter, accelerator;
-    CameraSceneEntity camera;
-    std::vector<std::pair<std::string, SceneEntity>> namedMaterials;
-    std::vector<SceneEntity> materials;
+    SceneEntity integrator, accelerator;
     std::vector<ShapeSceneEntity> shapes;
     std::vector<AnimatedShapeSceneEntity> animatedShapes;
     std::vector<InstanceSceneEntity> instances;
     std::map<InternedString, InstanceDefinitionSceneEntity *> instanceDefinitions;
 
-  private:
+private:
     // BasicScene Private Methods
     void startLoadingNormalMaps(const ParameterDictionary &parameters);
     Medium GetMedium(const std::string &name, const FileLoc *loc);
+
+    Camera camera;
+    Film film;
+    Sampler sampler;
+    std::mutex cameraFutureMutex, filmFutureMutex, samplerFutureMutex;
+    Future<Camera> cameraFuture;
+    Future<Film> filmFuture;
+    Future<Sampler> samplerFuture;
+    const RGBColorSpace *integratorColorSpace;
+
+    std::vector<std::pair<std::string, SceneEntity>> namedMaterials;
+    std::vector<SceneEntity> materials;
+
 
     // BasicScene Private Members
     std::mutex mediaMutex;
@@ -495,7 +526,8 @@ class BasicSceneBuilder : public ParserTarget {
     std::set<std::string> namedMaterialNames, mediumNames;
     std::set<std::string> floatTextureNames, spectrumTextureNames, instanceNames;
     int currentMaterialIndex = 0, currentLightIndex = -1;
-    SceneEntity film, sampler, integrator, filter, accelerator;
+    SceneEntity sampler;
+    SceneEntity film, integrator, filter, accelerator;
     CameraSceneEntity camera;
 };
 
