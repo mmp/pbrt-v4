@@ -75,11 +75,10 @@ void *monotonic_buffer_resource::do_allocate(size_t bytes, size_t align) {
     // so this is tied to pbrt's current usage of them...
     CHECK(constructTID == std::this_thread::get_id());
 #endif
-
     if (bytes > block_size)
         // We've got a big allocation; let the current block be so that
         // smaller allocations have a chance at using up more of it.
-        return allocate_block(bytes)->ptr;
+        return upstream->allocate(bytes, align);
 
     if ((current_pos % align) != 0)
         current_pos += align - (current_pos % align);

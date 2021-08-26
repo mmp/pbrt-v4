@@ -576,7 +576,10 @@ class alignas(64) monotonic_buffer_resource : public memory_resource {
     void *do_allocate(size_t bytes, size_t align) override;
 
     void do_deallocate(void *p, size_t bytes, size_t alignment) override {
-        // no-op
+        if (bytes > block_size)
+            // do_allocate() passes large allocations on to the upstream memory resource,
+            // so we might as well deallocate when it's possible.
+            upstream->deallocate(p, bytes);
     }
 
     bool do_is_equal(const memory_resource &other) const noexcept override {
