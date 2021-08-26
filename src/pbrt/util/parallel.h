@@ -362,6 +362,15 @@ class Future {
         Wait();
         return fut.get();
     }
+    pstd::optional<T> TryGet(std::mutex *mutex) {
+        if (IsReady())
+            return Get();
+
+        mutex->unlock();
+        DoParallelWork();
+        mutex->lock();
+        return {};
+    }
 
     void Wait() {
         while (!IsReady() && DoParallelWork())
