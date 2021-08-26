@@ -80,9 +80,7 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
     pstd::pmr::memory_resource *memoryResource, BasicScene &scene)
     : memoryResource(memoryResource) {
     ThreadLocal<Allocator> threadAllocators([memoryResource]() {
-        pstd::pmr::monotonic_buffer_resource *resource =
-            new pstd::pmr::monotonic_buffer_resource(1024 * 1024, memoryResource);
-        return Allocator(resource);
+        return Allocator(memoryResource);
     });
 
     Allocator alloc = threadAllocators.Get();
