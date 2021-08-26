@@ -7,6 +7,7 @@
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/rng.h>
 
+#include <map>
 #include <set>
 #include <string>
 
@@ -102,4 +103,53 @@ TEST(Optional, RunDestructors) {
         EXPECT_EQ(1, AliveCounter::nAlive);
     }
     EXPECT_EQ(0, AliveCounter::nAlive);
+}
+
+class TrackingResource : public pstd::pmr::memory_resource {
+public:
+    void *do_allocate(size_t bytes, size_t alignment) {
+        void *ptr = new char[bytes];
+        allocs[ptr] = bytes;
+        return ptr;
+    }
+
+    void do_deallocate(void *ptr, size_t bytes, size_t alignment) {
+        auto iter = allocs.find(ptr);
+        ASSERT_TRUE(iter != allocs.end());
+        ASSERT_EQ(iter->second, bytes);
+        allocs.erase(iter);
+        delete[] (char *)ptr;
+    }
+
+    bool do_is_equal(const memory_resource &other) const noexcept {
+        return &other == this;
+    }
+
+    std::map<void *, size_t> allocs;
+};
+
+TEST(MonotonicBufferResource, NoOverlap) {
+    TrackingResource tr;
+    pstd::pmr::monotonic_buffer_resource mb(1024, &tr);
+    Allocator alloc(&mb);
+    RNG rng;
+    struct Span {
+        char *ptr;
+        size_t size;
+    };
+    std::vector<Span> spans;
+
+    for (int i = 0; i < 10000; ++i) {
+        size_t size;
+        if (rng.Uniform<Float>() < .5f)
+            size = 1 << rng.Uniform<int>(12);
+        else
+            size = rng.Uniform<int>(2048);
+
+        char *p = (char *)alloc.allocate_bytes(size);
+        // O(n^2)...
+        for (const Span &s : spans)
+            EXPECT_TRUE(p >= s.ptr + s.size || p + size <= s.ptr);
+        spans.push_back(Span{p, size});
+    }
 }
