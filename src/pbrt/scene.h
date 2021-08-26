@@ -283,35 +283,35 @@ class BasicScene {
     void Done();
 
     Camera GetCamera() {
-        std::lock_guard<std::mutex> lock(cameraFutureMutex);
-        if (!camera) {
-            if (!cameraFuture.IsReady())
-                LOG_VERBOSE("Waiting for camera future");
-            camera = cameraFuture.Get();
-            LOG_VERBOSE("Got camera future");
+        cameraFutureMutex.lock();
+        while (!camera) {
+            pstd::optional<Camera> c = cameraFuture.TryGet(&cameraFutureMutex);
+            if (c)
+                camera = *c;
         }
+        cameraFutureMutex.unlock();
         return camera;
     }
 
     Film GetFilm() {
-        std::lock_guard<std::mutex> lock(filmFutureMutex);
-        if (!film) {
-            if (!filmFuture.IsReady())
-                LOG_VERBOSE("Waiting for film future");
-            film = filmFuture.Get();
-            LOG_VERBOSE("Got film future");
+        filmFutureMutex.lock();
+        while (!film) {
+            pstd::optional<Film> f = filmFuture.TryGet(&filmFutureMutex);
+            if (f)
+                film = *f;
         }
+        filmFutureMutex.unlock();
         return film;
     }
 
     Sampler GetSampler() {
-        std::lock_guard<std::mutex> lock(samplerFutureMutex);
-        if (!sampler) {
-            if (!samplerFuture.IsReady())
-                LOG_VERBOSE("Waiting for sampler future");
-            sampler = samplerFuture.Get();
-            LOG_VERBOSE("Got sampler future");
+        samplerFutureMutex.lock();
+        while (!sampler) {
+            pstd::optional<Sampler> s = samplerFuture.TryGet(&samplerFutureMutex);
+            if (s)
+                sampler = *s;
         }
+        samplerFutureMutex.unlock();
         return sampler;
     }
 

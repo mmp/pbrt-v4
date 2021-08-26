@@ -761,32 +761,43 @@ Medium BasicScene::GetMedium(const std::string &name, const FileLoc *loc) {
     if (name.empty())
         return nullptr;
 
-    std::lock_guard<std::mutex> lock(mediaMutex);
-    if (auto iter = mediaMap.find(name); iter != mediaMap.end())
-        return iter->second;
-    else {
-        auto fiter = mediumFutures.find(name);
-        if (fiter == mediumFutures.end())
-            ErrorExit(loc, "%s: medium is not defined.", name);
+    mediaMutex.lock();
+    while (true) {
+        if (auto iter = mediaMap.find(name); iter != mediaMap.end()) {
+            Medium m = iter->second;
+            mediaMutex.unlock();
+            return m;
+        }  else {
+            auto fiter = mediumFutures.find(name);
+            if (fiter == mediumFutures.end())
+                ErrorExit(loc, "%s: medium is not defined.", name);
 
-        Medium m = fiter->second.Get();
-        mediaMap[name] = m;
-        mediumFutures.erase(fiter);
-        return m;
+            pstd::optional<Medium> m = fiter->second.TryGet(&mediaMutex);
+            if (m) {
+                mediaMap[name] = *m;
+                mediumFutures.erase(fiter);
+                mediaMutex.unlock();
+                return *m;
+            }
+        }
     }
 }
 
 std::map<std::string, Medium> BasicScene::CreateMedia() {
-    std::lock_guard<std::mutex> lock(mediaMutex);
-    if (mediumFutures.empty())
-        return mediaMap;
-    // Consume futures for asynchronously-created _Medium_ objects
-    LOG_VERBOSE("Consume media futures start");
-    for (auto &m : mediumFutures) {
-        CHECK(mediaMap.find(m.first) == mediaMap.end());
-        mediaMap[m.first] = m.second.Get();
+    mediaMutex.lock();
+    if (!mediumFutures.empty()) {
+        // Consume futures for asynchronously-created _Medium_ objects
+        LOG_VERBOSE("Consume media futures start");
+        for (auto &m : mediumFutures) {
+            while (mediaMap.find(m.first) == mediaMap.end()) {
+                pstd::optional<Medium> med = m.second.TryGet(&mediaMutex);
+                if (med)
+                    mediaMap[m.first] = *med;
+            }
+        }
     }
     mediumFutures.clear();
+    mediaMutex.unlock();
     LOG_VERBOSE("Consume media futures finished");
 
     return mediaMap;
