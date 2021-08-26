@@ -66,7 +66,7 @@ static void updateMaterialNeeds(
     }
 
     *haveSubsurface |= m.HasSubsurfaceScattering();
-    *haveMedia |= (m == nullptr); // interface material
+    *haveMedia |= (m == nullptr);  // interface material
 
     FloatTexture displace = m.GetDisplacement();
     if (m.CanEvaluateTextures(BasicTextureEvaluator()) &&

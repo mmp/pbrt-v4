@@ -265,9 +265,8 @@ class BasicScene {
     // BasicScene Public Methods
     BasicScene();
 
-    void SetOptions(SceneEntity filter, SceneEntity film,
-                    CameraSceneEntity camera, SceneEntity sampler,
-                    SceneEntity integrator, SceneEntity accelerator);
+    void SetOptions(SceneEntity filter, SceneEntity film, CameraSceneEntity camera,
+                    SceneEntity sampler, SceneEntity integrator, SceneEntity accelerator);
 
     void AddNamedMaterial(std::string name, SceneEntity material);
     int AddMaterial(SceneEntity material);
@@ -293,6 +292,7 @@ class BasicScene {
         }
         return camera;
     }
+
     Film GetFilm() {
         std::lock_guard<std::mutex> lock(filmFutureMutex);
         if (!film) {
@@ -303,6 +303,7 @@ class BasicScene {
         }
         return film;
     }
+
     Sampler GetSampler() {
         std::lock_guard<std::mutex> lock(samplerFutureMutex);
         if (!sampler) {
@@ -339,37 +340,37 @@ class BasicScene {
 
     // BasicScene Public Members
     SceneEntity integrator, accelerator;
+    const RGBColorSpace *filmColorSpace;
     std::vector<ShapeSceneEntity> shapes;
     std::vector<AnimatedShapeSceneEntity> animatedShapes;
     std::vector<InstanceSceneEntity> instances;
     std::map<InternedString, InstanceDefinitionSceneEntity *> instanceDefinitions;
 
-private:
+  private:
     // BasicScene Private Methods
-    void startLoadingNormalMaps(const ParameterDictionary &parameters);
     Medium GetMedium(const std::string &name, const FileLoc *loc);
 
-    Camera camera;
-    Film film;
-    Sampler sampler;
-    std::mutex cameraFutureMutex, filmFutureMutex, samplerFutureMutex;
-    Future<Camera> cameraFuture;
-    Future<Film> filmFuture;
-    Future<Sampler> samplerFuture;
-    const RGBColorSpace *integratorColorSpace;
-
-    std::vector<std::pair<std::string, SceneEntity>> namedMaterials;
-    std::vector<SceneEntity> materials;
-
+    void startLoadingNormalMaps(const ParameterDictionary &parameters);
 
     // BasicScene Private Members
-    std::mutex mediaMutex;
-    std::map<std::string, Future<Medium>> mediaFutures;
+    Future<Sampler> samplerFuture;
     mutable ThreadLocal<Allocator> threadAllocators;
+    Camera camera;
+    Film film;
+    std::mutex cameraFutureMutex, filmFutureMutex;
+    Future<Camera> cameraFuture;
+    Future<Film> filmFuture;
+    std::mutex samplerFutureMutex;
+    Sampler sampler;
+    std::mutex mediaMutex;
+    std::map<std::string, Future<Medium>> mediumFutures;
     std::map<std::string, Medium> mediaMap;
     std::mutex materialMutex;
     std::map<std::string, Future<Image *>> normalMapFutures;
     std::map<std::string, Image *> normalMaps;
+
+    std::vector<std::pair<std::string, SceneEntity>> namedMaterials;
+    std::vector<SceneEntity> materials;
 
     std::mutex lightMutex;
     std::vector<Future<Light>> lightFutures;

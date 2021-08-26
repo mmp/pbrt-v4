@@ -77,7 +77,7 @@ std::unique_lock<std::mutex> ThreadPool::AddToJobList(ParallelJob *job) {
 
 void ThreadPool::WorkOrWait(std::unique_lock<std::mutex> *lock, bool isEnqueuingThread) {
     DCHECK(lock->owns_lock());
-
+    // Return if this is a worker thread and the thread pool is disabled
     if (!isEnqueuingThread && disabled) {
         jobListCondition.wait(*lock);
         return;
@@ -155,7 +155,7 @@ void ThreadPool::ForEachThread(std::function<void(void)> func) {
 void ThreadPool::Disable() {
     CHECK(!disabled);
     disabled = true;
-    CHECK(jobList == nullptr); // Nothing should be running when Disable() is called.
+    CHECK(jobList == nullptr);  // Nothing should be running when Disable() is called.
 }
 
 void ThreadPool::Reenable() {
@@ -368,6 +368,6 @@ void DisableThreadPool() {
 void ReenableThreadPool() {
     CHECK(ParallelJob::threadPool);
     ParallelJob::threadPool->Reenable();
-};
-  
+}
+
 }  // namespace pbrt

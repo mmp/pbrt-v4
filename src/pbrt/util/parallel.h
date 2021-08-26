@@ -339,9 +339,9 @@ class ThreadPool {
     std::vector<std::thread> threads;
     mutable std::mutex mutex;
     bool shutdownThreads = false;
+    bool disabled = false;
     ParallelJob *jobList = nullptr;
     std::condition_variable jobListCondition;
-    bool disabled = false;
 };
 
 bool DoParallelWork();

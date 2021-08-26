@@ -227,22 +227,21 @@ void BasicSceneBuilder::WorldBegin(FileLoc loc) {
     namedCoordinateSystems["world"] = graphicsState.ctm;
 
     // Pass pre-_WorldBegin_ entities to _scene_
-    scene->SetOptions(std::move(filter), std::move(film), std::move(camera),
-                      std::move(sampler), std::move(integrator),
-                      std::move(accelerator));
+    scene->SetOptions(filter, film, camera, sampler, integrator, accelerator);
 }
 
 void BasicSceneBuilder::MakeNamedMedium(const std::string &name,
                                         ParsedParameterVector params, FileLoc loc) {
-    ParameterDictionary dict(std::move(params), graphicsState.mediumAttributes,
-                             graphicsState.colorSpace);
-    // Issue error if medium _name_ is multiply-defined
+    // Issue error if medium _name_ is multiply defined
     if (mediumNames.find(name) != mediumNames.end()) {
         ErrorExitDeferred(&loc, "Named medium \"%s\" redefined.", name);
         return;
     }
     mediumNames.insert(name);
 
+    // Create _ParameterDictionary_ for medium and call _AddMedium()_
+    ParameterDictionary dict(std::move(params), graphicsState.mediumAttributes,
+                             graphicsState.colorSpace);
     scene->AddMedium(MediumSceneEntity(name, std::move(dict), loc, RenderFromObject()));
 }
 
@@ -687,11 +686,13 @@ void BasicSceneBuilder::AreaLightSource(const std::string &name,
 void BasicScene::SetOptions(SceneEntity filter, SceneEntity film,
                             CameraSceneEntity camera, SceneEntity sampler,
                             SceneEntity integ, SceneEntity accel) {
-    integratorColorSpace = film.parameters.ColorSpace();
+    // Store information for specificed integrator and accelerator
+    filmColorSpace = film.parameters.ColorSpace();
     integrator = integ;
     accelerator = accel;
 
-    filmFuture = RunAsync([filter,film,camera,this]() {
+    // Enqueue asynchronous job to create filter and film
+    filmFuture = RunAsync([filter, film, camera, this]() {
         LOG_VERBOSE("Starting to create filter and film");
         Allocator alloc = threadAllocators.Get();
         Filter filt = Filter::Create(filter.name, filter.parameters, &filter.loc, alloc);
@@ -701,29 +702,29 @@ void BasicScene::SetOptions(SceneEntity filter, SceneEntity film,
         // Film, yet now the film needs to know the exposure time from
         // the camera....
         Float exposureTime = camera.parameters.GetOneFloat("shutterclose", 1.f) -
-            camera.parameters.GetOneFloat("shutteropen", 0.f);
+                             camera.parameters.GetOneFloat("shutteropen", 0.f);
         if (exposureTime <= 0)
             ErrorExit(&camera.loc,
                       "The specified camera shutter times imply that the shutter "
                       "does not open.  A black image will result.");
 
-        Film f = Film::Create(film.name, film.parameters, exposureTime, camera.cameraTransform,
-                              filt, &film.loc, alloc);
+        Film f = Film::Create(film.name, film.parameters, exposureTime,
+                              camera.cameraTransform, filt, &film.loc, alloc);
         LOG_VERBOSE("Finished creating filter and film");
         return f;
     });
 
-    samplerFuture = RunAsync([sampler,this]() {
+    // Enqueue asynchronous job to create sampler
+    samplerFuture = RunAsync([sampler, this]() {
         LOG_VERBOSE("Starting to create sampler");
         Allocator alloc = threadAllocators.Get();
-        Film film = GetFilm();
-        Sampler s = Sampler::Create(sampler.name, sampler.parameters, film.FullResolution(),
-                                    &sampler.loc, alloc);
-        LOG_VERBOSE("Finished creating sampler");
-        return s;
+        Point2i res = GetFilm().FullResolution();
+        return Sampler::Create(sampler.name, sampler.parameters, res, &sampler.loc,
+                               alloc);
     });
 
-    cameraFuture = RunAsync([camera,this]() {
+    // Enqueue asynchronous job to create camera
+    cameraFuture = RunAsync([camera, this]() {
         LOG_VERBOSE("Starting to create camera");
         Allocator alloc = threadAllocators.Get();
         Film film = GetFilm();
@@ -738,7 +739,7 @@ void BasicScene::SetOptions(SceneEntity filter, SceneEntity film,
 
 void BasicScene::AddMedium(MediumSceneEntity medium) {
     // Define _create_ lambda function for _Medium_ creation
-    auto create = [=]() {
+    auto create = [medium, this]() {
         std::string type = medium.parameters.GetOneString("type", "");
         // Check for missing medium ``type'' or animated medium transform
         if (type.empty())
@@ -753,7 +754,7 @@ void BasicScene::AddMedium(MediumSceneEntity medium) {
     };
 
     std::lock_guard<std::mutex> lock(mediaMutex);
-    mediaFutures[medium.name] = RunAsync(create);
+    mediumFutures[medium.name] = RunAsync(create);
 }
 
 Medium BasicScene::GetMedium(const std::string &name, const FileLoc *loc) {
@@ -764,29 +765,28 @@ Medium BasicScene::GetMedium(const std::string &name, const FileLoc *loc) {
     if (auto iter = mediaMap.find(name); iter != mediaMap.end())
         return iter->second;
     else {
-        auto fiter = mediaFutures.find(name);
-        if (fiter == mediaFutures.end())
+        auto fiter = mediumFutures.find(name);
+        if (fiter == mediumFutures.end())
             ErrorExit(loc, "%s: medium is not defined.", name);
 
         Medium m = fiter->second.Get();
         mediaMap[name] = m;
-        mediaFutures.erase(fiter);
+        mediumFutures.erase(fiter);
         return m;
     }
 }
 
 std::map<std::string, Medium> BasicScene::CreateMedia() {
     std::lock_guard<std::mutex> lock(mediaMutex);
-    if (mediaFutures.empty())
+    if (mediumFutures.empty())
         return mediaMap;
-
     // Consume futures for asynchronously-created _Medium_ objects
     LOG_VERBOSE("Consume media futures start");
-    for (auto &m : mediaFutures) {
+    for (auto &m : mediumFutures) {
         CHECK(mediaMap.find(m.first) == mediaMap.end());
         mediaMap[m.first] = m.second.Get();
     }
-    mediaFutures.clear();
+    mediumFutures.clear();
     LOG_VERBOSE("Consume media futures finished");
 
     return mediaMap;
@@ -795,7 +795,7 @@ std::map<std::string, Medium> BasicScene::CreateMedia() {
 std::unique_ptr<Integrator> BasicScene::CreateIntegrator(
     Camera camera, Sampler sampler, Primitive accel, std::vector<Light> lights) const {
     return Integrator::Create(integrator.name, integrator.parameters, camera, sampler,
-                              accel, lights, integratorColorSpace, &integrator.loc);
+                              accel, lights, filmColorSpace, &integrator.loc);
 }
 
 BasicScene::BasicScene()
@@ -949,11 +949,11 @@ void BasicScene::AddLight(LightSceneEntity light) {
         Warning(&light.loc,
                 "Animated lights aren't supported. Using the start transform.");
 
-    auto create = [this,light,lightMedium]() {
+    auto create = [this, light, lightMedium]() {
         return Light::Create(light.name, light.parameters,
                              light.renderFromObject.startTransform,
-                             GetCamera().GetCameraTransform(), lightMedium,
-                             &light.loc, threadAllocators.Get());
+                             GetCamera().GetCameraTransform(), lightMedium, &light.loc,
+                             threadAllocators.Get());
     };
     lightFutures.push_back(RunAsync(create));
 }
@@ -1178,9 +1178,6 @@ NamedTextures BasicScene::CreateTextures() {
 std::vector<Light> BasicScene::CreateLights(
     const NamedTextures &textures,
     std::map<int, pstd::vector<Light> *> *shapeIndexToAreaLights) {
-    // Ensure that media are all ready
-    (void)CreateMedia();
-
     auto findMedium = [this](const std::string &s, const FileLoc *loc) -> Medium {
         if (s.empty())
             return nullptr;
@@ -1215,7 +1212,6 @@ std::vector<Light> BasicScene::CreateLights(
 
     LOG_VERBOSE("Starting area lights");
     std::vector<Light> lights;
-
     // Area Lights
     for (size_t i = 0; i < shapes.size(); ++i) {
         const auto &sh = shapes[i];
