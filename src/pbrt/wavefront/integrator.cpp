@@ -79,9 +79,8 @@ static void updateMaterialNeeds(
 WavefrontPathIntegrator::WavefrontPathIntegrator(
     pstd::pmr::memory_resource *memoryResource, BasicScene &scene)
     : memoryResource(memoryResource) {
-    ThreadLocal<Allocator> threadAllocators([memoryResource]() {
-        return Allocator(memoryResource);
-    });
+    ThreadLocal<Allocator> threadAllocators(
+        [memoryResource]() { return Allocator(memoryResource); });
 
     Allocator alloc = threadAllocators.Get();
 

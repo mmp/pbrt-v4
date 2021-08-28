@@ -156,11 +156,10 @@ class CameraBase {
                             Vector3f *dpdx, Vector3f *dpdy) const {
         // Compute tangent plane equation for ray differential intersections
         Point3f pCamera = CameraFromRender(p, time);
-        Normal3f nCamera = CameraFromRender(n, time);
         Transform DownZFromCamera =
             RotateFromTo(Normalize(Vector3f(pCamera)), Vector3f(0, 0, 1));
         Point3f pDownZ = DownZFromCamera(pCamera);
-        Normal3f nDownZ = DownZFromCamera(nCamera);
+        Normal3f nDownZ = DownZFromCamera(CameraFromRender(n, time));
         Float d = Dot(nDownZ, Vector3f(pDownZ));
 
         // Find intersection points for approximated camera differential rays

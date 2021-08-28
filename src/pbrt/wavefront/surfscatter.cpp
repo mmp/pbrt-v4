@@ -72,21 +72,23 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
                                       &dpdy);
             Vector3f dpdu = w.dpdu, dpdv = w.dpdv;
             // Estimate screen-space change in $(u,v)$
-            Float a00 = Dot(dpdu, dpdu), a01 = Dot(dpdu, dpdv), a11 = Dot(dpdv, dpdv);
-            Float invDet = 1 / (DifferenceOfProducts(a00, a11, a01, a01));
-
-            Float b0x = Dot(dpdu, dpdx), b1x = Dot(dpdv, dpdx);
-            Float b0y = Dot(dpdu, dpdy), b1y = Dot(dpdv, dpdy);
-
-            /* Set the UV partials to zero if dpdu and/or dpdv == 0 */
+            // Compute $\transpose{\XFORM{A}} \XFORM{A}$ and its determinant
+            Float ata00 = Dot(dpdu, dpdu), ata01 = Dot(dpdu, dpdv);
+            Float ata11 = Dot(dpdv, dpdv);
+            Float invDet = 1 / (DifferenceOfProducts(ata00, ata11, ata01, ata01));
             invDet = IsFinite(invDet) ? invDet : 0.f;
 
-            dudx = DifferenceOfProducts(a11, b0x, a01, b1x) * invDet;
-            dvdx = DifferenceOfProducts(a00, b1x, a01, b0x) * invDet;
+            // Compute $\transpose{\XFORM{A}} \VEC{b}$ for $x$ and $y$
+            Float atb0x = Dot(dpdu, dpdx), atb1x = Dot(dpdv, dpdx);
+            Float atb0y = Dot(dpdu, dpdy), atb1y = Dot(dpdv, dpdy);
 
-            dudy = DifferenceOfProducts(a11, b0y, a01, b1y) * invDet;
-            dvdy = DifferenceOfProducts(a00, b1y, a01, b0y) * invDet;
+            // Compute $u$ and $v$ partial derivatives with respect to $x$ and $y$
+            dudx = DifferenceOfProducts(ata11, atb0x, ata01, atb1x) * invDet;
+            dvdx = DifferenceOfProducts(ata00, atb1x, ata01, atb0x) * invDet;
+            dudy = DifferenceOfProducts(ata11, atb0y, ata01, atb1y) * invDet;
+            dvdy = DifferenceOfProducts(ata00, atb1y, ata01, atb0y) * invDet;
 
+            // Clamp partial derivatives of $u$ and $v$ to reasonable values
             dudx = IsFinite(dudx) ? Clamp(dudx, -1e8f, 1e8f) : 0.f;
             dvdx = IsFinite(dvdx) ? Clamp(dvdx, -1e8f, 1e8f) : 0.f;
             dudy = IsFinite(dudy) ? Clamp(dudy, -1e8f, 1e8f) : 0.f;

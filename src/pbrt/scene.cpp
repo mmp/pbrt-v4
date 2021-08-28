@@ -686,7 +686,7 @@ void BasicSceneBuilder::AreaLightSource(const std::string &name,
 void BasicScene::SetOptions(SceneEntity filter, SceneEntity film,
                             CameraSceneEntity camera, SceneEntity sampler,
                             SceneEntity integ, SceneEntity accel) {
-    // Store information for specificed integrator and accelerator
+    // Store information for specified integrator and accelerator
     filmColorSpace = film.parameters.ColorSpace();
     integrator = integ;
     accelerator = accel;
@@ -767,7 +767,7 @@ Medium BasicScene::GetMedium(const std::string &name, const FileLoc *loc) {
             Medium m = iter->second;
             mediaMutex.unlock();
             return m;
-        }  else {
+        } else {
             auto fiter = mediumFutures.find(name);
             if (fiter == mediumFutures.end())
                 ErrorExit(loc, "%s: medium is not defined.", name);
@@ -795,11 +795,10 @@ std::map<std::string, Medium> BasicScene::CreateMedia() {
                     mediaMap[m.first] = *med;
             }
         }
+        LOG_VERBOSE("Consume media futures finished");
+        mediumFutures.clear();
     }
-    mediumFutures.clear();
     mediaMutex.unlock();
-    LOG_VERBOSE("Consume media futures finished");
-
     return mediaMap;
 }
 
