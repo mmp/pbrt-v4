@@ -101,36 +101,29 @@ class SphericalMapping2D {
 
     PBRT_CPU_GPU
     Point2f Map(TextureEvalContext ctx, Vector2f *dstdx, Vector2f *dstdy) const {
-        Point2f st = Sphere(ctx.p);
-        // Compute texture coordinate differentials for sphere $(u,v)$ mapping
-        Float delta = .1f;
-        Point2f stDeltaX = Sphere(ctx.p + delta * ctx.dpdx);
-        *dstdx = (stDeltaX - st) / delta;
-        Point2f stDeltaY = Sphere(ctx.p + delta * ctx.dpdy);
-        *dstdy = (stDeltaY - st) / delta;
+        Point3f pt = textureFromRender(ctx.p);
+        // Compute $\partial s/\partial \pt{}$ and $\partial t/\partial \pt{}$ for
+        // spherical mapping
+        Float x2y2 = Sqr(pt.x) + Sqr(pt.y);
+        Float sqrtx2y2 = std::sqrt(x2y2);
+        Vector3f dsdp = Vector3f(-pt.y, pt.x, 0) / (2 * Pi * x2y2);
+        Vector3f dtdp =
+            1 / (Pi * (x2y2 + Sqr(pt.z))) *
+            Vector3f(pt.x * pt.z / sqrtx2y2, pt.y * pt.z / sqrtx2y2, -sqrtx2y2);
 
-        // Handle sphere mapping discontinuity for coordinate differentials
-        if ((*dstdx)[1] > .5)
-            (*dstdx)[1] = 1 - (*dstdx)[1];
-        else if ((*dstdx)[1] < -.5f)
-            (*dstdx)[1] = -((*dstdx)[1] + 1);
-        if ((*dstdy)[1] > .5)
-            (*dstdy)[1] = 1 - (*dstdy)[1];
-        else if ((*dstdy)[1] < -.5f)
-            (*dstdy)[1] = -((*dstdy)[1] + 1);
+        // Compute texture coordinate differentials for spherical mapping
+        Vector3f dpdx = textureFromRender(ctx.dpdx);
+        Vector3f dpdy = textureFromRender(ctx.dpdy);
+        *dstdx = Vector2f(Dot(dsdp, dpdx), Dot(dtdp, dpdx));
+        *dstdy = Vector2f(Dot(dsdp, dpdy), Dot(dtdp, dpdy));
 
-        return st;
+        // Return $(s,t)$ texture coordinates based on spherical mapping
+        Vector3f vec = Normalize(pt - Point3f(0, 0, 0));
+        Float theta = SphericalTheta(vec), phi = SphericalPhi(vec);
+        return Point2f(theta * InvPi, phi * Inv2Pi);
     }
 
   private:
-    // SphericalMapping2D Private Methods
-    PBRT_CPU_GPU
-    Point2f Sphere(Point3f p) const {
-        Vector3f vec = Normalize(textureFromRender(p) - Point3f(0, 0, 0));
-        Float theta = SphericalTheta(vec), phi = SphericalPhi(vec);
-        return {theta * InvPi, phi * Inv2Pi};
-    }
-
     // SphericalMapping2D Private Members
     Transform textureFromRender;
 };
@@ -145,33 +138,20 @@ class CylindricalMapping2D {
 
     PBRT_CPU_GPU
     Point2f Map(TextureEvalContext ctx, Vector2f *dstdx, Vector2f *dstdy) const {
-        Point2f st = Cylinder(ctx.p);
+        Point3f pt = textureFromRender(ctx.p);
         // Compute texture coordinate differentials for cylinder $(u,v)$ mapping
-        const Float delta = .01f;
-        Point2f stDeltaX = Cylinder(ctx.p + delta * ctx.dpdx);
-        *dstdx = (stDeltaX - st) / delta;
-        if ((*dstdx)[1] > .5)
-            (*dstdx)[1] = 1.f - (*dstdx)[1];
-        else if ((*dstdx)[1] < -.5f)
-            (*dstdx)[1] = -((*dstdx)[1] + 1);
-        Point2f stDeltaY = Cylinder(ctx.p + delta * ctx.dpdy);
-        *dstdy = (stDeltaY - st) / delta;
-        if ((*dstdy)[1] > .5)
-            (*dstdy)[1] = 1.f - (*dstdy)[1];
-        else if ((*dstdy)[1] < -.5f)
-            (*dstdy)[1] = -((*dstdy)[1] + 1);
+        Float x2y2 = Sqr(pt.x) + Sqr(pt.y);
+        Float sqrtx2y2 = std::sqrt(x2y2);
+        Vector3f dsdp = Vector3f(-pt.y, pt.x, 0) / (2 * Pi * x2y2),
+                 dtdp = Vector3f(0, 0, 1);
+        Vector3f dpdx = textureFromRender(ctx.dpdx), dpdy = textureFromRender(ctx.dpdy);
+        *dstdx = Vector2f(Dot(dsdp, dpdx), Dot(dtdp, dpdx));
+        *dstdy = Vector2f(Dot(dsdp, dpdy), Dot(dtdp, dpdy));
 
-        return st;
+        return Point2f((Pi + std::atan2(pt.y, pt.x)) * Inv2Pi, pt.z);
     }
 
   private:
-    // CylindricalMapping2D Private Methods
-    PBRT_CPU_GPU
-    Point2f Cylinder(Point3f p) const {
-        Vector3f vec = textureFromRender(p) - Point3f(0, 0, 0);
-        return Point2f((Pi + std::atan2(vec.y, vec.x)) * Inv2Pi, vec.z);
-    }
-
     // CylindricalMapping2D Private Members
     Transform textureFromRender;
 };
@@ -190,8 +170,8 @@ class PlanarMapping2D {
         // Initialize partial derivatives of planar mapping $(s,t)$ coordinates
         Vector3f dpdx = textureFromRender(ctx.dpdx);
         Vector3f dpdy = textureFromRender(ctx.dpdy);
-        *dstdx = Vector2f(Dot(dpdx, vs), Dot(dpdx, vt));
-        *dstdy = Vector2f(Dot(dpdy, vs), Dot(dpdy, vt));
+        *dstdx = Vector2f(Dot(vs, dpdx), Dot(vt, dpdx));
+        *dstdy = Vector2f(Dot(vs, dpdy), Dot(vt, dpdy));
 
         return Point2f(ds + Dot(vec, vs), dt + Dot(vec, vt));
     }
