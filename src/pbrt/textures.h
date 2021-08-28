@@ -187,9 +187,13 @@ class PlanarMapping2D {
     PBRT_CPU_GPU
     Point2f Map(TextureEvalContext ctx, Vector2f *dstdx, Vector2f *dstdy) const {
         Vector3f vec(textureFromRender(ctx.p));
-        *dstdx = Vector2f(Dot(ctx.dpdx, vs), Dot(ctx.dpdx, vt));
-        *dstdy = Vector2f(Dot(ctx.dpdy, vs), Dot(ctx.dpdy, vt));
-        return {ds + Dot(vec, vs), dt + Dot(vec, vt)};
+        // Initialize partial derivatives of planar mapping $(s,t)$ coordinates
+        Vector3f dpdx = textureFromRender(ctx.dpdx);
+        Vector3f dpdy = textureFromRender(ctx.dpdy);
+        *dstdx = Vector2f(Dot(dpdx, vs), Dot(dpdx, vt));
+        *dstdy = Vector2f(Dot(dpdy, vs), Dot(dpdy, vt));
+
+        return Point2f(ds + Dot(vec, vs), dt + Dot(vec, vt));
     }
 
     std::string ToString() const;
