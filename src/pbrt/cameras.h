@@ -160,7 +160,7 @@ class CameraBase {
             RotateFromTo(Normalize(Vector3f(pCamera)), Vector3f(0, 0, 1));
         Point3f pDownZ = DownZFromCamera(pCamera);
         Normal3f nDownZ = DownZFromCamera(CameraFromRender(n, time));
-        Float d = Dot(nDownZ, Vector3f(pDownZ));
+        Float d = nDownZ.z * pDownZ.z;
 
         // Find intersection points for approximated camera differential rays
         Ray xRay(Point3f(0, 0, 0) + minPosDifferentialX,
