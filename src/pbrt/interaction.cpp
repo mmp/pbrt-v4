@@ -124,8 +124,7 @@ RayDifferential SurfaceInteraction::SpawnRay(const RayDifferential &rayi,
             rd.ryOrigin = p() + dpdy;
 
             // Compute differential transmitted directions
-            // Find _eta_ and oriented surface normal for transmission
-            eta = 1 / eta;
+            // Find oriented surface normal for transmission
             if (Dot(wo, ns) < 0) {
                 ns = -ns;
                 dndx = -dndx;
@@ -133,11 +132,13 @@ RayDifferential SurfaceInteraction::SpawnRay(const RayDifferential &rayi,
             }
 
             // Compute partial derivatives of $\mu$
-            Float dwoDotNdx = Dot(dwodx, ns) + Dot(wo, dndx);
-            Float dwoDotNdy = Dot(dwody, ns) + Dot(wo, dndy);
-            Float mu = eta * Dot(wo, ns) - AbsDot(wi, ns);
-            Float dmudx = (eta - (eta * eta * Dot(wo, ns)) / AbsDot(wi, ns)) * dwoDotNdx;
-            Float dmudy = (eta - (eta * eta * Dot(wo, ns)) / AbsDot(wi, ns)) * dwoDotNdy;
+            Float dwoDotn_dx = Dot(dwodx, ns) + Dot(wo, dndx);
+            Float dwoDotn_dy = Dot(dwody, ns) + Dot(wo, dndy);
+            Float mu = Dot(wo, ns) / eta - AbsDot(wi, ns);
+            Float dmudx =
+                dwoDotn_dx * (1 / eta + (1 / Sqr(eta) * Dot(wo, ns)) / Dot(wi, ns));
+            Float dmudy =
+                dwoDotn_dy * (1 / eta + (1 / Sqr(eta) * Dot(wo, ns)) / Dot(wi, ns));
 
             rd.rxDirection = wi - eta * dwodx + Vector3f(mu * dndx + dmudx * ns);
             rd.ryDirection = wi - eta * dwody + Vector3f(mu * dndy + dmudy * ns);
