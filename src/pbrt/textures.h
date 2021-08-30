@@ -68,11 +68,11 @@ struct TextureEvalContext {
     int faceIndex = 0;
 };
 
-// UVMapping2D Definition
-class UVMapping2D {
+// UVMapping Definition
+class UVMapping {
   public:
-    // UVMapping2D Public Methods
-    UVMapping2D(Float su = 1, Float sv = 1, Float du = 0, Float dv = 0)
+    // UVMapping Public Methods
+    UVMapping(Float su = 1, Float sv = 1, Float du = 0, Float dv = 0)
         : su(su), sv(sv), du(du), dv(dv) {}
 
     std::string ToString() const;
@@ -83,18 +83,18 @@ class UVMapping2D {
         *dstdx = Vector2f(su * ctx.dudx, sv * ctx.dvdx);
         *dstdy = Vector2f(su * ctx.dudy, sv * ctx.dvdy);
 
-        return {su * ctx.uv[0] + du, sv * ctx.uv[1] + dv};
+        return Point2f(su * ctx.uv[0] + du, sv * ctx.uv[1] + dv);
     }
 
   private:
     Float su, sv, du, dv;
 };
 
-// SphericalMapping2D Definition
-class SphericalMapping2D {
+// SphericalMapping Definition
+class SphericalMapping {
   public:
-    // SphericalMapping2D Public Methods
-    SphericalMapping2D(const Transform &textureFromRender)
+    // SphericalMapping Public Methods
+    SphericalMapping(const Transform &textureFromRender)
         : textureFromRender(textureFromRender) {}
 
     std::string ToString() const;
@@ -124,15 +124,15 @@ class SphericalMapping2D {
     }
 
   private:
-    // SphericalMapping2D Private Members
+    // SphericalMapping Private Members
     Transform textureFromRender;
 };
 
-// CylindricalMapping2D Definition
-class CylindricalMapping2D {
+// CylindricalMapping Definition
+class CylindricalMapping {
   public:
-    // CylindricalMapping2D Public Methods
-    CylindricalMapping2D(const Transform &textureFromRender)
+    // CylindricalMapping Public Methods
+    CylindricalMapping(const Transform &textureFromRender)
         : textureFromRender(textureFromRender) {}
     std::string ToString() const;
 
@@ -152,16 +152,16 @@ class CylindricalMapping2D {
     }
 
   private:
-    // CylindricalMapping2D Private Members
+    // CylindricalMapping Private Members
     Transform textureFromRender;
 };
 
-// PlanarMapping2D Definition
-class PlanarMapping2D {
+// PlanarMapping Definition
+class PlanarMapping {
   public:
-    // PlanarMapping2D Public Methods
-    PlanarMapping2D(const Transform &textureFromRender, Vector3f vs, Vector3f vt,
-                    Float ds, Float dt)
+    // PlanarMapping Public Methods
+    PlanarMapping(const Transform &textureFromRender, Vector3f vs, Vector3f vt, Float ds,
+                  Float dt)
         : textureFromRender(textureFromRender), vs(vs), vt(vt), ds(ds), dt(dt) {}
 
     PBRT_CPU_GPU
@@ -179,21 +179,21 @@ class PlanarMapping2D {
     std::string ToString() const;
 
   private:
+    // PlanarMapping Private Members
     Transform textureFromRender;
     Vector3f vs, vt;
     Float ds, dt;
 };
 
 // TextureMapping2D Definition
-class TextureMapping2D : public TaggedPointer<UVMapping2D, SphericalMapping2D,
-                                              CylindricalMapping2D, PlanarMapping2D> {
+class TextureMapping2D : public TaggedPointer<UVMapping, SphericalMapping,
+                                              CylindricalMapping, PlanarMapping> {
   public:
     // TextureMapping2D Interface
     using TaggedPointer::TaggedPointer;
     PBRT_CPU_GPU
-    TextureMapping2D(TaggedPointer<UVMapping2D, SphericalMapping2D, CylindricalMapping2D,
-                                   PlanarMapping2D>
-                         tp)
+    TextureMapping2D(
+        TaggedPointer<UVMapping, SphericalMapping, CylindricalMapping, PlanarMapping> tp)
         : TaggedPointer(tp) {}
 
     static TextureMapping2D Create(const ParameterDictionary &parameters,
@@ -211,11 +211,11 @@ inline Point2f TextureMapping2D::Map(TextureEvalContext ctx, Vector2f *dstdx,
     return Dispatch(map);
 }
 
-// TransformMapping3D Definition
-class TransformMapping3D {
+// PointTransformMapping Definition
+class PointTransformMapping {
   public:
-    // TransformMapping3D Public Methods
-    TransformMapping3D(const Transform &textureFromRender)
+    // PointTransformMapping Public Methods
+    PointTransformMapping(const Transform &textureFromRender)
         : textureFromRender(textureFromRender) {}
 
     std::string ToString() const;
@@ -232,12 +232,12 @@ class TransformMapping3D {
 };
 
 // TextureMapping3D Definition
-class TextureMapping3D : public TaggedPointer<TransformMapping3D> {
+class TextureMapping3D : public TaggedPointer<PointTransformMapping> {
   public:
     // TextureMapping3D Interface
     using TaggedPointer::TaggedPointer;
     PBRT_CPU_GPU
-    TextureMapping3D(TaggedPointer<TransformMapping3D> tp) : TaggedPointer(tp) {}
+    TextureMapping3D(TaggedPointer<PointTransformMapping> tp) : TaggedPointer(tp) {}
 
     static TextureMapping3D Create(const ParameterDictionary &parameters,
                                    const Transform &renderFromTexture, const FileLoc *loc,

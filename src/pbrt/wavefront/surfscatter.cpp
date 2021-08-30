@@ -75,20 +75,20 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
             // Compute $\transpose{\XFORM{A}} \XFORM{A}$ and its determinant
             Float ata00 = Dot(dpdu, dpdu), ata01 = Dot(dpdu, dpdv);
             Float ata11 = Dot(dpdv, dpdv);
-            Float invDet = 1 / (DifferenceOfProducts(ata00, ata11, ata01, ata01));
+            Float invDet = 1 / DifferenceOfProducts(ata00, ata11, ata01, ata01);
             invDet = IsFinite(invDet) ? invDet : 0.f;
 
             // Compute $\transpose{\XFORM{A}} \VEC{b}$ for $x$ and $y$
             Float atb0x = Dot(dpdu, dpdx), atb1x = Dot(dpdv, dpdx);
             Float atb0y = Dot(dpdu, dpdy), atb1y = Dot(dpdv, dpdy);
 
-            // Compute $u$ and $v$ partial derivatives with respect to $x$ and $y$
+            // Compute $u$ and $v$ derivatives with respect to $x$ and $y$
             dudx = DifferenceOfProducts(ata11, atb0x, ata01, atb1x) * invDet;
             dvdx = DifferenceOfProducts(ata00, atb1x, ata01, atb0x) * invDet;
             dudy = DifferenceOfProducts(ata11, atb0y, ata01, atb1y) * invDet;
             dvdy = DifferenceOfProducts(ata00, atb1y, ata01, atb0y) * invDet;
 
-            // Clamp partial derivatives of $u$ and $v$ to reasonable values
+            // Clamp derivatives of $u$ and $v$ to reasonable values
             dudx = IsFinite(dudx) ? Clamp(dudx, -1e8f, 1e8f) : 0.f;
             dvdx = IsFinite(dvdx) ? Clamp(dvdx, -1e8f, 1e8f) : 0.f;
             dudy = IsFinite(dudy) ? Clamp(dudy, -1e8f, 1e8f) : 0.f;

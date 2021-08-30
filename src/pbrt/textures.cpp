@@ -41,27 +41,27 @@ TextureMapping2D TextureMapping2D::Create(const ParameterDictionary &parameters,
         Float sv = parameters.GetOneFloat("vscale", 1.);
         Float du = parameters.GetOneFloat("udelta", 0.);
         Float dv = parameters.GetOneFloat("vdelta", 0.);
-        return alloc.new_object<UVMapping2D>(su, sv, du, dv);
+        return alloc.new_object<UVMapping>(su, sv, du, dv);
     } else if (type == "spherical")
-        return alloc.new_object<SphericalMapping2D>(Inverse(renderFromTexture));
+        return alloc.new_object<SphericalMapping>(Inverse(renderFromTexture));
     else if (type == "cylindrical")
-        return alloc.new_object<CylindricalMapping2D>(Inverse(renderFromTexture));
+        return alloc.new_object<CylindricalMapping>(Inverse(renderFromTexture));
     else if (type == "planar")
-        return alloc.new_object<PlanarMapping2D>(
+        return alloc.new_object<PlanarMapping>(
             Inverse(renderFromTexture),
             parameters.GetOneVector3f("v1", Vector3f(1, 0, 0)),
             parameters.GetOneVector3f("v2", Vector3f(0, 1, 0)),
             parameters.GetOneFloat("udelta", 0.f), parameters.GetOneFloat("vdelta", 0.f));
     else {
         Error(loc, "2D texture mapping \"%s\" unknown", type);
-        return alloc.new_object<UVMapping2D>();
+        return alloc.new_object<UVMapping>();
     }
 }
 
 TextureMapping3D TextureMapping3D::Create(const ParameterDictionary &parameters,
                                           const Transform &renderFromTexture,
                                           const FileLoc *loc, Allocator alloc) {
-    return alloc.new_object<TransformMapping3D>(Inverse(renderFromTexture));
+    return alloc.new_object<PointTransformMapping>(Inverse(renderFromTexture));
 }
 
 std::string FloatTexture::ToString() const {
@@ -80,26 +80,25 @@ std::string SpectrumTexture::ToString() const {
     return DispatchCPU(toStr);
 }
 
-std::string UVMapping2D::ToString() const {
-    return StringPrintf("[ UVMapping2D su: %f sv: %f du: %f dv: %f ]", su, sv, du, dv);
+std::string UVMapping::ToString() const {
+    return StringPrintf("[ UVMapping su: %f sv: %f du: %f dv: %f ]", su, sv, du, dv);
 }
 
-std::string SphericalMapping2D::ToString() const {
-    return StringPrintf("[ SphericalMapping2D textureFromRender: %s ]",
+std::string SphericalMapping::ToString() const {
+    return StringPrintf("[ SphericalMapping textureFromRender: %s ]", textureFromRender);
+}
+
+std::string CylindricalMapping::ToString() const {
+    return StringPrintf("[ CylindricalMapping textureFromRender: %s ]",
                         textureFromRender);
 }
 
-std::string CylindricalMapping2D::ToString() const {
-    return StringPrintf("[ CylindricalMapping2D textureFromRender: %s ]",
-                        textureFromRender);
+std::string PlanarMapping::ToString() const {
+    return StringPrintf("[ PlanarMapping vs: %s vt: %s ds: %f dt: %f]", vs, vt, ds, dt);
 }
 
-std::string PlanarMapping2D::ToString() const {
-    return StringPrintf("[ PlanarMapping2D vs: %s vt: %s ds: %f dt: %f]", vs, vt, ds, dt);
-}
-
-std::string TransformMapping3D::ToString() const {
-    return StringPrintf("[ TransformMapping3D textureFromRender: %s ]",
+std::string PointTransformMapping::ToString() const {
+    return StringPrintf("[ PointTransformMapping textureFromRender: %s ]",
                         textureFromRender);
 }
 

@@ -63,20 +63,20 @@ void SurfaceInteraction::ComputeDifferentials(const RayDifferential &ray, Camera
     // Compute $\transpose{\XFORM{A}} \XFORM{A}$ and its determinant
     Float ata00 = Dot(dpdu, dpdu), ata01 = Dot(dpdu, dpdv);
     Float ata11 = Dot(dpdv, dpdv);
-    Float invDet = 1 / (DifferenceOfProducts(ata00, ata11, ata01, ata01));
+    Float invDet = 1 / DifferenceOfProducts(ata00, ata11, ata01, ata01);
     invDet = IsFinite(invDet) ? invDet : 0.f;
 
     // Compute $\transpose{\XFORM{A}} \VEC{b}$ for $x$ and $y$
     Float atb0x = Dot(dpdu, dpdx), atb1x = Dot(dpdv, dpdx);
     Float atb0y = Dot(dpdu, dpdy), atb1y = Dot(dpdv, dpdy);
 
-    // Compute $u$ and $v$ partial derivatives with respect to $x$ and $y$
+    // Compute $u$ and $v$ derivatives with respect to $x$ and $y$
     dudx = DifferenceOfProducts(ata11, atb0x, ata01, atb1x) * invDet;
     dvdx = DifferenceOfProducts(ata00, atb1x, ata01, atb0x) * invDet;
     dudy = DifferenceOfProducts(ata11, atb0y, ata01, atb1y) * invDet;
     dvdy = DifferenceOfProducts(ata00, atb1y, ata01, atb0y) * invDet;
 
-    // Clamp partial derivatives of $u$ and $v$ to reasonable values
+    // Clamp derivatives of $u$ and $v$ to reasonable values
     dudx = IsFinite(dudx) ? Clamp(dudx, -1e8f, 1e8f) : 0.f;
     dvdx = IsFinite(dvdx) ? Clamp(dvdx, -1e8f, 1e8f) : 0.f;
     dudy = IsFinite(dudy) ? Clamp(dudy, -1e8f, 1e8f) : 0.f;
@@ -98,7 +98,7 @@ RayDifferential SurfaceInteraction::SpawnRay(const RayDifferential &rayi,
     if (rayi.hasDifferentials) {
         // Compute ray differentials for specular reflection or transmission
         // Compute common factors for specular ray differentials
-        Normal3f ns = shading.n;
+        Normal3f n = shading.n;
         Normal3f dndx = shading.dndu * dudx + shading.dndv * dvdx;
         Normal3f dndy = shading.dndu * dudy + shading.dndv * dvdy;
         Vector3f dwodx = -rayi.rxDirection - wo, dwody = -rayi.ryDirection - wo;
@@ -110,12 +110,12 @@ RayDifferential SurfaceInteraction::SpawnRay(const RayDifferential &rayi,
             rd.ryOrigin = p() + dpdy;
 
             // Compute differential reflected directions
-            Float dwoDotn_dx = Dot(dwodx, ns) + Dot(wo, dndx);
-            Float dwoDotn_dy = Dot(dwody, ns) + Dot(wo, dndy);
+            Float dwoDotn_dx = Dot(dwodx, n) + Dot(wo, dndx);
+            Float dwoDotn_dy = Dot(dwody, n) + Dot(wo, dndy);
             rd.rxDirection =
-                wi - dwodx + 2 * Vector3f(Dot(wo, ns) * dndx + dwoDotn_dx * ns);
+                wi - dwodx + 2 * Vector3f(Dot(wo, n) * dndx + dwoDotn_dx * n);
             rd.ryDirection =
-                wi - dwody + 2 * Vector3f(Dot(wo, ns) * dndy + dwoDotn_dy * ns);
+                wi - dwody + 2 * Vector3f(Dot(wo, n) * dndy + dwoDotn_dy * n);
 
         } else if (flags == BxDFFlags::SpecularTransmission) {
             // Initialize origins of specular differential rays
@@ -125,23 +125,21 @@ RayDifferential SurfaceInteraction::SpawnRay(const RayDifferential &rayi,
 
             // Compute differential transmitted directions
             // Find oriented surface normal for transmission
-            if (Dot(wo, ns) < 0) {
-                ns = -ns;
+            if (Dot(wo, n) < 0) {
+                n = -n;
                 dndx = -dndx;
                 dndy = -dndy;
             }
 
             // Compute partial derivatives of $\mu$
-            Float dwoDotn_dx = Dot(dwodx, ns) + Dot(wo, dndx);
-            Float dwoDotn_dy = Dot(dwody, ns) + Dot(wo, dndy);
-            Float mu = Dot(wo, ns) / eta - AbsDot(wi, ns);
-            Float dmudx =
-                dwoDotn_dx * (1 / eta + (1 / Sqr(eta) * Dot(wo, ns)) / Dot(wi, ns));
-            Float dmudy =
-                dwoDotn_dy * (1 / eta + (1 / Sqr(eta) * Dot(wo, ns)) / Dot(wi, ns));
+            Float dwoDotn_dx = Dot(dwodx, n) + Dot(wo, dndx);
+            Float dwoDotn_dy = Dot(dwody, n) + Dot(wo, dndy);
+            Float mu = Dot(wo, n) / eta - AbsDot(wi, n);
+            Float dmudx = dwoDotn_dx * (1 / eta + 1 / Sqr(eta) * Dot(wo, n) / Dot(wi, n));
+            Float dmudy = dwoDotn_dy * (1 / eta + 1 / Sqr(eta) * Dot(wo, n) / Dot(wi, n));
 
-            rd.rxDirection = wi - eta * dwodx + Vector3f(mu * dndx + dmudx * ns);
-            rd.ryDirection = wi - eta * dwody + Vector3f(mu * dndy + dmudy * ns);
+            rd.rxDirection = wi - eta * dwodx + Vector3f(mu * dndx + dmudx * n);
+            rd.ryDirection = wi - eta * dwody + Vector3f(mu * dndy + dmudy * n);
         }
     }
     // Squash potentially troublesome differentials
