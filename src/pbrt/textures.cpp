@@ -32,6 +32,15 @@ std::string TextureEvalContext::ToString() const {
         p, dpdx, dpdy, n, uv, dudx, dudy, dvdx, dvdy, faceIndex);
 }
 
+std::string TexCoord2D::ToString() const {
+    return StringPrintf("[ TexCoord2D st: %s dsdx: %f dsdy: %f dtdx: %f dtdy: %f ]", st,
+                        dsdx, dsdy, dtdx, dtdy);
+}
+
+std::string TexCoord3D::ToString() const {
+    return StringPrintf("[ TexCoord3D p: %s dpdx: %s dpdy: %s ]", p, dpdx, dpdy);
+}
+
 TextureMapping2D TextureMapping2D::Create(const ParameterDictionary &parameters,
                                           const Transform &renderFromTexture,
                                           const FileLoc *loc, Allocator alloc) {
@@ -183,24 +192,22 @@ Float Checkerboard(TextureEvalContext ctx, TextureMapping2D map2D,
     if (map2D) {
         // Return weights for 2D checkerboard texture
         CHECK(!map3D);
-        Vector2f dstdx, dstdy;
-        Point2f st = map2D.Map(ctx, &dstdx, &dstdy);
-        Float ds = std::max(std::abs(dstdx[0]), std::abs(dstdy[0]));
-        Float dt = std::max(std::abs(dstdx[1]), std::abs(dstdy[1]));
+        TexCoord2D c = map2D.Map(ctx);
+        Float ds = std::max(std::abs(c.dsdx), std::abs(c.dsdy));
+        Float dt = std::max(std::abs(c.dtdx), std::abs(c.dtdy));
         // Integrate product of 2D checkerboard function and triangle filter
         ds *= 1.5f;
         dt *= 1.5f;
-        return 0.5f - 0.5f * bf(st[0], ds) * bf(st[1], dt);
+        return 0.5f - 0.5f * bf(c.st[0], ds) * bf(c.st[1], dt);
 
     } else {
         // Return weights for 3D checkerboard texture
         CHECK(map3D);
-        Vector3f dpdx, dpdy;
-        Point3f p = map3D.Map(ctx, &dpdx, &dpdy);
-        Float dx = 1.5f * std::max(std::abs(dpdx.x), std::abs(dpdy.x));
-        Float dy = 1.5f * std::max(std::abs(dpdx.y), std::abs(dpdy.y));
-        Float dz = 1.5f * std::max(std::abs(dpdx.z), std::abs(dpdy.z));
-        return 0.5f - 0.5f * bf(p.x, dx) * bf(p.y, dy) * bf(p.z, dz);
+        TexCoord3D c = map3D.Map(ctx);
+        Float dx = 1.5f * std::max(std::abs(c.dpdx.x), std::abs(c.dpdy.x));
+        Float dy = 1.5f * std::max(std::abs(c.dpdx.y), std::abs(c.dpdy.y));
+        Float dz = 1.5f * std::max(std::abs(c.dpdx.z), std::abs(c.dpdy.z));
+        return 0.5f - 0.5f * bf(c.p.x, dx) * bf(c.p.y, dy) * bf(c.p.z, dz);
     }
 }
 
@@ -351,12 +358,11 @@ SampledSpectrum SpectrumImageTexture::Evaluate(TextureEvalContext ctx,
     return SampledSpectrum(0);
 #else
     // Apply texture mapping and flip $t$ coordinate for image texture lookup
-    Vector2f dstdx, dstdy;
-    Point2f st = mapping.Map(ctx, &dstdx, &dstdy);
-    st[1] = 1 - st[1];
+    TexCoord2D c = mapping.Map(ctx);
+    c.st[1] = 1 - c.st[1];
 
     // Lookup filtered RGB value in _MIPMap_
-    RGB rgb = scale * mipmap->Filter<RGB>(st, dstdx, dstdy);
+    RGB rgb = scale * mipmap->Filter<RGB>(c.st, {c.dsdx, c.dtdx}, {c.dsdy, c.dtdy});
     rgb = ClampZero(invert ? (RGB(1, 1, 1) - rgb) : rgb);
 
     // Return _SampledSpectrum_ for RGB image texture value
@@ -468,21 +474,21 @@ SpectrumImageTexture *SpectrumImageTexture::Create(
 // MarbleTexture Method Definitions
 SampledSpectrum MarbleTexture::Evaluate(TextureEvalContext ctx,
                                         SampledWavelengths lambda) const {
-    Vector3f dpdx, dpdy;
-    Point3f p = mapping.Map(ctx, &dpdx, &dpdy);
-    p *= scale;
-    Float marble = p.y + variation * FBm(p, scale * dpdx, scale * dpdy, omega, octaves);
+    TexCoord3D c = mapping.Map(ctx);
+    c.p *= scale;
+    Float marble =
+        c.p.y + variation * FBm(c.p, scale * c.dpdx, scale * c.dpdy, omega, octaves);
     Float t = .5f + .5f * std::sin(marble);
     // Evaluate marble spline at $t$ to compute color _rgb_
-    const RGB c[] = {
+    const RGB colors[] = {
         {.58f, .58f, .6f}, {.58f, .58f, .6f}, {.58f, .58f, .6f},
         {.5f, .5f, .5f},   {.6f, .59f, .58f}, {.58f, .58f, .6f},
         {.58f, .58f, .6f}, {.2f, .2f, .33f},  {.58f, .58f, .6f},
     };
-    int nSeg = PBRT_ARRAYSIZE(c) - 3;
+    int nSeg = PBRT_ARRAYSIZE(colors) - 3;
     int first = std::min<int>(pstd::floor(t * nSeg), nSeg - 1);
     t = t * nSeg - first;
-    RGB rgb = 1.5f * EvaluateCubicBezier(pstd::span(c + first, 4), t);
+    RGB rgb = 1.5f * EvaluateCubicBezier(pstd::span(colors + first, 4), t);
 
 #ifdef PBRT_IS_GPU_CODE
     return RGBAlbedoSpectrum(*RGBColorSpace_sRGB, rgb).Sample(lambda);

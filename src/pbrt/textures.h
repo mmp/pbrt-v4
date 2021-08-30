@@ -68,6 +68,20 @@ struct TextureEvalContext {
     int faceIndex = 0;
 };
 
+// TexCoord2D Definition
+struct TexCoord2D {
+    Point2f st;
+    Float dsdx, dsdy, dtdx, dtdy;
+    std::string ToString() const;
+};
+
+// TexCoord3D Definition
+struct TexCoord3D {
+    Point3f p;
+    Vector3f dpdx, dpdy;
+    std::string ToString() const;
+};
+
 // UVMapping Definition
 class UVMapping {
   public:
@@ -78,12 +92,13 @@ class UVMapping {
     std::string ToString() const;
 
     PBRT_CPU_GPU
-    Point2f Map(TextureEvalContext ctx, Vector2f *dstdx, Vector2f *dstdy) const {
+    TexCoord2D Map(TextureEvalContext ctx) const {
         // Compute texture differentials for 2D $(u,v)$ mapping
-        *dstdx = Vector2f(su * ctx.dudx, sv * ctx.dvdx);
-        *dstdy = Vector2f(su * ctx.dudy, sv * ctx.dvdy);
+        Float dsdx = su * ctx.dudx, dsdy = su * ctx.dudy;
+        Float dtdx = sv * ctx.dvdx, dtdy = sv * ctx.dvdy;
 
-        return Point2f(su * ctx.uv[0] + du, sv * ctx.uv[1] + dv);
+        Point2f st(su * ctx.uv[0] + du, sv * ctx.uv[1] + dv);
+        return TexCoord2D{st, dsdx, dsdy, dtdx, dtdy};
     }
 
   private:
@@ -100,7 +115,7 @@ class SphericalMapping {
     std::string ToString() const;
 
     PBRT_CPU_GPU
-    Point2f Map(TextureEvalContext ctx, Vector2f *dstdx, Vector2f *dstdy) const {
+    TexCoord2D Map(TextureEvalContext ctx) const {
         Point3f pt = textureFromRender(ctx.p);
         // Compute $\partial s/\partial \pt{}$ and $\partial t/\partial \pt{}$ for
         // spherical mapping
@@ -114,13 +129,13 @@ class SphericalMapping {
         // Compute texture coordinate differentials for spherical mapping
         Vector3f dpdx = textureFromRender(ctx.dpdx);
         Vector3f dpdy = textureFromRender(ctx.dpdy);
-        *dstdx = Vector2f(Dot(dsdp, dpdx), Dot(dtdp, dpdx));
-        *dstdy = Vector2f(Dot(dsdp, dpdy), Dot(dtdp, dpdy));
+        Float dsdx = Dot(dsdp, dpdx), dsdy = Dot(dsdp, dpdy);
+        Float dtdx = Dot(dtdp, dpdx), dtdy = Dot(dtdp, dpdy);
 
-        // Return $(s,t)$ texture coordinates based on spherical mapping
+        // Return $(s,t)$ texture coordinates and differentials based on spherical mapping
         Vector3f vec = Normalize(pt - Point3f(0, 0, 0));
-        Float theta = SphericalTheta(vec), phi = SphericalPhi(vec);
-        return Point2f(theta * InvPi, phi * Inv2Pi);
+        Point2f st(SphericalTheta(vec) * InvPi, SphericalPhi(vec) * Inv2Pi);
+        return TexCoord2D{st, dsdx, dsdy, dtdx, dtdy};
     }
 
   private:
@@ -137,7 +152,7 @@ class CylindricalMapping {
     std::string ToString() const;
 
     PBRT_CPU_GPU
-    Point2f Map(TextureEvalContext ctx, Vector2f *dstdx, Vector2f *dstdy) const {
+    TexCoord2D Map(TextureEvalContext ctx) const {
         Point3f pt = textureFromRender(ctx.p);
         // Compute texture coordinate differentials for cylinder $(u,v)$ mapping
         Float x2y2 = Sqr(pt.x) + Sqr(pt.y);
@@ -145,10 +160,11 @@ class CylindricalMapping {
         Vector3f dsdp = Vector3f(-pt.y, pt.x, 0) / (2 * Pi * x2y2),
                  dtdp = Vector3f(0, 0, 1);
         Vector3f dpdx = textureFromRender(ctx.dpdx), dpdy = textureFromRender(ctx.dpdy);
-        *dstdx = Vector2f(Dot(dsdp, dpdx), Dot(dtdp, dpdx));
-        *dstdy = Vector2f(Dot(dsdp, dpdy), Dot(dtdp, dpdy));
+        Float dsdx = Dot(dsdp, dpdx), dsdy = Dot(dsdp, dpdy);
+        Float dtdx = Dot(dtdp, dpdx), dtdy = Dot(dtdp, dpdy);
 
-        return Point2f((Pi + std::atan2(pt.y, pt.x)) * Inv2Pi, pt.z);
+        Point2f st((Pi + std::atan2(pt.y, pt.x)) * Inv2Pi, pt.z);
+        return TexCoord2D{st, dsdx, dsdy, dtdx, dtdy};
     }
 
   private:
@@ -165,15 +181,16 @@ class PlanarMapping {
         : textureFromRender(textureFromRender), vs(vs), vt(vt), ds(ds), dt(dt) {}
 
     PBRT_CPU_GPU
-    Point2f Map(TextureEvalContext ctx, Vector2f *dstdx, Vector2f *dstdy) const {
+    TexCoord2D Map(TextureEvalContext ctx) const {
         Vector3f vec(textureFromRender(ctx.p));
         // Initialize partial derivatives of planar mapping $(s,t)$ coordinates
         Vector3f dpdx = textureFromRender(ctx.dpdx);
         Vector3f dpdy = textureFromRender(ctx.dpdy);
-        *dstdx = Vector2f(Dot(vs, dpdx), Dot(vt, dpdx));
-        *dstdy = Vector2f(Dot(vs, dpdy), Dot(vt, dpdy));
+        Float dsdx = Dot(vs, dpdx), dsdy = Dot(vs, dpdy);
+        Float dtdx = Dot(vt, dpdx), dtdy = Dot(vt, dpdy);
 
-        return Point2f(ds + Dot(vec, vs), dt + Dot(vec, vt));
+        Point2f st(ds + Dot(vec, vs), dt + Dot(vec, vt));
+        return TexCoord2D{st, dsdx, dsdy, dtdx, dtdy};
     }
 
     std::string ToString() const;
@@ -200,14 +217,12 @@ class TextureMapping2D : public TaggedPointer<UVMapping, SphericalMapping,
                                    const Transform &renderFromTexture, const FileLoc *loc,
                                    Allocator alloc);
 
-    PBRT_CPU_GPU inline Point2f Map(TextureEvalContext ctx, Vector2f *dstdx,
-                                    Vector2f *dstdy) const;
+    PBRT_CPU_GPU inline TexCoord2D Map(TextureEvalContext ctx) const;
 };
 
 // TextureMapping2D Inline Functions
-inline Point2f TextureMapping2D::Map(TextureEvalContext ctx, Vector2f *dstdx,
-                                     Vector2f *dstdy) const {
-    auto map = [&](auto ptr) { return ptr->Map(ctx, dstdx, dstdy); };
+inline TexCoord2D TextureMapping2D::Map(TextureEvalContext ctx) const {
+    auto map = [&](auto ptr) { return ptr->Map(ctx); };
     return Dispatch(map);
 }
 
@@ -221,10 +236,9 @@ class PointTransformMapping {
     std::string ToString() const;
 
     PBRT_CPU_GPU
-    Point3f Map(TextureEvalContext ctx, Vector3f *dpdx, Vector3f *dpdy) const {
-        *dpdx = textureFromRender(ctx.dpdx);
-        *dpdy = textureFromRender(ctx.dpdy);
-        return textureFromRender(ctx.p);
+    TexCoord3D Map(TextureEvalContext ctx) const {
+        return TexCoord3D{textureFromRender(ctx.p), textureFromRender(ctx.dpdx),
+                          textureFromRender(ctx.dpdy)};
     }
 
   private:
@@ -244,12 +258,11 @@ class TextureMapping3D : public TaggedPointer<PointTransformMapping> {
                                    Allocator alloc);
 
     PBRT_CPU_GPU
-    Point3f Map(TextureEvalContext ctx, Vector3f *dpdx, Vector3f *dpdy) const;
+    TexCoord3D Map(TextureEvalContext ctx) const;
 };
 
-inline Point3f TextureMapping3D::Map(TextureEvalContext ctx, Vector3f *dpdx,
-                                     Vector3f *dpdy) const {
-    auto map = [&](auto ptr) { return ptr->Map(ctx, dpdx, dpdy); };
+inline TexCoord3D TextureMapping3D::Map(TextureEvalContext ctx) const {
+    auto map = [&](auto ptr) { return ptr->Map(ctx); };
     return Dispatch(map);
 }
 
@@ -298,10 +311,9 @@ class FloatBilerpTexture {
 
     PBRT_CPU_GPU
     Float Evaluate(TextureEvalContext ctx) const {
-        Vector2f dstdx, dstdy;
-        Point2f st = mapping.Map(ctx, &dstdx, &dstdy);
-        return (1 - st[0]) * (1 - st[1]) * v00 + st[0] * (1 - st[1]) * v10 +
-               (1 - st[0]) * st[1] * v01 + st[0] * st[1] * v11;
+        TexCoord2D c = mapping.Map(ctx);
+        return (1 - c.st[0]) * (1 - c.st[1]) * v00 + c.st[0] * (1 - c.st[1]) * v10 +
+               (1 - c.st[0]) * c.st[1] * v01 + c.st[0] * c.st[1] * v11;
     }
 
     static FloatBilerpTexture *Create(const Transform &renderFromTexture,
@@ -325,10 +337,9 @@ class SpectrumBilerpTexture {
 
     PBRT_CPU_GPU
     SampledSpectrum Evaluate(TextureEvalContext ctx, SampledWavelengths lambda) const {
-        Vector2f dstdx, dstdy;
-        Point2f st = mapping.Map(ctx, &dstdx, &dstdy);
-        return Bilerp({st[0], st[1]}, {v00.Sample(lambda), v10.Sample(lambda),
-                                       v01.Sample(lambda), v11.Sample(lambda)});
+        TexCoord2D c = mapping.Map(ctx);
+        return Bilerp({c.st[0], c.st[1]}, {v00.Sample(lambda), v10.Sample(lambda),
+                                           v01.Sample(lambda), v11.Sample(lambda)});
     }
 
     static SpectrumBilerpTexture *Create(const Transform &renderFromTexture,
@@ -420,9 +431,8 @@ class FloatDotsTexture {
 
     PBRT_CPU_GPU
     Float Evaluate(TextureEvalContext ctx) const {
-        Vector2f dstdx, dstdy;
-        Point2f st = mapping.Map(ctx, &dstdx, &dstdy);
-        return InsidePolkaDot(st) ? insideDot.Evaluate(ctx) : outsideDot.Evaluate(ctx);
+        TexCoord2D c = mapping.Map(ctx);
+        return InsidePolkaDot(c.st) ? insideDot.Evaluate(ctx) : outsideDot.Evaluate(ctx);
     }
 
     static FloatDotsTexture *Create(const Transform &renderFromTexture,
@@ -447,10 +457,9 @@ class SpectrumDotsTexture {
 
     PBRT_CPU_GPU
     SampledSpectrum Evaluate(TextureEvalContext ctx, SampledWavelengths lambda) const {
-        Vector2f dstdx, dstdy;
-        Point2f st = mapping.Map(ctx, &dstdx, &dstdy);
-        return InsidePolkaDot(st) ? insideDot.Evaluate(ctx, lambda)
-                                  : outsideDot.Evaluate(ctx, lambda);
+        TexCoord2D c = mapping.Map(ctx);
+        return InsidePolkaDot(c.st) ? insideDot.Evaluate(ctx, lambda)
+                                    : outsideDot.Evaluate(ctx, lambda);
     }
 
     static SpectrumDotsTexture *Create(const Transform &renderFromTexture,
@@ -475,9 +484,8 @@ class FBmTexture {
 
     PBRT_CPU_GPU
     Float Evaluate(TextureEvalContext ctx) const {
-        Vector3f dpdx, dpdy;
-        Point3f p = mapping.Map(ctx, &dpdx, &dpdy);
-        return FBm(p, dpdx, dpdy, omega, octaves);
+        TexCoord3D c = mapping.Map(ctx);
+        return FBm(c.p, c.dpdx, c.dpdy, omega, octaves);
     }
 
     static FBmTexture *Create(const Transform &renderFromTexture,
@@ -573,11 +581,11 @@ class FloatImageTexture : public ImageTextureBase {
         return 0;
 #else
         Vector2f dstdx, dstdy;
-        Point2f st = mapping.Map(ctx, &dstdx, &dstdy);
+        TexCoord2D c = mapping.Map(ctx);
         // Texture coordinates are (0,0) in the lower left corner, but
         // image coordinates are (0,0) in the upper left.
-        st[1] = 1 - st[1];
-        Float v = scale * mipmap->Filter<Float>(st, dstdx, dstdy);
+        c.st[1] = 1 - c.st[1];
+        Float v = scale * mipmap->Filter<Float>(c.st, {c.dsdx, c.dtdx}, {c.dsdy, c.dtdy});
         return invert ? std::max<Float>(0, 1 - v) : v;
 #endif
     }
@@ -640,18 +648,17 @@ class GPUSpectrumImageTexture {
 #else
         // flip y coord since image has (0,0) at upper left, texture at lower
         // left
-        Vector2f dstdx, dstdy;
-        Point2f st = mapping.Map(ctx, &dstdx, &dstdy);
+        TexCoord2D c = mapping.Map(ctx);
         RGB rgb;
         if (isSingleChannel) {
-            float tex = scale * tex2DGrad<float>(texObj, st[0], 1 - st[1],
-                                                 make_float2(dstdx[0], dstdy[0]),
-                                                 make_float2(dstdx[1], dstdy[1]));
+            float tex = scale * tex2DGrad<float>(texObj, c.st[0], 1 - c.st[1],
+                                                 make_float2(c.dsdx, c.dsdy),
+                                                 make_float2(c.dtdx, c.dtdy));
             rgb = RGB(tex, tex, tex);
         } else {
-            float4 tex = tex2DGrad<float4>(texObj, st[0], 1 - st[1],
-                                           make_float2(dstdx[0], dstdy[0]),
-                                           make_float2(dstdx[1], dstdy[1]));
+            float4 tex = tex2DGrad<float4>(texObj, c.st[0], 1 - c.st[1],
+                                           make_float2(c.dsdx, c.dsdy),
+                                           make_float2(c.dtdx, c.dtdy));
             rgb = scale * RGB(tex.x, tex.y, tex.z);
         }
         if (invert)
@@ -700,13 +707,12 @@ class GPUFloatImageTexture {
         LOG_FATAL("GPUSpectrumImageTexture::Evaluate called from CPU");
         return 0;
 #else
-        Vector2f dstdx, dstdy;
-        Point2f st = mapping.Map(ctx, &dstdx, &dstdy);
+        TexCoord2D c = mapping.Map(ctx);
         // flip y coord since image has (0,0) at upper left, texture at lower
         // left
-        Float v = scale * tex2DGrad<float>(texObj, st[0], 1 - st[1],
-                                           make_float2(dstdx[0], dstdy[0]),
-                                           make_float2(dstdx[1], dstdy[1]));
+        Float v = scale * tex2DGrad<float>(texObj, c.st[0], 1 - c.st[1],
+                                           make_float2(c.dsdx, c.dsdy),
+                                           make_float2(c.dtdx, c.dtdy));
         return invert ? std::max<Float>(0, 1 - v) : v;
 #endif
     }
@@ -1077,10 +1083,9 @@ class WindyTexture {
 
     PBRT_CPU_GPU
     Float Evaluate(TextureEvalContext ctx) const {
-        Vector3f dpdx, dpdy;
-        Point3f p = mapping.Map(ctx, &dpdx, &dpdy);
-        Float windStrength = FBm(.1f * p, .1f * dpdx, .1f * dpdy, .5, 3);
-        Float waveHeight = FBm(p, dpdx, dpdy, .5, 6);
+        TexCoord3D c = mapping.Map(ctx);
+        Float windStrength = FBm(.1f * c.p, .1f * c.dpdx, .1f * c.dpdy, .5, 3);
+        Float waveHeight = FBm(c.p, c.dpdx, c.dpdy, .5, 6);
         return std::abs(windStrength) * waveHeight;
     }
 
@@ -1103,9 +1108,8 @@ class WrinkledTexture {
 
     PBRT_CPU_GPU
     Float Evaluate(TextureEvalContext ctx) const {
-        Vector3f dpdx, dpdy;
-        Point3f p = mapping.Map(ctx, &dpdx, &dpdy);
-        return Turbulence(p, dpdx, dpdy, omega, octaves);
+        TexCoord3D c = mapping.Map(ctx);
+        return Turbulence(c.p, c.dpdx, c.dpdy, omega, octaves);
     }
 
     static WrinkledTexture *Create(const Transform &renderFromTexture,
