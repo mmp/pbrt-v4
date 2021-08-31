@@ -183,10 +183,10 @@ Float Checkerboard(TextureEvalContext ctx, TextureMapping2D map2D,
         return x / 2 + y * (1 - 2 * std::abs(y));
     };
 
-    auto bf = [&](Float x, Float w) -> Float {
-        if (pstd::floor(x - w) == pstd::floor(x + w))
+    auto bf = [&](Float x, Float r) -> Float {
+        if (pstd::floor(x - r) == pstd::floor(x + r))
             return 1 - 2 * (int(pstd::floor(x)) & 1);
-        return (d(x + w) - 2 * d(x) + d(x - w)) / Sqr(w);
+        return (d(x + r) - 2 * d(x) + d(x - r)) / Sqr(r);
     };
 
     if (map2D) {
@@ -198,7 +198,7 @@ Float Checkerboard(TextureEvalContext ctx, TextureMapping2D map2D,
         // Integrate product of 2D checkerboard function and triangle filter
         ds *= 1.5f;
         dt *= 1.5f;
-        return 0.5f - 0.5f * bf(c.st[0], ds) * bf(c.st[1], dt);
+        return 0.5f - bf(c.st[0], ds) * bf(c.st[1], dt) / 2;
 
     } else {
         // Return weights for 3D checkerboard texture
@@ -291,7 +291,7 @@ bool InsidePolkaDot(Point2f st) {
         Float sCenter = sCell + maxShift * Noise(sCell + 1.5f, tCell + 2.8f);
         Float tCenter = tCell + maxShift * Noise(sCell + 4.5f, tCell + 9.8f);
         Vector2f dst = st - Point2f(sCenter, tCenter);
-        if (LengthSquared(dst) < radius * radius)
+        if (LengthSquared(dst) < Sqr(radius))
             return true;
     }
     return false;
@@ -1144,7 +1144,7 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
                     image = image.SelectChannels(rgbDesc);
 
                     MIPMap mipmap(image, colorSpace, WrapMode::Clamp /* TODO */,
-                                  Allocator(), filterOptions);
+                                  Allocator(), MIPMapFilterOptions());
                     nMIPMapLevels = mipmap.Levels();
                     const Image &baseImage = mipmap.GetLevel(0);
 

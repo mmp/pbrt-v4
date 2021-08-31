@@ -286,12 +286,14 @@ class FloatConstantTexture {
 // SpectrumConstantTexture Definition
 class SpectrumConstantTexture {
   public:
+    // SpectrumConstantTexture Public Methods
     SpectrumConstantTexture(Spectrum value) : value(value) {}
+
     PBRT_CPU_GPU
     SampledSpectrum Evaluate(TextureEvalContext ctx, SampledWavelengths lambda) const {
         return value.Sample(lambda);
     }
-    // SpectrumConstantTexture Public Methods
+
     static SpectrumConstantTexture *Create(const Transform &renderFromTexture,
                                            const TextureParameterDictionary &parameters,
                                            SpectrumType spectrumType, const FileLoc *loc,
