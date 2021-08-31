@@ -30,12 +30,13 @@ std::string MaterialEvalContext::ToString() const {
                         TextureEvalContext::ToString(), wo, ns, dpdus);
 }
 
-std::string BumpEvalContext::ToString() const {
-    return StringPrintf("[ BumpEvalContext p: %s uv: %s shading.n: %s shading.dpdu: %s "
-                        "shading.dpdv: %s shading.dndu: %s shading.dndv: %s dudx: %f "
-                        "dudy: %f dvdx: %f dvdy: %f dpdx: %s dpdy: %s faceIndex: %d ]",
-                        p, uv, shading.n, shading.dpdu, shading.dpdv, shading.dndu,
-                        shading.dndv, dudx, dudy, dvdx, dvdy, dpdx, dpdy, faceIndex);
+std::string NormalBumpEvalContext::ToString() const {
+    return StringPrintf(
+        "[ NormalBumpEvalContext p: %s uv: %s shading.n: %s shading.dpdu: %s "
+        "shading.dpdv: %s shading.dndu: %s shading.dndv: %s dudx: %f "
+        "dudy: %f dvdx: %f dvdy: %f dpdx: %s dpdy: %s faceIndex: %d ]",
+        p, uv, shading.n, shading.dpdu, shading.dpdv, shading.dndu, shading.dndv, dudx,
+        dudy, dvdx, dvdy, dpdx, dpdy, faceIndex);
 }
 
 // DielectricMaterial Method Definitions

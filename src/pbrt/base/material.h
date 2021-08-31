@@ -64,9 +64,9 @@ class Material
     template <typename TextureEvaluator>
     PBRT_CPU_GPU inline bool CanEvaluateTextures(TextureEvaluator texEval) const;
 
-    PBRT_CPU_GPU inline FloatTexture GetDisplacement() const;
-
     PBRT_CPU_GPU inline const Image *GetNormalMap() const;
+
+    PBRT_CPU_GPU inline FloatTexture GetDisplacement() const;
 
     PBRT_CPU_GPU inline bool HasSubsurfaceScattering() const;
 };

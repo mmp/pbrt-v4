@@ -280,9 +280,9 @@ template <typename ConcreteMaterial>
 struct MaterialEvalWorkItem {
     // MaterialEvalWorkItem Public Methods
     PBRT_CPU_GPU
-    BumpEvalContext GetBumpEvalContext(Float dudx, Float dudy, Float dvdx,
-                                       Float dvdy) const {
-        BumpEvalContext ctx;
+    NormalBumpEvalContext GetNormalBumpEvalContext(Float dudx, Float dudy, Float dvdx,
+                                                   Float dvdy) const {
+        NormalBumpEvalContext ctx;
         ctx.p = Point3f(pi);
         ctx.uv = uv;
         ctx.dudx = dudx;

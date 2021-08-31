@@ -154,7 +154,9 @@ RayDifferential SurfaceInteraction::SpawnRay(const RayDifferential &rayi,
 BSDF SurfaceInteraction::GetBSDF(const RayDifferential &ray, SampledWavelengths &lambda,
                                  Camera camera, ScratchBuffer &scratchBuffer,
                                  Sampler sampler) {
+    // Estimate $(u,v)$ and position differentials at intersection point
     ComputeDifferentials(ray, camera, sampler.SamplesPerPixel());
+
     // Resolve _MixMaterial_ if necessary
     while (material.Is<MixMaterial>()) {
         MixMaterial *mix = material.CastOrNullptr<MixMaterial>();
@@ -165,14 +167,19 @@ BSDF SurfaceInteraction::GetBSDF(const RayDifferential &ray, SampledWavelengths 
     if (!material)
         return {};
 
-    // Evaluate bump map and compute shading normal
+    // Evaluate normal or bump map, if present
     FloatTexture displacement = material.GetDisplacement();
     const Image *normalMap = material.GetNormalMap();
     if (displacement || normalMap) {
+        // Get shading $\dpdu$ and $\dpdv$ using normal or bump map
         Vector3f dpdu, dpdv;
-        Bump(UniversalTextureEvaluator(), displacement, normalMap, *this, &dpdu, &dpdv);
-        SetShadingGeometry(Normal3f(Normalize(Cross(dpdu, dpdv))), dpdu, dpdv,
-                           shading.dndu, shading.dndv, false);
+        if (normalMap)
+            NormalMap(normalMap, *this, &dpdu, &dpdv);
+        else
+            BumpMap(UniversalTextureEvaluator(), displacement, *this, &dpdu, &dpdv);
+
+        Normal3f ns(Normalize(Cross(dpdu, dpdv)));
+        SetShadingGeometry(ns, dpdu, dpdv, shading.dndu, shading.dndv, false);
     }
 
     // Return BSDF for surface interaction

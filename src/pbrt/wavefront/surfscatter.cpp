@@ -99,13 +99,23 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
             Vector3f dpdus = w.dpdus;
             FloatTexture displacement = w.material->GetDisplacement();
             const Image *normalMap = w.material->GetNormalMap();
-            if (displacement || normalMap) {
-                // Call _Bump()_ to find shading geometry
+            if (normalMap) {
+                // Call _NormalMap()_ to find shading geometry
+                NormalBumpEvalContext bctx =
+                    w.GetNormalBumpEvalContext(dudx, dudy, dvdx, dvdy);
+                Vector3f dpdvs;
+                NormalMap(normalMap, bctx, &dpdus, &dpdvs);
+                ns = Normal3f(Normalize(Cross(dpdus, dpdvs)));
+                ns = FaceForward(ns, w.n);
+
+            } else if (displacement) {
+                // Call _BumpMap()_ to find shading geometry
                 if (displacement)
                     DCHECK(texEval.CanEvaluate({displacement}, {}));
-                BumpEvalContext bctx = w.GetBumpEvalContext(dudx, dudy, dvdx, dvdy);
+                NormalBumpEvalContext bctx =
+                    w.GetNormalBumpEvalContext(dudx, dudy, dvdx, dvdy);
                 Vector3f dpdvs;
-                Bump(texEval, displacement, normalMap, bctx, &dpdus, &dpdvs);
+                BumpMap(texEval, displacement, bctx, &dpdus, &dpdvs);
                 ns = Normal3f(Normalize(Cross(dpdus, dpdvs)));
                 ns = FaceForward(ns, w.n);
             }
