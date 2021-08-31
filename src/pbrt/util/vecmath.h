@@ -1755,8 +1755,8 @@ class OctahedralVector {
             y = Encode(v.y);
         } else {
             // Encode octahedral vector with $z < 0$
-            x = Encode((1 - std::abs(v.y)) * SignNotZero(v.x));
-            y = Encode((1 - std::abs(v.x)) * SignNotZero(v.y));
+            x = Encode((1 - std::abs(v.y)) * Sign(v.x));
+            y = Encode((1 - std::abs(v.x)) * Sign(v.y));
         }
     }
 
@@ -1769,8 +1769,8 @@ class OctahedralVector {
         // Reparameterize directions in the $z<0$ portion of the octahedron
         if (v.z < 0) {
             Float xo = v.x;
-            v.x = (1 - std::abs(v.y)) * SignNotZero(xo);
-            v.y = (1 - std::abs(xo)) * SignNotZero(v.y);
+            v.x = (1 - std::abs(v.y)) * Sign(xo);
+            v.y = (1 - std::abs(xo)) * Sign(v.y);
         }
 
         return Normalize(v);
@@ -1783,7 +1783,7 @@ class OctahedralVector {
   private:
     // OctahedralVector Private Methods
     PBRT_CPU_GPU
-    static Float SignNotZero(Float v) { return (v < 0) ? -1 : 1; }
+    static Float Sign(Float v) { return std::copysign(1.f, v); }
 
     PBRT_CPU_GPU
     static uint16_t Encode(Float f) {
