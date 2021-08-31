@@ -33,7 +33,7 @@ using namespace pbrt;
 
 /* Resolution of the frequency table discretization. The azimuthal
    resolution is twice this value. */
-#define CHI2_THETA_RES 10
+#define CHI2_THETA_RES 80
 #define CHI2_PHI_RES (2 * CHI2_THETA_RES)
 
 /* Number of MC samples to compute the observed frequency table */
@@ -439,34 +439,73 @@ TEST(BSDFSampling, Lambertian) {
     TestBSDF(createLambertian, "Lambertian");
 }
 
-#if 0
-BSDF* createMicrofacet(const SurfaceInteraction& si, Allocator alloc, float roughx,
-                       float roughy) {
+#if 1
+BSDF* createConductorMicrofacet(const SurfaceInteraction& si, Allocator alloc, float eta,
+                                float k, float roughx, float roughy) {
     Float alphax = TrowbridgeReitzDistribution::RoughnessToAlpha(roughx);
     Float alphay = TrowbridgeReitzDistribution::RoughnessToAlpha(roughy);
     TrowbridgeReitzDistribution distrib(alphax, alphay);
-    FresnelHandle fresnel = alloc.new_object<FresnelDielectric>(1.5, true);
     return alloc.new_object<BSDF>(si.shading.n, si.shading.dpdu,
-        alloc.new_object<MicrofacetReflectionBxDF>(distrib, fresnel));
-    // CO    return alloc.new_object<BSDF>(si,
-    // alloc.new_object<DielectricInterface>(1.5, distrib,
-    // TransportMode::Radiance));
+        alloc.new_object<ConductorBxDF>(distrib, SampledSpectrum(eta), SampledSpectrum(k)));
 }
 
-TEST(BSDFSampling, TR_VA_0p5) {
-    TestBSDF(
-        [](const SurfaceInteraction& si, Allocator alloc) -> BSDF* {
-            return createMicrofacet(si, alloc, 0.5, 0.5);
-        },
-        "Trowbridge-Reitz, visible area sample, alpha = 0.5");
+BSDF* createDielectricMicrofacet(const SurfaceInteraction& si, Allocator alloc, float ior,
+                                 float roughx, float roughy) {
+    Float alphax = TrowbridgeReitzDistribution::RoughnessToAlpha(roughx);
+    Float alphay = TrowbridgeReitzDistribution::RoughnessToAlpha(roughy);
+    TrowbridgeReitzDistribution distrib(alphax, alphay);
+    return alloc.new_object<BSDF>(si.shading.n, si.shading.dpdu,
+        alloc.new_object<DielectricBxDF>(ior, distrib));
 }
 
-TEST(BSDFSampling, TR_VA_0p3_0p15) {
+TEST(BSDFSampling, TRCondIso) {
     TestBSDF(
         [](const SurfaceInteraction& si, Allocator alloc) -> BSDF* {
-            return createMicrofacet(si, alloc, 0.3, 0.15);
+            return createConductorMicrofacet(si, alloc, 2.f, 4.f, 0.5, 0.5);
         },
-        "Trowbridge-Reitz, visible area sample, alpha = 0.3/0.15");
+        "TRCondIso");
+}
+
+TEST(BSDFSampling, TRCondAniso) {
+    TestBSDF(
+        [](const SurfaceInteraction& si, Allocator alloc) -> BSDF* {
+            return createConductorMicrofacet(si, alloc, 2.f, 4.f, 0.3, 0.15);
+        },
+        "TRCondAniso");
+}
+
+TEST(BSDFSampling, TRDielIso) {
+    TestBSDF(
+        [](const SurfaceInteraction& si, Allocator alloc) -> BSDF* {
+            return createDielectricMicrofacet(si, alloc, 1.5f, 0.5, 0.5);
+        },
+        "TRDielIso");
+}
+
+
+TEST(BSDFSampling, TRDielAniso) {
+    TestBSDF(
+        [](const SurfaceInteraction& si, Allocator alloc) -> BSDF* {
+            return createDielectricMicrofacet(si, alloc, 1.5f, 0.3, 0.15);
+        },
+        "TRDielAniso");
+}
+
+TEST(BSDFSampling, TRDielIsoInv) {
+    TestBSDF(
+        [](const SurfaceInteraction& si, Allocator alloc) -> BSDF* {
+            return createDielectricMicrofacet(si, alloc, 1/1.5f, 0.5, 0.5);
+        },
+        "TRDielIsoInv");
+}
+
+
+TEST(BSDFSampling, TRDielAnisoInv) {
+    TestBSDF(
+        [](const SurfaceInteraction& si, Allocator alloc) -> BSDF* {
+            return createDielectricMicrofacet(si, alloc, 1/1.5f, 0.3, 0.15);
+        },
+        "TRDielAnisoInv");
 }
 #endif
 
