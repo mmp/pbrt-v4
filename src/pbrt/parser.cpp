@@ -1556,6 +1556,8 @@ std::string FormattingParserTarget::upgradeMaterial(std::string *name, Parameter
     } else if (*name == "matte") {
         *name = "diffuse";
         dict->RenameParameter("Kd", "reflectance");
+        dict->RemoveFloat("sigma");
+        dict->RemoveTexture("sigma");
     } else if (*name == "metal") {
         *name = "conductor";
         removeParamSilentIfConstant("Kr", 1);

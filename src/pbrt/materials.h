@@ -428,7 +428,7 @@ class HairMaterial {
 class DiffuseMaterial {
   public:
     // DiffuseMaterial Type Definitions
-    using BxDF = RoughDiffuseBxDF;
+    using BxDF = DiffuseBxDF;
     using BSSRDF = void;
 
     // DiffuseMaterial Public Methods
@@ -450,24 +450,20 @@ class DiffuseMaterial {
 
     std::string ToString() const;
 
-    DiffuseMaterial(SpectrumTexture reflectance, FloatTexture sigma,
-                    FloatTexture displacement, Image *normalMap)
-        : displacement(displacement),
-          normalMap(normalMap),
-          reflectance(reflectance),
-          sigma(sigma) {}
+    DiffuseMaterial(SpectrumTexture reflectance, FloatTexture displacement,
+                    Image *normalMap)
+        : displacement(displacement), normalMap(normalMap), reflectance(reflectance) {}
 
     template <typename TextureEvaluator>
     PBRT_CPU_GPU bool CanEvaluateTextures(TextureEvaluator texEval) const {
-        return texEval.CanEvaluate({sigma}, {reflectance});
+        return texEval.CanEvaluate({}, {reflectance});
     }
 
     template <typename TextureEvaluator>
     PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
-                              SampledWavelengths &lambda, RoughDiffuseBxDF *bxdf) const {
+                              SampledWavelengths &lambda, DiffuseBxDF *bxdf) const {
         SampledSpectrum r = Clamp(texEval(reflectance, ctx, lambda), 0, 1);
-        Float sig = Clamp(texEval(sigma, ctx), 0, 90);
-        *bxdf = RoughDiffuseBxDF(r, SampledSpectrum(0), sig);
+        *bxdf = DiffuseBxDF(r);
         return BSDF(ctx.ns, ctx.dpdus, bxdf);
     }
 
@@ -476,7 +472,6 @@ class DiffuseMaterial {
     FloatTexture displacement;
     Image *normalMap;
     SpectrumTexture reflectance;
-    FloatTexture sigma;
 };
 
 // ConductorMaterial Definition
@@ -799,20 +794,19 @@ class DiffuseTransmissionMaterial {
     using BSSRDF = void;
     // DiffuseTransmissionMaterial Public Methods
     DiffuseTransmissionMaterial(SpectrumTexture reflectance,
-                                SpectrumTexture transmittance, FloatTexture sigma,
-                                FloatTexture displacement, Image *normalMap, Float scale)
+                                SpectrumTexture transmittance, FloatTexture displacement,
+                                Image *normalMap, Float scale)
         : displacement(displacement),
           normalMap(normalMap),
           reflectance(reflectance),
           transmittance(transmittance),
-          sigma(sigma),
           scale(scale) {}
 
     static const char *Name() { return "DiffuseTransmissionMaterial"; }
 
     template <typename TextureEvaluator>
     PBRT_CPU_GPU bool CanEvaluateTextures(TextureEvaluator texEval) const {
-        return texEval.CanEvaluate({sigma}, {reflectance, transmittance});
+        return texEval.CanEvaluate({}, {reflectance, transmittance});
     }
 
     template <typename TextureEvaluator>
@@ -820,8 +814,7 @@ class DiffuseTransmissionMaterial {
                               SampledWavelengths &lambda, RoughDiffuseBxDF *bxdf) const {
         SampledSpectrum r = Clamp(scale * texEval(reflectance, ctx, lambda), 0, 1);
         SampledSpectrum t = Clamp(scale * texEval(transmittance, ctx, lambda), 0, 1);
-        Float s = texEval(sigma, ctx);
-        *bxdf = RoughDiffuseBxDF(r, t, s);
+        *bxdf = RoughDiffuseBxDF(r, t, 0);
         return BSDF(ctx.ns, ctx.dpdus, bxdf);
     }
 
@@ -847,7 +840,6 @@ class DiffuseTransmissionMaterial {
     FloatTexture displacement;
     Image *normalMap;
     SpectrumTexture reflectance, transmittance;
-    FloatTexture sigma;
     Float scale;
 };
 

@@ -180,7 +180,7 @@ HairMaterial *HairMaterial::Create(const TextureParameterDictionary &parameters,
 // DiffuseMaterial Method Definitions
 std::string DiffuseMaterial::ToString() const {
     return StringPrintf("[ DiffuseMaterial displacement: %s reflectance: %s sigma: %s ]",
-                        displacement, reflectance, sigma);
+                        displacement, reflectance);
 }
 
 DiffuseMaterial *DiffuseMaterial::Create(const TextureParameterDictionary &parameters,
@@ -191,10 +191,9 @@ DiffuseMaterial *DiffuseMaterial::Create(const TextureParameterDictionary &param
     if (!reflectance)
         reflectance = alloc.new_object<SpectrumConstantTexture>(
             alloc.new_object<ConstantSpectrum>(0.5f));
-    FloatTexture sigma = parameters.GetFloatTexture("sigma", 0.f, alloc);
     FloatTexture displacement = parameters.GetFloatTextureOrNull("displacement", alloc);
 
-    return alloc.new_object<DiffuseMaterial>(reflectance, sigma, displacement, normalMap);
+    return alloc.new_object<DiffuseMaterial>(reflectance, displacement, normalMap);
 }
 
 // ConductorMaterial Method Definitions
@@ -566,8 +565,8 @@ SubsurfaceMaterial *SubsurfaceMaterial::Create(
 // DiffuseTransmissionMaterial Method Definitions
 std::string DiffuseTransmissionMaterial::ToString() const {
     return StringPrintf("[ DiffuseTransmissionMaterial displacement: %s reflectance: %s "
-                        "transmittance: %s sigma: %s ]",
-                        displacement, reflectance, transmittance, sigma);
+                        "transmittance: %s ]",
+                        displacement, reflectance, transmittance);
 }
 
 DiffuseTransmissionMaterial *DiffuseTransmissionMaterial::Create(
@@ -587,11 +586,10 @@ DiffuseTransmissionMaterial *DiffuseTransmissionMaterial::Create(
 
     FloatTexture displacement = parameters.GetFloatTextureOrNull("displacement", alloc);
     bool remapRoughness = parameters.GetOneBool("remaproughness", true);
-    FloatTexture sigma = parameters.GetFloatTexture("sigma", 0.f, alloc);
     Float scale = parameters.GetOneFloat("scale", 1.f);
 
-    return alloc.new_object<DiffuseTransmissionMaterial>(
-        reflectance, transmittance, sigma, displacement, normalMap, scale);
+    return alloc.new_object<DiffuseTransmissionMaterial>(reflectance, transmittance,
+                                                         displacement, normalMap, scale);
 }
 
 MeasuredMaterial::MeasuredMaterial(const std::string &filename, FloatTexture displacement,
