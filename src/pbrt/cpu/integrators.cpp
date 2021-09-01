@@ -96,7 +96,7 @@ void ImageTileIntegrator::Render() {
     });
 
     // Declare common variables for rendering image in tiles
-    ThreadLocal<ScratchBuffer> scratchBuffers([]() { return ScratchBuffer(65536); });
+    ThreadLocal<ScratchBuffer> scratchBuffers([]() { return ScratchBuffer(); });
 
     ThreadLocal<Sampler> samplers([this]() { return samplerPrototype.Clone(); });
 
@@ -2537,8 +2537,7 @@ void MLTIntegrator::Render() {
     int nBootstrapSamples = nBootstrap * (maxDepth + 1);
     std::vector<Float> bootstrapWeights(nBootstrapSamples, 0);
     // Allocate scratch buffers for MLT samples
-    ThreadLocal<ScratchBuffer> threadScratchBuffers(
-        []() { return ScratchBuffer(65536); });
+    ThreadLocal<ScratchBuffer> threadScratchBuffers([]() { return ScratchBuffer(); });
 
     // Generate bootstrap samples in parallel
     ProgressReporter progress(nBootstrap, "Generating bootstrap paths", Options->quiet);
@@ -2789,7 +2788,8 @@ void SPPMIntegrator::Render() {
 
     // Allocate per-thread _ScratchBuffer_s for SPPM rendering
     ThreadLocal<ScratchBuffer> threadScratchBuffers([nPixels]() {
-        size_t allocSize = size_t(nPixels) * 4096 / RunningThreads();
+        size_t allocSize =
+            std::max<size_t>(256, size_t(nPixels) * 256 / RunningThreads());
         return ScratchBuffer(allocSize);
     });
 
@@ -3012,7 +3012,7 @@ void SPPMIntegrator::Render() {
         // Trace photons and accumulate contributions
         // Create per-thread scratch buffers for photon shooting
         ThreadLocal<ScratchBuffer> photonShootScratchBuffers(
-            []() { return ScratchBuffer(65536); });
+            []() { return ScratchBuffer(); });
 
         ParallelFor(0, photonsPerIteration, [&](int64_t start, int64_t end) {
             // Follow photon paths for photon index range _start_ - _end_
