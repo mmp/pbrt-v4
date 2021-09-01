@@ -523,6 +523,14 @@ void BasicSceneBuilder::Option(const std::string &name, const std::string &value
         else
             ErrorExitDeferred(&loc, "%s: expected \"true\" or \"false\" for option value",
                               value);
+    } else if (nName == "wavefront") {
+        if (value == "true")
+            Options->wavefront = true;
+        else if (value == "false")
+            Options->wavefront = false;
+        else
+            ErrorExitDeferred(&loc, "%s: expected \"true\" or \"false\" for option value",
+                              value);
     } else
         ErrorExitDeferred(&loc, "%s: unknown option", name);
 }

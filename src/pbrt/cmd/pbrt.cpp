@@ -260,7 +260,7 @@ int main(int argc, char *argv[]) {
         ParseFiles(&builder, filenames);
 
         // Render the scene
-        if (options.useGPU || options.wavefront)
+        if (Options->useGPU || Options->wavefront)
             RenderWavefront(scene);
         else
             RenderCPU(scene);
