@@ -293,17 +293,6 @@ class BasicScene {
         return camera;
     }
 
-    Film GetFilm() {
-        filmFutureMutex.lock();
-        while (!film) {
-            pstd::optional<Film> f = filmFuture.TryGet(&filmFutureMutex);
-            if (f)
-                film = *f;
-        }
-        filmFutureMutex.unlock();
-        return film;
-    }
-
     Sampler GetSampler() {
         samplerFutureMutex.lock();
         while (!sampler) {
@@ -357,9 +346,8 @@ class BasicScene {
     mutable ThreadLocal<Allocator> threadAllocators;
     Camera camera;
     Film film;
-    std::mutex cameraFutureMutex, filmFutureMutex;
+    std::mutex cameraFutureMutex;
     Future<Camera> cameraFuture;
-    Future<Film> filmFuture;
     std::mutex samplerFutureMutex;
     Sampler sampler;
     std::mutex mediaMutex;

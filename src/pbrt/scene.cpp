@@ -683,42 +683,39 @@ void BasicSceneBuilder::AreaLightSource(const std::string &name,
 }
 
 // BasicScene Method Definitions
-void BasicScene::SetOptions(SceneEntity filter, SceneEntity film,
+void BasicScene::SetOptions(SceneEntity filter, SceneEntity filmEntity,
                             CameraSceneEntity camera, SceneEntity sampler,
                             SceneEntity integ, SceneEntity accel) {
     // Store information for specified integrator and accelerator
-    filmColorSpace = film.parameters.ColorSpace();
+    filmColorSpace = filmEntity.parameters.ColorSpace();
     integrator = integ;
     accelerator = accel;
 
-    // Enqueue asynchronous job to create filter and film
-    filmFuture = RunAsync([filter, film, camera, this]() {
-        LOG_VERBOSE("Starting to create filter and film");
-        Allocator alloc = threadAllocators.Get();
-        Filter filt = Filter::Create(filter.name, filter.parameters, &filter.loc, alloc);
+    // Immediately create filter and film
+    LOG_VERBOSE("Starting to create filter and film");
+    Allocator alloc = threadAllocators.Get();
+    Filter filt = Filter::Create(filter.name, filter.parameters, &filter.loc, alloc);
 
-        // It's a little ugly to poke into the camera's parameters here, but we
-        // have this circular dependency that Camera::Create() expects a
-        // Film, yet now the film needs to know the exposure time from
-        // the camera....
-        Float exposureTime = camera.parameters.GetOneFloat("shutterclose", 1.f) -
-                             camera.parameters.GetOneFloat("shutteropen", 0.f);
-        if (exposureTime <= 0)
-            ErrorExit(&camera.loc,
-                      "The specified camera shutter times imply that the shutter "
-                      "does not open.  A black image will result.");
+    // It's a little ugly to poke into the camera's parameters here, but we
+    // have this circular dependency that Camera::Create() expects a
+    // Film, yet now the film needs to know the exposure time from
+    // the camera....
+    Float exposureTime = camera.parameters.GetOneFloat("shutterclose", 1.f) -
+        camera.parameters.GetOneFloat("shutteropen", 0.f);
+    if (exposureTime <= 0)
+        ErrorExit(&camera.loc,
+                  "The specified camera shutter times imply that the shutter "
+                  "does not open.  A black image will result.");
 
-        Film f = Film::Create(film.name, film.parameters, exposureTime,
-                              camera.cameraTransform, filt, &film.loc, alloc);
-        LOG_VERBOSE("Finished creating filter and film");
-        return f;
-    });
+    film = Film::Create(filmEntity.name, filmEntity.parameters, exposureTime,
+                        camera.cameraTransform, filt, &filmEntity.loc, alloc);
+    LOG_VERBOSE("Finished creating filter and film");
 
     // Enqueue asynchronous job to create sampler
     samplerFuture = RunAsync([sampler, this]() {
         LOG_VERBOSE("Starting to create sampler");
         Allocator alloc = threadAllocators.Get();
-        Point2i res = GetFilm().FullResolution();
+        Point2i res = film.FullResolution();
         return Sampler::Create(sampler.name, sampler.parameters, res, &sampler.loc,
                                alloc);
     });
@@ -727,7 +724,6 @@ void BasicScene::SetOptions(SceneEntity filter, SceneEntity film,
     cameraFuture = RunAsync([camera, this]() {
         LOG_VERBOSE("Starting to create camera");
         Allocator alloc = threadAllocators.Get();
-        Film film = GetFilm();
         Medium cameraMedium = GetMedium(camera.medium, &camera.loc);
 
         Camera c = Camera::Create(camera.name, camera.parameters, cameraMedium,
@@ -952,8 +948,8 @@ void BasicScene::AddSpectrumTexture(std::string name, TextureSceneEntity texture
 }
 
 void BasicScene::AddLight(LightSceneEntity light) {
-    std::lock_guard<std::mutex> lock(lightMutex);
     Medium lightMedium = GetMedium(light.medium, &light.loc);
+    std::lock_guard<std::mutex> lock(lightMutex);
 
     if (light.renderFromObject.IsAnimated())
         Warning(&light.loc,
