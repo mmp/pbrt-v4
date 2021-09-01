@@ -97,7 +97,6 @@ class alignas(PBRT_L1_CACHE_LINE_SIZE) ScratchBuffer {
         return *this;
     }
 
-    PBRT_CPU_GPU
     void *Alloc(size_t size, size_t align) {
         if ((offset % align) != 0)
             offset += align - (offset % align);
@@ -108,13 +107,13 @@ class alignas(PBRT_L1_CACHE_LINE_SIZE) ScratchBuffer {
     }
 
     template <typename T, typename... Args>
-    PBRT_CPU_GPU typename AllocationTraits<T>::SingleObject Alloc(Args &&...args) {
+    typename AllocationTraits<T>::SingleObject Alloc(Args &&...args) {
         T *p = (T *)Alloc(sizeof(T), alignof(T));
         return new (p) T(std::forward<Args>(args)...);
     }
 
     template <typename T>
-    PBRT_CPU_GPU typename AllocationTraits<T>::Array Alloc(size_t n = 1) {
+    typename AllocationTraits<T>::Array Alloc(size_t n = 1) {
         using ElementType = typename std::remove_extent_t<T>;
         ElementType *ret =
             (ElementType *)Alloc(n * sizeof(ElementType), alignof(ElementType));

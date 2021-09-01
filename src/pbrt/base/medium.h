@@ -111,7 +111,6 @@ class Medium : public TaggedPointer<HomogeneousMedium, UniformGridMedium, CloudM
     MediumProperties SamplePoint(Point3f p, const SampledWavelengths &lambda) const;
 
     // Medium Public Methods
-    PBRT_CPU_GPU
     RayMajorantIterator SampleRay(Ray ray, Float tMax, const SampledWavelengths &lambda,
                                   ScratchBuffer &buf) const;
 };

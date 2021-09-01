@@ -240,10 +240,8 @@ class SurfaceInteraction : public Interaction {
     RayDifferential SpawnRay(const RayDifferential &rayi, const BSDF &bsdf, Vector3f wi,
                              int /*BxDFFlags*/ flags, Float eta) const;
 
-    PBRT_CPU_GPU
     BSDF GetBSDF(const RayDifferential &ray, SampledWavelengths &lambda, Camera camera,
                  ScratchBuffer &scratchBuffer, Sampler sampler);
-    PBRT_CPU_GPU
     BSSRDF GetBSSRDF(const RayDifferential &ray, SampledWavelengths &lambda,
                      Camera camera, ScratchBuffer &scratchBuffer);
 

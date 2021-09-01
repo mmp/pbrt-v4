@@ -300,7 +300,7 @@ inline BSSRDFSample BSSRDF::ProbeIntersectionToSample(
         BxDF *bxdf = (BxDF *)scratchBuffer.Alloc(sizeof(BxDF), alignof(BxDF));
         return ptr->ProbeIntersectionToSample(si, bxdf);
     };
-    return Dispatch(pits);
+    return DispatchCPU(pits);
 }
 
 }  // namespace pbrt

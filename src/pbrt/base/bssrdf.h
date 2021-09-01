@@ -30,7 +30,7 @@ class BSSRDF : public TaggedPointer<TabulatedBSSRDF> {
     PBRT_CPU_GPU inline pstd::optional<BSSRDFProbeSegment> SampleSp(Float u1,
                                                                     Point2f u2) const;
 
-    PBRT_CPU_GPU inline BSSRDFSample ProbeIntersectionToSample(
+    inline BSSRDFSample ProbeIntersectionToSample(
         const SubsurfaceInteraction &si, ScratchBuffer &scratchBuffer) const;
 };
 

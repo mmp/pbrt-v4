@@ -823,7 +823,7 @@ inline RayMajorantIterator Medium::SampleRay(Ray ray, Float tMax,
         medium->SampleRay(ray, tMax, lambda, iter);
         return iter;
     };
-    return Dispatch(sample);
+    return DispatchCPU(sample);
 }
 
 }  // namespace pbrt
