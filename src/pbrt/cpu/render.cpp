@@ -100,9 +100,9 @@ void RenderCPU(BasicScene &parsedScene) {
 
     bool haveSubsurface = false;
     for (pbrt::Material mtl : materials)
-        haveSubsurface |= mtl.HasSubsurfaceScattering();
+        haveSubsurface |= mtl && mtl.HasSubsurfaceScattering();
     for (const auto &namedMtl : namedMaterials)
-        haveSubsurface |= namedMtl.second.HasSubsurfaceScattering();
+        haveSubsurface |= namedMtl.second && namedMtl.second.HasSubsurfaceScattering();
 
     if (haveSubsurface && parsedScene.integrator.name != "volpath")
         Warning("Some objects in the scene have subsurface scattering, which is "
