@@ -41,7 +41,7 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
             SampledSpectrum inv_w_u = w.inv_w_u;
             SampledSpectrum inv_w_l = w.inv_w_l;
             SampledSpectrum L(0.f);
-            RNG rng(Hash(tMax), Hash(ray.d));
+            RNG rng(Hash(ray.o, tMax), Hash(ray.d));
 
             PBRT_DBG("Lambdas %f %f %f %f\n", lambda[0], lambda[1], lambda[2], lambda[3]);
             PBRT_DBG("Medium sample beta %f %f %f %f inv_w_u %f %f %f %f inv_w_l %f %f "
