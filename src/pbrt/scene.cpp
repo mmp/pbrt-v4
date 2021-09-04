@@ -691,11 +691,11 @@ void BasicSceneBuilder::AreaLightSource(const std::string &name,
 }
 
 // BasicScene Method Definitions
-void BasicScene::SetOptions(SceneEntity filter, SceneEntity filmEntity,
+void BasicScene::SetOptions(SceneEntity filter, SceneEntity film,
                             CameraSceneEntity camera, SceneEntity sampler,
                             SceneEntity integ, SceneEntity accel) {
     // Store information for specified integrator and accelerator
-    filmColorSpace = filmEntity.parameters.ColorSpace();
+    filmColorSpace = film.parameters.ColorSpace();
     integrator = integ;
     accelerator = accel;
 
@@ -709,21 +709,21 @@ void BasicScene::SetOptions(SceneEntity filter, SceneEntity filmEntity,
     // Film, yet now the film needs to know the exposure time from
     // the camera....
     Float exposureTime = camera.parameters.GetOneFloat("shutterclose", 1.f) -
-        camera.parameters.GetOneFloat("shutteropen", 0.f);
+                         camera.parameters.GetOneFloat("shutteropen", 0.f);
     if (exposureTime <= 0)
         ErrorExit(&camera.loc,
                   "The specified camera shutter times imply that the shutter "
                   "does not open.  A black image will result.");
 
-    film = Film::Create(filmEntity.name, filmEntity.parameters, exposureTime,
-                        camera.cameraTransform, filt, &filmEntity.loc, alloc);
+    this->film = Film::Create(film.name, film.parameters, exposureTime,
+                              camera.cameraTransform, filt, &film.loc, alloc);
     LOG_VERBOSE("Finished creating filter and film");
 
     // Enqueue asynchronous job to create sampler
     samplerFuture = RunAsync([sampler, this]() {
         LOG_VERBOSE("Starting to create sampler");
         Allocator alloc = threadAllocators.Get();
-        Point2i res = film.FullResolution();
+        Point2i res = this->film.FullResolution();
         return Sampler::Create(sampler.name, sampler.parameters, res, &sampler.loc,
                                alloc);
     });
@@ -735,7 +735,7 @@ void BasicScene::SetOptions(SceneEntity filter, SceneEntity filmEntity,
         Medium cameraMedium = GetMedium(camera.medium, &camera.loc);
 
         Camera c = Camera::Create(camera.name, camera.parameters, cameraMedium,
-                                  camera.cameraTransform, film, &camera.loc, alloc);
+                                  camera.cameraTransform, this->film, &camera.loc, alloc);
         LOG_VERBOSE("Finished creating camera");
         return c;
     });

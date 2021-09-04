@@ -783,13 +783,13 @@ PBRT_CPU_GPU SampledSpectrum SampleT_maj(Ray ray, Float tMax, Float u, RNG &rng,
         while (true) {
             // Try to generate sample along current majorant segment
             Float t = tMin + SampleExponential(u, seg->sigma_maj[0]);
-            PBRT_DBG("Sampled t = %f from tMin %f u %f sigma_maj[0] %f\n",
-                     t, tMin, u, seg->sigma_maj[0]);
+            PBRT_DBG("Sampled t = %f from tMin %f u %f sigma_maj[0] %f\n", t, tMin, u,
+                     seg->sigma_maj[0]);
             u = rng.Uniform<Float>();
             if (t < seg->tMax) {
                 // Call callback function for sample within segment
-                T_maj *= FastExp(-(t - tMin) * seg->sigma_maj);
                 PBRT_DBG("t < seg->tMax\n");
+                T_maj *= FastExp(-(t - tMin) * seg->sigma_maj);
                 MediumProperties mp = medium->SamplePoint(ray(t), lambda);
                 if (!callback(ray(t), mp, seg->sigma_maj, T_maj)) {
                     // Returning out of doubly-nested while loop is not as good perf. wise

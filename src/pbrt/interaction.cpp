@@ -159,7 +159,7 @@ BSDF SurfaceInteraction::GetBSDF(const RayDifferential &ray, SampledWavelengths 
 
     // Resolve _MixMaterial_ if necessary
     while (material.Is<MixMaterial>()) {
-        MixMaterial *mix = material.CastOrNullptr<MixMaterial>();
+        MixMaterial *mix = material.Cast<MixMaterial>();
         material = mix->ChooseMaterial(UniversalTextureEvaluator(), *this);
     }
 
@@ -198,7 +198,7 @@ BSSRDF SurfaceInteraction::GetBSSRDF(const RayDifferential &ray,
                                      ScratchBuffer &scratchBuffer) {
     // Resolve _MixMaterial_ if necessary
     while (material.Is<MixMaterial>()) {
-        MixMaterial *mix = material.CastOrNullptr<MixMaterial>();
+        MixMaterial *mix = material.Cast<MixMaterial>();
         material = mix->ChooseMaterial(UniversalTextureEvaluator(), *this);
     }
 

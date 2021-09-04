@@ -147,8 +147,8 @@ class DielectricMaterial {
     // DielectricMaterial Public Methods
     DielectricMaterial(FloatTexture uRoughness, FloatTexture vRoughness, Spectrum eta,
                        FloatTexture displacement, Image *normalMap, bool remapRoughness)
-        : displacement(displacement),
-          normalMap(normalMap),
+        : normalMap(normalMap),
+          displacement(displacement),
           uRoughness(uRoughness),
           vRoughness(vRoughness),
           eta(eta),
@@ -205,8 +205,8 @@ class DielectricMaterial {
 
   private:
     // DielectricMaterial Private Members
-    FloatTexture displacement;
     Image *normalMap;
+    FloatTexture displacement;
     FloatTexture uRoughness, vRoughness;
     bool remapRoughness;
     Spectrum eta;
@@ -458,7 +458,7 @@ class DiffuseMaterial {
 
     DiffuseMaterial(SpectrumTexture reflectance, FloatTexture displacement,
                     Image *normalMap)
-        : displacement(displacement), normalMap(normalMap), reflectance(reflectance) {}
+        : normalMap(normalMap), displacement(displacement), reflectance(reflectance) {}
 
     template <typename TextureEvaluator>
     PBRT_CPU_GPU bool CanEvaluateTextures(TextureEvaluator texEval) const {
@@ -475,8 +475,8 @@ class DiffuseMaterial {
 
   private:
     // DiffuseMaterial Private Members
-    FloatTexture displacement;
     Image *normalMap;
+    FloatTexture displacement;
     SpectrumTexture reflectance;
 };
 
@@ -901,7 +901,7 @@ template <typename TextureEvaluator>
 inline BSDF Material::GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
                               SampledWavelengths &lambda,
                               ScratchBuffer &scratchBuffer) const {
-    // Define _getBSDF_ lamba function for _Material::GetBSDF()_
+    // Define _getBSDF_ lambda function for _Material::GetBSDF()_
     auto getBSDF = [&](auto mtl) -> BSDF {
         using Material = typename std::remove_reference_t<decltype(*mtl)>;
         using BxDF = typename Material::BxDF;
