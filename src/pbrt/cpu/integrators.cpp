@@ -950,7 +950,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                                       Sampler sampler, ScratchBuffer &scratchBuffer,
                                       VisibleSurface *visibleSurf) const {
     // Declare state variables for volumetric path sampling
-    SampledSpectrum L(0.f), beta(1.f), inv_w_u(1.f), inv_w_l(1.f);
+    SampledSpectrum L(0.f), beta(1.f), r_u(1.f), r_l(1.f);
     bool specularBounce = false, anyNonSpecularBounces = false;
     int depth = 0;
     Float etaScale = 1;
@@ -984,16 +984,16 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                     ++volumeInteractions;
                     // Add emission from medium scattering event
                     if (depth < maxDepth && mp.Le) {
-                        // Compute $\hat{P}$ at new path vertex
+                        // Compute $\beta'$ at new path vertex
                         Float pdf = sigma_maj[0] * T_maj[0];
-                        SampledSpectrum betap = beta * T_maj * mp.sigma_a / pdf;
+                        SampledSpectrum betap = beta * T_maj / pdf;
 
-                        // Compute PDF for absorption at path vertex
-                        SampledSpectrum inv_w_e = inv_w_u * sigma_maj * T_maj / pdf;
+                        // Compute rescaled path probability for absorption at path vertex
+                        SampledSpectrum r_e = r_u * sigma_maj * T_maj / pdf;
 
                         // Update _L_ for medium emission
-                        if (inv_w_e)
-                            L += betap * mp.Le / inv_w_e.Average();
+                        if (r_e)
+                            L += betap * mp.sigma_a * mp.Le / r_e.Average();
                     }
 
                     // Compute medium event probabilities for interaction
@@ -1018,14 +1018,16 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                             return false;
                         }
 
+                        // Update _beta_ and _r_u_ for real scattering event
                         Float pdf = T_maj[0] * mp.sigma_s[0];
                         beta *= T_maj * mp.sigma_s / pdf;
-                        inv_w_u *= T_maj * mp.sigma_s / pdf;
-                        if (beta && inv_w_u) {
+                        r_u *= T_maj * mp.sigma_s / pdf;
+
+                        if (beta && r_u) {
                             // Sample direct lighting at volume scattering event
                             MediumInteraction intr(p, -ray.d, ray.time, ray.medium,
                                                    mp.phase);
-                            L += SampleLd(intr, nullptr, lambda, sampler, beta, inv_w_u);
+                            L += SampleLd(intr, nullptr, lambda, sampler, beta, r_u);
 
                             // Sample new direction at real scattering event
                             Point2f u = sampler.Get2D();
@@ -1036,7 +1038,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                             else {
                                 // Update ray path state for indirect volume scattering
                                 beta *= ps->p / ps->pdf;
-                                inv_w_l = inv_w_u / ps->pdf;
+                                r_l = r_u / ps->pdf;
                                 prevIntrContext = LightSampleContext(intr);
                                 scattered = true;
                                 ray.o = p;
@@ -1053,19 +1055,20 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                             ClampZero(sigma_maj - mp.sigma_a - mp.sigma_s);
                         Float pdf = T_maj[0] * sigma_n[0];
                         beta *= T_maj * sigma_n / pdf;
-                        inv_w_u *= T_maj * sigma_n / pdf;
-                        inv_w_l *= T_maj * sigma_maj / pdf;
-                        return beta && inv_w_u;
+                        r_u *= T_maj * sigma_n / pdf;
+                        r_l *= T_maj * sigma_maj / pdf;
+                        return beta && r_u;
                     }
                 });
-            // Handle terminated, scattered, and unscattered rays after medium sampling
-            if (terminated || !beta || !inv_w_u)
+            // Handle terminated, scattered, and unscattered medium rays
+            if (terminated || !beta || !r_u)
                 return L;
             if (scattered)
                 continue;
+
             beta *= T_maj / T_maj[0];
-            inv_w_u *= T_maj / T_maj[0];
-            inv_w_l *= T_maj / T_maj[0];
+            r_u *= T_maj / T_maj[0];
+            r_l *= T_maj / T_maj[0];
         }
         // Handle surviving unscattered rays
         // Add emitted light at volume path vertex or from the environment
@@ -1074,13 +1077,13 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             for (const auto &light : infiniteLights) {
                 if (SampledSpectrum Le = light.Le(ray, lambda); Le) {
                     if (depth == 0 || specularBounce)
-                        L += beta * Le / inv_w_u.Average();
+                        L += beta * Le / r_u.Average();
                     else {
                         // Add infinite light contribution using both PDFs with MIS
                         Float lightPDF = lightSampler.PMF(prevIntrContext, light) *
                                          light.PDF_Li(prevIntrContext, ray.d, true);
-                        inv_w_l *= lightPDF;
-                        L += beta * Le / (inv_w_u + inv_w_l).Average();
+                        r_l *= lightPDF;
+                        L += beta * Le / (r_u + r_l).Average();
                     }
                 }
             }
@@ -1091,14 +1094,14 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
         if (SampledSpectrum Le = isect.Le(-ray.d, lambda); Le) {
             // Add contribution of emission from intersected surface
             if (depth == 0 || specularBounce)
-                L += beta * Le / inv_w_u.Average();
+                L += beta * Le / r_u.Average();
             else {
                 // Add surface light contribution using both PDFs with MIS
                 Light areaLight(isect.areaLight);
                 Float lightPDF = lightSampler.PMF(prevIntrContext, areaLight) *
                                  areaLight.PDF_Li(prevIntrContext, ray.d, true);
-                inv_w_l *= lightPDF;
-                L += beta * Le / (inv_w_u + inv_w_l).Average();
+                r_l *= lightPDF;
+                L += beta * Le / (r_u + r_l).Average();
             }
         }
 
@@ -1146,7 +1149,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
 
         // Sample illumination from lights to find attenuated path contribution
         if (IsNonSpecular(bsdf.Flags())) {
-            L += SampleLd(isect, &bsdf, lambda, sampler, beta, inv_w_u);
+            L += SampleLd(isect, &bsdf, lambda, sampler, beta, r_u);
             DCHECK(IsInf(L.y(lambda)) == false);
         }
         prevIntrContext = LightSampleContext(isect);
@@ -1157,12 +1160,12 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
         pstd::optional<BSDFSample> bs = bsdf.Sample_f(wo, u, sampler.Get2D());
         if (!bs)
             break;
-        // Update _T_hat_ and PDFs for BSDF scattering
+        // Update _beta_ and rescaled path probabilities for BSDF scattering
         beta *= bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
         if (bs->pdfIsProportional)
-            inv_w_l = inv_w_u / bsdf.PDF(wo, bs->wi);
+            r_l = r_u / bsdf.PDF(wo, bs->wi);
         else
-            inv_w_l = inv_w_u / bs->pdf;
+            r_l = r_u / bs->pdf;
 
         PBRT_DBG("%s\n", StringPrintf("Sampled BSDF, f = %s, pdf = %f -> beta = %s",
                                       bs->f, bs->pdf, beta)
@@ -1215,7 +1218,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             // Update path state for subsurface scattering
             Float pdf = interactionSampler.SampleProbability() * bssrdfSample.pdf[0];
             beta *= bssrdfSample.Sp / pdf;
-            inv_w_u *= bssrdfSample.pdf / bssrdfSample.pdf[0];
+            r_u *= bssrdfSample.pdf / bssrdfSample.pdf[0];
             SurfaceInteraction pi = ssi;
             pi.wo = bssrdfSample.wo;
             prevIntrContext = LightSampleContext(pi);
@@ -1229,7 +1232,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                 ++totalBSDFs;
 
             // Account for attenuated direct illumination subsurface scattering
-            L += SampleLd(pi, &Sw, lambda, sampler, beta, inv_w_u);
+            L += SampleLd(pi, &Sw, lambda, sampler, beta, r_u);
 
             // Sample ray for indirect subsurface scattering
             Float u = sampler.Get1D();
@@ -1237,7 +1240,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             if (!bs)
                 break;
             beta *= bs->f * AbsDot(bs->wi, pi.shading.n) / bs->pdf;
-            inv_w_l = inv_w_u / bs->pdf;
+            r_l = r_u / bs->pdf;
             // Don't increment depth this time...
             DCHECK(!IsInf(beta.y(lambda)));
             specularBounce = bs->IsSpecular();
@@ -1247,7 +1250,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
         // Possibly terminate volumetric path with Russian roulette
         if (!beta)
             break;
-        SampledSpectrum rrBeta = beta * etaScale / inv_w_u.Average();
+        SampledSpectrum rrBeta = beta * etaScale / r_u.Average();
         Float uRR = sampler.Get1D();
         PBRT_DBG("%s\n",
                  StringPrintf("etaScale %f -> rrBeta %s", etaScale, rrBeta).c_str());
@@ -1264,7 +1267,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
 SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF *bsdf,
                                             SampledWavelengths &lambda, Sampler sampler,
                                             SampledSpectrum beta,
-                                            SampledSpectrum inv_w_p) const {
+                                            SampledSpectrum r_p) const {
     // Estimate light-sampled direct illumination at _intr_
     // Initialize _LightSampleContext_ for volumetric light sampling
     LightSampleContext ctx;
@@ -1316,7 +1319,7 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
 
     // Declare path state variables for ray to light source
     Ray lightRay = intr.SpawnRayTo(ls->pLight);
-    SampledSpectrum T_ray(1.f), inv_w_l(1.f), inv_w_u(1.f);
+    SampledSpectrum T_ray(1.f), r_l(1.f), r_u(1.f);
     RNG rng(Hash(lightRay.o), Hash(lightRay.d));
 
     while (lightRay.d != Vector3f(0, 0, 0)) {
@@ -1330,37 +1333,38 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
         if (lightRay.medium) {
             Float tMax = si ? si->tHit : (1 - ShadowEpsilon);
             Float u = rng.Uniform<Float>();
-            SampledSpectrum T_maj = SampleT_maj(
-                lightRay, tMax, u, rng, lambda,
-                [&](Point3f p, MediumProperties mp, SampledSpectrum sigma_maj,
-                    SampledSpectrum T_maj) {
-                    // Update ray transmittance estimate at sampled point
-                    // Update _T_ray_ and PDFs using ratio-tracking estimator
-                    SampledSpectrum sigma_n =
-                        ClampZero(sigma_maj - mp.sigma_a - mp.sigma_s);
-                    Float pdf = T_maj[0] * sigma_maj[0];
-                    T_ray *= T_maj * sigma_n / pdf;
-                    inv_w_l *= T_maj * sigma_maj / pdf;
-                    inv_w_u *= T_maj * sigma_n / pdf;
+            SampledSpectrum T_maj =
+                SampleT_maj(lightRay, tMax, u, rng, lambda,
+                            [&](Point3f p, MediumProperties mp, SampledSpectrum sigma_maj,
+                                SampledSpectrum T_maj) {
+                                // Update ray transmittance estimate at sampled point
+                                // Update _T_ray_ and PDFs using ratio-tracking estimator
+                                SampledSpectrum sigma_n =
+                                    ClampZero(sigma_maj - mp.sigma_a - mp.sigma_s);
+                                Float pdf = T_maj[0] * sigma_maj[0];
+                                T_ray *= T_maj * sigma_n / pdf;
+                                r_l *= T_maj * sigma_maj / pdf;
+                                r_u *= T_maj * sigma_n / pdf;
 
-                    // Possibly terminate transmittance computation using Russian roulette
-                    SampledSpectrum Tr = T_ray / (inv_w_l + inv_w_u).Average();
-                    if (Tr.MaxComponentValue() < 0.05f) {
-                        Float q = 0.75f;
-                        if (rng.Uniform<Float>() < q)
-                            T_ray = SampledSpectrum(0.);
-                        else
-                            T_ray /= 1 - q;
-                    }
+                                // Possibly terminate transmittance computation using
+                                // Russian roulette
+                                SampledSpectrum Tr = T_ray / (r_l + r_u).Average();
+                                if (Tr.MaxComponentValue() < 0.05f) {
+                                    Float q = 0.75f;
+                                    if (rng.Uniform<Float>() < q)
+                                        T_ray = SampledSpectrum(0.);
+                                    else
+                                        T_ray /= 1 - q;
+                                }
 
-                    if (!T_ray)
-                        return false;
-                    return true;
-                });
+                                if (!T_ray)
+                                    return false;
+                                return true;
+                            });
             // Update transmittance estimate for final segment
             T_ray *= T_maj / T_maj[0];
-            inv_w_l *= T_maj / T_maj[0];
-            inv_w_u *= T_maj / T_maj[0];
+            r_l *= T_maj / T_maj[0];
+            r_u *= T_maj / T_maj[0];
         }
 
         // Generate next ray segment or return final transmittance
@@ -1371,12 +1375,12 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
         lightRay = si->intr.SpawnRayTo(ls->pLight);
     }
     // Return path contribution function estimate for direct lighting
-    inv_w_l *= inv_w_p * lightPDF;
-    inv_w_u *= inv_w_p * scatterPDF;
+    r_l *= r_p * lightPDF;
+    r_u *= r_p * scatterPDF;
     if (IsDeltaLight(light.Type()))
-        return beta * f_hat * T_ray * ls->L / inv_w_l.Average();
+        return beta * f_hat * T_ray * ls->L / r_l.Average();
     else
-        return beta * f_hat * T_ray * ls->L / (inv_w_l + inv_w_u).Average();
+        return beta * f_hat * T_ray * ls->L / (r_l + r_u).Average();
 }
 
 std::string VolPathIntegrator::ToString() const {
