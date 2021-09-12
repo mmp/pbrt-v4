@@ -141,7 +141,7 @@ struct CyHairHeader {
   float default_thickness;
   float default_transparency;
   float default_color[3];
-  char infomation[88];
+  char information[88];
 };
 
 class CyHair {

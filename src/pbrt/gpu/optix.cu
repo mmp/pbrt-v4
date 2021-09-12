@@ -266,7 +266,7 @@ extern "C" __global__ void __miss__shadow() {
 }
 
 extern "C" __global__ void __raygen__shadow_Tr() {
-    PBRT_DBG("raygen sahadow tr %d\n", optixGetLaunchIndex().x);
+    PBRT_DBG("raygen shadow tr %d\n", optixGetLaunchIndex().x);
     int index = optixGetLaunchIndex().x;
     if (index >= params.shadowRayQueue->Size())
         return;
