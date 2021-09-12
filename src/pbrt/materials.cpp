@@ -180,7 +180,7 @@ HairMaterial *HairMaterial::Create(const TextureParameterDictionary &parameters,
 
 // DiffuseMaterial Method Definitions
 std::string DiffuseMaterial::ToString() const {
-    return StringPrintf("[ DiffuseMaterial displacement: %s reflectance: %s sigma: %s ]",
+    return StringPrintf("[ DiffuseMaterial displacement: %s reflectance: %s ]",
                         displacement, reflectance);
 }
 
