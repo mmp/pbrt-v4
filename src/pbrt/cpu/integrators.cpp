@@ -1055,6 +1055,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                             ClampZero(sigma_maj - mp.sigma_a - mp.sigma_s);
                         Float pdf = T_maj[0] * sigma_n[0];
                         beta *= T_maj * sigma_n / pdf;
+                        if (pdf == 0) beta = SampledSpectrum(0.f);
                         r_u *= T_maj * sigma_n / pdf;
                         r_l *= T_maj * sigma_maj / pdf;
                         return beta && r_u;
