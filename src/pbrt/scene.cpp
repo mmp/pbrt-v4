@@ -1066,6 +1066,7 @@ void BasicScene::CreateMaterials(const NamedTextures &textures,
                                  std::map<std::string, pbrt::Material> *namedMaterialsOut,
                                  std::vector<pbrt::Material> *materialsOut) {
     LOG_VERBOSE("Starting to consume normal map futures");
+    std::lock_guard<std::mutex> lock(materialMutex);
     for (auto &fut : normalMapFutures) {
         CHECK(normalMaps.find(fut.first) == normalMaps.end());
         normalMaps[fut.first] = fut.second.Get();
@@ -1123,10 +1124,17 @@ NamedTextures BasicScene::CreateTextures() {
 
     // Consume futures
     LOG_VERBOSE("Starting to consume texture futures");
+    // The lock shouldn't be necessary since only the main thread should be
+    // active when CreateTextures() is called, but valgrind doesn't know
+    // that...
+    textureMutex.lock();
     for (auto &tex : floatTextureFutures)
         textures.floatTextures[tex.first] = tex.second.Get();
+    floatTextureFutures.clear();
     for (auto &tex : spectrumTextureFutures)
         textures.albedoSpectrumTextures[tex.first] = tex.second.Get();
+    spectrumTextureFutures.clear();
+    textureMutex.unlock();
     LOG_VERBOSE("Finished consuming texture futures");
 
     LOG_VERBOSE("Starting to create remaining textures");
@@ -1279,6 +1287,7 @@ std::vector<Light> BasicScene::CreateLights(
     LOG_VERBOSE("Finished area lights");
 
     LOG_VERBOSE("Starting to consume non-area light futures");
+    std::lock_guard<std::mutex> lock(lightMutex);
     for (auto &fut : lightFutures)
         lights.push_back(fut.Get());
     LOG_VERBOSE("Finished consuming non-area light futures");

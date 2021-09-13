@@ -14,6 +14,7 @@
 #include <pbrt/util/stats.h>
 #include <pbrt/util/vecmath.h>
 
+#include <atomic>
 #include <cstring>
 #include <shared_mutex>
 #include <string>
@@ -98,7 +99,7 @@ class BufferCache {
     static constexpr int nShards = 1 << logShards;
     std::shared_mutex mutex[nShards];
     std::unordered_set<Buffer, BufferHasher> cache[nShards];
-    size_t bytesUsed = 0;
+    std::atomic<size_t> bytesUsed{};
 };
 
 // BufferCache Global Declarations
