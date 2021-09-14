@@ -910,7 +910,8 @@ class InternCache {
           bufferResource(alloc.resource()),
           itemAlloc(&bufferResource) {}
 
-    const T *Lookup(const T &item) {
+    template <typename F>
+    const T *Lookup(const T &item, F create) {
         size_t offset = Hash()(item) % hashTable.size();
         int step = 1;
         mutex.lock_shared();
@@ -953,7 +954,7 @@ class InternCache {
 
                 // Allocate new hash table entry and add it to the hash table
                 ++nEntries;
-                T *newPtr = itemAlloc.new_object<T>(item);
+                T *newPtr = create(itemAlloc, item);
                 Insert(newPtr, &hashTable);
                 mutex.unlock();
                 return newPtr;
@@ -971,6 +972,12 @@ class InternCache {
                 offset %= hashTable.size();
             }
         }
+    }
+
+    const T *Lookup(const T &item) {
+        return Lookup(item, [](Allocator alloc, const T &item) {
+            return alloc.new_object<T>(item);
+        });
     }
 
     size_t size() const { return nEntries; }
