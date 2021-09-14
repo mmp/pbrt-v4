@@ -172,11 +172,13 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
     if (!haveLights)
         ErrorExit("No light sources specified");
 
+    LOG_VERBOSE("Starting to create light sampler");
     std::string lightSamplerName =
         scene.integrator.parameters.GetOneString("lightsampler", "bvh");
     if (allLights.size() == 1)
         lightSamplerName = "uniform";
     lightSampler = LightSampler::Create(lightSamplerName, allLights, alloc);
+    LOG_VERBOSE("Finished creating light sampler");
 
     if (scene.integrator.name != "path" && scene.integrator.name != "volpath")
         Warning(&scene.integrator.loc,

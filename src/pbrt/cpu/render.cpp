@@ -65,8 +65,10 @@ void RenderCPU(BasicScene &parsedScene) {
     Sampler sampler = parsedScene.GetSampler();
 
     // Integrator
+    LOG_VERBOSE("Starting to create integrator");
     std::unique_ptr<Integrator> integrator(
         parsedScene.CreateIntegrator(camera, sampler, accel, lights));
+    LOG_VERBOSE("Finished creating integrator");
 
     // Helpful warnings
     for (const auto &sh : parsedScene.shapes)
