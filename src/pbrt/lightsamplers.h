@@ -384,7 +384,7 @@ class BVHLightSampler {
     // BVHLightSampler Private Methods
     std::pair<int, LightBounds> buildBVH(
         std::vector<std::pair<int, LightBounds>> &bvhLights, int start, int end,
-        uint32_t bitTrail, int depth, Allocator alloc);
+        uint32_t bitTrail, int depth);
 
     Float EvaluateCost(const LightBounds &b, const Bounds3f &bounds, int dim) const {
         // Evaluate direction bounds measure for _LightBounds_

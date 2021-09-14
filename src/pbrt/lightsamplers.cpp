@@ -125,14 +125,14 @@ BVHLightSampler::BVHLightSampler(pstd::span<const Light> lights, Allocator alloc
         }
     }
     if (!bvhLights.empty())
-        buildBVH(bvhLights, 0, bvhLights.size(), 0, 0, alloc);
+        buildBVH(bvhLights, 0, bvhLights.size(), 0, 0);
     lightBVHBytes += nodes.size() * sizeof(LightBVHNode);
 }
 
 std::pair<int, LightBounds> BVHLightSampler::buildBVH(
     std::vector<std::pair<int, LightBounds>> &bvhLights, int start, int end,
-    uint32_t bitTrail, int depth, Allocator alloc) {
-    CHECK_LT(start, end);
+    uint32_t bitTrail, int depth) {
+    DCHECK_LT(start, end);
     // Initialize leaf node if only a single light remains
     if (end - start == 1) {
         int nodeIndex = nodes.size();
@@ -166,8 +166,8 @@ std::pair<int, LightBounds> BVHLightSampler::buildBVH(
             int b = nBuckets * centroidBounds.Offset(pc)[dim];
             if (b == nBuckets)
                 b = nBuckets - 1;
-            CHECK_GE(b, 0);
-            CHECK_LT(b, nBuckets);
+            DCHECK_GE(b, 0);
+            DCHECK_LT(b, nBuckets);
             bucketLightBounds[b] = Union(bucketLightBounds[b], bvhLights[i].second);
         }
 
@@ -207,14 +207,14 @@ std::pair<int, LightBounds> BVHLightSampler::buildBVH(
                         centroidBounds.Offset(l.second.Centroid())[minCostSplitDim];
                 if (b == nBuckets)
                     b = nBuckets - 1;
-                CHECK_GE(b, 0);
-                CHECK_LT(b, nBuckets);
+                DCHECK_GE(b, 0);
+                DCHECK_LT(b, nBuckets);
                 return b <= minCostSplitBucket;
             });
         mid = pmid - &bvhLights[0];
         if (mid == start || mid == end)
             mid = (start + end) / 2;
-        CHECK(mid > start && mid < end);
+        DCHECK(mid > start && mid < end);
     }
 
     // Allocate interior _LightBVHNode_ and recursively initialize children
@@ -222,10 +222,10 @@ std::pair<int, LightBounds> BVHLightSampler::buildBVH(
     nodes.push_back(LightBVHNode());
     CHECK_LT(depth, 64);
     std::pair<int, LightBounds> child0 =
-        buildBVH(bvhLights, start, mid, bitTrail, depth + 1, alloc);
-    CHECK_EQ(nodeIndex + 1, child0.first);
+        buildBVH(bvhLights, start, mid, bitTrail, depth + 1);
+    DCHECK_EQ(nodeIndex + 1, child0.first);
     std::pair<int, LightBounds> child1 =
-        buildBVH(bvhLights, mid, end, bitTrail | (1u << depth), depth + 1, alloc);
+        buildBVH(bvhLights, mid, end, bitTrail | (1u << depth), depth + 1);
 
     // Initialize interior node and return node index and bounds
     LightBounds lb = Union(child0.second, child1.second);
