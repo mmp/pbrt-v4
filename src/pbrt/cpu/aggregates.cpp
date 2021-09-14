@@ -153,11 +153,10 @@ BVHAggregate::BVHAggregate(std::vector<Primitive> prims, int maxPrimsInNode,
     // Declare _Allocator_s used for BVH construction
     pstd::pmr::monotonic_buffer_resource resource;
     Allocator alloc(&resource);
-    std::vector<std::unique_ptr<pstd::pmr::monotonic_buffer_resource>>
-        threadBufferResources;
+    using Resource = pstd::pmr::monotonic_buffer_resource;
+    std::vector<std::unique_ptr<Resource>> threadBufferResources;
     ThreadLocal<Allocator> threadAllocators([&threadBufferResources]() {
-        threadBufferResources.push_back(
-            std::make_unique<pstd::pmr::monotonic_buffer_resource>());
+        threadBufferResources.push_back(std::make_unique<Resource>());
         auto ptr = threadBufferResources.back().get();
         return Allocator(ptr);
     });

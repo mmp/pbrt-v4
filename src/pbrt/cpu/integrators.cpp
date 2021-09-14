@@ -1055,7 +1055,8 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                             ClampZero(sigma_maj - mp.sigma_a - mp.sigma_s);
                         Float pdf = T_maj[0] * sigma_n[0];
                         beta *= T_maj * sigma_n / pdf;
-                        if (pdf == 0) beta = SampledSpectrum(0.f);
+                        if (pdf == 0)
+                            beta = SampledSpectrum(0.f);
                         r_u *= T_maj * sigma_n / pdf;
                         r_l *= T_maj * sigma_maj / pdf;
                         return beta && r_u;
@@ -1304,12 +1305,12 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
     SampledSpectrum f_hat;
     Vector3f wo = intr.wo, wi = ls->wi;
     if (bsdf) {
-        // Update _bsdfLight_ and _scatterPDF_ accounting for the BSDF
+        // Update _f_hat_ and _scatterPDF_ accounting for the BSDF
         f_hat = bsdf->f(wo, wi) * AbsDot(wi, intr.AsSurface().shading.n);
         scatterPDF = bsdf->PDF(wo, wi);
 
     } else {
-        // Update _bsdfLight_ and _scatterPDF_ accounting for the phase function
+        // Update _f_hat_ and _scatterPDF_ accounting for the phase function
         CHECK(intr.IsMediumInteraction());
         PhaseFunction phase = intr.AsMedium().phase;
         f_hat = SampledSpectrum(phase.p(wo, wi));

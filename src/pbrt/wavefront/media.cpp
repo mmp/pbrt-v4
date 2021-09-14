@@ -128,7 +128,8 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
 
                         Float pr = T_maj[0] * sigma_n[0];
                         beta *= T_maj * sigma_n / pr;
-                        if (pr == 0) beta = SampledSpectrum(0.f);
+                        if (pr == 0)
+                            beta = SampledSpectrum(0.f);
                         inv_w_u *= T_maj * sigma_n / pr;
                         inv_w_l *= T_maj * sigma_maj / pr;
 
