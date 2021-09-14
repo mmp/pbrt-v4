@@ -27,13 +27,13 @@
 
 #ifdef PBRT_IS_WINDOWS
 #include <Windows.h>
-#endif // PBRT_IS_WINDOWS
+#endif  // PBRT_IS_WINDOWS
 
 namespace pbrt {
 
 #ifdef PBRT_IS_WINDOWS
 static LONG WINAPI handleExceptions(PEXCEPTION_POINTERS info) {
-    switch (info->ExceptionRecord->ExceptionCode) { 
+    switch (info->ExceptionRecord->ExceptionCode) {
     case EXCEPTION_ACCESS_VIOLATION:
         LOG_ERROR("Access violation--terminating execution");
         break;
@@ -52,7 +52,7 @@ static LONG WINAPI handleExceptions(PEXCEPTION_POINTERS info) {
     }
     return EXCEPTION_EXECUTE_HANDLER;
 }
-#endif // PBRT_IS_WINDOWS
+#endif  // PBRT_IS_WINDOWS
 
 // API Function Definitions
 void InitPBRT(const PBRTOptions &opt) {

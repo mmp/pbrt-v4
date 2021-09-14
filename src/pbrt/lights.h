@@ -173,6 +173,7 @@ class LightBase {
     }
 
   protected:
+    // LightBase Protected Methods
     static const DenselySampledSpectrum *LookupSpectrum(Spectrum s);
 
     std::string BaseToString() const;
@@ -180,17 +181,16 @@ class LightBase {
     LightType type;
     Transform renderFromLight;
     MediumInterface mediumInterface;
-
-  private:
-    static InternCache<DenselySampledSpectrum, DenselySampledSpectrum::Hash> *spectrumCache;
+    static InternCache<DenselySampledSpectrum, DenselySampledSpectrum::Hash>
+        *spectrumCache;
 };
 
 // PointLight Definition
 class PointLight : public LightBase {
   public:
     // PointLight Public Methods
-    PointLight(Transform renderFromLight, MediumInterface mediumInterface,
-               Spectrum I, Float scale)
+    PointLight(Transform renderFromLight, MediumInterface mediumInterface, Spectrum I,
+               Float scale)
         : LightBase(LightType::DeltaPosition, renderFromLight, mediumInterface),
           I(LookupSpectrum(I)),
           scale(scale) {}
@@ -734,8 +734,8 @@ class PortalImageInfiniteLight : public LightBase {
 class SpotLight : public LightBase {
   public:
     // SpotLight Public Methods
-    SpotLight(const Transform &renderFromLight, const MediumInterface &m,
-              Spectrum I, Float scale, Float totalWidth, Float falloffStart);
+    SpotLight(const Transform &renderFromLight, const MediumInterface &m, Spectrum I,
+              Float scale, Float totalWidth, Float falloffStart);
 
     static SpotLight *Create(const Transform &renderFromLight, Medium medium,
                              const ParameterDictionary &parameters,

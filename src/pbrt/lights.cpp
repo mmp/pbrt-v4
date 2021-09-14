@@ -11,7 +11,7 @@
 #include <pbrt/cameras.h>
 #ifdef PBRT_BUILD_GPU_RENDERER
 #include <pbrt/gpu/memory.h>
-#endif // PBRT_BUILD_GPU_RENDERER
+#endif  // PBRT_BUILD_GPU_RENDERER
 #include <pbrt/paramdict.h>
 #include <pbrt/samplers.h>
 #include <pbrt/shapes.h>
@@ -36,25 +36,6 @@ namespace pbrt {
 
 STAT_COUNTER("Scene/Lights", numLights);
 STAT_COUNTER("Scene/AreaLights", numAreaLights);
-
-InternCache<DenselySampledSpectrum, DenselySampledSpectrum::Hash> *LightBase::spectrumCache;
-
-const DenselySampledSpectrum *LightBase::LookupSpectrum(Spectrum s) {
-    static std::mutex mutex;
-    mutex.lock();
-    if (!spectrumCache)
-        spectrumCache = new InternCache<DenselySampledSpectrum, DenselySampledSpectrum::Hash>(
-#ifdef PBRT_BUILD_GPU_RENDERER
-                         Options->useGPU ? Allocator(&CUDATrackedMemoryResource::singleton) :
-#endif
-                         Allocator{});
-    mutex.unlock();
-
-    return spectrumCache->Lookup(DenselySampledSpectrum(s),
-                                 [](Allocator alloc, const DenselySampledSpectrum &s) {
-                                     return alloc.new_object<DenselySampledSpectrum>(s, alloc);
-                                 });
-}
 
 // Light Method Definitions
 std::string LightLiSample::ToString() const {
@@ -83,6 +64,7 @@ std::string ToString(LightType lf) {
     }
 }
 
+// LightBase Method Definitions
 LightBase::LightBase(LightType type, const Transform &renderFromLight,
                      const MediumInterface &mediumInterface)
     : type(type), mediumInterface(mediumInterface), renderFromLight(renderFromLight) {
@@ -92,6 +74,28 @@ LightBase::LightBase(LightType type, const Transform &renderFromLight,
 std::string LightBase::BaseToString() const {
     return StringPrintf("type: %s mediumInterface: %s renderFromLight: %s", type,
                         mediumInterface, renderFromLight);
+}
+
+InternCache<DenselySampledSpectrum, DenselySampledSpectrum::Hash>
+    *LightBase::spectrumCache;
+
+const DenselySampledSpectrum *LightBase::LookupSpectrum(Spectrum s) {
+    // Initialize _spectrumCache_ on first call
+    static std::mutex mutex;
+    mutex.lock();
+    if (!spectrumCache)
+        spectrumCache =
+            new InternCache<DenselySampledSpectrum, DenselySampledSpectrum::Hash>(
+#ifdef PBRT_BUILD_GPU_RENDERER
+                Options->useGPU ? Allocator(&CUDATrackedMemoryResource::singleton) :
+#endif
+                                Allocator{});
+    mutex.unlock();
+
+    auto create = [](Allocator alloc, const DenselySampledSpectrum &s) {
+        return alloc.new_object<DenselySampledSpectrum>(s, alloc);
+    };
+    return spectrumCache->Lookup(DenselySampledSpectrum(s), create);
 }
 
 std::string LightBounds::ToString() const {
@@ -518,8 +522,8 @@ ProjectionLight *ProjectionLight::Create(const Transform &renderFromLight, Mediu
 
 // GoniometricLight Method Definitions
 GoniometricLight::GoniometricLight(const Transform &renderFromLight,
-                                   const MediumInterface &mediumInterface,
-                                   Spectrum Iemit, Float scale, Image im, Allocator alloc)
+                                   const MediumInterface &mediumInterface, Spectrum Iemit,
+                                   Float scale, Image im, Allocator alloc)
     : LightBase(LightType::DeltaPosition, renderFromLight, mediumInterface),
       Iemit(LookupSpectrum(Iemit)),
       scale(scale),
@@ -681,8 +685,8 @@ GoniometricLight *GoniometricLight::Create(const Transform &renderFromLight,
 
 // DiffuseAreaLight Method Definitions
 DiffuseAreaLight::DiffuseAreaLight(const Transform &renderFromLight,
-                                   const MediumInterface &mediumInterface,
-                                   Spectrum Le, Float scale, const Shape shape, FloatTexture alpha,
+                                   const MediumInterface &mediumInterface, Spectrum Le,
+                                   Float scale, const Shape shape, FloatTexture alpha,
                                    Image im, const RGBColorSpace *imageColorSpace,
                                    bool twoSided)
     : LightBase(
