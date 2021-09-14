@@ -133,7 +133,23 @@ inline LightBounds::LightBounds(const Bounds3f &b, Vector3f w, Float phi,
       cosTheta_e(cosTheta_e),
       twoSided(twoSided) {}
 
-LightBounds Union(const LightBounds &a, const LightBounds &b);
+inline LightBounds Union(const LightBounds &a, const LightBounds &b) {
+    // If one _LightBounds_ has zero power, return the other
+    if (a.phi == 0)
+        return b;
+    if (b.phi == 0)
+        return a;
+
+    // Find average direction and updated angles for _LightBounds_
+    DirectionCone cone =
+        Union(DirectionCone(a.w, a.cosTheta_o), DirectionCone(b.w, b.cosTheta_o));
+    Float cosTheta_o = cone.cosTheta;
+    Float cosTheta_e = std::min(a.cosTheta_e, b.cosTheta_e);
+
+    // Return final _LightBounds_ union
+    return LightBounds(Union(a.bounds, b.bounds), cone.w, a.phi + b.phi, cosTheta_o,
+                       cosTheta_e, a.twoSided | b.twoSided);
+}
 
 // LightBase Definition
 class LightBase {
