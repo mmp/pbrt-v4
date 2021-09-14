@@ -14,6 +14,7 @@
 #include <pbrt/util/check.h>
 #include <pbrt/util/color.h>
 #include <pbrt/util/float.h>
+#include <pbrt/util/hash.h>
 #include <pbrt/util/math.h>
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/sampling.h>
@@ -377,6 +378,10 @@ class DenselySampledSpectrum {
           values(lambda_max - lambda_min + 1, alloc) {}
     DenselySampledSpectrum(Spectrum s, Allocator alloc)
         : DenselySampledSpectrum(s, Lambda_min, Lambda_max, alloc) {}
+    DenselySampledSpectrum(const DenselySampledSpectrum &s, Allocator alloc)
+        : lambda_min(s.lambda_min),
+          lambda_max(s.lambda_max),
+          values(s.values.begin(), s.values.end(), alloc) {}
 
     PBRT_CPU_GPU
     SampledSpectrum Sample(const SampledWavelengths &lambda) const {
@@ -432,7 +437,25 @@ class DenselySampledSpectrum {
         return values[offset];
     }
 
+    PBRT_CPU_GPU
+    bool operator==(const DenselySampledSpectrum &d) const {
+        if (lambda_min != d.lambda_min || lambda_max != d.lambda_max ||
+            values.size() != d.values.size())
+            return false;
+        for (size_t i = 0; i < values.size(); ++i)
+            if (values[i] != d.values[i])
+                return false;
+        return true;
+    }
+
+    struct Hash {
+        size_t operator()(const DenselySampledSpectrum &s) const {
+            return HashBuffer(s.values.data(), s.values.size());
+        }
+    };
+
   private:
+    friend struct Hash;
     // DenselySampledSpectrum Private Members
     int lambda_min, lambda_max;
     pstd::vector<Float> values;
