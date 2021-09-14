@@ -27,7 +27,7 @@ TEST(BVHLightSampling, OneSpot) {
     ConstantSpectrum one(1.f);
     lights.push_back(new SpotLight(id, MediumInterface(), &one, 1.f /* scale */,
                                    45.f /* total width */,
-                                   44.f /* falloff start */, Allocator()));
+                                   44.f /* falloff start */));
     BVHLightSampler distrib(lights, Allocator());
 
     RNG rng;
@@ -74,8 +74,7 @@ TEST(BVHLightSampling, Point) {
         // Random point in [-5, 5]
         Vector3f p{Lerp(rng.Uniform<Float>(), -5, 5), Lerp(rng.Uniform<Float>(), -5, 5),
                    Lerp(rng.Uniform<Float>(), -5, 5)};
-        lights.push_back(
-            new PointLight(Translate(p), MediumInterface(), &one, 1.f, Allocator()));
+        lights.push_back(new PointLight(Translate(p), MediumInterface(), &one, 1.f));
         lightToIndex[lights.back()] = i;
     }
     BVHLightSampler distrib(lights, Allocator());
@@ -126,7 +125,7 @@ TEST(BVHLightSampling, PointVaryPower) {
         lightSpectra.push_back(std::make_unique<ConstantSpectrum>(lightPower.back()));
         sumPower += lightPower.back();
         lights.push_back(new PointLight(Translate(p), MediumInterface(),
-                                        lightSpectra.back().get(), 1.f, Allocator()));
+                                        lightSpectra.back().get(), 1.f));
         lightToIndex[lights.back()] = i;
     }
     BVHLightSampler distrib(lights, Allocator());
@@ -208,8 +207,7 @@ TEST(BVHLightSampling, OneTri) {
     std::vector<Light> lights;
     ConstantSpectrum one(1.f);
     lights.push_back(new DiffuseAreaLight(id, MediumInterface(), &one, 1.f, tris[0],
-                                          nullptr, Image(), nullptr, false /* two sided */,
-                                          Allocator()));
+                                          nullptr, Image(), nullptr, false /* two sided */));
 
     BVHLightSampler distrib(lights, Allocator());
 
@@ -259,7 +257,7 @@ static std::tuple<std::vector<Light>, std::vector<Shape>> randomLights(
             static Transform id;
             lights.push_back(alloc.new_object<DiffuseAreaLight>(
                 id, MediumInterface(), alloc.new_object<ConstantSpectrum>(r()), 1.f,
-                tris[0], nullptr, Image(), nullptr, false /* two sided */, Allocator()));
+                tris[0], nullptr, Image(), nullptr, false /* two sided */));
             allTris.push_back(tris[0]);
         }
 
@@ -270,7 +268,7 @@ static std::tuple<std::vector<Light>, std::vector<Shape>> randomLights(
                        Lerp(rng.Uniform<Float>(), -5, 5)};
             lights.push_back(new PointLight(Translate(p), MediumInterface(),
                                             alloc.new_object<ConstantSpectrum>(r()),
-                                            1.f, Allocator()));
+                                            1.f));
         }
     }
 

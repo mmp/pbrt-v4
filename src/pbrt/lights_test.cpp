@@ -24,7 +24,7 @@ TEST(SpotLight, Power) {
     static ConstantSpectrum I(10.);
     Transform id;
     SpotLight light(id, MediumInterface(), &I, 1.f /* scale */, 60 /* total width */,
-                    40 /* falloff start */, Allocator());
+                    40 /* falloff start */);
 
     SampledWavelengths lambda = SampledWavelengths::SampleUniform(0.5);
     SampledSpectrum phi = light.Phi(lambda);
@@ -49,8 +49,7 @@ TEST(SpotLight, Sampling) {
     Transform id;
     for (auto ws : widthStart) {
         SpotLight light(id, MediumInterface(), &I, 1.f /* scale */,
-                        ws[0] /* total width */, ws[1] /* falloff start */,
-                        Allocator());
+                        ws[0] /* total width */, ws[1] /* falloff start */);
 
         RNG rng;
         for (int i = 0; i < 100; ++i) {
