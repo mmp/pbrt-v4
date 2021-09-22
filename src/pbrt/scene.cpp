@@ -497,6 +497,9 @@ void BasicSceneBuilder::Option(const std::string &name, const std::string &value
         else
             ErrorExitDeferred(&loc, "%s: expected \"true\" or \"false\" for option value",
                               value);
+    } else if (nName == "displacementedgescale") {
+        if (!Atof(value, &Options->displacementEdgeScale))
+            ErrorExitDeferred(&loc, "%s: expected floating-point option value", value);
     } else if (nName == "msereferenceimage") {
         if (value.size() < 3 || value.front() != '"' || value.back() != '"')
             ErrorExitDeferred(&loc, "%s: expected quoted string for option value", value);
