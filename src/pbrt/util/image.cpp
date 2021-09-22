@@ -551,7 +551,7 @@ ImageChannelValues Image::MAE(const ImageChannelDesc &desc, const Image &ref,
             ImageChannelValues vref = ref.GetChannels({x, y}, refDesc);
 
             for (int c = 0; c < desc.size(); ++c) {
-                Float error = v[c] - vref[c];
+                double error = double(v[c]) - double(vref[c]);
                 if (IsInf(error))
                     continue;
                 sumError[c] += error;
@@ -585,7 +585,7 @@ ImageChannelValues Image::MSE(const ImageChannelDesc &desc, const Image &ref,
             ImageChannelValues vref = ref.GetChannels({x, y}, refDesc);
 
             for (int c = 0; c < desc.size(); ++c) {
-                Float se = Sqr(v[c] - vref[c]);
+                double se = Sqr(double(v[c]) - double(vref[c]));
                 if (IsInf(se))
                     continue;
                 sumSE[c] += se;
@@ -617,7 +617,7 @@ ImageChannelValues Image::MRSE(const ImageChannelDesc &desc, const Image &ref,
             ImageChannelValues vref = ref.GetChannels({x, y}, refDesc);
 
             for (int c = 0; c < desc.size(); ++c) {
-                Float rse = Sqr(v[c] - vref[c]) / Sqr(vref[c] + 0.01);
+                double rse = Sqr(double(v[c]) - double(vref[c])) / Sqr(vref[c] + 0.01);
                 if (IsInf(rse))
                     continue;
                 sumRSE[c] += rse;
