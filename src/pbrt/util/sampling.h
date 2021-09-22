@@ -157,13 +157,13 @@ PBRT_CPU_GPU inline Point2f InvertBilinearSample(Point2f p, pstd::span<const Flo
             InvertLinearSample(p.y, w[0] + w[1], w[2] + w[3])};
 }
 
-PBRT_CPU_GPU inline Float XYZMatchingPDF(Float lambda) {
+PBRT_CPU_GPU inline Float VisibleWavelengthsPDF(Float lambda) {
     if (lambda < 360 || lambda > 830)
         return 0;
     return 0.0039398042f / Sqr(std::cosh(0.0072f * (lambda - 538)));
 }
 
-PBRT_CPU_GPU inline Float SampleXYZMatching(Float u) {
+PBRT_CPU_GPU inline Float SampleVisibleWavelengths(Float u) {
     return 538 - 138.888889f * std::atanh(0.85691062f - 1.82750197f * u);
 }
 

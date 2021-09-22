@@ -125,8 +125,8 @@ TEST(Spectrum, SamplingPdfY) {
     Float ysum = 0;
     int n = 1000;
     for (Float u : Stratified1D(n)) {
-        Float lambda = SampleXYZMatching(u);
-        Float pdf = XYZMatchingPDF(lambda);
+        Float lambda = SampleVisibleWavelengths(u);
+        Float pdf = VisibleWavelengthsPDF(lambda);
         if (pdf > 0)
             ysum += Spectra::Y()(lambda) / pdf;
     }
@@ -150,8 +150,8 @@ TEST(Spectrum, SamplingPdfXYZ) {
                 pdf;
         }
 
-        Float lambda = SampleXYZMatching(u);
-        Float pdf = XYZMatchingPDF(lambda);
+        Float lambda = SampleVisibleWavelengths(u);
+        Float pdf = VisibleWavelengthsPDF(lambda);
         if (pdf > 0)
             impSum +=
                 (Spectra::X()(lambda) + Spectra::Y()(lambda) + Spectra::Z()(lambda)) /

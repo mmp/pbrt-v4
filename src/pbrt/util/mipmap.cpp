@@ -255,22 +255,23 @@ T MIPMap::Filter(Point2f st, Vector2f dst0, Vector2f dst1) const {
             }
         }
     }
-    // Compute ellipse minor and major axes
+    // Compute EWA ellipse axes
     if (LengthSquared(dst0) < LengthSquared(dst1))
         pstd::swap(dst0, dst1);
-    Float majorLength = Length(dst0), minorLength = Length(dst1);
+    Float longerVecLength = Length(dst0), shorterVecLength = Length(dst1);
 
-    // Clamp ellipse eccentricity if too large
-    if (minorLength * options.maxAnisotropy < majorLength && minorLength > 0) {
-        Float scale = majorLength / (minorLength * options.maxAnisotropy);
+    // Clamp ellipse vector ratio if too large
+    if (shorterVecLength * options.maxAnisotropy < longerVecLength &&
+        shorterVecLength > 0) {
+        Float scale = longerVecLength / (shorterVecLength * options.maxAnisotropy);
         dst1 *= scale;
-        minorLength *= scale;
+        shorterVecLength *= scale;
     }
-    if (minorLength == 0)
+    if (shorterVecLength == 0)
         return Bilerp<T>(0, st);
 
     // Choose level of detail for EWA lookup and perform EWA filtering
-    Float lod = std::max<Float>(0, Levels() - 1 + Log2(minorLength));
+    Float lod = std::max<Float>(0, Levels() - 1 + Log2(shorterVecLength));
     int ilod = pstd::floor(lod);
     return Lerp(lod - ilod, EWA<T>(ilod, st, dst0, dst1),
                 EWA<T>(ilod + 1, st, dst0, dst1));

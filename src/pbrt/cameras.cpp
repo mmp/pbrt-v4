@@ -158,7 +158,7 @@ void CameraBase::FindMinimumDifferentials(Camera camera) {
     CameraSample sample;
     sample.pLens = Point2f(0.5, 0.5);
     sample.time = 0.5;
-    SampledWavelengths lambda = SampledWavelengths::SampleXYZ(0.5);
+    SampledWavelengths lambda = SampledWavelengths::SampleVisible(0.5);
 
     int n = 512;
     for (int i = 0; i < n; ++i) {

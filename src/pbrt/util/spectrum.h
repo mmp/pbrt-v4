@@ -328,7 +328,7 @@ class SampledWavelengths {
     }
 
     PBRT_CPU_GPU
-    static SampledWavelengths SampleXYZ(Float u) {
+    static SampledWavelengths SampleVisible(Float u) {
         SampledWavelengths swl;
         for (int i = 0; i < NSpectrumSamples; ++i) {
             // Compute _up_ for $i$th wavelength sample
@@ -336,8 +336,8 @@ class SampledWavelengths {
             if (up > 1)
                 up -= 1;
 
-            swl.lambda[i] = SampleXYZMatching(up);
-            swl.pdf[i] = XYZMatchingPDF(swl.lambda[i]);
+            swl.lambda[i] = SampleVisibleWavelengths(up);
+            swl.pdf[i] = VisibleWavelengthsPDF(swl.lambda[i]);
         }
         return swl;
     }

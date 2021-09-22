@@ -92,6 +92,7 @@ const DenselySampledSpectrum *LightBase::LookupSpectrum(Spectrum s) {
                                 Allocator{});
     mutex.unlock();
 
+    // Return unique _DenselySampledSpectrum_ from intern cache for _s_
     auto create = [](Allocator alloc, const DenselySampledSpectrum &s) {
         return alloc.new_object<DenselySampledSpectrum>(s, alloc);
     };

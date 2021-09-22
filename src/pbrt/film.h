@@ -210,7 +210,7 @@ class FilmBase {
 
     PBRT_CPU_GPU
     SampledWavelengths SampleWavelengths(Float u) const {
-        return SampledWavelengths::SampleXYZ(u);
+        return SampledWavelengths::SampleVisible(u);
     }
 
     PBRT_CPU_GPU

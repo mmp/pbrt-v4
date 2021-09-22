@@ -187,8 +187,8 @@ class PaddedSobolSampler {
         int dim = dimension;
         dimension += 2;
         // Return randomized 2D Sobol' sample
-        return {SampleDimension(0, index, uint32_t(hash)),
-                SampleDimension(1, index, hash >> 32)};
+        return Point2f(SampleDimension(0, index, uint32_t(hash)),
+                       SampleDimension(1, index, hash >> 32));
     }
 
     PBRT_CPU_GPU
