@@ -107,3 +107,17 @@ TEST(RotateFromTo, Randoms) {
         EXPECT_GT(Dot(to, toNew), .999f);
     }
 }
+
+#if 0
+TEST(Quaternion, RoundTripBug) {
+    Transform rot(SquareMatrix<4>(0.683930874, -0.150930509, -0.713763654, 0,
+                                  0.729445815, 0.157755896, 0.665598929, 0,
+                                  -0.0121412454, 0.975875556, -0.217989743, 0,
+                                  0, 0, 0, 1));
+    Quaternion qrot = Quaternion(rot);
+    Transform qrott = Transform(qrot);
+    for (int i = 0; i < 4; ++i)
+        for (int j = 0; j < 4; ++j)
+            EXPECT_LT(std::abs(rot.GetMatrix()[i][j] - qrott.GetMatrix()[i][j]), 1e-3f);
+}
+#endif
