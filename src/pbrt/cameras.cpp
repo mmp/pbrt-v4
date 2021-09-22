@@ -1353,9 +1353,9 @@ RealisticCamera *RealisticCamera::Create(const ParameterDictionary &parameters,
         } else if (apertureName == "square") {
             apertureImage = Image(PixelFormat::Float, {builtinRes, builtinRes}, {"Y"},
                                   nullptr, alloc);
-            for (int y = 0; y < apertureImage.Resolution().y; ++y)
-                for (int x = 0; x < apertureImage.Resolution().x; ++x)
-                    apertureImage.SetChannel({x, y}, 0, 1.f);
+            for (int y = .25 * builtinRes; y < .75 * builtinRes; ++y)
+                for (int x = .25 * builtinRes; x < .75 * builtinRes; ++x)
+                    apertureImage.SetChannel({x, y}, 0, 4.f);
         } else if (apertureName == "pentagon") {
             // https://mathworld.wolfram.com/RegularPentagon.html
             Float c1 = (std::sqrt(5.f) - 1) / 4;
