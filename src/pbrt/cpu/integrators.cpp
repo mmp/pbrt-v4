@@ -3304,41 +3304,54 @@ std::unique_ptr<SPPMIntegrator> SPPMIntegrator::Create(
 }
 
 // FunctionIntegrator Method Definitions
-FunctionIntegrator::FunctionIntegrator(std::function<Float(Point2f)> func,
+FunctionIntegrator::FunctionIntegrator(std::function<double(Point2f)> func,
                                        const std::string &outputFilename, Camera camera,
-                                       Sampler sampler)
+                                       Sampler sampler, bool skipBad, std::string imageFilename)
     : Integrator(nullptr, {}),
       func(func),
       outputFilename(outputFilename),
       camera(camera),
-      baseSampler(sampler) {}
+      baseSampler(sampler),
+      skipBad(skipBad),
+      imageFilename(imageFilename) {}
 
 namespace funcs {
 
-static Float step(Point2f p) {
+static double step(Point2f p) {
     return (p.x < 0.5) ? 2 : 0;
 }
-static Float diagonal(Point2f p) {
+static double diagonal(Point2f p) {
     return (p.x + p.y < 1) ? 2 : 0;
 }
-static Float disk(Point2f p) {
+static double disk(Point2f p) {
     return Distance(p, Point2f(0.5, 0.5)) < 0.5 ? (1 / (Pi * Sqr(0.5))) : 0;
 }
-static Float checkerboard(Point2f p) {
+static double checkerboard(Point2f p) {
     int freq = 10;
     Point2i pi(p * freq);
     return ((pi.x & 1) ^ (pi.y & 1)) ? 2 : 0;
 }
-static Float rotatedCheckerboard(Point2f p) {
-    Float angle = Radians(45);
-    Float nrm = 1.0169844966464572;
-    return checkerboard({p.x * std::cos(angle) - p.y * std::sin(angle),
-                         p.x * std::sin(angle) + p.y * std::cos(angle)}) /
+static double rotatedCheckerboard(Point2f p) {
+    double angle = Radians(45);
+    double nrm = 1.00006866455078125;
+    static double sa = std::sin(angle), ca = std::cos(angle);
+    return (double)checkerboard({Float(10 + p.x * ca - p.y * sa),
+                                 Float(10 + p.x * sa + p.y * ca)}) /
            nrm;
 }
-static Float gaussian(Point2f p) {
-    Float mu = 0.5, sigma = 0.5;
-    Float nrm = Sqr(GaussianIntegral(0, 1, mu, sigma));
+static double gaussian(Point2f p) {
+    auto Gaussian = [](double x, double mu = 0, double sigma = 1) {
+        return 1 / std::sqrt(2 * Pi * sigma * sigma) *
+            std::exp(-Sqr(x - mu) / (2 * sigma * sigma));
+    };
+    auto GaussianIntegral = [](double x0, double x1, double mu = 0,
+                               double sigma = 1) {
+        double sigmaRoot2 = sigma * double(1.414213562373095);
+        return 0.5f * (std::erf((mu - x0) / sigmaRoot2) - std::erf((mu - x1) / sigmaRoot2));
+    };
+
+    double mu = 0.5, sigma = 0.25;
+    static double nrm = Sqr(GaussianIntegral(0, 1, mu, sigma));
     return Gaussian(p.x, mu, sigma) * Gaussian(p.y, mu, sigma) / nrm;
 }
 
@@ -3374,7 +3387,11 @@ std::unique_ptr<FunctionIntegrator> FunctionIntegrator::Create(
         ErrorExit(loc, "\"sobol\" sampler should be replaced with \"paddedsobol\" for "
                        "the \"function\" integrator.");
 
-    return std::make_unique<FunctionIntegrator>(func, outputFilename, camera, sampler);
+    bool skipBad = parameters.GetOneBool("skipbad", true);
+    std::string imageFilename = parameters.GetOneString("imagefilename", "");
+
+    return std::make_unique<FunctionIntegrator>(func, outputFilename, camera, sampler,
+                                                skipBad, imageFilename);
 }
 
 void FunctionIntegrator::Render() {
@@ -3383,37 +3400,82 @@ void FunctionIntegrator::Render() {
     int nPixels = pixelBounds.Area();
     Array2D<double> sumv(pixelBounds);
     int nSamples = baseSampler.SamplesPerPixel();
+
+    if (!imageFilename.empty()) {
+        RNG rng;
+        Vector2i res = pixelBounds.pMax - pixelBounds.pMin;
+        Image image(PixelFormat::Float, {res.x, res.y}, {"Y"});
+        for (int y = 0; y < res.y; ++y)
+            for (int x = 0; x < res.x; ++x) {
+                int nSamples = 256;
+                Float sum = 0;
+                for (int i = 0; i < nSamples; ++i)
+                    sum += func(Point2f((x + rng.Uniform<Float>()) / res.x,
+                                        (y + rng.Uniform<Float>()) / res.y));
+                image.SetChannel({x, y}, 0, sum / nSamples);
+            }
+        image.Write(imageFilename);
+    }
+
     ProgressReporter prog(nSamples, "Sampling", Options->quiet);
-    Float firstMSE = 0;
 
     bool isHalton = baseSampler.Is<HaltonSampler>();
     bool isStratified = baseSampler.Is<StratifiedSampler>();
-    std::vector<Float> cpRot[2];
+    bool isSobol = baseSampler.Is<PaddedSobolSampler>();
     std::vector<DigitPermutation> digitPermutations[2];
     std::vector<uint64_t> owenHash[2];
+    RNG rng;
     if (isHalton) {
-        RNG rng;
         for (int d = 0; d < 2; ++d) {
-            cpRot[d].resize(nPixels);
-            for (int i = 0; i < nPixels; ++i)
-                cpRot[d][i] = rng.Uniform<Float>();
-
             digitPermutations[d].resize(nPixels);
             for (int i = 0; i < nPixels; ++i)
                 digitPermutations[d][i] =
                     DigitPermutation(d == 0 ? 2 : 3, rng.Uniform<uint32_t>(), {});
-
+        }
+    }
+    if (isHalton || isSobol) {
+        for (int d = 0; d < 2; ++d) {
             owenHash[d].resize(nPixels);
             for (int i = 0; i < nPixels; ++i)
                 owenHash[d][i] = rng.Uniform<uint64_t>();
         }
     }
 
+    int nTakenSamples = 0;
     ThreadLocal<Sampler> threadSamplers([this]() { return baseSampler.Clone({}); });
     for (int sampleIndex = 0; sampleIndex < nSamples; ++sampleIndex) {
+        bool reportResult = true;
+        if (skipBad) {
+            int nSamples = sampleIndex + 1;
+            if (isStratified && Sqr(int(std::sqrt(nSamples))) != nSamples) {
+                prog.Update();
+                continue;
+            }
+            else if (isSobol && !IsPowerOf2(nSamples))
+                reportResult = false;
+            else if (isHalton) {
+                int n2 = 0, n3 = 0;
+                while (true) {
+                    if ((nSamples % 2) == 0) {
+                        nSamples /= 2;
+                        ++n2;
+                    } else if ((nSamples % 3) == 0) {
+                        nSamples /= 3;
+                        ++n3;
+                    } else
+                        break;
+                }
+                if (nSamples != 1 || n2 != n3)
+                    reportResult = false;
+            }
+        }
+
+        ++nTakenSamples;
+
         if (isStratified) {
             int spp = sampleIndex + 1;
             int factor = int(std::sqrt(spp));
+
             while ((spp % factor) != 0)
                 --factor;
 
@@ -3432,64 +3494,96 @@ void FunctionIntegrator::Render() {
                         v += func(u);
                     }
                 }
-                // Need spp factor to cancel out division in sumSE computation.
-                sumv[pPixel] = v * spp / (nx * ny);
+                // Need nTakenSamples factor to cancel out division in sumSE computation.
+                sumv[pPixel] = v * nTakenSamples / (nx * ny);
             });
         } else {
-            ParallelFor2D(pixelBounds, [&](Point2i pPixel) {
-                Sampler sampler = threadSamplers.Get();
-                sampler.StartPixelSample(pPixel, sampleIndex, 0);
+            ParallelFor2D(pixelBounds, [&](Bounds2i bounds) {
+                for (Point2i pPixel : bounds) {
+                    Point2f u;
+                    if (isHalton) {
+                        int pixelIndex = (pPixel.x - pixelBounds.pMin.x) +
+                            (pPixel.y - pixelBounds.pMin.y) *
+                            (pixelBounds.pMax.x - pixelBounds.pMin.x);
+                        DCHECK_GE(pixelIndex, 0);
+                        DCHECK_LT(pixelIndex, nPixels);
 
-                Point2f u;
-                if (isHalton) {
-                    int pixelIndex = (pPixel.x - pixelBounds.pMin.x) +
-                                     (pPixel.y - pixelBounds.pMin.y) *
-                                         (pixelBounds.pMax.x - pixelBounds.pMin.x);
-                    CHECK_GE(pixelIndex, 0);
-                    CHECK_LT(pixelIndex, nPixels);
+                        switch (baseSampler.Cast<HaltonSampler>()->GetRandomizeStrategy()) {
+                        case RandomizeStrategy::None:
+                            u = Point2f(RadicalInverse(0, sampleIndex),
+                                        RadicalInverse(1, sampleIndex));
+                            break;
+                        case RandomizeStrategy::PermuteDigits:
+                            u = Point2f(
+                                        ScrambledRadicalInverse(0, sampleIndex,
+                                                                digitPermutations[0][pixelIndex]),
+                                        ScrambledRadicalInverse(1, sampleIndex,
+                                                                digitPermutations[1][pixelIndex]));
+                            break;
+                        case RandomizeStrategy::Owen:
+                            u = Point2f(OwenScrambledRadicalInverse(0, sampleIndex,
+                                                                    owenHash[0][pixelIndex]),
+                                        OwenScrambledRadicalInverse(1, sampleIndex,
+                                                                    owenHash[1][pixelIndex]));
+                            break;
+                        default:
+                            LOG_FATAL("Unhandled randomization strategy");
+                        }
+                    } else if (isSobol) {
+                        int pixelIndex = (pPixel.x - pixelBounds.pMin.x) +
+                            (pPixel.y - pixelBounds.pMin.y) *
+                            (pixelBounds.pMax.x - pixelBounds.pMin.x);
+                        DCHECK_GE(pixelIndex, 0);
+                        DCHECK_LT(pixelIndex, nPixels);
 
-                    switch (baseSampler.Cast<HaltonSampler>()->GetRandomizeStrategy()) {
-                    case RandomizeStrategy::None:
-                        u = Point2f(RadicalInverse(0, sampleIndex),
-                                    RadicalInverse(1, sampleIndex));
-                        break;
-                    case RandomizeStrategy::PermuteDigits:
-                        u = Point2f(
-                            ScrambledRadicalInverse(0, sampleIndex,
-                                                    digitPermutations[0][pixelIndex]),
-                            ScrambledRadicalInverse(1, sampleIndex,
-                                                    digitPermutations[1][pixelIndex]));
-                        break;
-                    case RandomizeStrategy::Owen:
-                        u = Point2f(OwenScrambledRadicalInverse(0, sampleIndex,
-                                                                owenHash[0][pixelIndex]),
-                                    OwenScrambledRadicalInverse(1, sampleIndex,
-                                                                owenHash[1][pixelIndex]));
-                        break;
-                    default:
-                        LOG_FATAL("Unhandled randomization strategy");
+                        switch (baseSampler.Cast<PaddedSobolSampler>()->GetRandomizeStrategy()) {
+                        case RandomizeStrategy::None:
+                            u = Point2f(SobolSample(sampleIndex, 0, NoRandomizer()),
+                                        SobolSample(sampleIndex, 1, NoRandomizer()));
+                            break;
+                        case RandomizeStrategy::PermuteDigits:
+                            u = Point2f(SobolSample(sampleIndex, 0,
+                                                    BinaryPermuteScrambler(owenHash[0][pixelIndex])),
+                                        SobolSample(sampleIndex, 1,
+                                                    BinaryPermuteScrambler(owenHash[1][pixelIndex])));
+                            break;
+                        case RandomizeStrategy::FastOwen:
+                            u = Point2f(SobolSample(sampleIndex, 0, FastOwenScrambler(owenHash[0][pixelIndex])),
+                                        SobolSample(sampleIndex, 1, FastOwenScrambler(owenHash[1][pixelIndex])));
+                            break;
+                        case RandomizeStrategy::Owen:
+                            u = Point2f(SobolSample(sampleIndex, 0, OwenScrambler(owenHash[0][pixelIndex])),
+                                        SobolSample(sampleIndex, 1, OwenScrambler(owenHash[1][pixelIndex])));
+                            break;
+                        default:
+                            LOG_FATAL("Unhandled randomization strategy");
+                        }
+
+                    } else {
+                        Sampler sampler = threadSamplers.Get();
+                        sampler.StartPixelSample(pPixel, sampleIndex, 0);
+                        u = sampler.GetPixel2D();
                     }
-                } else
-                    u = sampler.Get2D();
-                sumv[pPixel] += func(u);
+                    sumv[pPixel] += func(u);
+                }
             });
         }
 
         // Compute average MSE/variance
-        double sumSE = 0;
-        for (double v : sumv)
-            sumSE += Sqr(v / (sampleIndex + 1) - 1);
-        Float mse = sumSE / nPixels;
+        if (reportResult) {
+            double sumSE = 0;
+            for (double v : sumv)
+                sumSE += Sqr(v / nTakenSamples - 1);
+            Float mse = sumSE / nPixels;
 
-        if (sampleIndex == 0)
-            firstMSE = mse;
-        result += StringPrintf("%d %f %f\n", sampleIndex + 1, mse, firstMSE / mse);
+            result += StringPrintf("%d %f\n", sampleIndex + 1, mse);
+        }
         prog.Update();
     }
 
     // Make sure that it's basically one...
     double sum = std::accumulate(sumv.begin(), sumv.end(), 0.);
-    double avg = sum / (double(sumv.size()) * double(nSamples));
+    double avg = sum / (double(sumv.size()) * double(nTakenSamples));
     if (avg < 0.999 || avg > 1.001)
         Warning("Average estimate is %f, which is suspiciously far from 1.", avg);
 

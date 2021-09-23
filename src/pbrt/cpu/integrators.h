@@ -480,8 +480,9 @@ class SPPMIntegrator : public Integrator {
 // FunctionIntegrator Definition
 class FunctionIntegrator : public Integrator {
   public:
-    FunctionIntegrator(std::function<Float(Point2f)> func,
-                       const std::string &outputFilename, Camera camera, Sampler sampler);
+    FunctionIntegrator(std::function<double(Point2f)> func,
+                       const std::string &outputFilename, Camera camera, Sampler sampler,
+                       bool skipBad, std::string imageFilename);
 
     static std::unique_ptr<FunctionIntegrator> Create(
         const ParameterDictionary &parameters, Camera camera, Sampler sampler,
@@ -492,10 +493,12 @@ class FunctionIntegrator : public Integrator {
     std::string ToString() const;
 
   private:
-    std::function<Float(Point2f)> func;
+    std::function<double(Point2f)> func;
     std::string outputFilename;
     Camera camera;
     Sampler baseSampler;
+    bool skipBad;
+    std::string imageFilename;
 };
 
 }  // namespace pbrt

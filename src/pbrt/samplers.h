@@ -194,6 +194,9 @@ class PaddedSobolSampler {
     PBRT_CPU_GPU
     Point2f GetPixel2D() { return Get2D(); }
 
+    PBRT_CPU_GPU
+    RandomizeStrategy GetRandomizeStrategy() const { return randomize; }
+
     Sampler Clone(Allocator alloc);
     std::string ToString() const;
 
