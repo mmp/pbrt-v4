@@ -40,6 +40,11 @@ std::string MediumInteraction::ToString() const {
 // SurfaceInteraction Method Definitions
 void SurfaceInteraction::ComputeDifferentials(const RayDifferential &ray, Camera camera,
                                               int samplesPerPixel) {
+    if (GetOptions().disableTextureFiltering) {
+        dudx = dudy = dvdx = dvdy = 0;
+        dpdx = dpdy = Vector3f(0, 0, 0);
+        return;
+    }
     if (ray.hasDifferentials && Dot(n, ray.rxDirection) != 0 &&
         Dot(n, ray.ryDirection) != 0) {
         // Estimate screen-space change in $\pt{}$ using ray differentials

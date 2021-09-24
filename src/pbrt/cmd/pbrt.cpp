@@ -35,11 +35,12 @@ static void usage(const std::string &msg = {}) {
             R"(usage: pbrt [<options>] <filename.pbrt...>
 
 Rendering options:
-  --cropwindow <x0,x1,y0,y1>    Specify an image crop window w.r.t. [0,1]^2
+  --cropwindow <x0,x1,y0,y1>    Specify an image crop window w.r.t. [0,1]^2.
   --debugstart <values>         Inform the Integrator where to start rendering for
                                 faster debugging. (<values> are Integrator-specific
                                 and come from error message text.)
   --disable-pixel-jitter        Always sample pixels at their centers.
+  --disable-texture-filtering   Point-sample all textures.
   --disable-wavelength-jitter   Always sample the same %d wavelengths of light.
   --displacement-edge-scale <s> Scale target triangle edge length by given value.
                                 (Default: 1)
@@ -160,6 +161,8 @@ int main(int argc, char *argv[]) {
             ParseArg(&iter, args.end(), "debugstart", &options.debugStart, onError) ||
             ParseArg(&iter, args.end(), "disable-pixel-jitter",
                      &options.disablePixelJitter, onError) ||
+            ParseArg(&iter, args.end(), "disable-texture-filtering",
+                     &options.disableTextureFiltering, onError) ||
             ParseArg(&iter, args.end(), "disable-wavelength-jitter",
                      &options.disableWavelengthJitter, onError) ||
             ParseArg(&iter, args.end(), "displacement-edge-scale",

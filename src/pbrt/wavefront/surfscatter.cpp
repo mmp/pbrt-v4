@@ -68,31 +68,33 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
             // Compute differentials for position and $(u,v)$ at intersection point
             Vector3f dpdx, dpdy;
             Float dudx = 0, dudy = 0, dvdx = 0, dvdy = 0;
-            camera.Approximate_dp_dxy(Point3f(w.pi), w.n, w.time, samplesPerPixel, &dpdx,
-                                      &dpdy);
-            Vector3f dpdu = w.dpdu, dpdv = w.dpdv;
-            // Estimate screen-space change in $(u,v)$
-            // Compute $\transpose{\XFORM{A}} \XFORM{A}$ and its determinant
-            Float ata00 = Dot(dpdu, dpdu), ata01 = Dot(dpdu, dpdv);
-            Float ata11 = Dot(dpdv, dpdv);
-            Float invDet = 1 / DifferenceOfProducts(ata00, ata11, ata01, ata01);
-            invDet = IsFinite(invDet) ? invDet : 0.f;
+            if (!GetOptions().disableTextureFiltering) {
+                camera.Approximate_dp_dxy(Point3f(w.pi), w.n, w.time, samplesPerPixel, &dpdx,
+                                          &dpdy);
+                Vector3f dpdu = w.dpdu, dpdv = w.dpdv;
+                // Estimate screen-space change in $(u,v)$
+                // Compute $\transpose{\XFORM{A}} \XFORM{A}$ and its determinant
+                Float ata00 = Dot(dpdu, dpdu), ata01 = Dot(dpdu, dpdv);
+                Float ata11 = Dot(dpdv, dpdv);
+                Float invDet = 1 / DifferenceOfProducts(ata00, ata11, ata01, ata01);
+                invDet = IsFinite(invDet) ? invDet : 0.f;
 
-            // Compute $\transpose{\XFORM{A}} \VEC{b}$ for $x$ and $y$
-            Float atb0x = Dot(dpdu, dpdx), atb1x = Dot(dpdv, dpdx);
-            Float atb0y = Dot(dpdu, dpdy), atb1y = Dot(dpdv, dpdy);
+                // Compute $\transpose{\XFORM{A}} \VEC{b}$ for $x$ and $y$
+                Float atb0x = Dot(dpdu, dpdx), atb1x = Dot(dpdv, dpdx);
+                Float atb0y = Dot(dpdu, dpdy), atb1y = Dot(dpdv, dpdy);
 
-            // Compute $u$ and $v$ derivatives with respect to $x$ and $y$
-            dudx = DifferenceOfProducts(ata11, atb0x, ata01, atb1x) * invDet;
-            dvdx = DifferenceOfProducts(ata00, atb1x, ata01, atb0x) * invDet;
-            dudy = DifferenceOfProducts(ata11, atb0y, ata01, atb1y) * invDet;
-            dvdy = DifferenceOfProducts(ata00, atb1y, ata01, atb0y) * invDet;
+                // Compute $u$ and $v$ derivatives with respect to $x$ and $y$
+                dudx = DifferenceOfProducts(ata11, atb0x, ata01, atb1x) * invDet;
+                dvdx = DifferenceOfProducts(ata00, atb1x, ata01, atb0x) * invDet;
+                dudy = DifferenceOfProducts(ata11, atb0y, ata01, atb1y) * invDet;
+                dvdy = DifferenceOfProducts(ata00, atb1y, ata01, atb0y) * invDet;
 
-            // Clamp derivatives of $u$ and $v$ to reasonable values
-            dudx = IsFinite(dudx) ? Clamp(dudx, -1e8f, 1e8f) : 0.f;
-            dvdx = IsFinite(dvdx) ? Clamp(dvdx, -1e8f, 1e8f) : 0.f;
-            dudy = IsFinite(dudy) ? Clamp(dudy, -1e8f, 1e8f) : 0.f;
-            dvdy = IsFinite(dvdy) ? Clamp(dvdy, -1e8f, 1e8f) : 0.f;
+                // Clamp derivatives of $u$ and $v$ to reasonable values
+                dudx = IsFinite(dudx) ? Clamp(dudx, -1e8f, 1e8f) : 0.f;
+                dvdx = IsFinite(dvdx) ? Clamp(dvdx, -1e8f, 1e8f) : 0.f;
+                dudy = IsFinite(dudy) ? Clamp(dudy, -1e8f, 1e8f) : 0.f;
+                dvdy = IsFinite(dvdy) ? Clamp(dvdy, -1e8f, 1e8f) : 0.f;
+            }
 
             // Compute shading normal if bump or normal mapping is being used
             Normal3f ns = w.ns;

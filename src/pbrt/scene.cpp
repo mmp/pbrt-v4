@@ -489,6 +489,14 @@ void BasicSceneBuilder::Option(const std::string &name, const std::string &value
         else
             ErrorExitDeferred(&loc, "%s: expected \"true\" or \"false\" for option value",
                               value);
+    } else if (nName == "disabletexturefiltering") {
+        if (value == "true")
+            Options->disableTextureFiltering = true;
+        else if (value == "false")
+            Options->disableTextureFiltering = false;
+        else
+            ErrorExitDeferred(&loc, "%s: expected \"true\" or \"false\" for option value",
+                              value);
     } else if (nName == "disablewavelengthjitter") {
         if (value == "true")
             Options->disableWavelengthJitter = true;

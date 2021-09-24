@@ -23,6 +23,7 @@ struct BasicPBRTOptions {
     int seed = 0;
     bool quiet = false;
     bool disablePixelJitter = false, disableWavelengthJitter = false;
+    bool disableTextureFiltering = false;
     bool forceDiffuse = false;
     bool useGPU = false;
     bool wavefront = false;
