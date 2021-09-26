@@ -355,6 +355,8 @@ class UniformGridMediumProvider {
                               pstd::optional<SampledGrid<Float>> sigma_a,
                               pstd::optional<SampledGrid<Float>> sigma_s,
                               pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgb,
+                              pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbSigma_a,
+                              pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbSigma_s,
                               Spectrum Le, SampledGrid<Float> LeScale, Allocator alloc);
 
     static UniformGridMediumProvider *Create(const ParameterDictionary &parameters,
@@ -379,16 +381,25 @@ class UniformGridMediumProvider {
         Point3f pp = Point3f(bounds.Offset(p));
         if (densityGrid)
             return MediumDensity(densityGrid->Lookup(pp));
-        else if (sigma_aGrid)
-            return MediumDensity(SampledSpectrum(sigma_aGrid->Lookup(pp)),
-                                 SampledSpectrum(sigma_sGrid->Lookup(pp)));
         else {
             // Return _SampledSpectrum_ density from _rgb_
             auto convert = [=] PBRT_CPU_GPU(RGBUnboundedSpectrum s) {
                 return s.Sample(lambda);
             };
-            SampledSpectrum d = rgbGrid->Lookup(pp, convert);
-            return MediumDensity(d, d);
+            SampledSpectrum a, s;
+            if (sigma_aGrid)
+                a = SampledSpectrum(sigma_aGrid->Lookup(pp));
+            if (rgbSigma_aGrid)
+                a = rgbSigma_aGrid->Lookup(pp, convert);
+            if (sigma_sGrid)
+                s = SampledSpectrum(sigma_sGrid->Lookup(pp));
+            if (rgbSigma_sGrid)
+                s = rgbSigma_sGrid->Lookup(pp, convert);
+            if (rgbGrid) {
+                a = rgbGrid->Lookup(pp, convert);
+                s = a;
+            }
+            return MediumDensity(a, s);
         }
     }
 
@@ -406,14 +417,28 @@ class UniformGridMediumProvider {
                     // Set current _maxGrid_ entry for maximum density over _bounds_
                     if (densityGrid)
                         maxGrid[offset++] = densityGrid->MaxValue(bounds);
-                    else if (sigma_aGrid)
+                    else if (sigma_aGrid && sigma_sGrid)
                         maxGrid[offset++] =
-                            sigma_aGrid->MaxValue(bounds) + sigma_sGrid->MaxValue(bounds);
+                            //sigma_aGrid->MaxValue(bounds) + sigma_sGrid->MaxValue(bounds);
+                            std::max<Float>(sigma_aGrid->MaxValue(bounds) , sigma_sGrid->MaxValue(bounds));
                     else {
                         auto max = [] PBRT_CPU_GPU(RGBUnboundedSpectrum s) {
                             return s.MaxValue();
                         };
-                        maxGrid[offset++] = rgbGrid->MaxValue(bounds, max);
+                        if (rgbGrid) {
+                            maxGrid[offset] = rgbGrid->MaxValue(bounds, max);
+                        } else {
+                            maxGrid[offset] = 0.0;
+                            if (sigma_aGrid)
+                                maxGrid[offset] += sigma_aGrid->MaxValue(bounds);
+                            if (rgbSigma_aGrid)
+                                maxGrid[offset] += rgbSigma_aGrid->MaxValue(bounds, max);
+                            if (sigma_sGrid)
+                                maxGrid[offset] += sigma_sGrid->MaxValue(bounds);
+                            if (rgbSigma_sGrid)
+                                maxGrid[offset] += rgbSigma_sGrid->MaxValue(bounds, max);
+                        }
+                        offset++;
                     }
                 }
 
@@ -426,6 +451,7 @@ class UniformGridMediumProvider {
     pstd::optional<SampledGrid<Float>> densityGrid;
     pstd::optional<SampledGrid<Float>> sigma_aGrid, sigma_sGrid;
     pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbGrid;
+    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbSigma_aGrid, rgbSigma_sGrid;
     DenselySampledSpectrum Le_spec;
     SampledGrid<Float> LeScale;
 };

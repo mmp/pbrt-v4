@@ -212,26 +212,40 @@ STAT_MEMORY_COUNTER("Memory/Volume grids", volumeGridBytes);
 UniformGridMediumProvider::UniformGridMediumProvider(
     const Bounds3f &bounds, pstd::optional<SampledGrid<Float>> d,
     pstd::optional<SampledGrid<Float>> sa, pstd::optional<SampledGrid<Float>> ss,
-    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbGrid, Spectrum Le,
-    SampledGrid<Float> LeGrid, Allocator alloc)
+    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbGrid, 
+    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbA, 
+    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbS, 
+    Spectrum Le, SampledGrid<Float> LeGrid, Allocator alloc)
     : bounds(bounds),
       densityGrid(std::move(d)),
       sigma_aGrid(std::move(sa)),
       sigma_sGrid(std::move(ss)),
       rgbGrid(std::move(rgbGrid)),
+      rgbSigma_aGrid(std::move(rgbA)),
+      rgbSigma_sGrid(std::move(rgbS)),
       Le_spec(Le, alloc),
       LeScale(std::move(LeGrid)) {
     if (densityGrid) {
-        CHECK(!sigma_aGrid && !sigma_sGrid && !rgbGrid);
+        CHECK(!sigma_aGrid && !sigma_sGrid && !rgbGrid && !rgbSigma_aGrid && !rgbSigma_sGrid);
     }
     if (sigma_aGrid) {
-        CHECK(sigma_sGrid && !densityGrid && !rgbGrid);
+        CHECK(((!sigma_sGrid && rgbSigma_sGrid) || (sigma_sGrid && !rgbSigma_sGrid)) &&
+            !densityGrid && !rgbGrid && !rgbSigma_aGrid);
+    }
+    if (rgbSigma_aGrid) {
+        CHECK(((!sigma_sGrid && rgbSigma_sGrid) || (sigma_sGrid && !rgbSigma_sGrid)) &&
+            !densityGrid && !rgbGrid && !sigma_aGrid);
     }
     if (sigma_sGrid) {
-        CHECK(sigma_aGrid);
+        CHECK(((!sigma_aGrid && rgbSigma_aGrid) || (sigma_aGrid && !rgbSigma_aGrid)) &&
+            !densityGrid && !rgbGrid && !rgbSigma_sGrid);
+    }
+    if (rgbSigma_sGrid) {
+        CHECK(((!sigma_aGrid && rgbSigma_aGrid) || (sigma_aGrid && !rgbSigma_aGrid)) &&
+            !densityGrid && !rgbGrid && !sigma_sGrid);
     }
     if (rgbGrid) {
-        CHECK(!densityGrid && !sigma_aGrid && !sigma_sGrid);
+        CHECK(!sigma_aGrid && !sigma_sGrid && !densityGrid && !rgbSigma_aGrid && !rgbSigma_sGrid);
     }
     volumeGridBytes += LeScale.BytesAllocated();
     if (densityGrid)
@@ -242,6 +256,10 @@ UniformGridMediumProvider::UniformGridMediumProvider(
         volumeGridBytes += sigma_sGrid->BytesAllocated();
     if (rgbGrid)
         volumeGridBytes += rgbGrid->BytesAllocated();
+    if (rgbSigma_aGrid)
+        volumeGridBytes += rgbSigma_aGrid->BytesAllocated();
+    if (rgbSigma_sGrid)
+        volumeGridBytes += rgbSigma_sGrid->BytesAllocated();
 }
 
 UniformGridMediumProvider *UniformGridMediumProvider::Create(
@@ -250,6 +268,8 @@ UniformGridMediumProvider *UniformGridMediumProvider::Create(
     std::vector<Float> sigma_a = parameters.GetFloatArray("density.sigma_a");
     std::vector<Float> sigma_s = parameters.GetFloatArray("density.sigma_s");
     std::vector<RGB> rgbDensity = parameters.GetRGBArray("density.rgb");
+    std::vector<RGB> rgbSigma_a = parameters.GetRGBArray("density.sigma_a.rgb");
+    std::vector<RGB> rgbSigma_s = parameters.GetRGBArray("density.sigma_s.rgb");
 
     size_t nDensity;
     if (!density.empty()) {
@@ -262,21 +282,69 @@ UniformGridMediumProvider *UniformGridMediumProvider::Create(
                       "Both \"density\" and \"density.sigma_s\" values were provided.");
         if (!rgbDensity.empty())
             ErrorExit(loc, "Both \"density\" and \"density.rgb\" values were provided.");
-    } else if (!sigma_a.empty()) {
-        if (sigma_s.empty())
+        if (!rgbSigma_a.empty())
             ErrorExit(loc,
-                      "No \"density.sigma_s\" was provided with \"density.sigma_a\".");
-        if (!rgbDensity.empty())
-            ErrorExit(loc, "Both \"density.sigma_a/sigma_s\" and \"density.rgb\" values "
-                           "were provided.");
-        nDensity = sigma_a.size();
-        if (sigma_s.size() != sigma_a.size())
+                      "Both \"density\" and \"density.sigma_a.rgb\" values were provided.");
+        if (!rgbSigma_s.empty())
             ErrorExit(loc,
-                      "Different number of samples (%d vs %d) provided for "
-                      "\"density.sigma_a\" and \"density.sigma_s\".",
-                      sigma_a.size(), sigma_s.size());
-    } else if (!rgbDensity.empty())
+                      "Both \"density\" and \"density.sigma_s.rgb\" values were provided.");
+    } else if (!rgbDensity.empty()) {
         nDensity = rgbDensity.size();
+        if (!sigma_a.empty())
+            ErrorExit(loc,
+                      "Both \"density.rgb\" and \"density.sigma_a\" values were provided.");
+        if (!sigma_s.empty())
+            ErrorExit(loc,
+                      "Both \"density.rgb\" and \"density.sigma_s\" values were provided.");
+        if (!rgbSigma_a.empty())
+            ErrorExit(loc,
+                      "Both \"density.rgb\" and \"density.sigma_a.rgb\" values were provided.");
+        if (!rgbSigma_s.empty())
+            ErrorExit(loc,
+                      "Both \"density.rgb\" and \"density.sigma_s.rgb\" values were provided.");
+    } else if (!sigma_a.empty()) {
+        if (!rgbSigma_a.empty())
+            ErrorExit(loc,
+                      "Both \"density.sigma_a\" and \"density.sigma_a.rgb\" values were provided.");
+        nDensity = sigma_a.size();
+        if (!sigma_s.empty()) {
+            if (!rgbSigma_s.empty())
+                ErrorExit(loc,
+                          "Both \"density.sigma_s\" and \"density.sigma_s.rgb\" values were provided.");
+            if (sigma_s.size() != sigma_a.size())
+                ErrorExit(loc,
+                          "Different number of samples (%d vs %d) provided for "
+                          "\"density.sigma_a\" and \"density.sigma_s\".",
+                          sigma_a.size(), sigma_s.size());
+        } else if (!rgbSigma_s.empty()) {
+            if (rgbSigma_s.size() != sigma_a.size())
+                ErrorExit(loc,
+                          "Different number of samples (%d vs %d) provided for "
+                          "\"density.sigma_a\" and \"density.sigma_s.rgb\".",
+                          sigma_a.size(), rgbSigma_s.size());
+        } else
+            ErrorExit(loc, "No \"density.sigma_s\" or \"density.sigma_s.rgb\" provided with \"sigma_a\".");
+    } else if (!rgbSigma_a.empty()) {
+        nDensity = rgbSigma_a.size();
+        if (!sigma_s.empty()) {
+            if (!rgbSigma_s.empty())
+                ErrorExit(loc,
+                          "Both \"density.sigma_s\" and \"density.sigma_s.rgb\" values were provided.");
+            if (sigma_s.size() != rgbSigma_a.size())
+                ErrorExit(loc,
+                          "Different number of samples (%d vs %d) provided for "
+                          "\"density.sigma_a.rgb\" and \"density.sigma_s\".",
+                          rgbSigma_a.size(), sigma_s.size());
+        } else if (!rgbSigma_s.empty()) {
+            if (rgbSigma_s.size() != rgbSigma_a.size())
+                ErrorExit(loc,
+                          "Different number of samples (%d vs %d) provided for "
+                          "\"density.sigma_a.rgb\" and \"density.sigma_s.rgb\".",
+                          rgbSigma_a.size(), rgbSigma_s.size());
+        } else
+            ErrorExit(loc, "No \"density.sigma_s/density.sigma_s.rgb\" provided with \"density.sigma_a.rgb\".");
+    }  else if (!sigma_s.empty() || !rgbSigma_s.empty())
+        ErrorExit(loc, "No \"density.sigma_a/density.sigma_a.rgb\" provided with \"density.sigma_s/density.sigma_s.rgb\".");
     else
         ErrorExit(loc, "No \"density\" values provided for uniform grid medium.");
 
@@ -291,12 +359,15 @@ UniformGridMediumProvider *UniformGridMediumProvider::Create(
     pstd::optional<SampledGrid<Float>> densityGrid;
     pstd::optional<SampledGrid<Float>> sigma_aGrid, sigma_sGrid;
     pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbDensityGrid;
+    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbSigma_aGrid, rgbSigma_sGrid;
+
     if (density.size())
         densityGrid = SampledGrid<Float>(density, nx, ny, nz, alloc);
-    else if (sigma_a.size()) {
+    if (sigma_a.size())
         sigma_aGrid = SampledGrid<Float>(sigma_a, nx, ny, nz, alloc);
+    if (sigma_s.size())
         sigma_sGrid = SampledGrid<Float>(sigma_s, nx, ny, nz, alloc);
-    } else {
+    if (rgbDensity.size()) {
         const RGBColorSpace *colorSpace = parameters.ColorSpace();
         std::vector<RGBUnboundedSpectrum> rgbSpectrumDensity;
         for (RGB rgb : rgbDensity)
@@ -304,7 +375,23 @@ UniformGridMediumProvider *UniformGridMediumProvider::Create(
         rgbDensityGrid =
             SampledGrid<RGBUnboundedSpectrum>(rgbSpectrumDensity, nx, ny, nz, alloc);
     }
-
+    if (rgbSigma_a.size()) {
+        const RGBColorSpace *colorSpace = parameters.ColorSpace();
+        std::vector<RGBUnboundedSpectrum> rgbSpectrumDensity;
+        for (RGB rgb : rgbSigma_a)
+            rgbSpectrumDensity.push_back(RGBUnboundedSpectrum(*colorSpace, rgb));
+        rgbSigma_aGrid =
+            SampledGrid<RGBUnboundedSpectrum>(rgbSpectrumDensity, nx, ny, nz, alloc);
+    }
+    if (rgbSigma_s.size()) {
+        const RGBColorSpace *colorSpace = parameters.ColorSpace();
+        std::vector<RGBUnboundedSpectrum> rgbSpectrumDensity;
+        for (RGB rgb : rgbSigma_s)
+            rgbSpectrumDensity.push_back(RGBUnboundedSpectrum(*colorSpace, rgb));
+        rgbSigma_sGrid =
+            SampledGrid<RGBUnboundedSpectrum>(rgbSpectrumDensity, nx, ny, nz, alloc);
+    }
+        
     Spectrum Le =
         parameters.GetOneSpectrum("Le", nullptr, SpectrumType::Illuminant, alloc);
     Float LeNorm = 1;
@@ -332,7 +419,8 @@ UniformGridMediumProvider *UniformGridMediumProvider::Create(
 
     return alloc.new_object<UniformGridMediumProvider>(
         Bounds3f(p0, p1), std::move(densityGrid), std::move(sigma_aGrid),
-        std::move(sigma_sGrid), std::move(rgbDensityGrid), Le, std::move(LeGrid), alloc);
+        std::move(sigma_sGrid), std::move(rgbDensityGrid), std::move(rgbSigma_aGrid),
+        std::move(rgbSigma_sGrid), Le, std::move(LeGrid), alloc);
 }
 
 std::string UniformGridMediumProvider::ToString() const {
