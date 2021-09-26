@@ -2611,7 +2611,6 @@ int denoise_optix(std::vector<std::string> args) {
 
 int main(int argc, char *argv[]) {
     PBRTOptions opt;
-    opt.quiet = true;
     InitPBRT(opt);
 
     if (argc < 2) {
