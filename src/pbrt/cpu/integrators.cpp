@@ -3306,7 +3306,8 @@ std::unique_ptr<SPPMIntegrator> SPPMIntegrator::Create(
 // FunctionIntegrator Method Definitions
 FunctionIntegrator::FunctionIntegrator(std::function<double(Point2f)> func,
                                        const std::string &outputFilename, Camera camera,
-                                       Sampler sampler, bool skipBad, std::string imageFilename)
+                                       Sampler sampler, bool skipBad,
+                                       std::string imageFilename)
     : Integrator(nullptr, {}),
       func(func),
       outputFilename(outputFilename),
@@ -3335,19 +3336,19 @@ static double rotatedCheckerboard(Point2f p) {
     double angle = Radians(45);
     double nrm = 1.00006866455078125;
     static double sa = std::sin(angle), ca = std::cos(angle);
-    return (double)checkerboard({Float(10 + p.x * ca - p.y * sa),
-                                 Float(10 + p.x * sa + p.y * ca)}) /
+    return (double)checkerboard(
+               {Float(10 + p.x * ca - p.y * sa), Float(10 + p.x * sa + p.y * ca)}) /
            nrm;
 }
 static double gaussian(Point2f p) {
     auto Gaussian = [](double x, double mu = 0, double sigma = 1) {
         return 1 / std::sqrt(2 * Pi * sigma * sigma) *
-            std::exp(-Sqr(x - mu) / (2 * sigma * sigma));
+               std::exp(-Sqr(x - mu) / (2 * sigma * sigma));
     };
-    auto GaussianIntegral = [](double x0, double x1, double mu = 0,
-                               double sigma = 1) {
+    auto GaussianIntegral = [](double x0, double x1, double mu = 0, double sigma = 1) {
         double sigmaRoot2 = sigma * double(1.414213562373095);
-        return 0.5f * (std::erf((mu - x0) / sigmaRoot2) - std::erf((mu - x1) / sigmaRoot2));
+        return 0.5f *
+               (std::erf((mu - x0) / sigmaRoot2) - std::erf((mu - x1) / sigmaRoot2));
     };
 
     double mu = 0.5, sigma = 0.25;
@@ -3450,8 +3451,7 @@ void FunctionIntegrator::Render() {
             if (isStratified && Sqr(int(std::sqrt(nSamples))) != nSamples) {
                 prog.Update();
                 continue;
-            }
-            else if (isSobol && !IsPowerOf2(nSamples))
+            } else if (isSobol && !IsPowerOf2(nSamples))
                 reportResult = false;
             else if (isHalton) {
                 int n2 = 0, n3 = 0;
@@ -3503,57 +3503,68 @@ void FunctionIntegrator::Render() {
                     Point2f u;
                     if (isHalton) {
                         int pixelIndex = (pPixel.x - pixelBounds.pMin.x) +
-                            (pPixel.y - pixelBounds.pMin.y) *
-                            (pixelBounds.pMax.x - pixelBounds.pMin.x);
+                                         (pPixel.y - pixelBounds.pMin.y) *
+                                             (pixelBounds.pMax.x - pixelBounds.pMin.x);
                         DCHECK_GE(pixelIndex, 0);
                         DCHECK_LT(pixelIndex, nPixels);
 
-                        switch (baseSampler.Cast<HaltonSampler>()->GetRandomizeStrategy()) {
+                        switch (
+                            baseSampler.Cast<HaltonSampler>()->GetRandomizeStrategy()) {
                         case RandomizeStrategy::None:
                             u = Point2f(RadicalInverse(0, sampleIndex),
                                         RadicalInverse(1, sampleIndex));
                             break;
                         case RandomizeStrategy::PermuteDigits:
                             u = Point2f(
-                                        ScrambledRadicalInverse(0, sampleIndex,
-                                                                digitPermutations[0][pixelIndex]),
-                                        ScrambledRadicalInverse(1, sampleIndex,
-                                                                digitPermutations[1][pixelIndex]));
+                                ScrambledRadicalInverse(0, sampleIndex,
+                                                        digitPermutations[0][pixelIndex]),
+                                ScrambledRadicalInverse(
+                                    1, sampleIndex, digitPermutations[1][pixelIndex]));
                             break;
                         case RandomizeStrategy::Owen:
-                            u = Point2f(OwenScrambledRadicalInverse(0, sampleIndex,
-                                                                    owenHash[0][pixelIndex]),
-                                        OwenScrambledRadicalInverse(1, sampleIndex,
-                                                                    owenHash[1][pixelIndex]));
+                            u = Point2f(OwenScrambledRadicalInverse(
+                                            0, sampleIndex, owenHash[0][pixelIndex]),
+                                        OwenScrambledRadicalInverse(
+                                            1, sampleIndex, owenHash[1][pixelIndex]));
                             break;
                         default:
                             LOG_FATAL("Unhandled randomization strategy");
                         }
                     } else if (isSobol) {
                         int pixelIndex = (pPixel.x - pixelBounds.pMin.x) +
-                            (pPixel.y - pixelBounds.pMin.y) *
-                            (pixelBounds.pMax.x - pixelBounds.pMin.x);
+                                         (pPixel.y - pixelBounds.pMin.y) *
+                                             (pixelBounds.pMax.x - pixelBounds.pMin.x);
                         DCHECK_GE(pixelIndex, 0);
                         DCHECK_LT(pixelIndex, nPixels);
 
-                        switch (baseSampler.Cast<PaddedSobolSampler>()->GetRandomizeStrategy()) {
+                        switch (baseSampler.Cast<PaddedSobolSampler>()
+                                    ->GetRandomizeStrategy()) {
                         case RandomizeStrategy::None:
                             u = Point2f(SobolSample(sampleIndex, 0, NoRandomizer()),
                                         SobolSample(sampleIndex, 1, NoRandomizer()));
                             break;
                         case RandomizeStrategy::PermuteDigits:
-                            u = Point2f(SobolSample(sampleIndex, 0,
-                                                    BinaryPermuteScrambler(owenHash[0][pixelIndex])),
-                                        SobolSample(sampleIndex, 1,
-                                                    BinaryPermuteScrambler(owenHash[1][pixelIndex])));
+                            u = Point2f(
+                                SobolSample(
+                                    sampleIndex, 0,
+                                    BinaryPermuteScrambler(owenHash[0][pixelIndex])),
+                                SobolSample(
+                                    sampleIndex, 1,
+                                    BinaryPermuteScrambler(owenHash[1][pixelIndex])));
                             break;
                         case RandomizeStrategy::FastOwen:
-                            u = Point2f(SobolSample(sampleIndex, 0, FastOwenScrambler(owenHash[0][pixelIndex])),
-                                        SobolSample(sampleIndex, 1, FastOwenScrambler(owenHash[1][pixelIndex])));
+                            u = Point2f(
+                                SobolSample(sampleIndex, 0,
+                                            FastOwenScrambler(owenHash[0][pixelIndex])),
+                                SobolSample(sampleIndex, 1,
+                                            FastOwenScrambler(owenHash[1][pixelIndex])));
                             break;
                         case RandomizeStrategy::Owen:
-                            u = Point2f(SobolSample(sampleIndex, 0, OwenScrambler(owenHash[0][pixelIndex])),
-                                        SobolSample(sampleIndex, 1, OwenScrambler(owenHash[1][pixelIndex])));
+                            u = Point2f(
+                                SobolSample(sampleIndex, 0,
+                                            OwenScrambler(owenHash[0][pixelIndex])),
+                                SobolSample(sampleIndex, 1,
+                                            OwenScrambler(owenHash[1][pixelIndex])));
                             break;
                         default:
                             LOG_FATAL("Unhandled randomization strategy");

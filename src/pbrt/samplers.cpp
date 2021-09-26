@@ -85,8 +85,7 @@ HaltonSampler *HaltonSampler::Create(const ParameterDictionary &parameters,
     else if (s == "owen")
         randomizer = RandomizeStrategy::Owen;
     else
-        ErrorExit(loc, "%s: unknown randomization strategy given to PaddedSobolSampler",
-                  s);
+        ErrorExit(loc, "%s: unknown randomization strategy given to HaltonSampler", s);
 
     return alloc.new_object<HaltonSampler>(nsamp, fullResolution, randomizer, seed,
                                            alloc);

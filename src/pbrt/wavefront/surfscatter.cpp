@@ -69,8 +69,8 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
             Vector3f dpdx, dpdy;
             Float dudx = 0, dudy = 0, dvdx = 0, dvdy = 0;
             if (!GetOptions().disableTextureFiltering) {
-                camera.Approximate_dp_dxy(Point3f(w.pi), w.n, w.time, samplesPerPixel, &dpdx,
-                                          &dpdy);
+                camera.Approximate_dp_dxy(Point3f(w.pi), w.n, w.time, samplesPerPixel,
+                                          &dpdx, &dpdy);
                 Vector3f dpdu = w.dpdu, dpdv = w.dpdv;
                 // Estimate screen-space change in $(u,v)$
                 // Compute $\transpose{\XFORM{A}} \XFORM{A}$ and its determinant
