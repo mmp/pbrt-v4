@@ -1302,8 +1302,8 @@ static void printImageStats(const char *name, const Image &image,
         int m = int(s) / 60;
         s -= m * 60;
 
-        printf("\trender time: %dh %dm %d.%02ds\n", h, m, int(s),
-               int(100 * (s - int(s))));
+        printf("\trender time: %dh %dm %.02fs (total %.02fs)\n", h, m, s,
+               *metadata.renderTimeSeconds);
     }
     if (metadata.cameraFromWorld)
         printf("\tcamera from world: %s\n", metadata.cameraFromWorld->ToString().c_str());
