@@ -1425,14 +1425,18 @@ bool Image::WritePNG(const std::string &filename, const ImageMetadata &metadata)
 
     if (error == 0) {
         std::string encodedPNG(png, png + pngSize);
-        if (!WriteFileContents(filename, encodedPNG))
+        if (!WriteFileContents(filename, encodedPNG)) {
             Error("%s: error writing PNG.", filename);
-    } else
+            return false;
+        }
+    } else {
         Error("%s: %s", filename, lodepng_error_text(error));
+        return false;
+    }
 
     free(png);
 
-    return error == 0;
+    return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////
