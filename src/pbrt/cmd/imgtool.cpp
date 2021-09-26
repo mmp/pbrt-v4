@@ -77,7 +77,7 @@ static std::map<std::string, CommandUsage> commandUsage = {
       "Assemble multiple images representing cropped regions of a larger\n"
       "    image into a single composite image.",
       std::string(R"(
-    --outfile          Output image filename.
+    --outfile <name>   Output image filename.
 )")}},
     {"average",
      {"average [options] <filename base>",
@@ -85,7 +85,7 @@ static std::map<std::string, CommandUsage> commandUsage = {
       "    The constituent images are specified with a path that gives their\n"
       "    prefix.",
       std::string(R"(
-    --outfile          Output image filename.
+    --outfile <name>   Output image filename.
 )")}},
     {"cat",
      {"cat [options] <filename>",
@@ -104,7 +104,7 @@ static std::map<std::string, CommandUsage> commandUsage = {
                        image. Default: 5
     --level <n>        Minimum RGB value for a pixel for it to contribute to bloom.
                        Default: Infinity (i.e., no bloom is applied)
-    --outfile          Output image filename.
+    --outfile <name>   Output image filename.
     --scale <s>        Amount by which the bloom image is scaled before being
                        added to the original image. Default: 0.3
     --width <w>        Width of Gaussian used to generate bloom images.
@@ -131,7 +131,7 @@ static std::map<std::string, CommandUsage> commandUsage = {
     --gamma <v>        Apply a gamma curve with exponent v. (Default: 1 (none)).
     --maxluminance <n> Luminance value mapped to white by tonemapping.
                        Default: 1
-    --outfile          Output image filename.
+    --outfile <name>   Output image filename.
     --preservecolors   By default, out-of-gammut colors have each component
                        clamped to [0,1] when written to non-HDR formats. With
                        this option enabled, such colors are scaled by their
@@ -182,10 +182,10 @@ static std::map<std::string, CommandUsage> commandUsage = {
       "   reference image. All image files starting with <filename prefix>\n"
       "    are used to compute error.",
       std::string(R"(
-   --crop <x0,x1,y0,y1> Crop images before performing diff.
-   --errorfile <name>   Output average error image.
-   --metric <name>      Error metric to use. (Options: "MAE", MSE", "MRSE")
-   --reference <name>   Reference image filename.
+    --crop <x0,x1,y0,y1> Crop images before performing diff.
+    --errorfile <name>   Output average error image.
+    --metric <name>      Error metric to use. (Options: "MAE", MSE", "MRSE")
+    --reference <name>   Reference image filename.
 )")}},
     {"falsecolor",
      {"falsecolor [options] <filename>",
@@ -257,9 +257,9 @@ static std::map<std::string, CommandUsage> commandUsage = {
       "Apply white balancing to the specified image.", std::string(R"(
     --illuminant <n>   Apply white balance for the given standard illuminant
                        (e.g. D65, D50, A, F1, F2, ...)
-    --outfile <name>   Filename to store result image
-    --primaries <x,y>  Apply white balance for the primaries (x,y)
-    --temperature <T>  Apply white balance for a color temperature T
+    --outfile <name>   Filename to store result image.
+    --primaries <x,y>  Apply white balance for the primaries (x,y).
+    --temperature <T>  Apply white balance for a color temperature T.
 )")}},
 
 };
