@@ -408,7 +408,7 @@ class UniformGridMediumProvider {
                         maxGrid[offset++] = densityGrid->MaxValue(bounds);
                     else if (sigma_aGrid)
                         maxGrid[offset++] =
-                            sigma_aGrid->MaxValue(bounds) + sigma_sGrid->MaxValue(bounds);
+                            std::max<Float>(sigma_aGrid->MaxValue(bounds), sigma_sGrid->MaxValue(bounds));
                     else {
                         auto max = [] PBRT_CPU_GPU(RGBUnboundedSpectrum s) {
                             return s.MaxValue();
