@@ -150,7 +150,9 @@ void ProgressReporter::printBar() {
         // Update elapsed time and estimated time to completion
         Float elapsed = ElapsedSeconds();
         Float estRemaining = elapsed / percentDone - elapsed;
-        if (percentDone == 1.f)
+        if (exitThread)
+            printf(" (%.1fs)       ", *finishTime);
+        else if (percentDone == 1.f)
             printf(" (%.1fs)       ", elapsed);
         else if (!std::isinf(estRemaining))
             printf(" (%.1fs|%.1fs)  ", elapsed, std::max<Float>(0, estRemaining));
@@ -176,6 +178,7 @@ void ProgressReporter::Done() {
 
         // Only let one thread shut things down.
         bool fa = false;
+        finishTime = ElapsedSeconds();
         if (exitThread.compare_exchange_strong(fa, true)) {
             workDone = totalWork;
             exitThread = true;

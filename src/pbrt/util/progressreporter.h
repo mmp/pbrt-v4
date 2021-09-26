@@ -7,6 +7,8 @@
 
 #include <pbrt/pbrt.h>
 
+#include <pbrt/util/pstd.h>
+
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -15,7 +17,6 @@
 
 #ifdef PBRT_BUILD_GPU_RENDERER
 #include <cuda_runtime.h>
-#include <pbrt/util/pstd.h>
 #include <vector>
 #endif
 
@@ -68,6 +69,7 @@ class ProgressReporter {
     std::atomic<int64_t> workDone;
     std::atomic<bool> exitThread;
     std::thread updateThread;
+    pstd::optional<float> finishTime;
 
 #ifdef PBRT_BUILD_GPU_RENDERER
     std::vector<cudaEvent_t> gpuEvents;
@@ -77,7 +79,7 @@ class ProgressReporter {
 };
 // ProgressReporter Inline Method Definitions
 inline double ProgressReporter::ElapsedSeconds() const {
-    return timer.ElapsedSeconds();
+    return finishTime ? *finishTime : timer.ElapsedSeconds();
 }
 
 inline void ProgressReporter::Update(int64_t num) {
