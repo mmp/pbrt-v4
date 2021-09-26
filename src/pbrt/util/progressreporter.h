@@ -58,7 +58,6 @@ class ProgressReporter {
 
   private:
     // ProgressReporter Private Methods
-    void launchThread();
     void printBar();
 
     // ProgressReporter Private Members

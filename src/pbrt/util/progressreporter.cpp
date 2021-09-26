@@ -54,24 +54,14 @@ ProgressReporter::ProgressReporter(int64_t totalWork, const std::string &title,
 #endif
 
     // Launch thread to periodically update progress bar
-    if (!quiet)
-        launchThread();
-}
-
-void ProgressReporter::launchThread() {
-    Barrier *barrier = new Barrier(2);
-    updateThread = std::thread([this, barrier]() {
+    if (!quiet) {
+        updateThread = std::thread([this]() {
 #ifdef PBRT_BUILD_GPU_RENDERER
-        GPURegisterThread("PBRT_PROGRESS_BAR");
+            GPURegisterThread("PBRT_PROGRESS_BAR");
 #endif
-        if (barrier->Block())
-            delete barrier;
-        printBar();
-    });
-    // Wait for the thread to get past the ProfilerWorkerThreadInit()
-    // call.
-    if (barrier->Block())
-        delete barrier;
+            printBar();
+        });
+    }
 }
 
 ProgressReporter::~ProgressReporter() {
