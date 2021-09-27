@@ -797,10 +797,6 @@ template <typename S>
 inline PBRT_CPU_GPU CameraSample GetCameraSample(S sampler, Point2i pPixel,
                                                  Filter filter) {
     FilterSample fs = filter.Sample(sampler.GetPixel2D());
-    if (GetOptions().disablePixelJitter) {
-        fs.p = Point2f(0, 0);
-        fs.weight = 1;
-    }
 
     CameraSample cs;
     // Initialize _CameraSample_ member variables
@@ -808,6 +804,13 @@ inline PBRT_CPU_GPU CameraSample GetCameraSample(S sampler, Point2i pPixel,
     cs.time = sampler.Get1D();
     cs.pLens = sampler.Get2D();
     cs.filterWeight = fs.weight;
+
+    if (GetOptions().disablePixelJitter) {
+        cs.pFilm = pPixel + Vector2f(0.5f, 0.5f);
+        cs.time = 0.5f;
+        cs.pLens = Point2f(0.5f, 0.5f);
+        cs.filterWeight = 1;
+    }
 
     return cs;
 }
