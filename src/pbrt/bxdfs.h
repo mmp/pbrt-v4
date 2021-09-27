@@ -709,6 +709,7 @@ class LayeredBxDF {
         if (bs->IsReflection()) {
             if (flipWi)
                 bs->wi = -bs->wi;
+            bs->pdfIsProportional = true;
             return bs;
         }
         Vector3f w = bs->wi;
