@@ -93,7 +93,7 @@ void InitPBRT(const PBRTOptions &opt) {
 #ifdef PBRT_BUILD_GPU_RENDERER
         GPUInit();
 
-        CUDA_CHECK(cudaMemcpyToSymbol(OptionsGPU, Options, sizeof(OptionsGPU)));
+        CopyOptionsToGPU();
 
         // Leak this so memory it allocates isn't freed
         pstd::pmr::monotonic_buffer_resource *bufferResource =

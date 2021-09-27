@@ -544,6 +544,10 @@ void BasicSceneBuilder::Option(const std::string &name, const std::string &value
                               value);
     } else
         ErrorExitDeferred(&loc, "%s: unknown option", name);
+
+#ifdef PBRT_BUILD_GPU_RENDERER
+    CopyOptionsToGPU();
+#endif  // PBRT_BUILD_GPU_RENDERER
 }
 
 void BasicSceneBuilder::Transform(Float tr[16], FileLoc loc) {

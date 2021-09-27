@@ -4,6 +4,9 @@
 
 #include <pbrt/options.h>
 
+#if defined(PBRT_BUILD_GPU_RENDERER)
+#include <pbrt/gpu/util.h>
+#endif  // PBRT_BUILD_GPU_RENDERER
 #include <pbrt/util/print.h>
 
 namespace pbrt {
@@ -12,6 +15,10 @@ PBRTOptions *Options;
 
 #if defined(PBRT_BUILD_GPU_RENDERER)
 __constant__ BasicPBRTOptions OptionsGPU;
+
+void CopyOptionsToGPU() {
+    CUDA_CHECK(cudaMemcpyToSymbol(OptionsGPU, Options, sizeof(OptionsGPU)));
+}
 #endif
 
 std::string ToString(const RenderingCoordinateSystem &r) {
