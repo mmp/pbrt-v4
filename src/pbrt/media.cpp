@@ -295,7 +295,7 @@ UniformGridMediumProvider *UniformGridMediumProvider::Create(
                         "    \"density\"\n"
                         "    \"density.rgb\"\n"
                         "    \"density.sigma_a\" and \"density.sigma_s\"\n"
-                        "    \"density.sigma_a.rgb\" and \"density.sigma_\"s\n"
+                        "    \"density.sigma_a.rgb\" and \"density.sigma_s\"\n"
                         "    \"density.sigma_a\" and \"density.sigma_s.rgb\"\n"
                         "    \"density.sigma_a.rgb\" and \"density.sigma_s.rgb\"\n"
                         "  Parameters provided:\n"
