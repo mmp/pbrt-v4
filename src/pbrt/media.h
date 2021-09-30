@@ -419,7 +419,6 @@ class UniformGridMediumProvider {
                         maxGrid[offset++] = densityGrid->MaxValue(bounds);
                     else if (sigma_aGrid && sigma_sGrid)
                         maxGrid[offset++] =
-                            //sigma_aGrid->MaxValue(bounds) + sigma_sGrid->MaxValue(bounds);
                             std::max<Float>(sigma_aGrid->MaxValue(bounds) , sigma_sGrid->MaxValue(bounds));
                     else {
                         auto max = [] PBRT_CPU_GPU(RGBUnboundedSpectrum s) {
@@ -428,15 +427,16 @@ class UniformGridMediumProvider {
                         if (rgbGrid) {
                             maxGrid[offset] = rgbGrid->MaxValue(bounds, max);
                         } else {
-                            maxGrid[offset] = 0.0;
+                            Float gridMax = 0.0;
                             if (sigma_aGrid)
-                                maxGrid[offset] += sigma_aGrid->MaxValue(bounds);
+                                gridMax = std::max<Float>(sigma_aGrid->MaxValue(bounds), gridMax);
                             if (rgbSigma_aGrid)
-                                maxGrid[offset] += rgbSigma_aGrid->MaxValue(bounds, max);
+                                gridMax = std::max<Float>(rgbSigma_aGrid->MaxValue(bounds, max), gridMax);
                             if (sigma_sGrid)
-                                maxGrid[offset] += sigma_sGrid->MaxValue(bounds);
+                                gridMax = std::max<Float>(sigma_sGrid->MaxValue(bounds), gridMax);
                             if (rgbSigma_sGrid)
-                                maxGrid[offset] += rgbSigma_sGrid->MaxValue(bounds, max);
+                                gridMax = std::max<Float>(rgbSigma_sGrid->MaxValue(bounds, max), gridMax);
+                            maxGrid[offset] = gridMax;
                         }
                         offset++;
                     }
