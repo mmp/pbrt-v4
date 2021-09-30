@@ -272,81 +272,40 @@ UniformGridMediumProvider *UniformGridMediumProvider::Create(
     std::vector<RGB> rgbSigma_s = parameters.GetRGBArray("density.sigma_s.rgb");
 
     size_t nDensity;
-    if (!density.empty()) {
+    if (!density.empty() && rgbDensity.empty() && sigma_a.empty() && sigma_s.empty() &&
+            rgbSigma_a.empty() && rgbSigma_s.empty())
         nDensity = density.size();
-        if (!sigma_a.empty())
-            ErrorExit(loc,
-                      "Both \"density\" and \"density.sigma_a\" values were provided.");
-        if (!sigma_s.empty())
-            ErrorExit(loc,
-                      "Both \"density\" and \"density.sigma_s\" values were provided.");
-        if (!rgbDensity.empty())
-            ErrorExit(loc, "Both \"density\" and \"density.rgb\" values were provided.");
-        if (!rgbSigma_a.empty())
-            ErrorExit(loc,
-                      "Both \"density\" and \"density.sigma_a.rgb\" values were provided.");
-        if (!rgbSigma_s.empty())
-            ErrorExit(loc,
-                      "Both \"density\" and \"density.sigma_s.rgb\" values were provided.");
-    } else if (!rgbDensity.empty()) {
+    else if (!rgbDensity.empty() && density.empty() && sigma_a.empty() &&
+             sigma_s.empty() && rgbSigma_a.empty() && rgbSigma_s.empty())
         nDensity = rgbDensity.size();
-        if (!sigma_a.empty())
+    else if ((!sigma_a.empty() ^ !rgbSigma_a.empty()) && 
+             (!sigma_s.empty() ^ !rgbSigma_s.empty()) && density.empty() &&
+             rgbDensity.empty()) {
+        size_t aSize = !sigma_a.empty() ? sigma_a.size() : rgbSigma_a.size();
+        size_t sSize = !sigma_s.empty() ? sigma_s.size() : rgbSigma_s.size();
+        if ( aSize != sSize)
             ErrorExit(loc,
-                      "Both \"density.rgb\" and \"density.sigma_a\" values were provided.");
-        if (!sigma_s.empty())
-            ErrorExit(loc,
-                      "Both \"density.rgb\" and \"density.sigma_s\" values were provided.");
-        if (!rgbSigma_a.empty())
-            ErrorExit(loc,
-                      "Both \"density.rgb\" and \"density.sigma_a.rgb\" values were provided.");
-        if (!rgbSigma_s.empty())
-            ErrorExit(loc,
-                      "Both \"density.rgb\" and \"density.sigma_s.rgb\" values were provided.");
-    } else if (!sigma_a.empty()) {
-        if (!rgbSigma_a.empty())
-            ErrorExit(loc,
-                      "Both \"density.sigma_a\" and \"density.sigma_a.rgb\" values were provided.");
-        nDensity = sigma_a.size();
-        if (!sigma_s.empty()) {
-            if (!rgbSigma_s.empty())
-                ErrorExit(loc,
-                          "Both \"density.sigma_s\" and \"density.sigma_s.rgb\" values were provided.");
-            if (sigma_s.size() != sigma_a.size())
-                ErrorExit(loc,
-                          "Different number of samples (%d vs %d) provided for "
-                          "\"density.sigma_a\" and \"density.sigma_s\".",
-                          sigma_a.size(), sigma_s.size());
-        } else if (!rgbSigma_s.empty()) {
-            if (rgbSigma_s.size() != sigma_a.size())
-                ErrorExit(loc,
-                          "Different number of samples (%d vs %d) provided for "
-                          "\"density.sigma_a\" and \"density.sigma_s.rgb\".",
-                          sigma_a.size(), rgbSigma_s.size());
-        } else
-            ErrorExit(loc, "No \"density.sigma_s\" or \"density.sigma_s.rgb\" provided with \"sigma_a\".");
-    } else if (!rgbSigma_a.empty()) {
-        nDensity = rgbSigma_a.size();
-        if (!sigma_s.empty()) {
-            if (!rgbSigma_s.empty())
-                ErrorExit(loc,
-                          "Both \"density.sigma_s\" and \"density.sigma_s.rgb\" values were provided.");
-            if (sigma_s.size() != rgbSigma_a.size())
-                ErrorExit(loc,
-                          "Different number of samples (%d vs %d) provided for "
-                          "\"density.sigma_a.rgb\" and \"density.sigma_s\".",
-                          rgbSigma_a.size(), sigma_s.size());
-        } else if (!rgbSigma_s.empty()) {
-            if (rgbSigma_s.size() != rgbSigma_a.size())
-                ErrorExit(loc,
-                          "Different number of samples (%d vs %d) provided for "
-                          "\"density.sigma_a.rgb\" and \"density.sigma_s.rgb\".",
-                          rgbSigma_a.size(), rgbSigma_s.size());
-        } else
-            ErrorExit(loc, "No \"density.sigma_s/density.sigma_s.rgb\" provided with \"density.sigma_a.rgb\".");
-    }  else if (!sigma_s.empty() || !rgbSigma_s.empty())
-        ErrorExit(loc, "No \"density.sigma_a/density.sigma_a.rgb\" provided with \"density.sigma_s/density.sigma_s.rgb\".");
-    else
-        ErrorExit(loc, "No \"density\" values provided for uniform grid medium.");
+                      "Different number of samples (%d vs %d) provided for "
+                      "\"density.sigma_a[.rgb]\" and \"density.sigma_s[.rgb]\".",
+                      aSize, sSize);
+        nDensity = aSize;
+    } else
+        ErrorExit(loc, "Invalid density parameters provided for uniform grid medium. "
+                        "Supported parameters combinations are one of:\n"
+                        "    \"density\"\n"
+                        "    \"density.rgb\"\n"
+                        "    \"density.sigma_a\" and \"density.sigma_s\"\n"
+                        "    \"density.sigma_a.rgb\" and \"density.sigma_\"s\n"
+                        "    \"density.sigma_a\" and \"density.sigma_s.rgb\"\n"
+                        "    \"density.sigma_a.rgb\" and \"density.sigma_s.rgb\"\n"
+                        "  Parameters provided:\n"
+                        "%s%s%s%s%s%s", 
+                        !density.empty() ? "    \"density\"\n" : "",
+                        !rgbDensity.empty() ? "    \"density.rgb\"\n" : "",
+                        !sigma_a.empty() ? "    \"density.sigma_a\"\n" : "",
+                        !sigma_s.empty() ? "    \"density.sigma_s\"\n" : "",
+                        !rgbSigma_a.empty() ? "    \"density.sigma_a.rgb\"\n" : "",
+                        !rgbSigma_s.empty() ? "    \"density.sigma_s.rgb\"\n" : "");
 
     int nx = parameters.GetOneInt("nx", 1);
     int ny = parameters.GetOneInt("ny", 1);
