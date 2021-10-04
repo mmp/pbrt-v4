@@ -269,7 +269,7 @@ class ThinDielectricBxDF {
             return {};
 
         if (uc < pr / (pr + pt)) {
-            // Sample perfect specular reflection at thin dielectric interface
+            // Sample perfect specular dielectric BRDF
             Vector3f wi(-wo.x, -wo.y, wo.z);
             SampledSpectrum fr(R / AbsCosTheta(wi));
             return BSDFSample(fr, wi, pr / (pr + pt), BxDFFlags::SpecularReflection);

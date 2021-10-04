@@ -601,6 +601,7 @@ class RGBIlluminantSpectrum {
     Float operator()(Float lambda) const {
         return scale * rsp(lambda) * (*illuminant)(lambda);
     }
+
     PBRT_CPU_GPU
     Float MaxValue() const { return scale * rsp.MaxValue() * illuminant->MaxValue(); }
 

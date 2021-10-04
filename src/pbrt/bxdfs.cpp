@@ -128,12 +128,15 @@ pstd::optional<BSDFSample> DielectricBxDF::Sample_f(
         if (pr == 0 && pt == 0)
             return {};
 
+        Float pdf;
         if (uc < pr / (pr + pt)) {
             // Sample reflection at rough dielectric interface
             Vector3f wi = Reflect(wo, wm);
             if (!SameHemisphere(wo, wi))
                 return {};
-            Float pdf = mfDistrib.PDF(wo, wm) / (4 * AbsDot(wo, wm)) * pr / (pr + pt);
+            // Compute PDF of rough dielectric reflection
+            pdf = mfDistrib.PDF(wo, wm) / (4 * AbsDot(wo, wm)) * pr / (pr + pt);
+
             CHECK(!IsNaN(pdf));
             SampledSpectrum f(mfDistrib.D(wm) * mfDistrib.G(wo, wi) * R /
                               (4 * CosTheta(wi) * CosTheta(wo)));
@@ -147,12 +150,12 @@ pstd::optional<BSDFSample> DielectricBxDF::Sample_f(
             CHECK_RARE(1e-5f, tir);
             if (SameHemisphere(wo, wi) || wi.z == 0 || tir)
                 return {};
-            // Compute PDF of direction $\wi$ for rough transmission
+            // Compute PDF of rough dielectric transmission
             Float denom = Sqr(Dot(wi, wm) + Dot(wo, wm) / etap);
             Float dwm_dwi = AbsDot(wi, wm) / denom;
-            Float pdf = mfDistrib.PDF(wo, wm) * dwm_dwi * pt / (pr + pt);
-            CHECK(!IsNaN(pdf));
+            pdf = mfDistrib.PDF(wo, wm) * dwm_dwi * pt / (pr + pt);
 
+            CHECK(!IsNaN(pdf));
             // Evaluate BRDF and return _BSDFSample_ for rough transmission
             SampledSpectrum ft(T * mfDistrib.D(wm) * mfDistrib.G(wo, wi) *
                                std::abs(Dot(wi, wm) * Dot(wo, wm) /
@@ -240,15 +243,18 @@ Float DielectricBxDF::PDF(Vector3f wo, Vector3f wi, TransportMode mode,
     if (pr == 0 && pt == 0)
         return {};
 
+    Float pdf;
     if (reflect) {
-        // Return PDF of rough dielectric reflection
-        return mfDistrib.PDF(wo, wm) / (4 * AbsDot(wo, wm)) * pr / (pr + pt);
+        // Compute PDF of rough dielectric reflection
+        pdf = mfDistrib.PDF(wo, wm) / (4 * AbsDot(wo, wm)) * pr / (pr + pt);
 
     } else {
-        // Return PDF of rough dielectric transmission
-        Float dwm_dwi = AbsDot(wi, wm) / Sqr(Dot(wi, wm) + Dot(wo, wm) / etap);
-        return mfDistrib.PDF(wo, wm) * dwm_dwi * pt / (pr + pt);
+        // Compute PDF of rough dielectric transmission
+        Float denom = Sqr(Dot(wi, wm) + Dot(wo, wm) / etap);
+        Float dwm_dwi = AbsDot(wi, wm) / denom;
+        pdf = mfDistrib.PDF(wo, wm) * dwm_dwi * pt / (pr + pt);
     }
+    return pdf;
 }
 
 std::string DielectricBxDF::ToString() const {
