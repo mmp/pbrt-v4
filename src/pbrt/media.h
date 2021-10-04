@@ -463,12 +463,12 @@ class RGBGridMediumProvider {
         if (sigma_aGrid)
             a = sigma_aGrid->Lookup(pp, convert);
         else
-            a = SampledSpectrum(0.f);
+            a = SampledSpectrum(1.f);
 
         if (sigma_sGrid)
             s = sigma_sGrid->Lookup(pp, convert);
         else
-            s = SampledSpectrum(0.f);
+            s = SampledSpectrum(1.f);
 
         return MediumDensity(a, s);
     }
