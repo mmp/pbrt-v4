@@ -252,7 +252,7 @@ class ThinDielectricBxDF {
     pstd::optional<BSDFSample> Sample_f(Vector3f wo, Float uc, Point2f u,
                                         TransportMode mode,
                                         BxDFReflTransFlags sampleFlags) const {
-        Float R = FrDielectric(CosTheta(wo), eta), T = 1 - R;
+        Float R = FrDielectric(AbsCosTheta(wo), eta), T = 1 - R;
         // Compute _R_ and _T_ accounting for scattering between interfaces
         if (R < 1) {
             R += T * T * R / (1 - R * R);
