@@ -34,43 +34,37 @@ std::string RGBSigmoidPolynomial::ToString() const {
 
 // RGBToSpectrumTable Method Definitions
 RGBSigmoidPolynomial RGBToSpectrumTable::operator()(const RGB &rgb) const {
-    CHECK(rgb[0] >= 0.f && rgb[1] >= 0.f && rgb[2] >= 0.f && rgb[0] <= 1.f &&
-          rgb[1] <= 1.f && rgb[2] <= 1.f);
+    DCHECK(rgb[0] >= 0.f && rgb[1] >= 0.f && rgb[2] >= 0.f && rgb[0] <= 1.f &&
+           rgb[1] <= 1.f && rgb[2] <= 1.f);
 
-    // Find largest RGB component and handle uniform _rgb_
-    if (rgb[0] == rgb[1] && rgb[1] == rgb[2]) {
-        Float v = rgb[0], inv = (v - .5f) / std::sqrt(v * (1.f - v));
-        return {Float(0), Float(0), inv};
-    }
-    int i = 0;
-    for (int j = 1; j < 3; ++j)
-        if (rgb[j] >= rgb[i])
-            i = j;
+    // Handle uniform _rgb_
+    if (rgb[0] == rgb[1] && rgb[1] == rgb[2])
+        return RGBSigmoidPolynomial(0, 0,
+                                    (rgb[0] - .5f) / std::sqrt(rgb[0] * (1 - rgb[0])));
 
-    // Compute floating-point offsets into polynomial coefficient table
-    float z = rgb[i];
-    float x = rgb[(i + 1) % 3] * (res - 1) / z;
-    float y = rgb[(i + 2) % 3] * (res - 1) / z;
+    // Find maximum component and compute remapped component values
+    int maxc =
+        (rgb[0] > rgb[1]) ? ((rgb[0] > rgb[2]) ? 0 : 2) : ((rgb[1] > rgb[2]) ? 1 : 2);
+    float z = rgb[maxc];
+    float x = rgb[(maxc + 1) % 3] * (res - 1) / z;
+    float y = rgb[(maxc + 2) % 3] * (res - 1) / z;
 
     // Compute integer indices and offsets for coefficient interpolation
-    constexpr int nCoeffs = 3;
     int xi = std::min((int)x, res - 2), yi = std::min((int)y, res - 2),
-        zi = FindInterval(res, [&](int i) { return scale[i] < z; }),
-        offset = (((i * res + zi) * res + yi) * res + xi) * nCoeffs, dx = nCoeffs,
-        dy = nCoeffs * res, dz = nCoeffs * res * res;
-    Float x1 = x - xi, x0 = 1 - x1, y1 = y - yi, y0 = 1 - y1,
-          z1 = (z - scale[zi]) / (scale[zi + 1] - scale[zi]), z0 = 1 - z1;
+        zi = FindInterval(res, [&](int i) { return zNodes[i] < z; });
+    Float dx = x - xi, dy = y - yi, dz = (z - zNodes[zi]) / (zNodes[zi + 1] - zNodes[zi]);
 
-    // Bilinearly interpolate sigmoid polynomial coefficients _c_
-    pstd::array<Float, nCoeffs> c;
-    for (int j = 0; j < nCoeffs; ++j) {
-        c[j] = ((data[offset] * x0 + data[offset + dx] * x1) * y0 +
-                (data[offset + dy] * x0 + data[offset + dy + dx] * x1) * y1) *
-                   z0 +
-               ((data[offset + dz] * x0 + data[offset + dz + dx] * x1) * y0 +
-                (data[offset + dz + dy] * x0 + data[offset + dz + dy + dx] * x1) * y1) *
-                   z1;
-        offset++;
+    // Trilinearly interpolate sigmoid polynomial coefficients _c_
+    pstd::array<Float, 3> c;
+    for (int i = 0; i < 3; ++i) {
+        auto co = [&](int dx, int dy, int dz) {
+            return (*coeffs)[maxc][zi + dz][yi + dy][xi + dx][i];
+        };
+        c[i] = Lerp(dz,
+                    Lerp(dy, Lerp(dx, co(0, 0, 0), co(1, 0, 0)),
+                         Lerp(dx, co(0, 1, 0), co(1, 1, 0))),
+                    Lerp(dy, Lerp(dx, co(0, 0, 1), co(1, 0, 1)),
+                         Lerp(dx, co(0, 1, 1), co(1, 1, 1))));
     }
 
     return RGBSigmoidPolynomial(c[0], c[1], c[2]);
@@ -78,59 +72,43 @@ RGBSigmoidPolynomial RGBToSpectrumTable::operator()(const RGB &rgb) const {
 
 extern const int sRGBToSpectrumTable_Res;
 extern const float sRGBToSpectrumTable_Scale[64];
-extern const float sRGBToSpectrumTable_Data[2359296];
+extern const RGBToSpectrumTable::CoefficientArray sRGBToSpectrumTable_Data;
 
 const RGBToSpectrumTable *RGBToSpectrumTable::sRGB;
 
 extern const int DCI_P3ToSpectrumTable_Res;
 extern const float DCI_P3ToSpectrumTable_Scale[64];
-extern const float DCI_P3ToSpectrumTable_Data[2359296];
+extern const RGBToSpectrumTable::CoefficientArray DCI_P3ToSpectrumTable_Data;
 
 const RGBToSpectrumTable *RGBToSpectrumTable::DCI_P3;
 
 extern const int REC2020ToSpectrumTable_Res;
 extern const float REC2020ToSpectrumTable_Scale[64];
-extern const float REC2020ToSpectrumTable_Data[2359296];
+extern const RGBToSpectrumTable::CoefficientArray REC2020ToSpectrumTable_Data;
 
 const RGBToSpectrumTable *RGBToSpectrumTable::Rec2020;
 
 extern const int ACES2065_1ToSpectrumTable_Res;
 extern const float ACES2065_1ToSpectrumTable_Scale[64];
-extern const float ACES2065_1ToSpectrumTable_Data[2359296];
+extern const RGBToSpectrumTable::CoefficientArray ACES2065_1ToSpectrumTable_Data;
 
 const RGBToSpectrumTable *RGBToSpectrumTable::ACES2065_1;
 
 void RGBToSpectrumTable::Init(Allocator alloc) {
 #if defined(PBRT_BUILD_GPU_RENDERER)
     if (Options->useGPU) {
-        extern const int sRGBToSpectrumTable_Res;
-        extern const float sRGBToSpectrumTable_Scale[64];
-        extern const float sRGBToSpectrumTable_Data[2359296];
-
-        extern const int DCI_P3ToSpectrumTable_Res;
-        extern const float DCI_P3ToSpectrumTable_Scale[64];
-        extern const float DCI_P3ToSpectrumTable_Data[2359296];
-
-        extern const int REC2020ToSpectrumTable_Res;
-        extern const float REC2020ToSpectrumTable_Scale[64];
-        extern const float REC2020ToSpectrumTable_Data[2359296];
-
-        extern const int ACES2065_1ToSpectrumTable_Res;
-        extern const float ACES2065_1ToSpectrumTable_Scale[64];
-        extern const float ACES2065_1ToSpectrumTable_Data[2359296];
-
         // sRGB
         float *sRGBToSpectrumTableScalePtr =
             (float *)alloc.allocate_bytes(sizeof(sRGBToSpectrumTable_Scale));
         memcpy(sRGBToSpectrumTableScalePtr, sRGBToSpectrumTable_Scale,
                sizeof(sRGBToSpectrumTable_Scale));
-        float *sRGBToSpectrumTableDataPtr =
-            (float *)alloc.allocate_bytes(sizeof(sRGBToSpectrumTable_Data));
+        RGBToSpectrumTable::CoefficientArray *sRGBToSpectrumTableDataPtr =
+            (RGBToSpectrumTable::CoefficientArray *)alloc.allocate_bytes(
+                sizeof(RGBToSpectrumTable::CoefficientArray));
         memcpy(sRGBToSpectrumTableDataPtr, sRGBToSpectrumTable_Data,
                sizeof(sRGBToSpectrumTable_Data));
 
-        sRGB = alloc.new_object<RGBToSpectrumTable>(sRGBToSpectrumTable_Res,
-                                                    sRGBToSpectrumTableScalePtr,
+        sRGB = alloc.new_object<RGBToSpectrumTable>(sRGBToSpectrumTableScalePtr,
                                                     sRGBToSpectrumTableDataPtr);
 
         // DCI_P3
@@ -138,13 +116,13 @@ void RGBToSpectrumTable::Init(Allocator alloc) {
             (float *)alloc.allocate_bytes(sizeof(DCI_P3ToSpectrumTable_Scale));
         memcpy(DCI_P3ToSpectrumTableScalePtr, DCI_P3ToSpectrumTable_Scale,
                sizeof(DCI_P3ToSpectrumTable_Scale));
-        float *DCI_P3ToSpectrumTableDataPtr =
-            (float *)alloc.allocate_bytes(sizeof(DCI_P3ToSpectrumTable_Data));
+        RGBToSpectrumTable::CoefficientArray *DCI_P3ToSpectrumTableDataPtr =
+            (RGBToSpectrumTable::CoefficientArray *)alloc.allocate_bytes(
+                sizeof(DCI_P3ToSpectrumTable_Data));
         memcpy(DCI_P3ToSpectrumTableDataPtr, DCI_P3ToSpectrumTable_Data,
                sizeof(DCI_P3ToSpectrumTable_Data));
 
-        DCI_P3 = alloc.new_object<RGBToSpectrumTable>(DCI_P3ToSpectrumTable_Res,
-                                                      DCI_P3ToSpectrumTableScalePtr,
+        DCI_P3 = alloc.new_object<RGBToSpectrumTable>(DCI_P3ToSpectrumTableScalePtr,
                                                       DCI_P3ToSpectrumTableDataPtr);
 
         // Rec2020
@@ -152,13 +130,13 @@ void RGBToSpectrumTable::Init(Allocator alloc) {
             (float *)alloc.allocate_bytes(sizeof(REC2020ToSpectrumTable_Scale));
         memcpy(REC2020ToSpectrumTableScalePtr, REC2020ToSpectrumTable_Scale,
                sizeof(REC2020ToSpectrumTable_Scale));
-        float *REC2020ToSpectrumTableDataPtr =
-            (float *)alloc.allocate_bytes(sizeof(REC2020ToSpectrumTable_Data));
+        RGBToSpectrumTable::CoefficientArray *REC2020ToSpectrumTableDataPtr =
+            (RGBToSpectrumTable::CoefficientArray *)alloc.allocate_bytes(
+                sizeof(REC2020ToSpectrumTable_Data));
         memcpy(REC2020ToSpectrumTableDataPtr, REC2020ToSpectrumTable_Data,
                sizeof(REC2020ToSpectrumTable_Data));
 
-        Rec2020 = alloc.new_object<RGBToSpectrumTable>(REC2020ToSpectrumTable_Res,
-                                                       REC2020ToSpectrumTableScalePtr,
+        Rec2020 = alloc.new_object<RGBToSpectrumTable>(REC2020ToSpectrumTableScalePtr,
                                                        REC2020ToSpectrumTableDataPtr);
 
         // ACES2065_1
@@ -166,28 +144,25 @@ void RGBToSpectrumTable::Init(Allocator alloc) {
             (float *)alloc.allocate_bytes(sizeof(ACES2065_1ToSpectrumTable_Scale));
         memcpy(ACES2065_1ToSpectrumTableScalePtr, ACES2065_1ToSpectrumTable_Scale,
                sizeof(ACES2065_1ToSpectrumTable_Scale));
-        float *ACES2065_1ToSpectrumTableDataPtr =
-            (float *)alloc.allocate_bytes(sizeof(ACES2065_1ToSpectrumTable_Data));
+        RGBToSpectrumTable::CoefficientArray *ACES2065_1ToSpectrumTableDataPtr =
+            (RGBToSpectrumTable::CoefficientArray *)alloc.allocate_bytes(
+                sizeof(ACES2065_1ToSpectrumTable_Data));
         memcpy(ACES2065_1ToSpectrumTableDataPtr, ACES2065_1ToSpectrumTable_Data,
                sizeof(ACES2065_1ToSpectrumTable_Data));
 
         ACES2065_1 = alloc.new_object<RGBToSpectrumTable>(
-            ACES2065_1ToSpectrumTable_Res, ACES2065_1ToSpectrumTableScalePtr,
-            ACES2065_1ToSpectrumTableDataPtr);
+            ACES2065_1ToSpectrumTableScalePtr, ACES2065_1ToSpectrumTableDataPtr);
         return;
     }
 #endif
-    sRGB = alloc.new_object<RGBToSpectrumTable>(
-        sRGBToSpectrumTable_Res, sRGBToSpectrumTable_Scale, sRGBToSpectrumTable_Data);
-    DCI_P3 = alloc.new_object<RGBToSpectrumTable>(DCI_P3ToSpectrumTable_Res,
-                                                  DCI_P3ToSpectrumTable_Scale,
-                                                  DCI_P3ToSpectrumTable_Data);
-    Rec2020 = alloc.new_object<RGBToSpectrumTable>(REC2020ToSpectrumTable_Res,
-                                                   REC2020ToSpectrumTable_Scale,
-                                                   REC2020ToSpectrumTable_Data);
-    ACES2065_1 = alloc.new_object<RGBToSpectrumTable>(ACES2065_1ToSpectrumTable_Res,
-                                                      ACES2065_1ToSpectrumTable_Scale,
-                                                      ACES2065_1ToSpectrumTable_Data);
+    sRGB = alloc.new_object<RGBToSpectrumTable>(sRGBToSpectrumTable_Scale,
+                                                &sRGBToSpectrumTable_Data);
+    DCI_P3 = alloc.new_object<RGBToSpectrumTable>(DCI_P3ToSpectrumTable_Scale,
+                                                  &DCI_P3ToSpectrumTable_Data);
+    Rec2020 = alloc.new_object<RGBToSpectrumTable>(REC2020ToSpectrumTable_Scale,
+                                                   &REC2020ToSpectrumTable_Data);
+    ACES2065_1 = alloc.new_object<RGBToSpectrumTable>(ACES2065_1ToSpectrumTable_Scale,
+                                                      &ACES2065_1ToSpectrumTable_Data);
 }
 
 std::string RGBToSpectrumTable::ToString() const {

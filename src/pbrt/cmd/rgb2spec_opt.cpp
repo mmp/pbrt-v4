@@ -883,17 +883,33 @@ int main(int argc, char **argv) {
     FILE *f = fopen(argv[2], "w");
     if (f == nullptr)
         throw std::runtime_error("Could not create file!");
-    fprintf(f, "#include <pbrt/pbrt.h>\n");
     fprintf(f, "namespace pbrt {\n");
-    fprintf(f, "extern PBRT_CONST int %sToSpectrumTable_Res = %d;\n", argv[3], res);
-    fprintf(f, "extern PBRT_CONST float %sToSpectrumTable_Scale[%d] = {\n", argv[3], res);
+    fprintf(f, "extern const int %sToSpectrumTable_Res = %d;\n", argv[3], res);
+    fprintf(f, "extern const float %sToSpectrumTable_Scale[%d] = {\n", argv[3], res);
     for (int i = 0; i < res; ++i)
         fprintf(f, "%.9g, ", scale[i]);
     fprintf(f, "};\n");
-    fprintf(f, "extern PBRT_CONST float %sToSpectrumTable_Data[%d] = {\n", argv[3],
-            (int)bufsize);
-    for (int i = 0; i < bufsize; ++i)
-        fprintf(f, "%.9g,%c", out[i], ((i + 1) % 9) == 8 ? '\n' : ' ');
+    fprintf(f, "extern const float %sToSpectrumTable_Data[3][%d][%d][%d][3] = {\n",
+            argv[3], res, res, res);
+    const float *ptr = out;
+    for (int maxc = 0; maxc < 3; ++maxc) {
+        fprintf(f, "{ ");
+        for (int z = 0; z < res; ++z) {
+            fprintf(f, "{ ");
+            for (int y = 0; y < res; ++y) {
+                fprintf(f, "{ ");
+                for (int x = 0; x < res; ++x) {
+                    fprintf(f, "{ ");
+                    for (int c = 0; c < 3; ++c)
+                        fprintf(f, "%.9g, ", *ptr++);
+                    fprintf(f, "}, ");
+                }
+                fprintf(f, "},\n    ");
+            }
+            fprintf(f, "}, ");
+        }
+        fprintf(f, "}, ");
+    }
     fprintf(f, "};\n");
     fprintf(f, "} // namespace pbrt\n");
     fclose(f);
