@@ -629,7 +629,7 @@ class CloudMedium {
     }
 };
 
-// NanoVDBMediumProvider Definition
+// NanoVDBMedium Definition
 // NanoVDBBuffer Definition
 class NanoVDBBuffer {
   public:
@@ -701,51 +701,66 @@ class NanoVDBBuffer {
     uint8_t *ptr = nullptr;
 };
 
-class NanoVDBMediumProvider {
+class NanoVDBMedium {
   public:
-    // NanoVDBMediumProvider Public Methods
-    static NanoVDBMediumProvider *Create(const ParameterDictionary &parameters,
-                                         const FileLoc *loc, Allocator alloc);
+    using MajorantIterator = DDAMajorantIterator;
 
-    std::string ToString() const {
-        return StringPrintf("[ NanoVDBMediumProvider bounds: %s LeScale: %f "
-                            "temperatureCutoff: %f temperatureScale: %f (grids elided) ]",
-                            bounds, LeScale, temperatureCutoff, temperatureScale);
-    }
+    // NanoVDBMedium Public Methods
+    static NanoVDBMedium *Create(const ParameterDictionary &parameters,
+                                 const Transform &renderFromMedium,
+                                 const FileLoc *loc, Allocator alloc);
 
-    NanoVDBMediumProvider(nanovdb::GridHandle<NanoVDBBuffer> dg,
-                          nanovdb::GridHandle<NanoVDBBuffer> tg, Float LeScale,
-                          Float temperatureCutoff, Float temperatureScale)
-        : densityGrid(std::move(dg)),
-          temperatureGrid(std::move(tg)),
-          LeScale(LeScale),
-          temperatureCutoff(temperatureCutoff),
-          temperatureScale(temperatureScale) {
-        densityFloatGrid = densityGrid.grid<float>();
+    std::string ToString() const;
 
-        nanovdb::BBox<nanovdb::Vec3R> bbox = densityFloatGrid->worldBBox();
-        bounds = Bounds3f(Point3f(bbox.min()[0], bbox.min()[1], bbox.min()[2]),
-                          Point3f(bbox.max()[0], bbox.max()[1], bbox.max()[2]));
-
-        if (temperatureGrid) {
-            temperatureFloatGrid = temperatureGrid.grid<float>();
-            float minTemperature, maxTemperature;
-            temperatureFloatGrid->tree().extrema(minTemperature, maxTemperature);
-            LOG_VERBOSE("Max temperature: %f", maxTemperature);
-
-            nanovdb::BBox<nanovdb::Vec3R> bbox = temperatureFloatGrid->worldBBox();
-            bounds = Union(
-                bounds, Bounds3f(Point3f(bbox.min()[0], bbox.min()[1], bbox.min()[2]),
-                                 Point3f(bbox.max()[0], bbox.max()[1], bbox.max()[2])));
-        }
-    }
-
-    PBRT_CPU_GPU
-    const Bounds3f &Bounds() const { return bounds; }
+    NanoVDBMedium(const Transform &renderFromMedium, Spectrum sigma_a, Spectrum sigma_s,
+                  Float sigScale, Float g, nanovdb::GridHandle<NanoVDBBuffer> dg,
+                  nanovdb::GridHandle<NanoVDBBuffer> tg, Float LeScale,
+                  Float temperatureCutoff, Float temperatureScale, Allocator alloc);
 
     PBRT_CPU_GPU
     bool IsEmissive() const { return temperatureFloatGrid && LeScale > 0; }
 
+    PBRT_CPU_GPU
+    MediumProperties SamplePoint(Point3f p, const SampledWavelengths &lambda) const {
+        // Sample spectra for grid $\sigmaa$ and $\sigmas$
+        SampledSpectrum sigma_a = sigScale * sigma_a_spec.Sample(lambda);
+        SampledSpectrum sigma_s = sigScale * sigma_s_spec.Sample(lambda);
+
+        // Scale scattering coefficients by medium density at _p_
+        p = renderFromMedium.ApplyInverse(p);
+
+        nanovdb::Vec3<float> pIndex =
+            densityFloatGrid->worldToIndexF(nanovdb::Vec3<float>(p.x, p.y, p.z));
+        using Sampler = nanovdb::SampleFromVoxels<nanovdb::FloatGrid::TreeType, 1, false>;
+        Float d = Sampler(densityFloatGrid->tree())(pIndex);
+
+        return MediumProperties{sigma_a * d, sigma_s * d, &phase, Le(p, lambda)};
+    }
+
+    PBRT_CPU_GPU
+    void SampleRay(Ray ray, Float raytMax, const SampledWavelengths &lambda,
+                   DDAMajorantIterator *iter) const {
+        // Transform ray to grid density's space and compute bounds overlap
+        ray = renderFromMedium.ApplyInverse(ray, &raytMax);
+        Float tMin, tMax;
+        if (!bounds.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax)) {
+            *iter = DDAMajorantIterator();
+            return;
+        }
+        DCHECK_LE(tMax, raytMax);
+
+        // Sample spectra for grid $\sigmaa$ and $\sigmas$
+        SampledSpectrum sigma_a = sigScale * sigma_a_spec.Sample(lambda);
+        SampledSpectrum sigma_s = sigScale * sigma_s_spec.Sample(lambda);
+
+        // Initialize majorant iterator for _CuboidMedium_
+        SampledSpectrum sigma_t = sigma_a + sigma_s;
+        *iter = DDAMajorantIterator(ray, bounds, sigma_t, tMin, tMax, &maxDensityGrid,
+                                    maxDensityGridRes);
+    }
+
+  private:
+    // NanoVDBMedium Private Methods
     PBRT_CPU_GPU
     SampledSpectrum Le(Point3f p, const SampledWavelengths &lambda) const {
         if (!temperatureFloatGrid)
@@ -760,81 +775,14 @@ class NanoVDBMediumProvider {
         return LeScale * BlackbodySpectrum(temp).Sample(lambda);
     }
 
-    pstd::vector<Float> GetMaxDensityGrid(Allocator alloc, Point3i *res) const {
-#if 0
-    // For debugging: single, medium-wide majorant...
-    *res = Point3i(1, 1, 1);
-    Float minDensity, maxDensity;
-    densityFloatGrid->tree().extrema(minDensity, maxDensity);
-    return pstd::vector<Float>(1, maxDensity, alloc);
-#else
-        *res = Point3i(64, 64, 64);
-
-        LOG_VERBOSE("Starting nanovdb grid GetMaxDensityGrid()");
-
-        pstd::vector<Float> maxGrid(res->x * res->y * res->z, 0.f, alloc);
-
-        ParallelFor(0, maxGrid.size(), [&](size_t index) {
-            // Indices into maxGrid
-            int x = index % res->x;
-            int y = (index / res->x) % res->y;
-            int z = index / (res->x * res->y);
-            CHECK_EQ(index, x + res->x * (y + res->y * z));
-
-            // World (aka medium) space bounds of this max grid cell
-            Bounds3f wb(bounds.Lerp(Point3f(Float(x) / res->x, Float(y) / res->y,
-                                            Float(z) / res->z)),
-                        bounds.Lerp(Point3f(Float(x + 1) / res->x, Float(y + 1) / res->y,
-                                            Float(z + 1) / res->z)));
-
-            // Compute corresponding NanoVDB index-space bounds in floating-point.
-            nanovdb::Vec3R i0 = densityFloatGrid->worldToIndexF(
-                nanovdb::Vec3R(wb.pMin.x, wb.pMin.y, wb.pMin.z));
-            nanovdb::Vec3R i1 = densityFloatGrid->worldToIndexF(
-                nanovdb::Vec3R(wb.pMax.x, wb.pMax.y, wb.pMax.z));
-
-            // Now find integer index-space bounds, accounting for both
-            // filtering and the overall index bounding box.
-            auto bbox = densityFloatGrid->indexBBox();
-            Float delta = 1.f;  // Filter slop
-            int nx0 = std::max(int(i0[0] - delta), bbox.min()[0]);
-            int nx1 = std::min(int(i1[0] + delta), bbox.max()[0]);
-            int ny0 = std::max(int(i0[1] - delta), bbox.min()[1]);
-            int ny1 = std::min(int(i1[1] + delta), bbox.max()[1]);
-            int nz0 = std::max(int(i0[2] - delta), bbox.min()[2]);
-            int nz1 = std::min(int(i1[2] + delta), bbox.max()[2]);
-
-            float maxValue = 0;
-            auto accessor = densityFloatGrid->getAccessor();
-            // Apparently nanovdb integer bounding boxes are inclusive on
-            // the upper end...
-            for (int nz = nz0; nz <= nz1; ++nz)
-                for (int ny = ny0; ny <= ny1; ++ny)
-                    for (int nx = nx0; nx <= nx1; ++nx)
-                        maxValue = std::max(maxValue, accessor.getValue({nx, ny, nz}));
-
-            // Only write into maxGrid once when we're done to minimize
-            // cache thrashing..
-            maxGrid[index] = maxValue;
-        });
-
-        LOG_VERBOSE("Finished nanovdb grid GetMaxDensityGrid()");
-        return maxGrid;
-#endif
-    }
-
-    PBRT_CPU_GPU
-    MediumDensity Density(Point3f p, const SampledWavelengths &lambda) const {
-        nanovdb::Vec3<float> pIndex =
-            densityFloatGrid->worldToIndexF(nanovdb::Vec3<float>(p.x, p.y, p.z));
-        using Sampler = nanovdb::SampleFromVoxels<nanovdb::FloatGrid::TreeType, 1, false>;
-        Float density = Sampler(densityFloatGrid->tree())(pIndex);
-        return MediumDensity(density);
-    }
-
-  private:
-    // NanoVDBMediumProvider Private Members
+    // NanoVDBMedium Private Members
     Bounds3f bounds;
+    Transform renderFromMedium;
+    DenselySampledSpectrum sigma_a_spec, sigma_s_spec;
+    Float sigScale;
+    HGPhaseFunction phase;
+    Point3i maxDensityGridRes;
+    pstd::vector<Float> maxDensityGrid;
     nanovdb::GridHandle<NanoVDBBuffer> densityGrid;
     nanovdb::GridHandle<NanoVDBBuffer> temperatureGrid;
     const nanovdb::FloatGrid *densityFloatGrid = nullptr;

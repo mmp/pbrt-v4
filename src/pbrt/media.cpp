@@ -456,7 +456,7 @@ CloudMedium *CloudMedium::Create(const ParameterDictionary &parameters,
                                          density, wispiness, frequency, alloc);
 }
 
-// NanoVDBMediumProvider Method Definitions
+// NanoVDBMedium Method Definitions
 template <typename Buffer>
 static nanovdb::GridHandle<Buffer> readGrid(const std::string &filename,
                                             const std::string &gridName,
@@ -481,8 +481,112 @@ static nanovdb::GridHandle<Buffer> readGrid(const std::string &filename,
     return grid;
 }
 
-NanoVDBMediumProvider *NanoVDBMediumProvider::Create(
-    const ParameterDictionary &parameters, const FileLoc *loc, Allocator alloc) {
+NanoVDBMedium::NanoVDBMedium(const Transform &renderFromMedium, Spectrum sigma_a, Spectrum sigma_s,
+                             Float sigScale, Float g, nanovdb::GridHandle<NanoVDBBuffer> dg,
+                             nanovdb::GridHandle<NanoVDBBuffer> tg, Float LeScale,
+                             Float temperatureCutoff, Float temperatureScale, Allocator alloc)
+    : renderFromMedium(renderFromMedium),
+      sigma_a_spec(sigma_a, alloc),
+      sigma_s_spec(sigma_s, alloc),
+      sigScale(sigScale),
+      phase(g),
+      maxDensityGrid(alloc),
+      densityGrid(std::move(dg)),
+      temperatureGrid(std::move(tg)),
+      LeScale(LeScale),
+      temperatureCutoff(temperatureCutoff),
+      temperatureScale(temperatureScale) {
+    densityFloatGrid = densityGrid.grid<float>();
+
+    nanovdb::BBox<nanovdb::Vec3R> bbox = densityFloatGrid->worldBBox();
+    bounds = Bounds3f(Point3f(bbox.min()[0], bbox.min()[1], bbox.min()[2]),
+                      Point3f(bbox.max()[0], bbox.max()[1], bbox.max()[2]));
+
+    if (temperatureGrid) {
+        temperatureFloatGrid = temperatureGrid.grid<float>();
+        float minTemperature, maxTemperature;
+        temperatureFloatGrid->tree().extrema(minTemperature, maxTemperature);
+        LOG_VERBOSE("Max temperature: %f", maxTemperature);
+
+        nanovdb::BBox<nanovdb::Vec3R> bbox = temperatureFloatGrid->worldBBox();
+        bounds = Union(
+                       bounds, Bounds3f(Point3f(bbox.min()[0], bbox.min()[1], bbox.min()[2]),
+                                        Point3f(bbox.max()[0], bbox.max()[1], bbox.max()[2])));
+    }
+
+    // Initialize maxDensityGrid
+#if 0
+    // For debugging: single, medium-wide majorant...
+    maxDensityGridRes = Point3i(1, 1, 1);
+    Float minDensity, maxDensity;
+    densityFloatGrid->tree().extrema(minDensity, maxDensity);
+    maxDensityGrid.push_back(maxDensity);
+#else
+    maxDensityGridRes = Point3i(64, 64, 64);
+
+    LOG_VERBOSE("Starting nanovdb grid GetMaxDensityGrid()");
+
+    maxDensityGrid.resize(maxDensityGridRes.x * maxDensityGridRes.y * maxDensityGridRes.z);
+
+    ParallelFor(0, maxDensityGrid.size(), [&](size_t index) {
+        // Indices into maxDensityGrid
+        int x = index % maxDensityGridRes.x;
+        int y = (index / maxDensityGridRes.x) % maxDensityGridRes.y;
+        int z = index / (maxDensityGridRes.x * maxDensityGridRes.y);
+        CHECK_EQ(index, x + maxDensityGridRes.x * (y + maxDensityGridRes.y * z));
+
+        // World (aka medium) space bounds of this max grid cell
+        Bounds3f wb(bounds.Lerp(Point3f(Float(x) / maxDensityGridRes.x,
+                                        Float(y) / maxDensityGridRes.y,
+                                        Float(z) / maxDensityGridRes.z)),
+                    bounds.Lerp(Point3f(Float(x + 1) / maxDensityGridRes.x,
+                                        Float(y + 1) / maxDensityGridRes.y,
+                                        Float(z + 1) / maxDensityGridRes.z)));
+
+        // Compute corresponding NanoVDB index-space bounds in floating-point.
+        nanovdb::Vec3R i0 = densityFloatGrid->worldToIndexF(
+                                                            nanovdb::Vec3R(wb.pMin.x, wb.pMin.y, wb.pMin.z));
+        nanovdb::Vec3R i1 = densityFloatGrid->worldToIndexF(
+                                                            nanovdb::Vec3R(wb.pMax.x, wb.pMax.y, wb.pMax.z));
+
+        // Now find integer index-space bounds, accounting for both
+        // filtering and the overall index bounding box.
+        auto bbox = densityFloatGrid->indexBBox();
+        Float delta = 1.f;  // Filter slop
+        int nx0 = std::max(int(i0[0] - delta), bbox.min()[0]);
+        int nx1 = std::min(int(i1[0] + delta), bbox.max()[0]);
+        int ny0 = std::max(int(i0[1] - delta), bbox.min()[1]);
+        int ny1 = std::min(int(i1[1] + delta), bbox.max()[1]);
+        int nz0 = std::max(int(i0[2] - delta), bbox.min()[2]);
+        int nz1 = std::min(int(i1[2] + delta), bbox.max()[2]);
+
+        float maxValue = 0;
+        auto accessor = densityFloatGrid->getAccessor();
+        // Apparently nanovdb integer bounding boxes are inclusive on
+        // the upper end...
+        for (int nz = nz0; nz <= nz1; ++nz)
+            for (int ny = ny0; ny <= ny1; ++ny)
+                for (int nx = nx0; nx <= nx1; ++nx)
+                    maxValue = std::max(maxValue, accessor.getValue({nx, ny, nz}));
+
+        // Only write into maxGrid once when we're done to minimize
+        // cache thrashing..
+        maxDensityGrid[index] = maxValue;
+    });
+
+    LOG_VERBOSE("Finished nanovdb grid GetMaxDensityGrid()");
+#endif
+}
+
+std::string NanoVDBMedium::ToString() const {
+    return StringPrintf("[ NanoVDBMedium bounds: %s LeScale: %f "
+                        "temperatureCutoff: %f temperatureScale: %f (grids elided) ]",
+                        bounds, LeScale, temperatureCutoff, temperatureScale);
+}
+
+NanoVDBMedium *NanoVDBMedium::Create(
+    const ParameterDictionary &parameters, const Transform &renderFromMedium,
+    const FileLoc *loc, Allocator alloc) {
     std::string filename = ResolveFilename(parameters.GetOneString("filename", ""));
     if (filename.empty())
         ErrorExit(loc, "Must supply \"filename\" to \"nanovdb\" medium.");
@@ -499,9 +603,21 @@ NanoVDBMediumProvider *NanoVDBMediumProvider::Create(
     Float temperatureCutoff = parameters.GetOneFloat("temperaturecutoff", 0.f);
     Float temperatureScale = parameters.GetOneFloat("temperaturescale", 1.f);
 
-    return alloc.new_object<NanoVDBMediumProvider>(std::move(densityGrid),
-                                                   std::move(temperatureGrid), LeScale,
-                                                   temperatureCutoff, temperatureScale);
+    Float g = parameters.GetOneFloat("g", 0.);
+    Spectrum sigma_a = parameters.GetOneSpectrum("sigma_a", nullptr, SpectrumType::Unbounded,
+                                                 alloc);
+    if (!sigma_a)
+        sigma_a = alloc.new_object<ConstantSpectrum>(1.f);
+    Spectrum sigma_s = parameters.GetOneSpectrum("sigma_s", nullptr, SpectrumType::Unbounded,
+                                                 alloc);
+    if (!sigma_s)
+        sigma_s = alloc.new_object<ConstantSpectrum>(1.f);
+    Float sigScale = parameters.GetOneFloat("scale", 1.f);
+
+    return alloc.new_object<NanoVDBMedium>(renderFromMedium, sigma_a, sigma_s, sigScale, g,
+                                           std::move(densityGrid),
+                                           std::move(temperatureGrid), LeScale,
+                                           temperatureCutoff, temperatureScale, alloc);
 }
 
 Medium Medium::Create(const std::string &name, const ParameterDictionary &parameters,
@@ -520,10 +636,7 @@ Medium Medium::Create(const std::string &name, const ParameterDictionary &parame
     } else if (name == "cloud") {
         m = CloudMedium::Create(parameters, renderFromMedium, loc, alloc);
     } else if (name == "nanovdb") {
-        NanoVDBMediumProvider *provider =
-            NanoVDBMediumProvider::Create(parameters, loc, alloc);
-        m = CuboidMedium<NanoVDBMediumProvider>::Create(provider, parameters,
-                                                        renderFromMedium, loc, alloc);
+        m = NanoVDBMedium::Create(parameters, renderFromMedium, loc, alloc);
     } else
         ErrorExit(loc, "%s: medium unknown.", name);
 

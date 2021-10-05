@@ -51,9 +51,7 @@ class GridMedium;
 class RGBGridMediumProvider;
 // RGBGridMedium Definition
 using RGBGridMedium = CuboidMedium<RGBGridMediumProvider>;
-class NanoVDBMediumProvider;
-// NanoVDBMedium Definition
-using NanoVDBMedium = CuboidMedium<NanoVDBMediumProvider>;
+class NanoVDBMedium;
 
 struct MediumProperties;
 
