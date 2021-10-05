@@ -96,8 +96,11 @@ class RayMajorantIterator
 };
 
 // Medium Definition
-class Medium : public TaggedPointer<HomogeneousMedium, GridMedium, RGBGridMedium, CloudMedium,
-                                    NanoVDBMedium> {
+class Medium
+    : public TaggedPointer<  // Medium Types
+          HomogeneousMedium, GridMedium, RGBGridMedium, CloudMedium, NanoVDBMedium
+
+          > {
   public:
     // Medium Interface
     using TaggedPointer::TaggedPointer;

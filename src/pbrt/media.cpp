@@ -213,8 +213,10 @@ GridMediumProvider::GridMediumProvider(const Bounds3f &bounds, SampledGrid<Float
                                        pstd::optional<SampledGrid<Float>> temperature,
                                        Spectrum Le, SampledGrid<Float> LeGrid,
                                        Allocator alloc)
-    : bounds(bounds), densityGrid(std::move(d)),
-      temperatureGrid(std::move(temperature)), Le_spec(Le, alloc),
+    : bounds(bounds),
+      densityGrid(std::move(d)),
+      temperatureGrid(std::move(temperature)),
+      Le_spec(Le, alloc),
       LeScale(std::move(LeGrid)) {
     volumeGridBytes += LeScale.BytesAllocated();
     volumeGridBytes += densityGrid.BytesAllocated();
@@ -283,9 +285,9 @@ GridMediumProvider *GridMediumProvider::Create(const ParameterDictionary &parame
     Point3f p0 = parameters.GetOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
     Point3f p1 = parameters.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
 
-    return alloc.new_object<GridMediumProvider>(
-        Bounds3f(p0, p1), std::move(densityGrid), std::move(temperatureGrid), Le,
-        std::move(LeGrid), alloc);
+    return alloc.new_object<GridMediumProvider>(Bounds3f(p0, p1), std::move(densityGrid),
+                                                std::move(temperatureGrid), Le,
+                                                std::move(LeGrid), alloc);
 }
 
 std::string GridMediumProvider::ToString() const {
@@ -303,9 +305,8 @@ RGBGridMediumProvider::RGBGridMediumProvider(
       sigma_aGrid(std::move(rgbA)),
       sigma_sGrid(std::move(rgbS)),
       LeGrid(std::move(rgbLe)),
-      LeScale(LeScale)
-{
-    if (LeGrid) 
+      LeScale(LeScale) {
+    if (LeGrid)
         CHECK(sigma_aGrid);
     if (sigma_aGrid)
         volumeGridBytes += sigma_aGrid->BytesAllocated();
@@ -315,16 +316,14 @@ RGBGridMediumProvider::RGBGridMediumProvider(
         volumeGridBytes += LeGrid->BytesAllocated();
 }
 
-RGBGridMediumProvider *
-RGBGridMediumProvider::Create(const ParameterDictionary &parameters, const FileLoc *loc,
-                              Allocator alloc) {
+RGBGridMediumProvider *RGBGridMediumProvider::Create(
+    const ParameterDictionary &parameters, const FileLoc *loc, Allocator alloc) {
     std::vector<RGB> sigma_a = parameters.GetRGBArray("density.sigma_a");
     std::vector<RGB> sigma_s = parameters.GetRGBArray("density.sigma_s");
     std::vector<RGB> Le = parameters.GetRGBArray("Le");
 
     if (sigma_a.empty() && sigma_s.empty())
-        ErrorExit(loc,
-                  "rgb grid requires \"sigma_a.rgb\" and/or \"sigma_s.rgb\" values");
+        ErrorExit(loc, "rgb grid requires \"sigma_a.rgb\" and/or \"sigma_s.rgb\" values");
 
     size_t nDensity;
     if (!sigma_a.empty()) {
@@ -375,8 +374,7 @@ RGBGridMediumProvider::Create(const ParameterDictionary &parameters, const FileL
         std::vector<RGBUnboundedSpectrum> rgbSpectrumDensity;
         for (RGB rgb : Le)
             rgbSpectrumDensity.push_back(RGBUnboundedSpectrum(*colorSpace, rgb));
-        LeGrid =
-            SampledGrid<RGBUnboundedSpectrum>(rgbSpectrumDensity, nx, ny, nz, alloc);
+        LeGrid = SampledGrid<RGBUnboundedSpectrum>(rgbSpectrumDensity, nx, ny, nz, alloc);
     }
 
     Point3f p0 = parameters.GetOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
@@ -462,15 +460,14 @@ Medium Medium::Create(const std::string &name, const ParameterDictionary &parame
     if (name == "homogeneous")
         m = HomogeneousMedium::Create(parameters, loc, alloc);
     else if (name == "uniformgrid") {
-        GridMediumProvider *provider =
-            GridMediumProvider::Create(parameters, loc, alloc);
+        GridMediumProvider *provider = GridMediumProvider::Create(parameters, loc, alloc);
         m = CuboidMedium<GridMediumProvider>::Create(provider, parameters,
-                                                        renderFromMedium, loc, alloc);
+                                                     renderFromMedium, loc, alloc);
     } else if (name == "rgbgrid") {
         RGBGridMediumProvider *provider =
             RGBGridMediumProvider::Create(parameters, loc, alloc);
         m = CuboidMedium<RGBGridMediumProvider>::Create(provider, parameters,
-                                                            renderFromMedium, loc, alloc);
+                                                        renderFromMedium, loc, alloc);
     } else if (name == "cloud") {
         CloudMediumProvider *provider =
             CloudMediumProvider::Create(parameters, loc, alloc);

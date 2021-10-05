@@ -346,7 +346,6 @@ class CuboidMedium {
     Point3i gridResolution;
 };
 
-
 // GridMediumProvider Definition
 class GridMediumProvider {
   public:
@@ -403,6 +402,7 @@ class GridMediumProvider {
                     // Set current _maxGrid_ entry for maximum density over _bounds_
                     maxGrid[offset++] = densityGrid.MaxValue(bounds);
                 }
+
         return maxGrid;
     }
 
@@ -491,11 +491,11 @@ class RGBGridMediumProvider {
 
                     Float gridMax = 0.0;
                     if (sigma_aGrid)
-                        gridMax = std::max<Float>(sigma_aGrid->MaxValue(bounds, max),
-                                                  gridMax);
+                        gridMax =
+                            std::max<Float>(sigma_aGrid->MaxValue(bounds, max), gridMax);
                     if (sigma_sGrid)
-                        gridMax = std::max<Float>(sigma_sGrid->MaxValue(bounds, max),
-                                                  gridMax);
+                        gridMax =
+                            std::max<Float>(sigma_sGrid->MaxValue(bounds, max), gridMax);
                     maxGrid[offset++] = gridMax;
                 }
         return maxGrid;
