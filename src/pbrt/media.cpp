@@ -208,12 +208,21 @@ std::string HomogeneousMedium::ToString() const {
 
 STAT_MEMORY_COUNTER("Memory/Volume grids", volumeGridBytes);
 
-// GridMediumProvider Method Definitions
-GridMediumProvider::GridMediumProvider(const Bounds3f &bounds, SampledGrid<Float> d,
-                                       pstd::optional<SampledGrid<Float>> temperature,
-                                       Spectrum Le, SampledGrid<Float> LeGrid,
-                                       Allocator alloc)
+// GridMedium Method Definitions
+GridMedium::GridMedium(const Bounds3f &bounds, const Transform &renderFromMedium,
+                       Spectrum sigma_a, Spectrum sigma_s, Float sigScale, Float g,
+                       SampledGrid<Float> d,
+                       pstd::optional<SampledGrid<Float>> temperature,
+                       Spectrum Le, SampledGrid<Float> LeGrid,
+                       Allocator alloc)
     : bounds(bounds),
+      renderFromMedium(renderFromMedium),
+      sigma_a_spec(sigma_a, alloc),
+      sigma_s_spec(sigma_s, alloc),
+      sigScale(sigScale),
+      phase(g),
+      maxDensityGridRes(16, 16, 16),
+      maxDensityGrid(alloc),
       densityGrid(std::move(d)),
       temperatureGrid(std::move(temperature)),
       Le_spec(Le, alloc),
@@ -222,10 +231,28 @@ GridMediumProvider::GridMediumProvider(const Bounds3f &bounds, SampledGrid<Float
     volumeGridBytes += densityGrid.BytesAllocated();
     if (temperatureGrid)
         volumeGridBytes += temperatureGrid->BytesAllocated();
+
+    maxDensityGrid.resize(maxDensityGridRes[0] * maxDensityGridRes[1] *
+                          maxDensityGridRes[2]);
+    // Compute maximum density for each _maxGrid_ cell
+    int offset = 0;
+    for (Float z = 0; z < maxDensityGridRes.z; ++z)
+        for (Float y = 0; y < maxDensityGridRes.y; ++y)
+            for (Float x = 0; x < maxDensityGridRes.x; ++x) {
+                Bounds3f bounds(Point3f(x / maxDensityGridRes.x,
+                                        y / maxDensityGridRes.y,
+                                        z / maxDensityGridRes.z),
+                                Point3f((x + 1) / maxDensityGridRes.x,
+                                        (y + 1) / maxDensityGridRes.y,
+                                        (z + 1) / maxDensityGridRes.z));
+                // Set current _maxGrid_ entry for maximum density over _bounds_
+                maxDensityGrid[offset++] = densityGrid.MaxValue(bounds);
+            }
 }
 
-GridMediumProvider *GridMediumProvider::Create(const ParameterDictionary &parameters,
-                                               const FileLoc *loc, Allocator alloc) {
+GridMedium *GridMedium::Create(const ParameterDictionary &parameters,
+                               const Transform &renderFromMedium,
+                               const FileLoc *loc, Allocator alloc) {
     std::vector<Float> density = parameters.GetFloatArray("density");
     std::vector<Float> temperature = parameters.GetFloatArray("temperature");
 
@@ -285,14 +312,26 @@ GridMediumProvider *GridMediumProvider::Create(const ParameterDictionary &parame
     Point3f p0 = parameters.GetOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
     Point3f p1 = parameters.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
 
-    return alloc.new_object<GridMediumProvider>(Bounds3f(p0, p1), std::move(densityGrid),
-                                                std::move(temperatureGrid), Le,
-                                                std::move(LeGrid), alloc);
+    Float g = parameters.GetOneFloat("g", 0.);
+    Spectrum sigma_a = parameters.GetOneSpectrum("sigma_a", nullptr, SpectrumType::Unbounded,
+                                                 alloc);
+    if (!sigma_a)
+        sigma_a = alloc.new_object<ConstantSpectrum>(1.f);
+    Spectrum sigma_s = parameters.GetOneSpectrum("sigma_s", nullptr, SpectrumType::Unbounded,
+                                                 alloc);
+    if (!sigma_s)
+        sigma_s = alloc.new_object<ConstantSpectrum>(1.f);
+    Float sigScale = parameters.GetOneFloat("scale", 1.f);
+
+    return alloc.new_object<GridMedium>(Bounds3f(p0, p1), renderFromMedium, sigma_a, sigma_s,
+                                        sigScale, g, std::move(densityGrid),
+                                        std::move(temperatureGrid), Le,
+                                        std::move(LeGrid), alloc);
 }
 
-std::string GridMediumProvider::ToString() const {
+std::string GridMedium::ToString() const {
     // TODO Needs updating
-    return StringPrintf("[ GridMediumProvider Le_spec: %s (grids elided) ]", Le_spec);
+    return StringPrintf("[ GridMedium Le_spec: %s (grids elided) ]", Le_spec);
 }
 
 // RGBGridMediumProvider Method Definitions
@@ -470,9 +509,7 @@ Medium Medium::Create(const std::string &name, const ParameterDictionary &parame
     if (name == "homogeneous")
         m = HomogeneousMedium::Create(parameters, loc, alloc);
     else if (name == "uniformgrid") {
-        GridMediumProvider *provider = GridMediumProvider::Create(parameters, loc, alloc);
-        m = CuboidMedium<GridMediumProvider>::Create(provider, parameters,
-                                                     renderFromMedium, loc, alloc);
+        m = GridMedium::Create(parameters, renderFromMedium, loc, alloc);
     } else if (name == "rgbgrid") {
         RGBGridMediumProvider *provider =
             RGBGridMediumProvider::Create(parameters, loc, alloc);

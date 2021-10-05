@@ -47,9 +47,7 @@ class CloudMedium;
 
 template <typename Provider>
 class CuboidMedium;
-class GridMediumProvider;
-// GridMedium Definition
-using GridMedium = CuboidMedium<GridMediumProvider>;
+class GridMedium;
 class RGBGridMediumProvider;
 // RGBGridMedium Definition
 using RGBGridMedium = CuboidMedium<RGBGridMediumProvider>;

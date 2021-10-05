@@ -180,7 +180,7 @@ class DDAMajorantIterator {
     const pstd::vector<Float> *grid;
     Point3i res;
     Float nextCrossingT[3], deltaT[3];
-    Point3i step, voxelLimit, voxel;
+    int step[3], voxelLimit[3], voxel[3];
 };
 
 // HomogeneousMedium Definition
@@ -346,16 +346,21 @@ class CuboidMedium {
     Point3i gridResolution;
 };
 
-// GridMediumProvider Definition
-class GridMediumProvider {
+// GridMedium Definition
+class GridMedium {
   public:
-    // GridMediumProvider Public Methods
-    GridMediumProvider(const Bounds3f &bounds, SampledGrid<Float> density,
-                       pstd::optional<SampledGrid<Float>> temperature, Spectrum Le,
-                       SampledGrid<Float> LeScale, Allocator alloc);
+    using MajorantIterator = DDAMajorantIterator;
 
-    static GridMediumProvider *Create(const ParameterDictionary &parameters,
-                                      const FileLoc *loc, Allocator alloc);
+    // GridMedium Public Methods
+    GridMedium(const Bounds3f &bounds, const Transform &renderFromMedium,
+               Spectrum sigma_a, Spectrum sigma_s, Float sigScale, Float g,
+               SampledGrid<Float> density,
+               pstd::optional<SampledGrid<Float>> temperature, Spectrum Le,
+               SampledGrid<Float> LeScale, Allocator alloc);
+
+    static GridMedium *Create(const ParameterDictionary &parameters,
+                              const Transform &renderFromMedium,
+                              const FileLoc *loc, Allocator alloc);
 
     std::string ToString() const;
 
@@ -371,44 +376,62 @@ class GridMediumProvider {
     }
 
     PBRT_CPU_GPU
-    SampledSpectrum Le(Point3f p, const SampledWavelengths &lambda) const {
-        Point3f pp = Point3f(bounds.Offset(p));
-        if (temperatureGrid) {
-            Float temp = temperatureGrid->Lookup(pp);
-            if (temp <= 100.f)
-                return SampledSpectrum(0.f);
-            return LeScale.Lookup(pp) * BlackbodySpectrum(temp).Sample(lambda);
-        }
-        return Le_spec.Sample(lambda) * LeScale.Lookup(pp);
+    MediumProperties SamplePoint(Point3f p, const SampledWavelengths &lambda) const {
+        // Sample spectra for grid $\sigmaa$ and $\sigmas$
+        SampledSpectrum sigma_a = sigScale * sigma_a_spec.Sample(lambda);
+        SampledSpectrum sigma_s = sigScale * sigma_s_spec.Sample(lambda);
+
+        // Scale scattering coefficients by medium density at _p_
+        p = renderFromMedium.ApplyInverse(p);
+        p = Point3f(bounds.Offset(p));
+        Float d = densityGrid.Lookup(p);
+
+        return MediumProperties{sigma_a * d, sigma_s * d, &phase, Le(p, lambda)};
     }
 
     PBRT_CPU_GPU
-    MediumDensity Density(Point3f p, const SampledWavelengths &lambda) const {
-        Point3f pp = Point3f(bounds.Offset(p));
-        return MediumDensity(densityGrid.Lookup(pp));
-    }
+    void SampleRay(Ray ray, Float raytMax, const SampledWavelengths &lambda,
+                   DDAMajorantIterator *iter) const {
+        // Transform ray to grid density's space and compute bounds overlap
+        ray = renderFromMedium.ApplyInverse(ray, &raytMax);
+        Float tMin, tMax;
+        if (!bounds.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax)) {
+            *iter = DDAMajorantIterator();
+            return;
+        }
+        DCHECK_LE(tMax, raytMax);
 
-    pstd::vector<Float> GetMaxDensityGrid(Allocator alloc, Point3i *res) const {
-        *res = Point3i(16, 16, 16);
-        pstd::vector<Float> maxGrid(res->x * res->y * res->z, Float(0), alloc);
-        // Compute maximum density for each _maxGrid_ cell
-        int offset = 0;
-        for (Float z = 0; z < res->z; ++z)
-            for (Float y = 0; y < res->y; ++y)
-                for (Float x = 0; x < res->x; ++x) {
-                    Bounds3f bounds(
-                        Point3f(x / res->x, y / res->y, z / res->z),
-                        Point3f((x + 1) / res->x, (y + 1) / res->y, (z + 1) / res->z));
-                    // Set current _maxGrid_ entry for maximum density over _bounds_
-                    maxGrid[offset++] = densityGrid.MaxValue(bounds);
-                }
+        // Sample spectra for grid $\sigmaa$ and $\sigmas$
+        SampledSpectrum sigma_a = sigScale * sigma_a_spec.Sample(lambda);
+        SampledSpectrum sigma_s = sigScale * sigma_s_spec.Sample(lambda);
 
-        return maxGrid;
+        // Initialize majorant iterator for _CuboidMedium_
+        SampledSpectrum sigma_t = sigma_a + sigma_s;
+        *iter = DDAMajorantIterator(ray, bounds, sigma_t, tMin, tMax, &maxDensityGrid,
+                                    maxDensityGridRes);
     }
 
   private:
-    // GridMediumProvider Private Members
+    // GridMedium Private Methods
+    PBRT_CPU_GPU
+    SampledSpectrum Le(Point3f p, const SampledWavelengths &lambda) const {
+        if (temperatureGrid) {
+            Float temp = temperatureGrid->Lookup(p);
+            if (temp <= 100.f)
+                return SampledSpectrum(0.f);
+            return LeScale.Lookup(p) * BlackbodySpectrum(temp).Sample(lambda);
+        }
+        return Le_spec.Sample(lambda) * LeScale.Lookup(p);
+    }
+
+    // GridMedium Private Members
     Bounds3f bounds;
+    Transform renderFromMedium;
+    DenselySampledSpectrum sigma_a_spec, sigma_s_spec;
+    Float sigScale;
+    HGPhaseFunction phase;
+    Point3i maxDensityGridRes;
+    pstd::vector<Float> maxDensityGrid;
     SampledGrid<Float> densityGrid;
     pstd::optional<SampledGrid<Float>> temperatureGrid;
     DenselySampledSpectrum Le_spec;
