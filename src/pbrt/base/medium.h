@@ -45,9 +45,13 @@ class PhaseFunction : public TaggedPointer<HGPhaseFunction> {
 class HomogeneousMedium;
 template <typename Provider>
 class CuboidMedium;
-class UniformGridMediumProvider;
-// UniformGridMedium Definition
-using UniformGridMedium = CuboidMedium<UniformGridMediumProvider>;
+class GridMediumProvider;
+// GridMedium Definition
+using GridMedium = CuboidMedium<GridMediumProvider>;
+
+class RGBGridMediumProvider;
+// RGBGridMedium Definition
+using RGBGridMedium = CuboidMedium<RGBGridMediumProvider>;
 
 class CloudMediumProvider;
 // CloudMedium Definition
@@ -92,7 +96,7 @@ class RayMajorantIterator
 };
 
 // Medium Definition
-class Medium : public TaggedPointer<HomogeneousMedium, UniformGridMedium, CloudMedium,
+class Medium : public TaggedPointer<HomogeneousMedium, GridMedium, RGBGridMedium, CloudMedium,
                                     NanoVDBMedium> {
   public:
     // Medium Interface
