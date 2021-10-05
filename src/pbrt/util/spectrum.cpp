@@ -41,7 +41,7 @@ Float SpectrumToPhotometric(Spectrum s) {
     // RGB separately for the purposes of target power/illuminance computation
     // in the lights themselves (but we currently don't)
     if (s.Is<RGBIlluminantSpectrum>())
-        s = s.Cast<RGBIlluminantSpectrum>()->Illluminant();
+        s = s.Cast<RGBIlluminantSpectrum>()->Illuminant();
 
     Float y = 0;
     for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda)

@@ -606,7 +606,7 @@ class RGBIlluminantSpectrum {
     Float MaxValue() const { return scale * rsp.MaxValue() * illuminant->MaxValue(); }
 
     PBRT_CPU_GPU
-    const DenselySampledSpectrum *Illluminant() const { return illuminant; }
+    const DenselySampledSpectrum *Illuminant() const { return illuminant; }
 
     PBRT_CPU_GPU
     SampledSpectrum Sample(const SampledWavelengths &lambda) const {
