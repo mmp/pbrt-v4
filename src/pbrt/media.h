@@ -239,13 +239,12 @@ class GridMedium {
     // GridMedium Public Methods
     GridMedium(const Bounds3f &bounds, const Transform &renderFromMedium,
                Spectrum sigma_a, Spectrum sigma_s, Float sigScale, Float g,
-               SampledGrid<Float> density,
-               pstd::optional<SampledGrid<Float>> temperature, Spectrum Le,
-               SampledGrid<Float> LeScale, Allocator alloc);
+               SampledGrid<Float> density, pstd::optional<SampledGrid<Float>> temperature,
+               Spectrum Le, SampledGrid<Float> LeScale, Allocator alloc);
 
     static GridMedium *Create(const ParameterDictionary &parameters,
-                              const Transform &renderFromMedium,
-                              const FileLoc *loc, Allocator alloc);
+                              const Transform &renderFromMedium, const FileLoc *loc,
+                              Allocator alloc);
 
     std::string ToString() const;
 
@@ -253,9 +252,7 @@ class GridMedium {
     const Bounds3f &Bounds() const { return bounds; }
 
     PBRT_CPU_GPU
-    bool IsEmissive() const {
-        return isEmissive;
-    }
+    bool IsEmissive() const { return isEmissive; }
 
     PBRT_CPU_GPU
     MediumProperties SamplePoint(Point3f p, const SampledWavelengths &lambda) const {
@@ -329,17 +326,15 @@ class RGBGridMedium {
   public:
     using MajorantIterator = DDAMajorantIterator;
     // RGBGridMedium Public Methods
-    RGBGridMedium(const Bounds3f &bounds, const Transform &renderFromMedium,
-                  Float g,
+    RGBGridMedium(const Bounds3f &bounds, const Transform &renderFromMedium, Float g,
                   pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_a,
                   pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_s,
-                  Float sigScale,
-                  pstd::optional<SampledGrid<RGBIlluminantSpectrum>> Le,
+                  Float sigScale, pstd::optional<SampledGrid<RGBIlluminantSpectrum>> Le,
                   Float LeScale, Allocator alloc);
 
     static RGBGridMedium *Create(const ParameterDictionary &parameters,
-                                 const Transform &renderFromMedium,
-                                 const FileLoc *loc, Allocator alloc);
+                                 const Transform &renderFromMedium, const FileLoc *loc,
+                                 Allocator alloc);
 
     std::string ToString() const;
 
@@ -349,7 +344,6 @@ class RGBGridMedium {
     PBRT_CPU_GPU
     bool IsEmissive() const { return LeGrid && LeScale > 0.0f; }
 
-
     PBRT_CPU_GPU
     MediumProperties SamplePoint(Point3f p, const SampledWavelengths &lambda) const {
         p = renderFromMedium.ApplyInverse(p);
@@ -357,13 +351,13 @@ class RGBGridMedium {
         auto convert = [=] PBRT_CPU_GPU(RGBUnboundedSpectrum s) {
             return s.Sample(lambda);
         };
-        SampledSpectrum sigma_a = sigma_aGrid ? sigma_aGrid->Lookup(pp, convert) :
-            SampledSpectrum(1.f);
-        SampledSpectrum sigma_s = sigma_sGrid ? sigma_sGrid->Lookup(pp, convert) :
-            SampledSpectrum(1.f);
+        SampledSpectrum sigma_a =
+            sigma_aGrid ? sigma_aGrid->Lookup(pp, convert) : SampledSpectrum(1.f);
+        SampledSpectrum sigma_s =
+            sigma_sGrid ? sigma_sGrid->Lookup(pp, convert) : SampledSpectrum(1.f);
 
         return MediumProperties{sigma_a * sigScale, sigma_s * sigScale, &phase,
-                Le(pp, lambda)};
+                                Le(pp, lambda)};
     }
 
     PBRT_CPU_GPU
@@ -390,7 +384,7 @@ class RGBGridMedium {
             return SampledSpectrum(0.f);
 
         auto convert = [lambda] PBRT_CPU_GPU(RGBIlluminantSpectrum s) {
-            if (!s.Illuminant()) // default initialized for OOB...
+            if (!s.Illuminant())  // default initialized for OOB...
                 return SampledSpectrum(0.f);
 
             return s.Sample(lambda);
@@ -431,10 +425,16 @@ class CloudMedium {
     }
 
     CloudMedium(const Bounds3f &bounds, const Transform &renderFromMedium,
-                Spectrum sigma_a, Spectrum sigma_s, Float g, Float density, Float wispiness,
-                Float frequency, Allocator alloc)
-        : bounds(bounds), sigma_a_spec(sigma_a, alloc), sigma_s_spec(sigma_s,alloc), phase(g),
-          density(density), wispiness(wispiness), frequency(frequency), renderFromMedium(renderFromMedium) {}
+                Spectrum sigma_a, Spectrum sigma_s, Float g, Float density,
+                Float wispiness, Float frequency, Allocator alloc)
+        : bounds(bounds),
+          sigma_a_spec(sigma_a, alloc),
+          sigma_s_spec(sigma_s, alloc),
+          phase(g),
+          density(density),
+          wispiness(wispiness),
+          frequency(frequency),
+          renderFromMedium(renderFromMedium) {}
 
     PBRT_CPU_GPU
     bool IsEmissive() const { return false; }
@@ -587,8 +587,8 @@ class NanoVDBMedium {
 
     // NanoVDBMedium Public Methods
     static NanoVDBMedium *Create(const ParameterDictionary &parameters,
-                                 const Transform &renderFromMedium,
-                                 const FileLoc *loc, Allocator alloc);
+                                 const Transform &renderFromMedium, const FileLoc *loc,
+                                 Allocator alloc);
 
     std::string ToString() const;
 
