@@ -387,29 +387,28 @@ RGBGridMedium::RGBGridMedium(
 RGBGridMedium *RGBGridMedium::Create(
     const ParameterDictionary &parameters, const Transform &renderFromMedium,
     const FileLoc *loc, Allocator alloc) {
-    std::vector<RGB> sigma_a = parameters.GetRGBArray("density.sigma_a");
-    std::vector<RGB> sigma_s = parameters.GetRGBArray("density.sigma_s");
+    std::vector<RGB> sigma_a = parameters.GetRGBArray("sigma_a");
+    std::vector<RGB> sigma_s = parameters.GetRGBArray("sigma_s");
     std::vector<RGB> Le = parameters.GetRGBArray("Le");
 
     if (sigma_a.empty() && sigma_s.empty())
-        ErrorExit(loc, "rgb grid requires \"sigma_a.rgb\" and/or \"sigma_s.rgb\" values");
+        ErrorExit(loc, "RGB grid requires \"sigma_a\" and/or \"sigma_s\" parameter values.");
 
     size_t nDensity;
     if (!sigma_a.empty()) {
         nDensity = sigma_a.size();
         if (!sigma_s.empty() && nDensity != sigma_s.size())
             ErrorExit(loc,
-                      "Different number of samples (%d vs %d) provided for "
-                      "\"sigma_a.rgb\" and \"sigma_s.rgb\".",
+                      "Different number of samples (%d vs %d) provided for \"sigma_a\" and \"sigma_s\".",
                       nDensity, sigma_s.size());
     } else
         nDensity = sigma_s.size();
 
     if (!Le.empty() && sigma_a.empty())
-        ErrorExit(loc, "rgb grid requires \"sigma_a.rgb\" if \"Le\" value provided");
+        ErrorExit(loc, "RGB grid requires \"sigma_a\" if \"Le\" value provided.");
 
     if (!Le.empty() && nDensity != Le.size())
-        ErrorExit("Expected %d values for \"Le\" but were given %d.", nDensity,
+        ErrorExit("Expected %d values for \"Le\" parameter but were given %d.", nDensity,
                   Le.size());
 
     int nx = parameters.GetOneInt("nx", 1);
@@ -417,7 +416,7 @@ RGBGridMedium *RGBGridMedium::Create(
     int nz = parameters.GetOneInt("nz", 1);
     if (nDensity != nx * ny * nz)
         ErrorExit(loc,
-                  "Grid medium has %d density values; expected nx*ny*nz = %d",
+                  "RGB grid medium has %d density values; expected nx*ny*nz = %d",
                   nDensity, nx * ny * nz);
 
     pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_aGrid, sigma_sGrid;
