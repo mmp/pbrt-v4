@@ -44,13 +44,8 @@ class PhaseFunction : public TaggedPointer<HGPhaseFunction> {
 
 class HomogeneousMedium;
 class CloudMedium;
-
-template <typename Provider>
-class CuboidMedium;
 class GridMedium;
-class RGBGridMediumProvider;
-// RGBGridMedium Definition
-using RGBGridMedium = CuboidMedium<RGBGridMediumProvider>;
+class RGBGridMedium;
 class NanoVDBMedium;
 
 struct MediumProperties;

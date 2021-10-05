@@ -336,15 +336,19 @@ std::string GridMedium::ToString() const {
     return StringPrintf("[ GridMedium Le_spec: %s (grids elided) ]", Le_spec);
 }
 
-// RGBGridMediumProvider Method Definitions
-RGBGridMediumProvider::RGBGridMediumProvider(
-    const Bounds3f &bounds, pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbA,
-    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbS,
+// RGBGridMedium Method Definitions
+RGBGridMedium::RGBGridMedium(
+    const Bounds3f &bounds, const Transform &renderFromMedium, Float g,
+    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbA,
+    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbS, Float sigScale,
     pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbLe, Float LeScale,
     Allocator alloc)
     : bounds(bounds),
+      renderFromMedium(renderFromMedium),
+      phase(g),
       sigma_aGrid(std::move(rgbA)),
       sigma_sGrid(std::move(rgbS)),
+      sigScale(sigScale),
       LeGrid(std::move(rgbLe)),
       LeScale(LeScale) {
     if (LeGrid)
@@ -355,10 +359,34 @@ RGBGridMediumProvider::RGBGridMediumProvider(
         volumeGridBytes += sigma_sGrid->BytesAllocated();
     if (LeGrid)
         volumeGridBytes += LeGrid->BytesAllocated();
+
+    maxDensityGridRes = Point3i(16, 16, 16);
+    maxDensityGrid.resize(maxDensityGridRes.x * maxDensityGridRes.y * maxDensityGridRes.z);
+    // Compute maximum density for each _maxGrid_ cell
+    int offset = 0;
+    for (Float z = 0; z < maxDensityGridRes.z; ++z)
+        for (Float y = 0; y < maxDensityGridRes.y; ++y)
+            for (Float x = 0; x < maxDensityGridRes.x; ++x) {
+                Bounds3f bounds(Point3f(x / maxDensityGridRes.x,
+                                        y / maxDensityGridRes.y,
+                                        z / maxDensityGridRes.z),
+                                Point3f((x + 1) / maxDensityGridRes.x,
+                                        (y + 1) / maxDensityGridRes.y,
+                                        (z + 1) / maxDensityGridRes.z));
+
+                auto max = [] PBRT_CPU_GPU(RGBUnboundedSpectrum s) {
+                    return s.MaxValue();
+                };
+
+                maxDensityGrid[offset++] =
+                    sigScale * ((sigma_aGrid ? sigma_aGrid->MaxValue(bounds, max) : 1.f) +
+                                (sigma_sGrid ? sigma_sGrid->MaxValue(bounds, max) : 1.f));
+            }
 }
 
-RGBGridMediumProvider *RGBGridMediumProvider::Create(
-    const ParameterDictionary &parameters, const FileLoc *loc, Allocator alloc) {
+RGBGridMedium *RGBGridMedium::Create(
+    const ParameterDictionary &parameters, const Transform &renderFromMedium,
+    const FileLoc *loc, Allocator alloc) {
     std::vector<RGB> sigma_a = parameters.GetRGBArray("density.sigma_a");
     std::vector<RGB> sigma_s = parameters.GetRGBArray("density.sigma_s");
     std::vector<RGB> Le = parameters.GetRGBArray("Le");
@@ -421,15 +449,17 @@ RGBGridMediumProvider *RGBGridMediumProvider::Create(
     Point3f p0 = parameters.GetOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
     Point3f p1 = parameters.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
     Float LeScale = parameters.GetOneFloat("LeScale", 1.f);
+    Float g = parameters.GetOneFloat("g", 0.f);
+    Float sigScale = parameters.GetOneFloat("scale", 1.f);
 
-    return alloc.new_object<RGBGridMediumProvider>(
-        Bounds3f(p0, p1), std::move(sigma_aGrid), std::move(sigma_sGrid),
-        std::move(LeGrid), LeScale, alloc);
+    return alloc.new_object<RGBGridMedium>(
+        Bounds3f(p0, p1), renderFromMedium, g, std::move(sigma_aGrid),
+        std::move(sigma_sGrid), sigScale, std::move(LeGrid), LeScale, alloc);
 }
 
-std::string RGBGridMediumProvider::ToString() const {
+std::string RGBGridMedium::ToString() const {
     // TODO Update
-    return StringPrintf("[ RGBGridMediumProvider ]");
+    return StringPrintf("[ RGBGridMedium ]");
 }
 
 // CloudMedium Method Definitions
@@ -629,10 +659,7 @@ Medium Medium::Create(const std::string &name, const ParameterDictionary &parame
     else if (name == "uniformgrid") {
         m = GridMedium::Create(parameters, renderFromMedium, loc, alloc);
     } else if (name == "rgbgrid") {
-        RGBGridMediumProvider *provider =
-            RGBGridMediumProvider::Create(parameters, loc, alloc);
-        m = CuboidMedium<RGBGridMediumProvider>::Create(provider, parameters,
-                                                        renderFromMedium, loc, alloc);
+        m = RGBGridMedium::Create(parameters, renderFromMedium, loc, alloc);
     } else if (name == "cloud") {
         m = CloudMedium::Create(parameters, renderFromMedium, loc, alloc);
     } else if (name == "nanovdb") {

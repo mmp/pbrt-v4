@@ -439,18 +439,22 @@ class GridMedium {
     bool isEmissive;
 };
 
-// RGBGridMediumProvider Definition
-class RGBGridMediumProvider {
+// RGBGridMedium Definition
+class RGBGridMedium {
   public:
-    // RGBGridMediumProvider Public Methods
-    RGBGridMediumProvider(const Bounds3f &bounds,
-                          pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_a,
-                          pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_s,
-                          pstd::optional<SampledGrid<RGBUnboundedSpectrum>> Le,
-                          Float LeScale, Allocator alloc);
+    using MajorantIterator = DDAMajorantIterator;
+    // RGBGridMedium Public Methods
+    RGBGridMedium(const Bounds3f &bounds, const Transform &renderFromMedium,
+                  Float g,
+                  pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_a,
+                  pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_s,
+                  Float sigScale,
+                  pstd::optional<SampledGrid<RGBUnboundedSpectrum>> Le,
+                  Float LeScale, Allocator alloc);
 
-    static RGBGridMediumProvider *Create(const ParameterDictionary &parameters,
-                                         const FileLoc *loc, Allocator alloc);
+    static RGBGridMedium *Create(const ParameterDictionary &parameters,
+                                 const Transform &renderFromMedium,
+                                 const FileLoc *loc, Allocator alloc);
 
     std::string ToString() const;
 
@@ -458,10 +462,41 @@ class RGBGridMediumProvider {
     const Bounds3f &Bounds() const { return bounds; }
 
     PBRT_CPU_GPU
-    bool IsEmissive() const {
-        if (LeGrid && LeScale > 0.0f)
-            return true;
-        return false;
+    bool IsEmissive() const { return LeGrid && LeScale > 0.0f; }
+
+
+    PBRT_CPU_GPU
+    MediumProperties SamplePoint(Point3f p, const SampledWavelengths &lambda) const {
+        p = renderFromMedium.ApplyInverse(p);
+        Point3f pp = Point3f(bounds.Offset(p));
+        auto convert = [=] PBRT_CPU_GPU(RGBUnboundedSpectrum s) {
+            return s.Sample(lambda);
+        };
+        SampledSpectrum sigma_a = sigma_aGrid ? sigma_aGrid->Lookup(pp, convert) :
+            SampledSpectrum(1.f);
+        SampledSpectrum sigma_s = sigma_sGrid ? sigma_sGrid->Lookup(pp, convert) :
+            SampledSpectrum(1.f);
+
+        return MediumProperties{sigma_a * sigScale, sigma_s * sigScale, &phase,
+                Le(pp, lambda)};
+    }
+
+    PBRT_CPU_GPU
+    void SampleRay(Ray ray, Float raytMax, const SampledWavelengths &lambda,
+                   DDAMajorantIterator *iter) const {
+        // Transform ray to grid density's space and compute bounds overlap
+        ray = renderFromMedium.ApplyInverse(ray, &raytMax);
+        Float tMin, tMax;
+        if (!bounds.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax)) {
+            *iter = DDAMajorantIterator();
+            return;
+        }
+        DCHECK_LE(tMax, raytMax);
+
+        // Initialize majorant iterator for _CuboidMedium_
+        SampledSpectrum sigma_t(sigScale);
+        *iter = DDAMajorantIterator(ray, bounds, sigma_t, tMin, tMax, &maxDensityGrid,
+                                    maxDensityGridRes);
     }
 
     PBRT_CPU_GPU
@@ -469,65 +504,21 @@ class RGBGridMediumProvider {
         if (!LeGrid)
             return SampledSpectrum(0.f);
 
-        Point3f pp = Point3f(bounds.Offset(p));
-        auto convert = [=] PBRT_CPU_GPU(RGBUnboundedSpectrum s) {
+        auto convert = [lambda] PBRT_CPU_GPU(RGBUnboundedSpectrum s) {
             return s.Sample(lambda);
         };
-        return LeScale * LeGrid->Lookup(pp, convert);
-    }
-
-    PBRT_CPU_GPU
-    MediumDensity Density(Point3f p, const SampledWavelengths &lambda) const {
-        Point3f pp = Point3f(bounds.Offset(p));
-        auto convert = [=] PBRT_CPU_GPU(RGBUnboundedSpectrum s) {
-            return s.Sample(lambda);
-        };
-
-        SampledSpectrum a, s;
-        if (sigma_aGrid)
-            a = sigma_aGrid->Lookup(pp, convert);
-        else
-            a = SampledSpectrum(1.f);
-
-        if (sigma_sGrid)
-            s = sigma_sGrid->Lookup(pp, convert);
-        else
-            s = SampledSpectrum(1.f);
-
-        return MediumDensity(a, s);
-    }
-
-    pstd::vector<Float> GetMaxDensityGrid(Allocator alloc, Point3i *res) const {
-        *res = Point3i(16, 16, 16);
-        pstd::vector<Float> maxGrid(res->x * res->y * res->z, Float(0), alloc);
-        // Compute maximum density for each _maxGrid_ cell
-        int offset = 0;
-        for (Float z = 0; z < res->z; ++z)
-            for (Float y = 0; y < res->y; ++y)
-                for (Float x = 0; x < res->x; ++x) {
-                    Bounds3f bounds(
-                        Point3f(x / res->x, y / res->y, z / res->z),
-                        Point3f((x + 1) / res->x, (y + 1) / res->y, (z + 1) / res->z));
-
-                    auto max = [] PBRT_CPU_GPU(RGBUnboundedSpectrum s) {
-                        return s.MaxValue();
-                    };
-
-                    Float gridMax = 0.0;
-                    if (sigma_aGrid)
-                        gridMax =
-                            std::max<Float>(sigma_aGrid->MaxValue(bounds, max), gridMax);
-                    if (sigma_sGrid)
-                        gridMax =
-                            std::max<Float>(sigma_sGrid->MaxValue(bounds, max), gridMax);
-                    maxGrid[offset++] = gridMax;
-                }
-        return maxGrid;
+        return LeScale * LeGrid->Lookup(p, convert);
     }
 
   private:
-    // RGBGridMediumProvider Private Members
+    // RGBGridMedium Private Members
     Bounds3f bounds;
+    Transform renderFromMedium;
+    HGPhaseFunction phase;
+    Point3i maxDensityGridRes;
+    pstd::vector<Float> maxDensityGrid;
+    SampledGrid<Float> densityGrid;
+    Float sigScale;
     pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_aGrid, sigma_sGrid, LeGrid;
     Float LeScale;
 };
