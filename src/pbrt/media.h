@@ -369,10 +369,7 @@ class GridMedium {
 
     PBRT_CPU_GPU
     bool IsEmissive() const {
-        if (temperatureGrid)
-            // TODO Assume the grid's max value is greater than 100.f?
-            return true;
-        return Le_spec.MaxValue() > 0;
+        return isEmissive;
     }
 
     PBRT_CPU_GPU
@@ -415,6 +412,9 @@ class GridMedium {
     // GridMedium Private Methods
     PBRT_CPU_GPU
     SampledSpectrum Le(Point3f p, const SampledWavelengths &lambda) const {
+        if (!isEmissive)
+            return SampledSpectrum(0.f);
+
         if (temperatureGrid) {
             Float temp = temperatureGrid->Lookup(p);
             if (temp <= 100.f)
@@ -436,6 +436,7 @@ class GridMedium {
     pstd::optional<SampledGrid<Float>> temperatureGrid;
     DenselySampledSpectrum Le_spec;
     SampledGrid<Float> LeScale;
+    bool isEmissive;
 };
 
 // RGBGridMediumProvider Definition

@@ -232,6 +232,8 @@ GridMedium::GridMedium(const Bounds3f &bounds, const Transform &renderFromMedium
     if (temperatureGrid)
         volumeGridBytes += temperatureGrid->BytesAllocated();
 
+    isEmissive = temperatureGrid ? true : (Le_spec.MaxValue() > 0);
+
     maxDensityGrid.resize(maxDensityGridRes[0] * maxDensityGridRes[1] *
                           maxDensityGridRes[2]);
     // Compute maximum density for each _maxGrid_ cell
