@@ -82,8 +82,8 @@ class HomogeneousMajorantIterator {
     // HomogeneousMajorantIterator Public Methods
     HomogeneousMajorantIterator() = default;
     PBRT_CPU_GPU
-    HomogeneousMajorantIterator(Float tMax, SampledSpectrum sigma_maj)
-        : seg{Float(0), tMax, sigma_maj}, called(false) {}
+    HomogeneousMajorantIterator(Float tMin, Float tMax, SampledSpectrum sigma_maj)
+        : seg{tMin, tMax, sigma_maj}, called(false) {}
 
     PBRT_CPU_GPU
     pstd::optional<RayMajorantSegment> Next() {
@@ -97,7 +97,7 @@ class HomogeneousMajorantIterator {
 
   private:
     RayMajorantSegment seg;
-    bool called;
+    bool called = true;
 };
 
 // DDAMajorantIterator Definition
@@ -180,7 +180,7 @@ class DDAMajorantIterator {
     const pstd::vector<Float> *grid;
     Point3i res;
     Float nextCrossingT[3], deltaT[3];
-    int step[3], voxelLimit[3], voxel[3];
+    Point3i step, voxelLimit, voxel;
 };
 
 // HomogeneousMedium Definition
@@ -220,7 +220,7 @@ class HomogeneousMedium {
                    HomogeneousMajorantIterator *iter) const {
         SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
         SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
-        *iter = HomogeneousMajorantIterator(tMax, sigma_a + sigma_s);
+        *iter = HomogeneousMajorantIterator(0, tMax, sigma_a + sigma_s);
     }
 
     std::string ToString() const;
@@ -508,36 +508,77 @@ class RGBGridMediumProvider {
     Float LeScale;
 };
 
-// CloudMediumProvider Definition
-class CloudMediumProvider {
+// CloudMedium Definition
+class CloudMedium {
   public:
+    using MajorantIterator = HomogeneousMajorantIterator;
+
     // CloudMediumProvider Public Methods
-    static CloudMediumProvider *Create(const ParameterDictionary &parameters,
-                                       const FileLoc *loc, Allocator alloc);
+    static CloudMedium *Create(const ParameterDictionary &parameters,
+                               const Transform &renderFromMedium, const FileLoc *loc,
+                               Allocator alloc);
 
     std::string ToString() const {
-        return StringPrintf("[ CloudMediumProvider bounds: %s density: %f "
-                            "wispiness: %f frequency: %f ]",
-                            bounds, density, wispiness, frequency);
+        return StringPrintf("[ CloudMedium bounds: %s renderFromMedium: %s phase: %s "
+                            "sigma_a_spec: %s sigma_s_spec: %s density: %f wispiness: %f "
+                            "frequency: %f ]",
+                            bounds, renderFromMedium, phase, sigma_a_spec, sigma_s_spec,
+                            density, wispiness, frequency);
     }
 
-    CloudMediumProvider(const Bounds3f &bounds, Float density, Float wispiness,
-                        Float frequency)
-        : bounds(bounds), density(density), wispiness(wispiness), frequency(frequency) {}
-
-    PBRT_CPU_GPU
-    const Bounds3f &Bounds() const { return bounds; }
+    CloudMedium(const Bounds3f &bounds, const Transform &renderFromMedium,
+                Spectrum sigma_a, Spectrum sigma_s, Float g, Float density, Float wispiness,
+                Float frequency, Allocator alloc)
+        : bounds(bounds), sigma_a_spec(sigma_a, alloc), sigma_s_spec(sigma_s,alloc), phase(g),
+          density(density), wispiness(wispiness), frequency(frequency), renderFromMedium(renderFromMedium) {}
 
     PBRT_CPU_GPU
     bool IsEmissive() const { return false; }
 
     PBRT_CPU_GPU
-    SampledSpectrum Le(Point3f p, const SampledWavelengths &lambda) const {
-        return SampledSpectrum(0.f);
+    MediumProperties SamplePoint(Point3f p, const SampledWavelengths &lambda) const {
+        // Sample spectra for grid $\sigmaa$ and $\sigmas$
+        SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
+        SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
+
+        // Scale scattering coefficients by medium density at _p_
+        p = renderFromMedium.ApplyInverse(p);
+        Float density = Density(p);
+
+        return MediumProperties{sigma_a * density, sigma_s * density, &phase,
+                                SampledSpectrum(0.f)};
     }
 
     PBRT_CPU_GPU
-    MediumDensity Density(Point3f p, const SampledWavelengths &) const {
+    void SampleRay(Ray ray, Float raytMax, const SampledWavelengths &lambda,
+                   HomogeneousMajorantIterator *iter) const {
+        // Transform ray to grid density's space and compute bounds overlap
+        ray = renderFromMedium.ApplyInverse(ray, &raytMax);
+        Float tMin, tMax;
+        if (!bounds.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax)) {
+            *iter = HomogeneousMajorantIterator();
+            return;
+        }
+        DCHECK_LE(tMax, raytMax);
+
+        // Sample spectra for grid $\sigmaa$ and $\sigmas$
+        SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
+        SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
+        SampledSpectrum sigma_t = sigma_a + sigma_s;
+        *iter = HomogeneousMajorantIterator(tMin, tMax, sigma_t);
+    }
+
+  private:
+    // CloudMedium Private Members
+    Bounds3f bounds;
+    Transform renderFromMedium;
+    HGPhaseFunction phase;
+    DenselySampledSpectrum sigma_a_spec, sigma_s_spec;
+    Float density, wispiness, frequency;
+
+    // CloudMedium Private Methods
+    PBRT_CPU_GPU
+    Float Density(Point3f p) const {
         Point3f pp = frequency * p;
         if (wispiness > 0) {
             // Perturb cloud lookup point _pp_ using noise
@@ -560,18 +601,8 @@ class CloudMediumProvider {
         // Model decrease in density with altitude and return final cloud density
         d = Clamp((1 - p.y) * 4.5f * density * d, 0, 1);
         d += 2 * std::max<Float>(0, 0.5f - p.y);
-        return MediumDensity(Clamp(d, 0, 1));
+        return Clamp(d, 0, 1);
     }
-
-    pstd::vector<Float> GetMaxDensityGrid(Allocator alloc, Point3i *res) const {
-        *res = Point3i(1, 1, 1);
-        return pstd::vector<Float>(1, 1.f, alloc);
-    }
-
-  private:
-    // CloudMediumProvider Private Members
-    Bounds3f bounds;
-    Float density, wispiness, frequency;
 };
 
 // NanoVDBMediumProvider Definition

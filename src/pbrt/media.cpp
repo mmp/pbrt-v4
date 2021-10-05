@@ -391,18 +391,28 @@ std::string RGBGridMediumProvider::ToString() const {
     return StringPrintf("[ RGBGridMediumProvider ]");
 }
 
-// CloudMediumProvider Method Definitions
-CloudMediumProvider *CloudMediumProvider::Create(const ParameterDictionary &parameters,
-                                                 const FileLoc *loc, Allocator alloc) {
+// CloudMedium Method Definitions
+CloudMedium *CloudMedium::Create(const ParameterDictionary &parameters,
+                                 const Transform &renderFromMedium,
+                                 const FileLoc *loc, Allocator alloc) {
     Float density = parameters.GetOneFloat("density", 1);
+    Float g = parameters.GetOneFloat("g", 0.);
     Float wispiness = parameters.GetOneFloat("wispiness", 1);
     Float frequency = parameters.GetOneFloat("frequency", 5);
+    Spectrum sigma_a = parameters.GetOneSpectrum("sigma_a", nullptr, SpectrumType::Unbounded,
+                                                 alloc);
+    if (!sigma_a)
+        sigma_a = alloc.new_object<ConstantSpectrum>(1.f);
+    Spectrum sigma_s = parameters.GetOneSpectrum("sigma_s", nullptr, SpectrumType::Unbounded,
+                                                 alloc);
+    if (!sigma_s)
+        sigma_s = alloc.new_object<ConstantSpectrum>(1.f);
 
     Point3f p0 = parameters.GetOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
     Point3f p1 = parameters.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
 
-    return alloc.new_object<CloudMediumProvider>(Bounds3f(p0, p1), density, wispiness,
-                                                 frequency);
+    return alloc.new_object<CloudMedium>(Bounds3f(p0, p1), renderFromMedium, sigma_a, sigma_s, g,
+                                         density, wispiness, frequency, alloc);
 }
 
 // NanoVDBMediumProvider Method Definitions
@@ -469,10 +479,7 @@ Medium Medium::Create(const std::string &name, const ParameterDictionary &parame
         m = CuboidMedium<RGBGridMediumProvider>::Create(provider, parameters,
                                                         renderFromMedium, loc, alloc);
     } else if (name == "cloud") {
-        CloudMediumProvider *provider =
-            CloudMediumProvider::Create(parameters, loc, alloc);
-        m = CuboidMedium<CloudMediumProvider>::Create(provider, parameters,
-                                                      renderFromMedium, loc, alloc);
+        m = CloudMedium::Create(parameters, renderFromMedium, loc, alloc);
     } else if (name == "nanovdb") {
         NanoVDBMediumProvider *provider =
             NanoVDBMediumProvider::Create(parameters, loc, alloc);
