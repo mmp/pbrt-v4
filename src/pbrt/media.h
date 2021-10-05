@@ -334,7 +334,7 @@ class RGBGridMedium {
                   pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_a,
                   pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_s,
                   Float sigScale,
-                  pstd::optional<SampledGrid<RGBUnboundedSpectrum>> Le,
+                  pstd::optional<SampledGrid<RGBIlluminantSpectrum>> Le,
                   Float LeScale, Allocator alloc);
 
     static RGBGridMedium *Create(const ParameterDictionary &parameters,
@@ -389,7 +389,10 @@ class RGBGridMedium {
         if (!LeGrid)
             return SampledSpectrum(0.f);
 
-        auto convert = [lambda] PBRT_CPU_GPU(RGBUnboundedSpectrum s) {
+        auto convert = [lambda] PBRT_CPU_GPU(RGBIlluminantSpectrum s) {
+            if (!s.Illuminant()) // default initialized for OOB...
+                return SampledSpectrum(0.f);
+
             return s.Sample(lambda);
         };
         return LeScale * LeGrid->Lookup(p, convert);
@@ -404,7 +407,8 @@ class RGBGridMedium {
     pstd::vector<Float> maxDensityGrid;
     SampledGrid<Float> densityGrid;
     Float sigScale;
-    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_aGrid, sigma_sGrid, LeGrid;
+    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_aGrid, sigma_sGrid;
+    pstd::optional<SampledGrid<RGBIlluminantSpectrum>> LeGrid;
     Float LeScale;
 };
 

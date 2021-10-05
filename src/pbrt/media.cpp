@@ -341,7 +341,7 @@ RGBGridMedium::RGBGridMedium(
     const Bounds3f &bounds, const Transform &renderFromMedium, Float g,
     pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbA,
     pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbS, Float sigScale,
-    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbLe, Float LeScale,
+    pstd::optional<SampledGrid<RGBIlluminantSpectrum>> rgbLe, Float LeScale,
     Allocator alloc)
     : bounds(bounds),
       renderFromMedium(renderFromMedium),
@@ -417,10 +417,11 @@ RGBGridMedium *RGBGridMedium::Create(
     int nz = parameters.GetOneInt("nz", 1);
     if (nDensity != nx * ny * nz)
         ErrorExit(loc,
-                  "Uniform grid medium has %d density values; expected nx*ny*nz = %d",
+                  "Grid medium has %d density values; expected nx*ny*nz = %d",
                   nDensity, nx * ny * nz);
 
-    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_aGrid, sigma_sGrid, LeGrid;
+    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_aGrid, sigma_sGrid;
+    pstd::optional<SampledGrid<RGBIlluminantSpectrum>> LeGrid;
 
     if (!sigma_a.empty()) {
         const RGBColorSpace *colorSpace = parameters.ColorSpace();
@@ -440,10 +441,10 @@ RGBGridMedium *RGBGridMedium::Create(
     }
     if (!Le.empty()) {
         const RGBColorSpace *colorSpace = parameters.ColorSpace();
-        std::vector<RGBUnboundedSpectrum> rgbSpectrumDensity;
+        std::vector<RGBIlluminantSpectrum> rgbSpectrumDensity;
         for (RGB rgb : Le)
-            rgbSpectrumDensity.push_back(RGBUnboundedSpectrum(*colorSpace, rgb));
-        LeGrid = SampledGrid<RGBUnboundedSpectrum>(rgbSpectrumDensity, nx, ny, nz, alloc);
+            rgbSpectrumDensity.push_back(RGBIlluminantSpectrum(*colorSpace, rgb));
+        LeGrid = SampledGrid<RGBIlluminantSpectrum>(rgbSpectrumDensity, nx, ny, nz, alloc);
     }
 
     Point3f p0 = parameters.GetOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
