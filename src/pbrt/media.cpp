@@ -332,8 +332,9 @@ GridMedium *GridMedium::Create(const ParameterDictionary &parameters,
 }
 
 std::string GridMedium::ToString() const {
-    // TODO Needs updating
-    return StringPrintf("[ GridMedium Le_spec: %s (grids elided) ]", Le_spec);
+    return StringPrintf("[ GridMedium bounds: %s renderFromMedium: %s phase: %s "
+                        "maxDensityGridRes: %s sigScale: %f LeScale: %f (grids elided) ]",
+                        bounds, renderFromMedium, phase, maxDensityGridRes, sigScale, LeScale);
 }
 
 // RGBGridMedium Method Definitions
@@ -458,8 +459,9 @@ RGBGridMedium *RGBGridMedium::Create(
 }
 
 std::string RGBGridMedium::ToString() const {
-    // TODO Update
-    return StringPrintf("[ RGBGridMedium ]");
+    return StringPrintf("[ RGBGridMedium bounds: %s renderFromMedium: %s phase: %s "
+                        "maxDensityGridRes: %s sigScale: %f LeScale: %f (grids elided) ]",
+                        bounds, renderFromMedium, phase, maxDensityGridRes, sigScale, LeScale);
 }
 
 // CloudMedium Method Definitions
