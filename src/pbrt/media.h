@@ -100,39 +100,64 @@ class HomogeneousMajorantIterator {
     bool called = true;
 };
 
+// MajorantGrid Definition
+struct MajorantGrid {
+    // MajorantGrid Public Methods
+    MajorantGrid() = default;
+    MajorantGrid(Bounds3f bounds, Point3i res, Allocator alloc)
+        : bounds(bounds), voxels(res.x * res.y * res.z, alloc), res(res) {}
+
+    Float Lookup(int x, int y, int z) const {
+        return voxels[x + res.x * (y + res.y * z)];
+    }
+    void Set(int x, int y, int z, Float v) { voxels[x + res.x * (y + res.y * z)] = v; }
+
+    Bounds3f VoxelBounds(int x, int y, int z) const {
+        Point3f p0(Float(x) / res.x, Float(y) / res.y, Float(z) / res.z);
+        Point3f p1(Float(x + 1) / res.x, Float(y + 1) / res.y, Float(z + 1) / res.z);
+        return Bounds3f(p0, p1);
+    }
+
+    // MajorantGrid Public Members
+    Bounds3f bounds;
+    pstd::vector<Float> voxels;
+    Point3i res;
+};
+
 // DDAMajorantIterator Definition
 class DDAMajorantIterator {
   public:
     // DDAMajorantIterator Public Methods
     DDAMajorantIterator() = default;
     PBRT_CPU_GPU
-    DDAMajorantIterator(Ray ray, Bounds3f bounds, SampledSpectrum sigma_t, Float tMin,
-                        Float tMax, const pstd::vector<Float> *grid, Point3i res)
-        : sigma_t(sigma_t), tMin(tMin), tMax(tMax), grid(grid), res(res) {
+    DDAMajorantIterator(Ray ray, Float tMin, Float tMax, const MajorantGrid *grid,
+                        SampledSpectrum sigma_t)
+        : tMin(tMin), tMax(tMax), grid(grid), sigma_t(sigma_t) {
         // Set up 3D DDA for ray through the majorant grid
-        Vector3f diag = bounds.Diagonal();
-        Ray rayGrid(Point3f(bounds.Offset(ray.o)),
+        Vector3f diag = grid->bounds.Diagonal();
+        Ray rayGrid(Point3f(grid->bounds.Offset(ray.o)),
                     Vector3f(ray.d.x / diag.x, ray.d.y / diag.y, ray.d.z / diag.z));
         Point3f gridIntersect = rayGrid(tMin);
         for (int axis = 0; axis < 3; ++axis) {
             // Initialize ray stepping parameters for _axis_
             // Compute current voxel for axis and handle negative zero direction
-            voxel[axis] = Clamp(gridIntersect[axis] * res[axis], 0, res[axis] - 1);
-            deltaT[axis] = 1 / (std::abs(rayGrid.d[axis]) * res[axis]);
+            voxel[axis] =
+                Clamp(gridIntersect[axis] * grid->res[axis], 0, grid->res[axis] - 1);
+            deltaT[axis] = 1 / (std::abs(rayGrid.d[axis]) * grid->res[axis]);
             if (rayGrid.d[axis] == -0.f)
                 rayGrid.d[axis] = 0.f;
 
             if (rayGrid.d[axis] >= 0) {
                 // Handle ray with positive direction for voxel stepping
-                Float nextVoxelPos = Float(voxel[axis] + 1) / res[axis];
+                Float nextVoxelPos = Float(voxel[axis] + 1) / grid->res[axis];
                 nextCrossingT[axis] =
                     tMin + (nextVoxelPos - gridIntersect[axis]) / rayGrid.d[axis];
                 step[axis] = 1;
-                voxelLimit[axis] = res[axis];
+                voxelLimit[axis] = grid->res[axis];
 
             } else {
                 // Handle ray with negative direction for voxel stepping
-                Float nextVoxelPos = Float(voxel[axis]) / res[axis];
+                Float nextVoxelPos = Float(voxel[axis]) / grid->res[axis];
                 nextCrossingT[axis] =
                     tMin + (nextVoxelPos - gridIntersect[axis]) / rayGrid.d[axis];
                 step[axis] = -1;
@@ -154,9 +179,7 @@ class DDAMajorantIterator {
         Float tVoxelExit = std::min(tMax, nextCrossingT[stepAxis]);
 
         // Get _maxDensity_ for current voxel and initialize _RayMajorantSegment_, _seg_
-        int offset = voxel[0] + res.x * (voxel[1] + res.y * voxel[2]);
-        Float maxDensity = (*grid)[offset];
-        SampledSpectrum sigma_maj = sigma_t * maxDensity;
+        SampledSpectrum sigma_maj = sigma_t * grid->Lookup(voxel[0], voxel[1], voxel[2]);
         RayMajorantSegment seg{tMin, tVoxelExit, sigma_maj};
 
         // Advance to next voxel in maximum density grid
@@ -177,8 +200,7 @@ class DDAMajorantIterator {
     // DDAMajorantIterator Private Members
     SampledSpectrum sigma_t;
     Float tMin = Infinity, tMax = -Infinity;
-    const pstd::vector<Float> *grid;
-    Point3i res;
+    const MajorantGrid *grid;
     Float nextCrossingT[3], deltaT[3];
     int step[3], voxelLimit[3], voxel[3];
 };
@@ -190,14 +212,14 @@ class HomogeneousMedium {
     using MajorantIterator = HomogeneousMajorantIterator;
 
     // HomogeneousMedium Public Methods
-    HomogeneousMedium(Spectrum sigma_a, Spectrum sigma_s, Float sigScale, Spectrum Le,
+    HomogeneousMedium(Spectrum sigma_a, Spectrum sigma_s, Float sigmaScale, Spectrum Le,
                       Float LeScale, Float g, Allocator alloc)
         : sigma_a_spec(sigma_a, alloc),
           sigma_s_spec(sigma_s, alloc),
           Le_spec(Le, alloc),
           phase(g) {
-        sigma_a_spec.Scale(sigScale);
-        sigma_s_spec.Scale(sigScale);
+        sigma_a_spec.Scale(sigmaScale);
+        sigma_s_spec.Scale(sigmaScale);
         Le_spec.Scale(LeScale);
     }
 
@@ -234,11 +256,12 @@ class HomogeneousMedium {
 // GridMedium Definition
 class GridMedium {
   public:
+    // GridMedium Public Type Definitions
     using MajorantIterator = DDAMajorantIterator;
 
     // GridMedium Public Methods
     GridMedium(const Bounds3f &bounds, const Transform &renderFromMedium,
-               Spectrum sigma_a, Spectrum sigma_s, Float sigScale, Float g,
+               Spectrum sigma_a, Spectrum sigma_s, Float sigmaScale, Float g,
                SampledGrid<Float> density, pstd::optional<SampledGrid<Float>> temperature,
                Spectrum Le, SampledGrid<Float> LeScale, Allocator alloc);
 
@@ -249,87 +272,82 @@ class GridMedium {
     std::string ToString() const;
 
     PBRT_CPU_GPU
-    const Bounds3f &Bounds() const { return bounds; }
-
-    PBRT_CPU_GPU
     bool IsEmissive() const { return isEmissive; }
 
     PBRT_CPU_GPU
     MediumProperties SamplePoint(Point3f p, const SampledWavelengths &lambda) const {
-        // Sample spectra for grid $\sigmaa$ and $\sigmas$
-        SampledSpectrum sigma_a = sigScale * sigma_a_spec.Sample(lambda);
-        SampledSpectrum sigma_s = sigScale * sigma_s_spec.Sample(lambda);
+        // Sample spectra for grid medium $\sigmaa$ and $\sigmas$
+        SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
+        SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
 
         // Scale scattering coefficients by medium density at _p_
         p = renderFromMedium.ApplyInverse(p);
         p = Point3f(bounds.Offset(p));
         Float d = densityGrid.Lookup(p);
+        sigma_a *= d;
+        sigma_s *= d;
 
-        return MediumProperties{sigma_a * d, sigma_s * d, &phase, Le(p, lambda)};
+        // Compute grid emission _Le_ at _p_
+        SampledSpectrum Le(0.f);
+        if (isEmissive) {
+            Float scale = LeScale.Lookup(p);
+            if (scale > 0) {
+                if (temperatureGrid) {
+                    Float temp = temperatureGrid->Lookup(p);
+                    Le = scale * BlackbodySpectrum(temp).Sample(lambda);
+                } else
+                    Le = scale * Le_spec.Sample(lambda);
+            }
+        }
+
+        return MediumProperties{sigma_a, sigma_s, &phase, Le};
     }
 
     PBRT_CPU_GPU
     void SampleRay(Ray ray, Float raytMax, const SampledWavelengths &lambda,
                    DDAMajorantIterator *iter) const {
-        // Transform ray to grid density's space and compute bounds overlap
+        // Transform ray to medium's space and compute bounds overlap
         ray = renderFromMedium.ApplyInverse(ray, &raytMax);
         Float tMin, tMax;
         if (!bounds.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax)) {
-            *iter = DDAMajorantIterator();
+            *iter = MajorantIterator();
             return;
         }
         DCHECK_LE(tMax, raytMax);
 
-        // Sample spectra for grid $\sigmaa$ and $\sigmas$
-        SampledSpectrum sigma_a = sigScale * sigma_a_spec.Sample(lambda);
-        SampledSpectrum sigma_s = sigScale * sigma_s_spec.Sample(lambda);
+        // Sample spectra for grid medium $\sigmaa$ and $\sigmas$
+        SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
+        SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
 
-        // Initialize majorant iterator for _CuboidMedium_
         SampledSpectrum sigma_t = sigma_a + sigma_s;
-        *iter = DDAMajorantIterator(ray, bounds, sigma_t, tMin, tMax, &maxDensityGrid,
-                                    maxDensityGridRes);
+        *iter = DDAMajorantIterator(ray, tMin, tMax, &majorantGrid, sigma_t);
     }
 
   private:
-    // GridMedium Private Methods
-    PBRT_CPU_GPU
-    SampledSpectrum Le(Point3f p, const SampledWavelengths &lambda) const {
-        if (!isEmissive)
-            return SampledSpectrum(0.f);
-
-        if (temperatureGrid) {
-            Float temp = temperatureGrid->Lookup(p);
-            if (temp <= 100.f)
-                return SampledSpectrum(0.f);
-            return LeScale.Lookup(p) * BlackbodySpectrum(temp).Sample(lambda);
-        }
-        return Le_spec.Sample(lambda) * LeScale.Lookup(p);
-    }
-
     // GridMedium Private Members
     Bounds3f bounds;
     Transform renderFromMedium;
-    DenselySampledSpectrum sigma_a_spec, sigma_s_spec;
-    Float sigScale;
-    HGPhaseFunction phase;
-    Point3i maxDensityGridRes;
-    pstd::vector<Float> maxDensityGrid;
     SampledGrid<Float> densityGrid;
+    DenselySampledSpectrum sigma_a_spec, sigma_s_spec;
+    HGPhaseFunction phase;
     pstd::optional<SampledGrid<Float>> temperatureGrid;
     DenselySampledSpectrum Le_spec;
     SampledGrid<Float> LeScale;
     bool isEmissive;
+    MajorantGrid majorantGrid;
 };
 
 // RGBGridMedium Definition
 class RGBGridMedium {
   public:
+    // RGBGridMedium Public Type Definitions
     using MajorantIterator = DDAMajorantIterator;
+
     // RGBGridMedium Public Methods
     RGBGridMedium(const Bounds3f &bounds, const Transform &renderFromMedium, Float g,
                   pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_a,
                   pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_s,
-                  Float sigScale, pstd::optional<SampledGrid<RGBIlluminantSpectrum>> Le,
+                  Float sigmaScale, pstd::optional<SampledGrid<RGBIlluminantSpectrum>> Le,
                   Float LeScale, Allocator alloc);
 
     static RGBGridMedium *Create(const ParameterDictionary &parameters,
@@ -337,9 +355,6 @@ class RGBGridMedium {
                                  Allocator alloc);
 
     std::string ToString() const;
-
-    PBRT_CPU_GPU
-    const Bounds3f &Bounds() const { return bounds; }
 
     PBRT_CPU_GPU
     bool IsEmissive() const { return LeGrid && LeScale > 0.0f; }
@@ -356,26 +371,24 @@ class RGBGridMedium {
         SampledSpectrum sigma_s =
             sigma_sGrid ? sigma_sGrid->Lookup(pp, convert) : SampledSpectrum(1.f);
 
-        return MediumProperties{sigma_a * sigScale, sigma_s * sigScale, &phase,
+        return MediumProperties{sigma_a * sigmaScale, sigma_s * sigmaScale, &phase,
                                 Le(pp, lambda)};
     }
 
     PBRT_CPU_GPU
     void SampleRay(Ray ray, Float raytMax, const SampledWavelengths &lambda,
                    DDAMajorantIterator *iter) const {
-        // Transform ray to grid density's space and compute bounds overlap
+        // Transform ray to medium's space and compute bounds overlap
         ray = renderFromMedium.ApplyInverse(ray, &raytMax);
         Float tMin, tMax;
         if (!bounds.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax)) {
-            *iter = DDAMajorantIterator();
+            *iter = MajorantIterator();
             return;
         }
         DCHECK_LE(tMax, raytMax);
 
-        // Initialize majorant iterator for _CuboidMedium_
-        SampledSpectrum sigma_t(sigScale);
-        *iter = DDAMajorantIterator(ray, bounds, sigma_t, tMin, tMax, &maxDensityGrid,
-                                    maxDensityGridRes);
+        SampledSpectrum sigma_t(sigmaScale);
+        *iter = DDAMajorantIterator(ray, tMin, tMax, &majorantGrid, sigma_t);
     }
 
     PBRT_CPU_GPU
@@ -397,9 +410,8 @@ class RGBGridMedium {
     Bounds3f bounds;
     Transform renderFromMedium;
     HGPhaseFunction phase;
-    Point3i maxDensityGridRes;
-    pstd::vector<Float> maxDensityGrid;
-    Float sigScale;
+    MajorantGrid majorantGrid;
+    Float sigmaScale;
     pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_aGrid, sigma_sGrid;
     pstd::optional<SampledGrid<RGBIlluminantSpectrum>> LeGrid;
     Float LeScale;
@@ -408,9 +420,10 @@ class RGBGridMedium {
 // CloudMedium Definition
 class CloudMedium {
   public:
+    // CloudMedium Public Type Definitions
     using MajorantIterator = HomogeneousMajorantIterator;
 
-    // CloudMediumProvider Public Methods
+    // CloudMedium Public Methods
     static CloudMedium *Create(const ParameterDictionary &parameters,
                                const Transform &renderFromMedium, const FileLoc *loc,
                                Allocator alloc);
@@ -427,44 +440,42 @@ class CloudMedium {
                 Spectrum sigma_a, Spectrum sigma_s, Float g, Float density,
                 Float wispiness, Float frequency, Allocator alloc)
         : bounds(bounds),
+          renderFromMedium(renderFromMedium),
           sigma_a_spec(sigma_a, alloc),
           sigma_s_spec(sigma_s, alloc),
           phase(g),
           density(density),
           wispiness(wispiness),
-          frequency(frequency),
-          renderFromMedium(renderFromMedium) {}
+          frequency(frequency) {}
 
     PBRT_CPU_GPU
     bool IsEmissive() const { return false; }
 
     PBRT_CPU_GPU
     MediumProperties SamplePoint(Point3f p, const SampledWavelengths &lambda) const {
-        // Sample spectra for grid $\sigmaa$ and $\sigmas$
+        // Compute sampled spectra for cloud $\sigmaa$ and $\sigmas$ at _p_
         SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
         SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
+        Float density = Density(renderFromMedium.ApplyInverse(p));
+        sigma_a *= density;
+        sigma_s *= density;
 
-        // Scale scattering coefficients by medium density at _p_
-        p = renderFromMedium.ApplyInverse(p);
-        Float density = Density(p);
-
-        return MediumProperties{sigma_a * density, sigma_s * density, &phase,
-                                SampledSpectrum(0.f)};
+        return MediumProperties{sigma_a, sigma_s, &phase, SampledSpectrum(0.f)};
     }
 
     PBRT_CPU_GPU
     void SampleRay(Ray ray, Float raytMax, const SampledWavelengths &lambda,
                    HomogeneousMajorantIterator *iter) const {
-        // Transform ray to grid density's space and compute bounds overlap
+        // Transform ray to medium's space and compute bounds overlap
         ray = renderFromMedium.ApplyInverse(ray, &raytMax);
         Float tMin, tMax;
         if (!bounds.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax)) {
-            *iter = HomogeneousMajorantIterator();
+            *iter = MajorantIterator();
             return;
         }
         DCHECK_LE(tMax, raytMax);
 
-        // Sample spectra for grid $\sigmaa$ and $\sigmas$
+        // Compute $\sigmat$ bound for cloud medium and initialize majorant iterator
         SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
         SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
         SampledSpectrum sigma_t = sigma_a + sigma_s;
@@ -472,13 +483,6 @@ class CloudMedium {
     }
 
   private:
-    // CloudMedium Private Members
-    Bounds3f bounds;
-    Transform renderFromMedium;
-    HGPhaseFunction phase;
-    DenselySampledSpectrum sigma_a_spec, sigma_s_spec;
-    Float density, wispiness, frequency;
-
     // CloudMedium Private Methods
     PBRT_CPU_GPU
     Float Density(Point3f p) const {
@@ -506,6 +510,13 @@ class CloudMedium {
         d += 2 * std::max<Float>(0, 0.5f - p.y);
         return Clamp(d, 0, 1);
     }
+
+    // CloudMedium Private Members
+    Bounds3f bounds;
+    Transform renderFromMedium;
+    HGPhaseFunction phase;
+    DenselySampledSpectrum sigma_a_spec, sigma_s_spec;
+    Float density, wispiness, frequency;
 };
 
 // NanoVDBMedium Definition
@@ -583,7 +594,6 @@ class NanoVDBBuffer {
 class NanoVDBMedium {
   public:
     using MajorantIterator = DDAMajorantIterator;
-
     // NanoVDBMedium Public Methods
     static NanoVDBMedium *Create(const ParameterDictionary &parameters,
                                  const Transform &renderFromMedium, const FileLoc *loc,
@@ -592,7 +602,7 @@ class NanoVDBMedium {
     std::string ToString() const;
 
     NanoVDBMedium(const Transform &renderFromMedium, Spectrum sigma_a, Spectrum sigma_s,
-                  Float sigScale, Float g, nanovdb::GridHandle<NanoVDBBuffer> dg,
+                  Float sigmaScale, Float g, nanovdb::GridHandle<NanoVDBBuffer> dg,
                   nanovdb::GridHandle<NanoVDBBuffer> tg, Float LeScale,
                   Float temperatureCutoff, Float temperatureScale, Allocator alloc);
 
@@ -602,8 +612,8 @@ class NanoVDBMedium {
     PBRT_CPU_GPU
     MediumProperties SamplePoint(Point3f p, const SampledWavelengths &lambda) const {
         // Sample spectra for grid $\sigmaa$ and $\sigmas$
-        SampledSpectrum sigma_a = sigScale * sigma_a_spec.Sample(lambda);
-        SampledSpectrum sigma_s = sigScale * sigma_s_spec.Sample(lambda);
+        SampledSpectrum sigma_a = sigmaScale * sigma_a_spec.Sample(lambda);
+        SampledSpectrum sigma_s = sigmaScale * sigma_s_spec.Sample(lambda);
 
         // Scale scattering coefficients by medium density at _p_
         p = renderFromMedium.ApplyInverse(p);
@@ -619,23 +629,21 @@ class NanoVDBMedium {
     PBRT_CPU_GPU
     void SampleRay(Ray ray, Float raytMax, const SampledWavelengths &lambda,
                    DDAMajorantIterator *iter) const {
-        // Transform ray to grid density's space and compute bounds overlap
+        // Transform ray to medium's space and compute bounds overlap
         ray = renderFromMedium.ApplyInverse(ray, &raytMax);
         Float tMin, tMax;
         if (!bounds.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax)) {
-            *iter = DDAMajorantIterator();
+            *iter = MajorantIterator();
             return;
         }
         DCHECK_LE(tMax, raytMax);
 
         // Sample spectra for grid $\sigmaa$ and $\sigmas$
-        SampledSpectrum sigma_a = sigScale * sigma_a_spec.Sample(lambda);
-        SampledSpectrum sigma_s = sigScale * sigma_s_spec.Sample(lambda);
+        SampledSpectrum sigma_a = sigmaScale * sigma_a_spec.Sample(lambda);
+        SampledSpectrum sigma_s = sigmaScale * sigma_s_spec.Sample(lambda);
 
-        // Initialize majorant iterator for _CuboidMedium_
         SampledSpectrum sigma_t = sigma_a + sigma_s;
-        *iter = DDAMajorantIterator(ray, bounds, sigma_t, tMin, tMax, &maxDensityGrid,
-                                    maxDensityGridRes);
+        *iter = DDAMajorantIterator(ray, tMin, tMax, &majorantGrid, sigma_t);
     }
 
   private:
@@ -658,10 +666,9 @@ class NanoVDBMedium {
     Bounds3f bounds;
     Transform renderFromMedium;
     DenselySampledSpectrum sigma_a_spec, sigma_s_spec;
-    Float sigScale;
+    Float sigmaScale;
     HGPhaseFunction phase;
-    Point3i maxDensityGridRes;
-    pstd::vector<Float> maxDensityGrid;
+    MajorantGrid majorantGrid;
     nanovdb::GridHandle<NanoVDBBuffer> densityGrid;
     nanovdb::GridHandle<NanoVDBBuffer> temperatureGrid;
     const nanovdb::FloatGrid *densityFloatGrid = nullptr;

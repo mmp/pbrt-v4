@@ -43,9 +43,9 @@ class PhaseFunction : public TaggedPointer<HGPhaseFunction> {
 };
 
 class HomogeneousMedium;
-class CloudMedium;
 class GridMedium;
 class RGBGridMedium;
+class CloudMedium;
 class NanoVDBMedium;
 
 struct MediumProperties;
@@ -75,7 +75,7 @@ class RayMajorantIterator
 // Medium Definition
 class Medium
     : public TaggedPointer<  // Medium Types
-        HomogeneousMedium, CloudMedium, GridMedium, RGBGridMedium, NanoVDBMedium
+          HomogeneousMedium, CloudMedium, GridMedium, RGBGridMedium, NanoVDBMedium
 
           > {
   public:
