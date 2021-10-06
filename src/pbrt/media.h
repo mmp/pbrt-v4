@@ -405,7 +405,6 @@ class RGBGridMedium {
     HGPhaseFunction phase;
     Point3i maxDensityGridRes;
     pstd::vector<Float> maxDensityGrid;
-    SampledGrid<Float> densityGrid;
     Float sigScale;
     pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_aGrid, sigma_sGrid;
     pstd::optional<SampledGrid<RGBIlluminantSpectrum>> LeGrid;
