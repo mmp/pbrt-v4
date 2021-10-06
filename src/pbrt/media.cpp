@@ -347,6 +347,8 @@ RGBGridMedium::RGBGridMedium(
     : bounds(bounds),
       renderFromMedium(renderFromMedium),
       phase(g),
+      maxDensityGridRes(16, 16, 16),
+      maxDensityGrid(alloc),
       sigma_aGrid(std::move(rgbA)),
       sigma_sGrid(std::move(rgbS)),
       sigScale(sigScale),
@@ -361,7 +363,6 @@ RGBGridMedium::RGBGridMedium(
     if (LeGrid)
         volumeGridBytes += LeGrid->BytesAllocated();
 
-    maxDensityGridRes = Point3i(16, 16, 16);
     maxDensityGrid.resize(maxDensityGridRes.x * maxDensityGridRes.y * maxDensityGridRes.z);
     // Compute maximum density for each _maxGrid_ cell
     int offset = 0;
