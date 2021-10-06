@@ -107,11 +107,14 @@ struct MajorantGrid {
     MajorantGrid(Bounds3f bounds, Point3i res, Allocator alloc)
         : bounds(bounds), voxels(res.x * res.y * res.z, alloc), res(res) {}
 
+    PBRT_CPU_GPU
     Float Lookup(int x, int y, int z) const {
         return voxels[x + res.x * (y + res.y * z)];
     }
+    PBRT_CPU_GPU
     void Set(int x, int y, int z, Float v) { voxels[x + res.x * (y + res.y * z)] = v; }
 
+    PBRT_CPU_GPU
     Bounds3f VoxelBounds(int x, int y, int z) const {
         Point3f p0(Float(x) / res.x, Float(y) / res.y, Float(z) / res.z);
         Point3f p1(Float(x + 1) / res.x, Float(y + 1) / res.y, Float(z + 1) / res.z);
