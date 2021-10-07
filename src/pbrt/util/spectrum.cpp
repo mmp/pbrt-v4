@@ -264,7 +264,8 @@ std::string RGBUnboundedSpectrum::ToString() const {
 
 std::string RGBIlluminantSpectrum::ToString() const {
     return StringPrintf("[ RGBIlluminantSpectrum: rsp: %s scale: %f illuminant: %s ]",
-                        rsp, scale, *illuminant);
+                        rsp, scale,
+                        illuminant ? illuminant->ToString() : std::string("(nullptr)"));
 }
 
 namespace {

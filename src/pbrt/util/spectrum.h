@@ -599,17 +599,25 @@ class RGBIlluminantSpectrum {
 
     PBRT_CPU_GPU
     Float operator()(Float lambda) const {
+        if (!illuminant)
+            return 0;
         return scale * rsp(lambda) * (*illuminant)(lambda);
     }
 
     PBRT_CPU_GPU
-    Float MaxValue() const { return scale * rsp.MaxValue() * illuminant->MaxValue(); }
+    Float MaxValue() const {
+        if (!illuminant)
+            return 0;
+        return scale * rsp.MaxValue() * illuminant->MaxValue();
+    }
 
     PBRT_CPU_GPU
     const DenselySampledSpectrum *Illuminant() const { return illuminant; }
 
     PBRT_CPU_GPU
     SampledSpectrum Sample(const SampledWavelengths &lambda) const {
+        if (!illuminant)
+            return SampledSpectrum(0);
         SampledSpectrum s;
         for (int i = 0; i < NSpectrumSamples; ++i)
             s[i] = scale * rsp(lambda[i]);
