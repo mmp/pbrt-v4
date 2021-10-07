@@ -245,11 +245,11 @@ class HomogeneousMedium {
     }
 
     PBRT_CPU_GPU
-    void SampleRay(Ray ray, Float tMax, const SampledWavelengths &lambda,
-                   HomogeneousMajorantIterator *iter) const {
+    HomogeneousMajorantIterator SampleRay(Ray ray, Float tMax,
+                                          const SampledWavelengths &lambda) const {
         SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
         SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
-        *iter = HomogeneousMajorantIterator(0, tMax, sigma_a + sigma_s);
+        return HomogeneousMajorantIterator(0, tMax, sigma_a + sigma_s);
     }
 
     std::string ToString() const;
@@ -312,15 +312,13 @@ class GridMedium {
     }
 
     PBRT_CPU_GPU
-    void SampleRay(Ray ray, Float raytMax, const SampledWavelengths &lambda,
-                   DDAMajorantIterator *iter) const {
+    DDAMajorantIterator SampleRay(Ray ray, Float raytMax,
+                                  const SampledWavelengths &lambda) const {
         // Transform ray to medium's space and compute bounds overlap
         ray = renderFromMedium.ApplyInverse(ray, &raytMax);
         Float tMin, tMax;
-        if (!bounds.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax)) {
-            *iter = MajorantIterator();
-            return;
-        }
+        if (!bounds.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax))
+            return {};
         DCHECK_LE(tMax, raytMax);
 
         // Sample spectra for grid medium $\sigmaa$ and $\sigmas$
@@ -328,7 +326,7 @@ class GridMedium {
         SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
 
         SampledSpectrum sigma_t = sigma_a + sigma_s;
-        *iter = DDAMajorantIterator(ray, tMin, tMax, &majorantGrid, sigma_t);
+        return DDAMajorantIterator(ray, tMin, tMax, &majorantGrid, sigma_t);
     }
 
   private:
@@ -395,19 +393,17 @@ class RGBGridMedium {
     }
 
     PBRT_CPU_GPU
-    void SampleRay(Ray ray, Float raytMax, const SampledWavelengths &lambda,
-                   DDAMajorantIterator *iter) const {
+    DDAMajorantIterator SampleRay(Ray ray, Float raytMax,
+                                  const SampledWavelengths &lambda) const {
         // Transform ray to medium's space and compute bounds overlap
         ray = renderFromMedium.ApplyInverse(ray, &raytMax);
         Float tMin, tMax;
-        if (!bounds.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax)) {
-            *iter = MajorantIterator();
-            return;
-        }
+        if (!bounds.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax))
+            return {};
         DCHECK_LE(tMax, raytMax);
 
-        SampledSpectrum sigma_t(sigmaScale);
-        *iter = DDAMajorantIterator(ray, tMin, tMax, &majorantGrid, sigma_t);
+        SampledSpectrum sigma_t(1);
+        return DDAMajorantIterator(ray, tMin, tMax, &majorantGrid, sigma_t);
     }
 
   private:
@@ -467,22 +463,20 @@ class CloudMedium {
     }
 
     PBRT_CPU_GPU
-    void SampleRay(Ray ray, Float raytMax, const SampledWavelengths &lambda,
-                   HomogeneousMajorantIterator *iter) const {
+    HomogeneousMajorantIterator SampleRay(Ray ray, Float raytMax,
+                                          const SampledWavelengths &lambda) const {
         // Transform ray to medium's space and compute bounds overlap
         ray = renderFromMedium.ApplyInverse(ray, &raytMax);
         Float tMin, tMax;
-        if (!bounds.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax)) {
-            *iter = MajorantIterator();
-            return;
-        }
+        if (!bounds.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax))
+            return {};
         DCHECK_LE(tMax, raytMax);
 
         // Compute $\sigmat$ bound for cloud medium and initialize majorant iterator
         SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
         SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
         SampledSpectrum sigma_t = sigma_a + sigma_s;
-        *iter = HomogeneousMajorantIterator(tMin, tMax, sigma_t);
+        return HomogeneousMajorantIterator(tMin, tMax, sigma_t);
     }
 
   private:
@@ -630,15 +624,13 @@ class NanoVDBMedium {
     }
 
     PBRT_CPU_GPU
-    void SampleRay(Ray ray, Float raytMax, const SampledWavelengths &lambda,
-                   DDAMajorantIterator *iter) const {
+    DDAMajorantIterator SampleRay(Ray ray, Float raytMax,
+                                  const SampledWavelengths &lambda) const {
         // Transform ray to medium's space and compute bounds overlap
         ray = renderFromMedium.ApplyInverse(ray, &raytMax);
         Float tMin, tMax;
-        if (!bounds.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax)) {
-            *iter = MajorantIterator();
-            return;
-        }
+        if (!bounds.IntersectP(ray.o, ray.d, raytMax, &tMin, &tMax))
+            return {};
         DCHECK_LE(tMax, raytMax);
 
         // Sample spectra for grid $\sigmaa$ and $\sigmas$
@@ -646,7 +638,7 @@ class NanoVDBMedium {
         SampledSpectrum sigma_s = sigmaScale * sigma_s_spec.Sample(lambda);
 
         SampledSpectrum sigma_t = sigma_a + sigma_s;
-        *iter = DDAMajorantIterator(ray, tMin, tMax, &majorantGrid, sigma_t);
+        return DDAMajorantIterator(ray, tMin, tMax, &majorantGrid, sigma_t);
     }
 
   private:
@@ -707,6 +699,21 @@ inline MediumProperties Medium::SamplePoint(Point3f p,
 }
 
 // Medium Sampling Function Definitions
+inline RayMajorantIterator Medium::SampleRay(Ray ray, Float tMax,
+                                             const SampledWavelengths &lambda,
+                                             ScratchBuffer &buf) const {
+    // Explicit capture to work around MSVC weirdness; it doesn't see |buf| otherwise...
+    auto sample = [ray, tMax, lambda, &buf](auto medium) {
+        // Return _RayMajorantIterator_ for medium's majorant iterator
+        using ConcreteMedium = typename std::remove_reference_t<decltype(*medium)>;
+        using Iter = typename ConcreteMedium::MajorantIterator;
+        Iter *iter = (Iter *)buf.Alloc(sizeof(Iter), alignof(Iter));
+        *iter = medium->SampleRay(ray, tMax, lambda);
+        return RayMajorantIterator(iter);
+    };
+    return DispatchCPU(sample);
+}
+
 template <typename F>
 PBRT_CPU_GPU SampledSpectrum SampleT_maj(Ray ray, Float tMax, Float u, RNG &rng,
                                          const SampledWavelengths &lambda, F callback) {
@@ -726,8 +733,7 @@ PBRT_CPU_GPU SampledSpectrum SampleT_maj(Ray ray, Float tMax, Float u, RNG &rng,
 
     // Initialize _MajorantIterator_ for ray majorant sampling
     ConcreteMedium *medium = ray.medium.Cast<ConcreteMedium>();
-    typename ConcreteMedium::MajorantIterator iter;
-    medium->SampleRay(ray, tMax, lambda, &iter);
+    typename ConcreteMedium::MajorantIterator iter = medium->SampleRay(ray, tMax, lambda);
 
     // Generate ray majorant samples until termination
     SampledSpectrum T_maj(1.f);
@@ -784,20 +790,6 @@ PBRT_CPU_GPU SampledSpectrum SampleT_maj(Ray ray, Float tMax, Float u, RNG &rng,
         }
     }
     return SampledSpectrum(1.f);
-}
-
-inline RayMajorantIterator Medium::SampleRay(Ray ray, Float tMax,
-                                             const SampledWavelengths &lambda,
-                                             ScratchBuffer &buf) const {
-    // Explicit capture to work around MSVC weirdness; it doesn't see |buf| otherwise...
-    auto sample = [ray, tMax, lambda, &buf](auto medium) -> RayMajorantIterator {
-        using Medium = typename std::remove_reference_t<decltype(*medium)>;
-        using Iter = typename Medium::MajorantIterator;
-        Iter *iter = (Iter *)buf.Alloc(sizeof(Iter), alignof(Iter));
-        medium->SampleRay(ray, tMax, lambda, iter);
-        return iter;
-    };
-    return DispatchCPU(sample);
 }
 
 }  // namespace pbrt
