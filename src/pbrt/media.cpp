@@ -218,12 +218,12 @@ GridMedium::GridMedium(const Bounds3f &bounds, const Transform &renderFromMedium
       renderFromMedium(renderFromMedium),
       sigma_a_spec(sigma_a, alloc),
       sigma_s_spec(sigma_s, alloc),
-      phase(g),
-      majorantGrid(bounds, {16, 16, 16}, alloc),
       densityGrid(std::move(d)),
+      phase(g),
       temperatureGrid(std::move(temperature)),
       Le_spec(Le, alloc),
-      LeScale(std::move(LeGrid)) {
+      LeScale(std::move(LeGrid)),
+      majorantGrid(bounds, {16, 16, 16}, alloc) {
     sigma_a_spec.Scale(sigmaScale);
     sigma_s_spec.Scale(sigmaScale);
 
@@ -235,7 +235,6 @@ GridMedium::GridMedium(const Bounds3f &bounds, const Transform &renderFromMedium
     isEmissive = temperatureGrid ? true : (Le_spec.MaxValue() > 0);
 
     // Initialize _majorantGrid_ for _GridMedium_
-    // Compute maximum density for each _majorantGrid_ cell
     for (int z = 0; z < majorantGrid.res.z; ++z)
         for (int y = 0; y < majorantGrid.res.y; ++y)
             for (int x = 0; x < majorantGrid.res.x; ++x) {
@@ -354,22 +353,19 @@ RGBGridMedium::RGBGridMedium(const Bounds3f &bounds, const Transform &renderFrom
     if (LeGrid)
         volumeGridBytes += LeGrid->BytesAllocated();
 
-    // Compute maximum density for each _maxGrid_ cell
-    int offset = 0;
+    // Initialize _majorantGrid_ for _RGBGridMedium_
     for (int z = 0; z < majorantGrid.res.z; ++z)
         for (int y = 0; y < majorantGrid.res.y; ++y)
             for (int x = 0; x < majorantGrid.res.x; ++x) {
                 Bounds3f bounds = majorantGrid.VoxelBounds(x, y, z);
-
+                // Initialize _majorantGrid_ voxel for RGB $\sigmaa$ and $\sigmas$
                 auto max = [] PBRT_CPU_GPU(RGBUnboundedSpectrum s) {
                     return s.MaxValue();
                 };
-
-                majorantGrid.Set(
-                    x, y, z,
-                    sigmaScale *
-                        ((sigma_aGrid ? sigma_aGrid->MaxValue(bounds, max) : 1.f) +
-                         (sigma_sGrid ? sigma_sGrid->MaxValue(bounds, max) : 1.f)));
+                Float maxSigma_t =
+                    (sigma_aGrid ? sigma_aGrid->MaxValue(bounds, max) : 1) +
+                    (sigma_sGrid ? sigma_sGrid->MaxValue(bounds, max) : 1);
+                majorantGrid.Set(x, y, z, sigmaScale * maxSigma_t);
             }
 }
 

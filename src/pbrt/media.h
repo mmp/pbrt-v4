@@ -80,7 +80,7 @@ struct MediumProperties {
 class HomogeneousMajorantIterator {
   public:
     // HomogeneousMajorantIterator Public Methods
-    HomogeneousMajorantIterator() = default;
+    HomogeneousMajorantIterator() : called(true) {}
     PBRT_CPU_GPU
     HomogeneousMajorantIterator(Float tMin, Float tMax, SampledSpectrum sigma_maj)
         : seg{tMin, tMax, sigma_maj}, called(false) {}
@@ -97,7 +97,7 @@ class HomogeneousMajorantIterator {
 
   private:
     RayMajorantSegment seg;
-    bool called = true;
+    bool called;
 };
 
 // MajorantGrid Definition
@@ -109,10 +109,14 @@ struct MajorantGrid {
 
     PBRT_CPU_GPU
     Float Lookup(int x, int y, int z) const {
+        DCHECK(x >= 0 && x < res.x && y >= 0 && y < res.y && z >= 0 && z < res.z);
         return voxels[x + res.x * (y + res.y * z)];
     }
     PBRT_CPU_GPU
-    void Set(int x, int y, int z, Float v) { voxels[x + res.x * (y + res.y * z)] = v; }
+    void Set(int x, int y, int z, Float v) {
+        DCHECK(x >= 0 && x < res.x && y >= 0 && y < res.y && z >= 0 && z < res.z);
+        voxels[x + res.x * (y + res.y * z)] = v;
+    }
 
     PBRT_CPU_GPU
     Bounds3f VoxelBounds(int x, int y, int z) const {
@@ -295,6 +299,7 @@ class GridMedium {
         if (isEmissive) {
             Float scale = LeScale.Lookup(p);
             if (scale > 0) {
+                // Compute emitted radiance using _temperatureGrid_ or _Le_spec_
                 if (temperatureGrid) {
                     Float temp = temperatureGrid->Lookup(p);
                     Le = scale * BlackbodySpectrum(temp).Sample(lambda);
@@ -330,8 +335,8 @@ class GridMedium {
     // GridMedium Private Members
     Bounds3f bounds;
     Transform renderFromMedium;
-    SampledGrid<Float> densityGrid;
     DenselySampledSpectrum sigma_a_spec, sigma_s_spec;
+    SampledGrid<Float> densityGrid;
     HGPhaseFunction phase;
     pstd::optional<SampledGrid<Float>> temperatureGrid;
     DenselySampledSpectrum Le_spec;
@@ -360,22 +365,33 @@ class RGBGridMedium {
     std::string ToString() const;
 
     PBRT_CPU_GPU
-    bool IsEmissive() const { return LeGrid && LeScale > 0.0f; }
+    bool IsEmissive() const { return LeGrid && LeScale > 0; }
 
     PBRT_CPU_GPU
     MediumProperties SamplePoint(Point3f p, const SampledWavelengths &lambda) const {
         p = renderFromMedium.ApplyInverse(p);
-        Point3f pp = Point3f(bounds.Offset(p));
+        p = Point3f(bounds.Offset(p));
+        // Compute $\sigmaa$ and $\sigmas$ for _RGBGridMedium_
         auto convert = [=] PBRT_CPU_GPU(RGBUnboundedSpectrum s) {
             return s.Sample(lambda);
         };
         SampledSpectrum sigma_a =
-            sigma_aGrid ? sigma_aGrid->Lookup(pp, convert) : SampledSpectrum(1.f);
+            sigmaScale *
+            (sigma_aGrid ? sigma_aGrid->Lookup(p, convert) : SampledSpectrum(1.f));
         SampledSpectrum sigma_s =
-            sigma_sGrid ? sigma_sGrid->Lookup(pp, convert) : SampledSpectrum(1.f);
+            sigmaScale *
+            (sigma_sGrid ? sigma_sGrid->Lookup(p, convert) : SampledSpectrum(1.f));
 
-        return MediumProperties{sigma_a * sigmaScale, sigma_s * sigmaScale, &phase,
-                                Le(pp, lambda)};
+        // Find emitted radiance _Le_ for _RGBGridMedium_
+        SampledSpectrum Le(0.f);
+        if (LeGrid && LeScale > 0) {
+            auto convert = [=] PBRT_CPU_GPU(RGBIlluminantSpectrum s) {
+                return s.Sample(lambda);
+            };
+            Le = LeScale * LeGrid->Lookup(p, convert);
+        }
+
+        return MediumProperties{sigma_a, sigma_s, &phase, Le};
     }
 
     PBRT_CPU_GPU
@@ -394,30 +410,16 @@ class RGBGridMedium {
         *iter = DDAMajorantIterator(ray, tMin, tMax, &majorantGrid, sigma_t);
     }
 
-    PBRT_CPU_GPU
-    SampledSpectrum Le(Point3f p, const SampledWavelengths &lambda) const {
-        if (!LeGrid)
-            return SampledSpectrum(0.f);
-
-        auto convert = [lambda] PBRT_CPU_GPU(RGBIlluminantSpectrum s) {
-            if (!s.Illuminant())  // default initialized for OOB...
-                return SampledSpectrum(0.f);
-
-            return s.Sample(lambda);
-        };
-        return LeScale * LeGrid->Lookup(p, convert);
-    }
-
   private:
     // RGBGridMedium Private Members
     Bounds3f bounds;
     Transform renderFromMedium;
-    HGPhaseFunction phase;
-    MajorantGrid majorantGrid;
-    Float sigmaScale;
-    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_aGrid, sigma_sGrid;
     pstd::optional<SampledGrid<RGBIlluminantSpectrum>> LeGrid;
     Float LeScale;
+    HGPhaseFunction phase;
+    pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_aGrid, sigma_sGrid;
+    Float sigmaScale;
+    MajorantGrid majorantGrid;
 };
 
 // CloudMedium Definition
@@ -457,11 +459,9 @@ class CloudMedium {
     PBRT_CPU_GPU
     MediumProperties SamplePoint(Point3f p, const SampledWavelengths &lambda) const {
         // Compute sampled spectra for cloud $\sigmaa$ and $\sigmas$ at _p_
-        SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
-        SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
         Float density = Density(renderFromMedium.ApplyInverse(p));
-        sigma_a *= density;
-        sigma_s *= density;
+        SampledSpectrum sigma_a = density * sigma_a_spec.Sample(lambda);
+        SampledSpectrum sigma_s = density * sigma_s_spec.Sample(lambda);
 
         return MediumProperties{sigma_a, sigma_s, &phase, SampledSpectrum(0.f)};
     }
