@@ -854,7 +854,7 @@ int BasicScene::AddMaterial(SceneEntity material) {
 }
 
 void BasicScene::startLoadingNormalMaps(const ParameterDictionary &parameters) {
-    std::string filename = parameters.GetOneString("normalmap", "");
+    std::string filename = ResolveFilename(parameters.GetOneString("normalmap", ""));
     if (filename.empty())
         return;
 
