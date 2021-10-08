@@ -556,7 +556,12 @@ NanoVDBMedium::NanoVDBMedium(const Transform &renderFromMedium, Spectrum sigma_a
         CHECK_EQ(index, x + majorantGrid.res.x * (y + majorantGrid.res.y * z));
 
         // World (aka medium) space bounds of this max grid cell
-        Bounds3f wb = majorantGrid.VoxelBounds(x, y, z);
+        Bounds3f wb(bounds.Lerp(Point3f(Float(x) / majorantGrid.res.x,
+                                        Float(y) / majorantGrid.res.y,
+                                        Float(z) / majorantGrid.res.z)),
+                    bounds.Lerp(Point3f(Float(x + 1) / majorantGrid.res.x,
+                                        Float(y + 1) / majorantGrid.res.y,
+                                        Float(z + 1) / majorantGrid.res.z)));
 
         // Compute corresponding NanoVDB index-space bounds in floating-point.
         nanovdb::Vec3R i0 = densityFloatGrid->worldToIndexF(
