@@ -80,6 +80,7 @@ struct MediumProperties {
 class HomogeneousMajorantIterator {
   public:
     // HomogeneousMajorantIterator Public Methods
+    PBRT_CPU_GPU
     HomogeneousMajorantIterator() : called(true) {}
     PBRT_CPU_GPU
     HomogeneousMajorantIterator(Float tMin, Float tMax, SampledSpectrum sigma_maj)
