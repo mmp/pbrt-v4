@@ -23,7 +23,7 @@ class RGBColorSpace {
                   const RGBToSpectrumTable *rgbToSpectrumTable, Allocator alloc);
 
     PBRT_CPU_GPU
-    RGBSigmoidPolynomial ToRGBCoeffs(const RGB &rgb) const;
+    RGBSigmoidPolynomial ToRGBCoeffs(RGB rgb) const;
 
     static void Init(Allocator alloc);
 
@@ -52,9 +52,9 @@ class RGBColorSpace {
     }
 
     PBRT_CPU_GPU
-    RGB ToRGB(const XYZ &xyz) const { return Mul<RGB>(RGBFromXYZ, xyz); }
+    RGB ToRGB(XYZ xyz) const { return Mul<RGB>(RGBFromXYZ, xyz); }
     PBRT_CPU_GPU
-    XYZ ToXYZ(const RGB &rgb) const { return Mul<XYZ>(XYZFromRGB, rgb); }
+    XYZ ToXYZ(RGB rgb) const { return Mul<XYZ>(XYZFromRGB, rgb); }
 
     static const RGBColorSpace *GetNamed(std::string name);
     static const RGBColorSpace *Lookup(Point2f r, Point2f g, Point2f b, Point2f w);

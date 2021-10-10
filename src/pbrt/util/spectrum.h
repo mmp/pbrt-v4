@@ -543,7 +543,7 @@ class RGBAlbedoSpectrum {
     Float MaxValue() const { return rsp.MaxValue(); }
 
     PBRT_CPU_GPU
-    RGBAlbedoSpectrum(const RGBColorSpace &cs, const RGB &rgb);
+    RGBAlbedoSpectrum(const RGBColorSpace &cs, RGB rgb);
 
     PBRT_CPU_GPU
     SampledSpectrum Sample(const SampledWavelengths &lambda) const {
@@ -569,7 +569,7 @@ class RGBUnboundedSpectrum {
     Float MaxValue() const { return scale * rsp.MaxValue(); }
 
     PBRT_CPU_GPU
-    RGBUnboundedSpectrum(const RGBColorSpace &cs, const RGB &rgb);
+    RGBUnboundedSpectrum(const RGBColorSpace &cs, RGB rgb);
 
     PBRT_CPU_GPU
     RGBUnboundedSpectrum() : rsp(0, 0, 0), scale(0) {}
@@ -595,7 +595,7 @@ class RGBIlluminantSpectrum {
     // RGBIlluminantSpectrum Public Methods
     RGBIlluminantSpectrum() = default;
     PBRT_CPU_GPU
-    RGBIlluminantSpectrum(const RGBColorSpace &cs, const RGB &rgb);
+    RGBIlluminantSpectrum(const RGBColorSpace &cs, RGB rgb);
 
     PBRT_CPU_GPU
     Float operator()(Float lambda) const {

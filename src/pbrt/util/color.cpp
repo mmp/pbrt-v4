@@ -33,7 +33,7 @@ std::string RGBSigmoidPolynomial::ToString() const {
 }
 
 // RGBToSpectrumTable Method Definitions
-RGBSigmoidPolynomial RGBToSpectrumTable::operator()(const RGB &rgb) const {
+RGBSigmoidPolynomial RGBToSpectrumTable::operator()(RGB rgb) const {
     DCHECK(rgb[0] >= 0.f && rgb[1] >= 0.f && rgb[2] >= 0.f && rgb[0] <= 1.f &&
            rgb[1] <= 1.f && rgb[2] <= 1.f);
 
@@ -57,9 +57,11 @@ RGBSigmoidPolynomial RGBToSpectrumTable::operator()(const RGB &rgb) const {
     // Trilinearly interpolate sigmoid polynomial coefficients _c_
     pstd::array<Float, 3> c;
     for (int i = 0; i < 3; ++i) {
+        // Define _co_ lambda for looking up sigmoid polynomial coefficients
         auto co = [&](int dx, int dy, int dz) {
             return (*coeffs)[maxc][zi + dz][yi + dy][xi + dx][i];
         };
+
         c[i] = Lerp(dz,
                     Lerp(dy, Lerp(dx, co(0, 0, 0), co(1, 0, 0)),
                          Lerp(dx, co(0, 1, 0), co(1, 1, 0))),

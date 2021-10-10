@@ -231,13 +231,13 @@ RGB SampledSpectrum::ToRGB(const SampledWavelengths &lambda,
     return cs.ToRGB(xyz);
 }
 
-RGBAlbedoSpectrum::RGBAlbedoSpectrum(const RGBColorSpace &cs, const RGB &rgb) {
+RGBAlbedoSpectrum::RGBAlbedoSpectrum(const RGBColorSpace &cs, RGB rgb) {
     DCHECK_LE(std::max({rgb.r, rgb.g, rgb.b}), 1);
     DCHECK_GE(std::min({rgb.r, rgb.g, rgb.b}), 0);
     rsp = cs.ToRGBCoeffs(rgb);
 }
 
-RGBUnboundedSpectrum::RGBUnboundedSpectrum(const RGBColorSpace &cs, const RGB &rgb) {
+RGBUnboundedSpectrum::RGBUnboundedSpectrum(const RGBColorSpace &cs, RGB rgb) {
     Float m = std::max({rgb.r, rgb.g, rgb.b});
     if (m <= 1)
         rsp = cs.ToRGBCoeffs(rgb);
@@ -247,7 +247,7 @@ RGBUnboundedSpectrum::RGBUnboundedSpectrum(const RGBColorSpace &cs, const RGB &r
     }
 }
 
-RGBIlluminantSpectrum::RGBIlluminantSpectrum(const RGBColorSpace &cs, const RGB &rgb)
+RGBIlluminantSpectrum::RGBIlluminantSpectrum(const RGBColorSpace &cs, RGB rgb)
     : illuminant(&cs.illuminant) {
     Float m = std::max({rgb.r, rgb.g, rgb.b});
     scale = 2 * m;
