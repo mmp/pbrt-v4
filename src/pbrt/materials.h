@@ -174,13 +174,13 @@ class DielectricMaterial {
 
     template <typename TextureEvaluator>
     PBRT_CPU_GPU void GetBSSRDF(TextureEvaluator texEval, MaterialEvalContext ctx,
-                                SampledWavelengths &lambda, void *) const {}
+                                SampledWavelengths &lambda) const {}
 
     PBRT_CPU_GPU static constexpr bool HasSubsurfaceScattering() { return false; }
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
-                              SampledWavelengths &lambda, DielectricBxDF *bxdf) const {
+    PBRT_CPU_GPU DielectricBxDF GetBxDF(TextureEvaluator texEval, MaterialEvalContext ctx,
+                                        SampledWavelengths &lambda) const {
         // Compute index of refraction for dielectric material
         Float sampledEta = eta(lambda[0]);
         if (!eta.template Is<ConstantSpectrum>())
@@ -199,8 +199,7 @@ class DielectricMaterial {
         TrowbridgeReitzDistribution distrib(urough, vrough);
 
         // Return BSDF for dielectric material
-        *bxdf = DielectricBxDF(sampledEta, distrib);
-        return BSDF(ctx.ns, ctx.dpdus, bxdf);
+        return DielectricBxDF(sampledEta, distrib);
     }
 
   private:
@@ -224,9 +223,9 @@ class ThinDielectricMaterial {
     }
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
-                              SampledWavelengths &lambda,
-                              ThinDielectricBxDF *bxdf) const {
+    PBRT_CPU_GPU ThinDielectricBxDF GetBxDF(TextureEvaluator texEval,
+                                            MaterialEvalContext ctx,
+                                            SampledWavelengths &lambda) const {
         // Compute index of refraction for dielectric material
         Float sampledEta = eta(lambda[0]);
         if (!eta.template Is<ConstantSpectrum>())
@@ -236,9 +235,8 @@ class ThinDielectricMaterial {
         if (sampledEta == 0)
             sampledEta = 1;
 
-        // Return BSDF for _ThinDielectricMaterial_
-        *bxdf = ThinDielectricBxDF(sampledEta);
-        return BSDF(ctx.ns, ctx.dpdus, bxdf);
+        // Return BxDF for _ThinDielectricMaterial_
+        return ThinDielectricBxDF(sampledEta);
     }
 
     ThinDielectricMaterial(Spectrum eta, FloatTexture displacement, Image *normalMap)
@@ -257,7 +255,7 @@ class ThinDielectricMaterial {
 
     template <typename TextureEvaluator>
     PBRT_CPU_GPU void GetBSSRDF(TextureEvaluator texEval, MaterialEvalContext ctx,
-                                SampledWavelengths &lambda, void *) const {}
+                                SampledWavelengths &lambda) const {}
 
     PBRT_CPU_GPU static constexpr bool HasSubsurfaceScattering() { return false; }
 
@@ -274,7 +272,7 @@ class ThinDielectricMaterial {
 class MixMaterial {
   public:
     // MixMaterial Type Definitions
-    using BxDF = int;
+    using BxDF = void;
     using BSSRDF = void;
 
     // MixMaterial Public Methods
@@ -322,7 +320,7 @@ class MixMaterial {
 
     template <typename TextureEvaluator>
     PBRT_CPU_GPU void GetBSSRDF(TextureEvaluator texEval, MaterialEvalContext ctx,
-                                SampledWavelengths &lambda, void *) const {
+                                SampledWavelengths &lambda) const {
 #ifndef PBRT_IS_GPU_CODE
         LOG_FATAL("Shouldn't be called");
 #endif
@@ -338,12 +336,11 @@ class MixMaterial {
     }
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
-                              SampledWavelengths &lambda, void *bxdf) const {
+    PBRT_CPU_GPU void GetBxDF(TextureEvaluator texEval, MaterialEvalContext ctx,
+                              SampledWavelengths &lambda) const {
 #ifndef PBRT_IS_GPU_CODE
-        LOG_FATAL("MixMaterial::GetBSDF() shouldn't be called");
+        LOG_FATAL("MixMaterial::GetBxDF() shouldn't be called");
 #endif
-        return {};
     }
 
   private:
@@ -380,8 +377,8 @@ class HairMaterial {
     }
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
-                              SampledWavelengths &lambda, HairBxDF *bxdf) const {
+    PBRT_CPU_GPU HairBxDF GetBxDF(TextureEvaluator texEval, MaterialEvalContext ctx,
+                                  SampledWavelengths &lambda) const {
         Float bm = std::max<Float>(1e-2, texEval(beta_m, ctx));
         Float bn = std::max<Float>(1e-2, texEval(beta_n, ctx));
         Float a = texEval(alpha, ctx);
@@ -403,8 +400,7 @@ class HairMaterial {
 
         // Offset along width
         Float h = -1 + 2 * ctx.uv[1];
-        *bxdf = HairBxDF(h, e, sig_a, bm, bn, a);
-        return BSDF(ctx.ns, ctx.dpdus, bxdf);
+        return HairBxDF(h, e, sig_a, bm, bn, a);
     }
 
     static HairMaterial *Create(const TextureParameterDictionary &parameters,
@@ -417,7 +413,7 @@ class HairMaterial {
 
     template <typename TextureEvaluator>
     PBRT_CPU_GPU void GetBSSRDF(TextureEvaluator texEval, MaterialEvalContext ctx,
-                                SampledWavelengths &lambda, void *) const {}
+                                SampledWavelengths &lambda) const {}
 
     PBRT_CPU_GPU static constexpr bool HasSubsurfaceScattering() { return false; }
 
@@ -466,11 +462,10 @@ class DiffuseMaterial {
     }
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
-                              SampledWavelengths &lambda, DiffuseBxDF *bxdf) const {
+    PBRT_CPU_GPU DiffuseBxDF GetBxDF(TextureEvaluator texEval, MaterialEvalContext ctx,
+                                     SampledWavelengths &lambda) const {
         SampledSpectrum r = Clamp(texEval(reflectance, ctx, lambda), 0, 1);
-        *bxdf = DiffuseBxDF(r);
-        return BSDF(ctx.ns, ctx.dpdus, bxdf);
+        return DiffuseBxDF(r);
     }
 
   private:
@@ -493,8 +488,8 @@ class ConductorMaterial {
     }
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
-                              SampledWavelengths &lambda, ConductorBxDF *bxdf) const {
+    PBRT_CPU_GPU ConductorBxDF GetBxDF(TextureEvaluator texEval, MaterialEvalContext ctx,
+                                       SampledWavelengths &lambda) const {
         // Return BSDF for _ConductorMaterial_
         Float uRough = texEval(uRoughness, ctx), vRough = texEval(vRoughness, ctx);
         if (remapRoughness) {
@@ -511,8 +506,7 @@ class ConductorMaterial {
             ks = 2 * Sqrt(r) / Sqrt(ClampZero(SampledSpectrum(1) - r));
         }
         TrowbridgeReitzDistribution distrib(uRough, vRough);
-        *bxdf = ConductorBxDF(distrib, etas, ks);
-        return BSDF(ctx.ns, ctx.dpdus, bxdf);
+        return ConductorBxDF(distrib, etas, ks);
     }
 
     ConductorMaterial(SpectrumTexture eta, SpectrumTexture k, SpectrumTexture reflectance,
@@ -540,7 +534,7 @@ class ConductorMaterial {
 
     template <typename TextureEvaluator>
     PBRT_CPU_GPU void GetBSSRDF(TextureEvaluator texEval, MaterialEvalContext ctx,
-                                SampledWavelengths &lambda, void *) const {}
+                                SampledWavelengths &lambda) const {}
 
     PBRT_CPU_GPU static constexpr bool HasSubsurfaceScattering() { return false; }
 
@@ -588,8 +582,9 @@ class CoatedDiffuseMaterial {
     }
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, const MaterialEvalContext &ctx,
-                              SampledWavelengths &lambda, CoatedDiffuseBxDF *bxdf) const;
+    PBRT_CPU_GPU CoatedDiffuseBxDF GetBxDF(TextureEvaluator texEval,
+                                           const MaterialEvalContext &ctx,
+                                           SampledWavelengths &lambda) const;
 
     PBRT_CPU_GPU
     FloatTexture GetDisplacement() const { return displacement; }
@@ -602,7 +597,7 @@ class CoatedDiffuseMaterial {
 
     template <typename TextureEvaluator>
     PBRT_CPU_GPU void GetBSSRDF(TextureEvaluator texEval, const MaterialEvalContext &ctx,
-                                SampledWavelengths &lambda, void *) const {}
+                                SampledWavelengths &lambda) const {}
 
     PBRT_CPU_GPU static constexpr bool HasSubsurfaceScattering() { return false; }
 
@@ -661,9 +656,9 @@ class CoatedConductorMaterial {
     }
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, const MaterialEvalContext &ctx,
-                              SampledWavelengths &lambda,
-                              CoatedConductorBxDF *bxdf) const;
+    PBRT_CPU_GPU CoatedConductorBxDF GetBxDF(TextureEvaluator texEval,
+                                             const MaterialEvalContext &ctx,
+                                             SampledWavelengths &lambda) const;
 
     PBRT_CPU_GPU
     FloatTexture GetDisplacement() const { return displacement; }
@@ -732,8 +727,9 @@ class SubsurfaceMaterial {
     }
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, const MaterialEvalContext &ctx,
-                              SampledWavelengths &lambda, DielectricBxDF *bxdf) const {
+    PBRT_CPU_GPU DielectricBxDF GetBxDF(TextureEvaluator texEval,
+                                        const MaterialEvalContext &ctx,
+                                        SampledWavelengths &lambda) const {
         // Initialize BSDF for _SubsurfaceMaterial_
 
         Float urough = texEval(uRoughness, ctx), vrough = texEval(vRoughness, ctx);
@@ -744,14 +740,13 @@ class SubsurfaceMaterial {
         TrowbridgeReitzDistribution distrib(urough, vrough);
 
         // Initialize _bsdf_ for smooth or rough dielectric
-        *bxdf = DielectricBxDF(eta, distrib);
-        return BSDF(ctx.ns, ctx.dpdus, bxdf);
+        return DielectricBxDF(eta, distrib);
     }
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU void GetBSSRDF(TextureEvaluator texEval, const MaterialEvalContext &ctx,
-                                SampledWavelengths &lambda,
-                                TabulatedBSSRDF *bssrdf) const {
+    PBRT_CPU_GPU TabulatedBSSRDF GetBSSRDF(TextureEvaluator texEval,
+                                           const MaterialEvalContext &ctx,
+                                           SampledWavelengths &lambda) const {
         SampledSpectrum sig_a, sig_s;
         if (sigma_a && sigma_s) {
             // Evaluate textures for $\sigma_\roman{a}$ and $\sigma_\roman{s}$
@@ -765,7 +760,7 @@ class SubsurfaceMaterial {
             SampledSpectrum r = Clamp(texEval(reflectance, ctx, lambda), 0, 1);
             SubsurfaceFromDiffuse(table, r, mfree, &sig_a, &sig_s);
         }
-        *bssrdf = TabulatedBSSRDF(ctx.p, ctx.ns, ctx.wo, eta, sig_a, sig_s, &table);
+        return TabulatedBSSRDF(ctx.p, ctx.ns, ctx.wo, eta, sig_a, sig_s, &table);
     }
 
     PBRT_CPU_GPU
@@ -816,12 +811,12 @@ class DiffuseTransmissionMaterial {
     }
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
-                              SampledWavelengths &lambda, RoughDiffuseBxDF *bxdf) const {
+    PBRT_CPU_GPU RoughDiffuseBxDF GetBxDF(TextureEvaluator texEval,
+                                          MaterialEvalContext ctx,
+                                          SampledWavelengths &lambda) const {
         SampledSpectrum r = Clamp(scale * texEval(reflectance, ctx, lambda), 0, 1);
         SampledSpectrum t = Clamp(scale * texEval(transmittance, ctx, lambda), 0, 1);
-        *bxdf = RoughDiffuseBxDF(r, t, 0);
-        return BSDF(ctx.ns, ctx.dpdus, bxdf);
+        return RoughDiffuseBxDF(r, t, 0);
     }
 
     PBRT_CPU_GPU
@@ -835,7 +830,7 @@ class DiffuseTransmissionMaterial {
 
     template <typename TextureEvaluator>
     PBRT_CPU_GPU void GetBSSRDF(TextureEvaluator texEval, MaterialEvalContext ctx,
-                                SampledWavelengths &lambda, void *) const {}
+                                SampledWavelengths &lambda) const {}
 
     PBRT_CPU_GPU static constexpr bool HasSubsurfaceScattering() { return false; }
 
@@ -856,10 +851,9 @@ class MeasuredMaterial {
     using BSSRDF = void;
     // MeasuredMaterial Public Methods
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU BSDF GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
-                              SampledWavelengths &lambda, MeasuredBxDF *bxdf) const {
-        *bxdf = MeasuredBxDF(brdf, lambda);
-        return BSDF(ctx.ns, ctx.dpdus, bxdf);
+    PBRT_CPU_GPU MeasuredBxDF GetBxDF(TextureEvaluator texEval, MaterialEvalContext ctx,
+                                      SampledWavelengths &lambda) const {
+        return MeasuredBxDF(brdf, lambda);
     }
 
     MeasuredMaterial(const std::string &filename, FloatTexture displacement,
@@ -903,10 +897,16 @@ inline BSDF Material::GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
                               ScratchBuffer &scratchBuffer) const {
     // Define _getBSDF_ lambda function for _Material::GetBSDF()_
     auto getBSDF = [&](auto mtl) -> BSDF {
-        using Material = typename std::remove_reference_t<decltype(*mtl)>;
-        using BxDF = typename Material::BxDF;
-        BxDF *bxdf = (BxDF *)scratchBuffer.Alloc(sizeof(BxDF), alignof(BxDF));
-        return mtl->GetBSDF(texEval, ctx, lambda, bxdf);
+        using ConcreteMtl = typename std::remove_reference_t<decltype(*mtl)>;
+        using ConcreteBxDF = typename ConcreteMtl::BxDF;
+        if constexpr (std::is_same_v<ConcreteBxDF, void>)
+            return BSDF();
+        else {
+            // Allocate memory for _ConcreteBxDF_ and return _BSDF_ for material
+            ConcreteBxDF *bxdf = scratchBuffer.Alloc<ConcreteBxDF>();
+            *bxdf = mtl->GetBxDF(texEval, ctx, lambda);
+            return BSDF(ctx.ns, ctx.dpdus, bxdf);
+        }
     };
 
     return Dispatch(getBSDF);
@@ -922,16 +922,15 @@ template <typename TextureEvaluator>
 inline BSSRDF Material::GetBSSRDF(TextureEvaluator texEval, MaterialEvalContext ctx,
                                   SampledWavelengths &lambda,
                                   ScratchBuffer &scratchBuffer) const {
-    auto get = [&](auto ptr) -> BSSRDF {
-        using Material = typename std::remove_reference_t<decltype(*ptr)>;
-        using BSSRDF = typename Material::BSSRDF;
-        if constexpr (std::is_same_v<BSSRDF, void>)
+    auto get = [&](auto mtl) -> BSSRDF {
+        using Material = typename std::remove_reference_t<decltype(*mtl)>;
+        using MaterialBSSRDF = typename Material::BSSRDF;
+        if constexpr (std::is_same_v<MaterialBSSRDF, void>)
             return nullptr;
         else {
-            BSSRDF *bssrdf =
-                (BSSRDF *)scratchBuffer.Alloc(sizeof(BSSRDF), alignof(BSSRDF));
-            ptr->GetBSSRDF(texEval, ctx, lambda, bssrdf);
-            return bssrdf;
+            MaterialBSSRDF *bssrdf = scratchBuffer.Alloc<MaterialBSSRDF>();
+            *bssrdf = mtl->GetBSSRDF(texEval, ctx, lambda);
+            return BSSRDF(bssrdf);
         }
     };
     return Dispatch(get);

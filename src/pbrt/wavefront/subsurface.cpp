@@ -25,12 +25,11 @@ void WavefrontPathIntegrator::SampleSubsurface(int wavefrontDepth) {
     ForAllQueued(
         "Get BSSRDF and enqueue probe ray", bssrdfEvalQueue, maxQueueSize,
         PBRT_CPU_GPU_LAMBDA(const GetBSSRDFAndProbeRayWorkItem w) {
-            using BSSRDF = typename SubsurfaceMaterial::BSSRDF;
-            BSSRDF bssrdf;
             const SubsurfaceMaterial *material = w.material.Cast<SubsurfaceMaterial>();
             MaterialEvalContext ctx = w.GetMaterialEvalContext();
             SampledWavelengths lambda = w.lambda;
-            material->GetBSSRDF(BasicTextureEvaluator(), ctx, lambda, &bssrdf);
+            using BSSRDF = typename SubsurfaceMaterial::BSSRDF;
+            BSSRDF bssrdf = material->GetBSSRDF(BasicTextureEvaluator(), ctx, lambda);
 
             RaySamples raySamples = pixelSampleState.samples[w.pixelIndex];
             Float uc = raySamples.subsurface.uc;

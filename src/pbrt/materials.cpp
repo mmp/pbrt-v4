@@ -244,10 +244,9 @@ ConductorMaterial *ConductorMaterial::Create(const TextureParameterDictionary &p
 
 // CoatedDiffuseMaterial Method Definitions
 template <typename TextureEvaluator>
-BSDF CoatedDiffuseMaterial::GetBSDF(TextureEvaluator texEval,
-                                    const MaterialEvalContext &ctx,
-                                    SampledWavelengths &lambda,
-                                    CoatedDiffuseBxDF *bxdf) const {
+CoatedDiffuseBxDF CoatedDiffuseMaterial::GetBxDF(TextureEvaluator texEval,
+                                                 const MaterialEvalContext &ctx,
+                                                 SampledWavelengths &lambda) const {
     // Initialize diffuse component of plastic material
     SampledSpectrum r = Clamp(texEval(reflectance, ctx, lambda), 0, 1);
 
@@ -271,20 +270,17 @@ BSDF CoatedDiffuseMaterial::GetBSDF(TextureEvaluator texEval,
     SampledSpectrum a = Clamp(texEval(albedo, ctx, lambda), 0, 1);
     Float gg = Clamp(texEval(g, ctx), -1, 1);
 
-    *bxdf = CoatedDiffuseBxDF(DielectricBxDF(sampledEta, distrib), DiffuseBxDF(r), thick,
-                              a, gg, maxDepth, nSamples);
-    return BSDF(ctx.ns, ctx.dpdus, bxdf);
+    return CoatedDiffuseBxDF(DielectricBxDF(sampledEta, distrib), DiffuseBxDF(r), thick,
+                             a, gg, maxDepth, nSamples);
 }
 
 // Explicit template instantiation
-template BSDF CoatedDiffuseMaterial::GetBSDF(BasicTextureEvaluator,
-                                             const MaterialEvalContext &ctx,
-                                             SampledWavelengths &lambda,
-                                             CoatedDiffuseBxDF *bxdf) const;
-template BSDF CoatedDiffuseMaterial::GetBSDF(UniversalTextureEvaluator,
-                                             const MaterialEvalContext &ctx,
-                                             SampledWavelengths &lambda,
-                                             CoatedDiffuseBxDF *bxdf) const;
+template CoatedDiffuseBxDF CoatedDiffuseMaterial::GetBxDF(
+    BasicTextureEvaluator, const MaterialEvalContext &ctx,
+    SampledWavelengths &lambda) const;
+template CoatedDiffuseBxDF CoatedDiffuseMaterial::GetBxDF(
+    UniversalTextureEvaluator, const MaterialEvalContext &ctx,
+    SampledWavelengths &lambda) const;
 
 std::string CoatedDiffuseMaterial::ToString() const {
     return StringPrintf(
@@ -339,10 +335,9 @@ CoatedDiffuseMaterial *CoatedDiffuseMaterial::Create(
 }
 
 template <typename TextureEvaluator>
-BSDF CoatedConductorMaterial::GetBSDF(TextureEvaluator texEval,
-                                      const MaterialEvalContext &ctx,
-                                      SampledWavelengths &lambda,
-                                      CoatedConductorBxDF *bxdf) const {
+CoatedConductorBxDF CoatedConductorMaterial::GetBxDF(TextureEvaluator texEval,
+                                                     const MaterialEvalContext &ctx,
+                                                     SampledWavelengths &lambda) const {
     Float iurough = texEval(interfaceURoughness, ctx);
     Float ivrough = texEval(interfaceVRoughness, ctx);
     if (remapRoughness) {
@@ -380,20 +375,17 @@ BSDF CoatedConductorMaterial::GetBSDF(TextureEvaluator texEval,
     SampledSpectrum a = Clamp(texEval(albedo, ctx, lambda), 0, 1);
     Float gg = Clamp(texEval(g, ctx), -1, 1);
 
-    *bxdf = CoatedConductorBxDF(DielectricBxDF(ieta, interfaceDistrib),
-                                ConductorBxDF(conductorDistrib, ce, ck), thick, a, gg,
-                                maxDepth, nSamples);
-    return BSDF(ctx.ns, ctx.dpdus, bxdf);
+    return CoatedConductorBxDF(DielectricBxDF(ieta, interfaceDistrib),
+                               ConductorBxDF(conductorDistrib, ce, ck), thick, a, gg,
+                               maxDepth, nSamples);
 }
 
-template BSDF CoatedConductorMaterial::GetBSDF(BasicTextureEvaluator,
-                                               const MaterialEvalContext &ctx,
-                                               SampledWavelengths &lambda,
-                                               CoatedConductorBxDF *bxdf) const;
-template BSDF CoatedConductorMaterial::GetBSDF(UniversalTextureEvaluator,
-                                               const MaterialEvalContext &ctx,
-                                               SampledWavelengths &lambda,
-                                               CoatedConductorBxDF *bxdf) const;
+template CoatedConductorBxDF CoatedConductorMaterial::GetBxDF(
+    BasicTextureEvaluator, const MaterialEvalContext &ctx,
+    SampledWavelengths &lambda) const;
+template CoatedConductorBxDF CoatedConductorMaterial::GetBxDF(
+    UniversalTextureEvaluator, const MaterialEvalContext &ctx,
+    SampledWavelengths &lambda) const;
 
 std::string CoatedConductorMaterial::ToString() const {
     return StringPrintf("[ CoatedConductorMaterial displacement: %f interfaceURoughness: "

@@ -127,8 +127,8 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
             MaterialEvalContext ctx =
                 w.GetMaterialEvalContext(dudx, dudy, dvdx, dvdy, ns, dpdus);
             using ConcreteBxDF = typename ConcreteMaterial::BxDF;
-            ConcreteBxDF bxdf;
-            BSDF bsdf = w.material->GetBSDF(texEval, ctx, lambda, &bxdf);
+            ConcreteBxDF bxdf = w.material->GetBxDF(texEval, ctx, lambda);
+            BSDF bsdf(ctx.ns, ctx.dpdus, &bxdf);
             // Handle terminated secondary wavelengths after BSDF creation
             if (lambda.SecondaryTerminated())
                 pixelSampleState.lambda[w.pixelIndex] = lambda;
