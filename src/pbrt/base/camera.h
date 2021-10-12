@@ -64,7 +64,7 @@ class Camera : public TaggedPointer<PerspectiveCamera, OrthographicCamera,
 
     PBRT_CPU_GPU
     SampledSpectrum We(const Ray &ray, SampledWavelengths &lambda,
-                       Point2f *pRaster2 = nullptr) const;
+                       Point2f *pRasterOut = nullptr) const;
 
     PBRT_CPU_GPU
     void PDF_We(const Ray &ray, Float *pdfPos, Float *pdfDir) const;

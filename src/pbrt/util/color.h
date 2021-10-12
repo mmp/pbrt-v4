@@ -344,12 +344,11 @@ class RGBSigmoidPolynomial {
 
     PBRT_CPU_GPU
     Float MaxValue() const {
-        if (c0 < 0) {
-            Float lambda = -c1 / (2 * c0);
-            if (lambda >= 360 && lambda <= 830)
-                return std::max({(*this)(lambda), (*this)(360), (*this)(830)});
-        }
-        return std::max((*this)(360), (*this)(830));
+        Float result = std::max((*this)(360), (*this)(830));
+        Float lambda = -c1 / (2 * c0);
+        if (lambda >= 360 && lambda <= 830)
+            result = std::max(result, (*this)(lambda));
+        return result;
     }
 
   private:

@@ -850,8 +850,8 @@ pstd::optional<LightLeSample> DiffuseAreaLight::SampleLe(Point2f u1, Point2f u2,
     const Interaction &intr = ss->intr;
     Frame nFrame = Frame::FromZ(intr.n);
     w = nFrame.FromLocal(w);
-    return LightLeSample(L(intr.p(), intr.n, intr.uv, w, lambda), intr.SpawnRay(w), intr,
-                         ss->pdf, pdfDir);
+    SampledSpectrum Le = L(intr.p(), intr.n, intr.uv, w, lambda);
+    return LightLeSample(Le, intr.SpawnRay(w), intr, ss->pdf, pdfDir);
 }
 
 void DiffuseAreaLight::PDF_Le(const Interaction &intr, Vector3f w, Float *pdfPos,

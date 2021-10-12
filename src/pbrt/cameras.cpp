@@ -518,7 +518,7 @@ PerspectiveCamera *PerspectiveCamera::Create(const ParameterDictionary &paramete
 }
 
 SampledSpectrum PerspectiveCamera::We(const Ray &ray, SampledWavelengths &lambda,
-                                      Point2f *pRaster2) const {
+                                      Point2f *pRasterOut) const {
     // Check if ray is forward-facing with respect to the camera
     Float cosTheta = Dot(ray.d, RenderFromCamera(Vector3f(0, 0, 1), ray.time));
     if (cosTheta <= cosTotalWidth)
@@ -530,8 +530,8 @@ SampledSpectrum PerspectiveCamera::We(const Ray &ray, SampledWavelengths &lambda
     Point3f pRaster = cameraFromRaster.ApplyInverse(pCamera);
 
     // Return raster position if requested
-    if (pRaster2)
-        *pRaster2 = Point2f(pRaster.x, pRaster.y);
+    if (pRasterOut)
+        *pRasterOut = Point2f(pRaster.x, pRaster.y);
 
     // Return zero importance for out of bounds points
     Bounds2f sampleBounds = film.SampleBounds();
@@ -585,8 +585,8 @@ pstd::optional<CameraWiSample> PerspectiveCamera::SampleWi(
     wi /= dist;
 
     // Compute PDF for importance arriving at _ref_
-    Float lensArea = lensRadius != 0 ? (Pi * lensRadius * lensRadius) : 1;
-    Float pdf = (dist * dist) / (AbsDot(lensIntr.n, wi) * lensArea);
+    Float lensArea = lensRadius != 0 ? (Pi * Sqr(lensRadius)) : 1;
+    Float pdf = Sqr(dist) / (AbsDot(lensIntr.n, wi) * lensArea);
 
     // Compute importance and return _CameraWiSample_
     Point2f pRaster;

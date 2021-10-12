@@ -2755,8 +2755,7 @@ struct SPPMPixelListNode {
 };
 
 // SPPM Utility Functions
-static bool ToGrid(const Point3f &p, const Bounds3f &bounds, const int gridRes[3],
-                   Point3i *pi) {
+static bool ToGrid(Point3f p, const Bounds3f &bounds, const int gridRes[3], Point3i *pi) {
     bool inBounds = true;
     Vector3f pg = bounds.Offset(p);
     for (int i = 0; i < 3; ++i) {
@@ -2826,10 +2825,9 @@ void SPPMIntegrator::Render() {
 
         // Generate SPPM visible points
         // Sample wavelengths for SPPM pass
-        const SampledWavelengths passLambda =
-            Options->disableWavelengthJitter
-                ? film.SampleWavelengths(0.5)
-                : film.SampleWavelengths(RadicalInverse(1, iter));
+        Float uLambda =
+            Options->disableWavelengthJitter ? Float(0.5) : RadicalInverse(1, iter);
+        const SampledWavelengths passLambda = film.SampleWavelengths(uLambda);
 
         ParallelFor2D(pixelBounds, [&](Bounds2i tileBounds) {
             // Follow camera paths for _tileBounds_ in image for SPPM
@@ -3102,10 +3100,11 @@ void SPPMIntegrator::Render() {
                                 SampledSpectrum Phi =
                                     beta * pixel.vp.bsdf.f(pixel.vp.wo, wi);
                                 // Update _Phi_i_ for photon contribution
-                                SampledWavelengths l = lambda;
+                                SampledWavelengths photonLambda = lambda;
                                 if (pixel.vp.secondaryLambdaTerminated)
-                                    l.TerminateSecondary();
-                                RGB Phi_i = film.ToOutputRGB(pixel.vp.beta * Phi, l);
+                                    photonLambda.TerminateSecondary();
+                                RGB Phi_i =
+                                    film.ToOutputRGB(pixel.vp.beta * Phi, photonLambda);
                                 for (int i = 0; i < 3; ++i)
                                     pixel.Phi_i[i].Add(Phi_i[i]);
 
@@ -3161,9 +3160,7 @@ void SPPMIntegrator::Render() {
                 Float rNew = p.radius * std::sqrt(nNew / (p.n + m));
 
                 // Update $\tau$ for pixel
-                RGB Phi_i;
-                for (int i = 0; i < 3; ++i)
-                    Phi_i[i] = p.Phi_i[i];
+                RGB Phi_i(p.Phi_i[0], p.Phi_i[1], p.Phi_i[2]);
                 p.tau = (p.tau + Phi_i) * Sqr(rNew) / Sqr(p.radius);
 
                 // Set remaining pixel values for next photon pass
