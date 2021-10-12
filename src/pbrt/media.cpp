@@ -202,7 +202,7 @@ HomogeneousMedium *HomogeneousMedium::Create(const ParameterDictionary &paramete
 
 std::string HomogeneousMedium::ToString() const {
     return StringPrintf(
-        "[ Homogeneous medium sigma_a_spec: %s sigma_s_spec: %s Le_spec: phase: %s ]",
+        "[ Homogeneous medium sigma_a_spec: %s sigma_s_spec: %s Le_spec: %s phase: %s ]",
         sigma_a_spec, sigma_s_spec, Le_spec, phase);
 }
 
