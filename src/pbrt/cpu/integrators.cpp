@@ -1985,7 +1985,7 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
         if (ray.medium) {
             // Sample participating medium for _RandomWalk()_ ray
             Float tMax = si ? si->tHit : Infinity;
-            RNG rng(Hash(ray.d.x), Hash(ray.d.y));
+            RNG rng(Hash(ray.o, tMax), Hash(ray.d));
             Float u = sampler.Get1D();
             SampledSpectrum T_maj = SampleT_maj(
                 ray, tMax, u, rng, lambda,
