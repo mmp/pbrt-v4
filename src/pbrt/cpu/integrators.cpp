@@ -2792,11 +2792,8 @@ void SPPMIntegrator::Render() {
     PowerLightSampler shootLightSampler(lights, Allocator());
 
     // Allocate per-thread _ScratchBuffer_s for SPPM rendering
-    ThreadLocal<ScratchBuffer> threadScratchBuffers([nPixels]() {
-        size_t allocSize =
-            std::max<size_t>(256, size_t(nPixels) * 256 / RunningThreads());
-        return ScratchBuffer(allocSize);
-    });
+    ThreadLocal<ScratchBuffer> threadScratchBuffers(
+        [nPixels]() { return ScratchBuffer(1024 * 1024); });
 
     // Allocate samplers for SPPM rendering
     ThreadLocal<Sampler> threadSamplers(
