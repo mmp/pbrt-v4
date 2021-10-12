@@ -2038,8 +2038,12 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
                         // Handle null scattering for _RandomWalk()_ ray
                         SampledSpectrum sigma_n =
                             ClampZero(sigma_maj - mp.sigma_a - mp.sigma_s);
-                        beta *= T_maj * sigma_n / (T_maj[0] * sigma_n[0]);
-                        return true;
+                        Float pdf = T_maj[0] * sigma_n[0];
+                        if (pdf == 0)
+                            beta = SampledSpectrum(0.f);
+                        else
+                            beta *= T_maj * sigma_n / pdf;
+                        return bool(beta);
                     }
                 });
             // Update _beta_ for medium transmittance
