@@ -119,38 +119,6 @@ struct MapType<M, TypePack<T, Ts...>> {
     using type = typename Prepend<M<T>, typename MapType<M, TypePack<Ts...>>::type>::type;
 };
 
-template <template <typename> class Pred, typename... Ts>
-struct FilterTypes;
-
-namespace internal {
-
-template <typename T, bool>
-struct FilterTypesHelper;
-
-template <typename T>
-struct FilterTypesHelper<T, true> {
-    using type = T;
-};
-template <typename T>
-struct FilterTypesHelper<T, false> {
-    using type = void;
-};
-
-};  // namespace internal
-
-template <template <typename> class Pred, typename T>
-struct FilterTypes<Pred, TypePack<T>> {
-    using type = typename TypePack<
-        typename internal::FilterTypesHelper<T, Pred<T>::value>::type>::type;
-};
-
-template <template <typename> class Pred, typename T, typename... Ts>
-struct FilterTypes<Pred, TypePack<T, Ts...>> {
-    using type =
-        typename Prepend<typename internal::FilterTypesHelper<T, Pred<T>::value>::type,
-                         TypePack<Ts...>>::type;
-};
-
 template <typename Base, typename... Ts>
 inline constexpr bool AllInheritFrom(TypePack<Ts...>);
 

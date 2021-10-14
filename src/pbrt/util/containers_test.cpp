@@ -159,18 +159,6 @@ TEST(TypePack, Map) {
                   typename TakeFirstN<1, typename RemoveFirstN<2, SetPack>::type>::type>);
 }
 
-TEST(TypePack, Filter) {
-    using Pack = TypePack<signed int, float, double>;
-    using FilteredPack = typename FilterTypes<std::is_floating_point, Pack>::type;
-
-    static_assert(
-        std::is_same_v<TypePack<float>, typename TakeFirstN<1, FilteredPack>::type>);
-    static_assert(
-        std::is_same_v<
-            TypePack<double>,
-            typename TakeFirstN<1, typename RemoveFirstN<1, FilteredPack>::type>::type>);
-}
-
 TEST(InternCache, BasicString) {
     InternCache<std::string> cache;
 
