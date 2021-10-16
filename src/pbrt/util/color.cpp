@@ -37,7 +37,7 @@ RGBSigmoidPolynomial RGBToSpectrumTable::operator()(RGB rgb) const {
     DCHECK(rgb[0] >= 0.f && rgb[1] >= 0.f && rgb[2] >= 0.f && rgb[0] <= 1.f &&
            rgb[1] <= 1.f && rgb[2] <= 1.f);
 
-    // Handle uniform _rgb_
+    // Handle uniform _rgb_ values
     if (rgb[0] == rgb[1] && rgb[1] == rgb[2])
         return RGBSigmoidPolynomial(0, 0,
                                     (rgb[0] - .5f) / std::sqrt(rgb[0] * (1 - rgb[0])));

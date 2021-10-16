@@ -34,8 +34,8 @@ std::string Timer::ToString() const {
 }
 
 // ProgressReporter Method Definitions
-ProgressReporter::ProgressReporter(int64_t totalWork, const std::string &title,
-                                   bool quiet, bool gpu)
+ProgressReporter::ProgressReporter(int64_t totalWork, std::string title, bool quiet,
+                                   bool gpu)
     : totalWork(std::max<int64_t>(1, totalWork)), title(title), quiet(quiet) {
     workDone = 0;
     exitThread = false;

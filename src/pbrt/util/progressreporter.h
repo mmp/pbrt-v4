@@ -45,8 +45,7 @@ class ProgressReporter {
   public:
     // ProgressReporter Public Methods
     ProgressReporter() : quiet(true) {}
-    ProgressReporter(int64_t totalWork, const std::string &title, bool quiet,
-                     bool gpu = false);
+    ProgressReporter(int64_t totalWork, std::string title, bool quiet, bool gpu = false);
 
     ~ProgressReporter();
 

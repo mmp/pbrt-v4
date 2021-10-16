@@ -881,7 +881,6 @@ template <typename T>
 template <typename U>
 Vector2<T>::Vector2(Point2<U> p) : Tuple2<pbrt::Vector2, T>(T(p.x), T(p.y)) {}
 
-// TODO: book discuss why Dot() and not e.g. a.Dot(b)
 template <typename T>
 PBRT_CPU_GPU inline auto Dot(Vector2<T> v1, Vector2<T> v2) ->
     typename TupleLength<T>::type {

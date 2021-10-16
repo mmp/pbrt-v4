@@ -243,9 +243,8 @@ class RGBFilm : public FilmBase {
 
         // Optionally clamp sensor RGB value
         Float m = std::max({rgb.r, rgb.g, rgb.b});
-        if (m > maxComponentValue) {
+        if (m > maxComponentValue)
             rgb *= maxComponentValue / m;
-        }
 
         DCHECK(InsideExclusive(pFilm, pixelBounds));
         // Update pixel values with filtered sample contribution

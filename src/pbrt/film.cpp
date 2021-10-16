@@ -493,9 +493,8 @@ void RGBFilm::AddSplat(Point2f p, SampledSpectrum L, const SampledWavelengths &l
 
     // Optionally clamp sensor RGB value
     Float m = std::max({rgb.r, rgb.g, rgb.b});
-    if (m > maxComponentValue) {
+    if (m > maxComponentValue)
         rgb *= maxComponentValue / m;
-    }
 
     // Compute bounds of affected pixels for splat, _splatBounds_
     Point2f pDiscrete = p + Vector2f(0.5, 0.5);

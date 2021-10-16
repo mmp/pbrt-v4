@@ -200,9 +200,9 @@ std::pair<int, LightBounds> BVHLightSampler::buildBVH(
 
     // Partition lights according to chosen split
     int mid;
-    if (minCostSplitDim == -1) {
+    if (minCostSplitDim == -1)
         mid = (start + end) / 2;
-    } else {
+    else {
         const auto *pmid = std::partition(
             &bvhLights[start], &bvhLights[end - 1] + 1,
             [=](const std::pair<int, LightBounds> &l) {

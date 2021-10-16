@@ -156,7 +156,7 @@ class Array2D {
     // Array2D Public Methods
     Array2D(allocator_type allocator = {}) : Array2D({{0, 0}, {0, 0}}, allocator) {}
 
-    Array2D(const Bounds2i &extent, Allocator allocator = {})
+    Array2D(Bounds2i extent, Allocator allocator = {})
         : extent(extent), allocator(allocator) {
         int n = extent.Area();
         values = allocator.allocate_object<T>(n);
@@ -164,7 +164,7 @@ class Array2D {
             allocator.construct(values + i);
     }
 
-    Array2D(const Bounds2i &extent, T def, allocator_type allocator = {})
+    Array2D(Bounds2i extent, T def, allocator_type allocator = {})
         : Array2D(extent, allocator) {
         std::fill(begin(), end(), def);
     }
