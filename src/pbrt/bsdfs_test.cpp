@@ -564,17 +564,6 @@ TEST(BSDFEnergyConservation, LambertianReflection) {
         "LambertianReflection");
 }
 
-TEST(BSDFEnergyConservation, OrenNayar) {
-    TestEnergyConservation(
-        [](const SurfaceInteraction& si, Allocator alloc) -> BSDF* {
-            return alloc.new_object<BSDF>(
-                si.shading.n, si.shading.dpdu,
-                alloc.new_object<RoughDiffuseBxDF>(SampledSpectrum(1.f), SampledSpectrum(0.),
-                                                   20));
-        },
-        "Oren-Nayar sigma 20");
-}
-
 #if 0
 TEST(BSDFEnergyConservation,
      MicrofacetReflectionBxDFTrowbridgeReitz_alpha0_1_dielectric1_5) {

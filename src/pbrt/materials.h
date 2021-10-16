@@ -791,7 +791,7 @@ class SubsurfaceMaterial {
 // DiffuseTransmissionMaterial Definition
 class DiffuseTransmissionMaterial {
   public:
-    using BxDF = RoughDiffuseBxDF;
+    using BxDF = DiffuseTransmissionBxDF;
     using BSSRDF = void;
     // DiffuseTransmissionMaterial Public Methods
     DiffuseTransmissionMaterial(SpectrumTexture reflectance,
@@ -811,12 +811,12 @@ class DiffuseTransmissionMaterial {
     }
 
     template <typename TextureEvaluator>
-    PBRT_CPU_GPU RoughDiffuseBxDF GetBxDF(TextureEvaluator texEval,
-                                          MaterialEvalContext ctx,
-                                          SampledWavelengths &lambda) const {
+    PBRT_CPU_GPU DiffuseTransmissionBxDF GetBxDF(TextureEvaluator texEval,
+                                                 MaterialEvalContext ctx,
+                                                 SampledWavelengths &lambda) const {
         SampledSpectrum r = Clamp(scale * texEval(reflectance, ctx, lambda), 0, 1);
         SampledSpectrum t = Clamp(scale * texEval(transmittance, ctx, lambda), 0, 1);
-        return RoughDiffuseBxDF(r, t, 0);
+        return DiffuseTransmissionBxDF(r, t);
     }
 
     PBRT_CPU_GPU

@@ -152,7 +152,7 @@ struct BSDFSample {
 };
 
 class DiffuseBxDF;
-class RoughDiffuseBxDF;
+class DiffuseTransmissionBxDF;
 class DielectricBxDF;
 class ThinDielectricBxDF;
 class HairBxDF;
@@ -164,7 +164,7 @@ class CoatedConductorBxDF;
 
 // BxDF Definition
 class BxDF
-    : public TaggedPointer<DiffuseBxDF, RoughDiffuseBxDF, CoatedDiffuseBxDF,
+    : public TaggedPointer<DiffuseBxDF, DiffuseTransmissionBxDF, CoatedDiffuseBxDF,
                            CoatedConductorBxDF, DielectricBxDF, ThinDielectricBxDF,
                            HairBxDF, MeasuredBxDF, ConductorBxDF, NormalizedFresnelBxDF> {
   public:

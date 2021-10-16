@@ -81,44 +81,17 @@ class DiffuseBxDF {
     SampledSpectrum R;
 };
 
-// RoughDiffuseBxDF Definition
-class RoughDiffuseBxDF {
+// DiffuseTransmissionBxDF Definition
+class DiffuseTransmissionBxDF {
   public:
-    // RoughDiffuseBxDF Public Methods
-    RoughDiffuseBxDF() = default;
+    // DiffuseTransmissionBxDF Public Methods
+    DiffuseTransmissionBxDF() = default;
     PBRT_CPU_GPU
-    RoughDiffuseBxDF(SampledSpectrum R, SampledSpectrum T, Float sigma) : R(R), T(T) {
-        Float sigma2 = Sqr(Radians(sigma));
-        A = 1 - sigma2 / (2 * (sigma2 + 0.33f));
-        B = 0.45f * sigma2 / (sigma2 + 0.09f);
-    }
+    DiffuseTransmissionBxDF(SampledSpectrum R, SampledSpectrum T) : R(R), T(T) {}
 
     PBRT_CPU_GPU
     SampledSpectrum f(Vector3f wo, Vector3f wi, TransportMode mode) const {
-        // Return Lambertian BRDF for zero-roughness Oren--Nayar BRDF
-        if (B == 0)
-            return SameHemisphere(wo, wi) ? (R * InvPi) : (T * InvPi);
-
-        if ((SameHemisphere(wo, wi) && !R) || (!SameHemisphere(wo, wi) && !T))
-            return SampledSpectrum(0.f);
-        // Evaluate Oren--Nayar BRDF for given directions
-        Float sinTheta_i = SinTheta(wi), sinTheta_o = SinTheta(wo);
-        Float maxCos = std::max<Float>(0, CosDPhi(wi, wo));
-        // Compute $\sin \alpha$ and $\tan \beta$ terms of Oren--Nayar model
-        Float sinAlpha, tanBeta;
-        if (AbsCosTheta(wi) > AbsCosTheta(wo)) {
-            sinAlpha = sinTheta_o;
-            tanBeta = sinTheta_i / AbsCosTheta(wi);
-        } else {
-            sinAlpha = sinTheta_i;
-            tanBeta = sinTheta_o / AbsCosTheta(wo);
-        }
-
-        // Return final Oren--Nayar BSDF value
-        if (SameHemisphere(wo, wi))
-            return R * InvPi * (A + B * maxCos * sinAlpha * tanBeta);
-        else
-            return T * InvPi * (A + B * maxCos * sinAlpha * tanBeta);
+        return SameHemisphere(wo, wi) ? (R * InvPi) : (T * InvPi);
     }
 
     PBRT_CPU_GPU
@@ -172,7 +145,7 @@ class RoughDiffuseBxDF {
     }
 
     PBRT_CPU_GPU
-    static constexpr const char *Name() { return "RoughDiffuseBxDF"; }
+    static constexpr const char *Name() { return "DiffuseTransmissionBxDF"; }
 
     std::string ToString() const;
 
@@ -186,9 +159,8 @@ class RoughDiffuseBxDF {
     }
 
   private:
-    // RoughDiffuseBxDF Private Members
+    // DiffuseTransmissionBxDF Private Members
     SampledSpectrum R, T;
-    Float A, B;
 };
 
 // DielectricBxDF Definition

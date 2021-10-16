@@ -62,8 +62,8 @@ std::string ToString(TransportMode mode) {
 std::string DiffuseBxDF::ToString() const {
     return StringPrintf("[ DiffuseBxDF R: %s ]", R);
 }
-std::string RoughDiffuseBxDF::ToString() const {
-    return StringPrintf("[ RoughDiffuseBxDF R: %s T: %s A: %f B: %f ]", R, T, A, B);
+std::string DiffuseTransmissionBxDF::ToString() const {
+    return StringPrintf("[ DiffuseTransmissionBxDF R: %s T: %s ]", R, T);
 }
 
 template <typename TopBxDF, typename BottomBxDF, bool twoSided>
