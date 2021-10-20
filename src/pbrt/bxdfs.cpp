@@ -274,12 +274,7 @@ std::string ConductorBxDF::ToString() const {
 // HairBxDF Method Definitions
 HairBxDF::HairBxDF(Float h, Float eta, const SampledSpectrum &sigma_a, Float beta_m,
                    Float beta_n, Float alpha)
-    : h(h),
-      gamma_o(SafeASin(h)),
-      eta(eta),
-      sigma_a(sigma_a),
-      beta_m(beta_m),
-      beta_n(beta_n) {
+    : h(h), eta(eta), sigma_a(sigma_a), beta_m(beta_m), beta_n(beta_n) {
     CHECK(h >= -1 && h <= 1);
     CHECK(beta_m >= 0 && beta_m <= 1);
     CHECK(beta_n >= 0 && beta_n <= 1);
@@ -310,6 +305,7 @@ SampledSpectrum HairBxDF::f(Vector3f wo, Vector3f wi, TransportMode mode) const 
     Float sinTheta_o = wo.x;
     Float cosTheta_o = SafeSqrt(1 - Sqr(sinTheta_o));
     Float phi_o = std::atan2(wo.z, wo.y);
+    Float gamma_o = SafeASin(h);
 
     // Compute hair coordinate system terms related to _wi_
     Float sinTheta_i = wi.x;
@@ -404,18 +400,19 @@ pstd::optional<BSDFSample> HairBxDF::Sample_f(Vector3f wo, Float uc, Point2f u,
     Float sinTheta_o = wo.x;
     Float cosTheta_o = SafeSqrt(1 - Sqr(sinTheta_o));
     Float phi_o = std::atan2(wo.z, wo.y);
+    Float gamma_o = SafeASin(h);
 
     // Determine which term $p$ to sample for hair scattering
     pstd::array<Float, pMax + 1> apPDF = ApPDF(cosTheta_o);
     int p = SampleDiscrete(apPDF, uc, nullptr, &uc);
 
-    // Rotate $\sin \thetao$ and $\cos \thetao$ to account for hair scale tilt
+    // Compute $\sin \thetao$ and $\cos \thetao$ terms accounting for scales
     Float sinThetap_o, cosThetap_o;
     if (p == 0) {
         sinThetap_o = sinTheta_o * cos2kAlpha[1] - cosTheta_o * sin2kAlpha[1];
         cosThetap_o = cosTheta_o * cos2kAlpha[1] + sinTheta_o * sin2kAlpha[1];
     }
-    // Rotate $\sin \thetao$ and $\cos \thetao$ for $p \gt 0$
+    // Handle remainder of $p$ values for hair scale tilt
     else if (p == 1) {
         sinThetap_o = sinTheta_o * cos2kAlpha[0] + cosTheta_o * sin2kAlpha[0];
         cosThetap_o = cosTheta_o * cos2kAlpha[0] - sinTheta_o * sin2kAlpha[0];
@@ -455,13 +452,13 @@ pstd::optional<BSDFSample> HairBxDF::Sample_f(Vector3f wo, Float uc, Point2f u,
     // Compute PDF for sampled hair scattering direction _wi_
     Float pdf = 0;
     for (int p = 0; p < pMax; ++p) {
-        // Rotate $\sin \thetao$ and $\cos \thetao$ to account for hair scale tilt
+        // Compute $\sin \thetao$ and $\cos \thetao$ terms accounting for scales
         Float sinThetap_o, cosThetap_o;
         if (p == 0) {
             sinThetap_o = sinTheta_o * cos2kAlpha[1] - cosTheta_o * sin2kAlpha[1];
             cosThetap_o = cosTheta_o * cos2kAlpha[1] + sinTheta_o * sin2kAlpha[1];
         }
-        // Rotate $\sin \thetao$ and $\cos \thetao$ for $p \gt 0$
+        // Handle remainder of $p$ values for hair scale tilt
         else if (p == 1) {
             sinThetap_o = sinTheta_o * cos2kAlpha[0] + cosTheta_o * sin2kAlpha[0];
             cosThetap_o = cosTheta_o * cos2kAlpha[0] - sinTheta_o * sin2kAlpha[0];
@@ -493,6 +490,7 @@ Float HairBxDF::PDF(Vector3f wo, Vector3f wi, TransportMode mode,
     Float sinTheta_o = wo.x;
     Float cosTheta_o = SafeSqrt(1 - Sqr(sinTheta_o));
     Float phi_o = std::atan2(wo.z, wo.y);
+    Float gamma_o = SafeASin(h);
 
     // Compute hair coordinate system terms related to _wi_
     Float sinTheta_i = wi.x;
@@ -517,7 +515,6 @@ Float HairBxDF::PDF(Vector3f wo, Vector3f wi, TransportMode mode,
             sinThetap_o = sinTheta_o * cos2kAlpha[1] - cosTheta_o * sin2kAlpha[1];
             cosThetap_o = cosTheta_o * cos2kAlpha[1] + sinTheta_o * sin2kAlpha[1];
         }
-
         // Handle remainder of $p$ values for hair scale tilt
         else if (p == 1) {
             sinThetap_o = sinTheta_o * cos2kAlpha[0] + cosTheta_o * sin2kAlpha[0];
@@ -532,6 +529,7 @@ Float HairBxDF::PDF(Vector3f wo, Vector3f wi, TransportMode mode,
 
         // Handle out-of-range $\cos \thetao$ from scale adjustment
         cosThetap_o = std::abs(cosThetap_o);
+
         pdf += Mp(cosTheta_i, cosThetap_o, sinTheta_i, sinThetap_o, v[p]) * apPDF[p] *
                Np(phi, p, s, gamma_o, gamma_t);
     }
@@ -563,9 +561,9 @@ SampledSpectrum HairBxDF::SigmaAFromReflectance(const SampledSpectrum &c, Float 
 }
 
 std::string HairBxDF::ToString() const {
-    return StringPrintf("[ HairBxDF h: %f gamma_o: %f eta: %f beta_m: %f beta_n: %f "
-                        "v[0]: %f s: %f sigma_a: %s ]",
-                        h, gamma_o, eta, beta_m, beta_n, v[0], s, sigma_a);
+    return StringPrintf(
+        "[ HairBxDF h: %f eta: %f beta_m: %f beta_n: %f v[0]: %f s: %f sigma_a: %s ]", h,
+        eta, beta_m, beta_n, v[0], s, sigma_a);
 }
 
 // *****************************************************************************

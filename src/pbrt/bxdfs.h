@@ -1014,7 +1014,7 @@ class HairBxDF {
     pstd::array<Float, pMax + 1> ApPDF(Float cosTheta_o) const;
 
     // HairBxDF Private Members
-    Float h, gamma_o, eta;
+    Float h, eta;
     SampledSpectrum sigma_a;
     Float beta_m, beta_n;
     Float v[pMax + 1];
