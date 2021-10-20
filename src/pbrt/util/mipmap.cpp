@@ -201,13 +201,13 @@ MIPMap::MIPMap(Image image, const RGBColorSpace *colorSpace, WrapMode wrapMode,
 
 template <>
 Float MIPMap::Texel(int level, Point2i st) const {
-    CHECK(level >= 0 && level < pyramid.size());
+    DCHECK(level >= 0 && level < pyramid.size());
     return pyramid[level].GetChannel(st, 0, wrapMode);
 }
 
 template <>
 RGB MIPMap::Texel(int level, Point2i st) const {
-    CHECK(level >= 0 && level < pyramid.size());
+    DCHECK(level >= 0 && level < pyramid.size());
     if (int nc = pyramid[level].NChannels(); nc == 3 || nc == 4)
         return RGB(pyramid[level].GetChannel(st, 0, wrapMode),
                    pyramid[level].GetChannel(st, 1, wrapMode),
@@ -245,11 +245,11 @@ T MIPMap::Filter(Point2f st, Vector2f dst0, Vector2f dst1) const {
 
         } else {
             // Return trilinear-filtered value at selected MIP level
-            CHECK(options.filter == FilterFunction::Trilinear);
+            DCHECK(options.filter == FilterFunction::Trilinear);
             if (iLevel == 0)
                 return Bilerp<T>(0, st);
             else {
-                CHECK_LE(level - iLevel, 1);
+                DCHECK_LE(level - iLevel, 1);
                 return Lerp(level - iLevel, Bilerp<T>(iLevel, st),
                             Bilerp<T>(iLevel + 1, st));
             }
@@ -279,13 +279,13 @@ T MIPMap::Filter(Point2f st, Vector2f dst0, Vector2f dst1) const {
 
 template <>
 RGB MIPMap::Bilerp(int level, Point2f st) const {
-    CHECK(level >= 0 && level < pyramid.size());
+    DCHECK(level >= 0 && level < pyramid.size());
     if (int nc = pyramid[level].NChannels(); nc == 3 || nc == 4)
         return RGB(pyramid[level].BilerpChannel(st, 0, wrapMode),
                    pyramid[level].BilerpChannel(st, 1, wrapMode),
                    pyramid[level].BilerpChannel(st, 2, wrapMode));
     else {
-        CHECK_EQ(1, pyramid[level].NChannels());
+        DCHECK_EQ(1, pyramid[level].NChannels());
         Float v = pyramid[level].BilerpChannel(st, 0, wrapMode);
         return RGB(v, v, v);
     }

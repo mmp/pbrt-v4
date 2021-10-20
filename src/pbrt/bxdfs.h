@@ -169,7 +169,7 @@ class DielectricBxDF {
     // DielectricBxDF Public Methods
     DielectricBxDF() = default;
     PBRT_CPU_GPU
-    DielectricBxDF(Float eta, const TrowbridgeReitzDistribution &mfDistrib)
+    DielectricBxDF(Float eta, TrowbridgeReitzDistribution mfDistrib)
         : eta(eta), mfDistrib(mfDistrib) {}
 
     PBRT_CPU_GPU
@@ -227,7 +227,7 @@ class ThinDielectricBxDF {
         Float R = FrDielectric(AbsCosTheta(wo), eta), T = 1 - R;
         // Compute _R_ and _T_ accounting for scattering between interfaces
         if (R < 1) {
-            R += T * T * R / (1 - R * R);
+            R += Sqr(T) * R / (1 - Sqr(R));
             T = 1 - R;
         }
 
@@ -325,7 +325,7 @@ class ConductorBxDF {
         SampledSpectrum F = FrComplex(AbsDot(wo, wm), eta, k);
 
         SampledSpectrum f =
-            mfDistrib.D(wm) * mfDistrib.G(wo, wi) * F / (4 * cosTheta_i * cosTheta_o);
+            mfDistrib.D(wm) * F * mfDistrib.G(wo, wi) / (4 * cosTheta_i * cosTheta_o);
         return BSDFSample(f, wi, pdf, BxDFFlags::GlossyReflection);
     }
 
@@ -341,14 +341,14 @@ class ConductorBxDF {
         if (cosTheta_i == 0 || cosTheta_o == 0)
             return {};
         Vector3f wm = wi + wo;
-        if (wm.x == 0 && wm.y == 0 && wm.z == 0)
+        if (LengthSquared(wm) == 0)
             return {};
         wm = Normalize(wm);
 
         // Evaluate Fresnel factor _F_ for conductor BRDF
         SampledSpectrum F = FrComplex(AbsDot(wo, wm), eta, k);
 
-        return mfDistrib.D(wm) * mfDistrib.G(wo, wi) * F / (4 * cosTheta_i * cosTheta_o);
+        return mfDistrib.D(wm) * F * mfDistrib.G(wo, wi) / (4 * cosTheta_i * cosTheta_o);
     }
 
     PBRT_CPU_GPU
@@ -961,24 +961,21 @@ class HairBxDF {
     static constexpr int pMax = 3;
 
     // HairBxDF Private Methods
-    PBRT_CPU_GPU
-    static Float Mp(Float cosTheta_i, Float cosTheta_o, Float sinTheta_i,
-                    Float sinTheta_o, Float v) {
-        Float a = cosTheta_i * cosTheta_o / v;
-        Float b = sinTheta_i * sinTheta_o / v;
+    PBRT_CPU_GPU static Float Mp(Float cosTheta_i, Float cosTheta_o, Float sinTheta_i,
+                                 Float sinTheta_o, Float v) {
+        Float a = cosTheta_i * cosTheta_o / v, b = sinTheta_i * sinTheta_o / v;
         Float mp = (v <= .1)
                        ? (FastExp(LogI0(a) - b - 1 / v + 0.6931f + std::log(1 / (2 * v))))
                        : (FastExp(-b) * I0(a)) / (std::sinh(1 / v) * 2 * v);
-        CHECK(!IsInf(mp) && !IsNaN(mp));
+        DCHECK(!IsInf(mp) && !IsNaN(mp));
         return mp;
     }
 
-    PBRT_CPU_GPU
-    static pstd::array<SampledSpectrum, pMax + 1> Ap(Float cosTheta_o, Float eta, Float h,
-                                                     const SampledSpectrum &T) {
+    PBRT_CPU_GPU static pstd::array<SampledSpectrum, pMax + 1> Ap(
+        Float cosTheta_o, Float eta, Float h, const SampledSpectrum &T) {
         pstd::array<SampledSpectrum, pMax + 1> ap;
         // Compute $p=0$ attenuation at initial cylinder intersection
-        Float cosGamma_o = SafeSqrt(1 - h * h);
+        Float cosGamma_o = SafeSqrt(1 - Sqr(h));
         Float cosTheta = cosTheta_o * cosGamma_o;
         Float f = FrDielectric(cosTheta, eta);
         ap[0] = SampledSpectrum(f);
@@ -991,19 +988,18 @@ class HairBxDF {
             ap[p] = ap[p - 1] * T * f;
 
         // Compute attenuation term accounting for remaining orders of scattering
-        if (1.f - T * f)
-            ap[pMax] = ap[pMax - 1] * f * T / (1.f - T * f);
+        if (1 - T * f)
+            ap[pMax] = ap[pMax - 1] * f * T / (1 - T * f);
 
         return ap;
     }
 
-    PBRT_CPU_GPU
-    static inline Float Phi(int p, Float gamma_o, Float gamma_t) {
+    PBRT_CPU_GPU static inline Float Phi(int p, Float gamma_o, Float gamma_t) {
         return 2 * p * gamma_t - 2 * gamma_o + p * Pi;
     }
 
-    PBRT_CPU_GPU
-    static inline Float Np(Float phi, int p, Float s, Float gamma_o, Float gamma_t) {
+    PBRT_CPU_GPU static inline Float Np(Float phi, int p, Float s, Float gamma_o,
+                                        Float gamma_t) {
         Float dphi = phi - Phi(p, gamma_o, gamma_t);
         // Remap _dphi_ to $[-\pi,\pi]$
         while (dphi > Pi)
@@ -1015,7 +1011,7 @@ class HairBxDF {
     }
 
     PBRT_CPU_GPU
-    pstd::array<Float, pMax + 1> ComputeApPDF(Float cosThetaO) const;
+    pstd::array<Float, pMax + 1> ApPDF(Float cosTheta_o) const;
 
     // HairBxDF Private Members
     Float h, gamma_o, eta;
@@ -1023,7 +1019,7 @@ class HairBxDF {
     Float beta_m, beta_n;
     Float v[pMax + 1];
     Float s;
-    Float sin2kAlpha[3], cos2kAlpha[3];
+    Float sin2kAlpha[pMax], cos2kAlpha[pMax];
 };
 
 // MeasuredBxDF Definition

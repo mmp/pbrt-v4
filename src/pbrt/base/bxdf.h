@@ -148,7 +148,7 @@ struct BSDFSample {
     Float pdf = 0;
     BxDFFlags flags;
     Float eta = 1;
-    bool pdfIsProportional;
+    bool pdfIsProportional = false;
 };
 
 class DiffuseBxDF;

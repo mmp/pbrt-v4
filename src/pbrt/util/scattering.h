@@ -15,8 +15,7 @@
 namespace pbrt {
 
 // Scattering Inline Functions
-PBRT_CPU_GPU
-inline Vector3f Reflect(Vector3f wo, Vector3f n) {
+PBRT_CPU_GPU inline Vector3f Reflect(Vector3f wo, Vector3f n) {
     return -wo + 2 * Dot(wo, n) * n;
 }
 
@@ -71,26 +70,24 @@ inline Float FrDielectric(Float cosTheta_i, Float eta) {
 
     Float r_parl = (eta * cosTheta_i - cosTheta_t) / (eta * cosTheta_i + cosTheta_t);
     Float r_perp = (cosTheta_i - eta * cosTheta_t) / (cosTheta_i + eta * cosTheta_t);
-    return (r_parl * r_parl + r_perp * r_perp) / 2;
+    return (Sqr(r_parl) + Sqr(r_perp)) / 2;
 }
 
-PBRT_CPU_GPU
-inline Float FrComplex(Float cosTheta_i, pstd::complex<Float> eta) {
+PBRT_CPU_GPU inline Float FrComplex(Float cosTheta_i, pstd::complex<Float> eta) {
     using Complex = pstd::complex<Float>;
     cosTheta_i = Clamp(cosTheta_i, 0, 1);
     // Compute complex $\cos\,\theta_\roman{t}$ for Fresnel equations using Snell's law
     Float sin2Theta_i = 1 - Sqr(cosTheta_i);
     Complex sin2Theta_t = sin2Theta_i / Sqr(eta);
-    Complex cosTheta_t = pstd::sqrt(1.f - sin2Theta_t);
+    Complex cosTheta_t = pstd::sqrt(1 - sin2Theta_t);
 
     Complex r_parl = (eta * cosTheta_i - cosTheta_t) / (eta * cosTheta_i + cosTheta_t);
     Complex r_perp = (cosTheta_i - eta * cosTheta_t) / (cosTheta_i + eta * cosTheta_t);
-    return (pstd::norm(r_parl) + pstd::norm(r_perp)) * .5f;
+    return (pstd::norm(r_parl) + pstd::norm(r_perp)) / 2;
 }
 
-PBRT_CPU_GPU
-inline SampledSpectrum FrComplex(Float cosTheta_i, SampledSpectrum eta,
-                                 SampledSpectrum k) {
+PBRT_CPU_GPU inline SampledSpectrum FrComplex(Float cosTheta_i, SampledSpectrum eta,
+                                              SampledSpectrum k) {
     SampledSpectrum result;
     for (int i = 0; i < NSpectrumSamples; ++i)
         result[i] = FrComplex(cosTheta_i, pstd::complex<Float>(eta[i], k[i]));
@@ -135,7 +132,7 @@ class TrowbridgeReitzDistribution {
         if (IsInf(tan2Theta))
             return 0;
         Float alpha2 = Sqr(CosPhi(w) * alpha_x) + Sqr(SinPhi(w) * alpha_y);
-        return .5f * (std::sqrt(1 + alpha2 * tan2Theta) - 1);
+        return (std::sqrt(1 + alpha2 * tan2Theta) - 1) / 2;
     }
 
     PBRT_CPU_GPU
@@ -143,7 +140,7 @@ class TrowbridgeReitzDistribution {
 
     PBRT_CPU_GPU
     Float D(Vector3f w, Vector3f wm) const {
-        return D(wm) * G1(w) * std::abs(Dot(w, wm) / CosTheta(w));
+        return G1(w) / AbsCosTheta(w) * D(wm) * AbsDot(w, wm);
     }
 
     PBRT_CPU_GPU
@@ -162,8 +159,8 @@ class TrowbridgeReitzDistribution {
         Point2f p = SampleUniformDiskPolar(u);
 
         // Warp hemispherical projection for visible normal sampling
-        Float h = std::sqrt(1.f - Sqr(p.x));
-        p.y = Lerp(.5f * (1.f + wh.z), h, p.y);
+        Float h = std::sqrt(1 - Sqr(p.x));
+        p.y = Lerp((1 + wh.z) / 2, h, p.y);
 
         // Reproject to hemisphere and transform normal to ellipsoid configuration
         Float pz = std::sqrt(std::max<Float>(0, 1 - LengthSquared(Vector2f(p))));
