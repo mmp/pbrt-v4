@@ -424,6 +424,9 @@ pstd::optional<BSDFSample> HairBxDF::Sample_f(Vector3f wo, Float uc, Point2f u,
         cosThetap_o = cosTheta_o;
     }
 
+    // Handle out-of-range $\cos \thetao$ from scale adjustment
+    cosThetap_o = std::abs(cosThetap_o);
+
     // Sample $M_p$ to compute $\thetai$
     Float cosTheta = 1 + v[p] * std::log(std::max<Float>(u[0], 1e-5) +
                                          (1 - u[0]) * FastExp(-2 / v[p]));
@@ -469,6 +472,9 @@ pstd::optional<BSDFSample> HairBxDF::Sample_f(Vector3f wo, Float uc, Point2f u,
             sinThetap_o = sinTheta_o;
             cosThetap_o = cosTheta_o;
         }
+
+        // Handle out-of-range $\cos \thetao$ from scale adjustment
+        cosThetap_o = std::abs(cosThetap_o);
 
         // Handle out-of-range $\cos \thetao$ from scale adjustment
         cosThetap_o = std::abs(cosThetap_o);
