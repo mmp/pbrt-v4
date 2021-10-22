@@ -68,7 +68,7 @@ TEST(BVHLightSampling, OneSpot) {
 TEST(BVHLightSampling, Point) {
     RNG rng;
     std::vector<Light> lights;
-    std::unordered_map<Light, int, LightHash> lightToIndex;
+    std::unordered_map<Light, int> lightToIndex;
     ConstantSpectrum one(1.f);
     for (int i = 0; i < 33; ++i) {
         // Random point in [-5, 5]
@@ -116,7 +116,7 @@ TEST(BVHLightSampling, PointVaryPower) {
     std::vector<Float> lightPower;
     std::vector<std::unique_ptr<ConstantSpectrum>> lightSpectra;
     Float sumPower = 0;
-    std::unordered_map<Light, int, LightHash> lightToIndex;
+    std::unordered_map<Light, int> lightToIndex;
     for (int i = 0; i < 82; ++i) {
         // Random point in [-5, 5]
         Vector3f p{Lerp(rng.Uniform<Float>(), -5, 5), Lerp(rng.Uniform<Float>(), -5, 5),

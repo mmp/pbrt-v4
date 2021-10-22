@@ -22,12 +22,6 @@
 
 namespace pbrt {
 
-// LightHash Definition
-struct LightHash {
-    PBRT_CPU_GPU
-    size_t operator()(Light light) const { return Hash(light.ptr()); }
-};
-
 // UniformLightSampler Definition
 class UniformLightSampler {
   public:
@@ -100,7 +94,7 @@ class PowerLightSampler {
   private:
     // PowerLightSampler Private Members
     pstd::vector<Light> lights;
-    HashMap<Light, size_t, LightHash> lightToIndex;
+    HashMap<Light, size_t> lightToIndex;
     AliasTable aliasTable;
 };
 
@@ -406,7 +400,7 @@ class BVHLightSampler {
     pstd::vector<Light> infiniteLights;
     Bounds3f allLightBounds;
     pstd::vector<LightBVHNode> nodes;
-    HashMap<Light, uint32_t, LightHash> lightToBitTrail;
+    HashMap<Light, uint32_t> lightToBitTrail;
 };
 
 // ExhaustiveLightSampler Definition
@@ -441,7 +435,7 @@ class ExhaustiveLightSampler {
   private:
     pstd::vector<Light> lights, boundedLights, infiniteLights;
     pstd::vector<LightBounds> lightBounds;
-    HashMap<Light, size_t, LightHash> lightToBoundedIndex;
+    HashMap<Light, size_t> lightToBoundedIndex;
 };
 
 inline pstd::optional<SampledLight> LightSampler::Sample(const LightSampleContext &ctx,

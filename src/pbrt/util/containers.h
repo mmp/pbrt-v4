@@ -621,7 +621,7 @@ class InlinedVector {
 };
 
 // HashMap Definition
-template <typename Key, typename Value, typename Hash,
+template <typename Key, typename Value, typename Hash = std::hash<Key>,
           typename Allocator =
               pstd::pmr::polymorphic_allocator<pstd::optional<std::pair<Key, Value>>>>
 class HashMap {

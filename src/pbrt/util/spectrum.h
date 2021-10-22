@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <memory>
 #include <numeric>
 #include <string>
@@ -448,14 +449,8 @@ class DenselySampledSpectrum {
         return true;
     }
 
-    struct Hash {
-        size_t operator()(const DenselySampledSpectrum &s) const {
-            return HashBuffer(s.values.data(), s.values.size());
-        }
-    };
-
   private:
-    friend struct Hash;
+    friend struct std::hash<pbrt::DenselySampledSpectrum>;
     // DenselySampledSpectrum Private Members
     int lambda_min, lambda_max;
     pstd::vector<Float> values;
@@ -792,5 +787,17 @@ inline Float Spectrum::MaxValue() const {
 }
 
 }  // namespace pbrt
+
+namespace std {
+
+template <>
+struct hash<pbrt::DenselySampledSpectrum> {
+    PBRT_CPU_GPU
+    size_t operator()(const pbrt::DenselySampledSpectrum &s) const {
+        return pbrt::HashBuffer(s.values.data(), s.values.size());
+    }
+};
+
+}  // namespace std
 
 #endif  // PBRT_UTIL_SPECTRUM_H

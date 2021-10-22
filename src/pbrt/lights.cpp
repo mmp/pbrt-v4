@@ -76,20 +76,18 @@ std::string LightBase::BaseToString() const {
                         mediumInterface, renderFromLight);
 }
 
-InternCache<DenselySampledSpectrum, DenselySampledSpectrum::Hash>
-    *LightBase::spectrumCache;
+InternCache<DenselySampledSpectrum> *LightBase::spectrumCache;
 
 const DenselySampledSpectrum *LightBase::LookupSpectrum(Spectrum s) {
     // Initialize _spectrumCache_ on first call
     static std::mutex mutex;
     mutex.lock();
     if (!spectrumCache)
-        spectrumCache =
-            new InternCache<DenselySampledSpectrum, DenselySampledSpectrum::Hash>(
+        spectrumCache = new InternCache<DenselySampledSpectrum>(
 #ifdef PBRT_BUILD_GPU_RENDERER
-                Options->useGPU ? Allocator(&CUDATrackedMemoryResource::singleton) :
+            Options->useGPU ? Allocator(&CUDATrackedMemoryResource::singleton) :
 #endif
-                                Allocator{});
+                            Allocator{});
     mutex.unlock();
 
     // Return unique _DenselySampledSpectrum_ from intern cache for _s_

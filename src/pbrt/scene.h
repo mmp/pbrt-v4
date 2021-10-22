@@ -221,11 +221,6 @@ struct InstanceSceneEntity {
     const Transform *renderFromInstance = nullptr;
 };
 
-// TransformHash Definition
-struct TransformHash {
-    size_t operator()(const Transform &t) const { return t.Hash(); }
-};
-
 // MaxTransforms Definition
 constexpr int MaxTransforms = 2;
 
@@ -494,7 +489,7 @@ class BasicSceneBuilder : public ParserTarget {
     static constexpr int AllTransformsBits = (1 << MaxTransforms) - 1;
     std::map<std::string, TransformSet> namedCoordinateSystems;
     class Transform renderFromWorld;
-    InternCache<class Transform, TransformHash> transformCache;
+    InternCache<class Transform> transformCache;
     std::vector<GraphicsState> pushedGraphicsStates;
     std::vector<std::pair<char, FileLoc>> pushStack;  // 'a': attribute, 'o': object
     struct ActiveInstanceDefinition {

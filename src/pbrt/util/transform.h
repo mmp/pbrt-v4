@@ -16,6 +16,7 @@
 
 #include <stdio.h>
 #include <cmath>
+#include <functional>
 #include <limits>
 #include <memory>
 
@@ -34,8 +35,6 @@ class Transform {
     PBRT_CPU_GPU inline Vector3<T> ApplyInverse(Vector3<T> v) const;
     template <typename T>
     PBRT_CPU_GPU inline Normal3<T> ApplyInverse(Normal3<T>) const;
-
-    uint64_t Hash() const { return HashBuffer<sizeof(m)>(&m); }
 
     std::string ToString() const;
 
@@ -537,5 +536,18 @@ class AnimatedTransform {
 };
 
 }  // namespace pbrt
+
+namespace std {
+
+template <>
+struct hash<pbrt::Transform> {
+    PBRT_CPU_GPU
+    size_t operator()(const pbrt::Transform &t) const {
+        pbrt::SquareMatrix<4> m = t.GetMatrix();
+        return pbrt::HashBuffer<sizeof(m)>(&m);
+    }
+};
+
+}  // namespace std
 
 #endif  // PBRT_UTIL_TRANSFORM_H

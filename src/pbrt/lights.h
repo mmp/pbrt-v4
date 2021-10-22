@@ -25,6 +25,7 @@
 #include <pbrt/util/transform.h>
 #include <pbrt/util/vecmath.h>
 
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -181,8 +182,7 @@ class LightBase {
     LightType type;
     Transform renderFromLight;
     MediumInterface mediumInterface;
-    static InternCache<DenselySampledSpectrum, DenselySampledSpectrum::Hash>
-        *spectrumCache;
+    static InternCache<DenselySampledSpectrum> *spectrumCache;
 };
 
 // PointLight Definition
@@ -821,5 +821,17 @@ inline LightType Light::Type() const {
 }
 
 }  // namespace pbrt
+
+namespace std {
+
+template <>
+struct hash<pbrt::Light> {
+    PBRT_CPU_GPU
+    size_t operator()(pbrt::Light light) const noexcept {
+        return pbrt::Hash(light.ptr());
+    }
+};
+
+}  // namespace std
 
 #endif  // PBRT_LIGHTS_H
