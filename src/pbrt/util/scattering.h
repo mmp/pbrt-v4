@@ -52,8 +52,7 @@ PBRT_CPU_GPU inline Float HenyeyGreenstein(Float cosTheta, Float g) {
 }
 
 // Fresnel Inline Functions
-PBRT_CPU_GPU
-inline Float FrDielectric(Float cosTheta_i, Float eta) {
+PBRT_CPU_GPU inline Float FrDielectric(Float cosTheta_i, Float eta) {
     cosTheta_i = Clamp(cosTheta_i, -1, 1);
     // Potentially flip interface orientation for Fresnel equations
     if (cosTheta_i < 0) {
@@ -144,6 +143,9 @@ class TrowbridgeReitzDistribution {
     }
 
     PBRT_CPU_GPU
+    Float PDF(Vector3f w, Vector3f wm) const { return D(w, wm); }
+
+    PBRT_CPU_GPU
     Vector3f Sample_wm(Vector3f w, Point2f u) const {
         // Transform _w_ to hemispherical configuration
         Vector3f wh = Normalize(Vector3f(alpha_x * w.x, alpha_y * w.y, w.z));
@@ -171,9 +173,6 @@ class TrowbridgeReitzDistribution {
     }
 
     std::string ToString() const;
-
-    PBRT_CPU_GPU
-    Float PDF(Vector3f w, Vector3f wm) const { return D(w, wm); }
 
     PBRT_CPU_GPU
     static Float RoughnessToAlpha(Float roughness) { return std::sqrt(roughness); }

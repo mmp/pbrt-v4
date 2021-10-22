@@ -106,7 +106,7 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
                 NormalBumpEvalContext bctx =
                     w.GetNormalBumpEvalContext(dudx, dudy, dvdx, dvdy);
                 Vector3f dpdvs;
-                NormalMap(normalMap, bctx, &dpdus, &dpdvs);
+                NormalMap(*normalMap, bctx, &dpdus, &dpdvs);
                 ns = Normal3f(Normalize(Cross(dpdus, dpdvs)));
                 ns = FaceForward(ns, w.n);
 

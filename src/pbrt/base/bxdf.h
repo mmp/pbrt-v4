@@ -164,7 +164,7 @@ class CoatedConductorBxDF;
 
 // BxDF Definition
 class BxDF
-    : public TaggedPointer<DiffuseBxDF, DiffuseTransmissionBxDF, CoatedDiffuseBxDF,
+    : public TaggedPointer<DiffuseTransmissionBxDF, DiffuseBxDF, CoatedDiffuseBxDF,
                            CoatedConductorBxDF, DielectricBxDF, ThinDielectricBxDF,
                            HairBxDF, MeasuredBxDF, ConductorBxDF, NormalizedFresnelBxDF> {
   public:

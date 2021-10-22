@@ -83,15 +83,15 @@ struct NormalBumpEvalContext {
 };
 
 // Normal Mapping Function Definitions
-inline PBRT_CPU_GPU void NormalMap(const Image *normalMap,
+inline PBRT_CPU_GPU void NormalMap(const Image &normalMap,
                                    const NormalBumpEvalContext &ctx, Vector3f *dpdu,
                                    Vector3f *dpdv) {
     // Get normalized normal vector from normal map
     WrapMode2D wrap(WrapMode::Repeat);
     Point2f uv(ctx.uv[0], 1 - ctx.uv[1]);
-    Vector3f ns(2 * normalMap->BilerpChannel(uv, 0, wrap) - 1,
-                2 * normalMap->BilerpChannel(uv, 1, wrap) - 1,
-                2 * normalMap->BilerpChannel(uv, 2, wrap) - 1);
+    Vector3f ns(2 * normalMap.BilerpChannel(uv, 0, wrap) - 1,
+                2 * normalMap.BilerpChannel(uv, 1, wrap) - 1,
+                2 * normalMap.BilerpChannel(uv, 2, wrap) - 1);
     ns = Normalize(ns);
 
     // Transform tangent-space normal to rendering space

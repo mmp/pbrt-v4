@@ -32,7 +32,7 @@ class DiffuseBxDF {
     // DiffuseBxDF Public Methods
     DiffuseBxDF() = default;
     PBRT_CPU_GPU
-    DiffuseBxDF(const SampledSpectrum &R) : R(R) {}
+    DiffuseBxDF(SampledSpectrum R) : R(R) {}
 
     PBRT_CPU_GPU
     SampledSpectrum f(Vector3f wo, Vector3f wi, TransportMode mode) const {
@@ -284,8 +284,8 @@ class ConductorBxDF {
     // ConductorBxDF Public Methods
     ConductorBxDF() = default;
     PBRT_CPU_GPU
-    ConductorBxDF(const TrowbridgeReitzDistribution &mfDistrib,
-                  const SampledSpectrum &eta, const SampledSpectrum &k)
+    ConductorBxDF(const TrowbridgeReitzDistribution &mfDistrib, SampledSpectrum eta,
+                  SampledSpectrum k)
         : mfDistrib(mfDistrib), eta(eta), k(k) {}
 
     PBRT_CPU_GPU
@@ -419,12 +419,6 @@ class TopOrBottomBxDF {
               BxDFReflTransFlags sampleFlags = BxDFReflTransFlags::All) const {
         return top ? top->PDF(wo, wi, mode, sampleFlags)
                    : bottom->PDF(wo, wi, mode, sampleFlags);
-    }
-
-    PBRT_CPU_GPU
-    bool IsNonSpecular() const {
-        BxDFFlags flags = top ? top->Flags() : bottom->Flags();
-        return (flags & (BxDFFlags::Diffuse | BxDFFlags::Glossy));
     }
 
     PBRT_CPU_GPU
@@ -824,14 +818,14 @@ class LayeredBxDF {
 
                 // Update _pdfSum_ accounting for TRT scattering events
                 if (wos && wos->f && wos->pdf > 0 && wis && wis->f && wis->pdf > 0) {
-                    if (!tInterface.IsNonSpecular())
+                    if (!IsNonSpecular(tInterface.Flags()))
                         pdfSum += rInterface.PDF(-wos->wi, -wis->wi, mode);
                     else {
                         // Use multiple importance sampling to estimate PDF product
                         pstd::optional<BSDFSample> rs =
                             rInterface.Sample_f(-wos->wi, r(), {r(), r()}, mode);
                         if (rs && rs->f && rs->pdf > 0) {
-                            if (!rInterface.IsNonSpecular())
+                            if (!IsNonSpecular(rInterface.Flags()))
                                 pdfSum += tInterface.PDF(-rs->wi, wi, mode);
                             else {
                                 // Compute MIS-weighted estimate of Equation
@@ -971,8 +965,9 @@ class HairBxDF {
         return mp;
     }
 
-    PBRT_CPU_GPU static pstd::array<SampledSpectrum, pMax + 1> Ap(
-        Float cosTheta_o, Float eta, Float h, const SampledSpectrum &T) {
+    PBRT_CPU_GPU static pstd::array<SampledSpectrum, pMax + 1> Ap(Float cosTheta_o,
+                                                                  Float eta, Float h,
+                                                                  SampledSpectrum T) {
         pstd::array<SampledSpectrum, pMax + 1> ap;
         // Compute $p=0$ attenuation at initial cylinder intersection
         Float cosGamma_o = SafeSqrt(1 - Sqr(h));

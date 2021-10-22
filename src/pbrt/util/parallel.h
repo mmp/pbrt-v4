@@ -403,7 +403,6 @@ class AsyncJob : public ParallelJob {
         work();
     }
 
-    void DoWork() { work(); }
     void Cleanup() { delete this; }
 
     Future<T> GetFuture() { return work.get_future(); }
@@ -411,6 +410,8 @@ class AsyncJob : public ParallelJob {
     std::string ToString() const {
         return StringPrintf("[ AsyncJob started: %s ]", started);
     }
+
+    void DoWork() { work(); }
 
   private:
     bool started = false;

@@ -179,7 +179,7 @@ BSDF SurfaceInteraction::GetBSDF(const RayDifferential &ray, SampledWavelengths 
         // Get shading $\dpdu$ and $\dpdv$ using normal or bump map
         Vector3f dpdu, dpdv;
         if (normalMap)
-            NormalMap(normalMap, *this, &dpdu, &dpdv);
+            NormalMap(*normalMap, *this, &dpdu, &dpdv);
         else
             BumpMap(UniversalTextureEvaluator(), displacement, *this, &dpdu, &dpdv);
 

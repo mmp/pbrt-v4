@@ -480,7 +480,7 @@ class Disk {
         Float phi = isect.phi;
         // Find parametric representation of disk hit
         Float u = phi / phiMax;
-        Float rHit = std::sqrt(pHit.x * pHit.x + pHit.y * pHit.y);
+        Float rHit = std::sqrt(Sqr(pHit.x) + Sqr(pHit.y));
         Float v = (radius - rHit) / (radius - innerRadius);
         Vector3f dpdu(-phiMax * pHit.y, phiMax * pHit.x, 0);
         Vector3f dpdv = Vector3f(pHit.x, pHit.y, 0) * (innerRadius - radius) / rHit;
@@ -683,7 +683,7 @@ class Cylinder {
         }
 
         // Return _QuadricIntersection_ for cylinder intersection
-        return QuadricIntersection{(Float)tShapeHit, pHit, phi};
+        return QuadricIntersection{Float(tShapeHit), pHit, phi};
     }
 
     PBRT_CPU_GPU

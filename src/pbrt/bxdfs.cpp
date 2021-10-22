@@ -137,7 +137,7 @@ pstd::optional<BSDFSample> DielectricBxDF::Sample_f(
             // Compute PDF of rough dielectric reflection
             pdf = mfDistrib.PDF(wo, wm) / (4 * AbsDot(wo, wm)) * pr / (pr + pt);
 
-            CHECK(!IsNaN(pdf));
+            DCHECK(!IsNaN(pdf));
             SampledSpectrum f(mfDistrib.D(wm) * mfDistrib.G(wo, wi) * R /
                               (4 * CosTheta(wi) * CosTheta(wo)));
             return BSDFSample(f, wi, pdf, BxDFFlags::GlossyReflection);

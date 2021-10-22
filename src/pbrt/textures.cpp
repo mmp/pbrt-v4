@@ -485,7 +485,7 @@ SampledSpectrum MarbleTexture::Evaluate(TextureEvalContext ctx,
         {.5f, .5f, .5f},   {.6f, .59f, .58f}, {.58f, .58f, .6f},
         {.58f, .58f, .6f}, {.2f, .2f, .33f},  {.58f, .58f, .6f},
     };
-    int nSeg = PBRT_ARRAYSIZE(colors) - 3;
+    int nSeg = sizeof(colors) / sizeof(colors[0]) - 3;
     int first = std::min<int>(pstd::floor(t * nSeg), nSeg - 1);
     t = t * nSeg - first;
     RGB rgb = 1.5f * EvaluateCubicBezier(pstd::span(colors + first, 4), t);
