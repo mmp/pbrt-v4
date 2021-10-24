@@ -501,7 +501,8 @@ class ConductorMaterial {
             etas = texEval(eta, ctx, lambda);
             ks = texEval(k, ctx, lambda);
         } else {
-            SampledSpectrum r = texEval(reflectance, ctx, lambda);
+            // Avoid r==0 NaN case...
+            SampledSpectrum r = Clamp(texEval(reflectance, ctx, lambda), 0, .9999);
             etas = SampledSpectrum(1.f);
             ks = 2 * Sqrt(r) / Sqrt(ClampZero(SampledSpectrum(1) - r));
         }
