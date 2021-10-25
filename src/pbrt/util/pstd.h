@@ -1178,6 +1178,30 @@ PBRT_CPU_GPU inline double round(double arg) {
 #endif
 }
 
+PBRT_CPU_GPU inline float fmod(float x, float y) {
+#ifdef PBRT_IS_GPU_CODE
+    return ::fmodf(arg);
+#else
+    return std::fmodf(x, y);
+#endif
+}
+
+PBRT_CPU_GPU inline float fmodf(float x, float y) {
+#ifdef PBRT_IS_GPU_CODE
+    return ::fmodf(arg);
+#else
+    return std::fmodf(x, y);
+#endif
+}
+
+PBRT_CPU_GPU inline double fmod(double x, double y) {
+#ifdef PBRT_IS_GPU_CODE
+    return ::fmod(x, y);
+#else
+    return std::fmod(x, y);
+#endif
+}
+
 template <typename T>
 PBRT_CPU_GPU T real(const complex<T> &z) {
     return z.re;

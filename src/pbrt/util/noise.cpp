@@ -55,6 +55,11 @@ static PBRT_CONST int NoisePerm[2 * NoisePermSize] = {
 // Noise Function Definitions
 Float Noise(Float x, Float y, Float z) {
     // Compute noise cell coordinates and offsets
+    // Avoid overflow when computing deltas if the coordiantes are too large to store in
+    // int32s.
+    x = pstd::fmod(x, Float(1 << 30));
+    y = pstd::fmod(y, Float(1 << 30));
+    z = pstd::fmod(z, Float(1 << 30));
     int ix = pstd::floor(x), iy = pstd::floor(y), iz = pstd::floor(z);
     Float dx = x - ix, dy = y - iy, dz = z - iz;
 
