@@ -70,6 +70,8 @@ PBRT_CPU_GPU inline Float BalanceHeuristic(int nf, Float fPdf, int ng, Float gPd
 
 PBRT_CPU_GPU inline Float PowerHeuristic(int nf, Float fPdf, int ng, Float gPdf) {
     Float f = nf * fPdf, g = ng * gPdf;
+    if (IsInf(Sqr(f)))
+        return 1;
     return Sqr(f) / (Sqr(f) + Sqr(g));
 }
 
