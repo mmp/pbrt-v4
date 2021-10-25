@@ -162,8 +162,10 @@ void ParameterDictionary::checkParameterTypes() {
     for (const ParsedParameter *p : params) {
         if (p->type == ParameterTypeTraits<ParameterType::Boolean>::typeName) {
             if (p->bools.empty())
-                ErrorExit(&p->loc, "\"%s\": non-Boolean values provided for Boolean-valued parameter",
-                          p->name);
+                ErrorExit(
+                    &p->loc,
+                    "\"%s\": non-Boolean values provided for Boolean-valued parameter",
+                    p->name);
         } else if (p->type == ParameterTypeTraits<ParameterType::Float>::typeName ||
                    p->type == ParameterTypeTraits<ParameterType::Integer>::typeName ||
                    p->type == ParameterTypeTraits<ParameterType::Point2f>::typeName ||
@@ -173,17 +175,23 @@ void ParameterDictionary::checkParameterTypes() {
                    p->type == ParameterTypeTraits<ParameterType::Normal3f>::typeName ||
                    p->type == "rgb" || p->type == "blackbody") {
             if (p->ints.empty() && p->floats.empty())
-                ErrorExit(&p->loc, "\"%s\": non-numeric values provided for numeric-valued parameter",
-                          p->name);
+                ErrorExit(
+                    &p->loc,
+                    "\"%s\": non-numeric values provided for numeric-valued parameter",
+                    p->name);
         } else if (p->type == ParameterTypeTraits<ParameterType::String>::typeName ||
                    p->type == "texture") {
-                if (p->strings.empty())
-                    ErrorExit(&p->loc, "\"%s\": non-string values provided for string-valued parameter",
-                              p->name);
+            if (p->strings.empty())
+                ErrorExit(
+                    &p->loc,
+                    "\"%s\": non-string values provided for string-valued parameter",
+                    p->name);
         } else if (p->type == "spectrum") {
-                if (p->strings.empty() && p->ints.empty() && p->floats.empty())
-                    ErrorExit(&p->loc, "\"%s\": expecting string or numeric-valued parameter for spectrum parameter",
-                              p->name);
+            if (p->strings.empty() && p->ints.empty() && p->floats.empty())
+                ErrorExit(&p->loc,
+                          "\"%s\": expecting string or numeric-valued parameter for "
+                          "spectrum parameter",
+                          p->name);
         } else
             ErrorExit(&p->loc, "\"%s\": unknown parameter type", p->type);
     }

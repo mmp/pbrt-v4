@@ -509,7 +509,6 @@ NanoVDBMedium::NanoVDBMedium(const Transform &renderFromMedium, Spectrum sigma_a
     : renderFromMedium(renderFromMedium),
       sigma_a_spec(sigma_a, alloc),
       sigma_s_spec(sigma_s, alloc),
-      sigmaScale(sigmaScale),
       phase(g),
       majorantGrid(Bounds3f(), {64, 64, 64}, alloc),
       densityGrid(std::move(dg)),
@@ -518,6 +517,9 @@ NanoVDBMedium::NanoVDBMedium(const Transform &renderFromMedium, Spectrum sigma_a
       temperatureCutoff(temperatureCutoff),
       temperatureScale(temperatureScale) {
     densityFloatGrid = densityGrid.grid<float>();
+
+    sigma_a_spec.Scale(sigmaScale);
+    sigma_s_spec.Scale(sigmaScale);
 
     nanovdb::BBox<nanovdb::Vec3R> bbox = densityFloatGrid->worldBBox();
     bounds = Bounds3f(Point3f(bbox.min()[0], bbox.min()[1], bbox.min()[2]),

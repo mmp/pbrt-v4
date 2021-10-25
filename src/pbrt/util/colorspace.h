@@ -7,6 +7,7 @@
 
 #include <pbrt/pbrt.h>
 
+#include <pbrt/util/color.h>
 #include <pbrt/util/math.h>
 #include <pbrt/util/spectrum.h>
 #include <pbrt/util/vecmath.h>

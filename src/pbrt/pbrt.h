@@ -45,6 +45,7 @@
 #define PBRT_CPU_GPU_LAMBDA(...) [=] PBRT_CPU_GPU(__VA_ARGS__)
 #endif
 
+// Define Cache Line Size Constant
 #ifdef PBRT_BUILD_GPU_RENDERER
 #define PBRT_L1_CACHE_LINE_SIZE 128
 #else

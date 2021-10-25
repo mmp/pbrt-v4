@@ -610,8 +610,8 @@ class NanoVDBMedium {
     PBRT_CPU_GPU
     MediumProperties SamplePoint(Point3f p, const SampledWavelengths &lambda) const {
         // Sample spectra for grid $\sigmaa$ and $\sigmas$
-        SampledSpectrum sigma_a = sigmaScale * sigma_a_spec.Sample(lambda);
-        SampledSpectrum sigma_s = sigmaScale * sigma_s_spec.Sample(lambda);
+        SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
+        SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
 
         // Scale scattering coefficients by medium density at _p_
         p = renderFromMedium.ApplyInverse(p);
@@ -635,8 +635,8 @@ class NanoVDBMedium {
         DCHECK_LE(tMax, raytMax);
 
         // Sample spectra for grid $\sigmaa$ and $\sigmas$
-        SampledSpectrum sigma_a = sigmaScale * sigma_a_spec.Sample(lambda);
-        SampledSpectrum sigma_s = sigmaScale * sigma_s_spec.Sample(lambda);
+        SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
+        SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
 
         SampledSpectrum sigma_t = sigma_a + sigma_s;
         return DDAMajorantIterator(ray, tMin, tMax, &majorantGrid, sigma_t);
@@ -662,7 +662,6 @@ class NanoVDBMedium {
     Bounds3f bounds;
     Transform renderFromMedium;
     DenselySampledSpectrum sigma_a_spec, sigma_s_spec;
-    Float sigmaScale;
     HGPhaseFunction phase;
     MajorantGrid majorantGrid;
     nanovdb::GridHandle<NanoVDBBuffer> densityGrid;
