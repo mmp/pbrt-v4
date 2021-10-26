@@ -2014,8 +2014,8 @@ int whitebalance(std::vector<std::string> args) {
     } else if (temperature > 0) {
         // Sensor::Create uses Spectra::D() rather than BlackbodySpectrum
         // here---make consistent?
-        BlackbodySpectrum bb(temperature);
-        srcWhite = SpectrumToXYZ(&bb).xy();
+        DenselySampledSpectrum illum = Spectra::D(temperature, Allocator());
+        srcWhite = SpectrumToXYZ(&illum).xy();
     } else
         srcWhite = Point2f(xy[0], xy[1]);
 
