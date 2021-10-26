@@ -1731,6 +1731,14 @@ int convert(std::vector<std::string> args) {
     Image image = std::move(imRead.image);
     ImageMetadata metadata = std::move(imRead.metadata);
 
+    ImageMetadata outMetadata;
+    // These are the only entries it makes sense to copy along (so far).
+    outMetadata.colorSpace = metadata.colorSpace;
+    outMetadata.cameraFromWorld = metadata.cameraFromWorld;
+    outMetadata.NDCFromWorld = metadata.NDCFromWorld;
+    outMetadata.pixelBounds = metadata.pixelBounds;
+    outMetadata.fullResolution = metadata.fullResolution;
+
     if (channelNames.empty()) {
         // If the input image has AOVs and the target image is a regular
         // format, then just grab R,G,B...
@@ -1771,8 +1779,37 @@ int convert(std::vector<std::string> args) {
     if (cropWindow[3] < 0)
         cropWindow[3] = cropWindow[2] - cropWindow[3];
     if (cropWindow[0] >= 0 && cropWindow[2] >= 0) {
-        image = image.Crop(
-            Bounds2i({cropWindow[0], cropWindow[2]}, {cropWindow[1], cropWindow[3]}));
+        Bounds2i cropBounds({cropWindow[0], cropWindow[2]}, {cropWindow[1], cropWindow[3]});
+
+        Point2i fullRes = metadata.fullResolution ? *metadata.fullResolution :
+            image.Resolution();
+
+        if (metadata.pixelBounds && !Inside(cropBounds, *metadata.pixelBounds)) {
+            fprintf(stderr, "%s: crop window bounds (%d,%d)-(%d,%d) are not inside "
+                    "image's pixel bounds (%d,%d)-(%d,%d)\n", inFile.c_str(),
+                    cropBounds.pMin.x, cropBounds.pMin.y, cropBounds.pMax.x,
+                    cropBounds.pMax.y, metadata.pixelBounds->pMin.x,
+                    metadata.pixelBounds->pMin.y, metadata.pixelBounds->pMax.x,
+                    metadata.pixelBounds->pMax.y);
+            return 1;
+        } else if (!Inside(cropBounds, Bounds2i(Point2i(0,0), fullRes))) {
+            fprintf(stderr, "%s: crop window bounds (%d,%d)-(%d,%d) are not inside "
+                    "image's resolution (%d,%d)\n", inFile.c_str(), cropBounds.pMin.x,
+                    cropBounds.pMin.y, cropBounds.pMax.x, cropBounds.pMax.y,
+                    fullRes.x, fullRes.y);
+            return 1;
+        }
+
+        outMetadata.fullResolution = fullRes;
+        outMetadata.pixelBounds = cropBounds;
+
+        // Adjust crop bounds for call to Crop()
+        if (metadata.pixelBounds) {
+            cropBounds.pMin = Point2i(cropBounds.pMin - metadata.pixelBounds->pMin);
+            cropBounds.pMax = Point2i(cropBounds.pMax - metadata.pixelBounds->pMin);
+        }
+        image = image.Crop(cropBounds);
+
         res = image.Resolution();
     }
 
@@ -1807,9 +1844,7 @@ int convert(std::vector<std::string> args) {
             return 1;
         }
 
-        const RGBColorSpace *srcColorSpace = (metadata.colorSpace && *metadata.colorSpace)
-                                                 ? *metadata.colorSpace
-                                                 : RGBColorSpace::sRGB;
+        const RGBColorSpace *srcColorSpace = metadata.GetColorSpace();
         SquareMatrix<3> m = ConvertRGBColorSpace(*srcColorSpace, *dest);
         for (int y = 0; y < res.y; ++y)
             for (int x = 0; x < res.x; ++x) {
@@ -1817,7 +1852,7 @@ int convert(std::vector<std::string> args) {
                 RGB rgb = Mul<RGB>(m, channels);
                 image.SetChannels({x, y}, rgbDesc, {rgb.r, rgb.g, rgb.b});
             }
-        metadata.colorSpace = dest;
+        outMetadata.colorSpace = dest;
     }
 
     if (bw) {
@@ -1948,12 +1983,27 @@ int convert(std::vector<std::string> args) {
         }
         image = std::move(scaledImage);
         res = image.Resolution();
+
+        if (outMetadata.fullResolution)
+            *outMetadata.fullResolution *= repeat;
+        if (outMetadata.pixelBounds) {
+            outMetadata.pixelBounds->pMin *= repeat;
+            outMetadata.pixelBounds->pMax *= repeat;
+        }
     }
 
-    if (flipy)
+    if (flipy) {
         image.FlipY();
+        if (outMetadata.pixelBounds && outMetadata.fullResolution) {
+            // Flip the pixel bounds in the metadata as well
+            int by[2] = { outMetadata.fullResolution->y - 1 - outMetadata.pixelBounds->pMax.y,
+                          outMetadata.fullResolution->y - 1 - outMetadata.pixelBounds->pMin.y };
+            outMetadata.pixelBounds->pMin.y = by[0];
+            outMetadata.pixelBounds->pMax.y = by[1];
+        }
+    }
 
-    if (!image.Write(outFile))
+    if (!image.Write(outFile, outMetadata))
         return 1;
 
     return 0;
