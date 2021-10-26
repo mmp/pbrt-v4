@@ -66,7 +66,7 @@ struct SDFace {
         for (int i = 0; i < 3; ++i)
             if (v[i] != v0 && v[i] != v1)
                 return v[i];
-        LOG_FATAL("Basic logic error in SDVertex::otherVert()");
+        LOG_FATAL("Basic logic error in SDFace::otherVert()");
         return nullptr;
     }
     SDVertex *v[3];
