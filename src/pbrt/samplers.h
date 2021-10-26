@@ -339,7 +339,7 @@ class ZSobolSampler {
             int digit = (mortonIndex >> digitShift) & 3;
             // Choose permutation _p_ to use for _digit_
             uint64_t higherDigits = mortonIndex >> (digitShift + 2);
-            int p = (MixBits(higherDigits ^ (0x55555555 * dimension)) >> 24) % 24;
+            int p = (MixBits(higherDigits ^ (0x55555555u * dimension)) >> 24) % 24;
 
             digit = permutations[p][digit];
             sampleIndex |= uint64_t(digit) << digitShift;
@@ -349,7 +349,7 @@ class ZSobolSampler {
         if (pow2Samples) {
             int digit = mortonIndex & 1;
             sampleIndex |=
-                digit ^ (MixBits((mortonIndex >> 1) ^ (0x55555555 * dimension)) & 1);
+                digit ^ (MixBits((mortonIndex >> 1) ^ (0x55555555u * dimension)) & 1);
         }
 
         return sampleIndex;
