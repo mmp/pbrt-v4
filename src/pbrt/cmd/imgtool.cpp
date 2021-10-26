@@ -534,7 +534,10 @@ int assemble(std::vector<std::string> args) {
         fprintf(stderr, "%s: %d pixels not present in any images.\n", outfile.c_str(),
                 unseenPixels);
 
-    fullImage.Write(outfile);
+    ImageMetadata outMetadata;
+    outMetadata.colorSpace = colorSpace;
+
+    fullImage.Write(outfile, outMetadata);
 
     return 0;
 }
@@ -678,9 +681,14 @@ int splitn(std::vector<std::string> args) {
         }
     }
 
-    result.Write(outfile);
+    // TODO: we could try to be more clever about carrying through more
+    // metadata, when applciable.
+    ImageMetadata outMetadata;
+    outMetadata.colorSpace = colorSpace;
+
+    result.Write(outfile, outMetadata);
     if (crops.size())
-        cropsImage.Write(std::string("crops-") + outfile);
+        cropsImage.Write(std::string("crops-") + outfile, outMetadata);
 
     return 0;
 }
@@ -732,7 +740,7 @@ int scalenormalmap(std::vector<std::string> args) {
             scaledImage.SetChannels({x, y}, rgbDesc, rgb);
         }
 
-    if (!scaledImage.Write(outfile))
+    if (!scaledImage.Write(outfile, im.metadata))
         return 1;
 
     return 0;
@@ -1004,7 +1012,6 @@ int error(std::vector<std::string> args) {
 
     ThreadLocal<double> sumErrors;
     std::vector<int> spp(filenames.size());
-    std::atomic<bool> failed{false};
     ParallelFor(0, filenames.size(), [&](size_t i) {
         ImageAndMetadata imRead = Image::Read(filenames[i]);
         Image &im = imRead.image;
@@ -1043,9 +1050,6 @@ int error(std::vector<std::string> args) {
             return 1;
         }
     }
-
-    if (failed)
-        return 1;
 
     double sumError = 0.;
     sumErrors.ForAll([&sumError](double err) { sumError += err; });
@@ -1256,7 +1260,7 @@ int diff(std::vector<std::string> args) {
            referenceFile, imageAverage, refAverage, deltaString, metric, error.Average());
 
     if (!outFile.empty()) {
-        if (!errorImage.Write(outFile))
+        if (!errorImage.Write(outFile, im.metadata))
             return 1;
     }
 
@@ -1664,7 +1668,7 @@ int bloom(std::vector<std::string> args) {
         }
     }
 
-    image.Write(outFile);
+    image.Write(outFile, imRead.metadata);
 
     return 0;
 }
@@ -2030,7 +2034,7 @@ int whitebalance(std::vector<std::string> args) {
             image.SetChannels({x, y}, rgbDesc, {rgb.r, rgb.g, rgb.b});
         }
 
-    image.Write(outFile);
+    image.Write(outFile, imRead.metadata);
 
     return 0;
 }
@@ -2192,7 +2196,6 @@ int makeequiarea(std::vector<std::string> args) {
 
     ImageMetadata equiRectMetadata;
     equiRectMetadata.cameraFromWorld = latlong.metadata.cameraFromWorld;
-    equiRectMetadata.NDCFromWorld = latlong.metadata.NDCFromWorld;
     equiRectMetadata.colorSpace = latlong.metadata.colorSpace;
     equiRectMetadata.stringVectors = latlong.metadata.stringVectors;
     equiRectImage.Write(outFilename, equiRectMetadata);
@@ -2427,10 +2430,16 @@ int denoise(std::vector<std::string> args) {
                 result.SetChannel({x, y}, c, Ldenoised[c]);
         }
 
-    if (!result.Write(outFilename)) {
-        fprintf(stderr, "%s: couldn't write image.\n", outFilename.c_str());
+    ImageMetadata outMetadata;
+    outMetadata.cameraFromWorld = im.metadata.cameraFromWorld;
+    outMetadata.NDCFromWorld = im.metadata.NDCFromWorld;
+    outMetadata.pixelBounds = im.metadata.pixelBounds;
+    outMetadata.fullResolution = im.metadata.fullResolution;
+    outMetadata.colorSpace = im.metadata.colorSpace;
+
+    if (!result.Write(outFilename, outMetadata))
         return 1;
-    }
+
     return 0;
 }
 
@@ -2603,7 +2612,15 @@ int denoise_optix(std::vector<std::string> args) {
     Image result(PixelFormat::Float, image.Resolution(), {"R", "G", "B"});
     CUDA_CHECK(cudaMemcpy(result.RawPointer({0, 0}), (const void *)outputImage.data,
                           imageBytes, cudaMemcpyDeviceToHost));
-    CHECK(result.Write(outFilename));
+
+    ImageMetadata outMetadata;
+    outMetadata.cameraFromWorld = im.metadata.cameraFromWorld;
+    outMetadata.NDCFromWorld = im.metadata.NDCFromWorld;
+    outMetadata.pixelBounds = im.metadata.pixelBounds;
+    outMetadata.fullResolution = im.metadata.fullResolution;
+    outMetadata.colorSpace = im.metadata.colorSpace;
+
+    CHECK(result.Write(outFilename, outMetadata));
 
     return 0;
 }
