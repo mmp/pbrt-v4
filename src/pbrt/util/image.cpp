@@ -964,6 +964,21 @@ bool Image::Write(std::string name, const ImageMetadata &metadata) const {
     CHECK(outImage.NChannels() == 1 || outImage.NChannels() == 3);
 
     ImageMetadata outMetadata = metadata;
+    if (outImage.NChannels() == 3 && *metadata.GetColorSpace() != *RGBColorSpace::sRGB) {
+        Warning("%s: converting pixel colors to sRGB to match output image format.",
+                name);
+        SquareMatrix<3> m =
+            ConvertRGBColorSpace(*metadata.GetColorSpace(), *RGBColorSpace::sRGB);
+        ImageChannelDesc rgbDesc = outImage.GetChannelDesc({"R", "G", "B"});
+        // May not have RGB for weird non-RGB 3 channel images...
+        if (rgbDesc) {
+            for (int y = 0; y < outImage.Resolution().y; ++y)
+                for (int x = 0; x < outImage.Resolution().x; ++x) {
+                    ImageChannelValues channels = outImage.GetChannels({x, y}, rgbDesc);
+                    RGB rgb = Mul<RGB>(m, channels);
+                    outImage.SetChannels({x, y}, rgbDesc, {rgb.r, rgb.g, rgb.b});
+                }
+            outMetadata.colorSpace = RGBColorSpace::sRGB;
         }
     }
 
