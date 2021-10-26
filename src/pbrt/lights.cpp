@@ -269,10 +269,8 @@ DistantLight *DistantLight::Create(const Transform &renderFromLight,
     // Like for IBLs we measure illuminance as incident on an upward-facing
     // patch.
     Float E_v = parameters.GetOneFloat("illuminance", -1);
-    if (E_v > 0) {
-        Float k_e = -w.y;
-        sc *= E_v / k_e;
-    }
+    if (E_v > 0)
+        sc *= E_v;
 
     return alloc.new_object<DistantLight>(finalRenderFromLight, L, sc);
 }
