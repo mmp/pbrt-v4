@@ -200,18 +200,18 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
 
     // Warn about unsupported stuff...
     if (Options->forceDiffuse)
-        Warning("The wavefront integrator does not support --force-diffuse.");
+        ErrorExit("The wavefront integrator does not support --force-diffuse.");
     if (Options->writePartialImages)
         Warning("The wavefront integrator does not support --write-partial-images.");
     if (Options->recordPixelStatistics)
-        Warning("The wavefront integrator does not support --pixelstats.");
+        ErrorExit("The wavefront integrator does not support --pixelstats.");
     if (!Options->mseReferenceImage.empty())
-        Warning("The wavefront integrator does not support --mse-reference-image.");
+        ErrorExit("The wavefront integrator does not support --mse-reference-image.");
     if (!Options->mseReferenceOutput.empty())
-        Warning("The wavefront integrator does not support --mse-reference-out.");
+        ErrorExit("The wavefront integrator does not support --mse-reference-out.");
 
-        ///////////////////////////////////////////////////////////////////////////
-        // Allocate storage for all of the queues/buffers...
+    ///////////////////////////////////////////////////////////////////////////
+    // Allocate storage for all of the queues/buffers...
 
 #ifdef PBRT_BUILD_GPU_RENDERER
     size_t startSize = 0;
