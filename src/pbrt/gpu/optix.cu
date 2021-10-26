@@ -73,7 +73,7 @@ __device__ inline void Trace(OptixTraversableHandle traversable, Ray ray, Float 
 
 struct ClosestHitContext {
     ClosestHitContext() = default;
-    PBRT_GPU
+    __device__
     ClosestHitContext(Medium rayMedium, bool shadowRay)
         : rayMedium(rayMedium), shadowRay(shadowRay) {}
 
@@ -86,7 +86,7 @@ struct ClosestHitContext {
     Material material;
     MediumInterface mediumInterface;
 
-    PBRT_GPU
+    __device__
     Ray SpawnRayTo(const Point3f &p) const {
         Interaction intr(piHit, nHit);
         intr.mediumInterface = &mediumInterface;
@@ -526,7 +526,7 @@ extern "C" __global__ void __closesthit__randomHitTriangle() {
     p->intr = intr;
 
     if (rec.material == p->material)
-        p->wrs.Add([&] PBRT_CPU_GPU() { return intr; }, 1.f);
+        p->wrs.Add([&] __device__ () { return intr; }, 1.f);
 }
 
 extern "C" __global__ void __closesthit__randomHitBilinearPatch() {
@@ -543,7 +543,7 @@ extern "C" __global__ void __closesthit__randomHitBilinearPatch() {
     p->intr = intr;
 
     if (rec.material == p->material)
-        p->wrs.Add([&] PBRT_CPU_GPU() { return intr; }, 1.f);
+        p->wrs.Add([&] __device__ () { return intr; }, 1.f);
 }
 
 extern "C" __global__ void __closesthit__randomHitQuadric() {
@@ -564,5 +564,5 @@ extern "C" __global__ void __closesthit__randomHitQuadric() {
     p->intr = intr;
 
     if (rec.material == p->material)
-        p->wrs.Add([&] PBRT_CPU_GPU() { return intr; }, 1.f);
+        p->wrs.Add([&] __device__ () { return intr; }, 1.f);
 }
