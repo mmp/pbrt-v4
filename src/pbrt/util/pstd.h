@@ -1180,17 +1180,9 @@ PBRT_CPU_GPU inline double round(double arg) {
 
 PBRT_CPU_GPU inline float fmod(float x, float y) {
 #ifdef PBRT_IS_GPU_CODE
-    return ::fmodf(arg);
+    return ::fmodf(x, y);
 #else
-    return std::fmodf(x, y);
-#endif
-}
-
-PBRT_CPU_GPU inline float fmodf(float x, float y) {
-#ifdef PBRT_IS_GPU_CODE
-    return ::fmodf(arg);
-#else
-    return std::fmodf(x, y);
+    return std::fmod(x, y);
 #endif
 }
 
