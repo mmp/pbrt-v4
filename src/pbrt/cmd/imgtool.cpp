@@ -311,6 +311,43 @@ int help(std::vector<std::string> args) {
     return 0;
 }
 
+static bool checkImageCompatibility(std::string fn1, const Image &im1, const RGBColorSpace *cs1,
+                                    std::string fn2, const Image &im2, const RGBColorSpace *cs2) {
+    if (im1.Resolution() != im2.Resolution()) {
+        fprintf(stderr, "%s: image resolution (%d, %d) doesn't match \"%s\" (%d, %d).\n",
+                fn1.c_str(), im1.Resolution().x, im1.Resolution().y, fn2.c_str(),
+                im2.Resolution().x, im2.Resolution().y);
+        return false;
+    }
+    if (im1.NChannels() != im2.NChannels()) {
+        fprintf(stderr, "%s: image channel count %d doesn't match \"%s\", %d.\n",
+                fn1.c_str(), im1.NChannels(), fn2.c_str(), im2.NChannels());
+        return false;
+    }
+    if (im1.ChannelNames() != im2.ChannelNames()) {
+        auto print = [](const std::vector<std::string> &n) {
+            std::string s = n[0];
+            for (size_t i = 1; i < n.size(); ++i) {
+                s += ", ";
+                s += n[i];
+            }
+            return s;
+        };
+        fprintf(stderr,
+                "%s: warning: image channel names \"%s\" don't match \"%s\" "
+                "with \"%s\".\n",
+                fn1.c_str(), print(im1.ChannelNames()).c_str(), fn2.c_str(),
+                print(im2.ChannelNames()).c_str());
+    }
+
+    if (*cs1 != *cs2) {
+        fprintf(stderr, "%s: color space does not match \"%s\".\n", fn1.c_str(),
+                fn2.c_str());
+        return false;
+    }
+    return true;
+}
+
 int makesky(std::vector<std::string> args) {
     std::string outfile;
     Float albedo = 0.5;
@@ -576,16 +613,13 @@ int splitn(std::vector<std::string> args) {
     for (const std::string &file : infiles) {
         ImageAndMetadata im = Image::Read(file);
         Image &image = im.image;
-        if (!images.empty()) {
-            if (image.Resolution() != images.front().Resolution()) {
-                fprintf(stderr, "%s: image resolution mismatch.\n", file.c_str());
-                return 1;
-            }
-            if (image.NChannels() != images.front().NChannels()) {
-                fprintf(stderr, "%s: image channel count mismatch.\n", file.c_str());
-                return 1;
-            }
-        }
+
+        if (!colorSpace)
+            colorSpace = im.metadata.GetColorSpace();
+        else if (!checkImageCompatibility(infiles[0], images.front(), colorSpace,
+                                          file, image, im.metadata.GetColorSpace()))
+            return false;
+
         images.push_back(image);
     }
 
@@ -828,43 +862,6 @@ int cat(std::vector<std::string> args) {
     return 0;
 }
 
-static bool checkImageCompatibility(const std::string &fn1, const Image &im1,
-                                    const std::string &fn2, const Image &im2) {
-    if (im1.Resolution() != im2.Resolution()) {
-        fprintf(stderr, "%s: image resolution (%d, %d) doesn't match \"%s\" (%d, %d).",
-                fn1.c_str(), im1.Resolution().x, im1.Resolution().y, fn2.c_str(),
-                im2.Resolution().x, im2.Resolution().y);
-        return false;
-    }
-    if (im1.NChannels() != im2.NChannels()) {
-        fprintf(stderr, "%s: image channel count %d doesn't match \"%s\", %d.",
-                fn1.c_str(), im1.NChannels(), fn2.c_str(), im2.NChannels());
-        return false;
-    }
-    if (im1.ChannelNames() != im2.ChannelNames()) {
-        auto print = [](const std::vector<std::string> &n) {
-            std::string s = n[0];
-            for (size_t i = 1; i < n.size(); ++i) {
-                s += ", ";
-                s += n[i];
-            }
-            return s;
-        };
-        fprintf(stderr,
-                "%s: warning: image channel names \"%s\" don't match \"%s\" "
-                "with \"%s\".",
-                fn1.c_str(), print(im1.ChannelNames()).c_str(), fn2.c_str(),
-                print(im2.ChannelNames()).c_str());
-    }
-
-#if 0
-    if (*md1.GetColorSpace() != *md2.GetColorSpace())
-        fprintf(stderr, "%s: warning: : computing difference of images with different "
-                "color spaces!");
-#endif
-    return true;
-}
-
 int average(std::vector<std::string> args) {
     std::string avgFile, filenameBase;
 
@@ -895,6 +892,7 @@ int average(std::vector<std::string> args) {
 
     // Compute average image
     ThreadLocal<Image> avgImages;
+    ThreadLocal<const RGBColorSpace *> colorSpaces;
     std::atomic<bool> failed{false};
 
     ParallelFor(0, filenames.size(), [&](size_t i) {
@@ -902,9 +900,11 @@ int average(std::vector<std::string> args) {
         Image &im = imRead.image;
 
         Image &avg = avgImages.Get();
-        if (avg.Resolution() == Point2i(0, 0))
+        if (avg.Resolution() == Point2i(0, 0)) {
             avg = Image(PixelFormat::Float, im.Resolution(), im.ChannelNames());
-        else if (!checkImageCompatibility(filenames[i], im, filenames[0], avg)) {
+            colorSpaces.Get() = imRead.metadata.GetColorSpace();
+        } else if (!checkImageCompatibility(filenames[i], im, imRead.metadata.GetColorSpace(),
+                                            filenames[0], avg, colorSpaces.Get())) {
             failed = true;
             return;
         }
@@ -943,7 +943,14 @@ int average(std::vector<std::string> args) {
         }
     });
 
-    CHECK(avgImage.Write(avgFile));
+    ImageMetadata avgMetadata;
+    colorSpaces.ForAll([&](const RGBColorSpace *cs) {
+        // Will redundantly set it, but whatever.
+        avgMetadata.colorSpace = cs;
+    });
+
+    if (!avgImage.Write(avgFile, avgMetadata))
+        return 1;
 
     return 0;
 }
@@ -1163,17 +1170,9 @@ int diff(std::vector<std::string> args) {
         image = image.Crop(
             Bounds2i({cropWindow[0], cropWindow[2]}, {cropWindow[1], cropWindow[3]}));
 
-    if (image.Resolution() != refImage.Resolution()) {
-        fprintf(stderr,
-                "%s: image resolution (%d, %d) doesn't match reference (%d, %d)\n",
-                imageFile.c_str(), image.Resolution().x, image.Resolution().y,
-                refImage.Resolution().x, refImage.Resolution().y);
+    if (!checkImageCompatibility(imageFile, image, im.metadata.GetColorSpace(),
+                                 referenceFile, refImage, refMetadata.GetColorSpace()))
         return 1;
-    }
-
-    if (*im.metadata.GetColorSpace() != *refMetadata.GetColorSpace())
-        fprintf(stderr, "Warning: computing difference of images with different "
-                        "color spaces!");
 
     // Clamp Infs
     int nClamped = 0, nRefClamped = 0;
