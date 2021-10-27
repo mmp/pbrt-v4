@@ -6,6 +6,7 @@
 
 #include <pbrt/cpu/aggregates.h>
 #include <pbrt/cpu/integrators.h>
+#include <pbrt/cpu/primitive.h>
 #ifdef PBRT_BUILD_GPU_RENDERER
 #include <pbrt/gpu/memory.h>
 #endif  // PBRT_BUILD_GPU_RENDERER
@@ -735,7 +736,7 @@ void BasicScene::SetOptions(SceneEntity filter, SceneEntity film,
     LOG_VERBOSE("Finished creating filter and film");
 
     // Enqueue asynchronous job to create sampler
-    samplerFuture = RunAsync([sampler, this]() {
+    samplerJob = RunAsync([sampler, this]() {
         LOG_VERBOSE("Starting to create sampler");
         Allocator alloc = threadAllocators.Get();
         Point2i res = this->film.FullResolution();
@@ -744,7 +745,7 @@ void BasicScene::SetOptions(SceneEntity filter, SceneEntity film,
     });
 
     // Enqueue asynchronous job to create camera
-    cameraFuture = RunAsync([camera, this]() {
+    cameraJob = RunAsync([camera, this]() {
         LOG_VERBOSE("Starting to create camera");
         Allocator alloc = threadAllocators.Get();
         Medium cameraMedium = GetMedium(camera.medium, &camera.loc);
@@ -773,7 +774,7 @@ void BasicScene::AddMedium(MediumSceneEntity medium) {
     };
 
     std::lock_guard<std::mutex> lock(mediaMutex);
-    mediumFutures[medium.name] = RunAsync(create);
+    mediumJobs[medium.name] = RunAsync(create);
 }
 
 Medium BasicScene::GetMedium(const std::string &name, const FileLoc *loc) {
@@ -787,14 +788,14 @@ Medium BasicScene::GetMedium(const std::string &name, const FileLoc *loc) {
             mediaMutex.unlock();
             return m;
         } else {
-            auto fiter = mediumFutures.find(name);
-            if (fiter == mediumFutures.end())
+            auto fiter = mediumJobs.find(name);
+            if (fiter == mediumJobs.end())
                 ErrorExit(loc, "%s: medium is not defined.", name);
 
-            pstd::optional<Medium> m = fiter->second.TryGet(&mediaMutex);
+            pstd::optional<Medium> m = fiter->second->TryGet(&mediaMutex);
             if (m) {
                 mediaMap[name] = *m;
-                mediumFutures.erase(fiter);
+                mediumJobs.erase(fiter);
                 mediaMutex.unlock();
                 return *m;
             }
@@ -804,18 +805,18 @@ Medium BasicScene::GetMedium(const std::string &name, const FileLoc *loc) {
 
 std::map<std::string, Medium> BasicScene::CreateMedia() {
     mediaMutex.lock();
-    if (!mediumFutures.empty()) {
+    if (!mediumJobs.empty()) {
         // Consume futures for asynchronously-created _Medium_ objects
         LOG_VERBOSE("Consume media futures start");
-        for (auto &m : mediumFutures) {
+        for (auto &m : mediumJobs) {
             while (mediaMap.find(m.first) == mediaMap.end()) {
-                pstd::optional<Medium> med = m.second.TryGet(&mediaMutex);
+                pstd::optional<Medium> med = m.second->TryGet(&mediaMutex);
                 if (med)
                     mediaMap[m.first] = *med;
             }
         }
         LOG_VERBOSE("Consume media futures finished");
-        mediumFutures.clear();
+        mediumJobs.clear();
     }
     mediaMutex.unlock();
     return mediaMap;
@@ -859,7 +860,7 @@ void BasicScene::startLoadingNormalMaps(const ParameterDictionary &parameters) {
         return;
 
     // Overload materialMutex, which we already hold, for the futures...
-    if (normalMapFutures.find(filename) != normalMapFutures.end())
+    if (normalMapJobs.find(filename) != normalMapJobs.end())
         // It's already in flight.
         return;
 
@@ -876,7 +877,7 @@ void BasicScene::startLoadingNormalMaps(const ParameterDictionary &parameters) {
 
         return normalMap;
     };
-    normalMapFutures[filename] = RunAsync(create, filename);
+    normalMapJobs[filename] = RunAsync(create, filename);
 }
 
 void BasicScene::AddFloatTexture(std::string name, TextureSceneEntity texture) {
@@ -921,7 +922,7 @@ void BasicScene::AddFloatTexture(std::string name, TextureSceneEntity texture) {
         return FloatTexture::Create(texture.name, renderFromTexture, texDict,
                                     &texture.loc, alloc, Options->useGPU);
     };
-    floatTextureFutures[name] = RunAsync(create, texture);
+    floatTextureJobs[name] = RunAsync(create, texture);
 }
 
 void BasicScene::AddSpectrumTexture(std::string name, TextureSceneEntity texture) {
@@ -967,7 +968,7 @@ void BasicScene::AddSpectrumTexture(std::string name, TextureSceneEntity texture
                                        SpectrumType::Albedo, &texture.loc, alloc,
                                        Options->useGPU);
     };
-    spectrumTextureFutures[name] = RunAsync(create, texture);
+    spectrumTextureJobs[name] = RunAsync(create, texture);
 }
 
 void BasicScene::AddLight(LightSceneEntity light) {
@@ -984,7 +985,7 @@ void BasicScene::AddLight(LightSceneEntity light) {
                              GetCamera().GetCameraTransform(), lightMedium, &light.loc,
                              threadAllocators.Get());
     };
-    lightFutures.push_back(RunAsync(create));
+    lightJobs.push_back(RunAsync(create));
 }
 
 int BasicScene::AddAreaLight(SceneEntity light) {
@@ -1082,11 +1083,11 @@ void BasicScene::CreateMaterials(const NamedTextures &textures,
                                  std::vector<pbrt::Material> *materialsOut) {
     LOG_VERBOSE("Starting to consume normal map futures");
     std::lock_guard<std::mutex> lock(materialMutex);
-    for (auto &fut : normalMapFutures) {
-        CHECK(normalMaps.find(fut.first) == normalMaps.end());
-        normalMaps[fut.first] = fut.second.Get();
+    for (auto &job : normalMapJobs) {
+        CHECK(normalMaps.find(job.first) == normalMaps.end());
+        normalMaps[job.first] = job.second->Get();
     }
-    normalMapFutures.clear();
+    normalMapJobs.clear();
     LOG_VERBOSE("Finished consuming normal map futures");
 
     // Named materials
@@ -1143,12 +1144,12 @@ NamedTextures BasicScene::CreateTextures() {
     // active when CreateTextures() is called, but valgrind doesn't know
     // that...
     textureMutex.lock();
-    for (auto &tex : floatTextureFutures)
-        textures.floatTextures[tex.first] = tex.second.Get();
-    floatTextureFutures.clear();
-    for (auto &tex : spectrumTextureFutures)
-        textures.albedoSpectrumTextures[tex.first] = tex.second.Get();
-    spectrumTextureFutures.clear();
+    for (auto &tex : floatTextureJobs)
+        textures.floatTextures[tex.first] = tex.second->Get();
+    floatTextureJobs.clear();
+    for (auto &tex : spectrumTextureJobs)
+        textures.albedoSpectrumTextures[tex.first] = tex.second->Get();
+    spectrumTextureJobs.clear();
     textureMutex.unlock();
     LOG_VERBOSE("Finished consuming texture futures");
 
@@ -1303,8 +1304,8 @@ std::vector<Light> BasicScene::CreateLights(
 
     LOG_VERBOSE("Starting to consume non-area light futures");
     std::lock_guard<std::mutex> lock(lightMutex);
-    for (auto &fut : lightFutures)
-        lights.push_back(fut.Get());
+    for (auto &job : lightJobs)
+        lights.push_back(job->Get());
     LOG_VERBOSE("Finished consuming non-area light futures");
 
     return lights;

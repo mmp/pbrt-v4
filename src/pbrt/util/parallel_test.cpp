@@ -64,16 +64,16 @@ TEST(ThreadLocal, Consistency) {
         busywork(index);
     });
 
-    std::vector<Future<int>> futures;
+    std::vector<AsyncJob<int> *> jobs;
     for (int i = 0; i < 100; ++i) {
-        futures.push_back(RunAsync([&]() {
+        jobs.push_back(RunAsync([&]() {
             EXPECT_EQ(std::this_thread::get_id(), tids.Get());
             busywork(i);
             return i;
         }));
     }
     for (int i = 0; i < 100; ++i)
-        (void)futures[i].Get();
+        (void)jobs[i]->Get();
 
     ParallelFor(0, 1000, [&](int64_t index) {
         EXPECT_EQ(std::this_thread::get_id(), tids.Get());

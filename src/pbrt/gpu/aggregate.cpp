@@ -1337,7 +1337,7 @@ OptiXAggregate::OptiXAggregate(
         BVH bvh;
         int sbtOffset;
     };
-    Future<GAS> triFuture = RunAsync([&]() {
+    AsyncJob<GAS> *triJob = RunAsync([&]() {
         BVH triangleBVH = buildBVHForTriangles(
             scene.shapes, plyMeshes, optixContext, hitPGTriangle, anyhitPGShadowTriangle,
             hitPGRandomHitTriangle, textures.floatTextures, namedMaterials, materials, media,
@@ -1346,7 +1346,7 @@ OptiXAggregate::OptiXAggregate(
         return GAS{triangleBVH, sbtOffset};
     });
 
-    Future<GAS> blpFuture = RunAsync([&]() {
+    AsyncJob<GAS> *blpJob = RunAsync([&]() {
         BVH blpBVH = buildBVHForBLPs(
             scene.shapes, optixContext, hitPGBilinearPatch, anyhitPGShadowBilinearPatch,
             hitPGRandomHitBilinearPatch, textures.floatTextures, namedMaterials, materials,
@@ -1355,7 +1355,7 @@ OptiXAggregate::OptiXAggregate(
         return GAS{blpBVH, bilinearSBTOffset};
     });
 
-    Future<GAS> quadricFuture = RunAsync([&]() {
+    AsyncJob<GAS> *quadricJob = RunAsync([&]() {
         BVH quadricBVH = buildBVHForQuadrics(
             scene.shapes, optixContext, hitPGQuadric, anyhitPGShadowQuadric,
             hitPGRandomHitQuadric, textures.floatTextures, namedMaterials, materials, media,
@@ -1480,8 +1480,8 @@ OptiXAggregate::OptiXAggregate(
     gasInstance.flags =
         OPTIX_INSTANCE_FLAG_NONE;  // TODO: OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT
     LOG_VERBOSE("Starting to consume top-level GAS futures");
-    for (Future<GAS> *fut : {&triFuture, &blpFuture, &quadricFuture}) {
-        GAS gas = fut->Get();
+    for (AsyncJob<GAS> *job : {triJob, blpJob, quadricJob}) {
+        GAS gas = job->Get();
         if (gas.bvh.traversableHandle) {
             gasInstance.traversableHandle = gas.bvh.traversableHandle;
             gasInstance.sbtOffset = gas.sbtOffset;

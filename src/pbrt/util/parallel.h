@@ -293,8 +293,6 @@ class ParallelJob {
 
     virtual std::string ToString() const = 0;
 
-    virtual void Cleanup() {}
-
     // ParallelJob Public Members
     static ThreadPool *threadPool;
 
@@ -349,47 +347,6 @@ class ThreadPool {
 
 bool DoParallelWork();
 
-// Future Definition
-template <typename T>
-class Future {
-  public:
-    // Future Public Methods
-    Future() = default;
-    Future(std::future<T> &&f) : fut(std::move(f)) {}
-    Future &operator=(std::future<T> &&f) {
-        fut = std::move(f);
-        return *this;
-    }
-
-    T Get() {
-        Wait();
-        return fut.get();
-    }
-
-    pstd::optional<T> TryGet(std::mutex *mutex) {
-        if (IsReady())
-            return Get();
-
-        mutex->unlock();
-        DoParallelWork();
-        mutex->lock();
-        return {};
-    }
-
-    void Wait() {
-        while (!IsReady() && DoParallelWork())
-            ;
-        fut.wait();
-    }
-
-    bool IsReady() const {
-        return fut.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-    }
-
-  private:
-    std::future<T> fut;
-};
-
 // AsyncJob Definition
 template <typename T>
 class AsyncJob : public ParallelJob {
@@ -403,22 +360,64 @@ class AsyncJob : public ParallelJob {
         threadPool->RemoveFromJobList(this);
         started = true;
         lock->unlock();
-        work();
+
+        T r = work();
+        std::unique_lock<std::mutex> l(mutex);
+        result = r;
+        cv.notify_all();
     }
 
-    void Cleanup() { delete this; }
+    bool IsReady() const {
+        std::lock_guard<std::mutex> lock(mutex);
+        return result.has_value();
+    }
 
-    Future<T> GetFuture() { return work.get_future(); }
+    void Wait() {
+        while (!IsReady() && DoParallelWork())
+            ;
+
+        std::unique_lock<std::mutex> lock(mutex);
+        if (!result.has_value())
+            cv.wait(lock, [this]() { return result.has_value(); });
+    }
+
+    T Get() {
+        Wait();
+        std::lock_guard<std::mutex> lock(mutex);
+        return *result;
+    }
+
+    pstd::optional<T> TryGet(std::mutex *extMutex) {
+        {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (result)
+            return result;
+        }
+
+        extMutex->unlock();
+        DoParallelWork();
+        extMutex->lock();
+        return {};
+    }
 
     std::string ToString() const {
         return StringPrintf("[ AsyncJob started: %s ]", started);
     }
 
-    void DoWork() { work(); }
+    void DoWork() {
+        T r = work();
+        std::unique_lock<std::mutex> l(mutex);
+        CHECK(!result.has_value());
+        result = r;
+        cv.notify_all();
+    }
 
   private:
     bool started = false;
-    std::packaged_task<T(void)> work;
+    std::function<T(void)> work;
+    pstd::optional<T> result;
+    mutable std::mutex mutex;
+    std::condition_variable cv;
 };
 
 void ForEachThread(std::function<void(void)> func);
@@ -441,7 +440,7 @@ inline auto RunAsync(F func, Args &&...args) {
     else
         lock = ParallelJob::threadPool->AddToJobList(job);
 
-    return job->GetFuture();
+    return job;
 }
 
 }  // namespace pbrt

@@ -8,7 +8,6 @@
 #include <pbrt/pbrt.h>
 
 #include <pbrt/cameras.h>
-#include <pbrt/cpu/primitive.h>
 #include <pbrt/paramdict.h>
 #include <pbrt/parser.h>
 #include <pbrt/util/containers.h>
@@ -30,6 +29,7 @@
 namespace pbrt {
 
 class Integrator;
+class Primitive;
 
 // SceneEntity Definition
 struct SceneEntity {
@@ -278,24 +278,24 @@ class BasicScene {
     void Done();
 
     Camera GetCamera() {
-        cameraFutureMutex.lock();
+        cameraJobMutex.lock();
         while (!camera) {
-            pstd::optional<Camera> c = cameraFuture.TryGet(&cameraFutureMutex);
+            pstd::optional<Camera> c = cameraJob->TryGet(&cameraJobMutex);
             if (c)
                 camera = *c;
         }
-        cameraFutureMutex.unlock();
+        cameraJobMutex.unlock();
         return camera;
     }
 
     Sampler GetSampler() {
-        samplerFutureMutex.lock();
+        samplerJobMutex.lock();
         while (!sampler) {
-            pstd::optional<Sampler> s = samplerFuture.TryGet(&samplerFutureMutex);
+            pstd::optional<Sampler> s = samplerJob->TryGet(&samplerJobMutex);
             if (s)
                 sampler = *s;
         }
-        samplerFutureMutex.unlock();
+        samplerJobMutex.unlock();
         return sampler;
     }
 
@@ -337,26 +337,26 @@ class BasicScene {
     void startLoadingNormalMaps(const ParameterDictionary &parameters);
 
     // BasicScene Private Members
-    Future<Sampler> samplerFuture;
+    AsyncJob<Sampler> *samplerJob = nullptr;
     mutable ThreadLocal<Allocator> threadAllocators;
     Camera camera;
     Film film;
-    std::mutex cameraFutureMutex;
-    Future<Camera> cameraFuture;
-    std::mutex samplerFutureMutex;
+    std::mutex cameraJobMutex;
+    AsyncJob<Camera> *cameraJob = nullptr;
+    std::mutex samplerJobMutex;
     Sampler sampler;
     std::mutex mediaMutex;
-    std::map<std::string, Future<Medium>> mediumFutures;
+    std::map<std::string, AsyncJob<Medium> *> mediumJobs;
     std::map<std::string, Medium> mediaMap;
     std::mutex materialMutex;
-    std::map<std::string, Future<Image *>> normalMapFutures;
+    std::map<std::string, AsyncJob<Image *> *> normalMapJobs;
     std::map<std::string, Image *> normalMaps;
 
     std::vector<std::pair<std::string, SceneEntity>> namedMaterials;
     std::vector<SceneEntity> materials;
 
     std::mutex lightMutex;
-    std::vector<Future<Light>> lightFutures;
+    std::vector<AsyncJob<Light> *> lightJobs;
 
     std::mutex areaLightMutex;
     std::vector<SceneEntity> areaLights;
@@ -366,8 +366,8 @@ class BasicScene {
     std::vector<std::pair<std::string, TextureSceneEntity>> serialSpectrumTextures;
     std::vector<std::pair<std::string, TextureSceneEntity>> asyncSpectrumTextures;
     std::set<std::string> loadingTextureFilenames;
-    std::map<std::string, Future<FloatTexture>> floatTextureFutures;
-    std::map<std::string, Future<SpectrumTexture>> spectrumTextureFutures;
+    std::map<std::string, AsyncJob<FloatTexture> *> floatTextureJobs;
+    std::map<std::string, AsyncJob<SpectrumTexture> *> spectrumTextureJobs;
     int nMissingTextures = 0;
 
     std::mutex shapeMutex, animatedShapeMutex;

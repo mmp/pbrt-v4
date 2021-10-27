@@ -94,10 +94,8 @@ void ThreadPool::WorkOrWait(std::unique_lock<std::mutex> *lock, bool isEnqueuing
         DCHECK(!lock->owns_lock());
         lock->lock();
         job->activeWorkers--;
-        if (job->Finished()) {
+        if (job->Finished())
             jobListCondition.notify_all();
-            job->Cleanup();
-        }
 
     } else
         // Wait for new work to arrive or the job to finish
@@ -134,10 +132,8 @@ bool ThreadPool::WorkOrReturn() {
     DCHECK(!lock.owns_lock());
     lock.lock();
     job->activeWorkers--;
-    if (job->Finished()) {
+    if (job->Finished())
         jobListCondition.notify_all();
-        job->Cleanup();
-    }
 
     return true;
 }
@@ -195,7 +191,7 @@ std::string ThreadPool::ToString() const {
 }
 
 bool DoParallelWork() {
-    CHECK(ParallelJob::threadPool && ParallelJob::threadPool->size());
+    CHECK(ParallelJob::threadPool);
     // lock should be held when this is called...
     return ParallelJob::threadPool->WorkOrReturn();
 }
