@@ -50,6 +50,9 @@ namespace pbrt {
 namespace {
 
 float ElapsedSeconds() {
+    static std::mutex mutex;
+    std::lock_guard<std::mutex> lock(mutex);
+
     using clock = std::chrono::steady_clock;
     static clock::time_point start = clock::now();
 
