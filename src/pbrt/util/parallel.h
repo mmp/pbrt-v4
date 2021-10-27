@@ -78,8 +78,11 @@ inline T &ThreadLocal<T>::Get() {
             return threadLocal;
         } else if (!hashTable[hash]) {
             mutex.unlock_shared();
-            T newItem = create();
+
+            // Get reader-writer lock before calling the callback so that the user
+            // doesn't have to worry about writing a thread-safe callback.
             mutex.lock();
+            T newItem = create();
 
             if (hashTable[hash]) {
                 // someone else got there first--keep looking, but now
