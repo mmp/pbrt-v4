@@ -58,10 +58,12 @@ static __forceinline__ __device__ T *getPayload() {
 }
 
 template <typename... Args>
-__device__ inline void Trace(OptixTraversableHandle traversable, Ray ray, Float tMin,
+__device__ inline void Trace(OptixTraversableHandle traversable, Ray ray,
                              Float tMax, OptixRayFlags flags, Args &&... payload) {
+    static constexpr float eps = 1e-7f;
+
     optixTrace(traversable, make_float3(ray.o.x, ray.o.y, ray.o.z),
-               make_float3(ray.d.x, ray.d.y, ray.d.z), tMin, tMax, ray.time,
+               make_float3(ray.d.x, ray.d.y, ray.d.z), eps, tMax, ray.time,
                OptixVisibilityMask(255), flags, 0, /* ray type */
                1,                                  /* number of ray types */
                0,                                  /* missSBTIndex */
@@ -110,8 +112,7 @@ extern "C" __global__ void __raygen__findClosest() {
         ray.d.y, ray.d.z, tMax);
 
     uint32_t missed = 0;
-    Trace(params.traversable, ray, 1e-5f /* tMin */, tMax, OPTIX_RAY_FLAG_NONE, p0, p1,
-          missed);
+    Trace(params.traversable, ray, tMax, OPTIX_RAY_FLAG_NONE, p0, p1, missed);
 
     if (missed)
         EnqueueWorkAfterMiss(r, params.mediumSampleQueue, params.escapedRayQueue);
@@ -255,8 +256,7 @@ extern "C" __global__ void __raygen__shadow() {
              sr.ray.d.x, sr.ray.d.y, sr.ray.d.z);
 
     uint32_t missed = 0;
-    Trace(params.traversable, sr.ray, 1e-5f /* tMin */, sr.tMax, OPTIX_RAY_FLAG_NONE,
-          missed);
+    Trace(params.traversable, sr.ray, sr.tMax, OPTIX_RAY_FLAG_NONE, missed);
 
     RecordShadowRayResult(sr, &params.pixelSampleState, !missed);
 }
@@ -282,8 +282,7 @@ extern "C" __global__ void __raygen__shadow_Tr() {
 
                            uint32_t missed = 0;
 
-                           Trace(params.traversable, ray, 1e-5f /* tMin */, tMax, OPTIX_RAY_FLAG_NONE, p0,
-                                 p1, missed);
+                           Trace(params.traversable, ray, tMax, OPTIX_RAY_FLAG_NONE, p0, p1, missed);
 
                            return TransmittanceTraceResult{!missed, Point3f(ctx.piHit), ctx.material};
                        },
@@ -491,9 +490,9 @@ extern "C" __global__ void __raygen__randomHit() {
     PBRT_DBG("Randomhit raygen ray.o %f %f %f ray.d %f %f %f\n", ray.o.x, ray.o.y,
         ray.o.z, ray.d.x, ray.d.y, ray.d.z);
 
-    while (true) {
-        Trace(params.traversable, ray, 0.f /* tMin */, 1.f /* tMax */,
-              OPTIX_RAY_FLAG_NONE, ptr0, ptr1);
+    int depth = 0;
+    while (LengthSquared(ray.d) > 0 && ++depth < 100) {
+        Trace(params.traversable, ray, 1.f /* tMax */, OPTIX_RAY_FLAG_NONE, ptr0, ptr1);
 
         if (payload.intr) {
             ray = payload.intr->SpawnRayTo(s.p1);
