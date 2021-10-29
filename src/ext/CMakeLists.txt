@@ -26,7 +26,10 @@ set (LIBDEFLATE_LIBRARIES deflate::deflate PARENT_SCOPE)
 ###########################################################################
 # zlib
 
-find_package (ZLIB)
+if (NOT CMAKE_SYSTEM_NAME STREQUAL Windows)
+  find_package (ZLIB)
+endif ()
+
 if (NOT ZLIB_FOUND)
   # Build zlib
   set (ZLIB_BUILD_STATIC_LIBS ON CACHE BOOL " " FORCE)
