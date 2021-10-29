@@ -25,6 +25,7 @@
 #include <ImfChromaticitiesAttribute.h>
 #include <ImfFloatAttribute.h>
 #include <ImfFrameBuffer.h>
+#include <ImfHeader.h>
 #include <ImfInputFile.h>
 #include <ImfIntAttribute.h>
 #include <ImfMatrixAttribute.h>

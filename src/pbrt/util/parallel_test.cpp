@@ -73,7 +73,7 @@ TEST(ThreadLocal, Consistency) {
         }));
     }
     for (int i = 0; i < 100; ++i)
-        (void)jobs[i]->Get();
+        (void)jobs[i]->GetResult();
 
     ParallelFor(0, 1000, [&](int64_t index) {
         EXPECT_EQ(std::this_thread::get_id(), tids.Get());

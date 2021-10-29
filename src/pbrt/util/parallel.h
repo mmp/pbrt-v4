@@ -352,7 +352,7 @@ template <typename T>
 class AsyncJob : public ParallelJob {
   public:
     // AsyncJob Public Methods
-    AsyncJob(std::function<T(void)> w) : work(std::move(w)) {}
+    AsyncJob(std::function<T(void)> w) : func(std::move(w)) {}
 
     bool HaveWork() const { return !started; }
 
@@ -360,9 +360,9 @@ class AsyncJob : public ParallelJob {
         threadPool->RemoveFromJobList(this);
         started = true;
         lock->unlock();
-
-        T r = work();
-        std::unique_lock<std::mutex> l(mutex);
+        // Execute asynchronous work and notify waiting threads of its completion
+        T r = func();
+        std::unique_lock<std::mutex> ul(mutex);
         result = r;
         cv.notify_all();
     }
@@ -372,26 +372,17 @@ class AsyncJob : public ParallelJob {
         return result.has_value();
     }
 
-    void Wait() {
-        while (!IsReady() && DoParallelWork())
-            ;
-
-        std::unique_lock<std::mutex> lock(mutex);
-        if (!result.has_value())
-            cv.wait(lock, [this]() { return result.has_value(); });
-    }
-
-    T Get() {
+    T GetResult() {
         Wait();
         std::lock_guard<std::mutex> lock(mutex);
         return *result;
     }
 
-    pstd::optional<T> TryGet(std::mutex *extMutex) {
+    pstd::optional<T> TryGetResult(std::mutex *extMutex) {
         {
-        std::lock_guard<std::mutex> lock(mutex);
-        if (result)
-            return result;
+            std::lock_guard<std::mutex> lock(mutex);
+            if (result)
+                return result;
         }
 
         extMutex->unlock();
@@ -400,21 +391,30 @@ class AsyncJob : public ParallelJob {
         return {};
     }
 
-    std::string ToString() const {
-        return StringPrintf("[ AsyncJob started: %s ]", started);
+    void Wait() {
+        while (!IsReady() && DoParallelWork())
+            ;
+        std::unique_lock<std::mutex> lock(mutex);
+        if (!result.has_value())
+            cv.wait(lock, [this]() { return result.has_value(); });
     }
 
     void DoWork() {
-        T r = work();
+        T r = func();
         std::unique_lock<std::mutex> l(mutex);
         CHECK(!result.has_value());
         result = r;
         cv.notify_all();
     }
 
+    std::string ToString() const {
+        return StringPrintf("[ AsyncJob started: %s ]", started);
+    }
+
   private:
+    // AsyncJob Private Members
+    std::function<T(void)> func;
     bool started = false;
-    std::function<T(void)> work;
     pstd::optional<T> result;
     mutable std::mutex mutex;
     std::condition_variable cv;

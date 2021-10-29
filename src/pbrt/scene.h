@@ -8,6 +8,7 @@
 #include <pbrt/pbrt.h>
 
 #include <pbrt/cameras.h>
+#include <pbrt/cpu/primitive.h>
 #include <pbrt/paramdict.h>
 #include <pbrt/parser.h>
 #include <pbrt/util/containers.h>
@@ -29,7 +30,6 @@
 namespace pbrt {
 
 class Integrator;
-class Primitive;
 
 // SceneEntity Definition
 struct SceneEntity {
@@ -280,7 +280,7 @@ class BasicScene {
     Camera GetCamera() {
         cameraJobMutex.lock();
         while (!camera) {
-            pstd::optional<Camera> c = cameraJob->TryGet(&cameraJobMutex);
+            pstd::optional<Camera> c = cameraJob->TryGetResult(&cameraJobMutex);
             if (c)
                 camera = *c;
         }
@@ -291,7 +291,7 @@ class BasicScene {
     Sampler GetSampler() {
         samplerJobMutex.lock();
         while (!sampler) {
-            pstd::optional<Sampler> s = samplerJob->TryGet(&samplerJobMutex);
+            pstd::optional<Sampler> s = samplerJob->TryGetResult(&samplerJobMutex);
             if (s)
                 sampler = *s;
         }

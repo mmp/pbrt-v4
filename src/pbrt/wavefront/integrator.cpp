@@ -210,8 +210,8 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
     if (!Options->mseReferenceOutput.empty())
         ErrorExit("The wavefront integrator does not support --mse-reference-out.");
 
-    ///////////////////////////////////////////////////////////////////////////
-    // Allocate storage for all of the queues/buffers...
+        ///////////////////////////////////////////////////////////////////////////
+        // Allocate storage for all of the queues/buffers...
 
 #ifdef PBRT_BUILD_GPU_RENDERER
     size_t startSize = 0;

@@ -6,7 +6,6 @@
 
 #include <pbrt/cpu/aggregates.h>
 #include <pbrt/cpu/integrators.h>
-#include <pbrt/cpu/primitive.h>
 #ifdef PBRT_BUILD_GPU_RENDERER
 #include <pbrt/gpu/memory.h>
 #endif  // PBRT_BUILD_GPU_RENDERER
@@ -792,7 +791,7 @@ Medium BasicScene::GetMedium(const std::string &name, const FileLoc *loc) {
             if (fiter == mediumJobs.end())
                 ErrorExit(loc, "%s: medium is not defined.", name);
 
-            pstd::optional<Medium> m = fiter->second->TryGet(&mediaMutex);
+            pstd::optional<Medium> m = fiter->second->TryGetResult(&mediaMutex);
             if (m) {
                 mediaMap[name] = *m;
                 mediumJobs.erase(fiter);
@@ -806,11 +805,11 @@ Medium BasicScene::GetMedium(const std::string &name, const FileLoc *loc) {
 std::map<std::string, Medium> BasicScene::CreateMedia() {
     mediaMutex.lock();
     if (!mediumJobs.empty()) {
-        // Consume futures for asynchronously-created _Medium_ objects
+        // Consume results for asynchronously-created _Medium_ objects
         LOG_VERBOSE("Consume media futures start");
         for (auto &m : mediumJobs) {
             while (mediaMap.find(m.first) == mediaMap.end()) {
-                pstd::optional<Medium> med = m.second->TryGet(&mediaMutex);
+                pstd::optional<Medium> med = m.second->TryGetResult(&mediaMutex);
                 if (med)
                     mediaMap[m.first] = *med;
             }
@@ -1085,7 +1084,7 @@ void BasicScene::CreateMaterials(const NamedTextures &textures,
     std::lock_guard<std::mutex> lock(materialMutex);
     for (auto &job : normalMapJobs) {
         CHECK(normalMaps.find(job.first) == normalMaps.end());
-        normalMaps[job.first] = job.second->Get();
+        normalMaps[job.first] = job.second->GetResult();
     }
     normalMapJobs.clear();
     LOG_VERBOSE("Finished consuming normal map futures");
@@ -1145,10 +1144,10 @@ NamedTextures BasicScene::CreateTextures() {
     // that...
     textureMutex.lock();
     for (auto &tex : floatTextureJobs)
-        textures.floatTextures[tex.first] = tex.second->Get();
+        textures.floatTextures[tex.first] = tex.second->GetResult();
     floatTextureJobs.clear();
     for (auto &tex : spectrumTextureJobs)
-        textures.albedoSpectrumTextures[tex.first] = tex.second->Get();
+        textures.albedoSpectrumTextures[tex.first] = tex.second->GetResult();
     spectrumTextureJobs.clear();
     textureMutex.unlock();
     LOG_VERBOSE("Finished consuming texture futures");
@@ -1305,7 +1304,7 @@ std::vector<Light> BasicScene::CreateLights(
     LOG_VERBOSE("Starting to consume non-area light futures");
     std::lock_guard<std::mutex> lock(lightMutex);
     for (auto &job : lightJobs)
-        lights.push_back(job->Get());
+        lights.push_back(job->GetResult());
     LOG_VERBOSE("Finished consuming non-area light futures");
 
     return lights;
