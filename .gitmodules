@@ -27,3 +27,6 @@
 [submodule "src/ext/lodepng"]
 	path = src/ext/lodepng
 	url = https://github.com/lvandeve/lodepng.git
+[submodule "src/ext/Imath"]
+	path = src/ext/Imath
+	url = https://github.com/AcademySoftwareFoundation/Imath.git

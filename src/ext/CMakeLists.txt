@@ -51,51 +51,47 @@ set (ZLIB_INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS} PARENT_SCOPE)
 set (ZLIB_LIBRARIES ${ZLIB_LIBARIES} PARENT_SCOPE)
 
 ###########################################################################
-# OpenEXR
+# Imath / OpenEXR
 
-find_package (OpenEXR 2.3) # 2.3 is the first version compatible with C++17
+# DO NOT MERGE; commented out for CI testing
+#find_package (OpenEXR 2.4)
 
 if (OPENEXR_FOUND)
   message (STATUS "Found OpenEXR version ${OPENEXR_VERSION}")
+
   set (OPENEXR_INCLUDE ${OPENEXR_INCLUDES}/OpenEXR ${ILMBASE_INCLUDES}/OpenEXR PARENT_SCOPE)
   if (WIN32)
     set (OPENEXR_LIBS ${OPENEXR_LIBRARIES} ${ZLIB_LIBRARY} PARENT_SCOPE)
   else ()
     set (OPENEXR_LIBS ${OPENEXR_LIBRARIES} PARENT_SCOPE)
   endif ()
-else ()
-  message (STATUS "OpenEXR not found; building it from scratch.")
+else()
+  message (STATUS "Imath/OpenEXR not found; building them from scratch.")
 
-  SET (CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+  set (IMATH_IS_SUBPROJECT ON)
+  add_subdirectory (Imath)
 
-  set (ILMBASE_NAMESPACE_VERSIONING OFF CACHE BOOL " " FORCE)
-  set (OPENEXR_NAMESPACE_VERSIONING OFF CACHE BOOL " " FORCE)
-  set (OPENEXR_BUILD_SHARED_LIBS    OFF CACHE BOOL " " FORCE)
-  set (ILMBASE_BUILD_SHARED_LIBS    OFF CACHE BOOL " " FORCE)
-  set (PYILMBASE_ENABLE             OFF CACHE BOOL " " FORCE)
-  set (OPENEXR_BUILD_UTILS          OFF CACHE BOOL " " FORCE)
+  set (OPENEXR_BUILD_TOOLS OFF CACHE BOOL " " FORCE)
+
+  set (OPENEXR_IS_SUBPROJECT ON)
+  set (CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+
+  get_target_property (imathinc Imath INTERFACE_INCLUDE_DIRECTORIES)
+  get_target_property (imathconfinc ImathConfig INTERFACE_INCLUDE_DIRECTORIES)
+  set (IMATH_HEADER_ONLY_INCLUDE_DIRS "${imathinc};${imathconfinc}")
 
   add_subdirectory (openexr)
 
-  set_property (TARGET IexMath IlmThread Half
-                Iex Imath IlmImf HalfTest IexTest
-                IlmImfExamples IlmImfTest IlmImfUtil IlmImfUtilTest ImathTest
-                PROPERTY FOLDER "ext/OpenEXR")
+  get_target_property (iexinc Iex INTERFACE_INCLUDE_DIRECTORIES)
+  get_target_property (exrinc OpenEXR INTERFACE_INCLUDE_DIRECTORIES)
+  get_target_property (exrconfinc OpenEXRConfig INTERFACE_INCLUDE_DIRECTORIES)
 
-  set (OPENEXR_INCLUDE
-    ${CMAKE_CURRENT_SOURCE_DIR}/openexr/IlmBase/Imath
-    ${CMAKE_CURRENT_SOURCE_DIR}/openexr/IlmBase/Half
-    ${CMAKE_CURRENT_SOURCE_DIR}/openexr/IlmBase/Iex
-    ${CMAKE_CURRENT_SOURCE_DIR}/openexr/OpenEXR/IlmImf
-    ${CMAKE_CURRENT_BINARY_DIR}/openexr/IlmBase/config
-    ${CMAKE_CURRENT_BINARY_DIR}/openexr/OpenEXR/config
-  PARENT_SCOPE
-  )
+  set (OPENEXR_INCLUDE "${imathinc};${imathconfinc};${exrinc};${exrconfinc};${iexinc}" PARENT_SCOPE)
 
   if (WIN32)
-    set (OPENEXR_LIBS OpenEXR::IlmImf IlmBase::Imath IlmBase::Half ${ZLIB_LIBRARY} PARENT_SCOPE)
+    set (OPENEXR_LIBS OpenEXR::OpenEXR Imath::Imath ${ZLIB_LIBRARY} PARENT_SCOPE)
   else ()
-    set (OPENEXR_LIBS OpenEXR::IlmImf IlmBase::Imath IlmBase::Half PARENT_SCOPE)
+    set (OPENEXR_LIBS OpenEXR::OpenEXR Imath::Imath PARENT_SCOPE)
   endif ()
 endif ()
 
