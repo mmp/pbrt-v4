@@ -24,3 +24,6 @@
 [submodule "src/ext/libdeflate"]
 	path = src/ext/libdeflate
 	url = https://github.com/mmp/libdeflate.git
+[submodule "src/ext/lodepng"]
+	path = src/ext/lodepng
+	url = https://github.com/lvandeve/lodepng.git
