@@ -37,6 +37,9 @@ if (NOT ZLIB_FOUND)
   set (ZLIB_LIBRARIES zlibstatic)
   set (ZLIB_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/zlib ${CMAKE_CURRENT_BINARY_DIR}/zlib)
 
+  set (ZLIB_LIBRARY zlibstatic)
+  set (ZLIB_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/zlib ${CMAKE_CURRENT_BINARY_DIR}/zlib)
+
   set_property (TARGET zlibstatic PROPERTY FOLDER "ext")
 
   add_library (ZLIB::ZLIB ALIAS zlibstatic)
@@ -68,6 +71,7 @@ else()
   add_subdirectory (Imath)
 
   set (OPENEXR_BUILD_TOOLS OFF CACHE BOOL " " FORCE)
+  set (OPENEXR_FORCE_INTERNAL_ZLIB ON CACHE BOOL " " FORCE)
 
   set (OPENEXR_IS_SUBPROJECT ON)
   set (CMAKE_POLICY_DEFAULT_CMP0077 NEW)
