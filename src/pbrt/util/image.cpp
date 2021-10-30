@@ -1088,7 +1088,6 @@ static ImageAndMetadata ReadEXR(const std::string &name, Allocator alloc) {
         }
 
         // Figure out the color space
-        const RGBColorSpace *colorSpace = RGBColorSpace::sRGB;  // default
         const Imf::ChromaticitiesAttribute *chromaticitiesAttrib =
             file.header().findTypedAttribute<Imf::ChromaticitiesAttribute>(
                 "chromaticities");

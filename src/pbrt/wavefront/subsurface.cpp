@@ -19,7 +19,6 @@ void WavefrontPathIntegrator::SampleSubsurface(int wavefrontDepth) {
     if (!haveSubsurface)
         return;
 
-    RayQueue *rayQueue = CurrentRayQueue(wavefrontDepth);
     RayQueue *nextRayQueue = NextRayQueue(wavefrontDepth);
 
     ForAllQueued(

@@ -578,7 +578,6 @@ DiffuseTransmissionMaterial *DiffuseTransmissionMaterial::Create(
             alloc.new_object<ConstantSpectrum>(0.25f));
 
     FloatTexture displacement = parameters.GetFloatTextureOrNull("displacement", alloc);
-    bool remapRoughness = parameters.GetOneBool("remaproughness", true);
     Float scale = parameters.GetOneFloat("scale", 1.f);
 
     return alloc.new_object<DiffuseTransmissionMaterial>(reflectance, transmittance,
