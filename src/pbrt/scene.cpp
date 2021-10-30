@@ -848,9 +848,9 @@ void BasicScene::AddNamedMaterial(std::string name, SceneEntity material) {
 
 int BasicScene::AddMaterial(SceneEntity material) {
     std::lock_guard<std::mutex> lock(materialMutex);
-    materials.push_back(std::move(material));
     startLoadingNormalMaps(material.parameters);
-    return materials.size() - 1;
+    materials.push_back(std::move(material));
+    return int(materials.size() - 1);
 }
 
 void BasicScene::startLoadingNormalMaps(const ParameterDictionary &parameters) {
