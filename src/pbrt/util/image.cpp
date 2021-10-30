@@ -1685,8 +1685,7 @@ bool Image::WritePFM(const std::string &filename, const ImageMetadata &metadata)
                     scanline[3 * x + c] = GetChannel({x, y}, c);
             }
         }
-        if (fwrite(&scanline[0], sizeof(float), 3 * resolution.x, fp) <
-            (size_t)(3 * resolution.x))
+        if (fwrite(&scanline[0], sizeof(float), 3 * resolution.x, fp) < 3 * resolution.x)
             goto fail;
     }
 
