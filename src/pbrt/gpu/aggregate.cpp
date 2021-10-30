@@ -1481,7 +1481,7 @@ OptiXAggregate::OptiXAggregate(
         OPTIX_INSTANCE_FLAG_NONE;  // TODO: OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT
     LOG_VERBOSE("Starting to consume top-level GAS futures");
     for (AsyncJob<GAS> *job : {triJob, blpJob, quadricJob}) {
-        GAS gas = job->Get();
+        GAS gas = job->GetResult();
         if (gas.bvh.traversableHandle) {
             gasInstance.traversableHandle = gas.bvh.traversableHandle;
             gasInstance.sbtOffset = gas.sbtOffset;
