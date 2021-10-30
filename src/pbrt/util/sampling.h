@@ -592,7 +592,7 @@ class WeightedReservoirSampler {
     RNG rng;
     Float weightSum = 0;
     Float reservoirWeight = 0;
-    T reservoir;
+    T reservoir{};
 };
 
 // PiecewiseConstant1D Definition
