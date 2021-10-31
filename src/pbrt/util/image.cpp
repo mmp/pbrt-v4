@@ -1088,7 +1088,6 @@ static ImageAndMetadata ReadEXR(const std::string &name, Allocator alloc) {
         }
 
         // Figure out the color space
-        const RGBColorSpace *colorSpace = RGBColorSpace::sRGB;  // default
         const Imf::ChromaticitiesAttribute *chromaticitiesAttrib =
             file.header().findTypedAttribute<Imf::ChromaticitiesAttribute>(
                 "chromaticities");
@@ -1686,8 +1685,7 @@ bool Image::WritePFM(const std::string &filename, const ImageMetadata &metadata)
                     scanline[3 * x + c] = GetChannel({x, y}, c);
             }
         }
-        if (fwrite(&scanline[0], sizeof(float), 3 * resolution.x, fp) <
-            (size_t)(3 * resolution.x))
+        if (fwrite(&scanline[0], sizeof(float), 3 * resolution.x, fp) < 3 * resolution.x)
             goto fail;
     }
 

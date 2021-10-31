@@ -85,12 +85,11 @@ std::string TriangleMesh::ToString() const {
         reverseOrientation, transformSwapsHandedness, nTriangles, nVertices,
         vertexIndices ? StringPrintf("%s", pstd::MakeSpan(vertexIndices, 3 * nTriangles))
                       : np,
-        p ? StringPrintf("%s", pstd::MakeSpan(p, nVertices)) : nullptr,
-        n ? StringPrintf("%s", pstd::MakeSpan(n, nVertices)) : nullptr,
-        s ? StringPrintf("%s", pstd::MakeSpan(s, nVertices)) : nullptr,
-        uv ? StringPrintf("%s", pstd::MakeSpan(uv, nVertices)) : nullptr,
-        faceIndices ? StringPrintf("%s", pstd::MakeSpan(faceIndices, nTriangles))
-                    : nullptr);
+        p ? StringPrintf("%s", pstd::MakeSpan(p, nVertices)) : np,
+        n ? StringPrintf("%s", pstd::MakeSpan(n, nVertices)) : np,
+        s ? StringPrintf("%s", pstd::MakeSpan(s, nVertices)) : np,
+        uv ? StringPrintf("%s", pstd::MakeSpan(uv, nVertices)) : np,
+        faceIndices ? StringPrintf("%s", pstd::MakeSpan(faceIndices, nTriangles)) : np);
 }
 
 static void PlyErrorCallback(p_ply, const char *message) {
@@ -240,11 +239,10 @@ std::string BilinearPatchMesh::ToString() const {
         reverseOrientation, transformSwapsHandedness, nPatches, nVertices,
         vertexIndices ? StringPrintf("%s", pstd::MakeSpan(vertexIndices, 4 * nPatches))
                       : np,
-        p ? StringPrintf("%s", pstd::MakeSpan(p, nVertices)) : nullptr,
-        n ? StringPrintf("%s", pstd::MakeSpan(n, nVertices)) : nullptr,
-        uv ? StringPrintf("%s", pstd::MakeSpan(uv, nVertices)) : nullptr,
-        faceIndices ? StringPrintf("%s", pstd::MakeSpan(faceIndices, nPatches))
-                    : nullptr);
+        p ? StringPrintf("%s", pstd::MakeSpan(p, nVertices)) : np,
+        n ? StringPrintf("%s", pstd::MakeSpan(n, nVertices)) : np,
+        uv ? StringPrintf("%s", pstd::MakeSpan(uv, nVertices)) : np,
+        faceIndices ? StringPrintf("%s", pstd::MakeSpan(faceIndices, nPatches)) : np);
 }
 
 struct FaceCallbackContext {

@@ -230,7 +230,7 @@ Tokenizer::Tokenizer(std::string str, std::string filename,
     pos = contents.data();
     end = pos + contents.size();
     tokenizerMemory += contents.size();
-    CheckUTF(str.data(), str.size());
+    CheckUTF(contents.data(), contents.size());
 }
 
 #if defined(PBRT_HAVE_MMAP) || defined(PBRT_IS_WINDOWS)
