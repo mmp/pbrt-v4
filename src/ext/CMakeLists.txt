@@ -52,7 +52,7 @@ set (ZLIB_LIBRARIES ${ZLIB_LIBARIES} PARENT_SCOPE)
 ###########################################################################
 # Imath / OpenEXR
 
-#find_package (OpenEXR 2.4)
+find_package (OpenEXR 2.4)
 
 if (OPENEXR_FOUND)
   message (STATUS "Found OpenEXR version ${OPENEXR_VERSION}")
