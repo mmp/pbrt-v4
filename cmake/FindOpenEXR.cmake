@@ -1,6 +1,6 @@
 # Copyright Contributors to the Open Shading Language project.
 # SPDX-License-Identifier: BSD-3-Clause
-# https://github.com/imageworks/OpenShadingLanguage
+# https://github.com/AcademySoftwareFoundation/OpenShadingLanguage
 
 # Module to find OpenEXR and Imath.
 #
@@ -48,6 +48,7 @@ find_package(OpenEXR CONFIG)
 
 if (TARGET OpenEXR::OpenEXR AND TARGET Imath::Imath)
     # OpenEXR 3.x if both of these targets are found
+    set (FOUND_OPENEXR_WITH_CONFIG 1)
     if (NOT OpenEXR_FIND_QUIETLY)
         message (STATUS "Found CONFIG for OpenEXR 3 (OPENEXR_VERSION=${OpenEXR_VERSION})")
     endif ()
@@ -74,8 +75,10 @@ if (TARGET OpenEXR::OpenEXR AND TARGET Imath::Imath)
         list (APPEND ILMBASE_LIBRARIES ${CMAKE_THREAD_LIBS_INIT})
     endif ()
 
-elseif (TARGET OpenEXR::IlmImf AND TARGET IlmBase::Imath AND OPENEXR_VERSION VERSION_GREATER_EQUAL 2.4)
+elseif (TARGET OpenEXR::IlmImf AND TARGET IlmBase::Imath AND
+        (OPENEXR_VERSION VERSION_GREATER_EQUAL 2.4 OR OpenEXR_VERSION VERSION_GREATER_EQUAL 2.4))
     # OpenEXR 2.4 or 2.5 with exported config
+    set (FOUND_OPENEXR_WITH_CONFIG 1)
     if (NOT OpenEXR_FIND_QUIETLY)
         message (STATUS "Found CONFIG for OpenEXR 2 (OPENEXR_VERSION=${OpenEXR_VERSION})")
     endif ()
@@ -102,9 +105,17 @@ elseif (TARGET OpenEXR::IlmImf AND TARGET IlmBase::Imath AND OPENEXR_VERSION VER
         list (APPEND ILMBASE_LIBRARIES ${CMAKE_THREAD_LIBS_INIT})
     endif ()
 
+    # Correct for how old OpenEXR config exports set the directory one
+    # level lower than we prefer it.
+    string(REGEX REPLACE "include/OpenEXR$" "include" ILMBASE_INCLUDES "${ILMBASE_INCLUDES}")
+    string(REGEX REPLACE "include/OpenEXR$" "include" IMATH_INCLUDES "${IMATH_INCLUDES}")
+    string(REGEX REPLACE "include/OpenEXR$" "include" OPENEXR_INCLUDES "${OPENEXR_INCLUDES}")
+
 else ()
     # OpenEXR 2.x older versions without a config or whose configs we don't
     # trust.
+
+    set (FOUND_OPENEXR_WITH_CONFIG 0)
 
 # Other standard issue macros
 include (FindPackageHandleStandardArgs)
@@ -227,7 +238,6 @@ find_package_handle_standard_args (OpenEXR
     REQUIRED_VARS ILMBASE_INCLUDE_PATH OPENEXR_INCLUDE_PATH
                   OPENEXR_IMATH_LIBRARY OPENEXR_ILMIMF_LIBRARY
                   OPENEXR_IEX_LIBRARY OPENEXR_HALF_LIBRARY
-    VERSION_VAR OPENEXR_VERSION
     )
 
 if (OPENEXR_FOUND)

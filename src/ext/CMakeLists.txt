@@ -52,17 +52,13 @@ set (ZLIB_LIBRARIES ${ZLIB_LIBARIES} PARENT_SCOPE)
 ###########################################################################
 # Imath / OpenEXR
 
-find_package (OpenEXR 2.4)
+find_package (OpenEXR)
 
-if (OPENEXR_FOUND)
+if (OPENEXR_FOUND AND (OPENEXR_VERSION VERSION_GREATER_EQUAL "2.4"))
   message (STATUS "Found OpenEXR version ${OPENEXR_VERSION}")
 
   set (OPENEXR_INCLUDE ${OPENEXR_INCLUDES}/OpenEXR ${ILMBASE_INCLUDES}/OpenEXR PARENT_SCOPE)
-  if (WIN32)
-    set (OPENEXR_LIBS ${OPENEXR_LIBRARIES} ${ZLIB_LIBRARY} PARENT_SCOPE)
-  else ()
-    set (OPENEXR_LIBS ${OPENEXR_LIBRARIES} PARENT_SCOPE)
-  endif ()
+  message (STATUS "OPENEXRT LIBS ${OPENEXR_LIBRARIES}")
 else()
   message (STATUS "Imath/OpenEXR not found; building them from scratch.")
 
@@ -89,12 +85,7 @@ else()
   get_target_property (exrconfinc OpenEXRConfig INTERFACE_INCLUDE_DIRECTORIES)
 
   set (OPENEXR_INCLUDE "${imathinc};${imathconfinc};${exrinc};${exrconfinc};${iexinc}" PARENT_SCOPE)
-
-  if (WIN32)
-    set (OPENEXR_LIBS OpenEXR::OpenEXR Imath::Imath ${ZLIB_LIBRARY} PARENT_SCOPE)
-  else ()
-    set (OPENEXR_LIBS OpenEXR::OpenEXR Imath::Imath PARENT_SCOPE)
-  endif ()
+  set (OPENEXR_LIBRARIES Imath::Imath Imath::Half OpenEXR::OpenEXR OpenEXR::Iex OpenEXR::IlmThread PARENT_SCOPE)
 endif ()
 
 ###########################################################################
