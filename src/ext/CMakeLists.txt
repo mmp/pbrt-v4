@@ -52,7 +52,6 @@ set (ZLIB_LIBRARIES ${ZLIB_LIBARIES} PARENT_SCOPE)
 ###########################################################################
 # Imath / OpenEXR
 
-# DO NOT MERGE; commented out for CI testing
 #find_package (OpenEXR 2.4)
 
 if (OPENEXR_FOUND)
@@ -71,7 +70,9 @@ else()
   add_subdirectory (Imath)
 
   set (OPENEXR_BUILD_TOOLS OFF CACHE BOOL " " FORCE)
-  set (OPENEXR_FORCE_INTERNAL_ZLIB ON CACHE BOOL " " FORCE)
+  if (WIN32)
+    set (OPENEXR_FORCE_INTERNAL_ZLIB ON CACHE BOOL " " FORCE)
+  endif ()
   set (OPENEXR_INSTALL_EXAMPLES OFF CACHE BOOL " " FORCE)
 
   set (OPENEXR_IS_SUBPROJECT ON)
