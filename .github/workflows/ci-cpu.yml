@@ -53,7 +53,7 @@ jobs:
         cmake .. -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True ${{ matrix.config }}
       
     - name: Build
-      run: cmake --build build --parallel --config Release
+      run: cmake --build build --parallel --config Release -- -j 3
       
     - name: Test (Ubuntu/MacOS)
       if: ${{ (matrix.os == 'ubuntu-20.04' || matrix.os == 'macos-latest') && matrix.config == '' }}
