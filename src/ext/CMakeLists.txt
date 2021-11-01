@@ -52,41 +52,30 @@ set (ZLIB_LIBRARIES ${ZLIB_LIBARIES} PARENT_SCOPE)
 ###########################################################################
 # Imath / OpenEXR
 
-find_package (OpenEXR)
+set (IMATH_IS_SUBPROJECT ON)
+add_subdirectory (Imath)
 
-if (OPENEXR_FOUND AND (OPENEXR_VERSION VERSION_GREATER_EQUAL "2.4"))
-  message (STATUS "Found OpenEXR version ${OPENEXR_VERSION}")
-
-  set (OPENEXR_INCLUDE ${OPENEXR_INCLUDES}/OpenEXR ${ILMBASE_INCLUDES}/OpenEXR PARENT_SCOPE)
-  message (STATUS "OPENEXRT LIBS ${OPENEXR_LIBRARIES}")
-else()
-  message (STATUS "Imath/OpenEXR not found; building them from scratch.")
-
-  set (IMATH_IS_SUBPROJECT ON)
-  add_subdirectory (Imath)
-
-  set (OPENEXR_BUILD_TOOLS OFF CACHE BOOL " " FORCE)
-  if (WIN32)
-    set (OPENEXR_FORCE_INTERNAL_ZLIB ON CACHE BOOL " " FORCE)
-  endif ()
-  set (OPENEXR_INSTALL_EXAMPLES OFF CACHE BOOL " " FORCE)
-
-  set (OPENEXR_IS_SUBPROJECT ON)
-  set (CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-
-  get_target_property (imathinc Imath INTERFACE_INCLUDE_DIRECTORIES)
-  get_target_property (imathconfinc ImathConfig INTERFACE_INCLUDE_DIRECTORIES)
-  set (IMATH_HEADER_ONLY_INCLUDE_DIRS "${imathinc};${imathconfinc}")
-
-  add_subdirectory (openexr)
-
-  get_target_property (iexinc Iex INTERFACE_INCLUDE_DIRECTORIES)
-  get_target_property (exrinc OpenEXR INTERFACE_INCLUDE_DIRECTORIES)
-  get_target_property (exrconfinc OpenEXRConfig INTERFACE_INCLUDE_DIRECTORIES)
-
-  set (OPENEXR_INCLUDE "${imathinc};${imathconfinc};${exrinc};${exrconfinc};${iexinc}" PARENT_SCOPE)
-  set (OPENEXR_LIBRARIES Imath::Imath Imath::Half OpenEXR::OpenEXR OpenEXR::Iex OpenEXR::IlmThread PARENT_SCOPE)
+set (OPENEXR_BUILD_TOOLS OFF CACHE BOOL " " FORCE)
+if (WIN32)
+  set (OPENEXR_FORCE_INTERNAL_ZLIB ON CACHE BOOL " " FORCE)
 endif ()
+set (OPENEXR_INSTALL_EXAMPLES OFF CACHE BOOL " " FORCE)
+
+set (OPENEXR_IS_SUBPROJECT ON)
+set (CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+
+get_target_property (imathinc Imath INTERFACE_INCLUDE_DIRECTORIES)
+get_target_property (imathconfinc ImathConfig INTERFACE_INCLUDE_DIRECTORIES)
+set (IMATH_HEADER_ONLY_INCLUDE_DIRS "${imathinc};${imathconfinc}")
+
+add_subdirectory (openexr)
+
+get_target_property (iexinc Iex INTERFACE_INCLUDE_DIRECTORIES)
+get_target_property (exrinc OpenEXR INTERFACE_INCLUDE_DIRECTORIES)
+get_target_property (exrconfinc OpenEXRConfig INTERFACE_INCLUDE_DIRECTORIES)
+
+set (OPENEXR_INCLUDE "${imathinc};${imathconfinc};${exrinc};${exrconfinc};${iexinc}" PARENT_SCOPE)
+set (OPENEXR_LIBRARIES Imath::Imath OpenEXR::OpenEXR OpenEXR::Iex OpenEXR::IlmThread PARENT_SCOPE)
 
 ###########################################################################
 # ptex
