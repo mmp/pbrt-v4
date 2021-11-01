@@ -70,6 +70,9 @@ set (IMATH_HEADER_ONLY_INCLUDE_DIRS "${imathinc};${imathconfinc}")
 
 add_subdirectory (openexr)
 
+set_property (TARGET Iex IlmThread Imath OpenEXR OpenEXRCore OpenEXRUtil
+              PROPERTY FOLDER "ext/OpenEXR")
+
 get_target_property (iexinc Iex INTERFACE_INCLUDE_DIRECTORIES)
 get_target_property (exrinc OpenEXR INTERFACE_INCLUDE_DIRECTORIES)
 get_target_property (exrconfinc OpenEXRConfig INTERFACE_INCLUDE_DIRECTORIES)
