@@ -7,13 +7,13 @@ pbrt, Version 4 (Early Release)
 ![Transparent Machines frame, via @beeple](images/teaser-transparent-machines.png)
 
 This is an early release of pbrt-v4, the rendering system that will be
-described in the (eventually) forthcoming fourth edition of *Physically
-Based Rendering: From Theory to Implementation*.  (We hope to have an
-online version of the book posted in Fall of 2021 and printed books
-available in 2022.)
+described in the forthcoming fourth edition of *Physically Based Rendering:
+From Theory to Implementation*.  (We hope to have printed books available
+in Spring of 2022 and there will again be a free online version of the
+book.)
 
 We are making this code available for hardy adventurers; it's not yet
-extensively documented, but if you're familiar with previous versions of
+extensively documented, but if you are familiar with previous versions of
 pbrt, you should be able to make your away around it.  Our hope is that the
 system will be useful to some people in its current form and that any bugs
 in the current implementation might be found now, allowing us to correct
@@ -39,7 +39,7 @@ Major changes include:
     has been added.
   * Tighter majorants are used for null-scattering with the `GridDensityMedium`
     via a separate low-resolution grid of majorants.
-  * Emissive volumes are now supported.
+  * Both emissive volumes and volumes with RGB-valued absorption and scattering coefficients are now supported.
 * Support for rendering on GPUs is available on systems that have CUDA and OptiX.
   * The GPU path provides all of the functionality of the CPU-based
     `VolPathIntegrator`, including volumetric scattering, subsurface
@@ -69,8 +69,7 @@ Major changes include:
 * Rendering can now be performed in absolute physical units with modelling of real cameras as per [Langlands & Fascione 2020](https://github.com/wetadigital/physlight).
 * And also...
   * Various improvements have been made to the `Sampler` classes, including
-    better randomization and a new sampler that implements pmj02bn sampling ([Christensen et
-    al. 2018](https://graphics.pixar.com/library/ProgressiveMultiJitteredSampling/)).
+    better randomization and a new sampler that implements [Ahmed and Wonka's blue noise Sobol' sampler](http://abdallagafar.com/publications/zsampler/).
   * A new `GBufferFilm` that provides position, normal, albedo, etc., at
     each pixel is now available. (This is particularly useful for denoising and ML training.)
   * Path regularization (optionally).
@@ -79,7 +78,7 @@ Major changes include:
   * Most of the low-level sampling code has been factored out into
     stand-alone functions for easier reuse.  Also, functions that invert
     many sampling techniques are provided.
-  * Unit tests have been substantially increased.
+  * Unit test coverage has been substantially increased.
 
 We have also made a refactoring pass throughout the entire system, cleaning
 up various APIs and data types to improve both readability and usability.
