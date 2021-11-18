@@ -967,7 +967,7 @@ PBRT_CPU_GPU inline T Dot(Vector3<T> v, Vector3<T> w) {
 }
 
 // Equivalent to std::acos(Dot(a, b)), but more numerically stable.
-// via http://www.plunk.org/~hatch/rightway.php
+// via http://www.plunk.org/~hatch/rightway.html
 template <typename T>
 PBRT_CPU_GPU inline Float AngleBetween(Vector3<T> v1, Vector3<T> v2) {
     if (Dot(v1, v2) < 0)
@@ -1142,7 +1142,7 @@ PBRT_CPU_GPU inline Float AngleBetween(Quaternion q1, Quaternion q2) {
         return 2 * SafeASin(Length(q2 - q1) / 2);
 }
 
-// http://www.plunk.org/~hatch/rightway.php
+// http://www.plunk.org/~hatch/rightway.html
 PBRT_CPU_GPU inline Quaternion Slerp(Float t, Quaternion q1, Quaternion q2) {
     Float theta = AngleBetween(q1, q2);
     Float sinThetaOverTheta = SinXOverX(theta);

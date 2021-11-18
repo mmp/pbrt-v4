@@ -210,7 +210,7 @@ PBRT_CPU_GPU inline Float Lerp(Float x, Float a, Float b) {
     return (1 - x) * a + x * b;
 }
 
-// http://www.plunk.org/~hatch/rightway.php
+// http://www.plunk.org/~hatch/rightway.html
 PBRT_CPU_GPU inline Float SinXOverX(Float x) {
     if (1 + x * x == 1)
         return 1;
