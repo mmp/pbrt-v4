@@ -198,7 +198,9 @@ struct InstanceSceneEntity {
                         const AnimatedTransform &renderFromInstanceAnim)
         : name(SceneEntity::internedStrings.Lookup(n)),
           loc(loc),
-          renderFromInstanceAnim(new AnimatedTransform(renderFromInstanceAnim)) {}
+          renderFromInstanceAnim(new AnimatedTransform(renderFromInstanceAnim)) {
+        CHECK(this->renderFromInstanceAnim->IsAnimated());
+    }
     InstanceSceneEntity(const std::string &n, FileLoc loc,
                         const Transform *renderFromInstance)
         : name(SceneEntity::internedStrings.Lookup(n)),

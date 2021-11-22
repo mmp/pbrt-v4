@@ -372,14 +372,20 @@ void BasicSceneBuilder::ObjectInstance(const std::string &name, FileLoc loc) {
             RenderFromObject(0) * worldFromRender, graphicsState.transformStartTime,
             RenderFromObject(1) * worldFromRender, graphicsState.transformEndTime);
 
-        instanceUses.push_back(
-            InstanceSceneEntity(name, loc, animatedRenderFromInstance));
-    } else {
-        const class Transform *renderFromInstance =
-            transformCache.Lookup(RenderFromObject(0) * worldFromRender);
-
-        instanceUses.push_back(InstanceSceneEntity(name, loc, renderFromInstance));
+        // For very small changes, animatedRenderFromInstance may have both
+        // xforms equal even if CTMIsAnimated() has returned true. Fall
+        // through to create a regular non-animated instance in that case.
+        if (animatedRenderFromInstance.IsAnimated()) {
+            instanceUses.push_back(
+                InstanceSceneEntity(name, loc, animatedRenderFromInstance));
+            return;
+        }
     }
+
+    const class Transform *renderFromInstance =
+        transformCache.Lookup(RenderFromObject(0) * worldFromRender);
+
+    instanceUses.push_back(InstanceSceneEntity(name, loc, renderFromInstance));
 }
 
 void BasicSceneBuilder::EndOfFiles() {
