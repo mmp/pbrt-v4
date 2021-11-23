@@ -1186,7 +1186,7 @@ class Triangle {
     // Triangle Private Members
     int meshIndex = -1, triIndex = -1;
     static pstd::vector<const TriangleMesh *> *allMeshes;
-    static constexpr Float MinSphericalSampleArea = 2e-4;
+    static constexpr Float MinSphericalSampleArea = 3e-4;
     static constexpr Float MaxSphericalSampleArea = 6.22;
 };
 
