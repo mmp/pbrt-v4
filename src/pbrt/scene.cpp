@@ -1086,7 +1086,7 @@ void BasicScene::Done() {
 void BasicScene::CreateMaterials(const NamedTextures &textures,
                                  std::map<std::string, pbrt::Material> *namedMaterialsOut,
                                  std::vector<pbrt::Material> *materialsOut) {
-    LOG_VERBOSE("Starting to consume normal map futures");
+    LOG_VERBOSE("Starting to consume %d normal map futures", normalMapJobs.size());
     std::lock_guard<std::mutex> lock(materialMutex);
     for (auto &job : normalMapJobs) {
         CHECK(normalMaps.find(job.first) == normalMaps.end());
@@ -1114,8 +1114,12 @@ void BasicScene::CreateMaterials(const NamedTextures &textures,
             continue;
         }
 
-        std::string fn = nm.second.parameters.GetOneString("normalmap", "");
-        Image *normalMap = !fn.empty() ? normalMaps[fn] : nullptr;
+        std::string fn = ResolveFilename(nm.second.parameters.GetOneString("normalmap", ""));
+        Image *normalMap = nullptr;
+        if (!fn.empty()) {
+            CHECK(normalMaps.find(fn) != normalMaps.end());
+            normalMap = normalMaps[fn];
+        }
 
         TextureParameterDictionary texDict(&mtl.parameters, &textures);
         class Material m = Material::Create(type, texDict, normalMap, *namedMaterialsOut,
