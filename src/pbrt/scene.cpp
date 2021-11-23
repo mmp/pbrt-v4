@@ -1131,8 +1131,13 @@ void BasicScene::CreateMaterials(const NamedTextures &textures,
     materialsOut->reserve(materials.size());
     for (const auto &mtl : materials) {
         Allocator alloc = threadAllocators.Get();
-        std::string fn = mtl.parameters.GetOneString("normalmap", "");
-        Image *normalMap = !fn.empty() ? normalMaps[fn] : nullptr;
+
+        std::string fn = ResolveFilename(mtl.parameters.GetOneString("normalmap", ""));
+        Image *normalMap = nullptr;
+        if (!fn.empty()) {
+            CHECK(normalMaps.find(fn) != normalMaps.end());
+            normalMap = normalMaps[fn];
+        }
 
         TextureParameterDictionary texDict(&mtl.parameters, &textures);
         class Material m = Material::Create(mtl.name, texDict, normalMap,
