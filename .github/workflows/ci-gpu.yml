@@ -45,6 +45,12 @@ jobs:
         repository: mmp/rgb2spectrum
         path: build
 
+    - name: Cache OptiX headers
+      uses: actions/cache@v2
+      with:
+        path: optix
+        key: optix-7.123
+
     - name: Checkout OptiX headers
       uses: actions/checkout@v2
       with:
