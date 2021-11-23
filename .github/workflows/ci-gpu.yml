@@ -16,13 +16,24 @@ jobs:
       fail-fast: false
       matrix:
         optix: [ optix-7.1.0, optix-7.2.0, optix-7.3.0 ]
-        cuda: [ '11.0', '11.1', '11.2', '11.4' ]  # 11.3 fails for very unclear reasons
+        cuda: [ '11.0.3', '11.1.1', '11.2.2', '11.4.3', '11.5.0' ]  # 11.3.0 fails for unclear reasons
+        os: [ ubuntu-20.04, windows-latest ]
 
-    name: GPU Build Only (CUDA ${{ matrix.cuda }}, ${{ matrix.optix }})
+    name: GPU Build Only (${{ matrix.os }}, CUDA ${{ matrix.cuda }}, ${{ matrix.optix }})
 
-    runs-on: ubuntu-20.04
+    runs-on: ${{ matrix.os }}
 
     steps:
+    - uses: mmp/cuda-toolkit@master
+      id: cuda-toolkit
+      with:
+        cuda: ${{ matrix.cuda }}
+        method: 'network'
+        sub-packages: '[ "nvcc" ]'
+
+    - name: Check NVCC
+      run: nvcc -V
+
     - name: Checkout pbrt
       uses: actions/checkout@v2
       with:
@@ -45,23 +56,14 @@ jobs:
       uses: lukka/get-cmake@latest
 
     - name: Install OpenEXR
+      if: ${{ matrix.os == 'ubuntu-20.04' }}
       run: sudo apt-get -y install libopenexr-dev
 
-    - name: Install CUDA
-      run: |
-        wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin
-        sudo mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600
-        sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub
-        sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
-        cuda=`echo ${{ matrix.cuda }} | tr . -`
-        sudo apt install -y cuda-compiler-${cuda} cuda-libraries-${cuda} cuda-libraries-dev-${cuda}
-        echo /usr/local/cuda-${{ matrix.cuda }}/bin >> $GITHUB_PATH
-        
     - name: Configure
       run: |
         cd build
         cmake .. -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True -DPBRT_OPTIX7_PATH=../optix/${{ matrix.optix }} -DPBRT_GPU_SHADER_MODEL=sm_80
-      
+
     - name: Build
       # We need to limit the number of jobs so that it doesn't OOM 
       run: cmake --build build --parallel 3 --config Release
