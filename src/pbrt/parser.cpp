@@ -1037,7 +1037,7 @@ FormattingParserTarget::~FormattingParserTarget() {
 void FormattingParserTarget::Option(const std::string &name, const std::string &value,
                              FileLoc loc) {
     std::string nName = normalizeArg(name);
-    if (nName == "msereferenceimage" || nName == "msereferenceout")
+    if (nName == "msereferenceimage" || nName == "msereferenceout" || nName == "rendercoordsys")
         Printf("%sOption \"%s\" \"%s\"\n", indent(), name, value);
     else
         Printf("%sOption \"%s\" %s\n", indent(), name, value);
