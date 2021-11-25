@@ -522,6 +522,18 @@ void BasicSceneBuilder::Option(const std::string &name, const std::string &value
         if (value.size() < 3 || value.front() != '"' || value.back() != '"')
             ErrorExitDeferred(&loc, "%s: expected quoted string for option value", value);
         Options->mseReferenceOutput = value.substr(1, value.size() - 2);
+    } else if (nName == "rendercoordsys") {
+        if (value.size() < 3 || value.front() != '"' || value.back() != '"')
+            ErrorExitDeferred(&loc, "%s: expected quoted string for option value", value);
+        std::string renderCoordSys = value.substr(1, value.size() - 2);
+        if (renderCoordSys == "camera")
+            Options->renderingSpace = RenderingCoordinateSystem::Camera;
+        else if (renderCoordSys == "cameraworld")
+            Options->renderingSpace = RenderingCoordinateSystem::CameraWorld;
+        else if (renderCoordSys == "world")
+            Options->renderingSpace = RenderingCoordinateSystem::World;
+        else
+            ErrorExit("%s: unknown rendering coordinate system.", renderCoordSys);
     } else if (nName == "seed") {
         Options->seed = std::atoi(value.c_str());
     } else if (nName == "forcediffuse") {
