@@ -384,7 +384,6 @@ void BasicSceneBuilder::ObjectInstance(const std::string &name, FileLoc loc) {
 
     const class Transform *renderFromInstance =
         transformCache.Lookup(RenderFromObject(0) * worldFromRender);
-
     instanceUses.push_back(InstanceSceneEntity(name, loc, renderFromInstance));
 }
 
@@ -1126,7 +1125,8 @@ void BasicScene::CreateMaterials(const NamedTextures &textures,
             continue;
         }
 
-        std::string fn = ResolveFilename(nm.second.parameters.GetOneString("normalmap", ""));
+        std::string fn =
+            ResolveFilename(nm.second.parameters.GetOneString("normalmap", ""));
         Image *normalMap = nullptr;
         if (!fn.empty()) {
             CHECK(normalMaps.find(fn) != normalMaps.end());
@@ -1143,7 +1143,6 @@ void BasicScene::CreateMaterials(const NamedTextures &textures,
     materialsOut->reserve(materials.size());
     for (const auto &mtl : materials) {
         Allocator alloc = threadAllocators.Get();
-
         std::string fn = ResolveFilename(mtl.parameters.GetOneString("normalmap", ""));
         Image *normalMap = nullptr;
         if (!fn.empty()) {

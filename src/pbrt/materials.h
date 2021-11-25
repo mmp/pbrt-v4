@@ -888,7 +888,7 @@ class MeasuredMaterial {
     // MeasuredMaterial Private Members
     FloatTexture displacement;
     Image *normalMap;
-    const MeasuredBRDF *brdf;
+    const MeasuredBxDFData *brdf;
 };
 
 // Material Inline Method Definitions

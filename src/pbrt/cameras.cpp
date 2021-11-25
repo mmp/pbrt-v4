@@ -789,7 +789,7 @@ Float RealisticCamera::TraceLensesFromFilm(const Ray &rCamera, Ray *rOut) const 
             rLens.d = w;
         }
     }
-    // Transform _rLens_ from lens system space back to camera space
+    // Transform lens system space ray back to camera space
     if (rOut)
         *rOut = Ray(Point3f(rLens.o.x, rLens.o.y, -rLens.o.z),
                     Vector3f(rLens.d.x, rLens.d.y, -rLens.d.z), rLens.time);

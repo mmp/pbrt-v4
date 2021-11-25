@@ -100,8 +100,7 @@ inline PBRT_CPU_GPU typename std::enable_if_t<std::is_integral<T>::value, bool> 
     return true;
 }
 
-PBRT_CPU_GPU
-inline float FMA(float a, float b, float c) {
+PBRT_CPU_GPU inline float FMA(float a, float b, float c) {
     return std::fma(a, b, c);
 }
 

@@ -1429,7 +1429,7 @@ class PiecewiseLinear2D {
     }
 
     struct PLSample {
-        Vector2f p;
+        Point2f p;
         Float pdf;
     };
 
@@ -1440,7 +1440,7 @@ class PiecewiseLinear2D {
      * Returns the warped sample and associated probability density.
      */
     PBRT_CPU_GPU
-    PLSample Sample(Vector2f sample, const Float *param = nullptr) const {
+    PLSample Sample(Point2f sample, const Float *param = nullptr) const {
         /* Avoid degeneracies at the extrema */
         sample[0] = Clamp(sample[0], 1 - OneMinusEpsilon, OneMinusEpsilon);
         sample[1] = Clamp(sample[1], 1 - OneMinusEpsilon, OneMinusEpsilon);
@@ -1532,14 +1532,14 @@ class PiecewiseLinear2D {
                             : (c0 - SafeSqrt(c0 * c0 - 2.f * sample.x * (c0 - c1)));
         sample.x /= is_const ? (c0 + c1) : (c0 - c1);
 
-        return {Vector2f((col + sample.x) * m_patch_size.x,
-                         (row + sample.y) * m_patch_size.y),
-                ((1.f - sample.x) * c0 + sample.x * c1) * HProd(m_inv_patch_size)};
+        return {
+            Point2f((col + sample.x) * m_patch_size.x, (row + sample.y) * m_patch_size.y),
+            ((1.f - sample.x) * c0 + sample.x * c1) * HProd(m_inv_patch_size)};
     }
 
     /// Inverse of the mapping implemented in \c Sample()
     PBRT_CPU_GPU
-    PLSample Invert(Vector2f sample, const Float *param = nullptr) const {
+    PLSample Invert(Point2f sample, const Float *param = nullptr) const {
         /* Look up parameter-related indices and weights (if Dimension != 0) */
         float param_weight[2 * ArraySize];
         uint32_t slice_offset = 0u;
@@ -1582,7 +1582,7 @@ class PiecewiseLinear2D {
               v11 = lookup<Dimension>(m_data.data() + m_size.x + 1, offset, slice_size,
                                       param_weight);
 
-        Vector2f w1 = sample, w0 = Vector2f(1, 1) - w1;
+        Vector2f w1 = Vector2f(sample), w0 = Vector2f(1, 1) - w1;
 
         Float c0 = FMA(w0.y, v00, w1.y * v01), c1 = FMA(w0.y, v10, w1.y * v11),
               pdf = FMA(w0.x, c0, w1.x * c1);
@@ -1626,7 +1626,7 @@ class PiecewiseLinear2D {
      * parameterized by \c param if applicable.
      */
     PBRT_CPU_GPU
-    float Evaluate(Vector2f pos, const Float *param = nullptr) const {
+    float Evaluate(Point2f pos, const Float *param = nullptr) const {
         /* Look up parameter-related indices and weights (if Dimension != 0) */
         float param_weight[2 * ArraySize];
         uint32_t slice_offset = 0u;
@@ -1655,7 +1655,8 @@ class PiecewiseLinear2D {
         pos.y *= m_inv_patch_size.y;
         Vector2i offset = Min(Vector2i(pos), m_size - Vector2i(2, 2));
 
-        Vector2f w1 = pos - Vector2f(Vector2i(offset)), w0 = Vector2f(1, 1) - w1;
+        Vector2f w1 = Vector2f(pos) - Vector2f(Vector2i(offset)),
+                 w0 = Vector2f(1, 1) - w1;
 
         uint32_t index = offset.x + offset.y * m_size.x;
 

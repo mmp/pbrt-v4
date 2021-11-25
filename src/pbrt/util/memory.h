@@ -129,7 +129,6 @@ class alignas(PBRT_L1_CACHE_LINE_SIZE) ScratchBuffer {
         return ret;
     }
 
-    PBRT_CPU_GPU
     void Reset() {
         for (const auto &buf : smallBuffers)
             Allocator().deallocate_bytes(buf.first, buf.second, align);

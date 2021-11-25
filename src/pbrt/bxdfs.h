@@ -1023,10 +1023,11 @@ class MeasuredBxDF {
     // MeasuredBxDF Public Methods
     MeasuredBxDF() = default;
     PBRT_CPU_GPU
-    MeasuredBxDF(const MeasuredBRDF *brdf, const SampledWavelengths &lambda)
+    MeasuredBxDF(const MeasuredBxDFData *brdf, const SampledWavelengths &lambda)
         : brdf(brdf), lambda(lambda) {}
 
-    static MeasuredBRDF *BRDFDataFromFile(const std::string &filename, Allocator alloc);
+    static MeasuredBxDFData *BRDFDataFromFile(const std::string &filename,
+                                              Allocator alloc);
 
     PBRT_CPU_GPU
     SampledSpectrum f(Vector3f wo, Vector3f wi, TransportMode mode) const;
@@ -1062,7 +1063,7 @@ class MeasuredBxDF {
     static Float phi2u(Float phi) { return (phi + Pi) / (2.f * Pi); }
 
     // MeasuredBxDF Private Members
-    const MeasuredBRDF *brdf;
+    const MeasuredBxDFData *brdf;
     SampledWavelengths lambda;
 };
 
