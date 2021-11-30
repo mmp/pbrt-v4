@@ -1067,29 +1067,29 @@ SampledSpectrum MeasuredBxDF::f(Vector3f wo, Vector3f wi, TransportMode mode) co
     wm = Normalize(wm);
 
     // Cartesian -> spherical coordinates
-    Float theta_i = SphericalTheta(wi), phi_i = std::atan2(wi.y, wi.x);
+    Float theta_o = SphericalTheta(wo), phi_o = std::atan2(wo.y, wo.x);
     Float theta_m = SphericalTheta(wm), phi_m = std::atan2(wm.y, wm.x);
 
     // Spherical coordinates -> unit coordinate system
-    Point2f u_wi(theta2u(theta_i), phi2u(phi_i));
-    Point2f u_wm(theta2u(theta_m), phi2u(brdf->isotropic ? (phi_m - phi_i) : phi_m));
+    Point2f u_wo(theta2u(theta_o), phi2u(phi_o));
+    Point2f u_wm(theta2u(theta_m), phi2u(brdf->isotropic ? (phi_m - phi_o) : phi_m));
     u_wm.y = u_wm.y - pstd::floor(u_wm.y);
 
-    Float params[2] = {phi_i, theta_i};
+    Float params[2] = {phi_o, theta_o};
     auto ui = brdf->vndf.Invert(u_wm, params);
     Point2f sample = ui.p;
     Float vndfPDF = ui.pdf;
 
     SampledSpectrum fr(0);
     for (int i = 0; i < pbrt::NSpectrumSamples; ++i) {
-        Float params_fr[3] = {phi_i, theta_i, lambda[i]};
+        Float params_fr[3] = {phi_o, theta_o, lambda[i]};
         fr[i] = brdf->spectra.Evaluate(sample, params_fr);
         CHECK_RARE(1e-5f, fr[i] < 0);
         fr[i] = std::max<Float>(0, fr[i]);
     }
 
     return fr * brdf->ndf.Evaluate(u_wm, params) /
-           (4 * brdf->sigma.Evaluate(u_wi, params) * AbsCosTheta(wi));
+           (4 * brdf->sigma.Evaluate(u_wo, params) * AbsCosTheta(wi));
 }
 
 Float MeasuredBxDF::PDF(Vector3f wo, Vector3f wi, TransportMode mode,
@@ -1109,14 +1109,14 @@ Float MeasuredBxDF::PDF(Vector3f wo, Vector3f wi, TransportMode mode,
     wm = Normalize(wm);
 
     /* Cartesian -> spherical coordinates */
-    Float theta_i = SphericalTheta(wi), phi_i = std::atan2(wi.y, wi.x);
+    Float theta_o = SphericalTheta(wo), phi_o = std::atan2(wo.y, wo.x);
     Float theta_m = SphericalTheta(wm), phi_m = std::atan2(wm.y, wm.x);
 
     /* Spherical coordinates -> unit coordinate system */
-    Point2f u_wm(theta2u(theta_m), phi2u(brdf->isotropic ? (phi_m - phi_i) : phi_m));
+    Point2f u_wm(theta2u(theta_m), phi2u(brdf->isotropic ? (phi_m - phi_o) : phi_m));
     u_wm.y = u_wm.y - pstd::floor(u_wm.y);
 
-    Float params[2] = {phi_i, theta_i};
+    Float params[2] = {phi_o, theta_o};
     auto ui = brdf->vndf.Invert(u_wm, params);
     Point2f sample = ui.p;
     Float vndfPDF = ui.pdf;
@@ -1124,7 +1124,7 @@ Float MeasuredBxDF::PDF(Vector3f wo, Vector3f wi, TransportMode mode,
     Float pdf = brdf->luminance.Evaluate(sample, params);
     Float sinTheta_m = std::sqrt(Sqr(wm.x) + Sqr(wm.y));
     Float jacobian =
-        4.f * Dot(wi, wm) * std::max<Float>(2 * Sqr(Pi) * u_wm.x * sinTheta_m, 1e-6f);
+        4.f * Dot(wo, wm) * std::max<Float>(2 * Sqr(Pi) * u_wm.x * sinTheta_m, 1e-6f);
     return vndfPDF * pdf / jacobian;
 }
 
