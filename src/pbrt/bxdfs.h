@@ -863,7 +863,7 @@ class LayeredBxDF {
                 uc = r();
                 u = Point2f(r(), r());
                 pstd::optional<BSDFSample> wis = tiInterface.Sample_f(wi, uc, u, !mode);
-                if (!wis || !wos->f || wos->pdf == 0 || wos->wi.z == 0 ||
+                if (!wis || !wis->f || wis->pdf == 0 || wis->wi.z == 0 ||
                     wis->IsReflection())
                     continue;
 
