@@ -448,7 +448,6 @@ TEST(Triangle, BadCases) {
     EXPECT_FALSE(tris[0].Intersect(ray).has_value());
 }
 
-#if 0
 TEST(BilinearPatch, Offset) {
     RNG rng;
     for (int i = 0; i < 100; ++i) {
@@ -463,7 +462,7 @@ TEST(BilinearPatch, Offset) {
 
         BilinearPatchMesh mesh(Transform(), false, indices, p,
                                std::vector<Normal3f>(), std::vector<Point2f>(),
-                               std::vector<int>(), nullptr);
+                               std::vector<int>(), nullptr, Allocator());
         for (int j = 0; j < 100; ++j) {
             Point3f o(-20 + 40 * rng.Uniform<Float>(),
                       -20 + 40 * rng.Uniform<Float>(),
@@ -494,4 +493,3 @@ TEST(BilinearPatch, Offset) {
         }
     }
 }
-#endif
