@@ -475,10 +475,9 @@ TEST(BilinearPatch, Offset) {
                               uv[0] * uv[1] * p[3]);
             Ray r(o, pPatch - o);
             auto isect = IntersectBilinearPatch(r, Infinity, p[0], p[1], p[2], p[3]);
-            if (!isect) {
-                printf("wow\n");
+            if (!isect)
+                // Hmm...
                 continue;
-            }
 
             SurfaceInteraction intr =
                 BilinearPatch::InteractionFromIntersection(&mesh, 0, isect->uv,
@@ -487,8 +486,6 @@ TEST(BilinearPatch, Offset) {
             Ray spawned = intr.SpawnRay(r.d);
             auto spawnedIsect = IntersectBilinearPatch(spawned, Infinity,
                                                        p[0], p[1], p[2], p[3]);
-            if (spawnedIsect)
-                printf("doh!\n");
             EXPECT_FALSE(spawnedIsect.has_value());
         }
     }

@@ -1289,9 +1289,9 @@ PBRT_CPU_GPU inline pstd::optional<BilinearIntersection> IntersectBilinearPatch(
 
     // Find epsilon _eps_ to ensure that candidate $t$ is greater than zero
     Float eps =
-        gamma(5) * (MaxComponentValue(Abs(ray.o)) + MaxComponentValue(Abs(ray.d)) +
-                    MaxComponentValue(Abs(p00)) + MaxComponentValue(Abs(p10)) +
-                    MaxComponentValue(Abs(p01)) + MaxComponentValue(Abs(p11)));
+        gamma(10) * (MaxComponentValue(Abs(ray.o)) + MaxComponentValue(Abs(ray.d)) +
+                     MaxComponentValue(Abs(p00)) + MaxComponentValue(Abs(p10)) +
+                     MaxComponentValue(Abs(p01)) + MaxComponentValue(Abs(p11)));
 
     // Compute $v$ and $t$ for the first $u$ intersection
     Float t = tMax, u, v;
