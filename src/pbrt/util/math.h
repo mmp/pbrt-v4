@@ -922,9 +922,21 @@ class Interval {
     PBRT_CPU_GPU
     Interval &operator-=(Float f) { return *this -= Interval(f); }
     PBRT_CPU_GPU
-    Interval &operator*=(Float f) { return *this *= Interval(f); }
+    Interval &operator*=(Float f) {
+        if (f > 0)
+            *this = Interval(MulRoundDown(f, low), MulRoundUp(f, high));
+        else
+            *this = Interval(MulRoundDown(f, high), MulRoundUp(f, low));
+        return *this;
+    }
     PBRT_CPU_GPU
-    Interval &operator/=(Float f) { return *this /= Interval(f); }
+    Interval &operator/=(Float f) {
+        if (f > 0)
+            *this = Interval(DivRoundDown(low, f), DivRoundUp(high, f));
+        else
+            *this = Interval(DivRoundDown(high, f), DivRoundUp(low, f));
+        return *this;
+    }
 
 #ifndef PBRT_IS_GPU_CODE
     static const Interval Pi;
@@ -979,11 +991,22 @@ PBRT_CPU_GPU inline Interval operator-(Float f, Interval i) {
 }
 
 PBRT_CPU_GPU inline Interval operator*(Float f, Interval i) {
-    return Interval(f) * i;
+    if (f > 0)
+        return Interval(MulRoundDown(f, i.LowerBound()), MulRoundUp(f, i.UpperBound()));
+    else
+        return Interval(MulRoundDown(f, i.UpperBound()), MulRoundUp(f, i.LowerBound()));
 }
 
 PBRT_CPU_GPU inline Interval operator/(Float f, Interval i) {
-    return Interval(f) / i;
+    if (InRange(0, i))
+        // The interval we're dividing by straddles zero, so just
+        // return an interval of everything.
+        return Interval(-Infinity, Infinity);
+
+    if (f > 0)
+        return Interval(DivRoundDown(f, i.UpperBound()), DivRoundUp(f, i.LowerBound()));
+    else
+        return Interval(DivRoundDown(f, i.LowerBound()), DivRoundUp(f, i.UpperBound()));
 }
 
 PBRT_CPU_GPU inline Interval operator+(Interval i, Float f) {
@@ -995,11 +1018,20 @@ PBRT_CPU_GPU inline Interval operator-(Interval i, Float f) {
 }
 
 PBRT_CPU_GPU inline Interval operator*(Interval i, Float f) {
-    return i * Interval(f);
+    if (f > 0)
+        return Interval(MulRoundDown(f, i.LowerBound()), MulRoundUp(f, i.UpperBound()));
+    else
+        return Interval(MulRoundDown(f, i.UpperBound()), MulRoundUp(f, i.LowerBound()));
 }
 
 PBRT_CPU_GPU inline Interval operator/(Interval i, Float f) {
-    return i / Interval(f);
+    if (f == 0)
+        return Interval(-Infinity, Infinity);
+
+    if (f > 0)
+        return Interval(DivRoundDown(i.LowerBound(), f), DivRoundUp(i.UpperBound(), f));
+    else
+        return Interval(DivRoundDown(i.UpperBound(), f), DivRoundUp(i.LowerBound(), f));
 }
 
 PBRT_CPU_GPU inline Float Floor(Interval i) {
