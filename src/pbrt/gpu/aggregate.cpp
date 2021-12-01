@@ -30,7 +30,13 @@
 #include <optix_stubs.h>
 
 #ifdef NVTX
+#ifdef UNICODE
+#undef UNICODE
+#endif // UNICODE
 #include <nvtx3/nvToolsExt.h>
+#ifdef RGB
+#undef RGB
+#endif // RGB
 #endif
 
 #define OPTIX_CHECK(EXPR)                                                           \

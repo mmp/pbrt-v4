@@ -22,7 +22,14 @@
 #include <cuda_runtime_api.h>
 
 #ifdef NVTX
+#ifdef UNICODE
+#undef UNICODE
+#endif
 #include <nvtx3/nvToolsExt.h>
+
+#ifdef RGB
+#undef RGB
+#endif // RGB
 #endif
 
 #define CUDA_CHECK(EXPR)                                        \
