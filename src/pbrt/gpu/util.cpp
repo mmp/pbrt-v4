@@ -42,17 +42,10 @@ void GPUInit() {
 
     int nDevices;
     CUDA_CHECK(cudaGetDeviceCount(&nDevices));
-#ifdef PBRT_IS_WINDOWS
-    cudaDeviceProp firstDeviceProperties;
-#endif
     std::string devices;
     for (int i = 0; i < nDevices; ++i) {
         cudaDeviceProp deviceProperties;
         CUDA_CHECK(cudaGetDeviceProperties(&deviceProperties, i));
-#ifdef PBRT_IS_WINDOWS
-        if (i == 0)
-            firstDeviceProperties = deviceProperties;
-#endif
         CHECK(deviceProperties.canMapHostMemory);
 
         std::string deviceString = StringPrintf(
@@ -63,18 +56,18 @@ void GPUInit() {
             deviceProperties.major, deviceProperties.minor);
         LOG_VERBOSE("%s", deviceString);
         devices += deviceString + "\n";
+    }
 
 #ifdef PBRT_IS_WINDOWS
-        if (deviceProperties.major != firstDeviceProperties.major)
-            ErrorExit("Found multiple GPUs with different shader models.\n"
-                      "On Windows, this unfortunately causes a significant slowdown with "
-                      "pbrt.\n"
-                      "Please select a single GPU and use the --gpu-device command line "
-                      "option to specify it.\n"
-                      "Found devices:\n%s",
-                      devices);
+    if (nDevices > 1)
+        ErrorExit("Found multiple GPUs.\n"
+                  "On Windows, this unfortunately causes a significant slowdown with "
+                  "pbrt.\n"
+                  "Please select a single GPU and use the --gpu-device command line "
+                  "option to specify it.\n"
+                  "Found devices:\n%s",
+                  devices);
 #endif
-    }
 
     int device = Options->gpuDevice ? *Options->gpuDevice : 0;
     LOG_VERBOSE("Selecting GPU device %d", device);
