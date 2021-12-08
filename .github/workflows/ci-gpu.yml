@@ -49,7 +49,7 @@ jobs:
       uses: actions/cache@v2
       with:
         path: optix
-        key: optix-7.1234
+        key: optix-7.12345
 
     - name: Checkout OptiX headers
       uses: actions/checkout@v2
