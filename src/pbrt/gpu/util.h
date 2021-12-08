@@ -29,7 +29,7 @@
 
 #ifdef RGB
 #undef RGB
-#endif // RGB
+#endif  // RGB
 #endif
 
 #define CUDA_CHECK(EXPR)                                        \

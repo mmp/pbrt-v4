@@ -1054,13 +1054,14 @@ class MeasuredBxDF {
   private:
     // MeasuredBxDF Private Methods
     PBRT_CPU_GPU
+    static Float theta2u(Float theta) { return std::sqrt(theta * (2 / Pi)); }
+    PBRT_CPU_GPU
+    static Float phi2u(Float phi) { return phi * (1 / (2 * Pi)) + .5f; }
+
+    PBRT_CPU_GPU
     static Float u2theta(Float u) { return Sqr(u) * (Pi / 2.f); }
     PBRT_CPU_GPU
     static Float u2phi(Float u) { return (2.f * u - 1.f) * Pi; }
-    PBRT_CPU_GPU
-    static Float theta2u(Float theta) { return std::sqrt(theta * (2.f / Pi)); }
-    PBRT_CPU_GPU
-    static Float phi2u(Float phi) { return (phi + Pi) / (2.f * Pi); }
 
     // MeasuredBxDF Private Members
     const MeasuredBxDFData *brdf;

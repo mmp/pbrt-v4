@@ -582,6 +582,17 @@ NanoVDBMedium::NanoVDBMedium(const Transform &renderFromMedium, Spectrum sigma_a
         int nz0 = std::max(int(i0[2] - delta), bbox.min()[2]);
         int nz1 = std::min(int(i1[2] + delta), bbox.max()[2]);
 
+        // FIXME: While the following is properly conservative, it can lead
+        // to voxels with majorants that are much higher than any actual
+        // volume density value in their extent. The issue comes up when
+        // a) the density at a sample outside the is much higher than in the
+        // voxel's interior and b) that sample only has a minimal
+        // contribution in practice due to trilinear interpolation.  We
+        // compute a majorant as if it might fully contribute, even though
+        // it can't.  Fixing this would require careful handling of the
+        // boundary samples.  The impact of these majorants is not
+        // insignificant; they cause a roughly 10% slowdown in practice
+        // due to excess null scattering in such voxels.
         float maxValue = 0;
         auto accessor = densityFloatGrid->getAccessor();
         // Apparently nanovdb integer bounding boxes are inclusive on
