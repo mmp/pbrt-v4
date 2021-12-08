@@ -22,6 +22,7 @@
 #include <functional>
 #include <ostream>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace pbrt {
@@ -1441,8 +1442,8 @@ class PiecewiseLinear2D {
      */
     template <typename... Ts>
     PBRT_CPU_GPU PLSample Sample(Point2f sample, Ts... params) const {
-        static_assert((std::is_same_v<Ts, float> && ...),
-                      "Additional parameters must be floating point values");
+        static_assert((std::is_arithmetic_v<Ts> && ...),
+                      "Additional parameters must be numeric values");
         static_assert(sizeof...(Ts) == Dimension,
                       "Incorrect number of additional parameters passed");
         pstd::array<Float, Dimension> param = {params...};
@@ -1546,8 +1547,8 @@ class PiecewiseLinear2D {
     /// Inverse of the mapping implemented in \c Sample()
     template <typename... Ts>
     PBRT_CPU_GPU PLSample Invert(Point2f sample, Ts... params) const {
-        static_assert((std::is_same_v<Ts, float> && ...),
-                      "Additional parameters must be floating point values");
+        static_assert((std::is_arithmetic_v<Ts> && ...),
+                      "Additional parameters must be numeric values");
         static_assert(sizeof...(Ts) == Dimension,
                       "Incorrect number of additional parameters passed");
         pstd::array<Float, Dimension> param = {params...};
@@ -1639,8 +1640,8 @@ class PiecewiseLinear2D {
      */
     template <typename... Ts>
     PBRT_CPU_GPU float Evaluate(Point2f pos, Ts... params) const {
-        static_assert((std::is_same_v<Ts, float> && ...),
-                      "Additional parameters must be floating point values");
+        static_assert((std::is_arithmetic_v<Ts> && ...),
+                      "Additional parameters must be numeric values");
         static_assert(sizeof...(Ts) == Dimension,
                       "Incorrect number of additional parameters passed");
         pstd::array<Float, Dimension> param = {params...};
