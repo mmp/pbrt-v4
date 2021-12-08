@@ -175,7 +175,7 @@ class DielectricBxDF {
     PBRT_CPU_GPU
     BxDFFlags Flags() const {
         if (eta == 1)
-            return BxDFFlags::Transmission;
+            return BxDFFlags::Transmission | BxDFFlags::Specular;
         else
             return BxDFFlags::Reflection | BxDFFlags::Transmission |
                    (mfDistrib.EffectivelySmooth() ? BxDFFlags::Specular
