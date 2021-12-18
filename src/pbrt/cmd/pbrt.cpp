@@ -21,7 +21,6 @@
 #include <pbrt/util/spectrum.h>
 #include <pbrt/util/string.hpp>
 #include <pbrt/wavefront/wavefront.h>
-#include <json/single_include/nlohmann/json.hpp>
 
 #include <string>
 #include <vector>
