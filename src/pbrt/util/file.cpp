@@ -7,7 +7,7 @@
 #include <pbrt/util/check.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/parallel.h>
-#include <pbrt/util/string.h>
+#include <pbrt/util/string.hpp>
 
 #include <libdeflate.h>
 

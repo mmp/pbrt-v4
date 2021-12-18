@@ -8,7 +8,7 @@
 #include <pbrt/util/hash.h>
 #include <pbrt/util/image.h>
 #include <pbrt/util/print.h>
-#include <pbrt/util/string.h>
+#include <pbrt/util/string.hpp>
 
 #include <algorithm>
 #include <atomic>

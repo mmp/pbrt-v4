@@ -11,6 +11,8 @@
 
 #include <cmath>
 #include <cstdint>
+#include <sys/types.h>
+
 #include <cstring>
 #include <limits>
 #include <string>
@@ -117,7 +119,7 @@ inline uint32_t FloatToBits(float f) {
 #ifdef PBRT_IS_GPU_CODE
     return __float_as_uint(f);
 #else
-    return pstd::bit_cast<uint32_t>(f);
+    return pstd::bit_cast<uint32_t, float>(f);
 #endif
 }
 
@@ -126,7 +128,7 @@ inline float BitsToFloat(uint32_t ui) {
 #ifdef PBRT_IS_GPU_CODE
     return __uint_as_float(ui);
 #else
-    return pstd::bit_cast<float>(ui);
+    return pstd::bit_cast<float, uint32_t>(ui);
 #endif
 }
 
@@ -150,7 +152,7 @@ inline uint64_t FloatToBits(double f) {
 #ifdef PBRT_IS_GPU_CODE
     return __double_as_longlong(f);
 #else
-    return pstd::bit_cast<uint64_t>(f);
+    return pstd::bit_cast<uint64_t, double>(f);
 #endif
 }
 
@@ -159,7 +161,7 @@ inline double BitsToFloat(uint64_t ui) {
 #ifdef PBRT_IS_GPU_CODE
     return __longlong_as_double(ui);
 #else
-    return pstd::bit_cast<double>(ui);
+    return pstd::bit_cast<double, uint64_t>(ui);
 #endif
 }
 

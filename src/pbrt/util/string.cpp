@@ -6,7 +6,7 @@
 #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
 #endif  // PBRT_IS_WINDOWS
 
-#include <pbrt/util/string.h>
+#include <pbrt/util/string.hpp>
 
 #include <pbrt/util/check.h>
 

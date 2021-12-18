@@ -14,7 +14,7 @@
 #include <pbrt/util/check.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/file.h>
-#include <pbrt/util/float.h>
+#include <pbrt/util/float.hpp>
 #include <pbrt/util/image.h>
 #include <pbrt/util/loopsubdiv.h>
 #include <pbrt/util/lowdiscrepancy.h>

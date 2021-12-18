@@ -13,7 +13,7 @@
 #include <pbrt/util/file.h>
 #include <pbrt/util/memory.h>
 #include <pbrt/util/parallel.h>
-#include <pbrt/util/string.h>
+#include <pbrt/util/string.hpp>
 
 #include <stdio.h>
 #include <string.h>

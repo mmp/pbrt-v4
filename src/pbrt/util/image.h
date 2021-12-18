@@ -10,7 +10,7 @@
 #include <pbrt/util/check.h>
 #include <pbrt/util/color.h>
 #include <pbrt/util/containers.h>
-#include <pbrt/util/float.h>
+#include <pbrt/util/float.hpp>
 #include <pbrt/util/math.h>
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/pstd.h>

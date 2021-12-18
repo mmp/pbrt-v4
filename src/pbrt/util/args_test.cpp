@@ -6,7 +6,7 @@
 
 #include <pbrt/pbrt.h>
 #include <pbrt/util/args.h>
-#include <pbrt/util/string.h>
+#include <pbrt/util/string.hpp>
 
 #include <algorithm>
 #include <memory>

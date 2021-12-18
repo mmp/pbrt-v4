@@ -16,7 +16,7 @@
 #include <pbrt/util/memory.h>
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/print.h>
-#include <pbrt/util/string.h>
+#include <pbrt/util/string.hpp>
 #include <pbrt/util/transform.h>
 
 #include <functional>

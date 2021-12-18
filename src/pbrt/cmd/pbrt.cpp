@@ -19,8 +19,9 @@
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/print.h>
 #include <pbrt/util/spectrum.h>
-#include <pbrt/util/string.h>
+#include <pbrt/util/string.hpp>
 #include <pbrt/wavefront/wavefront.h>
+#include <json/single_include/nlohmann/json.hpp>
 
 #include <string>
 #include <vector>

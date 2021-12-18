@@ -8,7 +8,7 @@
 #include <pbrt/pbrt.h>
 
 #include <pbrt/util/check.h>
-#include <pbrt/util/float.h>
+#include <pbrt/util/float.hpp>
 #include <pbrt/util/hash.h>
 #include <pbrt/util/math.h>
 #include <pbrt/util/primes.h>

@@ -9,7 +9,7 @@
 #include <pbrt/util/color.h>
 #include <pbrt/util/colorspace.h>
 #include <pbrt/util/file.h>
-#include <pbrt/util/float.h>
+#include <pbrt/util/float.hpp>
 #include <pbrt/util/image.h>
 #include <pbrt/util/mipmap.h>
 #include <pbrt/util/rng.h>

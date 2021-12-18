@@ -21,7 +21,7 @@
 #include <pbrt/util/rng.h>
 #include <pbrt/util/sampling.h>
 #include <pbrt/util/spectrum.h>
-#include <pbrt/util/string.h>
+#include <pbrt/util/string.hpp>
 #include <pbrt/util/vecmath.h>
 
 extern "C" {

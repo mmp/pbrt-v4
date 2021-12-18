@@ -13,7 +13,7 @@
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/print.h>
 #include <pbrt/util/pstd.h>
-#include <pbrt/util/string.h>
+#include <pbrt/util/string.hpp>
 
 // No need, since we need to do our own file i/o to support UTF-8 filenames.
 #define LODEPNG_NO_COMPILE_DISK

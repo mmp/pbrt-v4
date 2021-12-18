@@ -7,7 +7,7 @@
 
 #include <pbrt/pbrt.h>
 
-#include <pbrt/util/float.h>
+#include <pbrt/util/float.hpp>
 #include <pbrt/util/vecmath.h>
 
 #include <atomic>

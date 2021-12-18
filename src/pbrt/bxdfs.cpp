@@ -13,7 +13,7 @@
 #include <pbrt/util/colorspace.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/file.h>
-#include <pbrt/util/float.h>
+#include <pbrt/util/float.hpp>
 #include <pbrt/util/hash.h>
 #include <pbrt/util/log.h>
 #include <pbrt/util/math.h>

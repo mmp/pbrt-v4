@@ -8,13 +8,13 @@
 #include <pbrt/pbrt.h>
 
 #include <pbrt/ray.h>
-#include <pbrt/util/float.h>
+#include <pbrt/util/float.hpp>
 #include <pbrt/util/hash.h>
 #include <pbrt/util/math.h>
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/vecmath.h>
 
-#include <stdio.h>
+#include <cstdio>
 #include <cmath>
 #include <functional>
 #include <limits>

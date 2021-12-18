@@ -8,7 +8,7 @@
 #include <pbrt/util/file.h>
 #include <pbrt/util/image.h>
 #include <pbrt/util/mesh.h>
-#include <pbrt/util/string.h>
+#include <pbrt/util/string.hpp>
 #include <pbrt/util/transform.h>
 #include <pbrt/util/vecmath.h>
 #include <stdlib.h>

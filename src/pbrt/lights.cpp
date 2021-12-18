@@ -20,7 +20,7 @@
 #include <pbrt/util/containers.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/file.h>
-#include <pbrt/util/float.h>
+#include <pbrt/util/float.hpp>
 #include <pbrt/util/math.h>
 #include <pbrt/util/memory.h>
 #include <pbrt/util/parallel.h>

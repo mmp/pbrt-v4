@@ -2,10 +2,17 @@
 
 cmake_minimum_required (VERSION 3.12)
 
-project (PBRT-V4 LANGUAGES CXX C)
+set(CMAKE_CXX_COMPILER "dpcpp")
+set(CMAKE_LINKER "dpcpp") 
+set(CMAKE_C_COMPILER "icx")
+set (CMAKE_CXX_FLAGS "-fhonor-nans -fhonor-infinites")
+set (CMAKE_EXE_LINKER_FLAGS "-m64 -v" )
 
 set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
+
+project (PBRT-V4 LANGUAGES CXX C)
+
 
 # For sanitizers
 list (INSERT CMAKE_MODULE_PATH 0 "${CMAKE_SOURCE_DIR}/cmake")
@@ -636,7 +643,7 @@ SET (PBRT_UTIL_SOURCE_HEADERS
   src/pbrt/util/display.h
   src/pbrt/util/error.h
   src/pbrt/util/file.h
-  src/pbrt/util/float.h
+  src/pbrt/util/float.hpp
   src/pbrt/util/hash.h
   src/pbrt/util/image.h
   src/pbrt/util/log.h
@@ -661,7 +668,7 @@ SET (PBRT_UTIL_SOURCE_HEADERS
   src/pbrt/util/spectrum.h
   src/pbrt/util/splines.h
   src/pbrt/util/stats.h
-  src/pbrt/util/string.h
+  src/pbrt/util/string.hpp
   src/pbrt/util/taggedptr.h
   src/pbrt/util/transform.h
   src/pbrt/util/vecmath.h

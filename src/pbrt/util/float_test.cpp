@@ -6,7 +6,7 @@
 #include <cmath>
 
 #include <pbrt/pbrt.h>
-#include <pbrt/util/float.h>
+#include <pbrt/util/float.hpp>
 #include <pbrt/util/math.h>
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/rng.h>

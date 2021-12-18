@@ -25,7 +25,7 @@
 #include <pbrt/util/pstd.h>
 #include <pbrt/util/spectrum.h>
 #include <pbrt/util/stats.h>
-#include <pbrt/util/string.h>
+#include <pbrt/util/string.hpp>
 #include <pbrt/util/taggedptr.h>
 #include <pbrt/wavefront/aggregate.h>
 

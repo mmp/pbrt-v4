@@ -8,7 +8,7 @@
 #include <pbrt/pbrt.h>
 #include <pbrt/util/print.h>
 #include <pbrt/util/pstd.h>
-#include <pbrt/util/string.h>
+#include <pbrt/util/string.hpp>
 
 #include <cctype>
 #include <cstring>

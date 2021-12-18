@@ -6,7 +6,7 @@
 
 #include <pbrt/pbrt.h>
 
-#include <pbrt/util/float.h>
+#include <pbrt/util/float.hpp>
 #include <pbrt/util/image.h>
 #include <pbrt/util/lowdiscrepancy.h>
 #include <pbrt/util/math.h>

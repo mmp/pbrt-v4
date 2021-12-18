@@ -8,7 +8,7 @@
 #include <cstdint>
 
 #include <pbrt/pbrt.h>
-#include <pbrt/util/float.h>
+#include <pbrt/util/float.hpp>
 #include <pbrt/util/math.h>
 #include <pbrt/util/rng.h>
 #include <pbrt/util/vecmath.h>
