@@ -4,9 +4,17 @@ cmake_minimum_required (VERSION 3.12)
 
 set(CMAKE_CXX_COMPILER "dpcpp")
 set(CMAKE_LINKER "dpcpp") 
+#set(CMAKE_CXX_COMPILER "icpx")
+#set(CMAKE_LINKER "icpx") 
 set(CMAKE_C_COMPILER "icx")
-set (CMAKE_CXX_FLAGS "-fhonor-nans -fhonor-infinites")
-set (CMAKE_EXE_LINKER_FLAGS "-m64 -v" )
+
+if(CMAKE_CXX_COMPILER STREQUAL "dpcpp" OR CMAKE_CXX_COMPILER STREQUAL "icpx")
+  set (CMAKE_CXX_FLAGS "-fp-model precise")
+endif()
+
+#if(CMAKE_LINKER STREQUAL "dpcpp")
+#  set (CMAKE_EXE_LINKER_FLAGS "-m64 -v" )
+#endif()
 
 set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
