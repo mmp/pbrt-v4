@@ -456,7 +456,7 @@ class IndependentSampler {
     PBRT_CPU_GPU
     void StartPixelSample(Point2i p, int sampleIndex, int dimension) {
         rng.SetSequence(Hash(p, seed));
-        rng.Advance(sampleIndex * 65536 + dimension);
+        rng.Advance(sampleIndex * 65536ull + dimension);
     }
 
     PBRT_CPU_GPU
@@ -588,7 +588,7 @@ class StratifiedSampler {
         sampleIndex = index;
         dimension = dim;
         rng.SetSequence(Hash(p, seed));
-        rng.Advance(sampleIndex * 65536 + dimension);
+        rng.Advance(sampleIndex * 65536ull + dimension);
     }
 
     PBRT_CPU_GPU
