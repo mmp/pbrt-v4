@@ -859,16 +859,13 @@ std::string Tensor::ToString() const {
 // MeasuredBxDFData Definition
 struct MeasuredBxDFData {
     // MeasuredBxDFData Public Members
-    using Warp2D3 = PiecewiseLinear2D<3>;
-    Warp2D3 spectra;
     pstd::vector<float> wavelengths;
-    using Warp2D0 = PiecewiseLinear2D<0>;
-    using Warp2D2 = PiecewiseLinear2D<2>;
-    Warp2D0 ndf;
-    Warp2D2 vndf;
-    Warp2D0 sigma;
+    PiecewiseLinear2D<3> spectra;
+    PiecewiseLinear2D<0> ndf;
+    PiecewiseLinear2D<2> vndf;
+    PiecewiseLinear2D<0> sigma;
     bool isotropic;
-    Warp2D2 luminance;
+    PiecewiseLinear2D<2> luminance;
     MeasuredBxDFData(Allocator alloc)
         : ndf(alloc),
           sigma(alloc),
@@ -948,24 +945,24 @@ MeasuredBxDFData *MeasuredBxDFData::Create(const std::string &filename, Allocato
     }
 
     /* Construct NDF interpolant data structure */
-    brdf->ndf = Warp2D0(alloc, (float *)ndf.data.get(), ndf.shape[1], ndf.shape[0], {},
-                        {}, false, false);
+    brdf->ndf = PiecewiseLinear2D<0>(alloc, (float *)ndf.data.get(), ndf.shape[1],
+                                     ndf.shape[0], {}, {}, false, false);
 
     /* Construct projected surface area interpolant data structure */
-    brdf->sigma = Warp2D0(alloc, (float *)sigma.data.get(), sigma.shape[1],
-                          sigma.shape[0], {}, {}, false, false);
+    brdf->sigma = PiecewiseLinear2D<0>(alloc, (float *)sigma.data.get(), sigma.shape[1],
+                                       sigma.shape[0], {}, {}, false, false);
 
     /* Construct VNDF warp data structure */
-    brdf->vndf =
-        Warp2D2(alloc, (float *)vndf.data.get(), vndf.shape[3], vndf.shape[2],
-                {{(int)phi_i.shape[0], (int)theta_i.shape[0]}},
-                {{(const float *)phi_i.data.get(), (const float *)theta_i.data.get()}});
+    brdf->vndf = PiecewiseLinear2D<2>(
+        alloc, (float *)vndf.data.get(), vndf.shape[3], vndf.shape[2],
+        {{(int)phi_i.shape[0], (int)theta_i.shape[0]}},
+        {{(const float *)phi_i.data.get(), (const float *)theta_i.data.get()}});
 
     /* Construct Luminance warp data structure */
-    brdf->luminance =
-        Warp2D2(alloc, (float *)luminance.data.get(), luminance.shape[3],
-                luminance.shape[2], {{(int)phi_i.shape[0], (int)theta_i.shape[0]}},
-                {{(const float *)phi_i.data.get(), (const float *)theta_i.data.get()}});
+    brdf->luminance = PiecewiseLinear2D<2>(
+        alloc, (float *)luminance.data.get(), luminance.shape[3], luminance.shape[2],
+        {{(int)phi_i.shape[0], (int)theta_i.shape[0]}},
+        {{(const float *)phi_i.data.get(), (const float *)theta_i.data.get()}});
 
     /* Copy wavelength information */
     size_t size = wavelengths.shape[0];
@@ -974,12 +971,12 @@ MeasuredBxDFData *MeasuredBxDFData::Create(const std::string &filename, Allocato
         brdf->wavelengths[i] = ((const float *)wavelengths.data.get())[i];
 
     /* Construct spectral interpolant */
-    brdf->spectra =
-        Warp2D3(alloc, (float *)spectra.data.get(), spectra.shape[4], spectra.shape[3],
-                {{(int)phi_i.shape[0], (int)theta_i.shape[0], (int)wavelengths.shape[0]}},
-                {{(const float *)phi_i.data.get(), (const float *)theta_i.data.get(),
-                  (const float *)wavelengths.data.get()}},
-                false, false);
+    brdf->spectra = PiecewiseLinear2D<3>(
+        alloc, (float *)spectra.data.get(), spectra.shape[4], spectra.shape[3],
+        {{(int)phi_i.shape[0], (int)theta_i.shape[0], (int)wavelengths.shape[0]}},
+        {{(const float *)phi_i.data.get(), (const float *)theta_i.data.get(),
+          (const float *)wavelengths.data.get()}},
+        false, false);
 
     measuredBRDFBytes += sizeof(MeasuredBxDFData) + 4 * brdf->wavelengths.size() +
                          brdf->ndf.BytesUsed() + brdf->sigma.BytesUsed() +
@@ -1018,13 +1015,13 @@ SampledSpectrum MeasuredBxDF::f(Vector3f wo, Vector3f wi, TransportMode mode) co
     Float theta_m = SphericalTheta(wm), phi_m = std::atan2(wm.y, wm.x);
     Point2f u_wo(theta2u(theta_o), phi2u(phi_o));
     Point2f u_wm(theta2u(theta_m), phi2u(brdf->isotropic ? (phi_m - phi_o) : phi_m));
-    u_wm.y = u_wm.y - pstd::floor(u_wm.y);
+    u_wm[1] = u_wm[1] - pstd::floor(u_wm[1]);
 
     // Evaluate inverse parameterization $R^{-1}$
     PLSample ui = brdf->vndf.Invert(u_wm, phi_o, theta_o);
 
     // Evaluate spectral 5D interpolant
-    SampledSpectrum fr(0);
+    SampledSpectrum fr;
     for (int i = 0; i < NSpectrumSamples; ++i)
         fr[i] =
             std::max<Float>(0, brdf->spectra.Evaluate(ui.p, phi_o, theta_o, lambda[i]));

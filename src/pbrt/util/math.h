@@ -204,17 +204,11 @@ struct CompensatedFloat {
 
 template <int N>
 class SquareMatrix;
+PBRT_CPU_GPU inline Float SinXOverX(Float x);
 
 // Math Inline Functions
 PBRT_CPU_GPU inline Float Lerp(Float x, Float a, Float b) {
     return (1 - x) * a + x * b;
-}
-
-// http://www.plunk.org/~hatch/rightway.html
-PBRT_CPU_GPU inline Float SinXOverX(Float x) {
-    if (1 + x * x == 1)
-        return 1;
-    return std::sin(x) / x;
 }
 
 template <typename T>
@@ -340,6 +334,13 @@ PBRT_CPU_GPU inline constexpr Float EvaluatePolynomial(Float t, C c) {
 template <typename Float, typename C, typename... Args>
 PBRT_CPU_GPU inline constexpr Float EvaluatePolynomial(Float t, C c, Args... cRemaining) {
     return FMA(t, EvaluatePolynomial(t, cRemaining...), c);
+}
+
+// http://www.plunk.org/~hatch/rightway.html
+PBRT_CPU_GPU inline Float SinXOverX(Float x) {
+    if (1 + x * x == 1)
+        return 1;
+    return std::sin(x) / x;
 }
 
 PBRT_CPU_GPU inline float SafeASin(float x) {
