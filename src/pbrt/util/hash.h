@@ -16,26 +16,19 @@
 namespace pbrt {
 
 // https://github.com/explosion/murmurhash/blob/master/murmurhash/MurmurHash2.cpp
-template <bool isAligned>
-PBRT_CPU_GPU inline uint64_t MurmurHash64AFlex(const void *key, size_t len,
-                                               uint64_t seed) {
-    if (isAligned)
-        DCHECK(((uintptr_t)key & 7) == 0);
-
+PBRT_CPU_GPU inline uint64_t MurmurHash64A(const unsigned char *key, size_t len,
+                                           uint64_t seed) {
     const uint64_t m = 0xc6a4a7935bd1e995ull;
     const int r = 47;
 
     uint64_t h = seed ^ (len * m);
 
-    const uint64_t *data = (const uint64_t *)key;
-    const uint64_t *end = data + (len / 8);
+    const unsigned char *end = key + 8 * (len / 8);
 
-    while (data != end) {
+    while (key != end) {
         uint64_t k;
-        if constexpr (isAligned)
-            k = *data++;
-        else
-            std::memcpy(&k, data++, sizeof(uint64_t));
+        std::memcpy(&k, key, sizeof(uint64_t));
+        key += 8;
 
         k *= m;
         k ^= k >> r;
@@ -45,23 +38,21 @@ PBRT_CPU_GPU inline uint64_t MurmurHash64AFlex(const void *key, size_t len,
         h *= m;
     }
 
-    const unsigned char *data2 = (const unsigned char *)data;
-
     switch (len & 7) {
     case 7:
-        h ^= uint64_t(data2[6]) << 48;
+        h ^= uint64_t(key[6]) << 48;
     case 6:
-        h ^= uint64_t(data2[5]) << 40;
+        h ^= uint64_t(key[5]) << 40;
     case 5:
-        h ^= uint64_t(data2[4]) << 32;
+        h ^= uint64_t(key[4]) << 32;
     case 4:
-        h ^= uint64_t(data2[3]) << 24;
+        h ^= uint64_t(key[3]) << 24;
     case 3:
-        h ^= uint64_t(data2[2]) << 16;
+        h ^= uint64_t(key[2]) << 16;
     case 2:
-        h ^= uint64_t(data2[1]) << 8;
+        h ^= uint64_t(key[1]) << 8;
     case 1:
-        h ^= uint64_t(data2[0]);
+        h ^= uint64_t(key[0]);
         h *= m;
     };
 
@@ -70,14 +61,6 @@ PBRT_CPU_GPU inline uint64_t MurmurHash64AFlex(const void *key, size_t len,
     h ^= h >> r;
 
     return h;
-}
-
-template <typename T>
-PBRT_CPU_GPU inline uint64_t MurmurHash64A(const T *key, size_t len, uint64_t seed) {
-    if (alignof(T) >= 8 || ((uintptr_t)key & 7) == 0)
-        return MurmurHash64AFlex<true>(key, len, seed);
-    else
-        return MurmurHash64AFlex<false>(key, len, seed);
 }
 
 // Hashing Inline Functions
@@ -95,12 +78,7 @@ inline uint64_t MixBits(uint64_t v) {
 
 template <typename T>
 PBRT_CPU_GPU inline uint64_t HashBuffer(const T *ptr, size_t size, uint64_t seed = 0) {
-    return MurmurHash64A(ptr, size, seed);
-}
-
-template <size_t size, typename T>
-PBRT_CPU_GPU inline uint64_t HashBuffer(const T *ptr, uint64_t seed = 0) {
-    return MurmurHash64A(ptr, size, seed);
+    return MurmurHash64A((const unsigned char *)ptr, size, seed);
 }
 
 template <typename... Args>
@@ -125,7 +103,7 @@ PBRT_CPU_GPU inline uint64_t Hash(Args... args) {
     constexpr size_t n = (sz + 7) / 8;
     uint64_t buf[n];
     hashRecursiveCopy((char *)buf, args...);
-    return MurmurHash64A(buf, sz, 0);
+    return MurmurHash64A((const unsigned char *)buf, sz, 0);
 }
 
 template <typename... Args>

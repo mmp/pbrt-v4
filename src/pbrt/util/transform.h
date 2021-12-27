@@ -544,7 +544,7 @@ struct hash<pbrt::Transform> {
     PBRT_CPU_GPU
     size_t operator()(const pbrt::Transform &t) const {
         pbrt::SquareMatrix<4> m = t.GetMatrix();
-        return pbrt::HashBuffer<sizeof(m)>(&m);
+        return pbrt::Hash(m);
     }
 };
 
