@@ -101,17 +101,6 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
         if (!shape.insideMedium.empty() || !shape.outsideMedium.empty())
             haveMedia = true;
 
-    auto findMedium = [&](const std::string &s, const FileLoc *loc) -> Medium {
-        if (s.empty())
-            return nullptr;
-
-        auto iter = media.find(s);
-        if (iter == media.end())
-            ErrorExit(loc, "%s: medium not defined", s);
-        haveMedia = true;
-        return iter->second;
-    };
-
     // Textures
     LOG_VERBOSE("Starting to create textures");
     NamedTextures textures = scene.CreateTextures();

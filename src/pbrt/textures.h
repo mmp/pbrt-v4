@@ -581,7 +581,6 @@ class FloatImageTexture : public ImageTextureBase {
         assert(!"Should not be called in GPU code");
         return 0;
 #else
-        Vector2f dstdx, dstdy;
         TexCoord2D c = mapping.Map(ctx);
         // Texture coordinates are (0,0) in the lower left corner, but
         // image coordinates are (0,0) in the upper left.

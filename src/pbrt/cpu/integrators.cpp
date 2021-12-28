@@ -1431,8 +1431,6 @@ retry:
         // Compute coordinate frame based on true geometry, not shading
         // geometry.
         Normal3f n = FaceForward(isect.n, -ray.d);
-        Vector3f s = Normalize(isect.dpdu);
-        Vector3f t = Cross(isect.n, s);
 
         Vector3f wi;
         Float pdf;
@@ -2797,7 +2795,7 @@ void SPPMIntegrator::Render() {
 
     // Allocate per-thread _ScratchBuffer_s for SPPM rendering
     ThreadLocal<ScratchBuffer> threadScratchBuffers(
-        [nPixels]() { return ScratchBuffer(1024 * 1024); });
+        []() { return ScratchBuffer(1024 * 1024); });
 
     // Allocate samplers for SPPM rendering
     ThreadLocal<Sampler> threadSamplers(
