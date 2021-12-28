@@ -2326,7 +2326,7 @@ Image denoiseImage(const Image &in, const ImageChannelDesc &Ldesc,
                                     continue;
 
                                 Float zp = z + dx * dzdx + dy * dzdy;
-                                Float dz = (z - zp) / ((z + zp) * 0.5f);
+                                Float dz = (zo - zp) / ((zo + zp) * 0.5f);
 
                                 // Assume camera space position...
                                 Float wp = Gaussian(dz, 0, sigma_z) *
