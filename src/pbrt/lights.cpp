@@ -915,7 +915,7 @@ DiffuseAreaLight *DiffuseAreaLight::Create(const Transform &renderFromLight,
         // distribution and texture and is used to normalize the emitted
         // radiance such that the user-defined power will be the actual power
         // emitted by the light.
-        Float k_e;
+        Float k_e = 1;
         // Get the appropriate luminance vector from the image colour space
         RGB lum = imageColorSpace->LuminanceVector();
         // we need to know which channels correspond to R, G and B

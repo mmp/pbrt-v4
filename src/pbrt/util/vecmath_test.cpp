@@ -95,14 +95,6 @@ TEST(Point2, InvertBilinear) {
     }
 
     for (int i = 0; i < 100; ++i) {
-        Point2f vRandom[4] = {Point2f{Lerp(rng.Uniform<Float>(), -10, 10),
-                                      Lerp(rng.Uniform<Float>(), -10, 10)},
-                              Point2f{Lerp(rng.Uniform<Float>(), -10, 10),
-                                      Lerp(rng.Uniform<Float>(), -10, 10)},
-                              Point2f{Lerp(rng.Uniform<Float>(), -10, 10),
-                                      Lerp(rng.Uniform<Float>(), -10, 10)},
-                              Point2f{Lerp(rng.Uniform<Float>(), -10, 10),
-                                      Lerp(rng.Uniform<Float>(), -10, 10)}};
         for (int j = 0; j < 100; ++j) {
             Point2f u{rng.Uniform<Float>(), rng.Uniform<Float>()};
             Point2f up = bilerp(u, vSimple);
@@ -182,14 +174,7 @@ TEST(Vector, AngleBetween) {
     Float naive = SafeACos(Dot(a, b));
     Float precise = std::acos(Clamp(Dot(ad, bd), -1, 1));
     Float abet = AngleBetween(a, b);
-    Float old = Pi - 2 * SafeASin(Length(a + b) / 2);
     EXPECT_EQ(abet, precise) << StringPrintf("vs naive %f", naive);
-    // CO    LOG(WARNING) << StringPrintf("naive %f (err %f), abet %f (err %f)
-    // old %f (err %f)", CO                                 naive,
-    // std::abs(naive
-    // - precise) / precise, CO                                 abet,
-    // std::abs(abet - precise) / precise, CO old, std::abs(old - precise) /
-    // precise);
 }
 
 TEST(Vector, CoordinateSystem) {
@@ -462,9 +447,9 @@ TEST(DirectionCone, BoundBounds) {
                   Lerp(rng.Uniform<Float>(), -4, 4));
 
         c = BoundSubtendedDirections(b, p);
-        if (Inside(p, b))
+        if (Inside(p, b)) {
             EXPECT_EQ(std::cos(Pi), c.cosTheta);
-        else {
+        } else {
             Vector3f wx, wy;
             CoordinateSystem(c.w, &wx, &wy);
             for (int j = 0; j < 1000; ++j) {
@@ -472,10 +457,12 @@ TEST(DirectionCone, BoundBounds) {
                 Vector3f w = SampleUniformSphere(u);
                 Ray r(p, w);
                 bool hit = b.IntersectP(r.o, r.d);
-                if (hit)
+                if (hit) {
                     EXPECT_TRUE(Inside(c, w));
-                if (!Inside(c, w))
+                }
+                if (!Inside(c, w)) {
                     EXPECT_FALSE(hit);
+                }
             }
         }
     }

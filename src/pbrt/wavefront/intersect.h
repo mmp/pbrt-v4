@@ -110,7 +110,6 @@ inline PBRT_CPU_GPU void EnqueueWorkAfterIntersection(
     if (intr.areaLight) {
         PBRT_DBG("Ray hit an area light: adding to hitAreaLightQueue pixel index %d\n",
                  r.pixelIndex);
-        Ray ray = r.ray;
         // TODO: intr.wo == -ray.d?
         hitAreaLightQueue->Push(HitAreaLightWorkItem{
             intr.areaLight, intr.p(), intr.n, intr.uv, intr.wo, r.lambda, r.depth, r.beta,

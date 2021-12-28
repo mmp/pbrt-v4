@@ -716,7 +716,6 @@ TEST(Hair, HOnTheEdge) {
 
 TEST(Hair, WhiteFurnaceSampled) {
     RNG rng;
-    SampledWavelengths lambda = SampledWavelengths::SampleVisible(0.5);
     Vector3f wo = SampleUniformSphere({rng.Uniform<Float>(), rng.Uniform<Float>()});
     for (Float beta_m = .1; beta_m < 1; beta_m += .2) {
         for (Float beta_n = .1; beta_n < 1; beta_n += .2) {
@@ -750,7 +749,6 @@ TEST(Hair, WhiteFurnaceSampled) {
 
 TEST(Hair, SamplingWeights) {
     RNG rng;
-    SampledWavelengths lambda = SampledWavelengths::SampleVisible(0.5);
     for (Float beta_m = .1; beta_m < 1; beta_m += .2)
         for (Float beta_n = .4; beta_n < 1; beta_n += .2) {
             int count = 10000;

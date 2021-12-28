@@ -17,11 +17,10 @@
 #include <vector>
 
 namespace pbrt {
-namespace {
 
 // Downcase the string and remove any '-' or '_' characters; thus we can be
 // a little flexible in what we match for argument names.
-std::string normalizeArg(const std::string &str) {
+inline std::string normalizeArg(const std::string &str) {
     std::string ret;
     for (unsigned char c : str) {
         if (c != '_' && c != '-')
@@ -30,7 +29,7 @@ std::string normalizeArg(const std::string &str) {
     return ret;
 }
 
-bool initArg(const std::string &str, int *ptr) {
+inline bool initArg(const std::string &str, int *ptr) {
     if (str.empty() || (!std::isdigit(str[0]) && str[0] != '-'))
         return false;
     try {
@@ -43,7 +42,7 @@ bool initArg(const std::string &str, int *ptr) {
     return true;
 }
 
-bool initArg(const std::string &str, float *ptr) {
+inline bool initArg(const std::string &str, float *ptr) {
     if (str.empty())
         return false;
     try {
@@ -56,7 +55,7 @@ bool initArg(const std::string &str, float *ptr) {
     return true;
 }
 
-bool initArg(const std::string &str, double *ptr) {
+inline bool initArg(const std::string &str, double *ptr) {
     if (str.empty())
         return false;
     try {
@@ -69,7 +68,7 @@ bool initArg(const std::string &str, double *ptr) {
     return true;
 }
 
-bool initArg(const std::string &str, pstd::span<float> out) {
+inline bool initArg(const std::string &str, pstd::span<float> out) {
     std::vector<Float> v = SplitStringToFloats(str, ',');
     if (v.size() != out.size())
         return false;
@@ -77,7 +76,7 @@ bool initArg(const std::string &str, pstd::span<float> out) {
     return true;
 }
 
-bool initArg(const std::string &str, pstd::span<double> out) {
+inline bool initArg(const std::string &str, pstd::span<double> out) {
     std::vector<double> v = SplitStringToDoubles(str, ',');
     if (v.size() != out.size())
         return false;
@@ -85,7 +84,7 @@ bool initArg(const std::string &str, pstd::span<double> out) {
     return true;
 }
 
-bool initArg(const std::string &str, pstd::span<int> out) {
+inline bool initArg(const std::string &str, pstd::span<int> out) {
     std::vector<int> v = SplitStringToInts(str, ',');
     if (v.size() != out.size())
         return false;
@@ -93,7 +92,7 @@ bool initArg(const std::string &str, pstd::span<int> out) {
     return true;
 }
 
-bool initArg(const std::string &str, char **ptr) {
+inline bool initArg(const std::string &str, char **ptr) {
     if (str.empty())
         return false;
     *ptr = new char[str.size() + 1];
@@ -101,14 +100,14 @@ bool initArg(const std::string &str, char **ptr) {
     return true;
 }
 
-bool initArg(const std::string &str, std::string *ptr) {
+inline bool initArg(const std::string &str, std::string *ptr) {
     if (str.empty())
         return false;
     *ptr = str;
     return true;
 }
 
-bool initArg(const std::string &str, bool *ptr) {
+inline bool initArg(const std::string &str, bool *ptr) {
     if (normalizeArg(str) == "false") {
         *ptr = false;
         return true;
@@ -129,7 +128,7 @@ bool initArg(const std::string &str, pstd::optional<T> *ptr) {
     return false;
 }
 
-bool matchPrefix(const std::string &str, const std::string &prefix) {
+inline bool matchPrefix(const std::string &str, const std::string &prefix) {
     if (prefix.size() > str.size())
         return false;
     for (size_t i = 0; i < prefix.size(); ++i)
@@ -143,12 +142,10 @@ bool enable(T ptr) {
     return false;
 }
 
-bool enable(bool *ptr) {
+inline bool enable(bool *ptr) {
     *ptr = true;
     return true;
 }
-
-}  // namespace
 
 // T basically needs to be a pointer type or a Span.
 template <typename Iter, typename T>

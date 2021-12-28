@@ -66,15 +66,6 @@ static Float sRGBRoundTrip(Float v, Float dither = 0) {
     return SRGB8ToLinear(encoded);
 }
 
-static pstd::vector<uint8_t> GetInt8Pixels(Point2i res, int nc) {
-    pstd::vector<uint8_t> r;
-    for (int y = 0; y < res[1]; ++y)
-        for (int x = 0; x < res[0]; ++x)
-            for (int c = 0; c < nc; ++c)
-                r.push_back((x * y + c) % 255);
-    return r;
-}
-
 static pstd::vector<float> GetFloatPixels(Point2i res, int nc) {
     pstd::vector<float> p;
     for (int y = 0; y < res[1]; ++y)
@@ -338,11 +329,12 @@ TEST(Image, ExrIO) {
                 for (int c = 0; c < 3; ++c, ++offset) {
                     if (format == PixelFormat::U256)
                         ;
-                    else if (format == PixelFormat::Half)
+                    else if (format == PixelFormat::Half) {
                         ASSERT_EQ(Float(Half(rgbPixels[offset])),
                                   image.GetChannel({x, y}, c));
-                    else if (format == PixelFormat::Float)
+                    } else if (format == PixelFormat::Float) {
                         ASSERT_EQ(rgbPixels[offset], image.GetChannel({x, y}, c));
+                    }
                 }
 
         ImageMetadata metadata;

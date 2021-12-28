@@ -399,7 +399,6 @@ int makesky(std::vector<std::string> args) {
         arhosekskymodelstate_alloc_init(elevation, turbidity, albedo);
 
     const RGBColorSpace *colorSpace = RGBColorSpace::ACES2065_1;
-    XYZ illumXYZ = SpectrumToXYZ(&colorSpace->illuminant);
 
     ParallelFor(0, resolution, [&](int64_t start, int64_t end) {
         std::vector<Float> skyv(lambda.size());

@@ -156,7 +156,6 @@ class CylindricalMapping {
         Point3f pt = textureFromRender(ctx.p);
         // Compute texture coordinate differentials for cylinder $(u,v)$ mapping
         Float x2y2 = Sqr(pt.x) + Sqr(pt.y);
-        Float sqrtx2y2 = std::sqrt(x2y2);
         Vector3f dsdp = Vector3f(-pt.y, pt.x, 0) / (2 * Pi * x2y2),
                  dtdp = Vector3f(0, 0, 1);
         Vector3f dpdx = textureFromRender(ctx.dpdx), dpdy = textureFromRender(ctx.dpdy);

@@ -47,16 +47,18 @@ TEST(RoundUpPow2, Basics) {
     for (int i = 0; i < 30; ++i) {
         int v = 1 << i;
         EXPECT_EQ(RoundUpPow2(v), v);
-        if (v > 2)
+        if (v > 2) {
             EXPECT_EQ(RoundUpPow2(v - 1), v);
+        }
         EXPECT_EQ(RoundUpPow2(v + 1), 2 * v);
     }
 
     for (int i = 0; i < 62; ++i) {
         int64_t v = 1ll << i;
         EXPECT_EQ(RoundUpPow2(v), v);
-        if (v > 2)
+        if (v > 2) {
             EXPECT_EQ(RoundUpPow2(v - 1), v);
+        }
         EXPECT_EQ(RoundUpPow2(v + 1), 2 * v);
     }
 }
@@ -196,8 +198,9 @@ TEST(Math, CompensatedSum) {
     int64_t floatErrorUlps = std::abs(floatBits - kahanDBits);
 
     // Expect each to be much more accurate than the one before it.
-    if (sizeof(long double) > sizeof(double))
+    if (sizeof(long double) > sizeof(double)) {
         EXPECT_LT(ldErrorUlps * 10000, doubleErrorUlps);
+    }
     // Less slop between double and Kahan with floats.
     EXPECT_LT(doubleErrorUlps * 1000, kahanFErrorUlps);
     EXPECT_LT(kahanFErrorUlps * 10000, floatErrorUlps);
@@ -253,7 +256,6 @@ TEST(Log4Int, Basics) {
     EXPECT_EQ(2, Log4Int(16));
     EXPECT_EQ(3, Log4Int(64));
 
-    int v = 1;
     int log4 = 0, next = 4;
     for (int v = 1; v < 16385; ++v) {
         if (v == next) {
@@ -269,8 +271,9 @@ TEST(Pow4, Basics) {
         int p4 = 1 << (2 * i);
         EXPECT_TRUE(IsPowerOf4(p4));
         EXPECT_EQ(p4, RoundUpPow4(p4));
-        if (i > 0)
+        if (i > 0) {
             EXPECT_EQ(p4, RoundUpPow4(p4 - 1));
+        }
         EXPECT_EQ(p4 * 4, RoundUpPow4(p4 + 1));
     }
 }
@@ -292,9 +295,9 @@ TEST(NextPrime, Basics) {
     };
 
     for (int n = 3; n < 8000; n += 3) {
-        if (isPrime(n))
+        if (isPrime(n)) {
             EXPECT_EQ(n, NextPrime(n));
-        else {
+        } else {
             int np = NextPrime(n);
             EXPECT_TRUE(isPrime(np));
         }
@@ -803,7 +806,6 @@ TEST(FloatInterval, Div) {
 
 TEST(FloatInterval, FMA) {
     int nTrials = 10000, nIters = 400;
-    float sumRatio = 0;
     int ratioCount = 0;
     int nBetter = 0;
     for (int i = 0; i < nTrials; ++i) {
@@ -822,7 +824,6 @@ TEST(FloatInterval, FMA) {
             double pa = getPrecise(a, rng);
             double pb = getPrecise(b, rng);
             double pc = getPrecise(c, rng);
-            double pv = getPrecise(v, rng);
             float preciseResult = FMA(pa, pb, pc);
             EXPECT_GE(preciseResult, v.LowerBound()) << v;
             EXPECT_LE(preciseResult, v.UpperBound()) << v;

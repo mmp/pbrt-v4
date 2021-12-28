@@ -179,8 +179,8 @@ TEST(Sobol, IntervalToIndex) {
                     // carefully to only accept points just at the upper limit
                     // but not into the next pixel.
                     EXPECT_TRUE(Point2i(x, y) == Point2i(ss) ||
-                                (x == int(ss.x) && Float(y + 1) == ss.y ||
-                                 Float(x + 1) == ss.x && y == int(ss.y)))
+                                (x == int(ss.x) && Float(y + 1) == ss.y) ||
+                                (Float(x + 1) == ss.x && y == int(ss.y)))
                         << "Pixel " << Point2i(x, y) << ", sample " << s << ", got "
                         << ss;
                 }
@@ -207,8 +207,8 @@ TEST(Sobol, IntervalToIndexRandoms) {
         // to only accept points just at the upper limit but not into
         // the next pixel.
         EXPECT_TRUE(Point2i(x, y) == Point2i(ss) ||
-                    (x == int(ss.x) && Float(y + 1) == ss.y ||
-                     Float(x + 1) == ss.x && y == int(ss.y)))
+                    (x == int(ss.x) && Float(y + 1) == ss.y) ||
+                    (Float(x + 1) == ss.x && y == int(ss.y)))
             << "Pixel " << Point2i(x, y) << ", sample " << s << ", got " << ss;
     }
 }
@@ -1276,9 +1276,10 @@ TEST(SummedArea, Randoms) {
             ref /= v.XSize() * v.YSize();
 
             double s = sat.Integral(bf);
-            if (ref != s)
+            if (ref != s) {
                 EXPECT_LT(std::abs((ref - s) / ref), 1e-3f)
                     << StringPrintf("ref %f s %f", ref, s);
+            }
         }
     }
 }
@@ -1308,8 +1309,9 @@ TEST(SummedArea, NonCellAligned) {
         Float sampledResult = sampledSum * b.Area() / nSamples;
 
         double s = sat.Integral(b);
-        if (sampledResult != s)
+        if (sampledResult != s) {
             EXPECT_LT(std::abs((sampledResult - s) / sampledResult), 1e-3f)
                 << StringPrintf("sampled %f s %f", sampledResult, s);
+        }
     }
 }

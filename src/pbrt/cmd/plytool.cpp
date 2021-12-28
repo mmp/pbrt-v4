@@ -100,10 +100,6 @@ options:
 int cat(std::vector<std::string> args) {
     std::string filename;
     for (auto iter = args.begin(); iter != args.end(); ++iter) {
-        auto onError = [](const std::string &err) {
-            usage("%s", err.c_str());
-            exit(1);
-        };
         if (filename.empty())
             filename = *iter;
         else
@@ -168,7 +164,6 @@ int info(std::vector<std::string> args) {
 int displace(std::vector<std::string> args) {
     Float scale = 1, uvScale = 1, edgeLength = 1;
     std::string filename, imageFilename, outFilename;
-    int maxFaces = 1000000;
     for (auto iter = args.begin(); iter != args.end(); ++iter) {
         auto onError = [](const std::string &err) {
             usage("%s", err.c_str());

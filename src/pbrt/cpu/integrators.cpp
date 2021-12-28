@@ -3212,7 +3212,6 @@ void SPPMIntegrator::Render() {
                 }
                 fprintf(stderr, "iterations: %d (%.2f s) radius range: %f - %f\n",
                         iter + 1, progress.ElapsedSeconds(), minrad, maxrad);
-                int offset = 0;
                 for (Point2i pPixel : pixelBounds) {
                     const SPPMPixel &p = pixels[pPixel];
                     Float v = 1.f - (p.radius - minrad) / (maxrad - minrad);

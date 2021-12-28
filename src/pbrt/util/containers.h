@@ -527,7 +527,7 @@ class InlinedVector {
     iterator insert(const_iterator pos, InputIt first, InputIt last) {
         if (pos == end()) {
             reserve(size() + (last - first));
-            iterator pos = end(), startPos = end();
+            iterator pos = end();
             for (auto iter = first; iter != last; ++iter, ++pos)
                 alloc.template construct<T>(pos, *iter);
             nStored += last - first;
