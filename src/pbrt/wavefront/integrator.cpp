@@ -100,11 +100,11 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
     for (const auto &shape : scene.animatedShapes)
         if (!shape.insideMedium.empty() || !shape.outsideMedium.empty())
             haveMedia = true;
-    for (const auto & [unused,  instanceDef ] : scene.instanceDefinitions) {
-        for (const auto &shape : instanceDef->shapes)
+    for (const auto &instanceDefinition: scene.instanceDefinitions) {
+        for (const auto &shape : instanceDefinition.second->shapes)
             if (!shape.insideMedium.empty() || !shape.outsideMedium.empty())
                 haveMedia = true;
-        for (const auto &shape : instanceDef->animatedShapes)
+        for (const auto &shape : instanceDefinition.second->animatedShapes)
             if (!shape.insideMedium.empty() || !shape.outsideMedium.empty())
                 haveMedia = true;
     }
