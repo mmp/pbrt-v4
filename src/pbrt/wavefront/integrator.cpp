@@ -93,13 +93,21 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
     // launched... Thus, it will be true if there actually are no media,
     // but some "interface" materials are present in the scene.
     haveMedia = false;
-    // Check the shapes...
+    // Check the shapes and instance definitions...
     for (const auto &shape : scene.shapes)
         if (!shape.insideMedium.empty() || !shape.outsideMedium.empty())
             haveMedia = true;
     for (const auto &shape : scene.animatedShapes)
         if (!shape.insideMedium.empty() || !shape.outsideMedium.empty())
             haveMedia = true;
+    for (const auto &instanceDefinition: scene.instanceDefinitions) {
+        for (const auto &shape : instanceDefinition.second->shapes)
+            if (!shape.insideMedium.empty() || !shape.outsideMedium.empty())
+                haveMedia = true;
+        for (const auto &shape : instanceDefinition.second->animatedShapes)
+            if (!shape.insideMedium.empty() || !shape.outsideMedium.empty())
+                haveMedia = true;
+    }
 
     // Textures
     LOG_VERBOSE("Starting to create textures");
