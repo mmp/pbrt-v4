@@ -47,15 +47,17 @@ void WavefrontPathIntegrator::GenerateRaySamples(int wavefrontDepth, int sampleI
             RaySamples rs;
             rs.direct.uc = pixelSampler.Get1D();
             rs.direct.u = pixelSampler.Get2D();
-            // Initialize indirect and possibly subsurface and medium samples in _rs_
+            // Initialize remaining samples in _rs_
             rs.indirect.uc = pixelSampler.Get1D();
             rs.indirect.u = pixelSampler.Get2D();
             rs.indirect.rr = pixelSampler.Get1D();
+            // Possibly initialize subsurface subsurface samples in _rs_
             rs.haveSubsurface = haveSubsurface;
             if (haveSubsurface) {
                 rs.subsurface.uc = pixelSampler.Get1D();
                 rs.subsurface.u = pixelSampler.Get2D();
             }
+
             rs.haveMedia = haveMedia;
             if (haveMedia) {
                 rs.media.uDist = pixelSampler.Get1D();

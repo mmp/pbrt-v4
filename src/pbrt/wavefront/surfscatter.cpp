@@ -215,7 +215,7 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
                 }
 
                 if (beta) {
-                    // Enqueue ray in indirect ray queue or BSSRDF queue, as appropriate
+                    // Initialize spawned ray and enqueue for next ray depth
                     if (bsdfSample->IsTransmission() &&
                         w.material->HasSubsurfaceScattering()) {
                         bssrdfEvalQueue->Push(w.material, lambda, beta, inv_w_u,
@@ -223,7 +223,6 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
                                               w.depth, w.mediumInterface, etaScale,
                                               w.pixelIndex);
                     } else {
-                        // Initialize spawned ray and enqueue for next ray depth
                         Ray ray = SpawnRay(w.pi, w.n, w.time, wi);
                         // Initialize _ray_ medium if media are present
                         if (haveMedia)

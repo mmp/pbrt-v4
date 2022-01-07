@@ -1828,7 +1828,7 @@ PBRT_CPU_GPU inline DirectionCone BoundSubtendedDirections(const Bounds3f &b, Po
     Float radius;
     Point3f pCenter;
     b.BoundingSphere(&pCenter, &radius);
-    if (DistanceSquared(p, pCenter) < radius * radius)
+    if (DistanceSquared(p, pCenter) < Sqr(radius))
         return DirectionCone::EntireSphere();
 
     // Compute and return _DirectionCone_ for bounding sphere

@@ -1051,7 +1051,7 @@ static cudaMipmappedArray_t createSingleChannelTextureArray(
             pitch = levelImage.Resolution().x * sizeof(float);
             break;
         default:
-            LOG_FATAL("Unhandled pixel format");
+            LOG_FATAL("Unhandled PixelFormat");
         }
 
         gpuImageTextureBytes += pitch * levelImage.Resolution().y;

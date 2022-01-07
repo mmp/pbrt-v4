@@ -299,7 +299,7 @@ ProjectionLight::ProjectionLight(Transform renderFromLight,
 
     // Compute projection image area _A_
     Float opposite = std::tan(Radians(fov) / 2);
-    A = 4 * Sqr(opposite) * (aspect > 1 ? aspect : 1 / aspect);
+    A = 4 * Sqr(opposite) * (aspect > 1 ? aspect : (1 / aspect));
 
     // Compute sampling distribution for _ProjectionLight_
     ImageChannelDesc channelDesc = image.GetChannelDesc({"R", "G", "B"});
@@ -492,7 +492,7 @@ ProjectionLight *ProjectionLight::Create(const Transform &renderFromLight, Mediu
 
         // Compute projection image area _A_
         Float opposite = std::tan(Radians(fov) / 2);
-        A = 4 * Sqr(opposite) * (aspect > 1 ? aspect : 1 / aspect);
+        A = 4 * Sqr(opposite) * (aspect > 1 ? aspect : (1 / aspect));
 
         Float sum = 0;
         RGB luminance = colorSpace->LuminanceVector();
