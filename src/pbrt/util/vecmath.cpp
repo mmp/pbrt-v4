@@ -55,9 +55,9 @@ std::string Quaternion::ToString() const {
 // DirectionCone Function Definitions
 DirectionCone Union(const DirectionCone &a, const DirectionCone &b) {
     // Handle the cases where one or both cones are empty
-    if (a.empty)
+    if (a.IsEmpty())
         return b;
-    if (b.empty)
+    if (b.IsEmpty())
         return a;
 
     // Handle the cases where one cone is inside the other
@@ -83,8 +83,7 @@ DirectionCone Union(const DirectionCone &a, const DirectionCone &b) {
 }
 
 std::string DirectionCone::ToString() const {
-    return StringPrintf("[ DirectionCone w: %s cosTheta: %f empty: %s ]", w, cosTheta,
-                        empty);
+    return StringPrintf("[ DirectionCone w: %s cosTheta: %f ]", w, cosTheta);
 }
 
 }  // namespace pbrt

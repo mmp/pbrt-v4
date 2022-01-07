@@ -1799,10 +1799,12 @@ class DirectionCone {
     // DirectionCone Public Methods
     DirectionCone() = default;
     PBRT_CPU_GPU
-    DirectionCone(Vector3f w, Float cosTheta)
-        : w(Normalize(w)), cosTheta(cosTheta), empty(false) {}
+    DirectionCone(Vector3f w, Float cosTheta) : w(Normalize(w)), cosTheta(cosTheta) {}
     PBRT_CPU_GPU
     explicit DirectionCone(Vector3f w) : DirectionCone(w, 1) {}
+
+    PBRT_CPU_GPU
+    bool IsEmpty() const { return cosTheta == Infinity; }
 
     PBRT_CPU_GPU
     static DirectionCone EntireSphere() { return DirectionCone(Vector3f(0, 0, 1), -1); }
@@ -1814,13 +1816,12 @@ class DirectionCone {
 
     // DirectionCone Public Members
     Vector3f w;
-    Float cosTheta;
-    bool empty = true;
+    Float cosTheta = Infinity;
 };
 
 // DirectionCone Inline Functions
 PBRT_CPU_GPU inline bool Inside(const DirectionCone &d, Vector3f w) {
-    return !d.empty && Dot(d.w, Normalize(w)) >= d.cosTheta;
+    return !d.IsEmpty() && Dot(d.w, Normalize(w)) >= d.cosTheta;
 }
 
 PBRT_CPU_GPU inline DirectionCone BoundSubtendedDirections(const Bounds3f &b, Point3f p) {
@@ -1840,7 +1841,7 @@ PBRT_CPU_GPU inline DirectionCone BoundSubtendedDirections(const Bounds3f &b, Po
 
 PBRT_CPU_GPU
 inline Vector3f DirectionCone::ClosestVectorInCone(Vector3f wp) const {
-    DCHECK(!empty);
+    DCHECK(!IsEmpty());
     wp = Normalize(wp);
     // Return provided vector if it is inside the cone
     if (Dot(wp, w) > cosTheta)
