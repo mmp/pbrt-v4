@@ -290,24 +290,23 @@ BVHBuildNode *BVHAggregate::buildRecursive(ThreadLocal<Allocator> &threadAllocat
 
                     // Compute costs for splitting after each bucket
                     constexpr int nSplits = nBuckets - 1;
-                    int countBelow[nSplits], countAbove[nSplits];
-                    Bounds3f boundsBelow[nSplits], boundsAbove[nSplits];
-                    // Initialize _countBelow_ and _boundsBelow_ using a forward scan over
-                    // splits
-                    countBelow[0] = buckets[0].count;
-                    boundsBelow[0] = buckets[0].bounds;
-                    for (int i = 1; i < nSplits; ++i) {
-                        countBelow[i] = countBelow[i - 1] + buckets[i].count;
-                        boundsBelow[i] = Union(boundsBelow[i - 1], buckets[i].bounds);
+                    float costs[nSplits] = {};
+                    // Partially initialize _costs_ using a forward scan over splits
+                    int countBelow = 0;
+                    Bounds3f boundBelow;
+                    for (int i = 0; i < nSplits; ++i) {
+                        boundBelow = Union(boundBelow, buckets[i].bounds);
+                        countBelow += buckets[i].count;
+                        costs[i] += countBelow * boundBelow.SurfaceArea();
                     }
 
-                    // Initialize _countAbove_ and _boundsAbove_ using a backwards scan
-                    // over splits
-                    countAbove[nSplits - 1] = buckets[nBuckets - 1].count;
-                    boundsAbove[nSplits - 1] = buckets[nBuckets - 1].bounds;
-                    for (int i = nSplits - 2; i >= 0; --i) {
-                        countAbove[i] = countAbove[i + 1] + buckets[i + 1].count;
-                        boundsAbove[i] = Union(boundsAbove[i + 1], buckets[i + 1].bounds);
+                    // Finish initializing _costs_ using a backwards scan over splits
+                    int countAbove = 0;
+                    Bounds3f boundAbove;
+                    for (int i = nSplits; i >= 1; --i) {
+                        boundAbove = Union(boundAbove, buckets[i].bounds);
+                        countAbove += buckets[i].count;
+                        costs[i - 1] += countAbove * boundAbove.SurfaceArea();
                     }
 
                     // Find bucket to split at that minimizes SAH metric
@@ -316,12 +315,8 @@ BVHBuildNode *BVHAggregate::buildRecursive(ThreadLocal<Allocator> &threadAllocat
                     for (int i = 0; i < nSplits; ++i) {
                         // Compute cost for candidate split and update minimum if
                         // necessary
-                        if (countBelow[i] == 0 || countAbove[i] == 0)
-                            continue;
-                        Float cost = (countBelow[i] * boundsBelow[i].SurfaceArea() +
-                                      countAbove[i] * boundsAbove[i].SurfaceArea());
-                        if (cost < minCost) {
-                            minCost = cost;
+                        if (costs[i] < minCost) {
+                            minCost = costs[i];
                             minCostSplitBucket = i;
                         }
                     }
