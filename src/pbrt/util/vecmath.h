@@ -1636,20 +1636,8 @@ PBRT_CPU_GPU inline Bounds2<T> Union(const Bounds2<T> &b, Point2<T> p) {
 
 // Spherical Geometry Inline Functions
 PBRT_CPU_GPU inline Float SphericalTriangleArea(Vector3f a, Vector3f b, Vector3f c) {
-    // Compute normalized cross products of all direction pairs
-    Vector3f n_ab = Cross(a, b), n_bc = Cross(b, c), n_ca = Cross(c, a);
-    if (LengthSquared(n_ab) == 0 || LengthSquared(n_bc) == 0 || LengthSquared(n_ca) == 0)
-        return {};
-    n_ab = Normalize(n_ab);
-    n_bc = Normalize(n_bc);
-    n_ca = Normalize(n_ca);
-
-    // Find angles $\alpha$, $\beta$, and $\gamma$ at spherical triangle vertices
-    Float alpha = AngleBetween(n_ab, -n_ca);
-    Float beta = AngleBetween(n_bc, -n_ab);
-    Float gamma = AngleBetween(n_ca, -n_bc);
-
-    return std::abs(alpha + beta + gamma - Pi);
+    return std::abs(
+        2 * std::atan2(Dot(a, Cross(b, c)), 1 + Dot(a, b) + Dot(a, c) + Dot(b, c)));
 }
 
 PBRT_CPU_GPU inline Float SphericalQuadArea(Vector3f a, Vector3f b, Vector3f c,
