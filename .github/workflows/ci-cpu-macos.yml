@@ -1,4 +1,4 @@
-name: cpu-build-and-test
+name: macos-cpu-build-and-test
 
 on:
   push:
@@ -17,10 +17,9 @@ jobs:
     strategy:
       matrix:
         config: [ '', '-DPBRT_DBG_LOGGING=True', '-DPBRT_FLOAT_AS_DOUBLE=True' ]
-        os: [ ubuntu-20.04, macos-latest, windows-latest ]
       fail-fast: false
 
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-latest
 
     steps:
     - name: Checkout pbrt
@@ -37,12 +36,7 @@ jobs:
     - name: Get cmake
       uses: lukka/get-cmake@latest
 
-    - name: Install OpenEXR (Ubuntu)
-      if: ${{ matrix.os == 'ubuntu-20.04' }}
-      run: sudo apt-get -y install libopenexr-dev
-
-    - name: Install OpenEXR (MacOS)
-      if: ${{ matrix.os == 'macos-latest' }}
+    - name: Install OpenEXR
       env:
           HOMEBREW_NO_INSTALL_CLEANUP: 1
       run: brew install openexr
@@ -55,12 +49,7 @@ jobs:
     - name: Build
       run: cmake --build build --parallel --config Release
       
-    - name: Test (Ubuntu/MacOS)
-      if: ${{ (matrix.os == 'ubuntu-20.04' || matrix.os == 'macos-latest') && matrix.config == '' }}
+    - name: Test
+      if: ${{ matrix.config == '' }}
       run: ./pbrt_test
-      working-directory: build
-
-    - name: Test (Windows)
-      if: ${{ matrix.os == 'windows-latest' && matrix.config == '' }}
-      run: .\Release\pbrt_test.exe
       working-directory: build

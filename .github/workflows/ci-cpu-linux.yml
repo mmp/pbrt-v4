@@ -1,0 +1,77 @@
+name: linux-cpu-build-and-test
+
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+      - 'images/**'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'images/**'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        config: [ '', '-DPBRT_DBG_LOGGING=True', '-DPBRT_FLOAT_AS_DOUBLE=True' ]
+        compilers:
+        - {
+            cc: "gcc-9",
+            cxx: "g++-9",
+          }
+        - {
+            cc: "gcc-10",
+            cxx: "g++-10",
+          }
+        - {
+            cc: "clang-10",
+            cxx: "clang++-10",
+          }
+        - {
+            cc: "clang-11",
+            cxx: "clang++-11",
+          }
+        - {
+            cc: "clang-12",
+            cxx: "clang++-12",
+          }
+
+      fail-fast: false
+
+    runs-on: ubuntu-20.04
+    name: Build and test ${{ matrix.compilers.cxx }} - ${{ matrix.config }}
+
+    steps:
+    - name: Checkout pbrt
+      uses: actions/checkout@v2
+      with:
+        submodules: true
+
+    - name: Checkout rgb2spectrum tables
+      uses: actions/checkout@v2
+      with:
+        repository: mmp/rgb2spectrum
+        path: build
+      
+    - name: Get cmake
+      uses: lukka/get-cmake@latest
+
+    - name: Install OpenEXR
+      run: sudo apt-get -y install libopenexr-dev
+
+    - name: Install compilers
+      run: sudo apt-get -y install ${{ matrix.compilers.cc }} ${{ matrix.compilers.cxx }}
+
+    - name: Configure
+      run: |
+        cd build
+        env CC=${{ matrix.compilers.cc }} CXX=${{ matrix.compilers.cxx }} cmake .. -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True ${{ matrix.config }}
+      
+    - name: Build
+      run: cmake --build build --parallel --config Release
+      
+    - name: Test
+      if: ${{ matrix.config == '' }}
+      run: ./pbrt_test
+      working-directory: build
