@@ -787,6 +787,8 @@ set (PBRT_SOA_GENERATED ${PBRT_SOA_GENERATED} ${CMAKE_CURRENT_BINARY_DIR}/wavefr
 
 add_custom_target (pbrt_soa_generated DEPENDS ${PBRT_SOA_GENERATED})
 
+set_property (TARGET soac PROPERTY FOLDER "cmd")
+
 ######################
 # pbrt_lib
 
@@ -909,6 +911,8 @@ if (NOT PBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES)
       DEPENDS rgb2spec_opt)
 endif ()
 
+set_property (TARGET rgb2spec_opt PROPERTY FOLDER "cmd")
+
 ######################
 # Main renderer
 
@@ -923,6 +927,8 @@ target_link_libraries (pbrt_exe PRIVATE ${ALL_PBRT_LIBS} pbrt_opt pbrt_warnings)
 set_target_properties (pbrt_exe PROPERTIES OUTPUT_NAME pbrt)
 
 add_sanitizers (pbrt_exe)
+
+set_property (TARGET pbrt_exe PROPERTY FOLDER "cmd")
 
 ######################
 # imgtool
@@ -940,6 +946,8 @@ target_link_libraries (imgtool PRIVATE ${ALL_PBRT_LIBS} pbrt_opt pbrt_warnings s
 
 add_sanitizers (imgtool)
 
+set_property (TARGET imgtool PROPERTY FOLDER "cmd")
+
 ######################
 # pspec
 
@@ -952,6 +960,8 @@ target_include_directories (pspec PRIVATE src src/ext)
 target_link_libraries (pspec PRIVATE ${ALL_PBRT_LIBS} pbrt_warnings)
 
 add_sanitizers (pspec)
+
+set_property (TARGET pspec PROPERTY FOLDER "cmd")
 
 ######################
 # plytool
@@ -968,6 +978,8 @@ set_target_properties (plytool PROPERTIES OUTPUT_NAME plytool)
 
 add_sanitizers (plytool)
 
+set_property (TARGET plytool PROPERTY FOLDER "cmd")
+
 ######################
 # cyhair2pbrt
 
@@ -978,6 +990,8 @@ target_compile_options (cyhair2pbrt PRIVATE ${PBRT_CXX_FLAGS})
 target_link_libraries (cyhair2pbrt PRIVATE pbrt_opt pbrt_warnings)
 
 add_sanitizers (cyhair2pbrt)
+
+set_property (TARGET cyhair2pbrt PROPERTY FOLDER "cmd")
 
 ##################
 # Unit tests
@@ -1025,6 +1039,8 @@ target_compile_options(pbrt_test PUBLIC ${PBRT_CXX_FLAGS})
 add_sanitizers (pbrt_test)
 
 add_test (pbrt_unit_test pbrt_test)
+
+set_property (TARGET pbrt_test PROPERTY FOLDER "cmd")
 
 ###############################
 # Installation

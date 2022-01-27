@@ -740,10 +740,10 @@ class DebugMLTSampler : public MLTSampler {
     PBRT_CPU_GPU
     Float Get1D() {
         int index = GetNextIndex();
-        CHECK_LT(index, u.size());
 #ifdef PBRT_IS_GPU_CODE
         return 0;
 #else
+        DCHECK_LT(index, u.size());
         return u[index];
 #endif
     }

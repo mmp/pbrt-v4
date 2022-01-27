@@ -9,6 +9,10 @@
 
 #include <type_traits>
 
+#ifdef interface
+#undef interface
+#endif // interface
+
 namespace pbrt {
 
 // WavefrontPathIntegrator Sampler Methods
