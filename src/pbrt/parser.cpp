@@ -1170,6 +1170,8 @@ void FormattingParserTarget::Sampler(const std::string &name, ParsedParameterVec
             Printf("%sSampler \"paddedsobol\"\n", indent());
         else if (name == "maxmindist")
             Printf("%sSampler \"pmj02bn\"\n", indent());
+        else if (name == "random")
+            Printf("%sSampler \"independent\"\n", indent());
         else
             Printf("%sSampler \"%s\"\n", indent(), name);
     } else
@@ -1277,13 +1279,15 @@ void FormattingParserTarget::Attribute(const std::string &target, ParsedParamete
 }
 
 void FormattingParserTarget::TransformBegin(FileLoc loc) {
-    Printf("%sTransformBegin\n", indent());
+    Warning(&loc, "Rewriting \"TransformBegin\" to \"AttributeBegin\".");
+    Printf("%sAttributeBegin\n", indent());
     catIndentCount += 4;
 }
 
 void FormattingParserTarget::TransformEnd(FileLoc loc) {
     catIndentCount -= 4;
-    Printf("%sTransformEnd\n", indent());
+    Warning(&loc, "Rewriting \"TransformEnd\" to \"AttributeEnd\".");
+    Printf("%sAttributeEnd\n", indent());
 }
 
 void FormattingParserTarget::Texture(const std::string &name, const std::string &type,
