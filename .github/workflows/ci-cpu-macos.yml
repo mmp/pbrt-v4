@@ -1,4 +1,4 @@
-name: macos-cpu-build-and-test
+name: cpu-macos-build-and-test
 
 on:
   push:

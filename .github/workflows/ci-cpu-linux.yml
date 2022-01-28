@@ -1,4 +1,4 @@
-name: linux-cpu-build-and-test
+name: cpu-linux-build-and-test
 
 on:
   push:
