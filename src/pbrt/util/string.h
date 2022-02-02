@@ -36,6 +36,8 @@ std::wstring WStringFromUTF8(std::string str);
 std::string UTF8FromWString(std::wstring str);
 #endif  // PBRT_IS_WINDOWS
 
+std::string NormalizeUTF8(std::string str);
+
 // InternedString Definition
 class InternedString {
   public:

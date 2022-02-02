@@ -65,6 +65,7 @@ check_ext ("filesystem" "filesystem/filesystem" c5f9de30142453eb3c6fe991e82dfc25
 check_ext ("libdeflate" "libdeflate/common" 1fd0bea6ca2073c68493632dafc4b1ddda1bcbc3)
 check_ext ("lodepng" "lodepng/examples" 8c6a9e30576f07bf470ad6f09458a2dcd7a6a84a)
 check_ext ("stb" "stb/tools" af1a5bc352164740c1cc1354942b1c6b72eacb8a)
+check_ext ("utf8proc" "utf8proc/bench" 2484e2ed5e1d9c19edcccf392a7d9920ad90dfaf)
 check_ext ("zlib" "zlib/doc" 54d591eabf9fe0e84c725638f8d5d8d202a093fa)
 
 add_compile_definitions ("$<$<CONFIG:DEBUG>:PBRT_DEBUG_BUILD>")
@@ -861,6 +862,7 @@ set (ALL_PBRT_LIBS
   ${LIBDEFLATE_LIBRARIES}
   double-conversion
   ${PBRT_CUDA_LIB}
+  utf8proc
 )
 
 if (PBRT_CUDA_ENABLED)
@@ -1024,6 +1026,7 @@ set (PBRT_TEST_SOURCE
   src/pbrt/util/sampling_test.cpp
   src/pbrt/util/spectrum_test.cpp
   src/pbrt/util/splines_test.cpp
+  src/pbrt/util/string_test.cpp
   src/pbrt/util/taggedptr_test.cpp
   src/pbrt/util/transform_test.cpp
   src/pbrt/util/vecmath_test.cpp
