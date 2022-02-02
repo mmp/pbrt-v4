@@ -10,6 +10,8 @@
 
 #include <pbrt/util/check.h>
 #include <pbrt/util/error.h>
+
+#define UTF8PROC_STATIC
 #include <utf8proc/utf8proc.h>
 
 #include <ctype.h>
