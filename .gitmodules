@@ -27,3 +27,6 @@
 [submodule "src/ext/lodepng"]
 	path = src/ext/lodepng
 	url = https://github.com/lvandeve/lodepng.git
+[submodule "src/ext/utf8proc"]
+	path = src/ext/utf8proc
+	url = https://github.com/JuliaStrings/utf8proc.git

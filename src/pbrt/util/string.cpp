@@ -9,6 +9,10 @@
 #include <pbrt/util/string.h>
 
 #include <pbrt/util/check.h>
+#include <pbrt/util/error.h>
+
+#define UTF8PROC_STATIC
+#include <utf8proc/utf8proc.h>
 
 #include <ctype.h>
 #include <codecvt>
@@ -183,6 +187,20 @@ std::u16string UTF16FromUTF8(std::string str) {
     std::u16string utf16 = cnv.from_bytes(str);
     CHECK_GE(cnv.converted(), str.size());
     return utf16;
+}
+
+std::string NormalizeUTF8(std::string str) {
+    utf8proc_option_t options = UTF8PROC_COMPOSE;
+
+    utf8proc_uint8_t *result;
+    utf8proc_ssize_t length = utf8proc_map((const unsigned char *)str.data(), str.size(),
+                                           &result, options);
+    if (length < 0)
+        ErrorExit("Unicode normalization error: %s: \"%s\"", utf8proc_errmsg(length), str);
+
+    str = std::string(result, result + length);
+    free(result);
+    return str;
 }
 
 }  // namespace pbrt

@@ -23,6 +23,7 @@
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/print.h>
 #include <pbrt/util/spectrum.h>
+#include <pbrt/util/string.h>
 #include <pbrt/util/transform.h>
 
 #include <iostream>
@@ -122,11 +123,13 @@ void BasicSceneBuilder::Translate(Float dx, Float dy, Float dz, FileLoc loc) {
         [=](auto t) { return t * pbrt::Translate(Vector3f(dx, dy, dz)); });
 }
 
-void BasicSceneBuilder::CoordinateSystem(const std::string &name, FileLoc loc) {
+void BasicSceneBuilder::CoordinateSystem(const std::string &origName, FileLoc loc) {
+    std::string name = NormalizeUTF8(origName);
     namedCoordinateSystems[name] = graphicsState.ctm;
 }
 
-void BasicSceneBuilder::CoordSysTransform(const std::string &name, FileLoc loc) {
+void BasicSceneBuilder::CoordSysTransform(const std::string &origName, FileLoc loc) {
+    std::string name = NormalizeUTF8(origName);
     if (namedCoordinateSystems.find(name) != namedCoordinateSystems.end())
         graphicsState.ctm = namedCoordinateSystems[name];
     else
@@ -230,8 +233,9 @@ void BasicSceneBuilder::WorldBegin(FileLoc loc) {
     scene->SetOptions(filter, film, camera, sampler, integrator, accelerator);
 }
 
-void BasicSceneBuilder::MakeNamedMedium(const std::string &name,
+void BasicSceneBuilder::MakeNamedMedium(const std::string &origName,
                                         ParsedParameterVector params, FileLoc loc) {
+    std::string name = NormalizeUTF8(origName);
     // Issue error if medium _name_ is multiply defined
     if (mediumNames.find(name) != mediumNames.end()) {
         ErrorExitDeferred(&loc, "Named medium \"%s\" redefined.", name);
@@ -302,7 +306,9 @@ void BasicSceneBuilder::Shape(const std::string &name, ParsedParameterVector par
     }
 }
 
-void BasicSceneBuilder::ObjectBegin(const std::string &name, FileLoc loc) {
+void BasicSceneBuilder::ObjectBegin(const std::string &origName, FileLoc loc) {
+    std::string name = NormalizeUTF8(origName);
+
     VERIFY_WORLD("ObjectBegin");
     pushedGraphicsStates.push_back(graphicsState);
 
@@ -356,7 +362,8 @@ void BasicSceneBuilder::ObjectEnd(FileLoc loc) {
     activeInstanceDefinition = nullptr;
 }
 
-void BasicSceneBuilder::ObjectInstance(const std::string &name, FileLoc loc) {
+void BasicSceneBuilder::ObjectInstance(const std::string &origName, FileLoc loc) {
+    std::string name = NormalizeUTF8(origName);
     VERIFY_WORLD("ObjectInstance");
 
     if (activeInstanceDefinition) {
@@ -643,15 +650,19 @@ void BasicSceneBuilder::Integrator(const std::string &name, ParsedParameterVecto
     integrator = SceneEntity(name, std::move(dict), loc);
 }
 
-void BasicSceneBuilder::MediumInterface(const std::string &insideName,
-                                        const std::string &outsideName, FileLoc loc) {
+void BasicSceneBuilder::MediumInterface(const std::string &origInsideName,
+                                        const std::string &origOutsideName, FileLoc loc) {
+    std::string insideName = NormalizeUTF8(origInsideName);
+    std::string outsideName = NormalizeUTF8(origOutsideName);
+
     graphicsState.currentInsideMedium = insideName;
     graphicsState.currentOutsideMedium = outsideName;
 }
 
-void BasicSceneBuilder::Texture(const std::string &name, const std::string &type,
+void BasicSceneBuilder::Texture(const std::string &origName, const std::string &type,
                                 const std::string &texname, ParsedParameterVector params,
                                 FileLoc loc) {
+    std::string name = NormalizeUTF8(origName);
     VERIFY_WORLD("Texture");
 
     ParameterDictionary dict(std::move(params), graphicsState.textureAttributes,
@@ -691,8 +702,9 @@ void BasicSceneBuilder::Material(const std::string &name, ParsedParameterVector 
     graphicsState.currentMaterialName.clear();
 }
 
-void BasicSceneBuilder::MakeNamedMaterial(const std::string &name,
+void BasicSceneBuilder::MakeNamedMaterial(const std::string &origName,
                                           ParsedParameterVector params, FileLoc loc) {
+    std::string name = NormalizeUTF8(origName);
     VERIFY_WORLD("MakeNamedMaterial");
 
     ParameterDictionary dict(std::move(params), graphicsState.materialAttributes,
@@ -707,7 +719,8 @@ void BasicSceneBuilder::MakeNamedMaterial(const std::string &name,
     scene->AddNamedMaterial(name, SceneEntity("", std::move(dict), loc));
 }
 
-void BasicSceneBuilder::NamedMaterial(const std::string &name, FileLoc loc) {
+void BasicSceneBuilder::NamedMaterial(const std::string &origName, FileLoc loc) {
+    std::string name = NormalizeUTF8(origName);
     VERIFY_WORLD("NamedMaterial");
     graphicsState.currentMaterialName = name;
     graphicsState.currentMaterialIndex = -1;
