@@ -1054,6 +1054,10 @@ OptixModule OptiXAggregate::createOptiXModule(OptixDeviceContext optixContext,
     moduleCompileOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
 #endif
 
+    // Workaround driver 510/511 bug with debug builds.
+    // (See https://github.com/mmp/pbrt-v4/issues/226).
+    moduleCompileOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
+
     OptixPipelineCompileOptions pipelineCompileOptions = getPipelineCompileOptions();
 
     char log[4096];
