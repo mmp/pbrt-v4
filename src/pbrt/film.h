@@ -393,6 +393,91 @@ class GBufferFilm : public FilmBase {
     SquareMatrix<3> outputRGBFromSensorRGB;
 };
 
+// SpectralFilm Definition
+class SpectralFilm : public FilmBase {
+  public:
+    // SpectralFilm Public Methods
+    PBRT_CPU_GPU
+    bool UsesVisibleSurface() const { return false; }
+
+    PBRT_CPU_GPU
+    SampledWavelengths SampleWavelengths(Float u) const {
+        return SampledWavelengths::SampleUniform(u, lambdaMin, lambdaMax);
+    }
+
+    PBRT_CPU_GPU
+    void AddSample(Point2i pFilm, SampledSpectrum L, const SampledWavelengths &lambda,
+                   const VisibleSurface *, Float weight) {
+        // Optionally clamp value.
+        // TODO: for spectral should we just clamp channels individually?
+        Float m = L.MaxComponentValue();
+        if (m > maxComponentValue)
+            L *= maxComponentValue / m;
+
+        L = weight * SafeDiv(L, lambda.PDF());
+
+        DCHECK(InsideExclusive(pFilm, pixelBounds));
+        Pixel &pixel = pixels[pFilm];
+        for (int i = 0; i < NSpectrumSamples; ++i) {
+            int b = LambdaToBucket(lambda[i]);
+            pixel.bucketSums[b] += L[i];
+            pixel.weightSums[b] += 1;
+        }
+    }
+
+    PBRT_CPU_GPU
+    RGB GetPixelRGB(Point2i p, Float splatScale = 1) const;
+
+    SpectralFilm(FilmBaseParameters p, Float lambdaMin, Float lambdaMax,
+                 int nBuckets, const RGBColorSpace *colorSpace,
+                 Float maxComponentValue = Infinity, Allocator alloc = {});
+
+    static SpectralFilm *Create(const ParameterDictionary &parameters, Float exposureTime,
+                                Filter filter, const RGBColorSpace *colorSpace,
+                                const FileLoc *loc, Allocator alloc);
+
+    PBRT_CPU_GPU
+    void AddSplat(Point2f p, SampledSpectrum v, const SampledWavelengths &lambda);
+
+    void WriteImage(ImageMetadata metadata, Float splatScale = 1);
+    Image GetImage(ImageMetadata *metadata, Float splatScale = 1);
+
+    std::string ToString() const;
+
+    PBRT_CPU_GPU
+    RGB ToOutputRGB(SampledSpectrum L, const SampledWavelengths &lambda) const {
+        LOG_FATAL("ToOutputRGB() is unimplemented. But that's ok since it's only used "
+                  "in the SPPM integrator, which is inherently very much based on "
+                  "RGB output.");
+        return {};
+    }
+
+  private:
+    PBRT_CPU_GPU
+    int LambdaToBucket(Float lambda) const {
+        CHECK_RARE(1e6f, lambda < lambdaMin || lambda > lambdaMax);
+        int bucket = nBuckets * (lambda - lambdaMin) / (lambdaMax - lambdaMin);
+        return Clamp(bucket, 0, nBuckets - 1);
+    }
+
+    // SpectralFilm::Pixel Definition
+    struct Pixel {
+        Pixel() = default;
+        pstd::vector<double> bucketSums;
+        pstd::vector<double> weightSums;
+        pstd::vector<AtomicDouble> bucketSplats;
+    };
+
+    // SpectralFilm Private Members
+    Float lambdaMin, lambdaMax;
+    int nBuckets;
+    Float maxComponentValue;
+    Float filterIntegral;
+    const RGBColorSpace *colorSpace; // only for GetPixelRGB()
+    Array2D<Pixel> pixels;
+    pstd::vector<Float> xInt, yInt, zInt;
+};
+
 PBRT_CPU_GPU
 inline SampledWavelengths Film::SampleWavelengths(Float u) const {
     auto sample = [&](auto ptr) { return ptr->SampleWavelengths(u); };

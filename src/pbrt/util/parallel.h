@@ -181,6 +181,14 @@ class AtomicDouble {
   public:
     // AtomicDouble Public Methods
     PBRT_CPU_GPU
+    AtomicDouble(const AtomicDouble &d) {
+#if (defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600)
+        value = d.value;
+#else
+        bits = d.bits.load(std::memory_order_relaxed);
+#endif
+    }
+    PBRT_CPU_GPU
     explicit AtomicDouble(double v = 0) {
 #if (defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600)
         value = v;

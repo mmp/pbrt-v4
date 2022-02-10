@@ -18,10 +18,11 @@ namespace pbrt {
 class VisibleSurface;
 class RGBFilm;
 class GBufferFilm;
+class SpectralFilm;
 class PixelSensor;
 
 // Film Definition
-class Film : public TaggedPointer<RGBFilm, GBufferFilm> {
+class Film : public TaggedPointer<RGBFilm, GBufferFilm, SpectralFilm> {
   public:
     // Film Interface
     PBRT_CPU_GPU inline void AddSample(Point2i pFilm, SampledSpectrum L,
