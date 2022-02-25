@@ -421,7 +421,7 @@ class SpectralFilm : public FilmBase {
         for (int i = 0; i < NSpectrumSamples; ++i) {
             int b = LambdaToBucket(lambda[i]);
             pixel.bucketSums[b] += L[i];
-            pixel.weightSums[b] += 1;
+            pixel.weightSums[b] += weight;
         }
     }
 
