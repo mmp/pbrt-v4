@@ -390,6 +390,7 @@ TEST(Image, ExrNoMetadata) {
     EXPECT_EQ(*metadata.pixelBounds, Bounds2i({0, 0}, res));
     EXPECT_TRUE((bool)metadata.fullResolution);
     EXPECT_EQ(*metadata.fullResolution, res);
+    EXPECT_EQ(0, metadata.strings.size());
     EXPECT_EQ(0, metadata.stringVectors.size());
 
     EXPECT_TRUE(RemoveFile(filename.c_str()));
@@ -417,6 +418,7 @@ TEST(Image, ExrMetadata) {
     outMetadata.NDCFromWorld = w2n;
     outMetadata.pixelBounds = pb;
     outMetadata.fullResolution = fullRes;
+    outMetadata.strings["pbrt"] = "v4";
     outMetadata.stringVectors = stringVectors;
     EXPECT_TRUE(image.Write(filename, outMetadata));
 
@@ -439,6 +441,9 @@ TEST(Image, ExrMetadata) {
 
     EXPECT_TRUE((bool)inMetadata.fullResolution);
     EXPECT_EQ(*inMetadata.fullResolution, fullRes);
+
+    EXPECT_EQ(1, inMetadata.strings.size());
+    EXPECT_EQ("v4", inMetadata.strings["pbrt"]);
 
     EXPECT_EQ(1, inMetadata.stringVectors.size());
     auto iter = stringVectors.find("yolo");

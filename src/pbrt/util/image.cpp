@@ -30,6 +30,7 @@
 #include <ImfIntAttribute.h>
 #include <ImfMatrixAttribute.h>
 #include <ImfOutputFile.h>
+#include <ImfStringAttribute.h>
 #include <ImfStringVectorAttribute.h>
 #endif
 
@@ -1078,8 +1079,13 @@ static ImageAndMetadata ReadEXR(const std::string &name, Allocator alloc) {
         if (mseAttrib)
             metadata.MSE = mseAttrib->value();
 
-        // Find any string vector attributes
+        // Find any string or string vector attributes
         for (auto iter = file.header().begin(); iter != file.header().end(); ++iter) {
+            if (strcmp(iter.attribute().typeName(), "string") == 0) {
+                Imf::StringAttribute &sv =
+                    (Imf::StringAttribute &)iter.attribute();
+                metadata.strings[iter.name()] = sv.value();
+            }
             if (strcmp(iter.attribute().typeName(), "stringvector") == 0) {
                 Imf::StringVectorAttribute &sv =
                     (Imf::StringVectorAttribute &)iter.attribute();
@@ -1195,6 +1201,8 @@ bool Image::WriteEXR(const std::string &name, const ImageMetadata &metadata) con
                           Imf::IntAttribute(*metadata.samplesPerPixel));
         if (metadata.MSE)
             header.insert("MSE", Imf::FloatAttribute(*metadata.MSE));
+        for (const auto &iter : metadata.strings)
+            header.insert(iter.first, Imf::StringAttribute(iter.second));
         for (const auto &iter : metadata.stringVectors)
             header.insert(iter.first, Imf::StringVectorAttribute(iter.second));
 

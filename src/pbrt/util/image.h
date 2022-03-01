@@ -158,6 +158,7 @@ struct ImageMetadata {
     pstd::optional<int> samplesPerPixel;
     pstd::optional<float> MSE;
     pstd::optional<const RGBColorSpace *> colorSpace;
+    std::map<std::string, std::string> strings;
     std::map<std::string, std::vector<std::string>> stringVectors;
 };
 

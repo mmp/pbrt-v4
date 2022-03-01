@@ -1302,6 +1302,9 @@ static void printImageStats(const char *name, const Image &image,
     if (metadata.MSE)
         printf("\tMSE vs. reference image: %g\n", *metadata.MSE);
 
+    for (const auto &iter : metadata.strings)
+        printf("\t\"%s\": \"%s\"\n", iter.first.c_str(), iter.second.c_str());
+
     for (const auto &iter : metadata.stringVectors) {
         printf("\t\"%s\": [ ", iter.first.c_str());
         for (const std::string &str : iter.second)
@@ -2226,6 +2229,7 @@ int makeequiarea(std::vector<std::string> args) {
     ImageMetadata equiRectMetadata;
     equiRectMetadata.cameraFromWorld = latlong.metadata.cameraFromWorld;
     equiRectMetadata.colorSpace = latlong.metadata.colorSpace;
+    equiRectMetadata.strings = latlong.metadata.strings;
     equiRectMetadata.stringVectors = latlong.metadata.stringVectors;
     equiRectImage.Write(outFilename, equiRectMetadata);
 
