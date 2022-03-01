@@ -29,6 +29,7 @@
 #include <pbrt/util/transform.h>
 
 #include <algorithm>
+#include <cstring>
 
 namespace pbrt {
 
@@ -835,6 +836,213 @@ GBufferFilm *GBufferFilm::Create(const ParameterDictionary &parameters,
                                          writeFP16, alloc);
 }
 
+// SpectralFilm Method Definitions
+SpectralFilm::SpectralFilm(FilmBaseParameters p, Float lambdaMin, Float lambdaMax,
+                           int nBuckets, const RGBColorSpace *colorSpace,
+                           Float maxComponentValue, bool writeFP16, Allocator alloc)
+    : FilmBase(p),
+      colorSpace(colorSpace),
+      lambdaMin(lambdaMin),
+      lambdaMax(lambdaMax),
+      nBuckets(nBuckets),
+      maxComponentValue(maxComponentValue),
+      writeFP16(writeFP16),
+      pixels(p.pixelBounds, alloc) {
+    // Compute _outputRGBFromSensorRGB_ matrix
+    outputRGBFromSensorRGB = colorSpace->RGBFromXYZ * sensor->XYZFromSensorRGB;
+
+    filterIntegral = filter.Integral();
+    CHECK(!pixelBounds.IsEmpty());
+    filmPixelMemory += pixelBounds.Area() * (sizeof(Pixel) + 3 * nBuckets * sizeof(double));
+
+    // Allocate memory for the pixel buffers in big arrays. Note that it's
+    // wasteful (but convenient) to be storing three pointers in each
+    // SpectralFilm::Pixel structure since the addresses could be computed
+    // based on the base pointers and pixel coordinates.
+    int nPixels = pixelBounds.Area();
+    double *bucketWeightBuffer = alloc.allocate_object<double>(2 * nBuckets * nPixels);
+    std::memset(bucketWeightBuffer, 0, 2 * nBuckets * nPixels * sizeof(double));
+    AtomicDouble *splatBuffer = alloc.allocate_object<AtomicDouble>(nBuckets * nPixels);
+    std::memset(splatBuffer, 0, nBuckets * nPixels * sizeof(double));
+
+    for (Point2i p : pixelBounds) {
+        Pixel &pixel = pixels[p];
+        pixel.bucketSums = bucketWeightBuffer;
+        bucketWeightBuffer += NSpectrumSamples;
+        pixel.weightSums = bucketWeightBuffer;
+        bucketWeightBuffer += NSpectrumSamples;
+        pixel.bucketSplats = splatBuffer;
+        splatBuffer += NSpectrumSamples;
+    }
+}
+
+RGB SpectralFilm::GetPixelRGB(Point2i p, Float splatScale) const {
+    // Note: this is effectively the same as RGBFilm::GetPixelRGB
+
+    const Pixel &pixel = pixels[p];
+    RGB rgb(pixel.rgbSum[0], pixel.rgbSum[1], pixel.rgbSum[2]);
+    // Normalize _rgb_ with weight sum
+    Float weightSum = pixel.rgbWeightSum;
+    if (weightSum != 0)
+        rgb /= weightSum;
+
+    // Add splat value at pixel
+    for (int c = 0; c < 3; ++c)
+        rgb[c] += splatScale * pixel.rgbSplat[c] / filterIntegral;
+
+    // Convert _rgb_ to output RGB color space
+    rgb = outputRGBFromSensorRGB * rgb;
+
+    return rgb;
+}
+
+void SpectralFilm::AddSplat(Point2f p, SampledSpectrum L, const SampledWavelengths &lambda) {
+    // This, too, is similar to RGBFilm::AddSplat(), with additions for
+    // spectra.
+
+    CHECK(!L.HasNaNs());
+
+    // Convert sample radiance to _PixelSensor_ RGB
+    RGB rgb = sensor->ToSensorRGB(L, lambda);
+
+    // Optionally clamp sensor RGB value
+    Float m = std::max({rgb.r, rgb.g, rgb.b});
+    if (m > maxComponentValue)
+        rgb *= maxComponentValue / m;
+
+    // Spectral clamping and normalization.
+    Float lm = L.MaxComponentValue();
+    if (lm > maxComponentValue)
+        L *= maxComponentValue / lm;
+    L = SafeDiv(L, lambda.PDF()) / NSpectrumSamples;
+
+    // Compute bounds of affected pixels for splat, _splatBounds_
+    Point2f pDiscrete = p + Vector2f(0.5, 0.5);
+    Vector2f radius = filter.Radius();
+    Bounds2i splatBounds(Point2i(Floor(pDiscrete - radius)),
+                         Point2i(Floor(pDiscrete + radius)) + Vector2i(1, 1));
+    splatBounds = Intersect(splatBounds, pixelBounds);
+
+    // Splat both RGB and spectral bucket contributions.
+    for (Point2i pi : splatBounds) {
+        // Evaluate filter at _pi_ and add splat contribution
+        Float wt = filter.Evaluate(Point2f(p - pi - Vector2f(0.5, 0.5)));
+        if (wt != 0) {
+            Pixel &pixel = pixels[pi];
+
+            for (int i = 0; i < 3; ++i)
+                pixel.rgbSplat[i].Add(wt * rgb[i]);
+
+            for (int i = 0; i < NSpectrumSamples; ++i) {
+                int b = LambdaToBucket(lambda[i]);
+                pixel.bucketSplats[b].Add(wt * L[i]);
+            }
+        }
+    }
+}
+
+void SpectralFilm::WriteImage(ImageMetadata metadata, Float splatScale) {
+    Image image = GetImage(&metadata, splatScale);
+    LOG_VERBOSE("Writing image %s with bounds %s", filename, pixelBounds);
+    image.Write(filename, metadata);
+}
+
+Image SpectralFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
+    // Convert image to RGB and compute final pixel values
+    LOG_VERBOSE("Computing final weighted pixel values");
+    PixelFormat format = writeFP16 ? PixelFormat::Half : PixelFormat::Float;
+
+    std::vector<std::string> imageChannels{{"R", "G", "B"}};
+    for (int i = 0; i < nBuckets; ++i) {
+        // The OpenEXR spectral layout takes the bucket center (and then
+        // determines bucket widths based on the neighbor wavelengths).
+        std::string lambda = StringPrintf("%.3fnm",
+                                          Lerp((i + 0.5f) / nBuckets, lambdaMin, lambdaMax));
+        // Convert any '.' to ',' in the number since OpenEXR uses '.' for
+        // separating layers.
+        std::replace(lambda.begin(), lambda.end(), '.', ',');
+
+        imageChannels.push_back("S0." + lambda);
+    }
+    Image image(format, Point2i(pixelBounds.Diagonal()), imageChannels);
+
+    std::atomic<int> nClamped{0};
+    ParallelFor2D(pixelBounds, [&](Point2i p) {
+        Pixel &pixel = pixels[p];
+
+        RGB rgb = GetPixelRGB(p, splatScale);
+
+        // Clamp to max representable fp16 to avoid Infs
+        if (writeFP16) {
+            for (int c = 0; c < 3; ++c) {
+                if (rgb[c] > 65504) {
+                    rgb[c] = 65504;
+                    ++nClamped;
+                }
+            }
+        }
+
+        Point2i pOffset(p.x - pixelBounds.pMin.x, p.y - pixelBounds.pMin.y);
+        image.SetChannels(pOffset, {rgb[0], rgb[1], rgb[2]});
+
+        // Set spectral channels. Hardcoded assuming that they come
+        // immediately after RGB, as is currently specified above.
+        for (int i = 0; i < nBuckets; ++i) {
+            Float c = 0;
+            if (pixel.weightSums[i] > 0) {
+                c = pixel.bucketSums[i] / pixel.weightSums[i] +
+                    splatScale * pixel.bucketSplats[i] / filterIntegral;
+                if (writeFP16 && c > 65504) {
+                    c = 65504;
+                    ++nClamped;
+                }
+            }
+            image.SetChannel(pOffset, 3 + i, c);
+        }
+    });
+
+    if (nClamped.load() > 0)
+        Warning("%d pixel values clamped to maximum fp16 value.", nClamped.load());
+
+    metadata->pixelBounds = pixelBounds;
+    metadata->fullResolution = fullResolution;
+    metadata->colorSpace = colorSpace;
+    metadata->strings["spectralLayoutVersion"] = "1.0";
+    // FIXME: if the RealisticCamera is being used, then we're actually
+    // storing "J.m^-2", but that isn't a supported value for
+    // "emissiveUnits" in the spec.
+    metadata->strings["emissiveUnits"] = "W.m^-2.sr^-1";
+
+    return image;
+}
+
+std::string SpectralFilm::ToString() const {
+    return StringPrintf(
+        "[ SpectralFilm %s lambdaMin: %f lambdaMax: %f nBuckets: %d writeFP16: %s maxComponentValue: %f ]",
+        BaseToString(), lambdaMin, lambdaMax, nBuckets, writeFP16, maxComponentValue);
+}
+
+SpectralFilm *SpectralFilm::Create(const ParameterDictionary &parameters, Float exposureTime,
+                                   Filter filter, const RGBColorSpace *colorSpace,
+                                   const FileLoc *loc, Allocator alloc) {
+    PixelSensor *sensor =
+        PixelSensor::Create(parameters, colorSpace, exposureTime, loc, alloc);
+    FilmBaseParameters filmBaseParameters(parameters, filter, sensor, loc);
+    bool writeFP16 = parameters.GetOneBool("savefp16", true);
+
+    if (!HasExtension(filmBaseParameters.filename, "exr"))
+        ErrorExit(loc, "%s: EXR is the only output format supported by the SpectralFilm.",
+                  filmBaseParameters.filename);
+
+    int nBuckets = parameters.GetOneInt("nbuckets", 16);
+    Float lambdaMin = parameters.GetOneFloat("lambdamin", Lambda_min);
+    Float lambdaMax = parameters.GetOneFloat("lambdamax", Lambda_max);
+    Float maxComponentValue = parameters.GetOneFloat("maxcomponentvalue", Infinity);
+
+    return alloc.new_object<SpectralFilm>(filmBaseParameters, lambdaMin, lambdaMax, nBuckets,
+                                          colorSpace, maxComponentValue, writeFP16, alloc);
+}
+
 Film Film::Create(const std::string &name, const ParameterDictionary &parameters,
                   Float exposureTime, const CameraTransform &cameraTransform,
                   Filter filter, const FileLoc *loc, Allocator alloc) {
@@ -845,6 +1053,9 @@ Film Film::Create(const std::string &name, const ParameterDictionary &parameters
     else if (name == "gbuffer")
         film = GBufferFilm::Create(parameters, exposureTime, cameraTransform, filter,
                                    parameters.ColorSpace(), loc, alloc);
+    else if (name == "spectral")
+        film = SpectralFilm::Create(parameters, exposureTime, filter,
+                                    parameters.ColorSpace(), loc, alloc);
     else
         ErrorExit(loc, "%s: film type unknown.", name);
 

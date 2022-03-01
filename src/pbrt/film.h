@@ -393,6 +393,127 @@ class GBufferFilm : public FilmBase {
     SquareMatrix<3> outputRGBFromSensorRGB;
 };
 
+// SpectralFilm Definition
+class SpectralFilm : public FilmBase {
+  public:
+    // SpectralFilm Public Methods
+    PBRT_CPU_GPU
+    bool UsesVisibleSurface() const { return false; }
+
+    PBRT_CPU_GPU
+    SampledWavelengths SampleWavelengths(Float u) const {
+        return SampledWavelengths::SampleUniform(u, lambdaMin, lambdaMax);
+    }
+
+    PBRT_CPU_GPU
+    void AddSample(Point2i pFilm, SampledSpectrum L, const SampledWavelengths &lambda,
+                   const VisibleSurface *, Float weight) {
+        // Start by doing more or less what RGBFilm::AddSample() does so
+        // that we can maintain accurate RGB values.
+
+        // Convert sample radiance to _PixelSensor_ RGB
+        RGB rgb = sensor->ToSensorRGB(L, lambda);
+
+        // Optionally clamp sensor RGB value
+        Float m = std::max({rgb.r, rgb.g, rgb.b});
+        if (m > maxComponentValue)
+            rgb *= maxComponentValue / m;
+
+        DCHECK(InsideExclusive(pFilm, pixelBounds));
+        // Update RGB fields in Pixel structure.
+        Pixel &pixel = pixels[pFilm];
+        for (int c = 0; c < 3; ++c)
+            pixel.rgbSum[c] += weight * rgb[c];
+        pixel.rgbWeightSum += weight;
+
+        // Spectral processing starts here.
+        // Optionally clamp spectral value. (TODO: for spectral should we
+        // just clamp channels individually?)
+        Float lm = L.MaxComponentValue();
+        if (lm > maxComponentValue)
+            L *= maxComponentValue / lm;
+
+        // The CIE_Y_integral factor effectively cancels out the effect of
+        // the conversion of light sources to use photometric units for
+        // specification.  We then do *not* divide by the PDF in |lambda|
+        // but take advantage of the fact that we know that it is uniform
+        // in SampleWavelengths(), the fact that the buckets all have the
+        // same extend, and can then just average radiance in buckets
+        // below.
+        L *= weight * CIE_Y_integral;
+
+        // Accumulate contributions in spectral buckets.
+        for (int i = 0; i < NSpectrumSamples; ++i) {
+            int b = LambdaToBucket(lambda[i]);
+            pixel.bucketSums[b] += L[i];
+            pixel.weightSums[b] += weight;
+        }
+    }
+
+    PBRT_CPU_GPU
+    RGB GetPixelRGB(Point2i p, Float splatScale = 1) const;
+
+    SpectralFilm(FilmBaseParameters p, Float lambdaMin, Float lambdaMax,
+                 int nBuckets, const RGBColorSpace *colorSpace,
+                 Float maxComponentValue = Infinity, bool writeFP16 = true,
+                 Allocator alloc = {});
+
+    static SpectralFilm *Create(const ParameterDictionary &parameters, Float exposureTime,
+                                Filter filter, const RGBColorSpace *colorSpace,
+                                const FileLoc *loc, Allocator alloc);
+
+    PBRT_CPU_GPU
+    void AddSplat(Point2f p, SampledSpectrum v, const SampledWavelengths &lambda);
+
+    void WriteImage(ImageMetadata metadata, Float splatScale = 1);
+
+    // Returns an image with both RGB and spectral components, following
+    // the layout proposed in "An OpenEXR Layout for Sepctral Images" by
+    // Fichet et al., https://jcgt.org/published/0010/03/01/.
+    Image GetImage(ImageMetadata *metadata, Float splatScale = 1);
+
+    std::string ToString() const;
+
+    PBRT_CPU_GPU
+    RGB ToOutputRGB(SampledSpectrum L, const SampledWavelengths &lambda) const {
+        LOG_FATAL("ToOutputRGB() is unimplemented. But that's ok since it's only used "
+                  "in the SPPM integrator, which is inherently very much based on "
+                  "RGB output.");
+        return {};
+    }
+
+  private:
+    PBRT_CPU_GPU
+    int LambdaToBucket(Float lambda) const {
+        DCHECK_RARE(1e6f, lambda < lambdaMin || lambda > lambdaMax);
+        int bucket = nBuckets * (lambda - lambdaMin) / (lambdaMax - lambdaMin);
+        return Clamp(bucket, 0, nBuckets - 1);
+    }
+
+    // SpectralFilm::Pixel Definition
+    struct Pixel {
+        Pixel() = default;
+        // Continue to store RGB, both to include in the final image as
+        // well as for previews during rendering.
+        double rgbSum[3] = {0., 0., 0.};
+        double rgbWeightSum = 0.;
+        AtomicDouble rgbSplat[3];
+        // The following will all have nBuckets entries.
+        double *bucketSums, *weightSums;
+        AtomicDouble *bucketSplats;
+    };
+
+    // SpectralFilm Private Members
+    const RGBColorSpace *colorSpace;
+    Float lambdaMin, lambdaMax;
+    int nBuckets;
+    Float maxComponentValue;
+    bool writeFP16;
+    Float filterIntegral;
+    Array2D<Pixel> pixels;
+    SquareMatrix<3> outputRGBFromSensorRGB;
+};
+
 PBRT_CPU_GPU
 inline SampledWavelengths Film::SampleWavelengths(Float u) const {
     auto sample = [&](auto ptr) { return ptr->SampleWavelengths(u); };
