@@ -414,7 +414,14 @@ class SpectralFilm : public FilmBase {
         if (m > maxComponentValue)
             L *= maxComponentValue / m;
 
-        L = weight * SafeDiv(L, lambda.PDF());
+        // The CIE_Y_integral factor effectively cancels out the effect of
+        // the conversion of light sources to use photometric units for
+        // specification.  We then do *not* divide by the PDF in |lambda|
+        // but take advantage of the fact that we know that it is uniform
+        // in SampleWavelengths(), the fact that the buckets all have the
+        // same extend, and can then just average radiance in buckets
+        // below.
+        L *= weight * CIE_Y_integral;
 
         DCHECK(InsideExclusive(pFilm, pixelBounds));
         Pixel &pixel = pixels[pFilm];
