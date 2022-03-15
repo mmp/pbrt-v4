@@ -27,6 +27,7 @@ struct BasicPBRTOptions {
     bool forceDiffuse = false;
     bool useGPU = false;
     bool wavefront = false;
+    bool interactive = false;
     RenderingCoordinateSystem renderingSpace = RenderingCoordinateSystem::CameraWorld;
 };
 

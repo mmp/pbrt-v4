@@ -250,6 +250,9 @@ class Array2D {
     }
 
     PBRT_CPU_GPU
+    Bounds2i Extent() const { return extent; }
+
+    PBRT_CPU_GPU
     int size() const { return extent.Area(); }
     PBRT_CPU_GPU
     int XSize() const { return extent.pMax.x - extent.pMin.x; }

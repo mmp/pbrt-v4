@@ -64,6 +64,8 @@ class Film : public TaggedPointer<RGBFilm, GBufferFilm, SpectralFilm> {
                        Filter filter, const FileLoc *loc, Allocator alloc);
 
     std::string ToString() const;
+
+    void Clear();
 };
 
 }  // namespace pbrt

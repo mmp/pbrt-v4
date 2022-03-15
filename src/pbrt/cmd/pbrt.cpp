@@ -54,6 +54,7 @@ Rendering options:
 #endif
             R"(
   --help                        Print this help text.
+  --interactive                 Enable interactive rendering mode.
   --mse-reference-image         Filename for reference image to use for MSE computation.
   --mse-reference-out           File to write MSE error vs spp results.
   --nthreads <num>              Use specified number of threads for rendering.
@@ -176,6 +177,7 @@ int main(int argc, char *argv[]) {
             ParseArg(&iter, args.end(), "log-utilization", &options.logUtilization,
                      onError) ||
             ParseArg(&iter, args.end(), "log-file", &options.logFile, onError) ||
+            ParseArg(&iter, args.end(), "interactive", &options.interactive, onError) ||
             ParseArg(&iter, args.end(), "mse-reference-image", &options.mseReferenceImage,
                      onError) ||
             ParseArg(&iter, args.end(), "mse-reference-out", &options.mseReferenceOutput,

@@ -1425,4 +1425,61 @@ RealisticCamera *RealisticCamera::Create(const ParameterDictionary &parameters,
                                              std::move(apertureImage), alloc);
 }
 
+std::string MovingCamera::ToString() const {
+    return StringPrintf("[ MovingCamera baseCamera: %s ]", baseCamera);
+}
+
+pstd::optional<CameraRay>
+MovingCamera::GenerateRay(CameraSample sample, SampledWavelengths &lambda) const {
+    // TODO: check if the apparently-possible recursion here (and elsewhere) hurts perf.
+    pstd::optional<CameraRay> ray = baseCamera.GenerateRay(sample, lambda);
+    if (ray)
+        ray->ray = movingFromBase(ray->ray);
+    return ray;
+}
+
+pstd::optional<CameraRayDifferential>
+MovingCamera::GenerateRayDifferential(CameraSample sample, SampledWavelengths &lambda) const {
+    LOG_FATAL("TODO");
+    return {};
+}
+
+CameraTransform MovingCamera::GetCameraTransform() const {
+    // This is only ever used at startup time, so we can just forward it on
+    // to the base.
+    return baseCamera.GetCameraTransform();
+}
+
+void MovingCamera::Approximate_dp_dxy(Point3f p, Normal3f n, Float time, int samplesPerPixel,
+                                      Vector3f *dpdx, Vector3f *dpdy) const {
+    p = movingFromBase.ApplyInverse(p);
+    n = movingFromBase.ApplyInverse(n);
+    baseCamera.Approximate_dp_dxy(p, n, time, samplesPerPixel, dpdx, dpdy);
+}
+
+SampledSpectrum MovingCamera::We(const Ray &ray, SampledWavelengths &lambda,
+                                 Point2f *pRasterOut) const {
+    LOG_FATAL("TODO");
+    return {};
+}
+
+void MovingCamera::PDF_We(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
+    LOG_FATAL("TODO");
+}
+
+pstd::optional<CameraWiSample>
+MovingCamera::SampleWi(const Interaction &ref, Point2f u, SampledWavelengths &lambda) const {
+    LOG_FATAL("TODO");
+    return {};
+}
+
+bool MovingCamera::EndFrame() {
+    static float time = 0.f;
+    time += .01f;
+
+    movingFromBase = Translate(Vector3f(0, 0, 10.f * std::sin(time)));
+
+    return true;
+}
+
 }  // namespace pbrt

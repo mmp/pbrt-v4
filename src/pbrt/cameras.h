@@ -143,7 +143,7 @@ class CameraBase {
     PBRT_CPU_GPU
     Film GetFilm() const { return film; }
     PBRT_CPU_GPU
-    const CameraTransform &GetCameraTransform() const { return cameraTransform; }
+    CameraTransform GetCameraTransform() const { return cameraTransform; }
 
     PBRT_CPU_GPU
     Float SampleTime(Float u) const { return Lerp(u, shutterOpen, shutterClose); }
@@ -181,6 +181,9 @@ class CameraBase {
         *dpdy =
             sppScale * RenderFromCamera(DownZFromCamera.ApplyInverse(py - pDownZ), time);
     }
+
+    // Default: for non-moving camera, no need to ever restart sampling...
+    bool EndFrame() { return false; }
 
   protected:
     // CameraBase Protected Members
@@ -583,6 +586,49 @@ class RealisticCamera : public CameraBase {
     pstd::vector<Bounds2f> exitPupilBounds;
 };
 
+class MovingCamera {
+public:
+    MovingCamera(Camera baseCamera) : baseCamera(baseCamera) { }
+
+    std::string ToString() const;
+
+    PBRT_CPU_GPU pstd::optional<CameraRay> GenerateRay(
+        CameraSample sample, SampledWavelengths &lambda) const;
+
+    PBRT_CPU_GPU
+    pstd::optional<CameraRayDifferential> GenerateRayDifferential(
+        CameraSample sample, SampledWavelengths &lambda) const;
+
+    PBRT_CPU_GPU Film GetFilm() const { return baseCamera.GetFilm(); }
+
+    PBRT_CPU_GPU inline Float SampleTime(Float u) const { return baseCamera.SampleTime(u); }
+
+    void InitMetadata(ImageMetadata *metadata) const { baseCamera.InitMetadata(metadata); }
+
+    PBRT_CPU_GPU CameraTransform GetCameraTransform() const;
+
+    PBRT_CPU_GPU
+    void Approximate_dp_dxy(Point3f p, Normal3f n, Float time, int samplesPerPixel,
+                            Vector3f *dpdx, Vector3f *dpdy) const;
+
+    PBRT_CPU_GPU
+    SampledSpectrum We(const Ray &ray, SampledWavelengths &lambda,
+                       Point2f *pRasterOut = nullptr) const;
+
+    PBRT_CPU_GPU
+    void PDF_We(const Ray &ray, Float *pdfPos, Float *pdfDir) const;
+
+    PBRT_CPU_GPU
+    pstd::optional<CameraWiSample> SampleWi(const Interaction &ref, Point2f u,
+                                            SampledWavelengths &lambda) const;
+
+    bool EndFrame();
+
+private:
+    Transform movingFromBase;
+    Camera baseCamera;
+};
+
 inline pstd::optional<CameraRay> Camera::GenerateRay(CameraSample sample,
                                                      SampledWavelengths &lambda) const {
     auto generate = [&](auto ptr) { return ptr->GenerateRay(sample, lambda); };
@@ -599,10 +645,8 @@ inline Float Camera::SampleTime(Float u) const {
     return Dispatch(sample);
 }
 
-inline const CameraTransform &Camera::GetCameraTransform() const {
-    auto gtc = [&](auto ptr) -> const CameraTransform & {
-        return ptr->GetCameraTransform();
-    };
+inline CameraTransform Camera::GetCameraTransform() const {
+    auto gtc = [&](auto ptr) { return ptr->GetCameraTransform(); };
     return Dispatch(gtc);
 }
 
@@ -618,6 +662,11 @@ inline void Camera::Approximate_dp_dxy(Point3f p, Normal3f n, Float time,
         };
         return Dispatch(approx);
     }
+}
+
+inline bool Camera::EndFrame() {
+    auto ef = [&](auto ptr) { return ptr->EndFrame(); };
+    return Dispatch(ef);
 }
 
 }  // namespace pbrt

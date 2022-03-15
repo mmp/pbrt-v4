@@ -529,6 +529,17 @@ Float WavefrontPathIntegrator::Render() {
                         displayRGB[p.x + p.y * resolution.x] = film.GetPixelRGB(pPixel);
                     });
 #endif  //  PBRT_BUILD_GPU_RENDERER
+
+            if (Options->interactive) {
+                if (Options->useGPU)
+                    // bleh
+                    GPUWait();
+                if (camera.EndFrame()) {
+                    sampleIndex = firstSampleIndex - 1;
+                    // FIXME: do this on the GPU when applicable to avoid the readback...
+                    camera.GetFilm().Clear();
+                }
+            }
         }
 
         progress.Update();

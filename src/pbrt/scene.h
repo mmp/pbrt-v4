@@ -283,8 +283,13 @@ class BasicScene {
         cameraJobMutex.lock();
         while (!camera) {
             pstd::optional<Camera> c = cameraJob->TryGetResult(&cameraJobMutex);
-            if (c)
+            if (c) {
                 camera = *c;
+                if (Options->interactive) {
+                    Allocator alloc = threadAllocators.Get();
+                    camera = alloc.new_object<MovingCamera>(camera);
+                }
+            }
         }
         cameraJobMutex.unlock();
         return camera;

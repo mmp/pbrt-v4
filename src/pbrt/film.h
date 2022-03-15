@@ -295,6 +295,15 @@ class RGBFilm : public FilmBase {
         return outputRGBFromSensorRGB * sensorRGB;
     }
 
+    void Clear() {
+        ParallelFor2D(pixels.Extent(), [&](Point2i pt) {
+            Pixel &p = pixels[pt];
+            p.rgbSum[0] = p.rgbSum[1] = p.rgbSum[2] = 0.;
+            p.weightSum = 0.;
+            p.rgbSplat[0] = p.rgbSplat[1] = p.rgbSplat[2] = 0.;
+        });
+    }
+
   private:
     // RGBFilm::Pixel Definition
     struct Pixel {
@@ -366,6 +375,10 @@ class GBufferFilm : public FilmBase {
     Image GetImage(ImageMetadata *metadata, Float splatScale = 1);
 
     std::string ToString() const;
+
+    void Clear() {
+        LOG_FATAL("TODO");
+    }
 
   private:
     // GBufferFilm::Pixel Definition
@@ -482,6 +495,10 @@ class SpectralFilm : public FilmBase {
         return {};
     }
 
+    void Clear() {
+        LOG_FATAL("TODO");
+    }
+
   private:
     PBRT_CPU_GPU
     int LambdaToBucket(Float lambda) const {
@@ -582,6 +599,11 @@ PBRT_CPU_GPU
 inline const PixelSensor *Film::GetPixelSensor() const {
     auto filter = [&](auto ptr) { return ptr->GetPixelSensor(); };
     return Dispatch(filter);
+}
+
+inline void Film::Clear() {
+    auto clear = [&](auto ptr) { ptr->Clear(); };
+    return Dispatch(clear);
 }
 
 }  // namespace pbrt
