@@ -287,7 +287,7 @@ class BasicScene {
                 camera = *c;
                 if (Options->interactive) {
                     Allocator alloc = threadAllocators.Get();
-                    camera = alloc.new_object<MovingCamera>(camera);
+                    camera = alloc.new_object<MovingCamera>(camera, threadAllocators.Get());
                 }
             }
         }

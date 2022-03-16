@@ -588,7 +588,7 @@ class RealisticCamera : public CameraBase {
 
 class MovingCamera {
 public:
-    MovingCamera(Camera baseCamera);
+    MovingCamera(Camera baseCamera, Allocator alloc);
 
     std::string ToString() const;
 
@@ -626,6 +626,7 @@ public:
 
 private:
     Transform movingFromBase;
+    Transform *movingFromBaseGPU;
     Camera baseCamera;
 };
 

@@ -13,6 +13,14 @@
 
 namespace pbrt {
 
+void GPUMemcpyToDevice(void* dst, void* src, size_t sz) {
+    CUDA_CHECK(cudaMemcpyAsync(dst, src, sz, cudaMemcpyHostToDevice));
+}
+
+void GPUMemcpyFromDevice(void *dst, void *src, size_t sz) {
+    CUDA_CHECK(cudaMemcpy(dst, src, sz, cudaMemcpyDeviceToHost));
+}
+
 void *CUDAMemoryResource::do_allocate(size_t size, size_t alignment) {
     void *ptr;
     CUDA_CHECK(cudaMallocManaged(&ptr, size));

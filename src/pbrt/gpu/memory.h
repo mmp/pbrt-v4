@@ -22,6 +22,9 @@ namespace pbrt {
 
 #ifdef PBRT_BUILD_GPU_RENDERER
 
+void GPUMemcpyToDevice(void *dst, void *src, size_t sz);
+void GPUMemcpyFromDevice(void *dst, void *src, size_t sz);
+
 class CUDAMemoryResource : public pstd::pmr::memory_resource {
     void *do_allocate(size_t size, size_t alignment);
     void do_deallocate(void *p, size_t bytes, size_t alignment);

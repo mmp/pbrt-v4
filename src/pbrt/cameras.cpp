@@ -10,6 +10,9 @@
 #include <pbrt/filters.h>
 #include <pbrt/options.h>
 #include <pbrt/paramdict.h>
+#ifdef PBRT_BUILD_GPU_RENDERER
+#include <pbrt/gpu/memory.h>
+#endif
 #include <pbrt/util/error.h>
 #include <pbrt/util/file.h>
 #include <pbrt/util/image.h>
@@ -20,10 +23,17 @@
 #include <pbrt/util/stats.h>
 
 #include <algorithm>
+
+// Raw console input support.
+// TODO: Put this behind an abstraction in util
+#ifdef PBRT_IS_WINDOWS
+#include <Windows.h>
+#else
 #include <signal.h>
 #include <poll.h>
 #include <termios.h>
 #include <unistd.h>
+#endif // PBRT_IS_WINDOWS
 
 namespace pbrt {
 
@@ -1429,18 +1439,21 @@ RealisticCamera *RealisticCamera::Create(const ParameterDictionary &parameters,
                                              std::move(apertureImage), alloc);
 }
 
-MovingCamera::MovingCamera(Camera baseCamera)
+MovingCamera::MovingCamera(Camera baseCamera, Allocator alloc)
     : baseCamera(baseCamera) {
+    movingFromBaseGPU = alloc.new_object<Transform>();
+#ifndef PBRT_IS_WINDOWS
     // Unbuffered keyboard input
     struct termios attr;
     int fd = 0; // stdin
     tcgetattr(fd, &attr);
     attr.c_lflag &= ~ICANON;
     tcsetattr(fd, TCSANOW, &attr);
+#endif // !PBRT_IS_WINDOWS
 }
 
 std::string MovingCamera::ToString() const {
-    return StringPrintf("[ MovingCamera baseCamera: %s ]", baseCamera);
+    return StringPrintf("[ MovingCamera movingFromBase: %s baseCamera: %s ]", movingFromBase, baseCamera);
 }
 
 pstd::optional<CameraRay>
@@ -1448,14 +1461,24 @@ MovingCamera::GenerateRay(CameraSample sample, SampledWavelengths &lambda) const
     // TODO: check if the apparently-possible recursion here (and elsewhere) hurts perf.
     pstd::optional<CameraRay> ray = baseCamera.GenerateRay(sample, lambda);
     if (ray)
+#ifdef PBRT_IS_GPU_CODE
+        ray->ray = (*movingFromBaseGPU)(ray->ray);
+#else
         ray->ray = movingFromBase(ray->ray);
+#endif // PBRT_IS_GPU_CODE
     return ray;
 }
 
 pstd::optional<CameraRayDifferential>
 MovingCamera::GenerateRayDifferential(CameraSample sample, SampledWavelengths &lambda) const {
-    LOG_FATAL("TODO");
-    return {};
+    pstd::optional<CameraRayDifferential> ray = baseCamera.GenerateRayDifferential(sample, lambda);
+    if (ray)
+#ifdef PBRT_IS_GPU_CODE
+        ray->ray = (*movingFromBaseGPU)(ray->ray);
+#else
+        ray->ray = movingFromBase(ray->ray);
+#endif  // PBRT_IS_GPU_CODE
+    return ray;
 }
 
 CameraTransform MovingCamera::GetCameraTransform() const {
@@ -1488,16 +1511,67 @@ MovingCamera::SampleWi(const Interaction &ref, Point2f u, SampledWavelengths &la
 }
 
 bool MovingCamera::EndFrame() {
-#if 0
-    static float time = 0.f;
-    time += .01f;
-
-    movingFromBase = Translate(Vector3f(0, 0, 10.f * std::sin(time)));
-
-    return true;
-#else
+    // TODO: use common code for handling key presses, etc.
     float moveScale = 1.f;
+#ifdef PBRT_IS_WINDOWS
+    HANDLE hIn = GetStdHandle(STD_INPUT_HANDLE);
+    DWORD n;
+    bool anyMotion = false;
+    while (true) {
+        if (GetNumberOfConsoleInputEvents(hIn, &n) == 0)
+            ErrorExit("GetNumberOfConsoleInputs");
+        fprintf(stderr, "%d inputs\n", n);
+        if (n == 0)
+            break;
+        for (int i = 0; i < n; ++i) {
+            DWORD nRead;
+            INPUT_RECORD inRec;
+            if (ReadConsoleInput(hIn, &inRec, 1, &nRead) == 0)
+                ErrorExit("ReadConsoleInput");
+            switch (inRec.EventType) {
+            case KEY_EVENT:
+                printf("ch %c\n", inRec.Event.KeyEvent.uChar.AsciiChar);
+                switch (inRec.Event.KeyEvent.uChar.AsciiChar) {
+                case 'a':
+                    movingFromBase =
+                        movingFromBase * Translate(Vector3f(-moveScale, 0, 0));
+                    anyMotion = true;
+                    break;
+                case 'd':
+                    movingFromBase =
+                        movingFromBase * Translate(Vector3f(moveScale, 0, 0));
+                    anyMotion = true;
+                    break;
+                case 's':
+                    movingFromBase =
+                        movingFromBase * Translate(Vector3f(0, 0, moveScale));
+                    anyMotion = true;
+                    break;
+                case 'w':
+                    movingFromBase =
+                        movingFromBase * Translate(Vector3f(0, 0, -moveScale));
+                    anyMotion = true;
+                    break;
+                case '=':
+                case '+':
+                    moveScale *= 2;
+                    break;
+                case '-':
+                    moveScale *= 0.5;
+                    break;
+                }
+                break;
+            }
+        }
+    }
+    if (anyMotion) {
+        Transform *t = new Transform(movingFromBase);
+        GPUMemcpyToDevice(movingFromBaseGPU, t, sizeof(movingFromBase));
+        // FIXME: t is leaked. YOLO.
+    }
 
+    return anyMotion;
+#else
     bool gotInput = false;
     struct pollfd p;
     p.fd = 0; // stdin

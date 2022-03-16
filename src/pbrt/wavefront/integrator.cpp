@@ -284,6 +284,13 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
 
 // WavefrontPathIntegrator Method Definitions
 Float WavefrontPathIntegrator::Render() {
+    // If the camera is a MovingCamera, make a CPU-side copy of it so that we can call
+    // its EndFrame() method. (Windows is otherwise unhappy with both CPU and GPU touching
+    // managed memory concurrently...)
+    MovingCamera *movingCamera = nullptr;
+    if (camera.Is<MovingCamera>())
+        movingCamera = new MovingCamera(*camera.Cast<MovingCamera>());
+
     Bounds2i pixelBounds = film.PixelBounds();
     Vector2i resolution = pixelBounds.Diagonal();
     Timer timer;
@@ -531,13 +538,10 @@ Float WavefrontPathIntegrator::Render() {
 #endif  //  PBRT_BUILD_GPU_RENDERER
 
             if (Options->interactive) {
-                if (Options->useGPU)
-                    // bleh
-                    GPUWait();
-                if (camera.EndFrame()) {
+                CHECK(movingCamera != nullptr);
+                if (movingCamera->EndFrame()) {
                     sampleIndex = firstSampleIndex - 1;
-                    // FIXME: do this on the GPU when applicable to avoid the readback...
-                    camera.GetFilm().Clear();
+                   film.Clear();
                 }
             }
         }
