@@ -295,14 +295,7 @@ class RGBFilm : public FilmBase {
         return outputRGBFromSensorRGB * sensorRGB;
     }
 
-    void Clear() {
-        ParallelFor2D(pixels.Extent(), [&](Point2i pt) {
-            Pixel &p = pixels[pt];
-            p.rgbSum[0] = p.rgbSum[1] = p.rgbSum[2] = 0.;
-            p.weightSum = 0.;
-            p.rgbSplat[0] = p.rgbSplat[1] = p.rgbSplat[2] = 0.;
-        });
-    }
+    void Clear();
 
   private:
     // RGBFilm::Pixel Definition

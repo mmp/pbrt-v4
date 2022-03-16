@@ -20,6 +20,10 @@
 #include <pbrt/util/stats.h>
 
 #include <algorithm>
+#include <signal.h>
+#include <poll.h>
+#include <termios.h>
+#include <unistd.h>
 
 namespace pbrt {
 
@@ -1425,6 +1429,16 @@ RealisticCamera *RealisticCamera::Create(const ParameterDictionary &parameters,
                                              std::move(apertureImage), alloc);
 }
 
+MovingCamera::MovingCamera(Camera baseCamera)
+    : baseCamera(baseCamera) {
+    // Unbuffered keyboard input
+    struct termios attr;
+    int fd = 0; // stdin
+    tcgetattr(fd, &attr);
+    attr.c_lflag &= ~ICANON;
+    tcsetattr(fd, TCSANOW, &attr);
+}
+
 std::string MovingCamera::ToString() const {
     return StringPrintf("[ MovingCamera baseCamera: %s ]", baseCamera);
 }
@@ -1474,12 +1488,60 @@ MovingCamera::SampleWi(const Interaction &ref, Point2f u, SampledWavelengths &la
 }
 
 bool MovingCamera::EndFrame() {
+#if 0
     static float time = 0.f;
     time += .01f;
 
     movingFromBase = Translate(Vector3f(0, 0, 10.f * std::sin(time)));
 
     return true;
+#else
+    float moveScale = 1.f;
+
+    bool gotInput = false;
+    struct pollfd p;
+    p.fd = 0; // stdin
+    p.events = POLLIN;
+    p.revents = 0;
+    while (true) {
+        switch (poll(&p, 1, 0)) {
+        case 0:
+            return gotInput;
+        case -1:
+            ErrorExit("poll: %s", ErrorString(LastError()));
+        case 1:
+            CHECK(!(p.revents & POLLERR));
+            if (p.revents & POLLIN) {
+                char ch;
+                int ret = read(0, &ch, 1);
+                if (ret == -1)
+                    ErrorExit("read: %s", ErrorString(LastError()));
+                gotInput = true;
+                switch (ch) {
+                case 'a':
+                    movingFromBase = movingFromBase * Translate(Vector3f(-moveScale, 0, 0));
+                    break;
+                case 'd':
+                    movingFromBase = movingFromBase * Translate(Vector3f(moveScale, 0, 0));
+                    break;
+                case 's':
+                    movingFromBase = movingFromBase * Translate(Vector3f(0, 0, moveScale));
+                    break;
+                case 'w':
+                    movingFromBase = movingFromBase * Translate(Vector3f(0, 0, -moveScale));
+                    break;
+                case '=':
+                case '+':
+                    moveScale *= 2;
+                    break;
+                case '-':
+                    moveScale *= 0.5;
+                    break;
+                }
+            }
+        }
+    }
+#endif
 }
 
 }  // namespace pbrt

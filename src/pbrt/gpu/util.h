@@ -123,6 +123,8 @@ void ReportKernelStats();
 void GPUInit();
 void GPUThreadInit();
 
+void GPUMemset(void *ptr, int byte, size_t bytes);
+
 void GPURegisterThread(const char *name);
 void GPUNameStream(cudaStream_t stream, const char *name);
 

@@ -13,6 +13,9 @@
 #include <pbrt/filters.h>
 #include <pbrt/options.h>
 #include <pbrt/paramdict.h>
+#ifdef PBRT_BUILD_GPU_RENDERER
+#include <pbrt/gpu/util.h>
+#endif // PBRT_BUILD_GPU_RENDERER
 #include <pbrt/util/bluenoise.h>
 #include <pbrt/util/check.h>
 #include <pbrt/util/color.h>
@@ -559,6 +562,22 @@ std::string RGBFilm::ToString() const {
     return StringPrintf(
         "[ RGBFilm %s colorSpace: %s maxComponentValue: %f writeFP16: %s ]",
         BaseToString(), *colorSpace, maxComponentValue, writeFP16);
+}
+
+void RGBFilm::Clear() {
+#ifdef PBRT_BUILD_GPU_RENDERER
+    if (Options->useGPU) {
+        GPUMemset(&pixels(0,0), 0, pixels.size() * sizeof(pixels(0,0)));
+        return;
+    }
+#endif // PBRT_BUILD_GPU_RENDERER
+
+    ParallelFor2D(pixels.Extent(), [&](Point2i pt) {
+        Pixel &p = pixels[pt];
+        p.rgbSum[0] = p.rgbSum[1] = p.rgbSum[2] = 0.;
+        p.weightSum = 0.;
+        p.rgbSplat[0] = p.rgbSplat[1] = p.rgbSplat[2] = 0.;
+    });
 }
 
 RGBFilm *RGBFilm::Create(const ParameterDictionary &parameters, Float exposureTime,

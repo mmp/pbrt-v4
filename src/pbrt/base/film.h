@@ -50,6 +50,7 @@ class Film : public TaggedPointer<RGBFilm, GBufferFilm, SpectralFilm> {
                                         const SampledWavelengths &lambda) const;
 
     Image GetImage(ImageMetadata *metadata, Float splatScale = 1);
+
     PBRT_CPU_GPU
     RGB GetPixelRGB(Point2i p, Float splatScale = 1) const;
 

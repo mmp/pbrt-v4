@@ -588,7 +588,7 @@ class RealisticCamera : public CameraBase {
 
 class MovingCamera {
 public:
-    MovingCamera(Camera baseCamera) : baseCamera(baseCamera) { }
+    MovingCamera(Camera baseCamera);
 
     std::string ToString() const;
 

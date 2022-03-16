@@ -423,7 +423,7 @@ Float WavefrontPathIntegrator::Render() {
     }
 
     ProgressReporter progress(lastSampleIndex - firstSampleIndex, "Rendering",
-                              Options->quiet, Options->useGPU);
+                              Options->quiet || Options->interactive, Options->useGPU);
     for (int sampleIndex = firstSampleIndex; sampleIndex < lastSampleIndex;
          ++sampleIndex) {
         // Attempt to work around issue #145.
