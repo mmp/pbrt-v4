@@ -15,20 +15,22 @@
 namespace pbrt {
 
 // WavefrontPathIntegrator Camera Ray Methods
-void WavefrontPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
+  void WavefrontPathIntegrator::GenerateCameraRays(int y0, Transform movingFromCamera,
+						   int sampleIndex) {
     // Define _generateRays_ lambda function
     auto generateRays = [=](auto sampler) {
         using ConcreteSampler = std::remove_reference_t<decltype(*sampler)>;
         if constexpr (!std::is_same_v<ConcreteSampler, MLTSampler> &&
                       !std::is_same_v<ConcreteSampler, DebugMLTSampler>)
-            GenerateCameraRays<ConcreteSampler>(y0, sampleIndex);
+            GenerateCameraRays<ConcreteSampler>(y0, movingFromCamera, sampleIndex);
     };
 
     sampler.DispatchCPU(generateRays);
 }
 
 template <typename ConcreteSampler>
-void WavefrontPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
+void WavefrontPathIntegrator::GenerateCameraRays(int y0, Transform movingFromCamera,
+						 int sampleIndex) {
     RayQueue *rayQueue = CurrentRayQueue(0);
     ParallelFor(
         "Generate camera rays", maxQueueSize, PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
@@ -58,6 +60,8 @@ void WavefrontPathIntegrator::GenerateCameraRays(int y0, int sampleIndex) {
             CameraSample cameraSample = GetCameraSample(pixelSampler, pPixel, filter);
             pstd::optional<CameraRay> cameraRay =
                 camera.GenerateRay(cameraSample, lambda);
+	    if (cameraRay)
+	      cameraRay->ray = movingFromCamera(cameraRay->ray);
 
             // Initialize remainder of _PixelSampleState_ for ray
             pixelSampleState.L[pixelIndex] = SampledSpectrum(0.f);

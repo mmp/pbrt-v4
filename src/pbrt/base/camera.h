@@ -29,11 +29,10 @@ class PerspectiveCamera;
 class OrthographicCamera;
 class SphericalCamera;
 class RealisticCamera;
-class MovingCamera;
 
 // Camera Definition
 class Camera : public TaggedPointer<PerspectiveCamera, OrthographicCamera,
-                                    SphericalCamera, RealisticCamera, MovingCamera> {
+                                    SphericalCamera, RealisticCamera> {
   public:
     // Camera Interface
     using TaggedPointer::TaggedPointer;
@@ -57,7 +56,7 @@ class Camera : public TaggedPointer<PerspectiveCamera, OrthographicCamera,
 
     void InitMetadata(ImageMetadata *metadata) const;
 
-    PBRT_CPU_GPU inline CameraTransform GetCameraTransform() const;
+    PBRT_CPU_GPU inline const CameraTransform &GetCameraTransform() const;
 
     PBRT_CPU_GPU
     void Approximate_dp_dxy(Point3f p, Normal3f n, Float time, int samplesPerPixel,
@@ -73,8 +72,6 @@ class Camera : public TaggedPointer<PerspectiveCamera, OrthographicCamera,
     PBRT_CPU_GPU
     pstd::optional<CameraWiSample> SampleWi(const Interaction &ref, Point2f u,
                                             SampledWavelengths &lambda) const;
-
-    bool EndFrame();
 };
 
 }  // namespace pbrt

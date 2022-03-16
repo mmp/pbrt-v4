@@ -66,7 +66,7 @@ class Film : public TaggedPointer<RGBFilm, GBufferFilm, SpectralFilm> {
 
     std::string ToString() const;
 
-    void Clear();
+    inline pstd::span<std::byte> GetPixelMemory();
 };
 
 }  // namespace pbrt

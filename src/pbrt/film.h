@@ -295,7 +295,10 @@ class RGBFilm : public FilmBase {
         return outputRGBFromSensorRGB * sensorRGB;
     }
 
-    void Clear();
+    pstd::span<std::byte> GetPixelMemory() {
+        return pstd::span<std::byte>((std::byte *)&pixels(0, 0),
+				     pixels.size() * sizeof(Pixel));
+    }
 
   private:
     // RGBFilm::Pixel Definition
@@ -369,8 +372,9 @@ class GBufferFilm : public FilmBase {
 
     std::string ToString() const;
 
-    void Clear() {
+    pstd::span<std::byte> GetPixelMemory() {
         LOG_FATAL("TODO");
+	return {};
     }
 
   private:
@@ -488,8 +492,9 @@ class SpectralFilm : public FilmBase {
         return {};
     }
 
-    void Clear() {
+    pstd::span<std::byte> GetPixelMemory() {
         LOG_FATAL("TODO");
+	return {};
     }
 
   private:
@@ -594,9 +599,9 @@ inline const PixelSensor *Film::GetPixelSensor() const {
     return Dispatch(filter);
 }
 
-inline void Film::Clear() {
-    auto clear = [&](auto ptr) { ptr->Clear(); };
-    return Dispatch(clear);
+inline pstd::span<std::byte> Film::GetPixelMemory() {
+    auto gpm = [&](auto ptr) { return ptr->GetPixelMemory(); };
+    return Dispatch(gpm);
 }
 
 }  // namespace pbrt
