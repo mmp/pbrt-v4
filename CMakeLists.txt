@@ -62,12 +62,12 @@ check_ext ("OpenVDB" "openvdb/nanovdb" 414bed84c2fc22e188eac7b611aa85c7edd7a5a9)
 check_ext ("Ptex" "ptex/src" 4cd8e9a6db2b06e478dfbbd8c26eb6df97f84483)
 check_ext ("double-conversion" "double-conversion/cmake" cc1f75a114aca8d2af69f73a5a959aecbab0e87a)
 check_ext ("filesystem" "filesystem/filesystem" c5f9de30142453eb3c6fe991e82dfc2583373116)
+check_ext ("glfw" "glfw/docs" 9cc252a406b79c31ab82648a21b715e2d3fc7ece)
 check_ext ("libdeflate" "libdeflate/common" 1fd0bea6ca2073c68493632dafc4b1ddda1bcbc3)
 check_ext ("lodepng" "lodepng/examples" 8c6a9e30576f07bf470ad6f09458a2dcd7a6a84a)
 check_ext ("stb" "stb/tools" af1a5bc352164740c1cc1354942b1c6b72eacb8a)
 check_ext ("utf8proc" "utf8proc/bench" 2484e2ed5e1d9c19edcccf392a7d9920ad90dfaf)
 check_ext ("zlib" "zlib/doc" 54d591eabf9fe0e84c725638f8d5d8d202a093fa)
-
 add_compile_definitions ("$<$<CONFIG:DEBUG>:PBRT_DEBUG_BUILD>")
 
 enable_testing ()
@@ -88,6 +88,8 @@ endif ()
 if (PBRT_DBG_LOGGING)
   list (APPEND PBRT_DEFINITIONS "PBRT_DBG_LOGGING")
 endif ()
+
+find_package(OpenGL REQUIRED)
 
 #######################################
 ## ext
@@ -836,6 +838,7 @@ target_include_directories (pbrt_lib PUBLIC
   ${PTEX_INCLUDE}
   ${DOUBLE_CONVERSION_INCLUDE}
   ${NANOVDB_INCLUDE}
+  ${GLFW_INCLUDE}
   ${CMAKE_CURRENT_BINARY_DIR}
 )
 if (PBRT_CUDA_ENABLED AND PBRT_OPTIX7_PATH)
@@ -863,6 +866,8 @@ set (ALL_PBRT_LIBS
   double-conversion
   ${PBRT_CUDA_LIB}
   utf8proc
+  glfw
+  OpenGL::GL
 )
 
 if (PBRT_CUDA_ENABLED)
