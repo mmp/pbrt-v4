@@ -295,14 +295,13 @@ class RGBFilm : public FilmBase {
         return outputRGBFromSensorRGB * sensorRGB;
     }
 
-    pstd::span<std::byte> GetPixelMemory() {
-        return pstd::span<std::byte>((std::byte *)&pixels(0, 0),
-				     pixels.size() * sizeof(Pixel));
+    PBRT_CPU_GPU void ResetPixel(Point2i p) {
+        std::memset(&pixels[p], 0, sizeof(Pixel));
     }
 
   private:
     // RGBFilm::Pixel Definition
-    struct Pixel {
+    struct alignas(16) Pixel {
         Pixel() = default;
         double rgbSum[3] = {0., 0., 0.};
         double weightSum = 0.;
@@ -372,10 +371,7 @@ class GBufferFilm : public FilmBase {
 
     std::string ToString() const;
 
-    pstd::span<std::byte> GetPixelMemory() {
-        LOG_FATAL("TODO");
-	return {};
-    }
+    PBRT_CPU_GPU void ResetPixel(Point2i p);
 
   private:
     // GBufferFilm::Pixel Definition
@@ -492,10 +488,7 @@ class SpectralFilm : public FilmBase {
         return {};
     }
 
-    pstd::span<std::byte> GetPixelMemory() {
-        LOG_FATAL("TODO");
-	return {};
-    }
+    PBRT_CPU_GPU void ResetPixel(Point2i p);
 
   private:
     PBRT_CPU_GPU
@@ -599,9 +592,10 @@ inline const PixelSensor *Film::GetPixelSensor() const {
     return Dispatch(filter);
 }
 
-inline pstd::span<std::byte> Film::GetPixelMemory() {
-    auto gpm = [&](auto ptr) { return ptr->GetPixelMemory(); };
-    return Dispatch(gpm);
+PBRT_CPU_GPU
+inline void Film::ResetPixel(Point2i p) {
+    auto rp = [&](auto ptr) { ptr->ResetPixel(p); };
+    return Dispatch(rp);
 }
 
 }  // namespace pbrt

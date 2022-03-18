@@ -402,7 +402,6 @@ static GLFWwindow *openWindow(Vector2i resolution) {
 Float WavefrontPathIntegrator::Render() {
     Bounds2i pixelBounds = film.PixelBounds();
     Vector2i resolution = pixelBounds.Diagonal();
-    pstd::span<std::byte> pixels = film.GetPixelMemory();
     // FIXME: camera animation; whatever...
     Transform renderFromCamera = camera.GetCameraTransform().RenderFromCamera().startTransform;
     Transform cameraFromRender = Inverse(renderFromCamera);
@@ -676,64 +675,53 @@ Float WavefrontPathIntegrator::Render() {
                         displayRGB[p.x + p.y * resolution.x] = film.GetPixelRGB(pPixel);
                     });
 #endif  //  PBRT_BUILD_GPU_RENDERER
+        }
 
 #ifdef PBRT_INTERACTIVE_SUPPORT
-            if (Options->interactive && updateDisplay) {
-                // FIXME: this will be buggy if we've split the image into
-                // multiple chunks via scanlinesPerPass <
-                // resolution.y... It assumes we have all of the latest
-                // pixel info and then clears updateDisplay even though
-                // there may be more to come...
-                int width, height;
-                glfwGetFramebufferSize(window, &width, &height);
-                glViewport(0, 0, width, height);
-                {
-                    std::lock_guard<std::mutex> lock(displayGLMutex);
+        if (Options->interactive && updateDisplay) {
+            int width, height;
+            glfwGetFramebufferSize(window, &width, &height);
+            glViewport(0, 0, width, height);
+            {
+                std::lock_guard<std::mutex> lock(displayGLMutex);
 
-                    pbrt::ParallelFor(0, resolution.y / 2, [&](int64_t y) {
-                        auto tonemap = [](RGB &rgb) {
-                            rgb *= exposure;
-                            rgb.r = LinearToSRGB(rgb.r);
-                            rgb.g = LinearToSRGB(rgb.g);
-                            rgb.b = LinearToSRGB(rgb.b);
-                        };
+                pbrt::ParallelFor(0, resolution.y / 2, [&](int64_t y) {
+                    auto tonemap = [](RGB &rgb) {
+                        rgb *= exposure;
+                        rgb.r = LinearToSRGB(rgb.r);
+                        rgb.g = LinearToSRGB(rgb.g);
+                        rgb.b = LinearToSRGB(rgb.b);
+                    };
 
-                        for (int x = 0; x < resolution.x; ++x) {
-                            std::swap(displayGL[y * resolution.x + x],
-                                      displayGL[(resolution.y - 1 - y) * resolution.x + x]);
+                    for (int x = 0; x < resolution.x; ++x) {
+                        std::swap(displayGL[y * resolution.x + x],
+                                  displayGL[(resolution.y - 1 - y) * resolution.x + x]);
 
-                            tonemap(displayGL[y * resolution.x + x]);
-                            tonemap(displayGL[(resolution.y - 1 - y) * resolution.x + x]);
-                        }
-                    });
+                        tonemap(displayGL[y * resolution.x + x]);
+                        tonemap(displayGL[(resolution.y - 1 - y) * resolution.x + x]);
+                    }
+                });
 
-                    glDrawPixels(resolution.x, resolution.y, GL_RGB, GL_FLOAT, displayGL);
-                }
-
-                //              GLenum err;
-                //              while ((err = glGetError()) != GL_NO_ERROR)
-                //LOG_ERROR("GL error %d", (int)err);
-
-                glfwSwapBuffers(window);
+                glDrawPixels(resolution.x, resolution.y, GL_RGB, GL_FLOAT, displayGL);
                 updateDisplay = false;
             }
-            glfwPollEvents();
 
-            if (processKeys()) {
-              sampleIndex = firstSampleIndex - 1;
+            CHECK(glGetError() == GL_NO_ERROR);
 
-#ifdef PBRT_BUILD_GPU_RENDERER
-              if (Options->useGPU) {
-                  std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents("Reset Pixels");
-                  cudaEventRecord(events.first);
-                  GPUMemset(pixels.data(), 0, pixels.size());
-                  cudaEventRecord(events.second);
-              } else
-#endif  // PBRT_BUILD_GPU_RENDERER
-                memset(pixels.data(), 0, pixels.size());
-            }
-#endif // PBRT_INTERACTIVE_SUPPORT
+            glfwSwapBuffers(window);
         }
+        glfwPollEvents();
+
+        if (processKeys()) {
+            sampleIndex = firstSampleIndex - 1;
+            GPUParallelFor("Reset pixels", resolution.x * resolution.y,
+                           PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
+                               int x = pixelIndex % resolution.x;
+                               int y = pixelIndex / resolution.x;
+                               film.ResetPixel(pixelBounds.pMin + Vector2i(x, y));
+                           });
+        }
+#endif // PBRT_INTERACTIVE_SUPPORT
 
         progress.Update();
     }

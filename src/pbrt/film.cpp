@@ -796,6 +796,10 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
     return image;
 }
 
+void GBufferFilm::ResetPixel(Point2i p) {
+    LOG_FATAL("TODO");
+}
+
 std::string GBufferFilm::ToString() const {
     return StringPrintf("[ GBufferFilm %s outputFromRender: %s applyInverse: %s "
                         "colorSpace: %s maxComponentValue: %f writeFP16: %s ]",
@@ -1017,6 +1021,10 @@ Image SpectralFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
     metadata->strings["emissiveUnits"] = "W.m^-2.sr^-1";
 
     return image;
+}
+
+void SpectralFilm::ResetPixel(Point2i p) {
+    LOG_FATAL("TODO");
 }
 
 std::string SpectralFilm::ToString() const {
