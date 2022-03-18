@@ -29,7 +29,9 @@
 #include <pbrt/util/taggedptr.h>
 #include <pbrt/wavefront/aggregate.h>
 
+#ifdef PBRT_INTERACTIVE_SUPPORT
 #include <GLFW/glfw3.h>
+#endif // PBRT_INTERACTIVE_SUPPORT
 
 #include <atomic>
 #include <cstring>
@@ -296,6 +298,8 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
 #endif  // PBRT_BUILD_GPU_RENDERER
 }
 
+#ifdef PBRT_INTERACTIVE_SUPPORT
+
 static Transform movingFromCamera;
 static float exposure = 1.f;
 
@@ -339,36 +343,34 @@ static void glfwKeyCallback(GLFWwindow *window, int key, int scan, int action, i
 
 static bool processKeys() {
     static float moveScale = 1.f;
-    bool needsRedraw = false;
+    bool needsReset = false;
 
-    auto handleNeedsRedraw = [&](char key, std::function<Transform(Transform)> update) {
+    auto handleNeedsReset = [&](char key, std::function<Transform(Transform)> update) {
         if (keysDown.find(key) != keysDown.end()) {
             movingFromCamera = update(movingFromCamera);
-            needsRedraw = true;
+            needsReset = true;
         }
     };
 
-    handleNeedsRedraw('a', [&](Transform t) { return t * Translate(Vector3f(-moveScale, 0, 0)); });
-    handleNeedsRedraw('d', [&](Transform t) { return t * Translate(Vector3f( moveScale, 0, 0)); });
-    handleNeedsRedraw('s', [&](Transform t) { return t * Translate(Vector3f(0, 0, -moveScale)); });
-    handleNeedsRedraw('w', [&](Transform t) { return t * Translate(Vector3f(0, 0,  moveScale)); });
-    handleNeedsRedraw('L', [&](Transform t) { return t * Rotate(-.5f, Vector3f(0, 1, 0)); });
-    handleNeedsRedraw('R', [&](Transform t) { return t * Rotate( .5f, Vector3f(0, 1, 0)); });
-    handleNeedsRedraw('U', [&](Transform t) { return t * Rotate(-.5f, Vector3f(1, 0, 0)); });
-    handleNeedsRedraw('D', [&](Transform t) { return t * Rotate( .5f, Vector3f(1, 0, 0)); });
-    handleNeedsRedraw('r', [&](Transform t) { return Transform(); });
-    handleNeedsRedraw('e', [&](Transform t) {
-        exposure *= 1.125f;
-        keysDown.erase(keysDown.find('e'));
-        return t;
-    });
-    handleNeedsRedraw('E', [&](Transform t) {
-        exposure /= 1.125f;
-        keysDown.erase(keysDown.find('E'));
-        return t;
-    });
+    handleNeedsReset('a', [&](Transform t) { return t * Translate(Vector3f(-moveScale, 0, 0)); });
+    handleNeedsReset('d', [&](Transform t) { return t * Translate(Vector3f( moveScale, 0, 0)); });
+    handleNeedsReset('s', [&](Transform t) { return t * Translate(Vector3f(0, 0, -moveScale)); });
+    handleNeedsReset('w', [&](Transform t) { return t * Translate(Vector3f(0, 0,  moveScale)); });
+    handleNeedsReset('L', [&](Transform t) { return t * Rotate(-.5f, Vector3f(0, 1, 0)); });
+    handleNeedsReset('R', [&](Transform t) { return t * Rotate( .5f, Vector3f(0, 1, 0)); });
+    handleNeedsReset('U', [&](Transform t) { return t * Rotate(-.5f, Vector3f(1, 0, 0)); });
+    handleNeedsReset('D', [&](Transform t) { return t * Rotate( .5f, Vector3f(1, 0, 0)); });
+    handleNeedsReset('r', [&](Transform t) { return Transform(); });
 
-    // No redraw needed for these.
+    // No reset needed for these.
+    if (keysDown.find('e') != keysDown.end()) {
+        keysDown.erase(keysDown.find('e'));
+        exposure *= 1.125f;
+    }
+    if (keysDown.find('E') != keysDown.end()) {
+        keysDown.erase(keysDown.find('E'));
+        exposure /= 1.125f;
+    }
     if (keysDown.find('=') != keysDown.end()) {
         keysDown.erase(keysDown.find('='));
         moveScale *= 2;
@@ -378,20 +380,10 @@ static bool processKeys() {
         moveScale *= 0.5;
     }
 
-    return needsRedraw;
+    return needsReset;
 }
 
-// WavefrontPathIntegrator Method Definitions
-Float WavefrontPathIntegrator::Render() {
-    Bounds2i pixelBounds = film.PixelBounds();
-    Vector2i resolution = pixelBounds.Diagonal();
-    pstd::span<std::byte> pixels = film.GetPixelMemory();
-    // FIXME: camera animation; whatever...
-    Transform renderFromCamera = camera.GetCameraTransform().RenderFromCamera().startTransform;
-    Transform cameraFromRender = Inverse(renderFromCamera);
-
-    // GLFW set up.
-    // TODO: encapsulate
+static GLFWwindow *openWindow(Vector2i resolution) {
     glfwSetErrorCallback(glfwErrorCallback);
     if (!glfwInit())
         LOG_FATAL("Unable to initialize GLFW");
@@ -402,6 +394,24 @@ Float WavefrontPathIntegrator::Render() {
     }
     glfwSetKeyCallback(window, glfwKeyCallback);
     glfwMakeContextCurrent(window);
+    return window;
+}
+#endif // PBRT_INTERACTIVE_SUPPORT
+
+// WavefrontPathIntegrator Method Definitions
+Float WavefrontPathIntegrator::Render() {
+    Bounds2i pixelBounds = film.PixelBounds();
+    Vector2i resolution = pixelBounds.Diagonal();
+    pstd::span<std::byte> pixels = film.GetPixelMemory();
+    // FIXME: camera animation; whatever...
+    Transform renderFromCamera = camera.GetCameraTransform().RenderFromCamera().startTransform;
+    Transform cameraFromRender = Inverse(renderFromCamera);
+
+#ifdef PBRT_INTERACTIVE_SUPPORT
+    GLFWwindow *window = nullptr;
+    if (Options->interactive)
+        window = openWindow(resolution);
+#endif
 
     Timer timer;
     // Prefetch allocations to GPU memory
@@ -445,11 +455,14 @@ Float WavefrontPathIntegrator::Render() {
 
     // Launch thread to copy image for display server, if enabled
     RGB *displayRGB = nullptr, *displayRGBHost = nullptr;
-    RGB *displayGL = new RGB[resolution.x * resolution.y];
-
-    std::atomic<bool> exitCopyThread{false}, updateDisplay{false};
+    std::atomic<bool> exitCopyThread{false};
     std::thread copyThread;
+
+#ifdef PBRT_INTERACTIVE_SUPPORT
+    std::atomic<bool> updateDisplay{false};
+    RGB *displayGL = new RGB[resolution.x * resolution.y];
     std::mutex displayGLMutex;
+#endif
 
     if (Options->interactive || !Options->displayServer.empty()) {
 #ifdef PBRT_BUILD_GPU_RENDERER
@@ -486,10 +499,11 @@ Float WavefrontPathIntegrator::Render() {
                     std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
                     CUDA_CHECK(cudaStreamSynchronize(memcpyStream));
-
+#ifdef PBRT_INTERACTIVE_SUPPORT
                     std::lock_guard<std::mutex> lock(displayGLMutex);
                     memcpy(displayGL, displayRGBHost, resolution.x * resolution.y * sizeof(RGB));
                     updateDisplay = true;
+#endif // PBRT_INTERACTIVE_SUPPORT
                 }
 
                 // Copy one more time to get the final image before exiting.
@@ -507,7 +521,7 @@ Float WavefrontPathIntegrator::Render() {
                                {"R", "G", "B"},
                                [resolution, displayRGBHost](
                                    Bounds2i b, pstd::span<pstd::span<Float>> displayValue) {
-                                     int index = 0;
+                                   int index = 0;
                                    for (Point2i p : b) {
                                        RGB rgb = displayRGBHost[p.x + p.y * resolution.x];
                                        displayValue[0][index] = rgb.r;
@@ -551,8 +565,12 @@ Float WavefrontPathIntegrator::Render() {
 
     ProgressReporter progress(lastSampleIndex - firstSampleIndex, "Rendering",
                               Options->quiet || Options->interactive, Options->useGPU);
-    int sampleIndex = firstSampleIndex;
-    while (!glfwWindowShouldClose(window) && sampleIndex < lastSampleIndex) {
+    for (int sampleIndex = firstSampleIndex; sampleIndex < lastSampleIndex; ++sampleIndex) {
+#ifdef PBRT_INTERACTIVE_SUPPORT
+        if (glfwWindowShouldClose(window))
+            break;
+#endif  // PBRT_INTERACTIVE_SUPPORT
+
         // Attempt to work around issue #145.
 #if !(defined(PBRT_IS_WINDOWS) && defined(PBRT_BUILD_GPU_RENDERER) && \
       __CUDACC_VER_MAJOR__ == 11 && __CUDACC_VER_MINOR__ == 1)
@@ -646,7 +664,7 @@ Float WavefrontPathIntegrator::Render() {
 
             // Copy updated film pixels to buffer for display
 #ifdef PBRT_BUILD_GPU_RENDERER
-            if (Options->useGPU && !Options->displayServer.empty())
+            if (Options->useGPU && (Options->interactive || !Options->displayServer.empty()))
                 GPUParallelFor(
                     "Update Display RGB Buffer", maxQueueSize,
                     PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
@@ -659,45 +677,45 @@ Float WavefrontPathIntegrator::Render() {
                     });
 #endif  //  PBRT_BUILD_GPU_RENDERER
 
-            if (updateDisplay) {
-              int width, height;
-              glfwGetFramebufferSize(window, &width, &height);
-              glViewport(0, 0, width, height);
-              //            glClearColor(1.f, .25f, .25f, 1.f);
-              //glClear(GL_COLOR_BUFFER_BIT);
-              //glRasterPos2f(-1.f, -1.f);
-              //            glPixelZoom(1, -1);
-              //            glRasterPos2f(0, resolution.y / 2.f);
+#ifdef PBRT_INTERACTIVE_SUPPORT
+            if (Options->interactive && updateDisplay) {
+                // FIXME: this will be buggy if we've split the image into
+                // multiple chunks via scanlinesPerPass <
+                // resolution.y... It assumes we have all of the latest
+                // pixel info and then clears updateDisplay even though
+                // there may be more to come...
+                int width, height;
+                glfwGetFramebufferSize(window, &width, &height);
+                glViewport(0, 0, width, height);
+                {
+                    std::lock_guard<std::mutex> lock(displayGLMutex);
 
-              {
-              std::lock_guard<std::mutex> lock(displayGLMutex);
+                    pbrt::ParallelFor(0, resolution.y / 2, [&](int64_t y) {
+                        auto tonemap = [](RGB &rgb) {
+                            rgb *= exposure;
+                            rgb.r = LinearToSRGB(rgb.r);
+                            rgb.g = LinearToSRGB(rgb.g);
+                            rgb.b = LinearToSRGB(rgb.b);
+                        };
 
-              pbrt::ParallelFor(0, resolution.y / 2, [&](int64_t y) {
-                auto tonemap = [](RGB &rgb) {
-                  rgb *= exposure;
-                  rgb.r = LinearToSRGB(rgb.r);
-                  rgb.g = LinearToSRGB(rgb.g);
-                  rgb.b = LinearToSRGB(rgb.b);
-                };
+                        for (int x = 0; x < resolution.x; ++x) {
+                            std::swap(displayGL[y * resolution.x + x],
+                                      displayGL[(resolution.y - 1 - y) * resolution.x + x]);
 
-                for (int x = 0; x < resolution.x; ++x) {
-                  std::swap(displayGL[y * resolution.x + x],
-                            displayGL[(resolution.y - 1 - y) * resolution.x + x]);
+                            tonemap(displayGL[y * resolution.x + x]);
+                            tonemap(displayGL[(resolution.y - 1 - y) * resolution.x + x]);
+                        }
+                    });
 
-                  tonemap(displayGL[y * resolution.x + x]);
-                  tonemap(displayGL[(resolution.y - 1 - y) * resolution.x + x]);
+                    glDrawPixels(resolution.x, resolution.y, GL_RGB, GL_FLOAT, displayGL);
                 }
-              });
 
-              glDrawPixels(resolution.x, resolution.y, GL_RGB, GL_FLOAT, displayGL);
-              }
+                //              GLenum err;
+                //              while ((err = glGetError()) != GL_NO_ERROR)
+                //LOG_ERROR("GL error %d", (int)err);
 
-              //              GLenum err;
-              //              while ((err = glGetError()) != GL_NO_ERROR)
-              //LOG_ERROR("GL error %d", (int)err);
-
-              glfwSwapBuffers(window);
-              updateDisplay = false;
+                glfwSwapBuffers(window);
+                updateDisplay = false;
             }
             glfwPollEvents();
 
@@ -705,22 +723,27 @@ Float WavefrontPathIntegrator::Render() {
               sampleIndex = firstSampleIndex - 1;
 
 #ifdef PBRT_BUILD_GPU_RENDERER
-              if (Options->useGPU)
-                GPUMemset(pixels.data(), 0, pixels.size());
-              else
+              if (Options->useGPU) {
+                  std::pair<cudaEvent_t, cudaEvent_t> events = GetProfilerEvents("Reset Pixels");
+                  cudaEventRecord(events.first);
+                  GPUMemset(pixels.data(), 0, pixels.size());
+                  cudaEventRecord(events.second);
+              } else
 #endif  // PBRT_BUILD_GPU_RENDERER
                 memset(pixels.data(), 0, pixels.size());
             }
+#endif // PBRT_INTERACTIVE_SUPPORT
         }
 
         progress.Update();
-        ++sampleIndex;
     }
 
+#ifdef PBRT_INTERACTIVE_SUPPORT
     if (window) {
         glfwDestroyWindow(window);
         glfwTerminate();
     }
+#endif // PBRT_INTERACTIVE_SUPPORT
 
     progress.Done();
 
@@ -734,7 +757,7 @@ Float WavefrontPathIntegrator::Render() {
     if (Options->useGPU) {
         // Wait until rendering is all done before we start to shut down the
         // display stuff..
-        if (!Options->displayServer.empty()) {
+        if (Options->interactive || !Options->displayServer.empty()) {
             exitCopyThread = true;
             copyThread.join();
         }

@@ -13,6 +13,7 @@ list (INSERT CMAKE_MODULE_PATH 0 "${CMAKE_SOURCE_DIR}/cmake")
 # Configuration options
 
 option (PBRT_FLOAT_AS_DOUBLE "Use 64-bit floats" OFF)
+option (PBRT_INTERACTIVE_SUPPORT "Provide option for interactive rendering" OFF)
 option (PBRT_BUILD_NATIVE_EXECUTABLE "Build executable optimized for CPU architecture of system pbrt was built on" ON)
 option (PBRT_DBG_LOGGING "Enable (very verbose!) debug logging" OFF)
 option (PBRT_NVTX "Insert NVTX annotations for NVIDIA Profiling and Debugging Tools" OFF)
@@ -85,11 +86,13 @@ endif ()
 if (PBRT_FLOAT_AS_DOUBLE)
   list (APPEND PBRT_DEFINITIONS "PBRT_FLOAT_AS_DOUBLE")
 endif ()
+if (PBRT_INTERACTIVE_SUPPORT)
+  list (APPEND PBRT_DEFINITIONS "PBRT_INTERACTIVE_SUPPORT")
+  find_package(OpenGL REQUIRED)
+endif ()
 if (PBRT_DBG_LOGGING)
   list (APPEND PBRT_DEFINITIONS "PBRT_DBG_LOGGING")
 endif ()
-
-find_package(OpenGL REQUIRED)
 
 #######################################
 ## ext
@@ -838,9 +841,13 @@ target_include_directories (pbrt_lib PUBLIC
   ${PTEX_INCLUDE}
   ${DOUBLE_CONVERSION_INCLUDE}
   ${NANOVDB_INCLUDE}
-  ${GLFW_INCLUDE}
   ${CMAKE_CURRENT_BINARY_DIR}
 )
+if (PBRT_INTERACTIVE_SUPPORT)
+target_include_directories (pbrt_lib PUBLIC
+  ${GLFW_INCLUDE}
+)
+endif ()
 if (PBRT_CUDA_ENABLED AND PBRT_OPTIX7_PATH)
     target_include_directories (pbrt_lib SYSTEM PUBLIC ${PBRT_OPTIX7_PATH}/include)
 endif ()
@@ -866,9 +873,11 @@ set (ALL_PBRT_LIBS
   double-conversion
   ${PBRT_CUDA_LIB}
   utf8proc
-  glfw
-  OpenGL::GL
 )
+
+if (PBRT_INTERACTIVE_SUPPORT)
+  set (ALL_PBRT_LIBS ${ALL_PBRT_LIBS} glfw OpenGL::GL)
+endif()
 
 if (PBRT_CUDA_ENABLED)
   set_property (TARGET pbrt_lib PROPERTY CUDA_SEPARABLE_COMPILATION ON)
