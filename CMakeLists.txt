@@ -846,6 +846,7 @@ target_include_directories (pbrt_lib PUBLIC
 if (PBRT_INTERACTIVE_SUPPORT)
 target_include_directories (pbrt_lib PUBLIC
   ${GLFW_INCLUDE}
+  ${GLAD_INCLUDE}
 )
 endif ()
 if (PBRT_CUDA_ENABLED AND PBRT_OPTIX7_PATH)
@@ -876,7 +877,7 @@ set (ALL_PBRT_LIBS
 )
 
 if (PBRT_INTERACTIVE_SUPPORT)
-  set (ALL_PBRT_LIBS ${ALL_PBRT_LIBS} glfw OpenGL::GL)
+  set (ALL_PBRT_LIBS ${ALL_PBRT_LIBS} glfw glad OpenGL::GL)
 endif()
 
 if (PBRT_CUDA_ENABLED)

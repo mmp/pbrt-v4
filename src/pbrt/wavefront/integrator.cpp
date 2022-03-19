@@ -2,6 +2,10 @@
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
 
+#ifdef PBRT_INTERACTIVE_SUPPORT
+#include <glad/glad.h>
+#endif // PBRT_INTERACTIVE_SUPPORT
+
 #include <pbrt/wavefront/integrator.h>
 
 #include <pbrt/base/medium.h>
@@ -394,6 +398,10 @@ static GLFWwindow *openWindow(Vector2i resolution) {
     }
     glfwSetKeyCallback(window, glfwKeyCallback);
     glfwMakeContextCurrent(window);
+
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+        LOG_FATAL("gladLoadGLLoader failed");
+
     return window;
 }
 #endif // PBRT_INTERACTIVE_SUPPORT
