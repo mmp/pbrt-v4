@@ -161,4 +161,7 @@ if (PBRT_INTERACTIVE_SUPPORT)
 
   add_subdirectory (glfw)
   add_subdirectory (glad)
+
+  set_property (TARGET glfw PROPERTY FOLDER "ext")
+  set_property (TARGET glad PROPERTY FOLDER "ext")
 endif()

@@ -36,6 +36,7 @@
 #include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <iostream>
 #include <string>
@@ -83,8 +84,7 @@ enum BufferImageFormat
 class GLDisplay
 {
 public:
-    GLDisplay(
-        BufferImageFormat format = BufferImageFormat::UNSIGNED_BYTE4);
+    GLDisplay(BufferImageFormat format = BufferImageFormat::UNSIGNED_BYTE4);
 
     void display(
             const int32_t  screen_res_x,
@@ -400,27 +400,10 @@ private:
     int32_t                    m_device_idx        = 0;
 };
 
-inline void ensureMinimumSize( int& w, int& h )
-{
-    if( w <= 0 )
-        w = 1;
-    if( h <= 0 )
-        h = 1;
-}
-
 template <typename PIXEL_FORMAT>
 CUDAOutputBuffer<PIXEL_FORMAT>::CUDAOutputBuffer(int32_t width, int32_t height )
 {
-    // Output dimensions must be at least 1 in both x and y to avoid an error
-    // with cudaMalloc.
-#if 0
-    if( width < 1 || height < 1 )
-    {
-        throw sutil::Exception( "CUDAOutputBuffer dimensions must be at least 1 in both x and y." );
-    }
-#else
-    ensureMinimumSize( width, height );
-#endif
+    CHECK(width > 0 && height > 0);
 
     // If using GL Interop, expect that the active device is also the display device.
         int current_device, is_display_device;
@@ -454,9 +437,7 @@ CUDAOutputBuffer<PIXEL_FORMAT>::~CUDAOutputBuffer()
 template <typename PIXEL_FORMAT>
 void CUDAOutputBuffer<PIXEL_FORMAT>::resize( int32_t width, int32_t height )
 {
-    // Output dimensions must be at least 1 in both x and y to avoid an error
-    // with cudaMalloc.
-    ensureMinimumSize( width, height );
+    CHECK(width > 0 && height > 0);
 
     if( m_width == width && m_height == height )
         return;
@@ -466,7 +447,6 @@ void CUDAOutputBuffer<PIXEL_FORMAT>::resize( int32_t width, int32_t height )
 
     makeCurrent();
 
-    {
         // GL buffer gets resized below
         GL_CHECK( glGenBuffers( 1, &m_pbo ) );
         GL_CHECK( glBindBuffer( GL_ARRAY_BUFFER, m_pbo ) );
@@ -478,7 +458,6 @@ void CUDAOutputBuffer<PIXEL_FORMAT>::resize( int32_t width, int32_t height )
                     m_pbo,
                     cudaGraphicsMapFlagsWriteDiscard
                     ) );
-    }
 
     if( !m_host_pixels.empty() )
         m_host_pixels.resize( m_width*m_height );
@@ -516,7 +495,6 @@ GLuint CUDAOutputBuffer<PIXEL_FORMAT>::getPBO()
 {
     if( m_pbo == 0u )
         GL_CHECK( glGenBuffers( 1, &m_pbo ) );
-
     return m_pbo;
 }
 
