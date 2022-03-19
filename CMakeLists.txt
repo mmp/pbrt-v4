@@ -681,6 +681,7 @@ if (PBRT_CUDA_ENABLED)
   )
   set (PBRT_GPU_SOURCE_HEADERS
     src/pbrt/gpu/aggregate.h
+    src/pbrt/gpu/cudagl.h
     src/pbrt/gpu/memory.h
     src/pbrt/gpu/optix.h
     src/pbrt/gpu/util.h

@@ -468,7 +468,7 @@ Float WavefrontPathIntegrator::Render() {
     std::thread copyThread;
 
 #ifdef PBRT_INTERACTIVE_SUPPORT
-    CUDAOutputBuffer<RGB> displayGL(CUDAOutputBufferType::GL_INTEROP, resolution.x, resolution.y);
+    CUDAOutputBuffer<RGB> displayGL(resolution.x, resolution.y);
     int device;
     CUDA_CHECK(cudaGetDevice(&device));
     displayGL.setDevice(device);
