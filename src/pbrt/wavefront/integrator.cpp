@@ -33,15 +33,17 @@
 #include <pbrt/util/taggedptr.h>
 #include <pbrt/wavefront/aggregate.h>
 
-#ifdef PBRT_INTERACTIVE_SUPPORT
-#include <GLFW/glfw3.h>
-#endif // PBRT_INTERACTIVE_SUPPORT
-
 #include <atomic>
 #include <cstring>
 #include <iostream>
 #include <map>
 #include <set>
+
+#ifdef PBRT_INTERACTIVE_SUPPORT
+#include <pbrt/gpu/cudagl.h>
+
+#include <GLFW/glfw3.h>
+#endif // PBRT_INTERACTIVE_SUPPORT
 
 // Raw console input support.
 // TODO: Put this behind an abstraction in util
@@ -212,7 +214,7 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
     filter = film.GetFilter();
     sampler = scene.GetSampler();
 
-    initializeVisibleSurface = film.UsesVisibleSurface();
+    initializeVisibleSurface = film.UsesVisibleSurface() || Options->interactive;
     samplesPerPixel = sampler.SamplesPerPixel();
 
     // Warn about unsupported stuff...
@@ -466,12 +468,14 @@ Float WavefrontPathIntegrator::Render() {
     std::thread copyThread;
 
 #ifdef PBRT_INTERACTIVE_SUPPORT
-    std::atomic<bool> updateDisplay{false};
-    RGB *displayGL = new RGB[resolution.x * resolution.y];
-    std::mutex displayGLMutex;
+    CUDAOutputBuffer<RGB> displayGL(CUDAOutputBufferType::GL_INTEROP, resolution.x, resolution.y);
+    int device;
+    CUDA_CHECK(cudaGetDevice(&device));
+    displayGL.setDevice(device);
+    GLDisplay display(BufferImageFormat::FLOAT3);
 #endif
 
-    if (Options->interactive || !Options->displayServer.empty()) {
+    if (!Options->displayServer.empty()) {
 #ifdef PBRT_BUILD_GPU_RENDERER
         if (Options->useGPU) {
             // Allocate staging memory on the GPU to store the current WIP
@@ -503,14 +507,9 @@ Float WavefrontPathIntegrator::Render() {
                                                resolution.x * resolution.y * sizeof(RGB),
                                                cudaMemcpyDeviceToHost, memcpyStream));
 
-                    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                    std::this_thread::sleep_for(std::chrono::milliseconds(20));
 
                     CUDA_CHECK(cudaStreamSynchronize(memcpyStream));
-#ifdef PBRT_INTERACTIVE_SUPPORT
-                    std::lock_guard<std::mutex> lock(displayGLMutex);
-                    memcpy(displayGL, displayRGBHost, resolution.x * resolution.y * sizeof(RGB));
-                    updateDisplay = true;
-#endif // PBRT_INTERACTIVE_SUPPORT
                 }
 
                 // Copy one more time to get the final image before exiting.
@@ -671,48 +670,46 @@ Float WavefrontPathIntegrator::Render() {
 
             // Copy updated film pixels to buffer for display
 #ifdef PBRT_BUILD_GPU_RENDERER
-            if (Options->useGPU && (Options->interactive || !Options->displayServer.empty()))
-                GPUParallelFor(
-                    "Update Display RGB Buffer", maxQueueSize,
-                    PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
-                        Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
-                        if (!InsideExclusive(pPixel, film.PixelBounds()))
-                            return;
+            CHECK(!(Options->interactive && !Options->useGPU)); // TODO
 
-                        Point2i p(pPixel - film.PixelBounds().pMin);
-                        displayRGB[p.x + p.y * resolution.x] = film.GetPixelRGB(pPixel);
-                    });
-#endif  //  PBRT_BUILD_GPU_RENDERER
+            if (Options->useGPU) {
+                if (!Options->displayServer.empty())
+                    GPUParallelFor(
+                        "Update Display RGB Buffer", maxQueueSize,
+                        PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
+                            Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
+                            if (!InsideExclusive(pPixel, film.PixelBounds()))
+                                return;
+
+                            Point2i p(pPixel - film.PixelBounds().pMin);
+                            displayRGB[p.x + p.y * resolution.x] = film.GetPixelRGB(pPixel);
+                        });
+                else if (Options->interactive) {
+                    RGB *rgb = displayGL.map();
+                    float ex = exposure;
+                    GPUParallelFor("Update OpenGL display buffer", maxQueueSize,
+                        PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
+                            Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
+                            if (!InsideExclusive(pPixel, film.PixelBounds()))
+                                return;
+
+                            Point2i p(pPixel - film.PixelBounds().pMin);
+                            rgb[p.x + p.y * resolution.x] = ex * film.GetPixelRGB(pPixel);
+                        });
+                    displayGL.unmap();
+                }
+            }
         }
+#endif  //  PBRT_BUILD_GPU_RENDERER
 
 #ifdef PBRT_INTERACTIVE_SUPPORT
-        if (Options->interactive && updateDisplay) {
+        if (Options->interactive) {
             int width, height;
             glfwGetFramebufferSize(window, &width, &height);
             glViewport(0, 0, width, height);
-            {
-                std::lock_guard<std::mutex> lock(displayGLMutex);
 
-                pbrt::ParallelFor(0, resolution.y / 2, [&](int64_t y) {
-                    auto tonemap = [](RGB &rgb) {
-                        rgb *= exposure;
-                        rgb.r = LinearToSRGB(rgb.r);
-                        rgb.g = LinearToSRGB(rgb.g);
-                        rgb.b = LinearToSRGB(rgb.b);
-                    };
-
-                    for (int x = 0; x < resolution.x; ++x) {
-                        std::swap(displayGL[y * resolution.x + x],
-                                  displayGL[(resolution.y - 1 - y) * resolution.x + x]);
-
-                        tonemap(displayGL[y * resolution.x + x]);
-                        tonemap(displayGL[(resolution.y - 1 - y) * resolution.x + x]);
-                    }
-                });
-
-                glDrawPixels(resolution.x, resolution.y, GL_RGB, GL_FLOAT, displayGL);
-                updateDisplay = false;
-            }
+            display.display(width, height, resolution.x, resolution.y,
+                            displayGL.getPBO());
 
             CHECK(glGetError() == GL_NO_ERROR);
 
@@ -753,7 +750,7 @@ Float WavefrontPathIntegrator::Render() {
     if (Options->useGPU) {
         // Wait until rendering is all done before we start to shut down the
         // display stuff..
-        if (Options->interactive || !Options->displayServer.empty()) {
+        if (!Options->displayServer.empty()) {
             exitCopyThread = true;
             copyThread.join();
         }
