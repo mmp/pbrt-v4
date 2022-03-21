@@ -294,85 +294,8 @@ Float WavefrontPathIntegrator::Render() {
 #endif  // PBRT_BUILD_GPU_RENDERER
 
     // Launch thread to copy image for display server, if enabled
-    RGB *displayRGB = nullptr, *displayRGBHost = nullptr;
-    std::atomic<bool> exitCopyThread{false};
-    std::thread copyThread;
-
-    if (!Options->displayServer.empty()) {
-#ifdef PBRT_BUILD_GPU_RENDERER
-        if (Options->useGPU) {
-            // Allocate staging memory on the GPU to store the current WIP
-            // image.
-            CUDA_CHECK(
-                cudaMalloc(&displayRGB, resolution.x * resolution.y * sizeof(RGB)));
-            CUDA_CHECK(
-                cudaMemset(displayRGB, 0, resolution.x * resolution.y * sizeof(RGB)));
-
-            // Host-side memory for the WIP Image.  We'll just let this leak so
-            // that the lambda passed to DisplayDynamic below doesn't access
-            // freed memory after Render() returns...
-            displayRGBHost = new RGB[resolution.x * resolution.y];
-
-            copyThread = std::thread([&]() {
-                GPURegisterThread("DISPLAY_SERVER_COPY_THREAD");
-
-                // Copy back to the CPU using a separate stream so that we can
-                // periodically but asynchronously pick up the latest results
-                // from the GPU.
-                cudaStream_t memcpyStream;
-                CUDA_CHECK(cudaStreamCreate(&memcpyStream));
-                GPUNameStream(memcpyStream, "DISPLAY_SERVER_COPY_STREAM");
-
-                // Copy back to the host from the GPU buffer, without any
-                // synthronization.
-                while (!exitCopyThread) {
-                    CUDA_CHECK(cudaMemcpyAsync(displayRGBHost, displayRGB,
-                                               resolution.x * resolution.y * sizeof(RGB),
-                                               cudaMemcpyDeviceToHost, memcpyStream));
-                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-
-                    CUDA_CHECK(cudaStreamSynchronize(memcpyStream));
-                }
-
-                // Copy one more time to get the final image before exiting.
-                CUDA_CHECK(cudaMemcpy(displayRGBHost, displayRGB,
-                                      resolution.x * resolution.y * sizeof(RGB),
-                                      cudaMemcpyDeviceToHost));
-                CUDA_CHECK(cudaDeviceSynchronize());
-            });
-
-            // Now on the CPU side, give the display system a lambda that
-            // copies values from |displayRGBHost| into its buffers used for
-            // sending messages to the display program (i.e., tev).
-            DisplayDynamic(film.GetFilename(), {resolution.x, resolution.y},
-                           {"R", "G", "B"},
-                           [resolution, displayRGBHost](
-                               Bounds2i b, pstd::span<pstd::span<Float>> displayValue) {
-                               int index = 0;
-                               for (Point2i p : b) {
-                                   RGB rgb = displayRGBHost[p.x + p.y * resolution.x];
-                                   displayValue[0][index] = rgb.r;
-                                   displayValue[1][index] = rgb.g;
-                                   displayValue[2][index] = rgb.b;
-                                   ++index;
-                               }
-                           });
-        } else
-#endif  // PBRT_BUILD_GPU_RENDERER
-            DisplayDynamic(
-                film.GetFilename(), Point2i(pixelBounds.Diagonal()), {"R", "G", "B"},
-                [pixelBounds, this](Bounds2i b,
-                                    pstd::span<pstd::span<Float>> displayValue) {
-                    int index = 0;
-                    for (Point2i p : b) {
-                        RGB rgb =
-                            film.GetPixelRGB(pixelBounds.pMin + p, 1.f /* splat scale */);
-                        for (int c = 0; c < 3; ++c)
-                            displayValue[c][index] = rgb[c];
-                        ++index;
-                    }
-                });
-    }
+    if (!Options->displayServer.empty())
+        StartDisplayThread();
 
     // Loop over sample indices and evaluate pixel samples
     int firstSampleIndex = 0, lastSampleIndex = samplesPerPixel;
@@ -483,19 +406,7 @@ Float WavefrontPathIntegrator::Render() {
 
             UpdateFilm();
             // Copy updated film pixels to buffer for display
-#ifdef PBRT_BUILD_GPU_RENDERER
-            if (Options->useGPU && !Options->displayServer.empty())
-                GPUParallelFor(
-                    "Update Display RGB Buffer", maxQueueSize,
-                    PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
-                        Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
-                        if (!InsideExclusive(pPixel, film.PixelBounds()))
-                            return;
-
-                        Point2i p(pPixel - film.PixelBounds().pMin);
-                        displayRGB[p.x + p.y * resolution.x] = film.GetPixelRGB(pPixel);
-                    });
-#endif  //  PBRT_BUILD_GPU_RENDERER
+            UpdateDisplay(resolution);
         }
 
         progress.Update();
@@ -507,21 +418,9 @@ Float WavefrontPathIntegrator::Render() {
         GPUWait();
 #endif  // PBRT_BUILD_GPU_RENDERER
     Float seconds = timer.ElapsedSeconds();
-    // Shut down display server thread, if active
-#ifdef PBRT_BUILD_GPU_RENDERER
-    if (Options->useGPU) {
-        // Wait until rendering is all done before we start to shut down the
-        // display stuff..
-        if (!Options->displayServer.empty()) {
-            exitCopyThread = true;
-            copyThread.join();
-        }
 
-        // Another synchronization to make sure no kernels are running on the
-        // GPU so that we can safely access unified memory from the CPU.
-        GPUWait();
-    }
-#endif  // PBRT_BUILD_GPU_RENDERER
+    // Shut down display server thread, if active
+    StopDisplayThread();
 
     return seconds;
 }
@@ -670,5 +569,118 @@ void WavefrontPathIntegrator::PrefetchGPUAllocations() {
     }
 }
 #endif // PBRT_BUILD_GPU_RENDERER
+
+void WavefrontPathIntegrator::StartDisplayThread() {
+    Bounds2i pixelBounds = film.PixelBounds();
+    Vector2i resolution = pixelBounds.Diagonal();
+
+#ifdef PBRT_BUILD_GPU_RENDERER
+    if (Options->useGPU) {
+        // Allocate staging memory on the GPU to store the current WIP
+        // image.
+        CUDA_CHECK(cudaMalloc(&displayRGB, resolution.x * resolution.y * sizeof(RGB)));
+        CUDA_CHECK(cudaMemset(displayRGB, 0, resolution.x * resolution.y * sizeof(RGB)));
+
+        // Host-side memory for the WIP Image.  We'll just let this leak so
+        // that the lambda passed to DisplayDynamic below doesn't access
+        // freed memory after Render() returns...
+        displayRGBHost = new RGB[resolution.x * resolution.y];
+
+        // Note that we can't just capture |this| for the member variables
+        // below because with managed memory on Windows, the CPU and GPU
+        // can't be accessing the same memory concurrently...
+        copyThread = std::thread([&exitCopyThread = this->exitCopyThread,
+                                  displayRGBHost = this->displayRGBHost,
+                                  displayRGB = this->displayRGB, resolution]() {
+            GPURegisterThread("DISPLAY_SERVER_COPY_THREAD");
+
+            // Copy back to the CPU using a separate stream so that we can
+            // periodically but asynchronously pick up the latest results
+            // from the GPU.
+            cudaStream_t memcpyStream;
+            CUDA_CHECK(cudaStreamCreate(&memcpyStream));
+            GPUNameStream(memcpyStream, "DISPLAY_SERVER_COPY_STREAM");
+
+            // Copy back to the host from the GPU buffer, without any
+            // synthronization.
+            while (!exitCopyThread) {
+                CUDA_CHECK(cudaMemcpyAsync(displayRGBHost, displayRGB,
+                                           resolution.x * resolution.y * sizeof(RGB),
+                                           cudaMemcpyDeviceToHost, memcpyStream));
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+                CUDA_CHECK(cudaStreamSynchronize(memcpyStream));
+            }
+
+            // Copy one more time to get the final image before exiting.
+            CUDA_CHECK(cudaMemcpy(displayRGBHost, displayRGB,
+                                  resolution.x * resolution.y * sizeof(RGB),
+                                  cudaMemcpyDeviceToHost));
+            CUDA_CHECK(cudaDeviceSynchronize());
+        });
+
+        // Now on the CPU side, give the display system a lambda that
+        // copies values from |displayRGBHost| into its buffers used for
+        // sending messages to the display program (i.e., tev).
+        DisplayDynamic(film.GetFilename(), {resolution.x, resolution.y},
+                       {"R", "G", "B"},
+                       [resolution, this](Bounds2i b, pstd::span<pstd::span<Float>> displayValue) {
+                           int index = 0;
+                           for (Point2i p : b) {
+                               RGB rgb = displayRGBHost[p.x + p.y * resolution.x];
+                               displayValue[0][index] = rgb.r;
+                               displayValue[1][index] = rgb.g;
+                               displayValue[2][index] = rgb.b;
+                               ++index;
+                           }
+                       });
+    } else
+#endif  // PBRT_BUILD_GPU_RENDERER
+        DisplayDynamic(film.GetFilename(), Point2i(pixelBounds.Diagonal()), {"R", "G", "B"},
+                       [pixelBounds, this](Bounds2i b,
+                                           pstd::span<pstd::span<Float>> displayValue) {
+                           int index = 0;
+                           for (Point2i p : b) {
+                               RGB rgb =
+                                   film.GetPixelRGB(pixelBounds.pMin + p, 1.f /* splat scale */);
+                               for (int c = 0; c < 3; ++c)
+                                   displayValue[c][index] = rgb[c];
+                               ++index;
+                           }
+                       });
+}
+
+void WavefrontPathIntegrator::UpdateDisplay(Vector2i resolution) {
+#ifdef PBRT_BUILD_GPU_RENDERER
+    if (Options->useGPU && !Options->displayServer.empty())
+        GPUParallelFor(
+            "Update Display RGB Buffer", maxQueueSize,
+            PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
+                Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
+                if (!InsideExclusive(pPixel, film.PixelBounds()))
+                    return;
+
+                Point2i p(pPixel - film.PixelBounds().pMin);
+                displayRGB[p.x + p.y * resolution.x] = film.GetPixelRGB(pPixel);
+            });
+#endif  //  PBRT_BUILD_GPU_RENDERER
+}
+
+void WavefrontPathIntegrator::StopDisplayThread() {
+#ifdef PBRT_BUILD_GPU_RENDERER
+    if (Options->useGPU) {
+        // Wait until rendering is all done before we start to shut down the
+        // display stuff..
+        if (!Options->displayServer.empty()) {
+            exitCopyThread = true;
+            copyThread.join();
+        }
+
+        // Another synchronization to make sure no kernels are running on the
+        // GPU so that we can safely access unified memory from the CPU.
+        GPUWait();
+    }
+#endif  // PBRT_BUILD_GPU_RENDERER
+}
 
 }  // namespace pbrt
