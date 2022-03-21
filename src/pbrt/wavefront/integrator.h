@@ -179,8 +179,8 @@ class WavefrontPathIntegrator {
     SubsurfaceScatterQueue *subsurfaceScatterQueue = nullptr;
 
     RGB *displayRGB = nullptr, *displayRGBHost = nullptr;
-    std::atomic<bool> exitCopyThread{false};
-    std::thread copyThread;
+    std::atomic<bool> *exitCopyThread;
+    std::thread *copyThread;
 };
 
 }  // namespace pbrt

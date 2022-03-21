@@ -78,7 +78,7 @@ static void updateMaterialNeeds(
 
 WavefrontPathIntegrator::WavefrontPathIntegrator(
     pstd::pmr::memory_resource *memoryResource, BasicScene &scene)
-    : memoryResource(memoryResource) {
+    : memoryResource(memoryResource), exitCopyThread(new std::atomic<bool>(false)) {
     ThreadLocal<Allocator> threadAllocators(
         [memoryResource]() { return Allocator(memoryResource); });
 
@@ -589,9 +589,9 @@ void WavefrontPathIntegrator::StartDisplayThread() {
         // Note that we can't just capture |this| for the member variables
         // below because with managed memory on Windows, the CPU and GPU
         // can't be accessing the same memory concurrently...
-        copyThread = std::thread([&exitCopyThread = this->exitCopyThread,
-                                  displayRGBHost = this->displayRGBHost,
-                                  displayRGB = this->displayRGB, resolution]() {
+        copyThread = new std::thread([exitCopyThread = this->exitCopyThread,
+                                      displayRGBHost = this->displayRGBHost,
+                                      displayRGB = this->displayRGB, resolution]() {
             GPURegisterThread("DISPLAY_SERVER_COPY_THREAD");
 
             // Copy back to the CPU using a separate stream so that we can
@@ -603,7 +603,7 @@ void WavefrontPathIntegrator::StartDisplayThread() {
 
             // Copy back to the host from the GPU buffer, without any
             // synthronization.
-            while (!exitCopyThread) {
+            while (!*exitCopyThread) {
                 CUDA_CHECK(cudaMemcpyAsync(displayRGBHost, displayRGB,
                                            resolution.x * resolution.y * sizeof(RGB),
                                            cudaMemcpyDeviceToHost, memcpyStream));
@@ -672,8 +672,10 @@ void WavefrontPathIntegrator::StopDisplayThread() {
         // Wait until rendering is all done before we start to shut down the
         // display stuff..
         if (!Options->displayServer.empty()) {
-            exitCopyThread = true;
-            copyThread.join();
+            *exitCopyThread = true;
+            copyThread->join();
+            delete copyThread;
+            copyThread = nullptr;
         }
 
         // Another synchronization to make sure no kernels are running on the

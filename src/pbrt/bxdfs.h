@@ -738,6 +738,9 @@ class LayeredBxDF {
                 f *= Tr(thickness, w);
             }
             // Initialize _interface_ for current interface surface
+#ifdef interface  // That's enough out of you, Windows.
+#undef interface
+#endif
             TopOrBottomBxDF<TopBxDF, BottomBxDF> interface;
             if (z == 0)
                 interface = &bottom;
