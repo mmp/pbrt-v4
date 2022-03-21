@@ -117,6 +117,10 @@ class WavefrontPathIntegrator {
         return rayQueues[(wavefrontDepth + 1) & 1];
     }
 
+#ifdef PBRT_BUILD_GPU_RENDERER
+    void PrefetchGPUAllocations();
+#endif  // PBRT_BUILD_GPU_RENDERER
+
     // WavefrontPathIntegrator Member Variables
     bool initializeVisibleSurface;
     bool haveSubsurface;

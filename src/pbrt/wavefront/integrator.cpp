@@ -289,41 +289,8 @@ Float WavefrontPathIntegrator::Render() {
     Timer timer;
     // Prefetch allocations to GPU memory
 #ifdef PBRT_BUILD_GPU_RENDERER
-    if (Options->useGPU) {
-        int deviceIndex;
-        CUDA_CHECK(cudaGetDevice(&deviceIndex));
-        int hasConcurrentManagedAccess;
-        CUDA_CHECK(cudaDeviceGetAttribute(&hasConcurrentManagedAccess,
-                                          cudaDevAttrConcurrentManagedAccess,
-                                          deviceIndex));
-
-        // Copy all of the scene data structures over to GPU memory.  This
-        // ensures that there isn't a big performance hitch for the first batch
-        // of rays as that stuff is copied over on demand.
-        if (hasConcurrentManagedAccess) {
-            // Set things up so that we can still have read from the
-            // WavefrontPathIntegrator struct on the CPU without hurting
-            // performance. (This makes it possible to use the values of things
-            // like WavefrontPathIntegrator::haveSubsurface to conditionally launch
-            // kernels according to what's in the scene...)
-            CUDA_CHECK(cudaMemAdvise(this, sizeof(*this), cudaMemAdviseSetReadMostly,
-                                     /* ignored argument */ 0));
-            CUDA_CHECK(cudaMemAdvise(this, sizeof(*this),
-                                     cudaMemAdviseSetPreferredLocation, deviceIndex));
-
-            // Copy all of the scene data structures over to GPU memory.  This
-            // ensures that there isn't a big performance hitch for the first batch
-            // of rays as that stuff is copied over on demand.
-            CUDATrackedMemoryResource *mr =
-                dynamic_cast<CUDATrackedMemoryResource *>(memoryResource);
-            CHECK(mr);
-            mr->PrefetchToGPU();
-        } else {
-            // TODO: on systems with basic unified memory, just launching a
-            // kernel should cause everything to be copied over. Is an empty
-            // kernel sufficient?
-        }
-    }
+    if (Options->useGPU)
+        PrefetchGPUAllocations();
 #endif  // PBRT_BUILD_GPU_RENDERER
 
     // Launch thread to copy image for display server, if enabled
@@ -665,5 +632,43 @@ std::string WavefrontPathIntegrator::Stats::Print() const {
                           StringPrintf("Shadow rays, depth %-3d", i), shadowRays[i]);
     return s;
 }
+
+#ifdef PBRT_BUILD_GPU_RENDERER
+void WavefrontPathIntegrator::PrefetchGPUAllocations() {
+    int deviceIndex;
+    CUDA_CHECK(cudaGetDevice(&deviceIndex));
+    int hasConcurrentManagedAccess;
+    CUDA_CHECK(cudaDeviceGetAttribute(&hasConcurrentManagedAccess,
+                                      cudaDevAttrConcurrentManagedAccess,
+                                      deviceIndex));
+
+    // Copy all of the scene data structures over to GPU memory.  This
+    // ensures that there isn't a big performance hitch for the first batch
+    // of rays as that stuff is copied over on demand.
+    if (hasConcurrentManagedAccess) {
+        // Set things up so that we can still have read from the
+        // WavefrontPathIntegrator struct on the CPU without hurting
+        // performance. (This makes it possible to use the values of things
+        // like WavefrontPathIntegrator::haveSubsurface to conditionally launch
+        // kernels according to what's in the scene...)
+        CUDA_CHECK(cudaMemAdvise(this, sizeof(*this), cudaMemAdviseSetReadMostly,
+                                 /* ignored argument */ 0));
+        CUDA_CHECK(cudaMemAdvise(this, sizeof(*this),
+                                 cudaMemAdviseSetPreferredLocation, deviceIndex));
+
+        // Copy all of the scene data structures over to GPU memory.  This
+        // ensures that there isn't a big performance hitch for the first batch
+        // of rays as that stuff is copied over on demand.
+        CUDATrackedMemoryResource *mr =
+            dynamic_cast<CUDATrackedMemoryResource *>(memoryResource);
+        CHECK(mr);
+        mr->PrefetchToGPU();
+    } else {
+        // TODO: on systems with basic unified memory, just launching a
+        // kernel should cause everything to be copied over. Is an empty
+        // kernel sufficient?
+    }
+}
+#endif // PBRT_BUILD_GPU_RENDERER
 
 }  // namespace pbrt
