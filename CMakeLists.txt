@@ -676,12 +676,14 @@ SET (PBRT_UTIL_SOURCE_HEADERS
 if (PBRT_CUDA_ENABLED)
   set (PBRT_GPU_SOURCE
     src/pbrt/gpu/aggregate.cpp
+    src/pbrt/gpu/denoiser.cpp
     src/pbrt/gpu/memory.cpp
     src/pbrt/gpu/util.cpp
   )
   set (PBRT_GPU_SOURCE_HEADERS
     src/pbrt/gpu/aggregate.h
     src/pbrt/gpu/cudagl.h
+    src/pbrt/gpu/denoiser.h
     src/pbrt/gpu/memory.h
     src/pbrt/gpu/optix.h
     src/pbrt/gpu/util.h
