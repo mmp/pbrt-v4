@@ -119,6 +119,14 @@ class WavefrontPathIntegrator {
         return rayQueues[(wavefrontDepth + 1) & 1];
     }
 
+#ifdef PBRT_BUILD_GPU_RENDERER
+    void PrefetchGPUAllocations();
+#endif  // PBRT_BUILD_GPU_RENDERER
+
+    void StartDisplayThread();
+    void UpdateDisplay(Vector2i resolution);
+    void StopDisplayThread();
+
     // WavefrontPathIntegrator Member Variables
     bool initializeVisibleSurface;
     bool haveSubsurface;
@@ -171,6 +179,10 @@ class WavefrontPathIntegrator {
 
     GetBSSRDFAndProbeRayQueue *bssrdfEvalQueue = nullptr;
     SubsurfaceScatterQueue *subsurfaceScatterQueue = nullptr;
+
+    RGB *displayRGB = nullptr, *displayRGBHost = nullptr;
+    std::atomic<bool> *exitCopyThread;
+    std::thread *copyThread;
 };
 
 }  // namespace pbrt

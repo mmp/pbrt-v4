@@ -16,7 +16,7 @@ book.)
 
 We are making this code available for hardy adventurers; it's not yet
 extensively documented, but if you are familiar with previous versions of
-pbrt, you should be able to make your away around it.  Our hope is that the
+pbrt, you should be able to make your way around it.  Our hope is that the
 system will be useful to some people in its current form and that any bugs
 in the current implementation might be found now, allowing us to correct
 them before the book is final.
@@ -193,7 +193,7 @@ These requirements are effectively what makes it possible to bring pbrt to
 the GPU with limited changes to the core system.  As a practical matter,
 these capabilities are only available via CUDA and OptiX on NVIDIA GPUs
 today, though we'd be happy to see pbrt running on any other GPUs that
-provided those capabilities.
+provide those capabilities.
 
 pbrt's GPU path currently requires CUDA 11.0 or later and OptiX 7.1 or
 later.  Both Linux and Windows are supported.
