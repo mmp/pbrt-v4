@@ -1,3 +1,6 @@
+// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
+// The pbrt source code is licensed under the Apache License, Version 2.0.
+// SPDX: Apache-2.0
 
 #include <pbrt/gpu/denoiser.h>
 
@@ -5,7 +8,6 @@
 #include <pbrt/gpu/util.h>
 
 #include <array>
-
 #include <cuda.h>
 #include <cuda_runtime.h>
 

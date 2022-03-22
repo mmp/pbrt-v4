@@ -33,29 +33,13 @@
 #include <pbrt/util/string.h>
 #include <pbrt/util/taggedptr.h>
 #include <pbrt/wavefront/aggregate.h>
+#include <pbrt/wavefront/interactive.h>
 
 #include <atomic>
 #include <cstring>
 #include <iostream>
 #include <map>
 #include <set>
-
-#ifdef PBRT_INTERACTIVE_SUPPORT
-#include <pbrt/gpu/cudagl.h>
-
-#include <GLFW/glfw3.h>
-#endif // PBRT_INTERACTIVE_SUPPORT
-
-// Raw console input support.
-// TODO: Put this behind an abstraction in util
-#ifdef PBRT_IS_WINDOWS
-#include <Windows.h>
-#else
-#include <signal.h>
-#include <poll.h>
-#include <termios.h>
-#include <unistd.h>
-#endif // PBRT_IS_WINDOWS
 
 #ifdef PBRT_BUILD_GPU_RENDERER
 #include <cuda.h>
@@ -305,132 +289,20 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
 #endif  // PBRT_BUILD_GPU_RENDERER
 }
 
-#ifdef PBRT_INTERACTIVE_SUPPORT
-
-static Transform movingFromCamera;
-static float exposure = 1.f;
-
-static void glfwErrorCallback(int error, const char *desc) {
-    LOG_ERROR("GLFW [%d]: %s", error, desc);
-}
-
-static std::set<char> keysDown;
-static bool doDenoise = false;
-
-static void glfwKeyCallback(GLFWwindow *window, int key, int scan, int action, int mods) {
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
-
-    auto doKey = [&](int k, char ch) {
-        if (key == k) {
-            if (action == GLFW_PRESS) keysDown.insert(ch);
-            else if (action == GLFW_RELEASE) {
-                if (auto iter = keysDown.find(ch); iter != keysDown.end())
-                    keysDown.erase(iter);
-            }
-        }
-    };
-
-    doKey(GLFW_KEY_A, 'a');
-    doKey(GLFW_KEY_D, 'd');
-    doKey(GLFW_KEY_S, 's');
-    doKey(GLFW_KEY_W, 'w');
-    doKey(GLFW_KEY_D, 'd');
-    if (mods & GLFW_MOD_SHIFT)
-        doKey(GLFW_KEY_E, 'E');
-    else
-        doKey(GLFW_KEY_E, 'e');
-    doKey(GLFW_KEY_R, 'r');
-    doKey(GLFW_KEY_EQUAL, '=');
-    doKey(GLFW_KEY_MINUS, '-');
-    doKey(GLFW_KEY_LEFT, 'L');
-    doKey(GLFW_KEY_RIGHT, 'R');
-    doKey(GLFW_KEY_UP, 'U');
-    doKey(GLFW_KEY_DOWN, 'D');
-    doKey(GLFW_KEY_N, 'n');
-}
-
-static bool processKeys() {
-    static float moveScale = 1.f;
-    bool needsReset = false;
-
-    auto handleNeedsReset = [&](char key, std::function<Transform(Transform)> update) {
-        if (keysDown.find(key) != keysDown.end()) {
-            movingFromCamera = update(movingFromCamera);
-            needsReset = true;
-        }
-    };
-
-    handleNeedsReset('a', [&](Transform t) { return t * Translate(Vector3f(-moveScale, 0, 0)); });
-    handleNeedsReset('d', [&](Transform t) { return t * Translate(Vector3f( moveScale, 0, 0)); });
-    handleNeedsReset('s', [&](Transform t) { return t * Translate(Vector3f(0, 0, -moveScale)); });
-    handleNeedsReset('w', [&](Transform t) { return t * Translate(Vector3f(0, 0,  moveScale)); });
-    handleNeedsReset('L', [&](Transform t) { return t * Rotate(-.5f, Vector3f(0, 1, 0)); });
-    handleNeedsReset('R', [&](Transform t) { return t * Rotate( .5f, Vector3f(0, 1, 0)); });
-    handleNeedsReset('U', [&](Transform t) { return t * Rotate(-.5f, Vector3f(1, 0, 0)); });
-    handleNeedsReset('D', [&](Transform t) { return t * Rotate( .5f, Vector3f(1, 0, 0)); });
-    handleNeedsReset('r', [&](Transform t) { return Transform(); });
-
-    // No reset needed for these.
-    if (keysDown.find('e') != keysDown.end()) {
-        keysDown.erase(keysDown.find('e'));
-        exposure *= 1.125f;
-    }
-    if (keysDown.find('E') != keysDown.end()) {
-        keysDown.erase(keysDown.find('E'));
-        exposure /= 1.125f;
-    }
-    if (keysDown.find('=') != keysDown.end()) {
-        keysDown.erase(keysDown.find('='));
-        moveScale *= 2;
-    }
-    if (keysDown.find('-') != keysDown.end()) {
-        keysDown.erase(keysDown.find('-'));
-        moveScale *= 0.5;
-    }
-    if (keysDown.find('n') != keysDown.end()) {
-        keysDown.erase(keysDown.find('n'));
-        doDenoise = !doDenoise;
-    }
-
-    return needsReset;
-}
-
-static GLFWwindow *openWindow(Vector2i resolution) {
-    glfwSetErrorCallback(glfwErrorCallback);
-    if (!glfwInit())
-        LOG_FATAL("Unable to initialize GLFW");
-    GLFWwindow *window = glfwCreateWindow(resolution.x, resolution.y, "pbrt", NULL, NULL);
-    if (!window) {
-        glfwTerminate();
-        LOG_FATAL("Unable to create GLFW window");
-    }
-    glfwSetKeyCallback(window, glfwKeyCallback);
-    glfwMakeContextCurrent(window);
-
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-        LOG_FATAL("gladLoadGLLoader failed");
-
-    return window;
-}
-#endif // PBRT_INTERACTIVE_SUPPORT
-
 // WavefrontPathIntegrator Method Definitions
 Float WavefrontPathIntegrator::Render() {
     Bounds2i pixelBounds = film.PixelBounds();
     Vector2i resolution = pixelBounds.Diagonal();
+
+    GUI *gui = nullptr;
     // FIXME: camera animation; whatever...
     Transform renderFromCamera = camera.GetCameraTransform().RenderFromCamera().startTransform;
     Transform cameraFromRender = Inverse(renderFromCamera);
-
-#ifdef PBRT_INTERACTIVE_SUPPORT
-    GLFWwindow *window = nullptr;
     if (Options->interactive) {
         if (!Options->displayServer.empty())
             ErrorExit("--interactive and --display-server cannot be used at the same time.");
-        window = openWindow(resolution);
+        gui = new GUI(film.GetFilename(), resolution);
     }
-#endif
 
     Timer timer;
     // Prefetch allocations to GPU memory
@@ -440,31 +312,19 @@ Float WavefrontPathIntegrator::Render() {
 #endif  // PBRT_BUILD_GPU_RENDERER
 
     // Launch thread to copy image for display server, if enabled
-#ifdef PBRT_INTERACTIVE_SUPPORT
-    CUDAOutputBuffer<RGB> *cudaFramebuffer = nullptr;
-    RGB *cpuFramebuffer = nullptr;
-    GLDisplay *glDisplay = nullptr;
+#ifdef PBRT_BUILD_GPU_RENDERER
     Denoiser *denoiser = nullptr;
     RGB *denoiserRGB = nullptr, *denoiserAlbedoAccum = nullptr, *denoiserAlbedo = nullptr;
     Normal3f *denoiserNAccum = nullptr, *denoiserN = nullptr;
-    if (Options->interactive) {
-        if (Options->useGPU) {
-            cudaFramebuffer = new CUDAOutputBuffer<RGB>(resolution.x, resolution.y);
-            int device;
-            CUDA_CHECK(cudaGetDevice(&device));
-            cudaFramebuffer->setDevice(device);
-
-            denoiser = new Denoiser(resolution, true);
-            CUDA_CHECK(cudaMalloc(&denoiserRGB, resolution.x * resolution.y * sizeof(RGB)));
-            CUDA_CHECK(cudaMalloc(&denoiserAlbedo, resolution.x * resolution.y * sizeof(RGB)));
-            CUDA_CHECK(cudaMalloc(&denoiserAlbedoAccum, resolution.x * resolution.y * sizeof(RGB)));
-            CHECK_EQ(4, sizeof(Float)); // TODO/FIXME
-            CUDA_CHECK(cudaMalloc(&denoiserNAccum, resolution.x * resolution.y * sizeof(Normal3f)));
-            CUDA_CHECK(cudaMalloc(&denoiserN, resolution.x * resolution.y * sizeof(Normal3f)));
-        } else
-            cpuFramebuffer = new RGB[resolution.x * resolution.y];
-
-        glDisplay = new GLDisplay(BufferImageFormat::FLOAT3);
+    if (Options->interactive && Options->useGPU) {
+        // FIXME: have denoiser allocate some of these...
+        denoiser = new Denoiser(resolution, true);
+        CUDA_CHECK(cudaMalloc(&denoiserRGB, resolution.x * resolution.y * sizeof(RGB)));
+        CUDA_CHECK(cudaMalloc(&denoiserAlbedo, resolution.x * resolution.y * sizeof(RGB)));
+        CUDA_CHECK(cudaMalloc(&denoiserAlbedoAccum, resolution.x * resolution.y * sizeof(RGB)));
+        CHECK_EQ(4, sizeof(Float)); // TODO/FIXME
+        CUDA_CHECK(cudaMalloc(&denoiserNAccum, resolution.x * resolution.y * sizeof(Normal3f)));
+        CUDA_CHECK(cudaMalloc(&denoiserN, resolution.x * resolution.y * sizeof(Normal3f)));
     }
 #endif
 
@@ -489,11 +349,6 @@ Float WavefrontPathIntegrator::Render() {
     ProgressReporter progress(lastSampleIndex - firstSampleIndex, "Rendering",
                               Options->quiet || Options->interactive, Options->useGPU);
     for (int sampleIndex = firstSampleIndex; sampleIndex < lastSampleIndex; ++sampleIndex) {
-#ifdef PBRT_INTERACTIVE_SUPPORT
-        if (glfwWindowShouldClose(window))
-            break;
-#endif  // PBRT_INTERACTIVE_SUPPORT
-
         // Attempt to work around issue #145.
 #if !(defined(PBRT_IS_WINDOWS) && defined(PBRT_BUILD_GPU_RENDERER) && \
       __CUDACC_VER_MAJOR__ == 11 && __CUDACC_VER_MINOR__ == 1)
@@ -516,7 +371,9 @@ Float WavefrontPathIntegrator::Render() {
                              sampleIndex, samplesPerPixel);
                     cameraRayQueue->Reset();
                 });
-            Transform cameraMotion = renderFromCamera * movingFromCamera * cameraFromRender;
+            Transform cameraMotion;
+            if (gui)
+                cameraMotion = renderFromCamera * gui->GetCameraTransform() * cameraFromRender;
             GenerateCameraRays(y0, cameraMotion, sampleIndex);
             Do(
                 "Update camera ray stats",
@@ -588,67 +445,53 @@ Float WavefrontPathIntegrator::Render() {
             // Copy updated film pixels to buffer for display
             UpdateDisplay(resolution);
 
-#ifdef PBRT_INTERACTIVE_SUPPORT
-            if (Options->interactive) {
+            if (gui != nullptr) {
 #ifdef PBRT_BUILD_GPU_RENDERER
-                if (Options->useGPU) {
-                    float ex = exposure;
-                    if (doDenoise)
-                        ParallelFor("Update OpenGL display buffer", maxQueueSize,
-                                    PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
-                                        Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
-                                        if (!InsideExclusive(pPixel, film.PixelBounds()))
-                                            return;
+                if (Options->useGPU && gui->denoiserEnabled) {
+                    float ex = gui->exposure;
+                    ParallelFor("Update denoiser buffers", maxQueueSize,
+                                PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
+                                    Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
+                                    if (!InsideExclusive(pPixel, film.PixelBounds()))
+                                        return;
 
-                                        Point2i p(pPixel - film.PixelBounds().pMin);
-                                        int offset = p.x + p.y * resolution.x;
-                                        denoiserRGB[offset] = ex * film.GetPixelRGB(pPixel);
+                                    Point2i p(pPixel - film.PixelBounds().pMin);
+                                    int offset = p.x + p.y * resolution.x;
+                                    denoiserRGB[offset] = ex * film.GetPixelRGB(pPixel);
 
-                                        SampledWavelengths lambda = pixelSampleState.lambda[pixelIndex];
-                                        SampledSpectrum albedo =
-                                            pixelSampleState.visibleSurface.albedo[pixelIndex];
-                                        RGB albedoRGB = albedo.ToRGB(lambda, *RGBColorSpace_sRGB);
-                                        denoiserAlbedoAccum[offset] += albedoRGB;
+                                    SampledWavelengths lambda = pixelSampleState.lambda[pixelIndex];
+                                    SampledSpectrum albedo =
+                                        pixelSampleState.visibleSurface.albedo[pixelIndex];
+                                    RGB albedoRGB = albedo.ToRGB(lambda, *RGBColorSpace_sRGB);
+                                    denoiserAlbedoAccum[offset] += albedoRGB;
 
-                                        Normal3f n = pixelSampleState.visibleSurface.ns[pixelIndex];
-                                        n.z *= -1;
-                                        denoiserNAccum[offset] += n;
-                                    });
-                    else {
-                        RGB *rgb = cudaFramebuffer->map();
-                        ParallelFor("Update OpenGL display buffer", maxQueueSize,
-                            PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
-                            Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
-                            if (!InsideExclusive(pPixel, film.PixelBounds()))
-                                return;
-
-                            Point2i p(pPixel - film.PixelBounds().pMin);
-                            int offset = p.x + p.y * resolution.x;
-                            rgb[offset] = ex * film.GetPixelRGB(pPixel);
-                        });
-                        cudaFramebuffer->unmap();
-                    }
-                } else {
+                                    Normal3f n = pixelSampleState.visibleSurface.ns[pixelIndex];
+                                    n.z *= -1;
+                                    denoiserNAccum[offset] += n;
+                                });
+                } else
 #endif // PBRT_BUILD_GPU_RENDERER
-                    float ex = exposure;
-                    ParallelFor("Update OpenGL display buffer", maxQueueSize,
+                {
+                    RGB *rgb = gui->MapFramebuffer();
+                    Float ex = gui->exposure;
+                    ParallelFor("Update framebuffer", maxQueueSize,
                         PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
-                            Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
-                            if (!InsideExclusive(pPixel, film.PixelBounds()))
-                                return;
+                        Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
+                        if (!InsideExclusive(pPixel, film.PixelBounds()))
+                            return;
 
-                            Point2i p(pPixel - film.PixelBounds().pMin);
-                            int offset = p.x + (resolution.y - 1 - p.y) * resolution.x;
-                            cpuFramebuffer[offset] = ex * film.GetPixelRGB(pPixel);
-                        });
+                        Point2i p(pPixel - film.PixelBounds().pMin);
+                        int offset = p.x + p.y * resolution.x;
+                        rgb[offset] = ex * film.GetPixelRGB(pPixel);
+                    });
+                    gui->UnmapFramebuffer();
                 }
             }
-#endif  //  PBRT_INTERACTIVE_SUPPORT
         }
 
-#ifdef PBRT_INTERACTIVE_SUPPORT
-        if (Options->interactive) {
-            if (doDenoise) {
+        if (gui) {
+#ifdef PBRT_BUILD_GPU_RENDERER
+            if (gui->denoiserEnabled) {
                 float scale = 1.f / (1 + sampleIndex - firstSampleIndex);
                 ParallelFor("Normalize N and Albedo guide buffers", resolution.x * resolution.y,
                             PBRT_CPU_GPU_LAMBDA(int index) {
@@ -656,36 +499,23 @@ Float WavefrontPathIntegrator::Render() {
                                 denoiserAlbedo[index] = denoiserAlbedoAccum[index] * scale;
                             });
 
-                RGB *rgb = cudaFramebuffer->map();
+                RGB *rgb = gui->MapFramebuffer();
                 denoiser->Denoise(denoiserRGB, denoiserN, denoiserAlbedo, rgb);
-                cudaFramebuffer->unmap();
+                gui->UnmapFramebuffer();
             }
-
-            int width, height;
-            glfwGetFramebufferSize(window, &width, &height);
-            GL_CHECK(glViewport(0, 0, width, height));
-
-#ifdef PBRT_BUILD_GPU_RENDERER
-            if (Options->useGPU)
-                glDisplay->display(resolution.x, resolution.y, width, height,
-                                   cudaFramebuffer->getPBO());
-            else
 #endif // PBRT_BUILD_GPU_RENDERER
-            {
-                GL_CHECK(glEnable(GL_FRAMEBUFFER_SRGB));
-                GL_CHECK(glDrawPixels(resolution.x, resolution.y, GL_RGB, GL_FLOAT, cpuFramebuffer));
-            }
 
-            glfwSwapBuffers(window);
-            glfwPollEvents();
-
-            if (processKeys()) {
+            if (DisplayState state = gui->RefreshDisplay(); state == DisplayState::EXIT)
+                break;
+            else if (state == DisplayState::RESET) {
                 sampleIndex = firstSampleIndex - 1;
                 ParallelFor("Reset pixels", resolution.x * resolution.y,
                             PBRT_CPU_GPU_LAMBDA(int i) {
                                 int x = i % resolution.x, y = i / resolution.x;
                                 film.ResetPixel(pixelBounds.pMin + Vector2i(x, y));
-                                denoiserNAccum[i] = Normal3f(0, 0, 0);
+                                if (denoiserNAccum)
+                                    denoiserNAccum[i] = Normal3f(0, 0, 0);
+                                if (denoiserAlbedoAccum)
                                 denoiserAlbedoAccum[i] = RGB(0, 0, 0);
                             });
             }
@@ -694,17 +524,10 @@ Float WavefrontPathIntegrator::Render() {
         progress.Update();
     }
 
-#ifdef PBRT_INTERACTIVE_SUPPORT
-    if (window) {
-        delete cudaFramebuffer;
-        cudaFramebuffer = nullptr;
-        delete[] cpuFramebuffer;
-        delete glDisplay;
-
-        glfwDestroyWindow(window);
-        glfwTerminate();
+    if (gui) {
+        delete gui;
+        gui = nullptr;
     }
-#endif // PBRT_INTERACTIVE_SUPPORT
 
     progress.Done();
 

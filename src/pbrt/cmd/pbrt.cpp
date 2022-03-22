@@ -250,12 +250,6 @@ int main(int argc, char *argv[]) {
         options.wavefront = false;
     }
 
-#ifndef PBRT_INTERACTIVE_SUPPORT
-    if (options.interactive)
-        ErrorExit("This version of pbrt has not been built with support for "
-                  "interactive rendering; please enable the PBRT_INTERACTIVE_SUPPORT "
-                  "cmake option and recompile.");
-#endif
     if (options.interactive && !(options.useGPU || options.wavefront))
         ErrorExit("The --interactive option is only supported with the --gpu "
                   "and --wavefront integrators.");

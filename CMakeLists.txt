@@ -13,7 +13,6 @@ list (INSERT CMAKE_MODULE_PATH 0 "${CMAKE_SOURCE_DIR}/cmake")
 # Configuration options
 
 option (PBRT_FLOAT_AS_DOUBLE "Use 64-bit floats" OFF)
-option (PBRT_INTERACTIVE_SUPPORT "Provide option for interactive rendering" OFF)
 option (PBRT_BUILD_NATIVE_EXECUTABLE "Build executable optimized for CPU architecture of system pbrt was built on" ON)
 option (PBRT_DBG_LOGGING "Enable (very verbose!) debug logging" OFF)
 option (PBRT_NVTX "Insert NVTX annotations for NVIDIA Profiling and Debugging Tools" OFF)
@@ -76,6 +75,8 @@ enable_testing ()
 find_package (Sanitizers)
 find_package (Threads)
 
+find_package(OpenGL REQUIRED)
+
 set_property (GLOBAL PROPERTY USE_FOLDERS ON)
 
 if (MSVC)
@@ -85,10 +86,6 @@ endif ()
 
 if (PBRT_FLOAT_AS_DOUBLE)
   list (APPEND PBRT_DEFINITIONS "PBRT_FLOAT_AS_DOUBLE")
-endif ()
-if (PBRT_INTERACTIVE_SUPPORT)
-  list (APPEND PBRT_DEFINITIONS "PBRT_INTERACTIVE_SUPPORT")
-  find_package(OpenGL REQUIRED)
 endif ()
 if (PBRT_DBG_LOGGING)
   list (APPEND PBRT_DEFINITIONS "PBRT_DBG_LOGGING")
@@ -576,6 +573,7 @@ SET (PBRT_WAVEFRONT_SOURCE
   src/pbrt/wavefront/camera.cpp
   src/pbrt/wavefront/film.cpp
   src/pbrt/wavefront/integrator.cpp
+  src/pbrt/wavefront/interactive.cpp
   src/pbrt/wavefront/media.cpp
   src/pbrt/wavefront/samples.cpp
   src/pbrt/wavefront/surfscatter.cpp
@@ -586,6 +584,7 @@ SET (PBRT_WAVEFRONT_SOURCE
 SET (PBRT_WAVEFRONT_SOURCE_HEADERS
   src/pbrt/wavefront/aggregate.h
   src/pbrt/wavefront/integrator.h
+  src/pbrt/wavefront/interactive.h
   src/pbrt/wavefront/intersect.h
   src/pbrt/wavefront/wavefront.h
   src/pbrt/wavefront/workitems.h
@@ -845,13 +844,10 @@ target_include_directories (pbrt_lib PUBLIC
   ${DOUBLE_CONVERSION_INCLUDE}
   ${NANOVDB_INCLUDE}
   ${CMAKE_CURRENT_BINARY_DIR}
-)
-if (PBRT_INTERACTIVE_SUPPORT)
-target_include_directories (pbrt_lib PUBLIC
   ${GLFW_INCLUDE}
   ${GLAD_INCLUDE}
 )
-endif ()
+
 if (PBRT_CUDA_ENABLED AND PBRT_OPTIX7_PATH)
     target_include_directories (pbrt_lib SYSTEM PUBLIC ${PBRT_OPTIX7_PATH}/include)
 endif ()
@@ -877,11 +873,9 @@ set (ALL_PBRT_LIBS
   double-conversion
   ${PBRT_CUDA_LIB}
   utf8proc
-)
-
-if (PBRT_INTERACTIVE_SUPPORT)
-  set (ALL_PBRT_LIBS ${ALL_PBRT_LIBS} glfw glad OpenGL::GL)
-endif()
+  glfw
+  glad
+  OpenGL::GL)
 
 if (PBRT_CUDA_ENABLED)
   set_property (TARGET pbrt_lib PROPERTY CUDA_SEPARABLE_COMPILATION ON)
