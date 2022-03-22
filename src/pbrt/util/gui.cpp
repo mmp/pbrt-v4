@@ -443,6 +443,8 @@ DisplayState GUI::RefreshDisplay() {
 #endif  // PBRT_BUILD_GPU_RENDERER
     {
         GL_CHECK(glEnable(GL_FRAMEBUFFER_SRGB));
+        GL_CHECK(glRasterPos2f(-1, 1));
+        GL_CHECK(glPixelZoom(1, -1));
         GL_CHECK(
             glDrawPixels(resolution.x, resolution.y, GL_RGB, GL_FLOAT, cpuFramebuffer));
     }

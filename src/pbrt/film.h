@@ -371,7 +371,9 @@ class GBufferFilm : public FilmBase {
 
     std::string ToString() const;
 
-    PBRT_CPU_GPU void ResetPixel(Point2i p);
+    PBRT_CPU_GPU void ResetPixel(Point2i p) {
+        std::memset(&pixels[p], 0, sizeof(Pixel));
+    }
 
   private:
     // GBufferFilm::Pixel Definition
@@ -488,7 +490,15 @@ class SpectralFilm : public FilmBase {
         return {};
     }
 
-    PBRT_CPU_GPU void ResetPixel(Point2i p);
+    PBRT_CPU_GPU void ResetPixel(Point2i p) {
+        Pixel &pix = pixels[p];
+        pix.rgbSum[0] = pix.rgbSum[1] = pix.rgbSum[2] = 0.;
+        pix.rgbWeightSum = 0.;
+        pix.rgbSplat[0] = pix.rgbSplat[1] = pix.rgbSplat[2] = 0.;
+        std::memset(pix.bucketSums, 0, nBuckets *sizeof(double));
+        std::memset(pix.weightSums, 0, nBuckets *sizeof(double));
+        std::memset(pix.bucketSplats, 0, nBuckets * sizeof(AtomicDouble));
+    }
 
   private:
     PBRT_CPU_GPU

@@ -453,7 +453,7 @@ Float WavefrontPathIntegrator::Render() {
 
         if (gui) {
 #ifdef PBRT_BUILD_GPU_RENDERER
-            if (gui->denoiserEnabled)
+            if (Options->useGPU && gui->denoiserEnabled)
                 DenoiseToFramebuffer(gui, 1 + sampleIndex - firstSampleIndex, resolution,
                                      denoiser, denoiserRGB, denoiserNAccum, denoiserN,
                                      denoiserAlbedoAccum, denoiserAlbedo);
