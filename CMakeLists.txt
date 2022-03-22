@@ -573,7 +573,6 @@ SET (PBRT_WAVEFRONT_SOURCE
   src/pbrt/wavefront/camera.cpp
   src/pbrt/wavefront/film.cpp
   src/pbrt/wavefront/integrator.cpp
-  src/pbrt/wavefront/interactive.cpp
   src/pbrt/wavefront/media.cpp
   src/pbrt/wavefront/samples.cpp
   src/pbrt/wavefront/surfscatter.cpp
@@ -584,7 +583,6 @@ SET (PBRT_WAVEFRONT_SOURCE
 SET (PBRT_WAVEFRONT_SOURCE_HEADERS
   src/pbrt/wavefront/aggregate.h
   src/pbrt/wavefront/integrator.h
-  src/pbrt/wavefront/interactive.h
   src/pbrt/wavefront/intersect.h
   src/pbrt/wavefront/wavefront.h
   src/pbrt/wavefront/workitems.h
@@ -603,6 +601,7 @@ SET (PBRT_UTIL_SOURCE
   src/pbrt/util/error.cpp
   src/pbrt/util/file.cpp
   src/pbrt/util/float.cpp
+  src/pbrt/util/gui.cpp
   src/pbrt/util/image.cpp
   src/pbrt/util/log.cpp
   src/pbrt/util/loopsubdiv.cpp
@@ -642,6 +641,7 @@ SET (PBRT_UTIL_SOURCE_HEADERS
   src/pbrt/util/error.h
   src/pbrt/util/file.h
   src/pbrt/util/float.h
+  src/pbrt/util/gui.h
   src/pbrt/util/hash.h
   src/pbrt/util/image.h
   src/pbrt/util/log.h

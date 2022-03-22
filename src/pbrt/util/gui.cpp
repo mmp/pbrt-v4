@@ -4,12 +4,13 @@
 
 #include <glad/glad.h>
 
+#include <pbrt/util/gui.h>
+
 #include <pbrt/options.h>
 #ifdef PBRT_BUILD_GPU_RENDERER
 #include <pbrt/gpu/util.h>
 #endif PBRT_BUILD_GPU_RENDERER
 #include <pbrt/util/error.h>
-#include <pbrt/wavefront/interactive.h>
 
 #define GL_CHECK(call)                                                  \
     do {                                                                \

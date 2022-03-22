@@ -2,10 +2,6 @@
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
 
-#ifdef PBRT_INTERACTIVE_SUPPORT
-#include <glad/glad.h>
-#endif // PBRT_INTERACTIVE_SUPPORT
-
 #include <pbrt/wavefront/integrator.h>
 
 #include <pbrt/base/medium.h>
@@ -23,6 +19,7 @@
 #include <pbrt/util/colorspace.h>
 #include <pbrt/util/display.h>
 #include <pbrt/util/file.h>
+#include <pbrt/util/gui.h>
 #include <pbrt/util/image.h>
 #include <pbrt/util/log.h>
 #include <pbrt/util/print.h>
@@ -33,7 +30,6 @@
 #include <pbrt/util/string.h>
 #include <pbrt/util/taggedptr.h>
 #include <pbrt/wavefront/aggregate.h>
-#include <pbrt/wavefront/interactive.h>
 
 #include <atomic>
 #include <cstring>

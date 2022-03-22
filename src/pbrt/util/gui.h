@@ -2,6 +2,9 @@
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
 
+#ifndef PBRT_UTIL_GUI_H
+#define PBRT_UTIL_GUI_H
+
 #include <pbrt/gpu/cudagl.h>
 #include <GLFW/glfw3.h>
 
@@ -74,3 +77,5 @@ class GUI {
 };
 
 } // namespace pbrt
+
+#endif // PBRT_UTIL_GUI_H

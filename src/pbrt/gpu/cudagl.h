@@ -30,6 +30,7 @@
 #define PBRT_GPU_CUDAGL_H
 
 #include <pbrt/util/error.h>
+#include <pbrt/gpu/util.h>
 
 #include <glad/glad.h>
 
@@ -167,7 +168,6 @@ PIXEL_FORMAT* CUDAOutputBuffer<PIXEL_FORMAT>::map()
 
     return m_device_pixels;
 }
-
 
 template <typename PIXEL_FORMAT>
 void CUDAOutputBuffer<PIXEL_FORMAT>::unmap()
