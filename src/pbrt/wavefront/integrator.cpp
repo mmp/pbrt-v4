@@ -441,64 +441,22 @@ Float WavefrontPathIntegrator::Render() {
             // Copy updated film pixels to buffer for display
             UpdateDisplay(resolution);
 
-            if (gui != nullptr) {
+            if (gui) {
 #ifdef PBRT_BUILD_GPU_RENDERER
-                if (Options->useGPU && gui->denoiserEnabled) {
-                    float ex = gui->exposure;
-                    ParallelFor("Update denoiser buffers", maxQueueSize,
-                                PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
-                                    Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
-                                    if (!InsideExclusive(pPixel, film.PixelBounds()))
-                                        return;
-
-                                    Point2i p(pPixel - film.PixelBounds().pMin);
-                                    int offset = p.x + p.y * resolution.x;
-                                    denoiserRGB[offset] = ex * film.GetPixelRGB(pPixel);
-
-                                    SampledWavelengths lambda = pixelSampleState.lambda[pixelIndex];
-                                    SampledSpectrum albedo =
-                                        pixelSampleState.visibleSurface.albedo[pixelIndex];
-                                    RGB albedoRGB = albedo.ToRGB(lambda, *RGBColorSpace_sRGB);
-                                    denoiserAlbedoAccum[offset] += albedoRGB;
-
-                                    Normal3f n = pixelSampleState.visibleSurface.ns[pixelIndex];
-                                    n.z *= -1;
-                                    denoiserNAccum[offset] += n;
-                                });
-                } else
+                if (Options->useGPU && gui->denoiserEnabled)
+                    UpdateDenoiserBuffers(gui, denoiserRGB, denoiserAlbedoAccum, denoiserNAccum);
+                else
 #endif // PBRT_BUILD_GPU_RENDERER
-                {
-                    RGB *rgb = gui->MapFramebuffer();
-                    Float ex = gui->exposure;
-                    ParallelFor("Update framebuffer", maxQueueSize,
-                        PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
-                        Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
-                        if (!InsideExclusive(pPixel, film.PixelBounds()))
-                            return;
-
-                        Point2i p(pPixel - film.PixelBounds().pMin);
-                        int offset = p.x + p.y * resolution.x;
-                        rgb[offset] = ex * film.GetPixelRGB(pPixel);
-                    });
-                    gui->UnmapFramebuffer();
-                }
+                    UpdateFramebufferFromFilm(gui, resolution);
             }
         }
 
         if (gui) {
 #ifdef PBRT_BUILD_GPU_RENDERER
-            if (gui->denoiserEnabled) {
-                float scale = 1.f / (1 + sampleIndex - firstSampleIndex);
-                ParallelFor("Normalize N and Albedo guide buffers", resolution.x * resolution.y,
-                            PBRT_CPU_GPU_LAMBDA(int index) {
-                                denoiserN[index] = Normalize(denoiserNAccum[index]);
-                                denoiserAlbedo[index] = denoiserAlbedoAccum[index] * scale;
-                            });
-
-                RGB *rgb = gui->MapFramebuffer();
-                denoiser->Denoise(denoiserRGB, denoiserN, denoiserAlbedo, rgb);
-                gui->UnmapFramebuffer();
-            }
+            if (gui->denoiserEnabled)
+                DenoiseToFramebuffer(gui, 1 + sampleIndex - firstSampleIndex, resolution,
+                                     denoiser, denoiserRGB, denoiserNAccum, denoiserN,
+                                     denoiserAlbedoAccum, denoiserAlbedo);
 #endif // PBRT_BUILD_GPU_RENDERER
 
             if (DisplayState state = gui->RefreshDisplay(); state == DisplayState::EXIT)
@@ -797,6 +755,64 @@ void WavefrontPathIntegrator::StopDisplayThread() {
         GPUWait();
     }
 #endif  // PBRT_BUILD_GPU_RENDERER
+}
+
+void WavefrontPathIntegrator::UpdateDenoiserBuffers(
+        GUI *gui, RGB *denoiserRGB, RGB *denoiserAlbedoAccum, Normal3f *denoiserNAccum) {
+    float ex = gui->exposure;
+    ParallelFor("Update denoiser buffers", maxQueueSize,
+                PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
+                    Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
+                    if (!InsideExclusive(pPixel, film.PixelBounds()))
+                        return;
+
+                    Bounds2i pixelBounds = film.PixelBounds();
+                    Point2i p(pPixel - pixelBounds.pMin);
+                    int offset = p.x + p.y * (pixelBounds.pMax.x - pixelBounds.pMin.x);
+                    denoiserRGB[offset] = ex * film.GetPixelRGB(pPixel);
+
+                    SampledWavelengths lambda = pixelSampleState.lambda[pixelIndex];
+                    SampledSpectrum albedo =
+                        pixelSampleState.visibleSurface.albedo[pixelIndex];
+                    RGB albedoRGB = albedo.ToRGB(lambda, *RGBColorSpace_sRGB);
+                    denoiserAlbedoAccum[offset] += albedoRGB;
+
+                    Normal3f n = pixelSampleState.visibleSurface.ns[pixelIndex];
+                    n.z *= -1;
+                    denoiserNAccum[offset] += n;
+                });
+}
+
+void WavefrontPathIntegrator::UpdateFramebufferFromFilm(GUI *gui, Vector2i resolution) {
+    RGB *rgb = gui->MapFramebuffer();
+    Float ex = gui->exposure;
+    ParallelFor("Update framebuffer", maxQueueSize,
+                PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
+                    Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
+                    if (!InsideExclusive(pPixel, film.PixelBounds()))
+                        return;
+
+                    Point2i p(pPixel - film.PixelBounds().pMin);
+                    int offset = p.x + p.y * resolution.x;
+                    rgb[offset] = ex * film.GetPixelRGB(pPixel);
+                });
+    gui->UnmapFramebuffer();
+}
+
+void WavefrontPathIntegrator::DenoiseToFramebuffer(
+        GUI *gui, int spp, Vector2i resolution, Denoiser *denoiser, RGB *denoiserRGB,
+        Normal3f *denoiserNAccum, Normal3f *denoiserN, RGB *denoiserAlbedoAccum,
+        RGB *denoiserAlbedo) {
+    float scale = 1.f / spp;
+    ParallelFor("Normalize N and Albedo guide buffers", resolution.x * resolution.y,
+                PBRT_CPU_GPU_LAMBDA(int index) {
+                    denoiserN[index] = Normalize(denoiserNAccum[index]);
+                    denoiserAlbedo[index] = denoiserAlbedoAccum[index] * scale;
+                });
+
+    RGB *rgb = gui->MapFramebuffer();
+    denoiser->Denoise(denoiserRGB, denoiserN, denoiserAlbedo, rgb);
+    gui->UnmapFramebuffer();
 }
 
 }  // namespace pbrt

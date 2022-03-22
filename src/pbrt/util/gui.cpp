@@ -2,8 +2,6 @@
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
 
-#include <glad/glad.h>
-
 #include <pbrt/util/gui.h>
 
 #include <pbrt/options.h>

@@ -5,8 +5,8 @@
 #ifndef PBRT_UTIL_GUI_H
 #define PBRT_UTIL_GUI_H
 
+#include <glad/glad.h>
 #include <GLFW/glfw3.h>
-#include <pbrt/gpu/cudagl.h>
 
 #include <pbrt/pbrt.h>
 
