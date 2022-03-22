@@ -29,170 +29,148 @@
 #ifndef PBRT_GPU_CUDAGL_H
 #define PBRT_GPU_CUDAGL_H
 
-#include <pbrt/util/error.h>
 #include <pbrt/gpu/util.h>
+#include <pbrt/util/error.h>
 
 #include <glad/glad.h>
 
 #include <cuda.h>
-#include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
+#include <cuda_runtime.h>
 
-#define GL_CHECK(call)                                                  \
-    do {                                                                \
-        call;                                                           \
-        if (GLenum err = glGetError(); err != GL_NO_ERROR)              \
+#define GL_CHECK(call)                                                   \
+    do {                                                                 \
+        call;                                                            \
+        if (GLenum err = glGetError(); err != GL_NO_ERROR)               \
             LOG_FATAL("GL error: %s for " #call, getGLErrorString(err)); \
     } while (0)
 
-
-#define GL_CHECK_ERRORS()                                              \
-    do {                                                               \
-       if (GLenum err = glGetError(); err != GL_NO_ERROR)              \
-           LOG_FATAL("GL error: %s", getGLErrorString(err));           \
+#define GL_CHECK_ERRORS()                                     \
+    do {                                                      \
+        if (GLenum err = glGetError(); err != GL_NO_ERROR)    \
+            LOG_FATAL("GL error: %s", getGLErrorString(err)); \
     } while (0)
 
 namespace pbrt {
 
 // Specialized from the original to only support GL_INTEROP
 template <typename PIXEL_FORMAT>
-class CUDAOutputBuffer
-{
-public:
-    CUDAOutputBuffer(int32_t width, int32_t height );
+class CUDAOutputBuffer {
+  public:
+    CUDAOutputBuffer(int32_t width, int32_t height);
     ~CUDAOutputBuffer();
 
-    void setDevice( int32_t device_idx ) { m_device_idx = device_idx; }
-    void setStream( CUstream stream    ) { m_stream     = stream;     }
+    void setDevice(int32_t device_idx) { m_device_idx = device_idx; }
+    void setStream(CUstream stream) { m_stream = stream; }
 
-    void resize( int32_t width, int32_t height );
+    void resize(int32_t width, int32_t height);
 
     // Allocate or update device pointer as necessary for CUDA access
     PIXEL_FORMAT* map();
     void unmap();
 
-    int32_t        width() const  { return m_width;  }
-    int32_t        height() const { return m_height; }
+    int32_t width() const { return m_width; }
+    int32_t height() const { return m_height; }
 
     // Get output buffer
-    GLuint         getPBO();
-    void           deletePBO();
+    GLuint getPBO();
+    void deletePBO();
 
-private:
-    void makeCurrent() { CUDA_CHECK( cudaSetDevice( m_device_idx ) ); }
+  private:
+    void makeCurrent() { CUDA_CHECK(cudaSetDevice(m_device_idx)); }
 
-    int32_t                    m_width             = 0u;
-    int32_t                    m_height            = 0u;
+    int32_t m_width = 0u;
+    int32_t m_height = 0u;
 
-    cudaGraphicsResource*      m_cuda_gfx_resource = nullptr;
-    GLuint                     m_pbo               = 0u;
-    PIXEL_FORMAT*              m_device_pixels     = nullptr;
+    cudaGraphicsResource* m_cuda_gfx_resource = nullptr;
+    GLuint m_pbo = 0u;
+    PIXEL_FORMAT* m_device_pixels = nullptr;
 
-    CUstream                   m_stream            = 0u;
-    int32_t                    m_device_idx        = 0;
+    CUstream m_stream = 0u;
+    int32_t m_device_idx = 0;
 };
 
 template <typename PIXEL_FORMAT>
-CUDAOutputBuffer<PIXEL_FORMAT>::CUDAOutputBuffer(int32_t width, int32_t height )
-{
+CUDAOutputBuffer<PIXEL_FORMAT>::CUDAOutputBuffer(int32_t width, int32_t height) {
     CHECK(width > 0 && height > 0);
 
     // If using GL Interop, expect that the active device is also the display device.
-        int current_device, is_display_device;
-        CUDA_CHECK( cudaGetDevice( &current_device ) );
-        CUDA_CHECK( cudaDeviceGetAttribute( &is_display_device, cudaDevAttrKernelExecTimeout, current_device ) );
-        if( !is_display_device )
-        {
-            LOG_FATAL(
-                    "GL interop is only available on display device, please use display device for optimal "
-                    "performance.  Alternatively you can disable GL interop with --no-gl-interop and run with "
-                    "degraded performance."
-                    );
-        }
+    int current_device, is_display_device;
+    CUDA_CHECK(cudaGetDevice(&current_device));
+    CUDA_CHECK(cudaDeviceGetAttribute(&is_display_device, cudaDevAttrKernelExecTimeout,
+                                      current_device));
+    if (!is_display_device)
+        LOG_FATAL("GL interop is only available on display device.");
 
-    resize( width, height );
+    resize(width, height);
 }
 
 template <typename PIXEL_FORMAT>
-CUDAOutputBuffer<PIXEL_FORMAT>::~CUDAOutputBuffer()
-{
-        makeCurrent();
+CUDAOutputBuffer<PIXEL_FORMAT>::~CUDAOutputBuffer() {
+    makeCurrent();
 
-        if( m_pbo != 0u )
-        {
-            GL_CHECK( glBindBuffer( GL_ARRAY_BUFFER, 0 ) );
-            GL_CHECK( glDeleteBuffers( 1, &m_pbo ) );
-        }
+    if (m_pbo != 0u) {
+        GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, 0));
+        GL_CHECK(glDeleteBuffers(1, &m_pbo));
+    }
 }
 
-
 template <typename PIXEL_FORMAT>
-void CUDAOutputBuffer<PIXEL_FORMAT>::resize( int32_t width, int32_t height )
-{
+void CUDAOutputBuffer<PIXEL_FORMAT>::resize(int32_t width, int32_t height) {
     CHECK(width > 0 && height > 0);
 
-    if( m_width == width && m_height == height )
+    if (m_width == width && m_height == height)
         return;
 
-    m_width  = width;
+    m_width = width;
     m_height = height;
 
     makeCurrent();
 
-        // GL buffer gets resized below
-        GL_CHECK( glGenBuffers( 1, &m_pbo ) );
-        GL_CHECK( glBindBuffer( GL_ARRAY_BUFFER, m_pbo ) );
-        GL_CHECK( glBufferData( GL_ARRAY_BUFFER, sizeof(PIXEL_FORMAT)*m_width*m_height, nullptr, GL_STREAM_DRAW ) );
-        GL_CHECK( glBindBuffer( GL_ARRAY_BUFFER, 0u ) );
+    // GL buffer gets resized below
+    GL_CHECK(glGenBuffers(1, &m_pbo));
+    GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_pbo));
+    GL_CHECK(glBufferData(GL_ARRAY_BUFFER, sizeof(PIXEL_FORMAT) * m_width * m_height,
+                          nullptr, GL_STREAM_DRAW));
+    GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, 0u));
 
-        CUDA_CHECK( cudaGraphicsGLRegisterBuffer(
-                    &m_cuda_gfx_resource,
-                    m_pbo,
-                    cudaGraphicsMapFlagsWriteDiscard
-                    ) );
+    CUDA_CHECK(cudaGraphicsGLRegisterBuffer(&m_cuda_gfx_resource, m_pbo,
+                                            cudaGraphicsMapFlagsWriteDiscard));
 }
 
-
 template <typename PIXEL_FORMAT>
-PIXEL_FORMAT* CUDAOutputBuffer<PIXEL_FORMAT>::map()
-{
-        makeCurrent();
+PIXEL_FORMAT* CUDAOutputBuffer<PIXEL_FORMAT>::map() {
+    makeCurrent();
 
-        size_t buffer_size = 0u;
-        CUDA_CHECK( cudaGraphicsMapResources ( 1, &m_cuda_gfx_resource, m_stream ) );
-        CUDA_CHECK( cudaGraphicsResourceGetMappedPointer(
-                    reinterpret_cast<void**>( &m_device_pixels ),
-                    &buffer_size,
-                    m_cuda_gfx_resource
-                    ) );
+    size_t buffer_size = 0u;
+    CUDA_CHECK(cudaGraphicsMapResources(1, &m_cuda_gfx_resource, m_stream));
+    CUDA_CHECK(cudaGraphicsResourceGetMappedPointer(
+        reinterpret_cast<void**>(&m_device_pixels), &buffer_size, m_cuda_gfx_resource));
 
     return m_device_pixels;
 }
 
 template <typename PIXEL_FORMAT>
-void CUDAOutputBuffer<PIXEL_FORMAT>::unmap()
-{
+void CUDAOutputBuffer<PIXEL_FORMAT>::unmap() {
     makeCurrent();
 
-    CUDA_CHECK( cudaGraphicsUnmapResources ( 1, &m_cuda_gfx_resource,  m_stream ) );
+    CUDA_CHECK(cudaGraphicsUnmapResources(1, &m_cuda_gfx_resource, m_stream));
 }
 
 template <typename PIXEL_FORMAT>
-GLuint CUDAOutputBuffer<PIXEL_FORMAT>::getPBO()
-{
-    if( m_pbo == 0u )
-        GL_CHECK( glGenBuffers( 1, &m_pbo ) );
+GLuint CUDAOutputBuffer<PIXEL_FORMAT>::getPBO() {
+    if (m_pbo == 0u)
+        GL_CHECK(glGenBuffers(1, &m_pbo));
     return m_pbo;
 }
 
 template <typename PIXEL_FORMAT>
-void CUDAOutputBuffer<PIXEL_FORMAT>::deletePBO()
-{
-    GL_CHECK( glBindBuffer( GL_ARRAY_BUFFER, 0 ) );
-    GL_CHECK( glDeleteBuffers( 1, &m_pbo ) );
+void CUDAOutputBuffer<PIXEL_FORMAT>::deletePBO() {
+    GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, 0));
+    GL_CHECK(glDeleteBuffers(1, &m_pbo));
     m_pbo = 0;
 }
 
-} // end namespace pbrt
+}  // end namespace pbrt
 
-#endif // PBRT_GPU_CUDAGL_H
+#endif  // PBRT_GPU_CUDAGL_H
