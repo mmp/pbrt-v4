@@ -32,10 +32,11 @@ jobs:
             cc: "clang-11",
             cxx: "clang++-11",
           }
-        - {
-            cc: "clang-12",
-            cxx: "clang++-12",
-          }
+# WAR github actions flakiness
+#        - {
+#            cc: "clang-12",
+#            cxx: "clang++-12",
+#          }
 
       fail-fast: false
 
