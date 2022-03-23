@@ -109,6 +109,14 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization, bool 
         logging::logLevel = LogLevel::Verbose;
     }
 
+#ifdef PBRT_IS_WINDOWS
+    HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD consoleMode;
+    GetConsoleMode(hStdout, &consoleMode);
+    consoleMode |= 0xc;  // virtual terminal processing, disable newline auto return
+    SetConsoleMode(hStdout, consoleMode);
+#endif // PBRT_IS_WINDOWS
+
     if (level == LogLevel::Invalid)
         ErrorExit("Invalid --log-level specified.");
 
