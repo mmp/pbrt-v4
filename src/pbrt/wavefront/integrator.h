@@ -125,10 +125,13 @@ class WavefrontPathIntegrator {
     void PrefetchGPUAllocations();
 #endif  // PBRT_BUILD_GPU_RENDERER
 
+    // --display-server methods
     void StartDisplayThread();
-    void UpdateDisplay(Vector2i resolution);
+    void UpdateDisplayRGBFromFilm(Bounds2i pixelBounds);
     void StopDisplayThread();
-    void UpdateFramebufferFromFilm(GUI *gui, Vector2i resolution);
+
+    // --interactive support
+    void UpdateFramebufferFromFilm(Bounds2i pixelBounds, Float exposure, RGB *rgb);
     void UpdateDenoiserBuffers(GUI *gui, RGB *denoiserRGB, RGB *denoiserAlbedoAccum,
                                Normal3f *denoiserNAccum);
     void DenoiseToFramebuffer(GUI *gui, int spp, Vector2i resolution, Denoiser *denoiser,

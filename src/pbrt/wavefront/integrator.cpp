@@ -438,18 +438,19 @@ Float WavefrontPathIntegrator::Render() {
 
             UpdateFilm();
 
-            // Copy updated film pixels to buffer for display
-            UpdateDisplay(resolution);
-
-            if (gui) {
 #ifdef PBRT_BUILD_GPU_RENDERER
-                if (Options->useGPU && gui->denoiserEnabled)
-                    UpdateDenoiserBuffers(gui, denoiserRGB, denoiserAlbedoAccum, denoiserNAccum);
-                else
+            if (gui && Options->useGPU && gui->denoiserEnabled)
+                // We need to grab the albedo and normal from the
+                // VisibleSurface in pixelSampleState since it will be
+                // clobbered if |scanlinesPerPass| isn't enough to render
+                // everything at once.
+                UpdateDenoiserBuffers(gui, denoiserRGB, denoiserAlbedoAccum, denoiserNAccum);
 #endif // PBRT_BUILD_GPU_RENDERER
-                    UpdateFramebufferFromFilm(gui, resolution);
-            }
         }
+
+        // Copy updated film pixels to buffer for the display server.
+        if (Options->useGPU && !Options->displayServer.empty())
+            UpdateDisplayRGBFromFilm(pixelBounds);
 
         if (gui) {
 #ifdef PBRT_BUILD_GPU_RENDERER
@@ -457,9 +458,16 @@ Float WavefrontPathIntegrator::Render() {
                 DenoiseToFramebuffer(gui, 1 + sampleIndex - firstSampleIndex, resolution,
                                      denoiser, denoiserRGB, denoiserNAccum, denoiserN,
                                      denoiserAlbedoAccum, denoiserAlbedo);
+            else
 #endif // PBRT_BUILD_GPU_RENDERER
+            {
+                RGB *rgb = gui->MapFramebuffer());
+                UpdateFramebufferFromFilm(pixelBounds, gui->exposure, rgb);
+                gui->UnmapFramebuffer();
+            }
 
-            if (DisplayState state = gui->RefreshDisplay(); state == DisplayState::EXIT)
+            DisplayState state = gui->RefreshDisplay();
+            if (state == DisplayState::EXIT)
                 break;
             else if (state == DisplayState::RESET) {
                 sampleIndex = firstSampleIndex - 1;
@@ -470,7 +478,7 @@ Float WavefrontPathIntegrator::Render() {
                                 if (denoiserNAccum)
                                     denoiserNAccum[i] = Normal3f(0, 0, 0);
                                 if (denoiserAlbedoAccum)
-                                denoiserAlbedoAccum[i] = RGB(0, 0, 0);
+                                    denoiserAlbedoAccum[i] = RGB(0, 0, 0);
                             });
             }
         }
@@ -722,19 +730,15 @@ void WavefrontPathIntegrator::StartDisplayThread() {
                        });
 }
 
-void WavefrontPathIntegrator::UpdateDisplay(Vector2i resolution) {
+void WavefrontPathIntegrator::UpdateDisplayRGBFromFilm(Bounds2i pixelBounds) {
 #ifdef PBRT_BUILD_GPU_RENDERER
-    if (Options->useGPU && !Options->displayServer.empty())
-        GPUParallelFor(
-            "Update Display RGB Buffer", maxQueueSize,
-            PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
-                Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
-                if (!InsideExclusive(pPixel, film.PixelBounds()))
-                    return;
-
-                Point2i p(pPixel - film.PixelBounds().pMin);
-                displayRGB[p.x + p.y * resolution.x] = film.GetPixelRGB(pPixel);
-            });
+    Vector2i resolution = pixelBounds.Diagonal();
+    GPUParallelFor(
+                   "Update Display RGB Buffer", resolution.x * resolution.y,
+                   PBRT_CPU_GPU_LAMBDA(int index) {
+                       Point2i p(index % resolution.x, index / resolution.x);
+                       displayRGB[index] = film.GetPixelRGB(p + pixelBounds.pMin);
+                   });
 #endif  //  PBRT_BUILD_GPU_RENDERER
 }
 
@@ -783,20 +787,14 @@ void WavefrontPathIntegrator::UpdateDenoiserBuffers(
                 });
 }
 
-void WavefrontPathIntegrator::UpdateFramebufferFromFilm(GUI *gui, Vector2i resolution) {
-    RGB *rgb = gui->MapFramebuffer();
-    Float ex = gui->exposure;
-    ParallelFor("Update framebuffer", maxQueueSize,
-                PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
-                    Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
-                    if (!InsideExclusive(pPixel, film.PixelBounds()))
-                        return;
-
-                    Point2i p(pPixel - film.PixelBounds().pMin);
-                    int offset = p.x + p.y * resolution.x;
-                    rgb[offset] = ex * film.GetPixelRGB(pPixel);
+void WavefrontPathIntegrator::UpdateFramebufferFromFilm(Bounds2i pixelBounds, Float exposure,
+                                                        RGB *rgb) {
+    Vector2i resolution = pixelBounds.Diagonal();
+    ParallelFor("Update framebuffer", resolution.x * resolution.y,
+                PBRT_CPU_GPU_LAMBDA(int index) {
+                    Point2i p(index % resolution.x, index / resolution.x);
+                    rgb[index] = exposure * film.GetPixelRGB(p + film.PixelBounds().pMin);
                 });
-    gui->UnmapFramebuffer();
 }
 
 void WavefrontPathIntegrator::DenoiseToFramebuffer(
