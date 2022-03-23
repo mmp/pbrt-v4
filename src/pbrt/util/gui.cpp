@@ -316,11 +316,9 @@ void GUI::keyboardCallback(GLFWwindow* window, int key, int scan, int action, in
     doKey(GLFW_KEY_D, 'd');
     doKey(GLFW_KEY_S, 's');
     doKey(GLFW_KEY_W, 'w');
-    doKey(GLFW_KEY_D, 'd');
-    if (mods & GLFW_MOD_SHIFT)
-        doKey(GLFW_KEY_E, 'E');
-    else
-        doKey(GLFW_KEY_E, 'e');
+    doKey(GLFW_KEY_Q, 'q');
+    doKey(GLFW_KEY_E, 'e');
+    doKey(GLFW_KEY_B, (mods & GLFW_MOD_SHIFT) ? 'B' : 'b');
     doKey(GLFW_KEY_R, 'r');
     doKey(GLFW_KEY_EQUAL, '=');
     doKey(GLFW_KEY_MINUS, '-');
@@ -328,7 +326,6 @@ void GUI::keyboardCallback(GLFWwindow* window, int key, int scan, int action, in
     doKey(GLFW_KEY_RIGHT, 'R');
     doKey(GLFW_KEY_UP, 'U');
     doKey(GLFW_KEY_DOWN, 'D');
-    doKey(GLFW_KEY_N, 'n');
 }
 
 bool GUI::processKeys() {
@@ -349,6 +346,10 @@ bool GUI::processKeys() {
         's', [&](Transform t) { return t * Translate(Vector3f(0, 0, -moveScale)); });
     handleNeedsReset(
         'w', [&](Transform t) { return t * Translate(Vector3f(0, 0, moveScale)); });
+    handleNeedsReset(
+        'q', [&](Transform t) { return t * Translate(Vector3f(0, -moveScale, 0)); });
+    handleNeedsReset(
+        'e', [&](Transform t) { return t * Translate(Vector3f(0, moveScale, 0)); });
     handleNeedsReset('L',
                      [&](Transform t) { return t * Rotate(-.5f, Vector3f(0, 1, 0)); });
     handleNeedsReset('R',
@@ -360,12 +361,12 @@ bool GUI::processKeys() {
     handleNeedsReset('r', [&](Transform t) { return Transform(); });
 
     // No reset needed for these.
-    if (keysDown.find('e') != keysDown.end()) {
-        keysDown.erase(keysDown.find('e'));
+    if (keysDown.find('b') != keysDown.end()) {
+        keysDown.erase(keysDown.find('b'));
         exposure *= 1.125f;
     }
-    if (keysDown.find('E') != keysDown.end()) {
-        keysDown.erase(keysDown.find('E'));
+    if (keysDown.find('B') != keysDown.end()) {
+        keysDown.erase(keysDown.find('B'));
         exposure /= 1.125f;
     }
     if (keysDown.find('=') != keysDown.end()) {
@@ -376,10 +377,6 @@ bool GUI::processKeys() {
         keysDown.erase(keysDown.find('-'));
         moveScale *= 0.5;
     }
-    if (keysDown.find('n') != keysDown.end()) {
-        keysDown.erase(keysDown.find('n'));
-        denoiserEnabled = !denoiserEnabled;
-    }
 
     return needsReset;
 }
@@ -389,7 +386,10 @@ static void glfwKeyCallback(GLFWwindow* window, int key, int scan, int action, i
     gui->keyboardCallback(window, key, scan, action, mods);
 }
 
-GUI::GUI(std::string title, Vector2i resolution) : resolution(resolution) {
+GUI::GUI(std::string title, Vector2i resolution, Bounds3f sceneBounds)
+    : resolution(resolution) {
+    moveScale = Length(sceneBounds.Diagonal()) / 1000.f;
+
     glfwSetErrorCallback(glfwErrorCallback);
     if (!glfwInit())
         LOG_FATAL("Unable to initialize GLFW");

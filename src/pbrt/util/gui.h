@@ -28,7 +28,7 @@ class GLDisplay;
 
 class GUI {
   public:
-    GUI(std::string title, Vector2i resolution);
+    GUI(std::string title, Vector2i resolution, Bounds3f sceneBounds);
     ~GUI();
 
     RGB *MapFramebuffer() {
@@ -49,7 +49,6 @@ class GUI {
     DisplayState RefreshDisplay();
 
     Transform GetCameraTransform() const { return movingFromCamera; }
-    bool denoiserEnabled = false;
     Float exposure = 1.f;
 
     void keyboardCallback(GLFWwindow *window, int key, int scan, int action, int mods);

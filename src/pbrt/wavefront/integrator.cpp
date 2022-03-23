@@ -296,7 +296,7 @@ Float WavefrontPathIntegrator::Render() {
     if (Options->interactive) {
         if (!Options->displayServer.empty())
             ErrorExit("--interactive and --display-server cannot be used at the same time.");
-        gui = new GUI(film.GetFilename(), resolution);
+        gui = new GUI(film.GetFilename(), resolution, aggregate->Bounds());
     }
 
     Timer timer;
@@ -350,6 +350,7 @@ Float WavefrontPathIntegrator::Render() {
                              sampleIndex, samplesPerPixel);
                     cameraRayQueue->Reset();
                 });
+
             Transform cameraMotion;
             if (gui)
                 cameraMotion = renderFromCamera * gui->GetCameraTransform() * cameraFromRender;
