@@ -195,7 +195,7 @@ std::unique_ptr<Tokenizer> Tokenizer::CreateFromFile(
     HANDLE fileHandle =
         CreateFileW(WStringFromUTF8(filename).c_str(), GENERIC_READ, FILE_SHARE_READ, 0,
                     OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-    if (!fileHandle)
+    if (fileHandle == INVALID_HANDLE_VALUE)
         return errorReportLambda();
 
     size_t len = GetFileSize(fileHandle, 0);
