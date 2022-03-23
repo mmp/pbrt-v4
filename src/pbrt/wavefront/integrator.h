@@ -26,7 +26,6 @@
 namespace pbrt {
 
 class BasicScene;
-class Denoiser;
 class GUI;
 
 // WavefrontAggregate Definition
@@ -132,11 +131,6 @@ class WavefrontPathIntegrator {
 
     // --interactive support
     void UpdateFramebufferFromFilm(Bounds2i pixelBounds, Float exposure, RGB *rgb);
-    void UpdateDenoiserBuffers(GUI *gui, RGB *denoiserRGB, RGB *denoiserAlbedoAccum,
-                               Normal3f *denoiserNAccum);
-    void DenoiseToFramebuffer(GUI *gui, int spp, Vector2i resolution, Denoiser *denoiser,
-                              RGB *denoiserRGB, Normal3f *denoiserNAccum, Normal3f *denoiserN,
-                              RGB *denoiserAlbedoAccum, RGB *denoiserAlbedo);
 
     // WavefrontPathIntegrator Member Variables
     bool initializeVisibleSurface;
