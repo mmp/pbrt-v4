@@ -63,11 +63,12 @@ class CUDAOutputBuffer {
     void setDevice(int32_t device_idx) { m_device_idx = device_idx; }
     void setStream(CUstream stream) { m_stream = stream; }
 
-    void resize(int32_t width, int32_t height);
-
     // Allocate or update device pointer as necessary for CUDA access
-    PIXEL_FORMAT* map();
+    PIXEL_FORMAT *map();
     void unmap();
+
+    void StartAsynchronousReadback();
+    const PIXEL_FORMAT *GetReadbackPixels();
 
     int32_t width() const { return m_width; }
     int32_t height() const { return m_height; }
@@ -82,9 +83,13 @@ class CUDAOutputBuffer {
     int32_t m_width = 0u;
     int32_t m_height = 0u;
 
-    cudaGraphicsResource* m_cuda_gfx_resource = nullptr;
+    cudaGraphicsResource *m_cuda_gfx_resource = nullptr;
     GLuint m_pbo = 0u;
-    PIXEL_FORMAT* m_device_pixels = nullptr;
+    PIXEL_FORMAT *m_device_pixels = nullptr;
+    PIXEL_FORMAT *m_host_pixels = nullptr;
+
+    bool readbackActive = false;
+    cudaEvent_t readbackFinishedEvent;
 
     CUstream m_stream = 0u;
     int32_t m_device_idx = 0;
@@ -102,26 +107,6 @@ CUDAOutputBuffer<PIXEL_FORMAT>::CUDAOutputBuffer(int32_t width, int32_t height) 
     if (!is_display_device)
         LOG_FATAL("GL interop is only available on display device.");
 
-    resize(width, height);
-}
-
-template <typename PIXEL_FORMAT>
-CUDAOutputBuffer<PIXEL_FORMAT>::~CUDAOutputBuffer() {
-    makeCurrent();
-
-    if (m_pbo != 0u) {
-        GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, 0));
-        GL_CHECK(glDeleteBuffers(1, &m_pbo));
-    }
-}
-
-template <typename PIXEL_FORMAT>
-void CUDAOutputBuffer<PIXEL_FORMAT>::resize(int32_t width, int32_t height) {
-    CHECK(width > 0 && height > 0);
-
-    if (m_width == width && m_height == height)
-        return;
-
     m_width = width;
     m_height = height;
 
@@ -136,6 +121,19 @@ void CUDAOutputBuffer<PIXEL_FORMAT>::resize(int32_t width, int32_t height) {
 
     CUDA_CHECK(cudaGraphicsGLRegisterBuffer(&m_cuda_gfx_resource, m_pbo,
                                             cudaGraphicsMapFlagsWriteDiscard));
+
+    CUDA_CHECK(cudaEventCreate(&readbackFinishedEvent));
+    CUDA_CHECK(cudaMallocHost(&m_host_pixels, m_width * m_height * sizeof(PIXEL_FORMAT)));
+}
+
+template <typename PIXEL_FORMAT>
+CUDAOutputBuffer<PIXEL_FORMAT>::~CUDAOutputBuffer() {
+    makeCurrent();
+
+    if (m_pbo != 0u) {
+        GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, 0));
+        GL_CHECK(glDeleteBuffers(1, &m_pbo));
+    }
 }
 
 template <typename PIXEL_FORMAT>
@@ -169,6 +167,31 @@ void CUDAOutputBuffer<PIXEL_FORMAT>::deletePBO() {
     GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, 0));
     GL_CHECK(glDeleteBuffers(1, &m_pbo));
     m_pbo = 0;
+}
+
+template <typename PIXEL_FORMAT>
+void CUDAOutputBuffer<PIXEL_FORMAT>::StartAsynchronousReadback() {
+    CHECK(!readbackActive);
+
+    makeCurrent();
+
+    CUDA_CHECK(cudaMemcpyAsync(m_host_pixels, m_device_pixels,
+                               m_width * m_height * sizeof(PIXEL_FORMAT),
+                               cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaEventRecord(readbackFinishedEvent));
+    readbackActive = true;
+}
+
+template <typename PIXEL_FORMAT>
+const PIXEL_FORMAT *CUDAOutputBuffer<PIXEL_FORMAT>::GetReadbackPixels() {
+    if (!readbackActive)
+        return nullptr;
+
+    makeCurrent();
+
+    CUDA_CHECK(cudaEventSynchronize(readbackFinishedEvent));
+    readbackActive = false;
+    return m_host_pixels;
 }
 
 }  // end namespace pbrt

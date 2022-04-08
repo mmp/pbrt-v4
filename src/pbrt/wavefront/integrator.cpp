@@ -31,6 +31,7 @@
 #include <pbrt/wavefront/aggregate.h>
 
 #include <atomic>
+#include <cstdio>
 #include <cstring>
 #include <iostream>
 #include <map>
@@ -293,6 +294,7 @@ Float WavefrontPathIntegrator::Render() {
     // FIXME: camera animation; whatever...
     Transform renderFromCamera = camera.GetCameraTransform().RenderFromCamera().startTransform;
     Transform cameraFromRender = Inverse(renderFromCamera);
+    Transform cameraFromWorld = camera.GetCameraTransform().CameraFromWorld(camera.SampleTime(0.f));
     if (Options->interactive) {
         if (!Options->displayServer.empty())
             ErrorExit("--interactive and --display-server cannot be used at the same time.");
@@ -431,6 +433,16 @@ Float WavefrontPathIntegrator::Render() {
             RGB *rgb = gui->MapFramebuffer();
             UpdateFramebufferFromFilm(pixelBounds, gui->exposure, rgb);
             gui->UnmapFramebuffer();
+
+            if (gui->printCameraTransform) {
+                SquareMatrix<4> cfw = (Inverse(gui->GetCameraTransform()) * cameraFromWorld).GetMatrix();
+                Printf("Current camera transform:\nTransform [ ");
+                for (int i = 0; i < 16; ++i)
+                    Printf("%f ", cfw[i % 4][i / 4]);
+                Printf("]\n");
+                std::fflush(stdout);
+                gui->printCameraTransform = false;
+            }
 
             DisplayState state = gui->RefreshDisplay();
             if (state == DisplayState::EXIT)

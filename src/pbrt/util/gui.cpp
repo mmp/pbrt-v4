@@ -9,6 +9,8 @@
 #include <pbrt/gpu/util.h>
 #endif PBRT_BUILD_GPU_RENDERER
 #include <pbrt/util/error.h>
+#include <pbrt/util/image.h>
+#include <pbrt/util/parallel.h>
 
 #define GL_CHECK(call)                                                   \
     do {                                                                 \
@@ -297,7 +299,7 @@ static void glfwErrorCallback(int error, const char* desc) {
     LOG_ERROR("GLFW [%d]: %s", error, desc);
 }
 
-void GUI::keyboardCallback(GLFWwindow* window, int key, int scan, int action, int mods) {
+void GUI::keyboardCallback(GLFWwindow *window, int key, int scan, int action, int mods) {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GLFW_TRUE);
 
@@ -318,14 +320,22 @@ void GUI::keyboardCallback(GLFWwindow* window, int key, int scan, int action, in
     doKey(GLFW_KEY_W, 'w');
     doKey(GLFW_KEY_Q, 'q');
     doKey(GLFW_KEY_E, 'e');
+
     doKey(GLFW_KEY_B, (mods & GLFW_MOD_SHIFT) ? 'B' : 'b');
-    doKey(GLFW_KEY_R, 'r');
+    doKey(GLFW_KEY_C, 'c');
     doKey(GLFW_KEY_EQUAL, '=');
     doKey(GLFW_KEY_MINUS, '-');
+
     doKey(GLFW_KEY_LEFT, 'L');
     doKey(GLFW_KEY_RIGHT, 'R');
     doKey(GLFW_KEY_UP, 'U');
     doKey(GLFW_KEY_DOWN, 'D');
+
+    if (key == GLFW_KEY_R && action == GLFW_PRESS &&
+        glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
+        recordFrames = !recordFrames;
+    else
+        doKey(GLFW_KEY_R, 'r');
 }
 
 bool GUI::processKeys() {
@@ -361,6 +371,10 @@ bool GUI::processKeys() {
     handleNeedsReset('r', [&](Transform t) { return Transform(); });
 
     // No reset needed for these.
+    if (keysDown.find('c') != keysDown.end()) {
+        keysDown.erase(keysDown.find('c'));
+        printCameraTransform = true;
+    }
     if (keysDown.find('b') != keysDown.end()) {
         keysDown.erase(keysDown.find('b'));
         exposure *= 1.125f;
@@ -451,6 +465,34 @@ DisplayState GUI::RefreshDisplay() {
 
     glfwSwapBuffers(window);
     glfwPollEvents();
+
+    if (recordFrames) {
+        const RGB *fb = nullptr;
+#ifdef PBRT_BUILD_GPU_RENDERER
+        if (cudaFramebuffer)
+            fb = cudaFramebuffer->GetReadbackPixels();
+        else
+#endif
+            fb = cpuFramebuffer;
+
+        if (fb) {
+            Image image(PixelFormat::Float, {width, height}, {"R", "G", "B"});
+            std::memcpy(image.RawPointer({0, 0}), fb, width * height * sizeof(RGB));
+
+//CO            RunAsync([](Image image, int frameNumber) {
+                // TODO: set metadata for e.g. current camera position...
+                ImageMetadata metadata;
+                image.Write(StringPrintf("pbrt-frame%05d.exr", frameNumber), metadata);
+//CO                return 0;  // FIXME: RunAsync() doesn't like lambdas that return void..
+//CO            }, std::move(image), frameNumber);
+
+            ++frameNumber;
+        }
+#ifdef PBRT_BUILD_GPU_RENDERER
+        if (cudaFramebuffer)
+            cudaFramebuffer->StartAsynchronousReadback();
+#endif
+    }
 
     if (glfwWindowShouldClose(window))
         return DisplayState::EXIT;

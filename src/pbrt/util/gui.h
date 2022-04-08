@@ -48,8 +48,12 @@ class GUI {
 
     DisplayState RefreshDisplay();
 
+    // It's a little messy that the state of values controlled via the UI
+    // are just public variables here but it's probably not worth putting
+    // an abstraction layer on top of all this at this point.
     Transform GetCameraTransform() const { return movingFromCamera; }
     Float exposure = 1.f;
+    bool printCameraTransform = false;
 
     void keyboardCallback(GLFWwindow *window, int key, int scan, int action, int mods);
 
@@ -60,6 +64,8 @@ class GUI {
     Float moveScale = 1.f;
     Transform movingFromCamera;
     Vector2i resolution;
+    bool recordFrames = false;
+    int frameNumber = 0;
 
 #ifdef PBRT_BUILD_GPU_RENDERER
     CUDAOutputBuffer<RGB> *cudaFramebuffer = nullptr;
