@@ -37,7 +37,7 @@ struct EvaluateMaterialCallback {
 // WavefrontPathIntegrator Surface Scattering Methods
 void WavefrontPathIntegrator::EvaluateMaterialsAndBSDFs(int wavefrontDepth, Transform movingFromCamera) {
     ForEachType(EvaluateMaterialCallback{wavefrontDepth, this, movingFromCamera},
-		Material::Types());
+                Material::Types());
 }
 
 template <typename ConcreteMaterial>
@@ -71,8 +71,8 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
             Vector3f dpdx, dpdy;
             Float dudx = 0, dudy = 0, dvdx = 0, dvdy = 0;
             if (!GetOptions().disableTextureFiltering) {
-  	        Point3f pc = movingFromCamera.ApplyInverse(Point3f(w.pi));
-		Normal3f nc = movingFromCamera.ApplyInverse(w.n);
+                Point3f pc = movingFromCamera.ApplyInverse(Point3f(w.pi));
+                Normal3f nc = movingFromCamera.ApplyInverse(w.n);
                 camera.Approximate_dp_dxy(pc, nc, w.time, samplesPerPixel,
                                           &dpdx, &dpdy);
                 Vector3f dpdu = w.dpdu, dpdv = w.dpdv;

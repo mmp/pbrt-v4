@@ -24,8 +24,6 @@ namespace pbrt {
 
 enum DisplayState { EXIT, RESET, NONE };
 
-class GLDisplay;
-
 class GUI {
   public:
     GUI(std::string title, Vector2i resolution, Bounds3f sceneBounds);
@@ -71,7 +69,6 @@ class GUI {
     CUDAOutputBuffer<RGB> *cudaFramebuffer = nullptr;
 #endif
     RGB *cpuFramebuffer = nullptr;
-    GLDisplay *glDisplay = nullptr;
     GLFWwindow *window = nullptr;
 };
 
