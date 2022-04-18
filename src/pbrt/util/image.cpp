@@ -942,6 +942,18 @@ bool Image::Write(std::string name, const ImageMetadata &metadata) const {
             outImage = outImage.SelectChannels(desc);
         break;
     }
+    case 4: {
+        ImageChannelDesc desc = outImage.GetChannelDesc({"R", "G", "B", "A"});
+        if (!desc)
+            // Still go for it.
+            Warning("%s: image has 4 channels but they are not R, G, B, and A. Image may be "
+                    "garbled.",
+                    name);
+        else
+            // Reorder them as RGBA.
+            outImage = outImage.SelectChannels(desc);
+        break;
+    }
     default: {
         ImageChannelDesc desc = outImage.GetChannelDesc({"R", "G", "B"});
         if (!desc) {
@@ -963,10 +975,11 @@ bool Image::Write(std::string name, const ImageMetadata &metadata) const {
         break;
     }
     }
-    CHECK(outImage.NChannels() == 1 || outImage.NChannels() == 3);
+    CHECK(outImage.NChannels() == 1 || outImage.NChannels() == 3 ||
+          outImage.NChannels() == 4);
 
     ImageMetadata outMetadata = metadata;
-    if (outImage.NChannels() == 3 && *metadata.GetColorSpace() != *RGBColorSpace::sRGB) {
+    if (outImage.NChannels() != 1 && *metadata.GetColorSpace() != *RGBColorSpace::sRGB) {
         Warning("%s: converting pixel colors to sRGB to match output image format.",
                 name);
         SquareMatrix<3> m =
@@ -1404,6 +1417,20 @@ std::string Image::ToString() const {
                         encoding ? encoding.ToString().c_str() : "(nullptr)");
 }
 
+std::unique_ptr<uint8_t[]> Image::QuantizePixelsToU256(int *nOutOfGamut) const {
+    std::unique_ptr<uint8_t[]> u256 = std::make_unique<uint8_t[]>(NChannels() * resolution.x * resolution.y);
+    for (int y = 0; y < resolution.y; ++y)
+        for (int x = 0; x < resolution.x; ++x)
+            for (int c = 0; c < NChannels(); ++c) {
+                Float dither = -.5f + BlueNoise(c, {x, y});
+                Float v = GetChannel({x, y}, c);
+                if (v < 0 || v > 1)
+                    ++(*nOutOfGamut);
+                u256[NChannels() * (y * resolution.x + x) + c] = LinearToSRGB8(v, dither);
+            }
+    return u256;
+}
+
 bool Image::WritePNG(const std::string &filename, const ImageMetadata &metadata) const {
     unsigned int error = 0;
     int nOutOfGamut = 0;
@@ -1411,48 +1438,29 @@ bool Image::WritePNG(const std::string &filename, const ImageMetadata &metadata)
     unsigned char *png;
     size_t pngSize;
 
+    LodePNGColorType pngColor;
+    switch (NChannels()) {
+    case 1:
+        pngColor = LCT_GREY;
+        break;
+    case 3:
+        // TODO: it would be nice to store the color encoding used in the PNG metadata...
+        pngColor = LCT_RGB;
+        break;
+    case 4:
+        pngColor = LCT_RGBA;
+        break;
+    default:
+        LOG_FATAL("Unexpected number of channels in WritePNG()");
+    }
+
     if (format == PixelFormat::U256) {
-        if (NChannels() == 1)
-            error = lodepng_encode_memory(&png, &pngSize, p8.data(), resolution.x,
-                                          resolution.y, LCT_GREY, 8 /* bitdepth */);
-        else if (NChannels() == 3)
-            // TODO: it would be nice to store the color encoding used in the
-            // PNG metadata...
-            error = lodepng_encode_memory(&png, &pngSize, p8.data(), resolution.x,
-                                          resolution.y, LCT_RGB, 8);
-        else
-            LOG_FATAL("Unhandled channel count in WritePNG(): %d", NChannels());
-    } else if (NChannels() == 3) {
-        // It may not actually be RGB, but that's what PNG's going to
-        // assume..
-        std::unique_ptr<uint8_t[]> rgb8 =
-            std::make_unique<uint8_t[]>(3 * resolution.x * resolution.y);
-        for (int y = 0; y < resolution.y; ++y)
-            for (int x = 0; x < resolution.x; ++x)
-                for (int c = 0; c < 3; ++c) {
-                    Float dither = -.5f + BlueNoise(c, {x, y});
-                    Float v = GetChannel({x, y}, c);
-                    if (v < 0 || v > 1)
-                        ++nOutOfGamut;
-                    rgb8[3 * (y * resolution.x + x) + c] = LinearToSRGB8(v, dither);
-                }
-
-        error = lodepng_encode_memory(&png, &pngSize, rgb8.get(), resolution.x,
-                                      resolution.y, LCT_RGB, 8);
-    } else if (NChannels() == 1) {
-        std::unique_ptr<uint8_t[]> y8 =
-            std::make_unique<uint8_t[]>(resolution.x * resolution.y);
-        for (int y = 0; y < resolution.y; ++y)
-            for (int x = 0; x < resolution.x; ++x) {
-                Float dither = -.5f + BlueNoise(0, {x, y});
-                Float v = GetChannel({x, y}, 0);
-                if (v < 0 || v > 1)
-                    ++nOutOfGamut;
-                y8[y * resolution.x + x] = LinearToSRGB8(v, dither);
-            }
-
-        error = lodepng_encode_memory(&png, &pngSize, y8.get(), resolution.x,
-                                      resolution.y, LCT_GREY, 8 /* bitdepth */);
+      error = lodepng_encode_memory(&png, &pngSize, p8.data(), resolution.x,
+                                    resolution.y, pngColor, 8 /* bitdepth */);
+    } else {
+        std::unique_ptr<uint8_t[]> pix8 = QuantizePixelsToU256(&nOutOfGamut);
+        error = lodepng_encode_memory(&png, &pngSize, pix8.get(), resolution.x,
+                                      resolution.y, pngColor, 8 /* bitdepth */);
     }
 
     if (nOutOfGamut > 0)
@@ -1655,7 +1663,12 @@ static ImageAndMetadata ReadHDR(const std::string &filename, Allocator alloc) {
 bool Image::WritePFM(const std::string &filename, const ImageMetadata &metadata) const {
     FILE *fp = FOpenWrite(filename);
     if (!fp) {
-        Error("Unable to open output PFM file \"%s\"", filename);
+        Error("%s: unable to open output PFM file.", filename);
+        return false;
+    }
+
+    if (NChannels() != 3) {
+        Error("%s: only 3-channel images are supported for PFM.");
         return false;
     }
 
