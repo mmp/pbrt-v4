@@ -61,6 +61,9 @@ jobs:
     - name: Install OpenEXR
       run: sudo apt-get -y install libopenexr-dev
 
+    - name: Install OpenGL
+      run: sudo apt-get -y install mesa-utils libglu1-mesa-dev freeglut3-dev mesa-common-dev
+
     - name: Install compilers
       run: sudo apt-get -y install ${{ matrix.compilers.cc }} ${{ matrix.compilers.cxx }}
 
