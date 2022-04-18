@@ -1736,7 +1736,8 @@ int convert(std::vector<std::string> args) {
             }
 
         if (hasAOVs && !HasExtension(outFile, "exr")) {
-            Warning("%s: image has non-RGB channels but converting to an image format that can't store them. Converting RGB only.",
+            Warning("%s: image has non-RGBA channels but converting to an image format "
+                    "that can't store them. Converting RGB only.",
                     inFile);
             channelNames = "R,G,B";
         }
@@ -1797,9 +1798,14 @@ int convert(std::vector<std::string> args) {
         res = image.Resolution();
     }
 
-    // Convert to a 32-bit format for maximum accuracy in the following
-    // processing.
-    if (!Is32Bit(image.Format()))
+    // Count how many of the following operations modify pixel values
+    // rather than copying existing ones.  (Takes heavy advantage of
+    // implicit bool->int conversions.)
+    int nModifyingOps = (!colorspace.empty() + (scale != 1) + (gamma != 1) + tonemap +
+                         preserveColors + acesFilmic);
+    // Convert to a 32-bit format for maximum accuracy if we're applying
+    // multiple operations to the pixel values.
+    if (nModifyingOps > 1 && !Is32Bit(image.Format()))
         image = image.ConvertToFormat(PixelFormat::Float);
 
     if (clamp < Infinity) {
