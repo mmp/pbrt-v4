@@ -32,7 +32,7 @@ class GUI {
     RGB *MapFramebuffer() {
 #ifdef PBRT_BUILD_GPU_RENDERER
         if (cudaFramebuffer)
-            return cudaFramebuffer->map();
+            return cudaFramebuffer->Map();
         else
 #endif  // PBRT_BUILD_GPU_RENDERER
             return cpuFramebuffer;
@@ -40,7 +40,7 @@ class GUI {
     void UnmapFramebuffer() {
 #ifdef PBRT_BUILD_GPU_RENDERER
         if (cudaFramebuffer)
-            cudaFramebuffer->unmap();
+            cudaFramebuffer->Unmap();
 #endif  // PBRT_BUILD_GPU_RENDERER
     }
 

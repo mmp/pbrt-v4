@@ -76,9 +76,6 @@ class GLDisplay {
     GLuint m_quad_vertex_buffer = 0;
 
     BufferImageFormat m_image_format;
-
-    static const std::string s_vert_source;
-    static const std::string s_frag_source;
 };
 
 static GLuint createGLShader(const std::string& source, GLuint shader_type) {
@@ -169,7 +166,12 @@ static size_t pixelFormatSize(BufferImageFormat format) {
     }
 }
 
-const std::string GLDisplay::s_vert_source = R"(
+inline GLDisplay::GLDisplay(BufferImageFormat image_format) : m_image_format(image_format) {
+    GLuint m_vertex_array;
+    GL_CHECK(glGenVertexArrays(1, &m_vertex_array));
+    GL_CHECK(glBindVertexArray(m_vertex_array));
+
+    std::string vert_source = R"(
 #version 330 core
 
 layout(location = 0) in vec3 vertexPosition_modelspace;
@@ -183,7 +185,7 @@ void main()
 }
 )";
 
-const std::string GLDisplay::s_frag_source = R"(
+    std::string frag_source = R"(
 #version 330 core
 
 in vec2 UV;
@@ -197,12 +199,8 @@ void main()
 }
 )";
 
-inline GLDisplay::GLDisplay(BufferImageFormat image_format) : m_image_format(image_format) {
-    GLuint m_vertex_array;
-    GL_CHECK(glGenVertexArrays(1, &m_vertex_array));
-    GL_CHECK(glBindVertexArray(m_vertex_array));
 
-    m_program = createGLProgram(s_vert_source, s_frag_source);
+    m_program = createGLProgram(vert_source, frag_source);
     m_render_tex_uniform_loc = getGLUniformLocation(m_program, "render_tex");
 
     GL_CHECK(glGenTextures(1, &m_render_tex));
@@ -311,15 +309,16 @@ class CUDAOutputBuffer {
     const PIXEL_FORMAT *GetReadbackPixels();
 
     void Draw(int windowWidth, int windowHeight) {
-        glDisplay->display(m_width, m_height, windowWidth, windowHeight,
-                           getPBO());
+        display->display(m_width, m_height, windowWidth, windowHeight,
+                         getPBO());
     }
+
+    PIXEL_FORMAT *Map();
+    void Unmap();
 
   private:
     void setStream(CUstream stream) { m_stream = stream; }
     // Allocate or update device pointer as necessary for CUDA access
-    PIXEL_FORMAT *map();
-    void unmap();
     void makeCurrent() { CUDA_CHECK(cudaSetDevice(m_device_idx)); }
 
     // Get output buffer
@@ -375,14 +374,14 @@ CUDAOutputBuffer<PIXEL_FORMAT>::CUDAOutputBuffer(int32_t width, int32_t height) 
     CUDA_CHECK(cudaEventCreate(&readbackFinishedEvent));
     CUDA_CHECK(cudaMallocHost(&m_host_pixels, m_width * m_height * sizeof(PIXEL_FORMAT)));
 
-    glDisplay = new GLDisplay(BufferImageFormat::FLOAT3);
+    display = new GLDisplay(BufferImageFormat::FLOAT3);
 }
 
 template <typename PIXEL_FORMAT>
 CUDAOutputBuffer<PIXEL_FORMAT>::~CUDAOutputBuffer() {
     makeCurrent();
 
-    delete glDisplay;
+    delete display;
 
     if (m_pbo != 0u) {
         GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, 0));
@@ -391,7 +390,7 @@ CUDAOutputBuffer<PIXEL_FORMAT>::~CUDAOutputBuffer() {
 }
 
 template <typename PIXEL_FORMAT>
-PIXEL_FORMAT* CUDAOutputBuffer<PIXEL_FORMAT>::map() {
+PIXEL_FORMAT* CUDAOutputBuffer<PIXEL_FORMAT>::Map() {
     makeCurrent();
 
     size_t buffer_size = 0u;
@@ -403,7 +402,7 @@ PIXEL_FORMAT* CUDAOutputBuffer<PIXEL_FORMAT>::map() {
 }
 
 template <typename PIXEL_FORMAT>
-void CUDAOutputBuffer<PIXEL_FORMAT>::unmap() {
+void CUDAOutputBuffer<PIXEL_FORMAT>::Unmap() {
     makeCurrent();
 
     CUDA_CHECK(cudaGraphicsUnmapResources(1, &m_cuda_gfx_resource, m_stream));
