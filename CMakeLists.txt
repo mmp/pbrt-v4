@@ -64,6 +64,7 @@ check_ext ("double-conversion" "double-conversion/cmake" cc1f75a114aca8d2af69f73
 check_ext ("filesystem" "filesystem/filesystem" c5f9de30142453eb3c6fe991e82dfc2583373116)
 check_ext ("libdeflate" "libdeflate/common" 1fd0bea6ca2073c68493632dafc4b1ddda1bcbc3)
 check_ext ("lodepng" "lodepng/examples" 8c6a9e30576f07bf470ad6f09458a2dcd7a6a84a)
+check_ext ("qoi" "qoi" 028c75fd26e5e0758c7c711216c00404994c1ad3)
 check_ext ("stb" "stb/tools" af1a5bc352164740c1cc1354942b1c6b72eacb8a)
 check_ext ("utf8proc" "utf8proc/bench" 2484e2ed5e1d9c19edcccf392a7d9920ad90dfaf)
 check_ext ("zlib" "zlib/doc" 54d591eabf9fe0e84c725638f8d5d8d202a093fa)
@@ -829,6 +830,7 @@ target_include_directories (pbrt_lib PUBLIC
   src
   src/ext
   ${STB_INCLUDE}
+  ${QOI_INCLUDE}
   ${OPENEXR_INCLUDE}
   ${ZLIB_INCLUDE_DIRS}
   ${LIBDEFLATE_INCLUDE_DIRS}
