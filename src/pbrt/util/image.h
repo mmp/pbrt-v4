@@ -407,6 +407,7 @@ class Image {
     bool WriteEXR(const std::string &name, const ImageMetadata &metadata) const;
     bool WritePFM(const std::string &name, const ImageMetadata &metadata) const;
     bool WritePNG(const std::string &name, const ImageMetadata &metadata) const;
+    bool WriteQOI(const std::string &name, const ImageMetadata &metadata) const;
 
     std::unique_ptr<uint8_t[]> QuantizePixelsToU256(int *nOutOfGamut) const;
 

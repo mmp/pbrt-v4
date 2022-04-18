@@ -30,3 +30,6 @@
 [submodule "src/ext/utf8proc"]
 	path = src/ext/utf8proc
 	url = https://github.com/JuliaStrings/utf8proc.git
+[submodule "src/ext/qoi"]
+	path = src/ext/qoi
+	url = https://github.com/phoboslab/qoi.git

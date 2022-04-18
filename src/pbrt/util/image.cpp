@@ -46,6 +46,10 @@
 #define STBI_WINDOWS_UTF8
 #include <stb/stb_image.h>
 
+#define QOI_NO_STDIO
+#define QOI_IMPLEMENTATION
+#include <qoi/qoi.h>
+
 namespace pbrt {
 
 std::string ToString(PixelFormat format) {
@@ -867,6 +871,7 @@ static ImageAndMetadata ReadPNG(const std::string &name, Allocator alloc,
                                 ColorEncoding encoding);
 static ImageAndMetadata ReadPFM(const std::string &filename, Allocator alloc);
 static ImageAndMetadata ReadHDR(const std::string &filename, Allocator alloc);
+static ImageAndMetadata ReadQOI(const std::string &filename, Allocator alloc);
 
 // ImageIO Function Definitions
 ImageAndMetadata Image::Read(std::string name, Allocator alloc, ColorEncoding encoding) {
@@ -878,6 +883,8 @@ ImageAndMetadata Image::Read(std::string name, Allocator alloc, ColorEncoding en
         return ReadPFM(name, alloc);
     else if (HasExtension(name, "hdr"))
         return ReadHDR(name, alloc);
+    else if (HasExtension(name, "qoi"))
+        return ReadQOI(name, alloc);
     else {
         int x, y, n;
         unsigned char *data = stbi_load(name.c_str(), &x, &y, &n, 0);
@@ -1001,6 +1008,8 @@ bool Image::Write(std::string name, const ImageMetadata &metadata) const {
         return outImage.WritePFM(name, outMetadata);
     else if (HasExtension(name, "png"))
         return outImage.WritePNG(name, outMetadata);
+    else if (HasExtension(name, "qoi"))
+        return outImage.WriteQOI(name, outMetadata);
     else {
         Error("%s: no support for writing images with this extension", name);
         return false;
@@ -1483,6 +1492,58 @@ bool Image::WritePNG(const std::string &filename, const ImageMetadata &metadata)
     return true;
 }
 
+bool Image::WriteQOI(const std::string &filename, const ImageMetadata &metadata) const {
+    Image image = *this;
+    void *qoiPixels = nullptr;
+    int qoiSize = 0;
+
+    qoi_desc desc;
+    desc.width = resolution.x;
+    desc.height = resolution.y;
+    desc.channels = NChannels();
+    if (Encoding() && !Encoding().Is<LinearColorEncoding>() &&
+        !Encoding().Is<sRGBColorEncoding>()) {
+        Error("%s: only linear and sRGB encodings are supported by QOI.", Encoding().ToString()); //filename);
+        return false;
+    }
+    desc.colorspace = Encoding().Is<LinearColorEncoding>() ? QOI_LINEAR : QOI_SRGB;
+
+    if (NChannels() == 4) {
+        // Try to order it as QOI expects. Though continue on if we don't
+        // find these particular channel names.a
+        ImageChannelDesc desc = GetChannelDesc({"R", "G", "B", "A"});
+        if (desc)
+            image = SelectChannels(desc);
+    } else if (NChannels() == 3) {
+        // Similarly try to get the channels in order..
+        ImageChannelDesc desc = GetChannelDesc({"R", "G", "B"});
+        if (desc)
+            image = SelectChannels(desc);
+    } else {
+        Error("%s: only 3 and 4 channel images are supported for QOI", filename);
+        return false;
+    }
+
+    if (format == PixelFormat::U256)
+        qoiPixels = qoi_encode(image.RawPointer({0, 0}), &desc, &qoiSize);
+    else {
+        int nOutOfGamut = 0;
+        std::unique_ptr<uint8_t[]> rgba8 = QuantizePixelsToU256(&nOutOfGamut);
+        if (nOutOfGamut > 0)
+            Warning("%s: %d out of gamut pixel channels clamped to [0,1].", filename,
+                    nOutOfGamut);
+
+        qoiPixels = qoi_encode(rgba8.get(), &desc, &qoiSize);
+    }
+
+    bool success = WriteFileContents(filename, std::string((const char *)qoiPixels, qoiSize));
+    if (!success)
+        Error("%s: error writing QOI file.", filename);
+
+    free(qoiPixels);
+    return success;
+}
+
 ///////////////////////////////////////////////////////////////////////////
 // PFM Function Definitions
 
@@ -1659,6 +1720,34 @@ static ImageAndMetadata ReadHDR(const std::string &filename, Allocator alloc) {
         ErrorExit("%s: %d channel image unsupported.", filename, n);
     }
 }
+
+static ImageAndMetadata ReadQOI(const std::string &filename, Allocator alloc) {
+    std::string contents = ReadFileContents(filename);
+    qoi_desc desc;
+    void *pixels = qoi_decode(contents.data(), contents.size(), &desc, 0 /* channels */);
+    CHECK(pixels != nullptr); // qoi failure
+
+    ImageMetadata metadata;
+    metadata.colorSpace = RGBColorSpace::sRGB;
+
+    std::vector<std::string> channelNames{"R", "G", "B"};
+    if (desc.channels == 4)
+        channelNames.push_back("A");
+    else
+        CHECK_EQ(3, desc.channels);
+
+    CHECK(desc.colorspace == QOI_SRGB || desc.colorspace == QOI_LINEAR);
+    ColorEncoding encoding = (desc.colorspace == QOI_SRGB) ? ColorEncoding::sRGB :
+                                                             ColorEncoding::Linear;
+
+    Image image(PixelFormat::U256, Point2i(desc.width, desc.height), channelNames, encoding, alloc);
+    std::memcpy(image.RawPointer({0, 0}), pixels, desc.width * desc.height * desc.channels);
+
+    free(pixels);
+
+    return ImageAndMetadata{image, metadata};
+}
+
 
 bool Image::WritePFM(const std::string &filename, const ImageMetadata &metadata) const {
     FILE *fp = FOpenWrite(filename);
