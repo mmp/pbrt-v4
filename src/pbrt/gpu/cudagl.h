@@ -53,7 +53,7 @@
 
 namespace pbrt {
 
-// GLDisplay functionality
+// BufferDisplay functionality
 // Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
 // BSD 3-clause license
 
@@ -61,9 +61,9 @@ extern const char *getGLErrorString(GLenum error);
 
 enum BufferImageFormat { UNSIGNED_BYTE4, FLOAT4, FLOAT3 };
 
-class GLDisplay {
+class BufferDisplay {
   public:
-    GLDisplay(BufferImageFormat format = BufferImageFormat::UNSIGNED_BYTE4);
+    BufferDisplay(BufferImageFormat format = BufferImageFormat::UNSIGNED_BYTE4);
 
     void display(const int32_t screen_res_x, const int32_t screen_res_y,
                  const int32_t framebuf_res_x, const int32_t framebuf_res_y,
@@ -166,7 +166,7 @@ static size_t pixelFormatSize(BufferImageFormat format) {
     }
 }
 
-inline GLDisplay::GLDisplay(BufferImageFormat image_format) : m_image_format(image_format) {
+inline BufferDisplay::BufferDisplay(BufferImageFormat image_format) : m_image_format(image_format) {
     GLuint m_vertex_array;
     GL_CHECK(glGenVertexArrays(1, &m_vertex_array));
     GL_CHECK(glBindVertexArray(m_vertex_array));
@@ -199,7 +199,6 @@ void main()
 }
 )";
 
-
     m_program = createGLProgram(vert_source, frag_source);
     m_render_tex_uniform_loc = getGLUniformLocation(m_program, "render_tex");
 
@@ -224,7 +223,7 @@ void main()
     GL_CHECK_ERRORS();
 }
 
-inline void GLDisplay::display(const int32_t screen_res_x, const int32_t screen_res_y,
+inline void BufferDisplay::display(const int32_t screen_res_x, const int32_t screen_res_y,
                                const int32_t framebuf_res_x, const int32_t framebuf_res_y,
                                const uint32_t pbo) const {
     GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, 0));
@@ -339,7 +338,7 @@ class CUDAOutputBuffer {
     CUstream m_stream = 0u;
     int32_t m_device_idx = 0;
 
-    GLDisplay *display = nullptr;
+    BufferDisplay *display = nullptr;
 };
 
 template <typename PIXEL_FORMAT>
@@ -374,7 +373,7 @@ CUDAOutputBuffer<PIXEL_FORMAT>::CUDAOutputBuffer(int32_t width, int32_t height) 
     CUDA_CHECK(cudaEventCreate(&readbackFinishedEvent));
     CUDA_CHECK(cudaMallocHost(&m_host_pixels, m_width * m_height * sizeof(PIXEL_FORMAT)));
 
-    display = new GLDisplay(BufferImageFormat::FLOAT3);
+    display = new BufferDisplay(BufferImageFormat::FLOAT3);
 }
 
 template <typename PIXEL_FORMAT>
