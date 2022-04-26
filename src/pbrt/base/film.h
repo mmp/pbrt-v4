@@ -50,6 +50,7 @@ class Film : public TaggedPointer<RGBFilm, GBufferFilm, SpectralFilm> {
                                         const SampledWavelengths &lambda) const;
 
     Image GetImage(ImageMetadata *metadata, Float splatScale = 1);
+
     PBRT_CPU_GPU
     RGB GetPixelRGB(Point2i p, Float splatScale = 1) const;
 
@@ -64,6 +65,8 @@ class Film : public TaggedPointer<RGBFilm, GBufferFilm, SpectralFilm> {
                        Filter filter, const FileLoc *loc, Allocator alloc);
 
     std::string ToString() const;
+
+    PBRT_CPU_GPU inline void ResetPixel(Point2i p);
 };
 
 }  // namespace pbrt
