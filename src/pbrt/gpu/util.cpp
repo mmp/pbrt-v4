@@ -204,6 +204,10 @@ void GPUWait() {
     CUDA_CHECK(cudaDeviceSynchronize());
 }
 
+void GPUMemset(void *ptr, int byte, size_t bytes) {
+    CUDA_CHECK(cudaMemset(ptr, byte, bytes));
+}
+
 void ReportKernelStats() {
     CUDA_CHECK(cudaDeviceSynchronize());
 

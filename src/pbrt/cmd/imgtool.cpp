@@ -6,6 +6,10 @@
 
 #include <pbrt/filters.h>
 #include <pbrt/options.h>
+#ifdef PBRT_BUILD_GPU_RENDERER
+#include <pbrt/gpu/denoiser.h>
+#include <pbrt/gpu/util.h>
+#endif // PBRT_BUILD_GPU_RENDERER
 #include <pbrt/util/args.h>
 #include <pbrt/util/check.h>
 #include <pbrt/util/color.h>
@@ -38,31 +42,6 @@ extern "C" {
 #include <string>
 
 #include <flip.h>
-
-#ifdef PBRT_BUILD_GPU_RENDERER
-
-#include <pbrt/gpu/memory.h>
-#include <pbrt/gpu/util.h>
-
-#include <cuda.h>
-#include <cuda_runtime.h>
-
-#include <optix.h>
-#include <optix_stubs.h>
-
-#define OPTIX_CHECK(EXPR)                                                           \
-    do {                                                                            \
-        OptixResult res = EXPR;                                                     \
-        if (res != OPTIX_SUCCESS)                                                   \
-            LOG_FATAL("OptiX call " #EXPR " failed with code %d: \"%s\"", int(res), \
-                      optixGetErrorString(res));                                    \
-    } while (false) /* eat semicolon */
-#endif
-
-// Stop that, Windows.
-#ifdef RGB
-#undef RGB
-#endif
 
 using namespace pbrt;
 
@@ -2504,18 +2483,10 @@ int denoise_optix(std::vector<std::string> args) {
     if (outFilename.empty())
         usage("denoise-optix", "output image filename must be provided.");
 
-    CUDA_CHECK(cudaFree(nullptr));
-
-    CUcontext cudaContext;
-    CU_CHECK(cuCtxGetCurrent(&cudaContext));
-    CHECK(cudaContext != nullptr);
-
-    OPTIX_CHECK(optixInit());
-    OptixDeviceContext optixContext;
-    OPTIX_CHECK(optixDeviceContextCreate(cudaContext, 0, &optixContext));
-
     ImageAndMetadata im = Image::Read(inFilename);
     Image &image = im.image;
+
+    CUDA_CHECK(cudaFree(nullptr));
 
     int nLayers = 3;
     ImageChannelDesc desc[3] = {
@@ -2537,114 +2508,49 @@ int denoise_optix(std::vector<std::string> args) {
         nLayers = 1;
     }
 
-    OptixDenoiserOptions options = {};
-#if (OPTIX_VERSION >= 70300)
-    if (nLayers == 3)
-        options.guideAlbedo = options.guideNormal = 1;
-
-    OptixDenoiser denoiserHandle;
-    OPTIX_CHECK(optixDenoiserCreate(optixContext, OPTIX_DENOISER_MODEL_KIND_HDR, &options,
-                                    &denoiserHandle));
-#else
-    options.inputKind = (nLayers == 3) ? OPTIX_DENOISER_INPUT_RGB_ALBEDO_NORMAL
-                                       : OPTIX_DENOISER_INPUT_RGB;
-
-    OptixDenoiser denoiserHandle;
-    OPTIX_CHECK(optixDenoiserCreate(optixContext, &options, &denoiserHandle));
-
-    OPTIX_CHECK(
-        optixDenoiserSetModel(denoiserHandle, OPTIX_DENOISER_MODEL_KIND_HDR, nullptr, 0));
-#endif
-
-    OptixDenoiserSizes memorySizes;
-    OPTIX_CHECK(optixDenoiserComputeMemoryResources(denoiserHandle, image.Resolution().x,
-                                                    image.Resolution().y, &memorySizes));
-
-    void *denoiserState;
-    CUDA_CHECK(cudaMalloc(&denoiserState, memorySizes.stateSizeInBytes));
-    void *scratchBuffer;
-    CUDA_CHECK(cudaMalloc(&scratchBuffer, memorySizes.withoutOverlapScratchSizeInBytes));
-
-    OPTIX_CHECK(optixDenoiserSetup(
-        denoiserHandle, 0 /* stream */, image.Resolution().x, image.Resolution().y,
-        CUdeviceptr(denoiserState), memorySizes.stateSizeInBytes,
-        CUdeviceptr(scratchBuffer), memorySizes.withoutOverlapScratchSizeInBytes));
+    Denoiser denoiser((Vector2i)image.Resolution(), nLayers == 3);
 
     size_t imageBytes = 3 * image.Resolution().x * image.Resolution().y * sizeof(float);
-    std::vector<OptixImage2D> inputLayers(nLayers);
-    for (int i = 0; i < nLayers; ++i) {
-        inputLayers[i].width = image.Resolution().x;
-        inputLayers[i].height = image.Resolution().y;
-        inputLayers[i].rowStrideInBytes = image.Resolution().x * 3 * sizeof(float);
-        inputLayers[i].pixelStrideInBytes = 0;
-        inputLayers[i].format = OPTIX_PIXEL_FORMAT_FLOAT3;
 
-        size_t sz = 3 * image.Resolution().x * image.Resolution().y;
-        std::vector<float> bufHost(sz);
+    auto copyChannelsToGPU = [&](std::array<std::string, 3> ch,
+                                 bool flipZ = false) {
+        void *bufGPU;
+        CUDA_CHECK(cudaMalloc(&bufGPU, imageBytes));
+        std::vector<float> hostStaging(imageBytes / sizeof(float));
+
+        ImageChannelDesc desc = image.GetChannelDesc(ch);
+        CHECK(desc);
         int offset = 0;
         for (int y = 0; y < image.Resolution().y; ++y)
             for (int x = 0; x < image.Resolution().x; ++x) {
-                ImageChannelValues v = image.GetChannels({x, y}, desc[i]);
-                if (i == 2)
-                    v[2] *= -1;  // flip z--right handed...
+                ImageChannelValues v = image.GetChannels({x, y}, desc);
+                if (flipZ)
+                    v[2] *= -1;  // flip normal's z--right handed...
                 for (int c = 0; c < 3; ++c)
-                    bufHost[offset++] = v[c];
+                    hostStaging[offset++] = v[c];
             }
+        CUDA_CHECK(cudaMemcpy(bufGPU, hostStaging.data(), imageBytes,
+                              cudaMemcpyHostToDevice));
+        return bufGPU;
+    };
+    RGB *rgbGPU = (RGB *)copyChannelsToGPU({"R", "G", "B"});
 
-        void *bufGPU;
-        CUDA_CHECK(cudaMalloc(&bufGPU, imageBytes));
-        CUDA_CHECK(
-            cudaMemcpy(bufGPU, bufHost.data(), imageBytes, cudaMemcpyHostToDevice));
-        inputLayers[i].data = CUdeviceptr(bufGPU);
-    }
-
-    OptixImage2D outputImage;
-    outputImage.width = image.Resolution().x;
-    outputImage.height = image.Resolution().y;
-    outputImage.rowStrideInBytes = image.Resolution().x * 3 * sizeof(float);
-    outputImage.pixelStrideInBytes = 0;
-    outputImage.format = OPTIX_PIXEL_FORMAT_FLOAT3;
-    CUDA_CHECK(cudaMalloc((void **)&outputImage.data, imageBytes));
-
-    void *intensity;
-    CUDA_CHECK(cudaMalloc(&intensity, sizeof(float)));
-    OPTIX_CHECK(optixDenoiserComputeIntensity(
-        denoiserHandle, 0 /* stream */, &inputLayers[0], CUdeviceptr(intensity),
-        CUdeviceptr(scratchBuffer), memorySizes.withoutOverlapScratchSizeInBytes));
-
-    OptixDenoiserParams params = {};
-    params.denoiseAlpha = 0;
-    params.hdrIntensity = CUdeviceptr(intensity);
-    params.blendFactor = 0;  // TODO what should this be??
-
-#if (OPTIX_VERSION >= 70300)
-    OptixDenoiserGuideLayer guideLayer;
+    RGB *albedoGPU = nullptr;
+    Normal3f *normalGPU = nullptr;
     if (nLayers == 3) {
-        guideLayer.albedo = inputLayers[1];
-        guideLayer.normal = inputLayers[2];
+        albedoGPU = (RGB *)copyChannelsToGPU({"Albedo.R", "Albedo.G", "Albedo.B"});
+        normalGPU = (Normal3f *)copyChannelsToGPU({"Nsx", "Nsy", "Nsz"}, true);
     }
 
-    OptixDenoiserLayer layers;
-    layers.input = inputLayers[0];
-    layers.output = outputImage;
+    RGB *rgbResultGPU;
+    CUDA_CHECK(cudaMalloc(&rgbResultGPU, imageBytes));
 
-    OPTIX_CHECK(optixDenoiserInvoke(
-        denoiserHandle, 0 /* stream */, &params, CUdeviceptr(denoiserState),
-        memorySizes.stateSizeInBytes, &guideLayer, &layers, 1 /* # layers to denoise */,
-        0 /* offset x */, 0 /* offset y */, CUdeviceptr(scratchBuffer),
-        memorySizes.withoutOverlapScratchSizeInBytes));
-#else
-    OPTIX_CHECK(optixDenoiserInvoke(
-        denoiserHandle, 0 /* stream */, &params, CUdeviceptr(denoiserState),
-        memorySizes.stateSizeInBytes, inputLayers.data(), nLayers, 0 /* offset x */,
-        0 /* offset y */, &outputImage, CUdeviceptr(scratchBuffer),
-        memorySizes.withoutOverlapScratchSizeInBytes));
-#endif
+    denoiser.Denoise(rgbGPU, normalGPU, albedoGPU, rgbResultGPU);
 
     CUDA_CHECK(cudaDeviceSynchronize());
 
     Image result(PixelFormat::Float, image.Resolution(), {"R", "G", "B"});
-    CUDA_CHECK(cudaMemcpy(result.RawPointer({0, 0}), (const void *)outputImage.data,
+    CUDA_CHECK(cudaMemcpy(result.RawPointer({0, 0}), (const void *)rgbResultGPU,
                           imageBytes, cudaMemcpyDeviceToHost));
 
     ImageMetadata outMetadata;
