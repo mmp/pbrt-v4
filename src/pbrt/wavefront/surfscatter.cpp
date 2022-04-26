@@ -25,33 +25,35 @@ namespace pbrt {
 struct EvaluateMaterialCallback {
     int wavefrontDepth;
     WavefrontPathIntegrator *integrator;
+    Transform movingFromCamera;
     // EvaluateMaterialCallback Public Methods
     template <typename ConcreteMaterial>
     void operator()() {
         if constexpr (!std::is_same_v<ConcreteMaterial, MixMaterial>)
-            integrator->EvaluateMaterialAndBSDF<ConcreteMaterial>(wavefrontDepth);
+            integrator->EvaluateMaterialAndBSDF<ConcreteMaterial>(wavefrontDepth, movingFromCamera);
     }
 };
 
 // WavefrontPathIntegrator Surface Scattering Methods
-void WavefrontPathIntegrator::EvaluateMaterialsAndBSDFs(int wavefrontDepth) {
-    ForEachType(EvaluateMaterialCallback{wavefrontDepth, this}, Material::Types());
+void WavefrontPathIntegrator::EvaluateMaterialsAndBSDFs(int wavefrontDepth, Transform movingFromCamera) {
+    ForEachType(EvaluateMaterialCallback{wavefrontDepth, this, movingFromCamera},
+                Material::Types());
 }
 
 template <typename ConcreteMaterial>
-void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(int wavefrontDepth) {
+void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(int wavefrontDepth, Transform movingFromCamera) {
     int index = Material::TypeIndex<ConcreteMaterial>();
     if (haveBasicEvalMaterial[index])
         EvaluateMaterialAndBSDF<ConcreteMaterial, BasicTextureEvaluator>(
-            basicEvalMaterialQueue, wavefrontDepth);
+            basicEvalMaterialQueue, movingFromCamera, wavefrontDepth);
     if (haveUniversalEvalMaterial[index])
         EvaluateMaterialAndBSDF<ConcreteMaterial, UniversalTextureEvaluator>(
-            universalEvalMaterialQueue, wavefrontDepth);
+            universalEvalMaterialQueue, movingFromCamera, wavefrontDepth);
 }
 
 template <typename ConcreteMaterial, typename TextureEvaluator>
 void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQueue,
-                                                      int wavefrontDepth) {
+                                                      Transform movingFromCamera, int wavefrontDepth) {
     // Get BSDF for items in _evalQueue_ and sample illumination
     // Construct _desc_ for material/texture evaluation kernel
     std::string desc = StringPrintf(
@@ -69,7 +71,9 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
             Vector3f dpdx, dpdy;
             Float dudx = 0, dudy = 0, dvdx = 0, dvdy = 0;
             if (!GetOptions().disableTextureFiltering) {
-                camera.Approximate_dp_dxy(Point3f(w.pi), w.n, w.time, samplesPerPixel,
+                Point3f pc = movingFromCamera.ApplyInverse(Point3f(w.pi));
+                Normal3f nc = movingFromCamera.ApplyInverse(w.n);
+                camera.Approximate_dp_dxy(pc, nc, w.time, samplesPerPixel,
                                           &dpdx, &dpdy);
                 Vector3f dpdu = w.dpdu, dpdv = w.dpdv;
                 // Estimate screen-space change in $(u,v)$

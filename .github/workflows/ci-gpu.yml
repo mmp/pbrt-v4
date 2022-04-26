@@ -65,6 +65,10 @@ jobs:
       if: ${{ matrix.os == 'ubuntu-20.04' }}
       run: sudo apt-get -y install libopenexr-dev
 
+    - name: Install OpenGL
+      if: ${{ matrix.os == 'ubuntu-20.04' }}
+      run: sudo apt-get install -y --no-install-recommends libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxext-dev libxfixes-dev libgl1-mesa-dev
+
     - name: Configure
       run: |
         cd build

@@ -69,13 +69,14 @@ check_ext ("qoi" "qoi" 028c75fd26e5e0758c7c711216c00404994c1ad3)
 check_ext ("stb" "stb/tools" af1a5bc352164740c1cc1354942b1c6b72eacb8a)
 check_ext ("utf8proc" "utf8proc/bench" 2484e2ed5e1d9c19edcccf392a7d9920ad90dfaf)
 check_ext ("zlib" "zlib/doc" 54d591eabf9fe0e84c725638f8d5d8d202a093fa)
-
 add_compile_definitions ("$<$<CONFIG:DEBUG>:PBRT_DEBUG_BUILD>")
 
 enable_testing ()
 
 find_package (Sanitizers)
 find_package (Threads)
+
+find_package(OpenGL REQUIRED)
 
 set_property (GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -601,6 +602,7 @@ SET (PBRT_UTIL_SOURCE
   src/pbrt/util/error.cpp
   src/pbrt/util/file.cpp
   src/pbrt/util/float.cpp
+  src/pbrt/util/gui.cpp
   src/pbrt/util/image.cpp
   src/pbrt/util/log.cpp
   src/pbrt/util/loopsubdiv.cpp
@@ -640,6 +642,7 @@ SET (PBRT_UTIL_SOURCE_HEADERS
   src/pbrt/util/error.h
   src/pbrt/util/file.h
   src/pbrt/util/float.h
+  src/pbrt/util/gui.h
   src/pbrt/util/hash.h
   src/pbrt/util/image.h
   src/pbrt/util/log.h
@@ -679,6 +682,7 @@ if (PBRT_CUDA_ENABLED)
   )
   set (PBRT_GPU_SOURCE_HEADERS
     src/pbrt/gpu/aggregate.h
+    src/pbrt/gpu/cudagl.h
     src/pbrt/gpu/denoiser.h
     src/pbrt/gpu/memory.h
     src/pbrt/gpu/optix.h
@@ -842,7 +846,10 @@ target_include_directories (pbrt_lib PUBLIC
   ${DOUBLE_CONVERSION_INCLUDE}
   ${NANOVDB_INCLUDE}
   ${CMAKE_CURRENT_BINARY_DIR}
+  ${GLFW_INCLUDE}
+  ${GLAD_INCLUDE}
 )
+
 if (PBRT_CUDA_ENABLED AND PBRT_OPTIX7_PATH)
     target_include_directories (pbrt_lib SYSTEM PUBLIC ${PBRT_OPTIX7_PATH}/include)
 endif ()
@@ -868,7 +875,9 @@ set (ALL_PBRT_LIBS
   double-conversion
   ${PBRT_CUDA_LIB}
   utf8proc
-)
+  glfw
+  glad
+  OpenGL::GL)
 
 if (PBRT_CUDA_ENABLED)
   set_property (TARGET pbrt_lib PROPERTY CUDA_SEPARABLE_COMPILATION ON)

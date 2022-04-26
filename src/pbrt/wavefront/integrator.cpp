@@ -18,6 +18,7 @@
 #include <pbrt/util/colorspace.h>
 #include <pbrt/util/display.h>
 #include <pbrt/util/file.h>
+#include <pbrt/util/gui.h>
 #include <pbrt/util/image.h>
 #include <pbrt/util/log.h>
 #include <pbrt/util/print.h>
@@ -286,6 +287,18 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
 Float WavefrontPathIntegrator::Render() {
     Bounds2i pixelBounds = film.PixelBounds();
     Vector2i resolution = pixelBounds.Diagonal();
+
+    GUI *gui = nullptr;
+    // FIXME: camera animation; whatever...
+    Transform renderFromCamera = camera.GetCameraTransform().RenderFromCamera().startTransform;
+    Transform cameraFromRender = Inverse(renderFromCamera);
+    Transform cameraFromWorld = camera.GetCameraTransform().CameraFromWorld(camera.SampleTime(0.f));
+    if (Options->interactive) {
+        if (!Options->displayServer.empty())
+            ErrorExit("--interactive and --display-server cannot be used at the same time.");
+        gui = new GUI(film.GetFilename(), resolution, aggregate->Bounds());
+    }
+
     Timer timer;
     // Prefetch allocations to GPU memory
 #ifdef PBRT_BUILD_GPU_RENDERER
@@ -313,9 +326,8 @@ Float WavefrontPathIntegrator::Render() {
     }
 
     ProgressReporter progress(lastSampleIndex - firstSampleIndex, "Rendering",
-                              Options->quiet, Options->useGPU);
-    for (int sampleIndex = firstSampleIndex; sampleIndex < lastSampleIndex;
-         ++sampleIndex) {
+                              Options->quiet || Options->interactive, Options->useGPU);
+    for (int sampleIndex = firstSampleIndex; sampleIndex < lastSampleIndex; ++sampleIndex) {
         // Attempt to work around issue #145.
 #if !(defined(PBRT_IS_WINDOWS) && defined(PBRT_BUILD_GPU_RENDERER) && \
       __CUDACC_VER_MAJOR__ == 11 && __CUDACC_VER_MINOR__ == 1)
@@ -338,7 +350,11 @@ Float WavefrontPathIntegrator::Render() {
                              sampleIndex, samplesPerPixel);
                     cameraRayQueue->Reset();
                 });
-            GenerateCameraRays(y0, sampleIndex);
+
+            Transform cameraMotion;
+            if (gui)
+                cameraMotion = renderFromCamera * gui->GetCameraTransform() * cameraFromRender;
+            GenerateCameraRays(y0, cameraMotion, sampleIndex);
             Do(
                 "Update camera ray stats",
                 PBRT_CPU_GPU_LAMBDA() { stats->cameraRays += cameraRayQueue->Size(); });
@@ -396,7 +412,7 @@ Float WavefrontPathIntegrator::Render() {
                 if (wavefrontDepth == maxDepth)
                     break;
 
-                EvaluateMaterialsAndBSDFs(wavefrontDepth);
+                EvaluateMaterialsAndBSDFs(wavefrontDepth, cameraMotion);
 
                 // Do immediately so that we have space for shadow rays for subsurface..
                 TraceShadowRays(wavefrontDepth);
@@ -405,12 +421,48 @@ Float WavefrontPathIntegrator::Render() {
             }
 
             UpdateFilm();
-            // Copy updated film pixels to buffer for display
-            UpdateDisplay(resolution);
+        }
+
+        // Copy updated film pixels to buffer for the display server.
+        if (Options->useGPU && !Options->displayServer.empty())
+            UpdateDisplayRGBFromFilm(pixelBounds);
+
+        if (gui) {
+            RGB *rgb = gui->MapFramebuffer();
+            UpdateFramebufferFromFilm(pixelBounds, gui->exposure, rgb);
+            gui->UnmapFramebuffer();
+
+            if (gui->printCameraTransform) {
+                SquareMatrix<4> cfw = (Inverse(gui->GetCameraTransform()) * cameraFromWorld).GetMatrix();
+                Printf("Current camera transform:\nTransform [ ");
+                for (int i = 0; i < 16; ++i)
+                    Printf("%f ", cfw[i % 4][i / 4]);
+                Printf("]\n");
+                std::fflush(stdout);
+                gui->printCameraTransform = false;
+            }
+
+            DisplayState state = gui->RefreshDisplay();
+            if (state == DisplayState::EXIT)
+                break;
+            else if (state == DisplayState::RESET) {
+                sampleIndex = firstSampleIndex - 1;
+                ParallelFor("Reset pixels", resolution.x * resolution.y,
+                            PBRT_CPU_GPU_LAMBDA(int i) {
+                                int x = i % resolution.x, y = i / resolution.x;
+                                film.ResetPixel(pixelBounds.pMin + Vector2i(x, y));
+                            });
+            }
         }
 
         progress.Update();
     }
+
+    if (gui) {
+        delete gui;
+        gui = nullptr;
+    }
+
     progress.Done();
 
 #ifdef PBRT_BUILD_GPU_RENDERER
@@ -650,19 +702,15 @@ void WavefrontPathIntegrator::StartDisplayThread() {
                        });
 }
 
-void WavefrontPathIntegrator::UpdateDisplay(Vector2i resolution) {
+void WavefrontPathIntegrator::UpdateDisplayRGBFromFilm(Bounds2i pixelBounds) {
 #ifdef PBRT_BUILD_GPU_RENDERER
-    if (Options->useGPU && !Options->displayServer.empty())
-        GPUParallelFor(
-            "Update Display RGB Buffer", maxQueueSize,
-            PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
-                Point2i pPixel = pixelSampleState.pPixel[pixelIndex];
-                if (!InsideExclusive(pPixel, film.PixelBounds()))
-                    return;
-
-                Point2i p(pPixel - film.PixelBounds().pMin);
-                displayRGB[p.x + p.y * resolution.x] = film.GetPixelRGB(pPixel);
-            });
+    Vector2i resolution = pixelBounds.Diagonal();
+    GPUParallelFor(
+                   "Update Display RGB Buffer", resolution.x * resolution.y,
+                   PBRT_CPU_GPU_LAMBDA(int index) {
+                       Point2i p(index % resolution.x, index / resolution.x);
+                       displayRGB[index] = film.GetPixelRGB(p + pixelBounds.pMin);
+                   });
 #endif  //  PBRT_BUILD_GPU_RENDERER
 }
 
@@ -683,6 +731,16 @@ void WavefrontPathIntegrator::StopDisplayThread() {
         GPUWait();
     }
 #endif  // PBRT_BUILD_GPU_RENDERER
+}
+
+void WavefrontPathIntegrator::UpdateFramebufferFromFilm(Bounds2i pixelBounds, Float exposure,
+                                                        RGB *rgb) {
+    Vector2i resolution = pixelBounds.Diagonal();
+    ParallelFor("Update framebuffer", resolution.x * resolution.y,
+                PBRT_CPU_GPU_LAMBDA(int index) {
+                    Point2i p(index % resolution.x, index / resolution.x);
+                    rgb[index] = exposure * film.GetPixelRGB(p + film.PixelBounds().pMin);
+                });
 }
 
 }  // namespace pbrt
