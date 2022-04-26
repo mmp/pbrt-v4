@@ -33,3 +33,7 @@
 [submodule "src/ext/qoi"]
 	path = src/ext/qoi
 	url = https://github.com/phoboslab/qoi.git
+[submodule "src/ext/glfw"]
+	path = src/ext/glfw
+	url = https://github.com/glfw/glfw.git
+
