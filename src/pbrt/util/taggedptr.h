@@ -687,10 +687,10 @@ class TaggedPointer {
     TaggedPointer() = default;
     template <typename T>
     PBRT_CPU_GPU TaggedPointer(T *ptr) {
-        uintptr_t iptr = reinterpret_cast<uintptr_t>(ptr);
+        uint64_t iptr = reinterpret_cast<uint64_t>(ptr);
         DCHECK_EQ(iptr & ptrMask, iptr);
         constexpr unsigned int type = TypeIndex<T>();
-        bits = iptr | ((uintptr_t)type << tagShift);
+        bits = iptr | ((uint64_t)type << tagShift);
     }
 
     PBRT_CPU_GPU
@@ -803,13 +803,13 @@ class TaggedPointer {
     }
 
   private:
-    static_assert(sizeof(uintptr_t) == 8, "Expected uintptr_t to be 64 bits");
+    static_assert(sizeof(uintptr_t) <= sizeof(uint64_t), "Expected pointer size to be <= 64 bits");
     // TaggedPointer Private Members
     static constexpr int tagShift = 57;
     static constexpr int tagBits = 64 - tagShift;
     static constexpr uint64_t tagMask = ((1ull << tagBits) - 1) << tagShift;
     static constexpr uint64_t ptrMask = ~tagMask;
-    uintptr_t bits = 0;
+    uint64_t bits = 0;
 };
 
 }  // namespace pbrt
