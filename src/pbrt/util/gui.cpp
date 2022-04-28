@@ -194,7 +194,11 @@ GUI::~GUI() {
 DisplayState GUI::RefreshDisplay() {
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
+    int windowWidth, windowHeight;
+    glfwGetWindowSize(window, &windowWidth, &windowHeight);
     GL_CHECK(glViewport(0, 0, width, height));
+    float pixelScales[2] = {(float)width / (float)windowWidth,
+                            (float)height / (float)windowHeight};
 
 #ifdef PBRT_BUILD_GPU_RENDERER
     if (Options->useGPU)
@@ -204,7 +208,7 @@ DisplayState GUI::RefreshDisplay() {
     {
         GL_CHECK(glEnable(GL_FRAMEBUFFER_SRGB));
         GL_CHECK(glRasterPos2f(-1, 1));
-        GL_CHECK(glPixelZoom(1, -1));
+        GL_CHECK(glPixelZoom(pixelScales[0], -pixelScales[1]));
         GL_CHECK(
             glDrawPixels(resolution.x, resolution.y, GL_RGB, GL_FLOAT, cpuFramebuffer));
     }
