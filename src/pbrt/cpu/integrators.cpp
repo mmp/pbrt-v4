@@ -541,7 +541,7 @@ void LightPathIntegrator::EvaluatePixelSample(Point2i pPixel, int sampleIndex,
                     light.L(les->intr->p(), les->intr->n, les->intr->uv, cs->wi, lambda);
                 if (Le && Unoccluded(cs->pRef, cs->pLens)) {
                     // Compute visible light's path contribution and add to film
-                    SampledSpectrum L = Le * les->AbsCosTheta(cs->wi) * cs->Wi /
+                    SampledSpectrum L = Le * DistanceSquared(cs->pRef.p(), cs->pLens.p()) * cs->Wi /
                                         (lightPDF * pdf * cs->pdf);
                     camera.GetFilm().AddSplat(cs->pRaster, L, lambda);
                 }
