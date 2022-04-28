@@ -535,7 +535,7 @@ void LightPathIntegrator::EvaluatePixelSample(Point2i pPixel, int sampleIndex,
         pstd::optional<CameraWiSample> cs =
             camera.SampleWi(*les->intr, sampler.Get2D(), lambda);
         if (cs && cs->pdf != 0) {
-            if (Float pdf = light.PDF_Li(cs->pLens, cs->wi); pdf > 0) {
+            if (Float pdf = light.PDF_Li(cs->pLens, -cs->wi); pdf > 0) {
                 // Add light's emitted radiance if nonzero and light is visible
                 SampledSpectrum Le =
                     light.L(les->intr->p(), les->intr->n, les->intr->uv, cs->wi, lambda);
