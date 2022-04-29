@@ -233,7 +233,7 @@ class DisplayItem {
     DisplayItem(
         const std::string &title, Point2i resolution,
         std::vector<std::string> channelNames,
-        std::function<void(Bounds2i b, pstd::span<pstd::span<Float>>)> getTileValues);
+        std::function<void(Bounds2i b, pstd::span<pstd::span<float>>)> getTileValues);
 
     bool Display(IPCChannel &channel);
 
@@ -243,7 +243,7 @@ class DisplayItem {
     bool openedImage = false;
     std::string title;
     Point2i resolution;
-    std::function<void(Bounds2i b, pstd::span<pstd::span<Float>>)> getTileValues;
+    std::function<void(Bounds2i b, pstd::span<pstd::span<float>>)> getTileValues;
     std::vector<std::string> channelNames;
 
     struct ImageChannelBuffer {
@@ -265,7 +265,7 @@ class DisplayItem {
 DisplayItem::DisplayItem(
     const std::string &baseTitle, Point2i resolution,
     std::vector<std::string> channelNames,
-    std::function<void(Bounds2i b, pstd::span<pstd::span<Float>>)> getTileValues)
+    std::function<void(Bounds2i b, pstd::span<pstd::span<float>>)> getTileValues)
     : resolution(resolution), getTileValues(getTileValues), channelNames(channelNames) {
 #ifdef PBRT_IS_WINDOWS
     title = StringPrintf("%s (%d)", baseTitle, GetCurrentThreadId());
@@ -298,7 +298,7 @@ DisplayItem::ImageChannelBuffer::ImageChannelBuffer(const std::string &channelNa
     tileBoundsOffset = ptr - buffer.data();
     // Note: may not be float-aligned, but that's not a problem on x86...
     // TODO: fix this. The problem is that it breaks the whole idea of
-    // passing a span<Float> to the callback function...
+    // passing a span<float> to the callback function...
     channelValuesOffset = tileBoundsOffset + 4 * sizeof(int);
 
     // Zero-initialize the buffer color contents before computing the hash
@@ -349,9 +349,9 @@ bool DisplayItem::Display(IPCChannel &ipcChannel) {
         openedImage = true;
     }
 
-    std::vector<pstd::span<Float>> displayValues(channelBuffers.size());
+    std::vector<pstd::span<float>> displayValues(channelBuffers.size());
     for (int c = 0; c < channelBuffers.size(); ++c) {
-        Float *ptr = (Float *)(channelBuffers[c].buffer.data() +
+        float *ptr = (float *)(channelBuffers[c].buffer.data() +
                                channelBuffers[c].channelValuesOffset);
         displayValues[c] = pstd::MakeSpan(ptr, tileSize * tileSize);
     }
@@ -446,7 +446,7 @@ void DisconnectFromDisplayServer() {
 
 static DisplayItem GetImageDisplayItem(const std::string &title, const Image &image,
                                        pstd::optional<ImageChannelDesc> channelDesc) {
-    auto getValues = [=](Bounds2i b, pstd::span<pstd::span<Float>> displayValues) {
+    auto getValues = [=](Bounds2i b, pstd::span<pstd::span<float>> displayValues) {
         int offset = 0;
         for (Point2i p : b) {
             ImageChannelValues v =
@@ -488,7 +488,7 @@ void DisplayDynamic(std::string title, const Image &image,
 
 void DisplayStatic(std::string title, Point2i resolution,
     std::vector<std::string> channelNames,
-    std::function<void(Bounds2i b, pstd::span<pstd::span<Float>>)> getTileValues) {
+    std::function<void(Bounds2i b, pstd::span<pstd::span<float>>)> getTileValues) {
     DisplayItem item(title, resolution, channelNames, getTileValues);
 
     std::lock_guard<std::mutex> lock(mutex);
@@ -498,7 +498,7 @@ void DisplayStatic(std::string title, Point2i resolution,
 
 void DisplayDynamic(std::string title, Point2i resolution,
     std::vector<std::string> channelNames,
-    std::function<void(Bounds2i b, pstd::span<pstd::span<Float>>)> getTileValues) {
+    std::function<void(Bounds2i b, pstd::span<pstd::span<float>>)> getTileValues) {
     std::lock_guard<std::mutex> lock(mutex);
     dynamicItems.push_back(DisplayItem(title, resolution, channelNames, getTileValues));
 }

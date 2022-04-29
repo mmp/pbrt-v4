@@ -146,7 +146,7 @@ void ImageTileIntegrator::Render() {
         Film film = camera.GetFilm();
         DisplayDynamic(film.GetFilename(), Point2i(pixelBounds.Diagonal()),
                        {"R", "G", "B"},
-                       [&](Bounds2i b, pstd::span<pstd::span<Float>> displayValue) {
+                       [&](Bounds2i b, pstd::span<pstd::span<float>> displayValue) {
                            int index = 0;
                            for (Point2i p : b) {
                                RGB rgb = film.GetPixelRGB(pixelBounds.pMin + p,
@@ -2585,7 +2585,7 @@ void MLTIntegrator::Render() {
         DisplayDynamic(
             camera.GetFilm().GetFilename(),
             Point2i(camera.GetFilm().PixelBounds().Diagonal()), {"R", "G", "B"},
-            [&](Bounds2i bounds, pstd::span<pstd::span<Float>> displayValue) {
+            [&](Bounds2i bounds, pstd::span<pstd::span<float>> displayValue) {
                 Film film = camera.GetFilm();
                 Bounds2i pixelBounds = film.PixelBounds();
                 int index = 0;
@@ -2808,7 +2808,7 @@ void SPPMIntegrator::Render() {
         if (iter == 0 && !Options->displayServer.empty()) {
             DisplayDynamic(
                 film.GetFilename(), Point2i(pixelBounds.Diagonal()), {"R", "G", "B"},
-                [&](Bounds2i b, pstd::span<pstd::span<Float>> displayValue) {
+                [&](Bounds2i b, pstd::span<pstd::span<float>> displayValue) {
                     int index = 0;
                     uint64_t np = (uint64_t)(iter + 1) * (uint64_t)photonsPerIteration;
                     for (Point2i pPixel : b) {

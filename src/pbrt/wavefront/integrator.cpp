@@ -676,7 +676,7 @@ void WavefrontPathIntegrator::StartDisplayThread() {
         // sending messages to the display program (i.e., tev).
         DisplayDynamic(film.GetFilename(), {resolution.x, resolution.y},
                        {"R", "G", "B"},
-                       [resolution, this](Bounds2i b, pstd::span<pstd::span<Float>> displayValue) {
+                       [resolution, this](Bounds2i b, pstd::span<pstd::span<float>> displayValue) {
                            int index = 0;
                            for (Point2i p : b) {
                                RGB rgb = displayRGBHost[p.x + p.y * resolution.x];
@@ -690,7 +690,7 @@ void WavefrontPathIntegrator::StartDisplayThread() {
 #endif  // PBRT_BUILD_GPU_RENDERER
         DisplayDynamic(film.GetFilename(), Point2i(pixelBounds.Diagonal()), {"R", "G", "B"},
                        [pixelBounds, this](Bounds2i b,
-                                           pstd::span<pstd::span<Float>> displayValue) {
+                                           pstd::span<pstd::span<float>> displayValue) {
                            int index = 0;
                            for (Point2i p : b) {
                                RGB rgb =
