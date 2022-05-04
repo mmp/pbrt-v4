@@ -24,6 +24,10 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
+    - name: Fetch new CUDA pubkey
+      if: ${{ matrix.os == 'ubuntu-20.04' }}
+      run: sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub 
+
     - uses: mmp/cuda-toolkit@master
       id: cuda-toolkit
       with:
