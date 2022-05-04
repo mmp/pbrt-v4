@@ -84,10 +84,13 @@ struct NoRandomizer {
 
 // Low Discrepancy Inline Functions
 PBRT_CPU_GPU inline Float RadicalInverse(int baseIndex, uint64_t a) {
-    int base = Primes[baseIndex];
+    unsigned int base = Primes[baseIndex];
+    // We have to stop once reversedDigits is >= limit since otherwise the
+    // next digit of |a| may cause reversedDigits to overflow.
+    uint64_t limit = ~0ull / base - base;
     Float invBase = (Float)1 / (Float)base, invBaseN = 1;
     uint64_t reversedDigits = 0;
-    while (a) {
+    while (a && reversedDigits < limit) {
         // Extract least significant digit from _a_ and update _reversedDigits_
         uint64_t next = a / base;
         uint64_t digit = a - next * base;
@@ -111,11 +114,14 @@ PBRT_CPU_GPU inline uint64_t InverseRadicalInverse(uint64_t inverse, int base,
 
 PBRT_CPU_GPU inline Float ScrambledRadicalInverse(int baseIndex, uint64_t a,
                                                   const DigitPermutation &perm) {
-    int base = Primes[baseIndex];
+    unsigned int base = Primes[baseIndex];
+    // We have to stop once reversedDigits is >= limit since otherwise the
+    // next digit of |a| may cause reversedDigits to overflow.
+    uint64_t limit = ~0ull / base - base;
     Float invBase = (Float)1 / (Float)base, invBaseM = 1;
     uint64_t reversedDigits = 0;
     int digitIndex = 0;
-    while (1 - (base - 1) * invBaseM < 1) {
+    while (1 - (base - 1) * invBaseM < 1 && reversedDigits < limit) {
         // Permute least significant digit from _a_ and update _reversedDigits_
         uint64_t next = a / base;
         int digitValue = a - next * base;
@@ -129,11 +135,14 @@ PBRT_CPU_GPU inline Float ScrambledRadicalInverse(int baseIndex, uint64_t a,
 
 PBRT_CPU_GPU inline Float OwenScrambledRadicalInverse(int baseIndex, uint64_t a,
                                                       uint32_t hash) {
-    int base = Primes[baseIndex];
+    unsigned int base = Primes[baseIndex];
+    // We have to stop once reversedDigits is >= limit since otherwise the
+    // next digit of |a| may cause reversedDigits to overflow.
+    uint64_t limit = ~0ull / base - base;
     Float invBase = (Float)1 / (Float)base, invBaseM = 1;
     uint64_t reversedDigits = 0;
     int digitIndex = 0;
-    while (1 - invBaseM < 1) {
+    while (1 - invBaseM < 1 && reversedDigits < limit) {
         // Compute Owen-scrambled digit for _digitIndex_
         uint64_t next = a / base;
         int digitValue = a - next * base;
