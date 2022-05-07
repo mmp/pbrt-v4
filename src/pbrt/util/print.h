@@ -157,7 +157,7 @@ void stringPrintfRecursive(std::string *s, const char *fmt);
 std::string copyToFormatString(const char **fmt_ptr, std::string *s);
 
 template <typename T>
-inline typename std::enable_if_t<!std::is_class<typename std::decay_t<T>>::value,
+inline typename std::enable_if_t<!std::is_class_v<typename std::decay_t<T>>,
                                  std::string>
 formatOne(const char *fmt, T &&v) {
     // Figure out how much space we need to allocate; add an extra
@@ -172,7 +172,7 @@ formatOne(const char *fmt, T &&v) {
 
 template <typename T>
 inline
-    typename std::enable_if_t<std::is_class<typename std::decay_t<T>>::value, std::string>
+    typename std::enable_if_t<std::is_class_v<typename std::decay_t<T>>, std::string>
     formatOne(const char *fmt, T &&v) {
     LOG_FATAL("Printf: Non-basic type %s passed for format string %s", typeid(v).name(),
               fmt);
@@ -190,7 +190,7 @@ inline void stringPrintfRecursiveWithPrecision(std::string *s, const char *fmt,
 }
 
 template <typename T, typename... Args>
-inline typename std::enable_if_t<!std::is_class<typename std::decay_t<T>>::value, void>
+inline typename std::enable_if_t<!std::is_class_v<typename std::decay_t<T>>, void>
 stringPrintfRecursiveWithPrecision(std::string *s, const char *fmt,
                                    const std::string &nextFmt, int precision, T &&v,
                                    Args &&...args) {
@@ -221,7 +221,7 @@ inline void stringPrintfRecursive(std::string *s, const char *fmt, T &&v,
     bool isSFmt = nextFmt.find('s') != std::string::npos;
     bool isDFmt = nextFmt.find('d') != std::string::npos;
 
-    if constexpr (std::is_integral<std::decay_t<T>>::value) {
+    if constexpr (std::is_integral_v<std::decay_t<T>>) {
         if (precisionViaArg) {
             stringPrintfRecursiveWithPrecision(s, fmt, nextFmt, v,
                                                std::forward<Args>(args)...);
@@ -230,25 +230,25 @@ inline void stringPrintfRecursive(std::string *s, const char *fmt, T &&v,
     } else if (precisionViaArg)
         LOG_FATAL("Non-integral type provided for %* format.");
 
-    if constexpr (std::is_same<std::decay_t<T>, float>::value)
+    if constexpr (std::is_same_v<std::decay_t<T>, float>)
         if (nextFmt == "%f" || nextFmt == "%s") {
             *s += detail::FloatToString(v);
             goto done;
         }
 
-    if constexpr (std::is_same<std::decay_t<T>, double>::value)
+    if constexpr (std::is_same_v<std::decay_t<T>, double>)
         if (nextFmt == "%f" || nextFmt == "%s") {
             *s += detail::DoubleToString(v);
             goto done;
         }
 
-    if constexpr (std::is_same<std::decay_t<T>, bool>::value)  // FIXME: %-10s with bool
+    if constexpr (std::is_same_v<std::decay_t<T>, bool>)  // FIXME: %-10s with bool
         if (isSFmt) {
             *s += bool(v) ? "true" : "false";
             goto done;
         }
 
-    if constexpr (std::is_integral<std::decay_t<T>>::value) {
+    if constexpr (std::is_integral_v<std::decay_t<T>>) {
         if (isDFmt) {
             nextFmt.replace(nextFmt.find('d'), 1,
                             detail::IntegerFormatTrait<std::decay_t<T>>::fmt());

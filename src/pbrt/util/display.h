@@ -37,7 +37,7 @@ void DisplayDynamic(std::string title, const Image &image,
                     pstd::optional<ImageChannelDesc> channelDesc = {});
 
 template <typename T>
-inline typename std::enable_if_t<std::is_arithmetic<T>::value, void> DisplayStatic(
+inline typename std::enable_if_t<std::is_arithmetic_v<T>, void> DisplayStatic(
     const std::string &title, pstd::span<const T> values, int xResolution) {
     CHECK_EQ(0, values.size() % xResolution);
     int yResolution = values.size() / xResolution;
@@ -51,7 +51,7 @@ inline typename std::enable_if_t<std::is_arithmetic<T>::value, void> DisplayStat
 }
 
 template <typename T>
-inline typename std::enable_if_t<std::is_arithmetic<T>::value, void> DisplayDynamic(
+inline typename std::enable_if_t<std::is_arithmetic_v<T>, void> DisplayDynamic(
     const std::string &title, pstd::span<const T> values, int xResolution) {
     CHECK_EQ(0, values.size() % xResolution);
     int yResolution = values.size() / xResolution;

@@ -54,7 +54,7 @@ static constexpr float OneMinusEpsilon = FloatOneMinusEpsilon;
 
 // Floating-point Inline Functions
 template <typename T>
-inline PBRT_CPU_GPU typename std::enable_if_t<std::is_floating_point<T>::value, bool>
+inline PBRT_CPU_GPU typename std::enable_if_t<std::is_floating_point_v<T>, bool>
 IsNaN(T v) {
 #ifdef PBRT_IS_GPU_CODE
     return isnan(v);
@@ -64,13 +64,13 @@ IsNaN(T v) {
 }
 
 template <typename T>
-inline PBRT_CPU_GPU typename std::enable_if_t<std::is_integral<T>::value, bool> IsNaN(
+inline PBRT_CPU_GPU typename std::enable_if_t<std::is_integral_v<T>, bool> IsNaN(
     T v) {
     return false;
 }
 
 template <typename T>
-inline PBRT_CPU_GPU typename std::enable_if_t<std::is_floating_point<T>::value, bool>
+inline PBRT_CPU_GPU typename std::enable_if_t<std::is_floating_point_v<T>, bool>
 IsInf(T v) {
 #ifdef PBRT_IS_GPU_CODE
     return isinf(v);
@@ -80,13 +80,13 @@ IsInf(T v) {
 }
 
 template <typename T>
-inline PBRT_CPU_GPU typename std::enable_if_t<std::is_integral<T>::value, bool> IsInf(
+inline PBRT_CPU_GPU typename std::enable_if_t<std::is_integral_v<T>, bool> IsInf(
     T v) {
     return false;
 }
 
 template <typename T>
-inline PBRT_CPU_GPU typename std::enable_if_t<std::is_floating_point<T>::value, bool>
+inline PBRT_CPU_GPU typename std::enable_if_t<std::is_floating_point_v<T>, bool>
 IsFinite(T v) {
 #ifdef PBRT_IS_GPU_CODE
     return isfinite(v);
@@ -95,7 +95,7 @@ IsFinite(T v) {
 #endif
 }
 template <typename T>
-inline PBRT_CPU_GPU typename std::enable_if_t<std::is_integral<T>::value, bool> IsFinite(
+inline PBRT_CPU_GPU typename std::enable_if_t<std::is_integral_v<T>, bool> IsFinite(
     T v) {
     return true;
 }

@@ -653,7 +653,7 @@ struct IsSameType<T> {
 template <typename T, typename U, typename... Ts>
 struct IsSameType<T, U, Ts...> {
     static constexpr bool value =
-        (std::is_same<T, U>::value && IsSameType<U, Ts...>::value);
+        (std::is_same_v<T, U> && IsSameType<U, Ts...>::value);
 };
 
 template <typename... Ts>

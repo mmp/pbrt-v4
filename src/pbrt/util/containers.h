@@ -55,7 +55,7 @@ struct HasType {
 template <typename T, typename Tfirst, typename... Ts>
 struct HasType<T, TypePack<Tfirst, Ts...>> {
     static constexpr bool value =
-        (std::is_same<T, Tfirst>::value || HasType<T, TypePack<Ts...>>::value);
+        (std::is_same_v<T, Tfirst> || HasType<T, TypePack<Ts...>>::value);
 };
 
 template <typename T>
@@ -170,7 +170,7 @@ class Array2D {
     }
     template <typename InputIt,
               typename = typename std::enable_if_t<
-                  !std::is_integral<InputIt>::value &&
+                  !std::is_integral_v<InputIt> &&
                   std::is_base_of<
                       std::input_iterator_tag,
                       typename std::iterator_traits<InputIt>::iterator_category>::value>>
