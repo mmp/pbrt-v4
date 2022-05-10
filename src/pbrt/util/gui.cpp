@@ -11,7 +11,6 @@
 #include <pbrt/util/error.h>
 #include <pbrt/util/image.h>
 #include <pbrt/util/parallel.h>
-#include <iostream>
 
 #define GL_CHECK(call)                                                   \
     do {                                                                 \
