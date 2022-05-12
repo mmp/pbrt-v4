@@ -12,14 +12,14 @@ using namespace pbrt;
 
 template <int n>
 struct IntType {
-    int func() { return n; }
-    int cfunc() const { return n; }
+    PBRT_CPU_GPU int func() { return n; }
+    PBRT_CPU_GPU int cfunc() const { return n; }
 };
 
 struct Handle : public TaggedPointer<IntType<0>, IntType<1>, IntType<2>, IntType<3>,
                                      IntType<4>, IntType<5>, IntType<6>, IntType<7>,
                                      IntType<8>, IntType<9>, IntType<10>, IntType<11>,
-                                     IntType<12>, IntType<13>, IntType<14>> {
+                                     IntType<12>, IntType<13>, IntType<14>, IntType<15>> {
     using TaggedPointer::TaggedPointer;
 
     int func() {
@@ -32,11 +32,36 @@ struct Handle : public TaggedPointer<IntType<0>, IntType<1>, IntType<2>, IntType
     }
 };
 
+struct HandleWithEightConcreteTypes
+    : public TaggedPointer<IntType<0>, IntType<1>, IntType<2>, IntType<3>, IntType<4>,
+                           IntType<5>, IntType<6>, IntType<7>> {
+    using TaggedPointer::TaggedPointer;
+
+    int func() {
+        auto f = [&](auto ptr) { return ptr->func(); };
+        return DispatchCPU(f);
+    }
+    int cfunc() const {
+        auto f = [&](auto ptr) { return ptr->cfunc(); };
+        return DispatchCPU(f);
+    }
+
+    PBRT_CPU_GPU int funcGPU() {
+        auto f = [&](auto ptr) { return ptr->func(); };
+        return Dispatch(f);
+    }
+
+    PBRT_CPU_GPU int cfuncGPU() {
+        auto f = [&](auto ptr) { return ptr->cfunc(); };
+        return Dispatch(f);
+    }
+};
+
 TEST(TaggedPointer, Basics) {
     EXPECT_EQ(nullptr, Handle().ptr());
 
-    EXPECT_EQ(15, Handle::MaxTag());
-    EXPECT_EQ(16, Handle::NumTags());
+    EXPECT_EQ(16, Handle::MaxTag());
+    EXPECT_EQ(17, Handle::NumTags());
 
     IntType<0> it0;
     IntType<1> it1;
@@ -53,6 +78,7 @@ TEST(TaggedPointer, Basics) {
     IntType<12> it12;
     IntType<13> it13;
     IntType<14> it14;
+    IntType<15> it15;
 
     EXPECT_TRUE(Handle(&it0).Is<IntType<0>>());
     EXPECT_TRUE(Handle(&it1).Is<IntType<1>>());
@@ -69,6 +95,7 @@ TEST(TaggedPointer, Basics) {
     EXPECT_TRUE(Handle(&it12).Is<IntType<12>>());
     EXPECT_TRUE(Handle(&it13).Is<IntType<13>>());
     EXPECT_TRUE(Handle(&it14).Is<IntType<14>>());
+    EXPECT_TRUE(Handle(&it15).Is<IntType<15>>());
 
     EXPECT_FALSE(Handle(&it0).Is<IntType<1>>());
     EXPECT_FALSE(Handle(&it1).Is<IntType<0>>());
@@ -85,6 +112,7 @@ TEST(TaggedPointer, Basics) {
     EXPECT_FALSE(Handle(&it12).Is<IntType<13>>());
     EXPECT_FALSE(Handle(&it13).Is<IntType<12>>());
     EXPECT_FALSE(Handle(&it14).Is<IntType<10>>());
+    EXPECT_FALSE(Handle(&it15).Is<IntType<11>>());
 
     EXPECT_EQ(0, Handle(nullptr).Tag());
     EXPECT_EQ(1, Handle(&it0).Tag());
@@ -102,6 +130,7 @@ TEST(TaggedPointer, Basics) {
     EXPECT_EQ(13, Handle(&it12).Tag());
     EXPECT_EQ(14, Handle(&it13).Tag());
     EXPECT_EQ(15, Handle(&it14).Tag());
+    EXPECT_EQ(16, Handle(&it15).Tag());
 
     EXPECT_EQ(1, Handle::TypeIndex<decltype(it0)>());
     EXPECT_EQ(2, Handle::TypeIndex<decltype(it1)>());
@@ -118,6 +147,7 @@ TEST(TaggedPointer, Basics) {
     EXPECT_EQ(13, Handle::TypeIndex<decltype(it12)>());
     EXPECT_EQ(14, Handle::TypeIndex<decltype(it13)>());
     EXPECT_EQ(15, Handle::TypeIndex<decltype(it14)>());
+    EXPECT_EQ(16, Handle::TypeIndex<decltype(it15)>());
 
     EXPECT_EQ(&it0, Handle(&it0).CastOrNullptr<IntType<0>>());
     EXPECT_EQ(nullptr, Handle(&it0).CastOrNullptr<IntType<1>>());
@@ -231,4 +261,11 @@ TEST(TaggedPointer, Dispatch) {
     EXPECT_EQ(14, h14.func());
     ASSERT_EQ(14, it14.cfunc());
     EXPECT_EQ(14, h14.cfunc());
+
+    IntType<15> it15;
+    Handle h15(&it15);
+    ASSERT_EQ(15, it15.func());
+    EXPECT_EQ(15, h15.func());
+    ASSERT_EQ(15, it15.cfunc());
+    EXPECT_EQ(15, h15.cfunc());
 }
