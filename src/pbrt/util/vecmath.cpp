@@ -26,7 +26,7 @@ std::string internal::ToString3<Interval>(Interval x, Interval y, Interval z) {
 
 template <typename T>
 std::string internal::ToString2(T x, T y) {
-    if (std::is_floating_point<T>::value)
+    if (std::is_floating_point_v<T>)
         return StringPrintf("[ %f, %f ]", x, y);
     else
         return StringPrintf("[ %d, %d ]", x, y);
@@ -34,7 +34,7 @@ std::string internal::ToString2(T x, T y) {
 
 template <typename T>
 std::string internal::ToString3(T x, T y, T z) {
-    if (std::is_floating_point<T>::value)
+    if (std::is_floating_point_v<T>)
         return StringPrintf("[ %f, %f, %f ]", x, y, z);
     else
         return StringPrintf("[ %d, %d, %d ]", x, y, z);

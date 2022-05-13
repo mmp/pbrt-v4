@@ -329,11 +329,11 @@ class span {
 
     // Used to SFINAE-enable a function when the slice elements are const.
     template <typename U>
-    using EnableIfConstView = typename std::enable_if_t<std::is_const<T>::value, U>;
+    using EnableIfConstView = typename std::enable_if_t<std::is_const_v<T>, U>;
 
     // Used to SFINAE-enable a function when the slice elements are mutable.
     template <typename U>
-    using EnableIfMutableView = typename std::enable_if_t<!std::is_const<T>::value, U>;
+    using EnableIfMutableView = typename std::enable_if_t<!std::is_const_v<T>, U>;
 
     using value_type = typename std::remove_cv_t<T>;
     using iterator = T *;

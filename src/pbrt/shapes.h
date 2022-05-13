@@ -1427,7 +1427,7 @@ class BilinearPatch {
             Vector3f dpds = dpdu * duds + dpdv * dvds;
             Vector3f dpdt = dpdu * dudt + dpdv * dvdt;
 
-            // Set _dpdu_ and _dpdt_ to updated partial derivatives
+            // Set _dpdu_ and _dpdv_ to updated partial derivatives
             if (Cross(dpds, dpdt) != Vector3f(0, 0, 0)) {
                 if (Dot(Cross(dpdu, dpdv), Cross(dpds, dpdt)) < 0)
                     dpdt = -dpdt;
