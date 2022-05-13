@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         optix: [ optix-7.1.0, optix-7.2.0, optix-7.3.0, optix-7.4.0 ]
-        cuda: [ '11.0.3', '11.1.1', '11.2.2', '11.4.3', '11.5.0' ]  # 11.3.0 fails for unclear reasons
+        cuda: [ '11.2.2', '11.4.3', '11.5.2', '11.6.1', '11.7.0' ]  # 11.3.0 fails for unclear reasons
         os: [ ubuntu-20.04, windows-latest ]
 
     name: GPU Build Only (${{ matrix.os }}, CUDA ${{ matrix.cuda }}, ${{ matrix.optix }})
