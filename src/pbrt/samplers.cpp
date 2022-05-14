@@ -81,7 +81,7 @@ HaltonSampler *HaltonSampler::Create(const ParameterDictionary &parameters,
     else if (s == "permutedigits")
         randomizer = RandomizeStrategy::PermuteDigits;
     else if (s == "fastowen")
-        ErrorExit("%s: \"fastowen\" randomization not supported by Halton sampler.");
+        ErrorExit("\"fastowen\" randomization not supported by Halton sampler.");
     else if (s == "owen")
         randomizer = RandomizeStrategy::Owen;
     else
