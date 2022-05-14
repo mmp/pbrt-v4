@@ -146,6 +146,14 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
                             &haveSubsurface, &haveMedia);
     LOG_VERBOSE("Finished creating materials");
 
+    // Retrieve these here so that the CPU isn't writing to managed memory
+    // concurrently with the OptiX acceleration-structure construction work
+    // that follows. (Verbotten on Windows.)
+    camera = scene.GetCamera();
+    film = camera.GetFilm();
+    filter = film.GetFilter();
+    sampler = scene.GetSampler();
+
     if (Options->useGPU) {
 #ifdef PBRT_BUILD_GPU_RENDERER
         CUDATrackedMemoryResource *mr =
@@ -187,11 +195,6 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
     // Integrator parameters
     regularize = scene.integrator.parameters.GetOneBool("regularize", false);
     maxDepth = scene.integrator.parameters.GetOneInt("maxdepth", 5);
-
-    camera = scene.GetCamera();
-    film = camera.GetFilm();
-    filter = film.GetFilter();
-    sampler = scene.GetSampler();
 
     initializeVisibleSurface = film.UsesVisibleSurface();
     samplesPerPixel = sampler.SamplesPerPixel();

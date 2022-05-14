@@ -287,6 +287,7 @@ class BasicScene {
                 camera = *c;
         }
         cameraJobMutex.unlock();
+        LOG_VERBOSE("Retrieved Camera from future");
         return camera;
     }
 
@@ -298,6 +299,7 @@ class BasicScene {
                 sampler = *s;
         }
         samplerJobMutex.unlock();
+        LOG_VERBOSE("Retrieved Sampler from future");
         return sampler;
     }
 
