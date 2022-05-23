@@ -87,6 +87,40 @@ void GUI::keyboardCallback(GLFWwindow *window, int key, int scan, int action, in
         doKey(GLFW_KEY_R, 'r');
 }
 
+bool GUI::processMouse() {
+    bool needsReset = false;
+    double amount = 1.f;
+    if (!pressed) return false;
+    if (xoffset < 0) {
+        movingFromCamera = movingFromCamera * Rotate(-amount, Vector3f(0, 1, 0));
+        needsReset = true;
+        xoffset = 0;
+    }
+    if (xoffset > 0) {
+        movingFromCamera = movingFromCamera * Rotate(amount, Vector3f(0, 1, 0));
+        needsReset = true;
+        xoffset = 0;
+    }
+    if (yoffset > 0) {
+        movingFromCamera = movingFromCamera * Rotate(-amount, Vector3f(1, 0, 0));
+        needsReset = true;
+        yoffset = 0;
+    }
+    if (yoffset < 0) {
+        movingFromCamera = movingFromCamera * Rotate(amount, Vector3f(1, 0, 0));
+        needsReset = true;
+        yoffset = 0;
+    }
+    return needsReset;
+}
+
+bool GUI::process() {
+    bool needsReset = false;
+    needsReset |= processKeys();
+    needsReset |= processMouse();
+    return needsReset;
+}
+
 bool GUI::processKeys() {
     bool needsReset = false;
 
@@ -144,9 +178,43 @@ bool GUI::processKeys() {
     return needsReset;
 }
 
+
 static void glfwKeyCallback(GLFWwindow* window, int key, int scan, int action, int mods) {
     GUI* gui = (GUI*)glfwGetWindowUserPointer(window);
     gui->keyboardCallback(window, key, scan, action, mods);
+}
+
+
+void GUI::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+    {
+        pressed = true;
+        glfwGetCursorPos(window, &lastX, &lastY);
+    }
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
+    {
+        pressed = false;
+    }
+}
+
+static void glfwMouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
+{
+    GUI* gui = (GUI*)glfwGetWindowUserPointer(window);
+    gui->mouseButtonCallback(window, button, action, mods);
+
+}
+
+static void glfwCursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
+    GUI* gui = (GUI*)glfwGetWindowUserPointer(window);
+    gui->cursorPosCallback(window, xpos, ypos);
+}
+
+void GUI::cursorPosCallback(GLFWwindow* window, double xpos, double ypos)
+{
+    xoffset = xpos - lastX;
+    yoffset = lastY - ypos;
+    lastX = xpos;
+    lastY = ypos;
 }
 
 GUI::GUI(std::string title, Vector2i resolution, Bounds3f sceneBounds)
@@ -162,6 +230,9 @@ GUI::GUI(std::string title, Vector2i resolution, Bounds3f sceneBounds)
         LOG_FATAL("Unable to create GLFW window");
     }
     glfwSetKeyCallback(window, glfwKeyCallback);
+    glfwSetMouseButtonCallback(window, glfwMouseButtonCallback);
+    glfwSetCursorPosCallback(window, glfwCursorPosCallback);
+
     glfwSetWindowUserPointer(window, this);
     glfwMakeContextCurrent(window);
 
@@ -246,7 +317,7 @@ DisplayState GUI::RefreshDisplay() {
 
     if (glfwWindowShouldClose(window))
         return DisplayState::EXIT;
-    else if (processKeys())
+    else if (process())
         return DisplayState::RESET;
     else
         return DisplayState::NONE;
