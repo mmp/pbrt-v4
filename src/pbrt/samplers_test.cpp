@@ -27,13 +27,15 @@ TEST(Sampler, ConsistentValues) {
     samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::FastOwen));
     samplers.push_back(new PaddedSobolSampler(spp, RandomizeStrategy::Owen));
     samplers.push_back(new ZSobolSampler(spp, resolution, RandomizeStrategy::None));
-    samplers.push_back(new ZSobolSampler(spp, resolution, RandomizeStrategy::PermuteDigits));
+    samplers.push_back(
+        new ZSobolSampler(spp, resolution, RandomizeStrategy::PermuteDigits));
     samplers.push_back(new ZSobolSampler(spp, resolution, RandomizeStrategy::FastOwen));
     samplers.push_back(new ZSobolSampler(spp, resolution, RandomizeStrategy::Owen));
     samplers.push_back(new PMJ02BNSampler(spp));
     samplers.push_back(new StratifiedSampler(rootSpp, rootSpp, true));
     samplers.push_back(new SobolSampler(spp, resolution, RandomizeStrategy::None));
-    samplers.push_back(new SobolSampler(spp, resolution, RandomizeStrategy::PermuteDigits));
+    samplers.push_back(
+        new SobolSampler(spp, resolution, RandomizeStrategy::PermuteDigits));
     samplers.push_back(new SobolSampler(spp, resolution, RandomizeStrategy::Owen));
     samplers.push_back(new SobolSampler(spp, resolution, RandomizeStrategy::FastOwen));
 
@@ -97,8 +99,8 @@ static void checkElementary(const char *name, std::vector<Point2f> samples,
     }
 }
 
-static void checkElementarySampler(const char *name, Sampler sampler,
-                                   int logSamples, int res = 1) {
+static void checkElementarySampler(const char *name, Sampler sampler, int logSamples,
+                                   int res = 1) {
     // Get all of the samples for a pixel.
     int spp = sampler.SamplesPerPixel();
     std::vector<Point2f> samples;
@@ -116,8 +118,7 @@ static void checkElementarySampler(const char *name, Sampler sampler,
 // TODO: check Halton (where the elementary intervals are (2^i, 3^j)).
 
 TEST(PaddedSobolSampler, ElementaryIntervals) {
-    for (auto rand :
-         {RandomizeStrategy::None, RandomizeStrategy::PermuteDigits})
+    for (auto rand : {RandomizeStrategy::None, RandomizeStrategy::PermuteDigits})
         for (int logSamples = 2; logSamples <= 10; ++logSamples)
             checkElementarySampler("PaddedSobolSampler",
                                    new PaddedSobolSampler(1 << logSamples, rand),
@@ -126,12 +127,12 @@ TEST(PaddedSobolSampler, ElementaryIntervals) {
 
 TEST(ZSobolSampler, ElementaryIntervals) {
     for (int seed : {0, 1, 5, 6, 10, 15})
-        for (auto rand :
-                 {RandomizeStrategy::None, RandomizeStrategy::PermuteDigits})
+        for (auto rand : {RandomizeStrategy::None, RandomizeStrategy::PermuteDigits})
             for (int logSamples = 2; logSamples <= 8; ++logSamples)
-                checkElementarySampler(StringPrintf("ZSobolSampler - %s - %d", rand, seed).c_str(),
-                                       new ZSobolSampler(1 << logSamples, Point2i(10, 10), rand, seed),
-                                       logSamples, 10);
+                checkElementarySampler(
+                    StringPrintf("ZSobolSampler - %s - %d", rand, seed).c_str(),
+                    new ZSobolSampler(1 << logSamples, Point2i(10, 10), rand, seed),
+                    logSamples, 10);
 }
 
 TEST(SobolUnscrambledSampler, ElementaryIntervals) {
@@ -144,10 +145,10 @@ TEST(SobolUnscrambledSampler, ElementaryIntervals) {
 
 TEST(SobolXORScrambledSampler, ElementaryIntervals) {
     for (int logSamples = 2; logSamples <= 10; ++logSamples)
-        checkElementarySampler(
-            "Sobol XOR Scrambled",
-            new SobolSampler(1 << logSamples, Point2i(1, 1), RandomizeStrategy::PermuteDigits),
-            logSamples);
+        checkElementarySampler("Sobol XOR Scrambled",
+                               new SobolSampler(1 << logSamples, Point2i(1, 1),
+                                                RandomizeStrategy::PermuteDigits),
+                               logSamples);
 }
 
 TEST(SobolOwenScrambledSampler, ElementaryIntervals) {

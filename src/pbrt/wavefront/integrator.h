@@ -59,8 +59,7 @@ class WavefrontPathIntegrator {
     // WavefrontPathIntegrator Public Methods
     Float Render();
 
-    void GenerateCameraRays(int y0, Transform movingFromcamera,
-                            int sampleIndex);
+    void GenerateCameraRays(int y0, Transform movingFromcamera, int sampleIndex);
     template <typename Sampler>
     void GenerateCameraRays(int y0, Transform movingFromCamera, int sampleIndex);
 

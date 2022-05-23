@@ -106,7 +106,7 @@ TEST(Optional, RunDestructors) {
 }
 
 class TrackingResource : public pstd::pmr::memory_resource {
-public:
+  public:
     void *do_allocate(size_t bytes, size_t alignment) {
         void *ptr = new char[bytes];
         allocs[ptr] = bytes;

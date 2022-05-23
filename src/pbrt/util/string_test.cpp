@@ -21,6 +21,6 @@ TEST(Unicode, BasicNormalization) {
     std::string nfd8 = UTF8FromUTF16(nfd16);
     EXPECT_NE(nfc8, nfd8);
 
-    EXPECT_EQ(nfc8, NormalizeUTF8(nfc8)); // nfc is already normalized
-    EXPECT_EQ(nfc8, NormalizeUTF8(nfd8)); // normalizing nfd should make it equal nfc
+    EXPECT_EQ(nfc8, NormalizeUTF8(nfc8));  // nfc is already normalized
+    EXPECT_EQ(nfc8, NormalizeUTF8(nfd8));  // normalizing nfd should make it equal nfc
 }

@@ -157,8 +157,7 @@ void stringPrintfRecursive(std::string *s, const char *fmt);
 std::string copyToFormatString(const char **fmt_ptr, std::string *s);
 
 template <typename T>
-inline typename std::enable_if_t<!std::is_class_v<typename std::decay_t<T>>,
-                                 std::string>
+inline typename std::enable_if_t<!std::is_class_v<typename std::decay_t<T>>, std::string>
 formatOne(const char *fmt, T &&v) {
     // Figure out how much space we need to allocate; add an extra
     // character for the '\0'.
@@ -171,9 +170,8 @@ formatOne(const char *fmt, T &&v) {
 }
 
 template <typename T>
-inline
-    typename std::enable_if_t<std::is_class_v<typename std::decay_t<T>>, std::string>
-    formatOne(const char *fmt, T &&v) {
+inline typename std::enable_if_t<std::is_class_v<typename std::decay_t<T>>, std::string>
+formatOne(const char *fmt, T &&v) {
     LOG_FATAL("Printf: Non-basic type %s passed for format string %s", typeid(v).name(),
               fmt);
     return "";

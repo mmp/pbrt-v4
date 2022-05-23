@@ -166,7 +166,8 @@ static size_t pixelFormatSize(BufferImageFormat format) {
     }
 }
 
-inline BufferDisplay::BufferDisplay(BufferImageFormat image_format) : m_image_format(image_format) {
+inline BufferDisplay::BufferDisplay(BufferImageFormat image_format)
+    : m_image_format(image_format) {
     GLuint m_vertex_array;
     GL_CHECK(glGenVertexArrays(1, &m_vertex_array));
     GL_CHECK(glBindVertexArray(m_vertex_array));
@@ -224,8 +225,9 @@ void main()
 }
 
 inline void BufferDisplay::display(const int32_t screen_res_x, const int32_t screen_res_y,
-                               const int32_t framebuf_res_x, const int32_t framebuf_res_y,
-                               const uint32_t pbo) const {
+                                   const int32_t framebuf_res_x,
+                                   const int32_t framebuf_res_y,
+                                   const uint32_t pbo) const {
     GL_CHECK(glBindFramebuffer(GL_FRAMEBUFFER, 0));
     GL_CHECK(glViewport(0, 0, framebuf_res_x, framebuf_res_y));
 
@@ -276,7 +278,7 @@ inline void BufferDisplay::display(const int32_t screen_res_x, const int32_t scr
     GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, m_quad_vertex_buffer));
     GL_CHECK(glVertexAttribPointer(0,  // attribute 0. No particular reason for 0, but
                                        // must match the layout in the shader.
-                                   3,  // size
+                                   3,         // size
                                    GL_FLOAT,  // type
                                    GL_FALSE,  // normalized?
                                    0,         // stride
@@ -288,7 +290,8 @@ inline void BufferDisplay::display(const int32_t screen_res_x, const int32_t scr
     else
         GL_CHECK(glDisable(GL_FRAMEBUFFER_SRGB));
 
-    GL_CHECK(glDrawArrays(GL_TRIANGLES, 0, 6));  // 2*3 indices starting at 0 -> 2 triangles
+    GL_CHECK(
+        glDrawArrays(GL_TRIANGLES, 0, 6));  // 2*3 indices starting at 0 -> 2 triangles
 
     GL_CHECK(glDisableVertexAttribArray(0));
 
@@ -308,8 +311,7 @@ class CUDAOutputBuffer {
     const PIXEL_FORMAT *GetReadbackPixels();
 
     void Draw(int windowWidth, int windowHeight) {
-        display->display(m_width, m_height, windowWidth, windowHeight,
-                         getPBO());
+        display->display(m_width, m_height, windowWidth, windowHeight, getPBO());
     }
 
     PIXEL_FORMAT *Map();

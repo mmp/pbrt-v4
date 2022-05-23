@@ -480,8 +480,8 @@ TEST(Image, PngYIO) {
 
     for (int y = 0; y < res[1]; ++y)
         for (int x = 0; x < res[0]; ++x)
-          EXPECT_EQ(SRGB8ToLinear(rgbPixels[y * res[0] + x]),
-                    read.image.GetChannel({x, y}, 0))
+            EXPECT_EQ(SRGB8ToLinear(rgbPixels[y * res[0] + x]),
+                      read.image.GetChannel({x, y}, 0))
                 << " x " << x << ", y " << y << ", orig " << rgbPixels[y * res[0] + x];
 
     EXPECT_TRUE(RemoveFile("test.png"));
@@ -506,8 +506,8 @@ TEST(Image, PngRgbIO) {
     for (int y = 0; y < res[1]; ++y)
         for (int x = 0; x < res[0]; ++x)
             for (int c = 0; c < 3; ++c) {
-              EXPECT_EQ(SRGB8ToLinear(rgbPixels[c + 3 * (y * res[0] + x)]),
-                        image.GetChannel({x, y}, c))
+                EXPECT_EQ(SRGB8ToLinear(rgbPixels[c + 3 * (y * res[0] + x)]),
+                          image.GetChannel({x, y}, c))
                     << " x " << x << ", y " << y << ", c " << c << ", orig "
                     << rgbPixels[3 * y * res[0] + 3 * x + c];
             }
@@ -537,8 +537,8 @@ TEST(Image, PngEmojiIO) {
     for (int y = 0; y < res[1]; ++y)
         for (int x = 0; x < res[0]; ++x)
             for (int c = 0; c < 3; ++c) {
-              EXPECT_EQ(SRGB8ToLinear(rgbPixels[c + 3 * (y * res[0] + x)]),
-                        image.GetChannel({x, y}, c))
+                EXPECT_EQ(SRGB8ToLinear(rgbPixels[c + 3 * (y * res[0] + x)]),
+                          image.GetChannel({x, y}, c))
                     << " x " << x << ", y " << y << ", c " << c << ", orig "
                     << rgbPixels[3 * y * res[0] + 3 * x + c];
             }
@@ -565,8 +565,8 @@ TEST(Image, QoiRgbIO) {
     for (int y = 0; y < res[1]; ++y)
         for (int x = 0; x < res[0]; ++x)
             for (int c = 0; c < 3; ++c) {
-              EXPECT_EQ(SRGB8ToLinear(rgbPixels[c + 3 * (y * res[0] + x)]),
-                        image.GetChannel({x, y}, c))
+                EXPECT_EQ(SRGB8ToLinear(rgbPixels[c + 3 * (y * res[0] + x)]),
+                          image.GetChannel({x, y}, c))
                     << " x " << x << ", y " << y << ", c " << c << ", orig "
                     << rgbPixels[3 * y * res[0] + 3 * x + c];
             }

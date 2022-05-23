@@ -15,14 +15,14 @@
 namespace pbrt {
 
 class Denoiser {
- public:
+  public:
     Denoiser(Vector2i resolution, bool haveAlbedoAndNormal);
 
     // All pointers should be to GPU memory.
     // |n| and |albedo| should be nullptr iff \haveAlbedoAndNormal| is false.
     void Denoise(RGB *rgb, Normal3f *n, RGB *albedo, RGB *result);
 
- private:
+  private:
     Vector2i resolution;
     bool haveAlbedoAndNormal;
     OptixDenoiser denoiserHandle;
@@ -30,6 +30,6 @@ class Denoiser {
     void *denoiserState, *scratchBuffer, *intensity;
 };
 
-} // namespace pbrt
+}  // namespace pbrt
 
-#endif // PBRT_GPU_DENOISER_H
+#endif  // PBRT_GPU_DENOISER_H

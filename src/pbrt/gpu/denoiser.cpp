@@ -7,9 +7,9 @@
 #include <pbrt/gpu/memory.h>
 #include <pbrt/gpu/util.h>
 
-#include <array>
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <array>
 
 #include <optix.h>
 #include <optix_stubs.h>
@@ -130,4 +130,4 @@ void Denoiser::Denoise(RGB *rgb, Normal3f *n, RGB *albedo, RGB *result) {
 #endif
 }
 
-} // namespace pbrt
+}  // namespace pbrt

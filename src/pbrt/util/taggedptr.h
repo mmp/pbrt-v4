@@ -708,8 +708,7 @@ struct IsSameType<T> {
 
 template <typename T, typename U, typename... Ts>
 struct IsSameType<T, U, Ts...> {
-    static constexpr bool value =
-        (std::is_same_v<T, U> && IsSameType<U, Ts...>::value);
+    static constexpr bool value = (std::is_same_v<T, U> && IsSameType<U, Ts...>::value);
 };
 
 template <typename... Ts>
@@ -859,7 +858,8 @@ class TaggedPointer {
     }
 
   private:
-    static_assert(sizeof(uintptr_t) <= sizeof(uint64_t), "Expected pointer size to be <= 64 bits");
+    static_assert(sizeof(uintptr_t) <= sizeof(uint64_t),
+                  "Expected pointer size to be <= 64 bits");
     // TaggedPointer Private Members
     static constexpr int tagShift = 57;
     static constexpr int tagBits = 64 - tagShift;

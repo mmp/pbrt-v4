@@ -486,8 +486,8 @@ void DisplayDynamic(std::string title, const Image &image,
     dynamicItems.push_back(GetImageDisplayItem(title, image, channelDesc));
 }
 
-void DisplayStatic(std::string title, Point2i resolution,
-    std::vector<std::string> channelNames,
+void DisplayStatic(
+    std::string title, Point2i resolution, std::vector<std::string> channelNames,
     std::function<void(Bounds2i b, pstd::span<pstd::span<float>>)> getTileValues) {
     DisplayItem item(title, resolution, channelNames, getTileValues);
 
@@ -496,8 +496,8 @@ void DisplayStatic(std::string title, Point2i resolution,
         LOG_ERROR("Unable to display static content \"%s\".", title);
 }
 
-void DisplayDynamic(std::string title, Point2i resolution,
-    std::vector<std::string> channelNames,
+void DisplayDynamic(
+    std::string title, Point2i resolution, std::vector<std::string> channelNames,
     std::function<void(Bounds2i b, pstd::span<pstd::span<float>>)> getTileValues) {
     std::lock_guard<std::mutex> lock(mutex);
     dynamicItems.push_back(DisplayItem(title, resolution, channelNames, getTileValues));

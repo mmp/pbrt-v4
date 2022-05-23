@@ -430,9 +430,8 @@ void TestBSDF(std::function<BSDF*(const SurfaceInteraction&, Allocator)> createB
 
 BSDF* createLambertian(const SurfaceInteraction& si, Allocator alloc) {
     SampledSpectrum Kd(1.);
-    return alloc.new_object<BSDF>(
-        si.shading.n, si.shading.dpdu,
-        alloc.new_object<DiffuseBxDF>(Kd));
+    return alloc.new_object<BSDF>(si.shading.n, si.shading.dpdu,
+                                  alloc.new_object<DiffuseBxDF>(Kd));
 }
 
 TEST(BSDFSampling, Lambertian) {
@@ -446,7 +445,8 @@ BSDF* createConductorMicrofacet(const SurfaceInteraction& si, Allocator alloc, f
     Float alphay = TrowbridgeReitzDistribution::RoughnessToAlpha(roughy);
     TrowbridgeReitzDistribution distrib(alphax, alphay);
     return alloc.new_object<BSDF>(si.shading.n, si.shading.dpdu,
-        alloc.new_object<ConductorBxDF>(distrib, SampledSpectrum(eta), SampledSpectrum(k)));
+                                  alloc.new_object<ConductorBxDF>(
+                                      distrib, SampledSpectrum(eta), SampledSpectrum(k)));
 }
 
 BSDF* createDielectricMicrofacet(const SurfaceInteraction& si, Allocator alloc, float ior,
@@ -455,7 +455,7 @@ BSDF* createDielectricMicrofacet(const SurfaceInteraction& si, Allocator alloc, 
     Float alphay = TrowbridgeReitzDistribution::RoughnessToAlpha(roughy);
     TrowbridgeReitzDistribution distrib(alphax, alphay);
     return alloc.new_object<BSDF>(si.shading.n, si.shading.dpdu,
-        alloc.new_object<DielectricBxDF>(ior, distrib));
+                                  alloc.new_object<DielectricBxDF>(ior, distrib));
 }
 
 TEST(BSDFSampling, TRCondIso) {
@@ -482,7 +482,6 @@ TEST(BSDFSampling, TRDielIso) {
         "TRDielIso");
 }
 
-
 TEST(BSDFSampling, TRDielAniso) {
     TestBSDF(
         [](const SurfaceInteraction& si, Allocator alloc) -> BSDF* {
@@ -494,16 +493,15 @@ TEST(BSDFSampling, TRDielAniso) {
 TEST(BSDFSampling, TRDielIsoInv) {
     TestBSDF(
         [](const SurfaceInteraction& si, Allocator alloc) -> BSDF* {
-            return createDielectricMicrofacet(si, alloc, 1/1.5f, 0.5, 0.5);
+            return createDielectricMicrofacet(si, alloc, 1 / 1.5f, 0.5, 0.5);
         },
         "TRDielIsoInv");
 }
 
-
 TEST(BSDFSampling, TRDielAnisoInv) {
     TestBSDF(
         [](const SurfaceInteraction& si, Allocator alloc) -> BSDF* {
-            return createDielectricMicrofacet(si, alloc, 1/1.5f, 0.3, 0.15);
+            return createDielectricMicrofacet(si, alloc, 1 / 1.5f, 0.3, 0.15);
         },
         "TRDielAnisoInv");
 }
@@ -733,8 +731,8 @@ TEST(Hair, WhiteFurnaceSampled) {
                 Float uc = RadicalInverse(2, i);
                 Point2f u(RadicalInverse(3, i), RadicalInverse(4, i));
 
-                pstd::optional<BSDFSample> bs = hair.Sample_f(wo, uc, u, TransportMode::Radiance,
-                                                              BxDFReflTransFlags::All);
+                pstd::optional<BSDFSample> bs = hair.Sample_f(
+                    wo, uc, u, TransportMode::Radiance, BxDFReflTransFlags::All);
                 if (bs) {
                     SampledSpectrum f = bs->f * AbsCosTheta(bs->wi) / bs->pdf;
                     ySum += f.y(lambda);
@@ -763,8 +761,8 @@ TEST(Hair, SamplingWeights) {
                     SampleUniformSphere({RadicalInverse(1, i), RadicalInverse(2, i)});
                 Float uc = RadicalInverse(3, i);
                 Point2f u = {RadicalInverse(4, i), RadicalInverse(5, i)};
-                pstd::optional<BSDFSample> bs = hair.Sample_f(wo, uc, u, TransportMode::Radiance,
-                                                              BxDFReflTransFlags::All);
+                pstd::optional<BSDFSample> bs = hair.Sample_f(
+                    wo, uc, u, TransportMode::Radiance, BxDFReflTransFlags::All);
                 if (bs) {
                     Float sum = 0;
                     int ny = 20;
@@ -803,8 +801,8 @@ TEST(Hair, SamplingConsistency) {
                 Vector3f wi;
                 Float uc = rng.Uniform<Float>();
                 Point2f u = {rng.Uniform<Float>(), rng.Uniform<Float>()};
-                pstd::optional<BSDFSample> bs = hair.Sample_f(wo, uc, u, TransportMode::Radiance,
-                                                              BxDFReflTransFlags::All);
+                pstd::optional<BSDFSample> bs = hair.Sample_f(
+                    wo, uc, u, TransportMode::Radiance, BxDFReflTransFlags::All);
                 if (bs)
                     fImportance +=
                         bs->f * Li(bs->wi) * AbsCosTheta(bs->wi) / (count * bs->pdf);

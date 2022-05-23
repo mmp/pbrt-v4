@@ -56,7 +56,7 @@ TEST(ThreadLocal, Consistency) {
         for (int i = 0; i <= index; ++i)
             for (int j = 0; j <= index; ++j)
                 f *= std::sqrt(f);
-        EXPECT_NE(f, 1.141f); // make sure it isn't optimized out
+        EXPECT_NE(f, 1.141f);  // make sure it isn't optimized out
     };
 
     ParallelFor(0, 1000, [&](int64_t index) {

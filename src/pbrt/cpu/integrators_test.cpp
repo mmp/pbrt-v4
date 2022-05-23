@@ -139,9 +139,8 @@ std::vector<TestScene> GetScenes() {
         // properly normalized (this is usually all handled inside *Light::Create())
         ConstantSpectrum Le(1);
         Float scale = 0.5 / SpectrumToPhotometric(&Le);
-        Light areaLight =
-            new DiffuseAreaLight(identity, MediumInterface(), &Le, scale, sphere, nullptr,
-                                 Image(), nullptr, false);
+        Light areaLight = new DiffuseAreaLight(identity, MediumInterface(), &Le, scale,
+                                               sphere, nullptr, Image(), nullptr, false);
 
         std::vector<Light> lights;
         lights.push_back(areaLight);

@@ -115,7 +115,7 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization, bool 
     GetConsoleMode(hStdout, &consoleMode);
     consoleMode |= 0xc;  // virtual terminal processing, disable newline auto return
     SetConsoleMode(hStdout, consoleMode);
-#endif // PBRT_IS_WINDOWS
+#endif  // PBRT_IS_WINDOWS
 
     if (level == LogLevel::Invalid)
         ErrorExit("Invalid --log-level specified.");
@@ -244,10 +244,10 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization, bool 
 
                 // Report activity since last logging event. A value of 1
                 // represents all cores running at 100% utilization.
-                int64_t delta = (currentUsage.user + currentUsage.nice +
-                                 currentUsage.system + currentUsage.idle) -
-                                (prevUsage.user + prevUsage.nice +
-                                 prevUsage.system + prevUsage.idle);
+                int64_t delta =
+                    (currentUsage.user + currentUsage.nice + currentUsage.system +
+                     currentUsage.idle) -
+                    (prevUsage.user + prevUsage.nice + prevUsage.system + prevUsage.idle);
                 LOG_VERBOSE("CPU: Memory used %d MB. "
                             "Core activity: %.4f user %.4f nice %.4f system %.4f idle",
                             GetCurrentRSS() / (1024 * 1024),
@@ -255,11 +255,12 @@ void InitLogging(LogLevel level, std::string logFile, bool logUtilization, bool 
                             double(currentUsage.nice - prevUsage.nice) / delta,
                             double(currentUsage.system - prevUsage.system) / delta,
                             double(currentUsage.idle - prevUsage.idle) / delta);
-                LOG_VERBOSE("IO: read request %d read actual %d write request %d write actual %d",
-                            currentUsage.readRequest - prevUsage.readRequest,
-                            currentUsage.readActual - prevUsage.readActual,
-                            currentUsage.writeRequest - prevUsage.writeRequest,
-                            currentUsage.writeActual - prevUsage.writeActual);
+                LOG_VERBOSE(
+                    "IO: read request %d read actual %d write request %d write actual %d",
+                    currentUsage.readRequest - prevUsage.readRequest,
+                    currentUsage.readActual - prevUsage.readActual,
+                    currentUsage.writeRequest - prevUsage.writeRequest,
+                    currentUsage.writeActual - prevUsage.writeActual);
 
                 prevUsage = currentUsage;
 
@@ -391,9 +392,9 @@ void Log(LogLevel level, const char *file, int line, const char *s) {
 #ifdef __NVCC__
 // warning #1305-D: function declared with "noreturn" does return
 #ifdef __NVCC_DIAG_PRAGMA_SUPPORT__
-  #pragma nv_diag_suppress 1305
+#pragma nv_diag_suppress 1305
 #else
-  #pragma diag_suppress 1305
+#pragma diag_suppress 1305
 #endif
 #endif
 

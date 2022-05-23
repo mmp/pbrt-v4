@@ -7,7 +7,7 @@
 #include <pbrt/options.h>
 #ifdef PBRT_BUILD_GPU_RENDERER
 #include <pbrt/gpu/util.h>
-#endif // PBRT_BUILD_GPU_RENDERER
+#endif  // PBRT_BUILD_GPU_RENDERER
 #include <pbrt/util/error.h>
 #include <pbrt/util/image.h>
 #include <pbrt/util/parallel.h>
@@ -90,7 +90,8 @@ void GUI::keyboardCallback(GLFWwindow *window, int key, int scan, int action, in
 bool GUI::processMouse() {
     bool needsReset = false;
     double amount = 1.f;
-    if (!pressed) return false;
+    if (!pressed)
+        return false;
     if (xoffset < 0) {
         movingFromCamera = movingFromCamera * Rotate(-amount, Vector3f(0, 1, 0));
         needsReset = true;
@@ -178,30 +179,25 @@ bool GUI::processKeys() {
     return needsReset;
 }
 
-
 static void glfwKeyCallback(GLFWwindow* window, int key, int scan, int action, int mods) {
     GUI* gui = (GUI*)glfwGetWindowUserPointer(window);
     gui->keyboardCallback(window, key, scan, action, mods);
 }
 
-
 void GUI::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
-    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
-    {
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
         pressed = true;
         glfwGetCursorPos(window, &lastX, &lastY);
     }
-    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
-    {
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
         pressed = false;
     }
 }
 
-static void glfwMouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
-{
+static void glfwMouseButtonCallback(GLFWwindow* window, int button, int action,
+                                    int mods) {
     GUI* gui = (GUI*)glfwGetWindowUserPointer(window);
     gui->mouseButtonCallback(window, button, action, mods);
-
 }
 
 static void glfwCursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
@@ -209,8 +205,7 @@ static void glfwCursorPosCallback(GLFWwindow* window, double xpos, double ypos) 
     gui->cursorPosCallback(window, xpos, ypos);
 }
 
-void GUI::cursorPosCallback(GLFWwindow* window, double xpos, double ypos)
-{
+void GUI::cursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
     xoffset = xpos - lastX;
     yoffset = lastY - ypos;
     lastX = xpos;
@@ -300,12 +295,16 @@ DisplayState GUI::RefreshDisplay() {
             Image image(PixelFormat::Float, {width, height}, {"R", "G", "B"});
             std::memcpy(image.RawPointer({0, 0}), fb, width * height * sizeof(RGB));
 
-            RunAsync([](Image image, int frameNumber) {
-                // TODO: set metadata for e.g. current camera position...
-                ImageMetadata metadata;
-                image.Write(StringPrintf("pbrt-frame%05d.exr", frameNumber), metadata);
-                return 0;  // FIXME: RunAsync() doesn't like lambdas that return void..
-            }, std::move(image), frameNumber);
+            RunAsync(
+                [](Image image, int frameNumber) {
+                    // TODO: set metadata for e.g. current camera position...
+                    ImageMetadata metadata;
+                    image.Write(StringPrintf("pbrt-frame%05d.exr", frameNumber),
+                                metadata);
+                    return 0;  // FIXME: RunAsync() doesn't like lambdas that return
+                               // void..
+                },
+                std::move(image), frameNumber);
 
             ++frameNumber;
         }

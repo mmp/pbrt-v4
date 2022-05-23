@@ -220,7 +220,8 @@ std::unique_ptr<Tokenizer> Tokenizer::CreateFromFile(
 
 std::unique_ptr<Tokenizer> Tokenizer::CreateFromString(
     std::string str, std::function<void(const char *, const FileLoc *)> errorCallback) {
-    return std::make_unique<Tokenizer>(std::move(str), "<stdin>", std::move(errorCallback));
+    return std::make_unique<Tokenizer>(std::move(str), "<stdin>",
+                                       std::move(errorCallback));
 }
 
 Tokenizer::Tokenizer(std::string str, std::string filename,
@@ -598,7 +599,8 @@ static ParsedParameterVector parseParameters(
 }
 
 void parse(ParserTarget *target, std::unique_ptr<Tokenizer> t) {
-    FormattingParserTarget *formattingTarget = dynamic_cast<FormattingParserTarget *>(target);
+    FormattingParserTarget *formattingTarget =
+        dynamic_cast<FormattingParserTarget *>(target);
     bool formatting = formattingTarget;
 
     static std::atomic<bool> warnedTransformBeginEndDeprecated{false};
@@ -644,7 +646,8 @@ void parse(ParserTarget *target, std::unique_ptr<Tokenizer> t) {
             // Swallow comments, unless --format or --toply was given, in
             // which case they're printed to stdout.
             if (formatting)
-                printf("%s%s\n", dynamic_cast<FormattingParserTarget *>(target)->indent().c_str(),
+                printf("%s%s\n",
+                       dynamic_cast<FormattingParserTarget *>(target)->indent().c_str(),
                        toString(tok->token).c_str());
             return nextToken(flags);
         } else
@@ -660,8 +663,8 @@ void parse(ParserTarget *target, std::unique_ptr<Tokenizer> t) {
     // Helper function for pbrt API entrypoints that take a single string
     // parameter and a ParameterVector (e.g. pbrtShape()).
     auto basicParamListEntrypoint =
-        [&](void (ParserTarget::*apiFunc)(const std::string &,
-                                          ParsedParameterVector, FileLoc),
+        [&](void (ParserTarget::*apiFunc)(const std::string &, ParsedParameterVector,
+                                          FileLoc),
             FileLoc loc) {
             Token t = *nextToken(TokenRequired);
             std::string_view dequoted = dequoteString(t);
@@ -752,7 +755,8 @@ void parse(ParserTarget *target, std::unique_ptr<Tokenizer> t) {
                 std::string filename = toString(dequoteString(filenameToken));
                 if (formatting)
                     Printf("%sInclude \"%s\"\n",
-                           dynamic_cast<FormattingParserTarget *>(target)->indent(), filename);
+                           dynamic_cast<FormattingParserTarget *>(target)->indent(),
+                           filename);
                 else {
                     filename = ResolveFilename(filename);
                     std::unique_ptr<Tokenizer> tinc =
@@ -769,12 +773,15 @@ void parse(ParserTarget *target, std::unique_ptr<Tokenizer> t) {
                 std::string filename = toString(dequoteString(filenameToken));
                 if (formatting)
                     Printf("%sImport \"%s\"\n",
-                           dynamic_cast<FormattingParserTarget *>(target)->indent(), filename);
+                           dynamic_cast<FormattingParserTarget *>(target)->indent(),
+                           filename);
                 else {
-                    BasicSceneBuilder *builder = dynamic_cast<BasicSceneBuilder *>(target);
+                    BasicSceneBuilder *builder =
+                        dynamic_cast<BasicSceneBuilder *>(target);
                     CHECK(builder);
 
-                    if (builder->currentBlock != BasicSceneBuilder::BlockState::WorldBlock)
+                    if (builder->currentBlock !=
+                        BasicSceneBuilder::BlockState::WorldBlock)
                         ErrorExit(&tok->loc, "Import statement only allowed inside world "
                                              "definition block.");
 
@@ -816,15 +823,14 @@ void parse(ParserTarget *target, std::unique_ptr<Tokenizer> t) {
                 for (int i = 0; i < 9; ++i)
                     v[i] = parseFloat(*nextToken(TokenRequired));
                 target->LookAt(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8],
-                              tok->loc);
+                               tok->loc);
             } else
                 syntaxError(*tok);
             break;
 
         case 'M':
             if (tok->token == "MakeNamedMaterial")
-                basicParamListEntrypoint(&ParserTarget::MakeNamedMaterial,
-                                         tok->loc);
+                basicParamListEntrypoint(&ParserTarget::MakeNamedMaterial, tok->loc);
             else if (tok->token == "MakeNamedMedium")
                 basicParamListEntrypoint(&ParserTarget::MakeNamedMedium, tok->loc);
             else if (tok->token == "Material")
@@ -1035,7 +1041,7 @@ FormattingParserTarget::~FormattingParserTarget() {
 }
 
 void FormattingParserTarget::Option(const std::string &name, const std::string &value,
-                             FileLoc loc) {
+                                    FileLoc loc) {
     std::string nName = normalizeArg(name);
     Printf("%sOption \"%s\" %s\n", indent(), name, value);
 }
@@ -1048,7 +1054,8 @@ void FormattingParserTarget::Translate(Float dx, Float dy, Float dz, FileLoc loc
     Printf("%sTranslate %f %f %f\n", indent(), dx, dy, dz);
 }
 
-void FormattingParserTarget::Rotate(Float angle, Float ax, Float ay, Float az, FileLoc loc) {
+void FormattingParserTarget::Rotate(Float angle, Float ax, Float ay, Float az,
+                                    FileLoc loc) {
     Printf("%sRotate %f %f %f %f\n", indent(), angle, ax, ay, az);
 }
 
@@ -1056,8 +1063,8 @@ void FormattingParserTarget::Scale(Float sx, Float sy, Float sz, FileLoc loc) {
     Printf("%sScale %f %f %f\n", indent(), sx, sy, sz);
 }
 
-void FormattingParserTarget::LookAt(Float ex, Float ey, Float ez, Float lx, Float ly, Float lz,
-                             Float ux, Float uy, Float uz, FileLoc loc) {
+void FormattingParserTarget::LookAt(Float ex, Float ey, Float ez, Float lx, Float ly,
+                                    Float lz, Float ux, Float uy, Float uz, FileLoc loc) {
     Printf("%sLookAt %f %f %f\n%s    %f %f %f\n%s    %f %f %f\n", indent(), ex, ey, ez,
            indent(), lx, ly, lz, indent(), ux, uy, uz);
 }
@@ -1104,8 +1111,8 @@ void FormattingParserTarget::ColorSpace(const std::string &n, FileLoc loc) {
     Printf("%sColorSpace \"%s\"\n", indent(), n);
 }
 
-void FormattingParserTarget::PixelFilter(const std::string &name, ParsedParameterVector params,
-                                  FileLoc loc) {
+void FormattingParserTarget::PixelFilter(const std::string &name,
+                                         ParsedParameterVector params, FileLoc loc) {
     ParameterDictionary dict(std::move(params), RGBColorSpace::sRGB);
 
     std::string extra;
@@ -1136,7 +1143,7 @@ void FormattingParserTarget::PixelFilter(const std::string &name, ParsedParamete
 }
 
 void FormattingParserTarget::Film(const std::string &type, ParsedParameterVector params,
-                           FileLoc loc) {
+                                  FileLoc loc) {
     ParameterDictionary dict(std::move(params), RGBColorSpace::sRGB);
 
     std::string extra;
@@ -1161,8 +1168,8 @@ void FormattingParserTarget::Film(const std::string &type, ParsedParameterVector
     std::cout << extra << dict.ToParameterList(catIndentCount);
 }
 
-void FormattingParserTarget::Sampler(const std::string &name, ParsedParameterVector params,
-                              FileLoc loc) {
+void FormattingParserTarget::Sampler(const std::string &name,
+                                     ParsedParameterVector params, FileLoc loc) {
     ParameterDictionary dict(std::move(params), RGBColorSpace::sRGB);
 
     if (upgrade) {
@@ -1179,16 +1186,16 @@ void FormattingParserTarget::Sampler(const std::string &name, ParsedParameterVec
     std::cout << dict.ToParameterList(catIndentCount);
 }
 
-void FormattingParserTarget::Accelerator(const std::string &name, ParsedParameterVector params,
-                                  FileLoc loc) {
+void FormattingParserTarget::Accelerator(const std::string &name,
+                                         ParsedParameterVector params, FileLoc loc) {
     ParameterDictionary dict(std::move(params), RGBColorSpace::sRGB);
 
     Printf("%sAccelerator \"%s\"\n%s", indent(), name,
            dict.ToParameterList(catIndentCount));
 }
 
-void FormattingParserTarget::Integrator(const std::string &name, ParsedParameterVector params,
-                                 FileLoc loc) {
+void FormattingParserTarget::Integrator(const std::string &name,
+                                        ParsedParameterVector params, FileLoc loc) {
     ParameterDictionary dict(std::move(params), RGBColorSpace::sRGB);
 
     std::string extra;
@@ -1223,7 +1230,7 @@ void FormattingParserTarget::Integrator(const std::string &name, ParsedParameter
 }
 
 void FormattingParserTarget::Camera(const std::string &name, ParsedParameterVector params,
-                             FileLoc loc) {
+                                    FileLoc loc) {
     ParameterDictionary dict(std::move(params), RGBColorSpace::sRGB);
 
     if (upgrade && name == "environment")
@@ -1238,7 +1245,7 @@ void FormattingParserTarget::Camera(const std::string &name, ParsedParameterVect
 }
 
 void FormattingParserTarget::MakeNamedMedium(const std::string &name,
-                                      ParsedParameterVector params, FileLoc loc) {
+                                             ParsedParameterVector params, FileLoc loc) {
     ParameterDictionary dict(params, RGBColorSpace::sRGB);
     if (upgrade && name == "heterogeneous")
         Printf("%sMakeNamedMedium \"%s\"\n%s\n", indent(), "uniformgrid",
@@ -1249,7 +1256,8 @@ void FormattingParserTarget::MakeNamedMedium(const std::string &name,
 }
 
 void FormattingParserTarget::MediumInterface(const std::string &insideName,
-                                      const std::string &outsideName, FileLoc loc) {
+                                             const std::string &outsideName,
+                                             FileLoc loc) {
     Printf("%sMediumInterface \"%s\" \"%s\"\n", indent(), insideName, outsideName);
 }
 
@@ -1267,8 +1275,8 @@ void FormattingParserTarget::AttributeEnd(FileLoc loc) {
     Printf("%sAttributeEnd\n", indent());
 }
 
-void FormattingParserTarget::Attribute(const std::string &target, ParsedParameterVector params,
-                                FileLoc loc) {
+void FormattingParserTarget::Attribute(const std::string &target,
+                                       ParsedParameterVector params, FileLoc loc) {
     ParameterDictionary dict(params, RGBColorSpace::sRGB);
     Printf("%sAttribute \"%s\" ", indent(), target);
     if (params.size() == 1)
@@ -1291,8 +1299,8 @@ void FormattingParserTarget::TransformEnd(FileLoc loc) {
 }
 
 void FormattingParserTarget::Texture(const std::string &name, const std::string &type,
-                              const std::string &texname, ParsedParameterVector params,
-                              FileLoc loc) {
+                                     const std::string &texname,
+                                     ParsedParameterVector params, FileLoc loc) {
     if (upgrade) {
         if (definedTextures.find(name) != definedTextures.end()) {
             static int count = 0;
@@ -1411,8 +1419,8 @@ void FormattingParserTarget::Texture(const std::string &name, const std::string 
 }
 
 std::string FormattingParserTarget::upgradeMaterialIndex(const std::string &name,
-                                                  ParameterDictionary *dict,
-                                                  FileLoc loc) const {
+                                                         ParameterDictionary *dict,
+                                                         FileLoc loc) const {
     if (name != "glass" && name != "uber")
         return "";
 
@@ -1446,8 +1454,9 @@ std::string FormattingParserTarget::upgradeMaterialIndex(const std::string &name
     }
 }
 
-std::string FormattingParserTarget::upgradeMaterial(std::string *name, ParameterDictionary *dict,
-                                             FileLoc loc) const {
+std::string FormattingParserTarget::upgradeMaterial(std::string *name,
+                                                    ParameterDictionary *dict,
+                                                    FileLoc loc) const {
     std::string extra = upgradeMaterialIndex(*name, dict, loc);
 
     dict->RenameParameter("bumpmap", "displacement");
@@ -1589,8 +1598,8 @@ std::string FormattingParserTarget::upgradeMaterial(std::string *name, Parameter
     return extra;
 }
 
-void FormattingParserTarget::Material(const std::string &name, ParsedParameterVector params,
-                               FileLoc loc) {
+void FormattingParserTarget::Material(const std::string &name,
+                                      ParsedParameterVector params, FileLoc loc) {
     ParameterDictionary dict(params, RGBColorSpace::sRGB);
     if (upgrade)
         dict.RenameUsedTextures(definedTextures);
@@ -1630,7 +1639,8 @@ void FormattingParserTarget::Material(const std::string &name, ParsedParameterVe
 }
 
 void FormattingParserTarget::MakeNamedMaterial(const std::string &name,
-                                        ParsedParameterVector params, FileLoc loc) {
+                                               ParsedParameterVector params,
+                                               FileLoc loc) {
     ParameterDictionary dict(params, RGBColorSpace::sRGB);
 
     if (upgrade) {
@@ -1688,8 +1698,8 @@ static std::string upgradeMapname(const FormattingParserTarget &scene,
     return scene.indent(1) + StringPrintf("\"string filename\" \"%s\"\n", n);
 }
 
-void FormattingParserTarget::LightSource(const std::string &name, ParsedParameterVector params,
-                                  FileLoc loc) {
+void FormattingParserTarget::LightSource(const std::string &name,
+                                         ParsedParameterVector params, FileLoc loc) {
     ParameterDictionary dict(params, RGBColorSpace::sRGB);
 
     Printf("%sLightSource \"%s\"\n", indent(), name);
@@ -1744,7 +1754,7 @@ void FormattingParserTarget::LightSource(const std::string &name, ParsedParamete
 }
 
 void FormattingParserTarget::AreaLightSource(const std::string &name,
-                                      ParsedParameterVector params, FileLoc loc) {
+                                             ParsedParameterVector params, FileLoc loc) {
     ParameterDictionary dict(params, RGBColorSpace::sRGB);
     std::string extra;
     Float totalScale = 1;
@@ -1810,7 +1820,7 @@ static std::string upgradeTriMeshUVs(const FormattingParserTarget &scene,
 }
 
 void FormattingParserTarget::Shape(const std::string &name, ParsedParameterVector params,
-                            FileLoc loc) {
+                                   FileLoc loc) {
     ParameterDictionary dict(params, RGBColorSpace::sRGB);
 
     if (toPly && name == "trianglemesh") {

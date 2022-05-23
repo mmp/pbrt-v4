@@ -32,11 +32,11 @@
 #ifdef NVTX
 #ifdef UNICODE
 #undef UNICODE
-#endif // UNICODE
+#endif  // UNICODE
 #include <nvtx3/nvToolsExt.h>
 #ifdef RGB
 #undef RGB
-#endif // RGB
+#endif  // RGB
 #endif
 
 #define OPTIX_CHECK(EXPR)                                                           \
@@ -369,9 +369,8 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
 
         TriangleMesh *mesh = nullptr;
         if (shape.name == "trianglemesh") {
-            mesh =
-                Triangle::CreateMesh(shape.renderFromObject, shape.reverseOrientation,
-                                     shape.parameters, &shape.loc, alloc);
+            mesh = Triangle::CreateMesh(shape.renderFromObject, shape.reverseOrientation,
+                                        shape.parameters, &shape.loc, alloc);
             CHECK(mesh != nullptr);
         } else if (shape.name == "loopsubdiv") {
             // Copied from pbrt/shapes.cpp... :-p
@@ -379,12 +378,12 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
             std::vector<int> vertexIndices = shape.parameters.GetIntArray("indices");
             if (vertexIndices.empty())
                 ErrorExit(&shape.loc, "Vertex indices \"indices\" not "
-                          "provided for LoopSubdiv shape.");
+                                      "provided for LoopSubdiv shape.");
 
             std::vector<Point3f> P = shape.parameters.GetPoint3fArray("P");
             if (P.empty())
                 ErrorExit(&shape.loc, "Vertex positions \"P\" not provided "
-                          "for LoopSubdiv shape.");
+                                      "for LoopSubdiv shape.");
 
             // don't actually use this for now...
             std::string scheme = shape.parameters.GetOneString("scheme", "loop");
@@ -418,11 +417,11 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
             }
 
             mesh = alloc.new_object<TriangleMesh>(
-                                                  *shape.renderFromObject, shape.reverseOrientation, plyMesh.triIndices,
-                                                  plyMesh.p, std::vector<Vector3f>(), plyMesh.n, plyMesh.uv,
-                                                  plyMesh.faceIndices, alloc);
+                *shape.renderFromObject, shape.reverseOrientation, plyMesh.triIndices,
+                plyMesh.p, std::vector<Vector3f>(), plyMesh.n, plyMesh.uv,
+                plyMesh.faceIndices, alloc);
         } else
-              LOG_FATAL("Logic error in GPUAggregate::buildBVHForTriangles()");
+            LOG_FATAL("Logic error in GPUAggregate::buildBVHForTriangles()");
 
         Bounds3f bounds;
         for (size_t i = 0; i < mesh->nVertices; ++i)
@@ -431,7 +430,6 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
         meshes[meshIndex] = mesh;
         meshBounds[meshIndex] = bounds;
     });
-
 
     BVH bvh(nMeshes);
     std::vector<OptixBuildInput> optixBuildInputs(nMeshes);
@@ -1048,7 +1046,7 @@ OptixModule OptiXAggregate::createOptiXModule(OptixDeviceContext optixContext,
     moduleCompileOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_MODERATE;
 #else
     moduleCompileOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;
-#endif // OPTIX_VERSION
+#endif  // OPTIX_VERSION
 #else
     moduleCompileOptions.optLevel = OPTIX_COMPILE_OPTIMIZATION_DEFAULT;
     moduleCompileOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
@@ -1161,7 +1159,7 @@ OptiXAggregate::OptiXAggregate(
     // kernel is running on the GPU to build a BVH... (Issue #164).
     if (Options->useGPU)
         DisableThreadPool();
-#endif // PBRT_IS_WINDOWS
+#endif  // PBRT_IS_WINDOWS
 
     ThreadLocal<cudaStream_t> threadCUDAStreams([]() {
         cudaStream_t stream;
@@ -1354,17 +1352,18 @@ OptiXAggregate::OptiXAggregate(
     AsyncJob<GAS> *triJob = RunAsync([&]() {
         BVH triangleBVH = buildBVHForTriangles(
             scene.shapes, plyMeshes, optixContext, hitPGTriangle, anyhitPGShadowTriangle,
-            hitPGRandomHitTriangle, textures.floatTextures, namedMaterials, materials, media,
-            shapeIndexToAreaLights, threadAllocators, threadCUDAStreams);
+            hitPGRandomHitTriangle, textures.floatTextures, namedMaterials, materials,
+            media, shapeIndexToAreaLights, threadAllocators, threadCUDAStreams);
         int sbtOffset = addHGRecords(triangleBVH);
         return GAS{triangleBVH, sbtOffset};
     });
 
     AsyncJob<GAS> *blpJob = RunAsync([&]() {
-        BVH blpBVH = buildBVHForBLPs(
-            scene.shapes, optixContext, hitPGBilinearPatch, anyhitPGShadowBilinearPatch,
-            hitPGRandomHitBilinearPatch, textures.floatTextures, namedMaterials, materials,
-            media, shapeIndexToAreaLights, threadAllocators, threadCUDAStreams);
+        BVH blpBVH =
+            buildBVHForBLPs(scene.shapes, optixContext, hitPGBilinearPatch,
+                            anyhitPGShadowBilinearPatch, hitPGRandomHitBilinearPatch,
+                            textures.floatTextures, namedMaterials, materials, media,
+                            shapeIndexToAreaLights, threadAllocators, threadCUDAStreams);
         int bilinearSBTOffset = addHGRecords(blpBVH);
         return GAS{blpBVH, bilinearSBTOffset};
     });
@@ -1372,8 +1371,8 @@ OptiXAggregate::OptiXAggregate(
     AsyncJob<GAS> *quadricJob = RunAsync([&]() {
         BVH quadricBVH = buildBVHForQuadrics(
             scene.shapes, optixContext, hitPGQuadric, anyhitPGShadowQuadric,
-            hitPGRandomHitQuadric, textures.floatTextures, namedMaterials, materials, media,
-            shapeIndexToAreaLights, threadAllocators, threadCUDAStreams);
+            hitPGRandomHitQuadric, textures.floatTextures, namedMaterials, materials,
+            media, shapeIndexToAreaLights, threadAllocators, threadCUDAStreams);
         int quadricSBTOffset = addHGRecords(quadricBVH);
         return GAS{quadricBVH, quadricSBTOffset};
     });
@@ -1459,7 +1458,8 @@ OptiXAggregate::OptiXAggregate(
     // Get the appropriate instanceMap iterator for each instance use, just
     // once, and in parallel.  While we're at it, count the total number of
     // OptixInstances that will be added to iasInstances.
-    std::vector<std::unordered_map<InternedString, Instance, InternedStringHash>::const_iterator>
+    std::vector<
+        std::unordered_map<InternedString, Instance, InternedStringHash>::const_iterator>
         instanceMapIters(scene.instances.size());
     std::atomic<int> totalOptixInstances{0};
     std::vector<int> numValidHandles(scene.instances.size());
@@ -1617,8 +1617,8 @@ OptiXAggregate::OptiXAggregate(
 
 #ifdef PBRT_IS_WINDOWS
     if (Options->useGPU)
-      ReenableThreadPool();
-#endif // PBRT_IS_WINDOWS
+        ReenableThreadPool();
+#endif  // PBRT_IS_WINDOWS
 }
 
 OptiXAggregate::ParamBufferState &OptiXAggregate::getParamBuffer(

@@ -55,7 +55,7 @@ class GUI {
 
     void keyboardCallback(GLFWwindow *window, int key, int scan, int action, int mods);
     void cursorPosCallback(GLFWwindow *window, double xpos, double ypos);
-    void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
+    void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods);
 
   private:
     bool processKeys();
@@ -72,7 +72,7 @@ class GUI {
     Float xoffset = 0.f;
     Float yoffset = 0.f;
     double lastX = 0.f;
-    double lastY = 0.f;;
+    double lastY = 0.f;
 
 #ifdef PBRT_BUILD_GPU_RENDERER
     CUDAOutputBuffer<RGB> *cudaFramebuffer = nullptr;

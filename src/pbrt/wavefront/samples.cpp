@@ -11,7 +11,7 @@
 
 #ifdef interface
 #undef interface
-#endif // interface
+#endif  // interface
 
 namespace pbrt {
 

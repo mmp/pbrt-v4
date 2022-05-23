@@ -295,9 +295,7 @@ class RGBFilm : public FilmBase {
         return outputRGBFromSensorRGB * sensorRGB;
     }
 
-    PBRT_CPU_GPU void ResetPixel(Point2i p) {
-        std::memset(&pixels[p], 0, sizeof(Pixel));
-    }
+    PBRT_CPU_GPU void ResetPixel(Point2i p) { std::memset(&pixels[p], 0, sizeof(Pixel)); }
 
   private:
     // RGBFilm::Pixel Definition
@@ -371,9 +369,7 @@ class GBufferFilm : public FilmBase {
 
     std::string ToString() const;
 
-    PBRT_CPU_GPU void ResetPixel(Point2i p) {
-        std::memset(&pixels[p], 0, sizeof(Pixel));
-    }
+    PBRT_CPU_GPU void ResetPixel(Point2i p) { std::memset(&pixels[p], 0, sizeof(Pixel)); }
 
   private:
     // GBufferFilm::Pixel Definition
@@ -461,10 +457,9 @@ class SpectralFilm : public FilmBase {
     PBRT_CPU_GPU
     RGB GetPixelRGB(Point2i p, Float splatScale = 1) const;
 
-    SpectralFilm(FilmBaseParameters p, Float lambdaMin, Float lambdaMax,
-                 int nBuckets, const RGBColorSpace *colorSpace,
-                 Float maxComponentValue = Infinity, bool writeFP16 = true,
-                 Allocator alloc = {});
+    SpectralFilm(FilmBaseParameters p, Float lambdaMin, Float lambdaMax, int nBuckets,
+                 const RGBColorSpace *colorSpace, Float maxComponentValue = Infinity,
+                 bool writeFP16 = true, Allocator alloc = {});
 
     static SpectralFilm *Create(const ParameterDictionary &parameters, Float exposureTime,
                                 Filter filter, const RGBColorSpace *colorSpace,
@@ -495,8 +490,8 @@ class SpectralFilm : public FilmBase {
         pix.rgbSum[0] = pix.rgbSum[1] = pix.rgbSum[2] = 0.;
         pix.rgbWeightSum = 0.;
         pix.rgbSplat[0] = pix.rgbSplat[1] = pix.rgbSplat[2] = 0.;
-        std::memset(pix.bucketSums, 0, nBuckets *sizeof(double));
-        std::memset(pix.weightSums, 0, nBuckets *sizeof(double));
+        std::memset(pix.bucketSums, 0, nBuckets * sizeof(double));
+        std::memset(pix.weightSums, 0, nBuckets * sizeof(double));
         std::memset(pix.bucketSplats, 0, nBuckets * sizeof(AtomicDouble));
     }
 

@@ -193,10 +193,11 @@ std::string NormalizeUTF8(std::string str) {
     utf8proc_option_t options = UTF8PROC_COMPOSE;
 
     utf8proc_uint8_t *result;
-    utf8proc_ssize_t length = utf8proc_map((const unsigned char *)str.data(), str.size(),
-                                           &result, options);
+    utf8proc_ssize_t length =
+        utf8proc_map((const unsigned char *)str.data(), str.size(), &result, options);
     if (length < 0)
-        ErrorExit("Unicode normalization error: %s: \"%s\"", utf8proc_errmsg(length), str);
+        ErrorExit("Unicode normalization error: %s: \"%s\"", utf8proc_errmsg(length),
+                  str);
 
     str = std::string(result, result + length);
     free(result);

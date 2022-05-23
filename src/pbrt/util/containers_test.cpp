@@ -190,7 +190,7 @@ TEST(InternCache, BadHash) {
         const int *p = cache.Lookup(ii);
         EXPECT_EQ(*p, ii);
         firstPass[ii] = p;
-        EXPECT_EQ(i+1, cache.size());
+        EXPECT_EQ(i + 1, cache.size());
     }
     for (int i = 0; i < n; ++i) {
         int ii = PermutationElement(i, n, 0xfeed00f5);

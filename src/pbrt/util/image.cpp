@@ -953,9 +953,10 @@ bool Image::Write(std::string name, const ImageMetadata &metadata) const {
         ImageChannelDesc desc = outImage.GetChannelDesc({"R", "G", "B", "A"});
         if (!desc)
             // Still go for it.
-            Warning("%s: image has 4 channels but they are not R, G, B, and A. Image may be "
-                    "garbled.",
-                    name);
+            Warning(
+                "%s: image has 4 channels but they are not R, G, B, and A. Image may be "
+                "garbled.",
+                name);
         else
             // Reorder them as RGBA.
             outImage = outImage.SelectChannels(desc);
@@ -1104,8 +1105,7 @@ static ImageAndMetadata ReadEXR(const std::string &name, Allocator alloc) {
         // Find any string or string vector attributes
         for (auto iter = file.header().begin(); iter != file.header().end(); ++iter) {
             if (strcmp(iter.attribute().typeName(), "string") == 0) {
-                Imf::StringAttribute &sv =
-                    (Imf::StringAttribute &)iter.attribute();
+                Imf::StringAttribute &sv = (Imf::StringAttribute &)iter.attribute();
                 metadata.strings[iter.name()] = sv.value();
             }
             if (strcmp(iter.attribute().typeName(), "stringvector") == 0) {
@@ -1427,7 +1427,8 @@ std::string Image::ToString() const {
 }
 
 std::unique_ptr<uint8_t[]> Image::QuantizePixelsToU256(int *nOutOfGamut) const {
-    std::unique_ptr<uint8_t[]> u256 = std::make_unique<uint8_t[]>(NChannels() * resolution.x * resolution.y);
+    std::unique_ptr<uint8_t[]> u256 =
+        std::make_unique<uint8_t[]>(NChannels() * resolution.x * resolution.y);
     for (int y = 0; y < resolution.y; ++y)
         for (int x = 0; x < resolution.x; ++x)
             for (int c = 0; c < NChannels(); ++c) {
@@ -1464,8 +1465,8 @@ bool Image::WritePNG(const std::string &filename, const ImageMetadata &metadata)
     }
 
     if (format == PixelFormat::U256) {
-      error = lodepng_encode_memory(&png, &pngSize, p8.data(), resolution.x,
-                                    resolution.y, pngColor, 8 /* bitdepth */);
+        error = lodepng_encode_memory(&png, &pngSize, p8.data(), resolution.x,
+                                      resolution.y, pngColor, 8 /* bitdepth */);
     } else {
         std::unique_ptr<uint8_t[]> pix8 = QuantizePixelsToU256(&nOutOfGamut);
         error = lodepng_encode_memory(&png, &pngSize, pix8.get(), resolution.x,
@@ -1503,7 +1504,8 @@ bool Image::WriteQOI(const std::string &filename, const ImageMetadata &metadata)
     desc.channels = NChannels();
     if (Encoding() && !Encoding().Is<LinearColorEncoding>() &&
         !Encoding().Is<sRGBColorEncoding>()) {
-        Error("%s: only linear and sRGB encodings are supported by QOI.", Encoding().ToString()); //filename);
+        Error("%s: only linear and sRGB encodings are supported by QOI.",
+              Encoding().ToString());  // filename);
         return false;
     }
     desc.colorspace = Encoding().Is<LinearColorEncoding>() ? QOI_LINEAR : QOI_SRGB;
@@ -1536,7 +1538,8 @@ bool Image::WriteQOI(const std::string &filename, const ImageMetadata &metadata)
         qoiPixels = qoi_encode(rgba8.get(), &desc, &qoiSize);
     }
 
-    bool success = WriteFileContents(filename, std::string((const char *)qoiPixels, qoiSize));
+    bool success =
+        WriteFileContents(filename, std::string((const char *)qoiPixels, qoiSize));
     if (!success)
         Error("%s: error writing QOI file.", filename);
 
@@ -1725,7 +1728,7 @@ static ImageAndMetadata ReadQOI(const std::string &filename, Allocator alloc) {
     std::string contents = ReadFileContents(filename);
     qoi_desc desc;
     void *pixels = qoi_decode(contents.data(), contents.size(), &desc, 0 /* channels */);
-    CHECK(pixels != nullptr); // qoi failure
+    CHECK(pixels != nullptr);  // qoi failure
 
     ImageMetadata metadata;
     metadata.colorSpace = RGBColorSpace::sRGB;
@@ -1737,17 +1740,18 @@ static ImageAndMetadata ReadQOI(const std::string &filename, Allocator alloc) {
         CHECK_EQ(3, desc.channels);
 
     CHECK(desc.colorspace == QOI_SRGB || desc.colorspace == QOI_LINEAR);
-    ColorEncoding encoding = (desc.colorspace == QOI_SRGB) ? ColorEncoding::sRGB :
-                                                             ColorEncoding::Linear;
+    ColorEncoding encoding =
+        (desc.colorspace == QOI_SRGB) ? ColorEncoding::sRGB : ColorEncoding::Linear;
 
-    Image image(PixelFormat::U256, Point2i(desc.width, desc.height), channelNames, encoding, alloc);
-    std::memcpy(image.RawPointer({0, 0}), pixels, desc.width * desc.height * desc.channels);
+    Image image(PixelFormat::U256, Point2i(desc.width, desc.height), channelNames,
+                encoding, alloc);
+    std::memcpy(image.RawPointer({0, 0}), pixels,
+                desc.width * desc.height * desc.channels);
 
     free(pixels);
 
     return ImageAndMetadata{image, metadata};
 }
-
 
 bool Image::WritePFM(const std::string &filename, const ImageMetadata &metadata) const {
     FILE *fp = FOpenWrite(filename);
