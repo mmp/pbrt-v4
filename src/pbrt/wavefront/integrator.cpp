@@ -48,6 +48,7 @@ static void updateMaterialNeeds(
     Material m, pstd::array<bool, Material::NumTags()> *haveBasicEvalMaterial,
     pstd::array<bool, Material::NumTags()> *haveUniversalEvalMaterial,
     bool *haveSubsurface, bool *haveMedia) {
+    *haveMedia |= (m == nullptr);  // interface material
     if (!m)
         return;
 
@@ -67,7 +68,6 @@ static void updateMaterialNeeds(
     }
 
     *haveSubsurface |= m.HasSubsurfaceScattering();
-    *haveMedia |= (m == nullptr);  // interface material
 
     FloatTexture displace = m.GetDisplacement();
     if (m.CanEvaluateTextures(BasicTextureEvaluator()) &&
