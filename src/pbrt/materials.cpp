@@ -136,34 +136,36 @@ HairMaterial *HairMaterial::Create(const TextureParameterDictionary &parameters,
                                    const FileLoc *loc, Allocator alloc) {
     SpectrumTexture sigma_a =
         parameters.GetSpectrumTextureOrNull("sigma_a", SpectrumType::Unbounded, alloc);
-    SpectrumTexture color =
-        parameters.GetSpectrumTextureOrNull("color", SpectrumType::Albedo, alloc);
+    SpectrumTexture reflectance =
+        parameters.GetSpectrumTextureOrNull("reflectance", SpectrumType::Albedo, alloc);
+    if (!reflectance)
+        reflectance = parameters.GetSpectrumTextureOrNull("color", SpectrumType::Albedo, alloc);
     FloatTexture eumelanin = parameters.GetFloatTextureOrNull("eumelanin", alloc);
     FloatTexture pheomelanin = parameters.GetFloatTextureOrNull("pheomelanin", alloc);
     if (sigma_a) {
-        if (color)
-            Warning(loc, R"(Ignoring "color" parameter since "sigma_a" was provided.)");
+        if (reflectance)
+            Warning(loc, R"(Ignoring "reflectance" parameter since "sigma_a" was provided.)");
         if (eumelanin)
             Warning(loc, "Ignoring \"eumelanin\" parameter since \"sigma_a\" was "
                          "provided.");
         if (pheomelanin)
             Warning(loc, "Ignoring \"pheomelanin\" parameter since \"sigma_a\" was "
                          "provided.");
-    } else if (color) {
+    } else if (reflectance) {
         if (sigma_a)
-            Warning(loc, R"(Ignoring "sigma_a" parameter since "color" was provided.)");
+            Warning(loc, R"(Ignoring "sigma_a" parameter since "reflectance" was provided.)");
         if (eumelanin)
-            Warning(loc, "Ignoring \"eumelanin\" parameter since \"color\" was "
+            Warning(loc, "Ignoring \"eumelanin\" parameter since \"reflectance\" was "
                          "provided.");
         if (pheomelanin)
-            Warning(loc, "Ignoring \"pheomelanin\" parameter since \"color\" was "
+            Warning(loc, "Ignoring \"pheomelanin\" parameter since \"reflectance\" was "
                          "provided.");
     } else if (eumelanin || pheomelanin) {
         if (sigma_a)
             Warning(loc, "Ignoring \"sigma_a\" parameter since "
                          "\"eumelanin\"/\"pheomelanin\" was provided.");
-        if (color)
-            Warning(loc, "Ignoring \"color\" parameter since "
+        if (reflectance)
+            Warning(loc, "Ignoring \"reflectance\" parameter since "
                          "\"eumelanin\"/\"pheomelanin\" was provided.");
     } else {
         // Default: brown-ish hair.
@@ -177,7 +179,7 @@ HairMaterial *HairMaterial::Create(const TextureParameterDictionary &parameters,
     FloatTexture beta_n = parameters.GetFloatTexture("beta_n", 0.3f, alloc);
     FloatTexture alpha = parameters.GetFloatTexture("alpha", 2.f, alloc);
 
-    return alloc.new_object<HairMaterial>(sigma_a, color, eumelanin, pheomelanin, eta,
+    return alloc.new_object<HairMaterial>(sigma_a, reflectance, eumelanin, pheomelanin, eta,
                                           beta_m, beta_n, alpha);
 }
 

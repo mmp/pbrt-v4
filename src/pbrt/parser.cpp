@@ -1592,6 +1592,8 @@ std::string FormattingParserTarget::upgradeMaterial(std::string *name,
     } else if (*name == "disney") {
         *name = "diffuse";
         dict->RenameParameter("color", "reflectance");
+    } else if (*name == "hair") {
+        dict->RenameParameter("color", "reflectance");
     } else if (name->empty() || *name == "none")
         *name = "interface";
 
