@@ -1418,7 +1418,7 @@ pstd::vector<Shape> Shape::Create(
         std::string filename = ResolveFilename(parameters.GetOneString("filename", ""));
         TriQuadMesh plyMesh = TriQuadMesh::ReadPLY(filename);
 
-        Float edgeLength = parameters.GetOneFloat("displacement.edgelength", 1.f);
+        Float edgeLength = parameters.GetOneFloat("edgelength", 1.f);
         edgeLength *= Options->displacementEdgeScale;
 
         std::string displacementTexName = parameters.GetTexture("displacement");
