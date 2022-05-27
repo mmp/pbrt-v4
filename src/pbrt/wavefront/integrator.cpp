@@ -498,12 +498,14 @@ void WavefrontPathIntegrator::HandleEscapedRays() {
             for (const auto &light : *infiniteLights) {
                 if (SampledSpectrum Le = light.Le(Ray(w.rayo, w.rayd), w.lambda); Le) {
                     // Compute path radiance contribution from infinite light
-                    PBRT_DBG("L %f %f %f %f beta %f %f %f %f Le %f %f %f %f", L[0], L[1],
+                    PBRT_DBG("L %f %f %f %f beta %f %f %f %f Le %f %f %f %f\n", L[0], L[1],
                              L[2], L[3], w.beta[0], w.beta[1], w.beta[2], w.beta[3],
                              Le[0], Le[1], Le[2], Le[3]);
-                    PBRT_DBG("pdf uni %f %f %f %f pdf nee %f %f %f %f", w.inv_w_u[0],
-                             w.inv_w_u[1], w.inv_w_u[2], w.inv_w_u[3], w.inv_w_l[0],
-                             w.inv_w_l[1], w.inv_w_l[2], w.inv_w_l[3]);
+                    PBRT_DBG("depth %d specularBounce %d pdf uni %f %f %f %f "
+                             "pdf nee %f %f %f %f\n",
+                             w.depth, w.specularBounce,
+                             w.inv_w_u[0], w.inv_w_u[1], w.inv_w_u[2], w.inv_w_u[3],
+                             w.inv_w_l[0], w.inv_w_l[1], w.inv_w_l[2], w.inv_w_l[3]);
 
                     if (w.depth == 0 || w.specularBounce) {
                         L += w.beta * Le / w.inv_w_u.Average();
