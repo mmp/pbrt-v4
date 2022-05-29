@@ -156,6 +156,10 @@ bool Image::HasAnyNaNPixels() const {
     return false;
 }
 
+bool Image::IsNonSquare() const {
+    return resolution.x != resolution.y;
+}
+
 Image Image::GaussianFilter(const ImageChannelDesc &desc, int halfWidth,
                             Float sigma) const {
     // Compute filter weights

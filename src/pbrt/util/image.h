@@ -321,6 +321,7 @@ class Image {
 
     bool HasAnyInfinitePixels() const;
     bool HasAnyNaNPixels() const;
+    bool IsNonSquare() const;
 
     ImageChannelValues MAE(const ImageChannelDesc &desc, const Image &ref,
                            Image *errorImage = nullptr) const;
