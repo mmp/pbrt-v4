@@ -630,7 +630,9 @@ GoniometricLight *GoniometricLight::Create(const Transform &renderFromLight,
 
         if (imageAndMetadata.image.IsNonSquare())
             ErrorExit("%s: image resolution (%d, %d) is non-square. It's unlikely "
-                      "this is an equal-area environment map.",
+                      "that this is an equal-area environment map. Consider to use "
+                      "the command makeequiarea of the helper program imgtool to "
+                      "resolve this issue.",
                       texname, imageAndMetadata.image.Resolution().x,
                       imageAndMetadata.image.Resolution().y);
 
@@ -1027,7 +1029,9 @@ ImageInfiniteLight::ImageInfiniteLight(Transform renderFromLight, Image im,
     CHECK(channelDesc.IsIdentity());
     if (image.IsNonSquare())
         ErrorExit("%s: image resolution (%d, %d) is non-square. It's unlikely "
-                  "this is an equal area environment map.",
+                  "that this is an equal-area environment map. Consider to use "
+                  "the command makeequiarea of the helper program imgtool to "
+                  "resolve this issue.",
                   filename, image.Resolution().x, image.Resolution().y);
     Array2D<Float> d = image.GetSamplingDistribution();
     Bounds2f domain = Bounds2f(Point2f(0, 0), Point2f(1, 1));
@@ -1129,7 +1133,9 @@ PortalImageInfiniteLight::PortalImageInfiniteLight(
 
     if (equalAreaImage.IsNonSquare())
         ErrorExit("%s: image resolution (%d, %d) is non-square. It's unlikely "
-                  "this is an equal area environment map.",
+                  "that this is an equal-area environment map. Consider to use "
+                  "the command makeequiarea of the helper program imgtool to "
+                  "resolve this issue.",
                   filename, equalAreaImage.Resolution().x, equalAreaImage.Resolution().y);
 
     if (p.size() != 4)
