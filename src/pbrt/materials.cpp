@@ -671,6 +671,10 @@ Material Material::Create(const std::string &name,
             if (iter == namedMaterials.end())
                 ErrorExit("%s: named material not found.", materialNames[i]);
             materials[i] = iter->second;
+
+            if (materials[i] == nullptr)
+                ErrorExit("%s: an \"interface\" material cannot be used as an element of "
+                          "the \"mix\" material.", materialNames[i]);
         }
         material = MixMaterial::Create(materials, parameters, loc, alloc);
     } else
