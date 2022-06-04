@@ -36,7 +36,7 @@ PBRT_CPU_GPU inline bool Refract(Vector3f wi, Normal3f n, Float eta, Float *etap
     if (sin2Theta_t >= 1)
         return false;
 
-    Float cosTheta_t = SafeSqrt(1 - sin2Theta_t);
+    Float cosTheta_t = std::sqrt(1 - sin2Theta_t);
 
     *wt = -wi / eta + (cosTheta_i / eta - cosTheta_t) * Vector3f(n);
     // Provide relative IOR along ray to caller
