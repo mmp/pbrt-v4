@@ -532,28 +532,31 @@ class WeightedReservoirSampler {
     void Seed(uint64_t seed) { rng.SetSequence(seed); }
 
     PBRT_CPU_GPU
-    void Add(const T &sample, Float weight) {
+    bool Add(const T &sample, Float weight) {
         weightSum += weight;
         // Randomly add _sample_ to reservoir
         Float p = weight / weightSum;
         if (rng.Uniform<Float>() < p) {
             reservoir = sample;
             reservoirWeight = weight;
+            return true;
         }
-
         DCHECK_LT(weightSum, 1e80);
+        return false;
     }
 
     template <typename F>
-    PBRT_CPU_GPU void Add(F func, Float weight) {
+    PBRT_CPU_GPU bool Add(F func, Float weight) {
         // Process weighted reservoir sample via callback
         weightSum += weight;
         Float p = weight / weightSum;
         if (rng.Uniform<Float>() < p) {
             reservoir = func();
             reservoirWeight = weight;
+            return true;
         }
         DCHECK_LT(weightSum, 1e80);
+        return false;
     }
 
     PBRT_CPU_GPU
@@ -578,8 +581,8 @@ class WeightedReservoirSampler {
     PBRT_CPU_GPU
     void Merge(const WeightedReservoirSampler &wrs) {
         DCHECK_LE(weightSum + wrs.WeightSum(), 1e80);
-        if (wrs.HasSample())
-            Add(wrs.reservoir, wrs.weightSum);
+        if (wrs.HasSample() && Add(wrs.reservoir, wrs.weightSum))
+            reservoirWeight = wrs.reservoirWeight;
     }
 
     std::string ToString() const {
