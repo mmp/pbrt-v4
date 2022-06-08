@@ -3295,7 +3295,7 @@ std::unique_ptr<SPPMIntegrator> SPPMIntegrator::Create(
     int maxDepth = parameters.GetOneInt("maxdepth", 5);
     int photonsPerIter = parameters.GetOneInt("photonsperiteration", -1);
     Float radius = parameters.GetOneFloat("radius", 1.f);
-    int seed = parameters.GetOneInt("seed", 6502);
+    int seed = parameters.GetOneInt("seed", Options->seed);
     return std::make_unique<SPPMIntegrator>(camera, sampler, aggregate, lights,
                                             photonsPerIter, maxDepth, radius, seed,
                                             colorSpace);
