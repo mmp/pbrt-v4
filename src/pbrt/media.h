@@ -602,7 +602,7 @@ class NanoVDBMedium {
     NanoVDBMedium(const Transform &renderFromMedium, Spectrum sigma_a, Spectrum sigma_s,
                   Float sigmaScale, Float g, nanovdb::GridHandle<NanoVDBBuffer> dg,
                   nanovdb::GridHandle<NanoVDBBuffer> tg, Float LeScale,
-                  Float temperatureCutoff, Float temperatureScale, Allocator alloc);
+                  Float temperatureOffset, Float temperatureScale, Allocator alloc);
 
     PBRT_CPU_GPU
     bool IsEmissive() const { return temperatureFloatGrid && LeScale > 0; }
@@ -652,7 +652,7 @@ class NanoVDBMedium {
             temperatureFloatGrid->worldToIndexF(nanovdb::Vec3<float>(p.x, p.y, p.z));
         using Sampler = nanovdb::SampleFromVoxels<nanovdb::FloatGrid::TreeType, 1, false>;
         Float temp = Sampler(temperatureFloatGrid->tree())(pIndex);
-        temp = (temp - temperatureCutoff) * temperatureScale;
+        temp = (temp - temperatureOffset) * temperatureScale;
         if (temp <= 100.f)
             return SampledSpectrum(0.f);
         return LeScale * BlackbodySpectrum(temp).Sample(lambda);
@@ -668,7 +668,7 @@ class NanoVDBMedium {
     nanovdb::GridHandle<NanoVDBBuffer> temperatureGrid;
     const nanovdb::FloatGrid *densityFloatGrid = nullptr;
     const nanovdb::FloatGrid *temperatureFloatGrid = nullptr;
-    Float LeScale, temperatureCutoff, temperatureScale;
+    Float LeScale, temperatureOffset, temperatureScale;
 };
 
 inline Float PhaseFunction::p(Vector3f wo, Vector3f wi) const {

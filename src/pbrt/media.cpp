@@ -504,7 +504,7 @@ NanoVDBMedium::NanoVDBMedium(const Transform &renderFromMedium, Spectrum sigma_a
                              Spectrum sigma_s, Float sigmaScale, Float g,
                              nanovdb::GridHandle<NanoVDBBuffer> dg,
                              nanovdb::GridHandle<NanoVDBBuffer> tg, Float LeScale,
-                             Float temperatureCutoff, Float temperatureScale,
+                             Float temperatureOffset, Float temperatureScale,
                              Allocator alloc)
     : renderFromMedium(renderFromMedium),
       sigma_a_spec(sigma_a, alloc),
@@ -514,7 +514,7 @@ NanoVDBMedium::NanoVDBMedium(const Transform &renderFromMedium, Spectrum sigma_a
       densityGrid(std::move(dg)),
       temperatureGrid(std::move(tg)),
       LeScale(LeScale),
-      temperatureCutoff(temperatureCutoff),
+      temperatureOffset(temperatureOffset),
       temperatureScale(temperatureScale) {
     densityFloatGrid = densityGrid.grid<float>();
 
@@ -613,8 +613,8 @@ NanoVDBMedium::NanoVDBMedium(const Transform &renderFromMedium, Spectrum sigma_a
 
 std::string NanoVDBMedium::ToString() const {
     return StringPrintf("[ NanoVDBMedium bounds: %s LeScale: %f "
-                        "temperatureCutoff: %f temperatureScale: %f (grids elided) ]",
-                        bounds, LeScale, temperatureCutoff, temperatureScale);
+                        "temperatureOffset: %f temperatureScale: %f (grids elided) ]",
+                        bounds, LeScale, temperatureOffset, temperatureScale);
 }
 
 NanoVDBMedium *NanoVDBMedium::Create(const ParameterDictionary &parameters,
@@ -632,8 +632,9 @@ NanoVDBMedium *NanoVDBMedium::Create(const ParameterDictionary &parameters,
     nanovdb::GridHandle<NanoVDBBuffer> temperatureGrid;
     temperatureGrid = readGrid<NanoVDBBuffer>(filename, "temperature", loc, alloc);
 
-    Float LeScale = parameters.GetOneFloat("LeScale", 1.f);
-    Float temperatureCutoff = parameters.GetOneFloat("temperaturecutoff", 0.f);
+    Float LeScale = parameters.GetOneFloat("Lescale", 1.f);
+    Float temperatureOffset = parameters.GetOneFloat("temperatureoffset",
+                                                     parameters.GetOneFloat("temperaturecutoff", 0.f));
     Float temperatureScale = parameters.GetOneFloat("temperaturescale", 1.f);
 
     Float g = parameters.GetOneFloat("g", 0.);
@@ -649,7 +650,7 @@ NanoVDBMedium *NanoVDBMedium::Create(const ParameterDictionary &parameters,
 
     return alloc.new_object<NanoVDBMedium>(
         renderFromMedium, sigma_a, sigma_s, sigmaScale, g, std::move(densityGrid),
-        std::move(temperatureGrid), LeScale, temperatureCutoff, temperatureScale, alloc);
+        std::move(temperatureGrid), LeScale, temperatureOffset, temperatureScale, alloc);
 }
 
 Medium Medium::Create(const std::string &name, const ParameterDictionary &parameters,
