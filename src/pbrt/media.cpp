@@ -435,7 +435,7 @@ RGBGridMedium *RGBGridMedium::Create(const ParameterDictionary &parameters,
 
     Point3f p0 = parameters.GetOnePoint3f("p0", Point3f(0.f, 0.f, 0.f));
     Point3f p1 = parameters.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
-    Float LeScale = parameters.GetOneFloat("LeScale", 1.f);
+    Float LeScale = parameters.GetOneFloat("Lescale", 1.f);
     Float g = parameters.GetOneFloat("g", 0.f);
     Float sigmaScale = parameters.GetOneFloat("scale", 1.f);
 
