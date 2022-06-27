@@ -69,8 +69,11 @@ std::string RemoveExtension(std::string filename) {
 std::string ResolveFilename(std::string filename) {
     if (searchDirectory.empty() || filename.empty() || IsAbsolutePath(filename))
         return filename;
-    else
-        return (searchDirectory / filesystem::path(filename)).make_absolute().str();
+
+    filesystem::path filepath = searchDirectory / filesystem::path(filename);
+    if (filepath.exists())
+        return filepath.make_absolute().str();
+    return filename;
 }
 
 std::vector<std::string> MatchingFilenames(std::string filenameBase) {
