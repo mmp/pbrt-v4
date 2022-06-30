@@ -1333,7 +1333,7 @@ RealisticCamera *RealisticCamera::Create(const ParameterDictionary &parameters,
         return image;
     };
 
-    std::string apertureName = ResolveFilename(parameters.GetOneString("aperture", ""));
+    std::string apertureName = parameters.GetOneString("aperture", "");
     Image apertureImage(alloc);
     if (!apertureName.empty()) {
         // built-in diaphragm shapes
@@ -1380,7 +1380,7 @@ RealisticCamera *RealisticCamera::Create(const ParameterDictionary &parameters,
             std::reverse(vert.begin(), vert.end());
             apertureImage = rasterize(vert);
         } else {
-            ImageAndMetadata im = Image::Read(apertureName, alloc);
+            ImageAndMetadata im = Image::Read(ResolveFilename(apertureName), alloc);
             apertureImage = std::move(im.image);
             if (apertureImage.NChannels() > 1) {
                 ImageChannelDesc rgbDesc = apertureImage.GetChannelDesc({"R", "G", "B"});
