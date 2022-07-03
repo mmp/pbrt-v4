@@ -110,7 +110,7 @@ set (PTEX_BUILD_SHARED_LIBS OFF CACHE BOOL " " FORCE)
 
 set (CMAKE_MACOSX_RPATH 1)
 if (WIN32)
-  add_definitions (/D PTEX_STATIC)
+  add_definitions (/DPTEX_STATIC)
 endif ()
 
 add_subdirectory (ptex)
