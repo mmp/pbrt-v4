@@ -105,8 +105,16 @@ class TrowbridgeReitzDistribution {
     // TrowbridgeReitzDistribution Public Methods
     TrowbridgeReitzDistribution() = default;
     PBRT_CPU_GPU
-    TrowbridgeReitzDistribution(Float alpha_x, Float alpha_y)
-        : alpha_x(alpha_x), alpha_y(alpha_y) {}
+    TrowbridgeReitzDistribution(Float ax, Float ay)
+        : alpha_x(ax), alpha_y(ay) {
+        if (!EffectivelySmooth()) {
+            // If one direction has some roughness, then the other can't
+            // have zero (or very low) roughness; the computation of |e| in
+            // D() blows up in that case.
+            alpha_x = std::max<Float>(alpha_x, 1e-4f);
+            alpha_y = std::max<Float>(alpha_y, 1e-4f);
+        }
+    }
 
     PBRT_CPU_GPU inline Float D(Vector3f wm) const {
         Float tan2Theta = Tan2Theta(wm);
