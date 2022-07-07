@@ -625,11 +625,14 @@ NanoVDBMedium *NanoVDBMedium::Create(const ParameterDictionary &parameters,
         ErrorExit(loc, "Must supply \"filename\" to \"nanovdb\" medium.");
 
     nanovdb::GridHandle<NanoVDBBuffer> densityGrid;
-    densityGrid = readGrid<NanoVDBBuffer>(filename, "density", loc, alloc);
+    std::string gridname = parameters.GetOneString("gridname", "density");
+    densityGrid = readGrid<NanoVDBBuffer>(filename, gridname, loc, alloc);
     if (!densityGrid)
         ErrorExit(loc, "%s: didn't find \"density\" grid.", filename);
 
     nanovdb::GridHandle<NanoVDBBuffer> temperatureGrid;
+    std::string temperaturename =
+        parameters.GetOneString("temperaturename", "temperature");
     temperatureGrid = readGrid<NanoVDBBuffer>(filename, "temperature", loc, alloc);
 
     Float LeScale = parameters.GetOneFloat("LeScale", 1.f);
