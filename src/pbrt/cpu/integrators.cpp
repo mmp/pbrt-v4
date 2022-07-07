@@ -606,6 +606,9 @@ std::string LightPathIntegrator::ToString() const {
 std::unique_ptr<LightPathIntegrator> LightPathIntegrator::Create(
     const ParameterDictionary &parameters, Camera camera, Sampler sampler,
     Primitive aggregate, std::vector<Light> lights, const FileLoc *loc) {
+    if (!camera.Is<PerspectiveCamera>())
+        ErrorExit("Only the \"perspective\" camera is currently supported with the "
+                  "\"lightpath\" integrator.");
     int maxDepth = parameters.GetOneInt("maxdepth", 5);
     return std::make_unique<LightPathIntegrator>(maxDepth, camera, sampler, aggregate,
                                                  lights);
@@ -2424,6 +2427,9 @@ std::string BDPTIntegrator::ToString() const {
 std::unique_ptr<BDPTIntegrator> BDPTIntegrator::Create(
     const ParameterDictionary &parameters, Camera camera, Sampler sampler,
     Primitive aggregate, std::vector<Light> lights, const FileLoc *loc) {
+    if (!camera.Is<PerspectiveCamera>())
+        ErrorExit("Only the \"perspective\" camera is currently supported with the "
+                  "\"bdpt\" integrator.");
     int maxDepth = parameters.GetOneInt("maxdepth", 5);
     bool visualizeStrategies = parameters.GetOneBool("visualizestrategies", false);
     bool visualizeWeights = parameters.GetOneBool("visualizeweights", false);
@@ -2695,6 +2701,9 @@ std::string MLTIntegrator::ToString() const {
 std::unique_ptr<MLTIntegrator> MLTIntegrator::Create(
     const ParameterDictionary &parameters, Camera camera, Primitive aggregate,
     std::vector<Light> lights, const FileLoc *loc) {
+    if (!camera.Is<PerspectiveCamera>())
+        ErrorExit("Only the \"perspective\" camera is currently supported with the "
+                  "\"mlt\" integrator.");
     int maxDepth = parameters.GetOneInt("maxdepth", 5);
     int nBootstrap = parameters.GetOneInt("bootstrapsamples", 100000);
     int64_t nChains = parameters.GetOneInt("chains", 1000);
