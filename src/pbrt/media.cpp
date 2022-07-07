@@ -633,7 +633,7 @@ NanoVDBMedium *NanoVDBMedium::Create(const ParameterDictionary &parameters,
     nanovdb::GridHandle<NanoVDBBuffer> temperatureGrid;
     std::string temperaturename =
         parameters.GetOneString("temperaturename", "temperature");
-    temperatureGrid = readGrid<NanoVDBBuffer>(filename, "temperature", loc, alloc);
+    temperatureGrid = readGrid<NanoVDBBuffer>(filename, temperaturename, loc, alloc);
 
     Float LeScale = parameters.GetOneFloat("LeScale", 1.f);
     Float temperatureCutoff = parameters.GetOneFloat("temperaturecutoff", 0.f);
