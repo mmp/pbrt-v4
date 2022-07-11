@@ -39,8 +39,6 @@ void WavefrontPathIntegrator::GenerateRaySamples(int wavefrontDepth, int sampleI
             int dimension = 6 + 7 * w.depth;
             if (haveSubsurface)
                 dimension += 3 * w.depth;
-            if (haveMedia)
-                dimension += 2 * w.depth;
 
             // Initialize _Sampler_ for pixel, sample index, and dimension
             ConcreteSampler pixelSampler = *sampler.Cast<ConcreteSampler>();
@@ -60,12 +58,6 @@ void WavefrontPathIntegrator::GenerateRaySamples(int wavefrontDepth, int sampleI
             if (haveSubsurface) {
                 rs.subsurface.uc = pixelSampler.Get1D();
                 rs.subsurface.u = pixelSampler.Get2D();
-            }
-
-            rs.haveMedia = haveMedia;
-            if (haveMedia) {
-                rs.media.uDist = pixelSampler.Get1D();
-                rs.media.uMode = pixelSampler.Get1D();
             }
 
             // Store _RaySamples_ in pixel sample state

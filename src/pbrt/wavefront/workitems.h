@@ -35,10 +35,6 @@ struct RaySamples {
         Float uc;
         Point2f u;
     } subsurface;
-    bool haveMedia;
-    struct {
-        Float uDist, uMode;
-    } media;
 };
 
 template <>
@@ -62,7 +58,6 @@ struct SOA<RaySamples> {
         rs.direct.uc = dir.v[2];
 
         rs.haveSubsurface = int(dir.v[3]) & 1;
-        rs.haveMedia = int(dir.v[3]) & 2;
 
         Float4 ind = Load4(indirect + i);
         rs.indirect.uc = ind.v[0];
@@ -75,11 +70,6 @@ struct SOA<RaySamples> {
             rs.subsurface.u = Point2f(ss.v[1], ss.v[2]);
         }
 
-        if (rs.haveMedia) {
-            rs.media.uDist = mediaDist[i];
-            rs.media.uMode = mediaMode[i];
-        }
-
         return rs;
     }
 
@@ -89,7 +79,7 @@ struct SOA<RaySamples> {
 
         PBRT_CPU_GPU
         void operator=(RaySamples rs) {
-            int flags = (rs.haveSubsurface ? 1 : 0) | (rs.haveMedia ? 2 : 0);
+            int flags = rs.haveSubsurface ? 1 : 0;
             soa->direct[index] =
                 Float4{rs.direct.u[0], rs.direct.u[1], rs.direct.uc, Float(flags)};
             soa->indirect[index] = Float4{rs.indirect.uc, rs.indirect.rr,
@@ -97,10 +87,6 @@ struct SOA<RaySamples> {
             if (rs.haveSubsurface)
                 soa->subsurface[index] =
                     Float4{rs.subsurface.uc, rs.subsurface.u.x, rs.subsurface.u.y, 0.f};
-            if (rs.haveMedia) {
-                soa->mediaDist[index] = rs.media.uDist;
-                soa->mediaMode[index] = rs.media.uMode;
-            }
         }
 
         SOA *soa;

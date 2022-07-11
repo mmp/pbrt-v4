@@ -55,8 +55,8 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
             bool scattered = false;
 
             RaySamples raySamples = pixelSampleState.samples[w.pixelIndex];
-            Float uDist = raySamples.media.uDist;
-            Float uMode = raySamples.media.uMode;
+            Float uDist = rng.Uniform<Float>();
+            Float uMode = rng.Uniform<Float>();
 
             SampledSpectrum T_maj = SampleT_maj(
                 ray, tMax, uDist, rng, lambda,
