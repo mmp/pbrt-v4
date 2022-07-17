@@ -299,7 +299,7 @@ class ConductorBxDF {
         if (!(sampleFlags & BxDFReflTransFlags::Reflection))
             return {};
         if (mfDistrib.EffectivelySmooth()) {
-            // Sample perfectly specular conductor BRDF
+            // Sample perfect specular conductor BRDF
             Vector3f wi(-wo.x, -wo.y, wo.z);
             SampledSpectrum f = FrComplex(AbsCosTheta(wi), eta, k) / AbsCosTheta(wi);
             return BSDFSample(f, wi, 1, BxDFFlags::SpecularReflection);
@@ -359,12 +359,12 @@ class ConductorBxDF {
         if (mfDistrib.EffectivelySmooth())
             return 0;
         // Evaluate sampling PDF of rough conductor BRDF
-        Vector3f wh = wo + wi;
-        CHECK_RARE(1e-5f, LengthSquared(wh) == 0);
-        if (LengthSquared(wh) == 0)
+        Vector3f wm = wo + wi;
+        CHECK_RARE(1e-5f, LengthSquared(wm) == 0);
+        if (LengthSquared(wm) == 0)
             return 0;
-        wh = FaceForward(Normalize(wh), Normal3f(0, 0, 1));
-        return mfDistrib.PDF(wo, wh) / (4 * AbsDot(wo, wh));
+        wm = FaceForward(Normalize(wm), Normal3f(0, 0, 1));
+        return mfDistrib.PDF(wo, wm) / (4 * AbsDot(wo, wm));
     }
 
     PBRT_CPU_GPU

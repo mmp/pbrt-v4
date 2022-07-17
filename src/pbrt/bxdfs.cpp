@@ -78,7 +78,7 @@ pstd::optional<BSDFSample> DielectricBxDF::Sample_f(
     Vector3f wo, Float uc, Point2f u, TransportMode mode,
     BxDFReflTransFlags sampleFlags) const {
     if (eta == 1 || mfDistrib.EffectivelySmooth()) {
-        // Sample perfectly specular dielectric BSDF
+        // Sample perfect specular dielectric BSDF
         Float R = FrDielectric(CosTheta(wo), eta), T = 1 - R;
         // Compute probabilities _pr_ and _pt_ for sampling reflection and transmission
         Float pr = R, pt = T;
