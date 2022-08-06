@@ -101,7 +101,7 @@ void Denoiser::Denoise(RGB *rgb, Normal3f *n, RGB *albedo, RGB *result) {
         CUdeviceptr(scratchBuffer), memorySizes.withoutOverlapScratchSizeInBytes));
 
     OptixDenoiserParams params = {};
-    params.denoiseAlpha = 0;
+    params.denoiseAlpha = OPTIX_DENOISER_ALPHA_MODE_COPY;
     params.hdrIntensity = CUdeviceptr(intensity);
     params.blendFactor = 0;  // TODO what should this be??
 
