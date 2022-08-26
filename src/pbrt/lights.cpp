@@ -916,10 +916,6 @@ DiffuseAreaLight *DiffuseAreaLight::Create(const Transform &renderFromLight,
         // radiance such that the user-defined power will be the actual power
         // emitted by the light.
         Float k_e = 1;
-        // we need to know which channels correspond to R, G and B
-        // we know that the channelDesc is valid as we would have exited in the
-        // block above otherwise
-        ImageChannelDesc channelDesc = image.GetChannelDesc({"R", "G", "B"});
         if (image) {
             // Get the appropriate luminance vector from the image colour space
             RGB lum = imageColorSpace->LuminanceVector();
