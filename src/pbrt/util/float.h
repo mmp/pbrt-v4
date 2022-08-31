@@ -499,7 +499,7 @@ class Half {
 
     PBRT_CPU_GPU
     bool operator==(const Half &v) const {
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && __CUDA_ARCH__ >= 530
         return __ushort_as_half(h) == __ushort_as_half(v.h);
 #else
         if (Bits() == v.Bits())

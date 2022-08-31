@@ -5,7 +5,7 @@
 
 int main(int argc, char **argv){
     cudaDeviceProp dP;
-    float min_cc = 5.3;  // We need half floats...
+    float min_cc = 5.2;
 
     int rc = cudaGetDeviceProperties(&dP, 0);
     if(rc != cudaSuccess) {
