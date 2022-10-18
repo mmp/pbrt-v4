@@ -333,8 +333,8 @@ Float WavefrontPathIntegrator::Render() {
 
     ProgressReporter progress(lastSampleIndex - firstSampleIndex, "Rendering",
                               Options->quiet || Options->interactive, Options->useGPU);
-    for (int sampleIndex = firstSampleIndex; sampleIndex < lastSampleIndex;
-         ++sampleIndex) {
+    int sampleIndex = firstSampleIndex;
+    while (true) {
         // Attempt to work around issue #145.
 #if !(defined(PBRT_IS_WINDOWS) && defined(PBRT_BUILD_GPU_RENDERER) && \
       __CUDACC_VER_MAJOR__ == 11 && __CUDACC_VER_MINOR__ == 1)
@@ -465,6 +465,10 @@ Float WavefrontPathIntegrator::Render() {
             }
         }
 
+        ++sampleIndex;
+        if (!gui && sampleIndex == lastSampleIndex) {
+                break;
+        }
         progress.Update();
     }
 
