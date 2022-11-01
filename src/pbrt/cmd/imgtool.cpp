@@ -2424,8 +2424,8 @@ int denoise(std::vector<std::string> args) {
     checkForChannels(nsDesc, "Nsx,Nsy,Nsz");
     ImageChannelDesc albedoDesc = in.GetChannelDesc({"Albedo.R", "Albedo.G", "Albedo.B"});
     checkForChannels(albedoDesc, "Albedo.R,Albedo.G,Albedo.B");
-    ImageChannelDesc varianceDesc = in.GetChannelDesc({"rgbVariance"});
-    checkForChannels(varianceDesc, "rgbVariance");
+    ImageChannelDesc varianceDesc = in.GetChannelDesc({"Variance.R", "Variance.G", "Variance.B"});
+    checkForChannels(varianceDesc, "Variance.R,Variance.G,Variance.B");
 
     ImageChannelDesc jointDesc = in.GetChannelDesc({"Pz", "Nx", "Ny", "Nz"});
     ImageChannelValues jointSigmaIndir(4, 1);
