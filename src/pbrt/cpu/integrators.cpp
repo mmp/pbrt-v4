@@ -2279,14 +2279,31 @@ SampledSpectrum BDPTIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
                      StringPrintf("Connect bdpt s: %d, t: %d, Lpath: %s, misWeight: %f\n",
                                   s, t, Lpath, misWeight)
                          .c_str());
-            if (pFilmNew && (visualizeStrategies || visualizeWeights)) {
+            if (Lpath && (visualizeStrategies || visualizeWeights)) {
                 SampledSpectrum value;
                 if (visualizeStrategies)
                     value = misWeight == 0 ? SampledSpectrum(0.) : Lpath / misWeight;
                 if (visualizeWeights)
                     value = Lpath;
-                CHECK(pFilmNew.has_value());
-                weightFilms[BufferIndex(s, t)].AddSplat(*pFilmNew, value, lambda);
+                if (pFilmNew)
+                    weightFilms[BufferIndex(s, t)].AddSplat(*pFilmNew, value, lambda);
+                else {
+                    // Unfortunately we no longer have the pixel
+                    // coordinates of the sample easily available, so we
+                    // need to go back to the camera and ask for them; here
+                    // we take a point a little bit along the camera ray
+                    // and ask the camera to reproject that for us.
+                    //
+                    // Double unfortunately, this doesn't quite work for
+                    // scenes where the camera has a finite aperture, since
+                    // we don't have the CameraSample either so just have
+                    // to pass (0.5,0.5) in for the lens sample...
+                    pstd::optional<CameraWiSample> cs =
+                        camera.SampleWi(Interaction(ray(100.f), nullptr), Point2f(0.5f, 0.5f), lambda);
+                    CHECK_RARE(1e-3, !cs);
+                    if (cs)
+                        weightFilms[BufferIndex(s, t)].AddSplat(cs->pRaster, value, lambda);
+                }
             }
             if (t != 1)
                 L += Lpath;
