@@ -333,7 +333,7 @@ Float WavefrontPathIntegrator::Render() {
 
     ProgressReporter progress(lastSampleIndex - firstSampleIndex, "Rendering",
                               Options->quiet || Options->interactive, Options->useGPU);
-    for (int sampleIndex = firstSampleIndex; sampleIndex < lastSampleIndex;
+    for (int sampleIndex = firstSampleIndex; sampleIndex < lastSampleIndex || gui;
          ++sampleIndex) {
         // Attempt to work around issue #145.
 #if !(defined(PBRT_IS_WINDOWS) && defined(PBRT_BUILD_GPU_RENDERER) && \
@@ -345,95 +345,101 @@ Float WavefrontPathIntegrator::Render() {
         });
 #endif
 
-        // Render image for sample _sampleIndex_
-        LOG_VERBOSE("Starting to submit work for sample %d", sampleIndex);
-        for (int y0 = pixelBounds.pMin.y; y0 < pixelBounds.pMax.y;
-             y0 += scanlinesPerPass) {
-            // Generate camera rays for current scanline range
-            RayQueue *cameraRayQueue = CurrentRayQueue(0);
-            Do(
-                "Reset ray queue", PBRT_CPU_GPU_LAMBDA() {
-                    PBRT_DBG("Starting scanlines at y0 = %d, sample %d / %d\n", y0,
-                             sampleIndex, samplesPerPixel);
-                    cameraRayQueue->Reset();
-                });
-
-            Transform cameraMotion;
-            if (gui)
-                cameraMotion =
-                    renderFromCamera * gui->GetCameraTransform() * cameraFromRender;
-            GenerateCameraRays(y0, cameraMotion, sampleIndex);
-            Do(
-                "Update camera ray stats",
-                PBRT_CPU_GPU_LAMBDA() { stats->cameraRays += cameraRayQueue->Size(); });
-
-            // Trace rays and estimate radiance up to maximum ray depth
-            for (int wavefrontDepth = 0; true; ++wavefrontDepth) {
-                // Reset queues before tracing rays
-                RayQueue *nextQueue = NextRayQueue(wavefrontDepth);
+        // Keep running the outer for loop but don't take more samples if
+        // the GUI is being used so that the user can move the camera, etc.
+        if (sampleIndex < lastSampleIndex) {
+            // Render image for sample _sampleIndex_
+            LOG_VERBOSE("Starting to submit work for sample %d", sampleIndex);
+            for (int y0 = pixelBounds.pMin.y; y0 < pixelBounds.pMax.y;
+                 y0 += scanlinesPerPass) {
+                // Generate camera rays for current scanline range
+                RayQueue *cameraRayQueue = CurrentRayQueue(0);
                 Do(
-                    "Reset queues before tracing rays", PBRT_CPU_GPU_LAMBDA() {
-                        nextQueue->Reset();
-                        // Reset queues before tracing next batch of rays
-                        if (mediumSampleQueue)
-                            mediumSampleQueue->Reset();
-                        if (mediumScatterQueue)
-                            mediumScatterQueue->Reset();
+                   "Reset ray queue", PBRT_CPU_GPU_LAMBDA() {
+                       PBRT_DBG("Starting scanlines at y0 = %d, sample %d / %d\n", y0,
+                                sampleIndex, samplesPerPixel);
+                       cameraRayQueue->Reset();
+                   });
 
-                        if (escapedRayQueue)
-                            escapedRayQueue->Reset();
-                        hitAreaLightQueue->Reset();
+                Transform cameraMotion;
+                if (gui)
+                    cameraMotion =
+                        renderFromCamera * gui->GetCameraTransform() * cameraFromRender;
+                GenerateCameraRays(y0, cameraMotion, sampleIndex);
+                Do(
+                   "Update camera ray stats",
+                   PBRT_CPU_GPU_LAMBDA() { stats->cameraRays += cameraRayQueue->Size(); });
 
-                        basicEvalMaterialQueue->Reset();
-                        universalEvalMaterialQueue->Reset();
-
-                        if (bssrdfEvalQueue)
-                            bssrdfEvalQueue->Reset();
-                        if (subsurfaceScatterQueue)
-                            subsurfaceScatterQueue->Reset();
-                    });
-
-                // Follow active ray paths and accumulate radiance estimates
-                GenerateRaySamples(wavefrontDepth, sampleIndex);
-
-                // Find closest intersections along active rays
-                aggregate->IntersectClosest(
-                    maxQueueSize, CurrentRayQueue(wavefrontDepth), escapedRayQueue,
-                    hitAreaLightQueue, basicEvalMaterialQueue, universalEvalMaterialQueue,
-                    mediumSampleQueue, NextRayQueue(wavefrontDepth));
-
-                if (wavefrontDepth > 0) {
-                    // As above, with the indexing...
-                    RayQueue *statsQueue = CurrentRayQueue(wavefrontDepth);
+                // Trace rays and estimate radiance up to maximum ray depth
+                for (int wavefrontDepth = 0; true; ++wavefrontDepth) {
+                    // Reset queues before tracing rays
+                    RayQueue *nextQueue = NextRayQueue(wavefrontDepth);
                     Do(
-                        "Update indirect ray stats", PBRT_CPU_GPU_LAMBDA() {
-                            stats->indirectRays[wavefrontDepth] += statsQueue->Size();
-                        });
+                       "Reset queues before tracing rays", PBRT_CPU_GPU_LAMBDA() {
+                           nextQueue->Reset();
+                           // Reset queues before tracing next batch of rays
+                           if (mediumSampleQueue)
+                               mediumSampleQueue->Reset();
+                           if (mediumScatterQueue)
+                               mediumScatterQueue->Reset();
+
+                           if (escapedRayQueue)
+                               escapedRayQueue->Reset();
+                           hitAreaLightQueue->Reset();
+
+                           basicEvalMaterialQueue->Reset();
+                           universalEvalMaterialQueue->Reset();
+
+                           if (bssrdfEvalQueue)
+                               bssrdfEvalQueue->Reset();
+                           if (subsurfaceScatterQueue)
+                               subsurfaceScatterQueue->Reset();
+                       });
+
+                    // Follow active ray paths and accumulate radiance estimates
+                    GenerateRaySamples(wavefrontDepth, sampleIndex);
+
+                    // Find closest intersections along active rays
+                    aggregate->IntersectClosest(
+                                                maxQueueSize, CurrentRayQueue(wavefrontDepth), escapedRayQueue,
+                                                hitAreaLightQueue, basicEvalMaterialQueue, universalEvalMaterialQueue,
+                                                mediumSampleQueue, NextRayQueue(wavefrontDepth));
+
+                    if (wavefrontDepth > 0) {
+                        // As above, with the indexing...
+                        RayQueue *statsQueue = CurrentRayQueue(wavefrontDepth);
+                        Do(
+                           "Update indirect ray stats", PBRT_CPU_GPU_LAMBDA() {
+                               stats->indirectRays[wavefrontDepth] += statsQueue->Size();
+                           });
+                    }
+
+                    SampleMediumInteraction(wavefrontDepth);
+
+                    HandleEscapedRays();
+
+                    HandleEmissiveIntersection();
+
+                    if (wavefrontDepth == maxDepth)
+                        break;
+
+                    EvaluateMaterialsAndBSDFs(wavefrontDepth, cameraMotion);
+
+                    // Do immediately so that we have space for shadow rays for subsurface..
+                    TraceShadowRays(wavefrontDepth);
+
+                    SampleSubsurface(wavefrontDepth);
                 }
 
-                SampleMediumInteraction(wavefrontDepth);
-
-                HandleEscapedRays();
-
-                HandleEmissiveIntersection();
-
-                if (wavefrontDepth == maxDepth)
-                    break;
-
-                EvaluateMaterialsAndBSDFs(wavefrontDepth, cameraMotion);
-
-                // Do immediately so that we have space for shadow rays for subsurface..
-                TraceShadowRays(wavefrontDepth);
-
-                SampleSubsurface(wavefrontDepth);
+                UpdateFilm();
             }
 
-            UpdateFilm();
-        }
+            // Copy updated film pixels to buffer for the display server.
+            if (Options->useGPU && !Options->displayServer.empty())
+                UpdateDisplayRGBFromFilm(pixelBounds);
 
-        // Copy updated film pixels to buffer for the display server.
-        if (Options->useGPU && !Options->displayServer.empty())
-            UpdateDisplayRGBFromFilm(pixelBounds);
+            progress.Update();
+        }
 
         if (gui) {
             RGB *rgb = gui->MapFramebuffer();
@@ -465,7 +471,6 @@ Float WavefrontPathIntegrator::Render() {
             }
         }
 
-        progress.Update();
     }
 
     if (gui) {
