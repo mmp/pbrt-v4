@@ -118,7 +118,9 @@ add_subdirectory (ptex)
 set_property (TARGET Ptex_static ptxinfo halftest ftest rtest wtest PROPERTY FOLDER "ext/ptex")
 
 set (PTEX_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/ptex/src/ptex PARENT_SCOPE)
-
+if (WIN32)
+  set (PTEX_LIBS ${ZLIB_LIBRARY} PARENT_SCOPE) # fix Ptex_static build issue, like OpenEXR does..
+endif ()
 ###########################################################################
 # double-conversion
 
