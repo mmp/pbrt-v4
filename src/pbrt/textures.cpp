@@ -833,7 +833,8 @@ GPUSpectrumPtexTexture::GPUSpectrumPtexTexture(const std::string &filename,
         else
             DCHECK_EQ(3, nc);
 
-        faceValues[i] = RGB(result[0], result[1], result[2]);
+        RGB rgb(result[0], result[1], result[2]);
+        faceValues[i] = rgb;
     }
 
     gpuPtexMemoryUsed += nFaces * sizeof(faceValues[0]);
