@@ -352,9 +352,10 @@ CUDAOutputBuffer<PIXEL_FORMAT>::CUDAOutputBuffer(int32_t width, int32_t height) 
     CUDA_CHECK(cudaGetDevice(&current_device));
     CUDA_CHECK(cudaDeviceGetAttribute(&is_display_device, cudaDevAttrKernelExecTimeout,
                                       current_device));
-    if (!is_display_device)
-        LOG_FATAL("GL interop is only available on display device.");
-
+    if (getenv("XDG_SESSION_TYPE") == nullptr || getenv("XDG_SESSION_TYPE") != std::string("wayland")) {
+        if (!is_display_device)
+            LOG_FATAL("GL interop is only available on display device.");
+    }
     CUDA_CHECK(cudaGetDevice(&m_device_idx));
 
     m_width = width;
