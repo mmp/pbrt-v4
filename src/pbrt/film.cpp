@@ -19,6 +19,7 @@
 #include <pbrt/util/colorspace.h>
 #include <pbrt/util/error.h>
 #include <pbrt/util/file.h>
+#include <pbrt/util/gui.h>
 #include <pbrt/util/image.h>
 #include <pbrt/util/lowdiscrepancy.h>
 #include <pbrt/util/memory.h>
@@ -78,8 +79,16 @@ FilmBaseParameters::FilmBaseParameters(const ParameterDictionary &parameters,
     } else if (filename.empty())
         filename = "pbrt.exr";
 
-    fullResolution = Point2i(parameters.GetOneInt("xresolution", 1280),
-                             parameters.GetOneInt("yresolution", 720));
+    if (Options->fullscreen) {
+        fullResolution = GUI::GetResolution();
+
+        // Omit unused parameter error
+        auto unusedX = parameters.GetOneInt("xresolution", 1280);
+        auto unusedY = parameters.GetOneInt("yresolution", 720);
+    } else {
+        fullResolution = Point2i(parameters.GetOneInt("xresolution", 1280),
+                                 parameters.GetOneInt("yresolution", 720));
+    }
     if (Options->quickRender) {
         fullResolution.x = std::max(1, fullResolution.x / 4);
         fullResolution.y = std::max(1, fullResolution.y / 4);

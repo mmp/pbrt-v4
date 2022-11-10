@@ -55,6 +55,7 @@ Rendering options:
             R"(
   --help                        Print this help text.
   --interactive                 Enable interactive rendering mode.
+  --fullscreen                  Render fullscreen. Only possible with interactive.
   --mse-reference-image         Filename for reference image to use for MSE computation.
   --mse-reference-out           File to write MSE error vs spp results.
   --nthreads <num>              Use specified number of threads for rendering.
@@ -178,6 +179,7 @@ int main(int argc, char *argv[]) {
                      onError) ||
             ParseArg(&iter, args.end(), "log-file", &options.logFile, onError) ||
             ParseArg(&iter, args.end(), "interactive", &options.interactive, onError) ||
+            ParseArg(&iter, args.end(), "fullscreen", &options.fullscreen, onError) ||
             ParseArg(&iter, args.end(), "mse-reference-image", &options.mseReferenceImage,
                      onError) ||
             ParseArg(&iter, args.end(), "mse-reference-out", &options.mseReferenceOutput,
@@ -253,6 +255,10 @@ int main(int argc, char *argv[]) {
     if (options.interactive && !(options.useGPU || options.wavefront))
         ErrorExit("The --interactive option is only supported with the --gpu "
                   "and --wavefront integrators.");
+
+    if (options.fullscreen && !options.interactive) {
+        ErrorExit("The --fullscreen option is only supported in interactive mode");
+    }
 
     options.logLevel = LogLevelFromString(logLevel);
 

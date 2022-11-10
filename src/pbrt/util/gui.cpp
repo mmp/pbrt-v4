@@ -194,6 +194,17 @@ void GUI::mouseButtonCallback(GLFWwindow* window, int button, int action, int mo
     }
 }
 
+void GUI::Initialize() {
+    if (!glfwInit())
+        LOG_FATAL("Unable to initialize GLFW");
+}
+
+Point2i GUI::GetResolution() {
+    auto monitor = glfwGetPrimaryMonitor();
+    auto videoMode = glfwGetVideoMode(monitor);
+    return Point2i(videoMode->width, videoMode->height);
+}
+
 static void glfwMouseButtonCallback(GLFWwindow* window, int button, int action,
                                     int mods) {
     GUI* gui = (GUI*)glfwGetWindowUserPointer(window);
@@ -214,12 +225,16 @@ void GUI::cursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
 
 GUI::GUI(std::string title, Vector2i resolution, Bounds3f sceneBounds)
     : resolution(resolution) {
+
     moveScale = Length(sceneBounds.Diagonal()) / 1000.f;
 
     glfwSetErrorCallback(glfwErrorCallback);
-    if (!glfwInit())
-        LOG_FATAL("Unable to initialize GLFW");
-    window = glfwCreateWindow(resolution.x, resolution.y, "pbrt", NULL, NULL);
+    if (Options->fullscreen) {
+        window = glfwCreateWindow(resolution.x, resolution.y, "pbrt", glfwGetPrimaryMonitor(), NULL);
+    } else {
+        window = glfwCreateWindow(resolution.x, resolution.y, "pbrt", NULL, NULL);
+    }
+
     if (!window) {
         glfwTerminate();
         LOG_FATAL("Unable to create GLFW window");
