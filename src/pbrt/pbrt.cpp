@@ -124,7 +124,9 @@ void InitPBRT(const PBRTOptions &opt) {
 
     InitBufferCaches();
 
-    GUI::Initialize();
+    if (Options->interactive) {
+        GUI::Initialize();
+    }
 
     if (!Options->displayServer.empty())
         ConnectToDisplayServer(Options->displayServer);
