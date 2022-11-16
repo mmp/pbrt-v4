@@ -4,6 +4,7 @@
 
 #include <pbrt/util/mipmap.h>
 
+#include <pbrt/options.h>
 #include <pbrt/util/check.h>
 #include <pbrt/util/color.h>
 #include <pbrt/util/colorspace.h>
@@ -195,6 +196,11 @@ MIPMap::MIPMap(Image image, const RGBColorSpace *colorSpace, WrapMode wrapMode,
     : colorSpace(colorSpace), wrapMode(wrapMode), options(options) {
     CHECK(colorSpace);
     pyramid = Image::GeneratePyramid(std::move(image), wrapMode, alloc);
+    if (Options->disableImageTextures) {
+        Image top = pyramid.back();
+        pyramid.clear();
+        pyramid.push_back(top);
+    }
     std::for_each(pyramid.begin(), pyramid.end(),
                   [](const Image &im) { imageMapBytes += im.BytesUsed(); });
 }
