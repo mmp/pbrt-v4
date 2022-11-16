@@ -39,6 +39,7 @@ Rendering options:
   --debugstart <values>         Inform the Integrator where to start rendering for
                                 faster debugging. (<values> are Integrator-specific
                                 and come from error message text.)
+  --disable-image-textures      Always return the average value of image textures.
   --disable-pixel-jitter        Always sample pixels at their centers.
   --disable-texture-filtering   Point-sample all textures.
   --disable-wavelength-jitter   Always sample the same %d wavelengths of light.
@@ -161,6 +162,8 @@ int main(int argc, char *argv[]) {
             ParseArg(&iter, args.end(), "gpu-device", &options.gpuDevice, onError) ||
 #endif
             ParseArg(&iter, args.end(), "debugstart", &options.debugStart, onError) ||
+            ParseArg(&iter, args.end(), "disable-image-textures",
+                     &options.disableImageTextures, onError) ||
             ParseArg(&iter, args.end(), "disable-pixel-jitter",
                      &options.disablePixelJitter, onError) ||
             ParseArg(&iter, args.end(), "disable-texture-filtering",
