@@ -417,6 +417,12 @@ std::vector<Spectrum> ParameterDictionary::extractSpectrumArray(
             ErrorExit(&param.loc, "Found odd number of values for \"%s\"", param.name);
 
         int nSamples = param.floats.size() / 2;
+        if (nSamples == 1)
+            return returnArray<Spectrum>(
+                param.floats, param, param.floats.size(),
+                [this, &alloc](const Float *v, const FileLoc *loc) -> Spectrum {
+                    return alloc.new_object<ConstantSpectrum>(v[1]);
+            });
         return returnArray<Spectrum>(
             param.floats, param, param.floats.size(),
             [this, nSamples, &alloc, param](const Float *v,
