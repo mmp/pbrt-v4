@@ -260,6 +260,10 @@ int main(int argc, char *argv[]) {
         ErrorExit("The --fullscreen option is only supported in interactive mode");
     }
 
+    if (options.interactive && options.quickRender) {
+        ErrorExit("The --quick option is not supported in interactive mode");
+    }
+
     options.logLevel = LogLevelFromString(logLevel);
 
     // Initialize pbrt
