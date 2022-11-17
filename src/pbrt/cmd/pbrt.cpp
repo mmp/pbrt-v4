@@ -48,6 +48,7 @@ Rendering options:
   --display-server <addr:port>  Connect to display server at given address and port
                                 to display the image as it's being rendered.
   --force-diffuse               Convert all materials to be diffuse.)"
+  --fullscreen                  Render fullscreen. Only supported with --interactive.
 #ifdef PBRT_BUILD_GPU_RENDERER
             R"(
   --gpu                         Use the GPU for rendering. (Default: disabled)
@@ -56,7 +57,6 @@ Rendering options:
             R"(
   --help                        Print this help text.
   --interactive                 Enable interactive rendering mode.
-  --fullscreen                  Render fullscreen. Only possible with interactive.
   --mse-reference-image         Filename for reference image to use for MSE computation.
   --mse-reference-out           File to write MSE error vs spp results.
   --nthreads <num>              Use specified number of threads for rendering.
