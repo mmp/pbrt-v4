@@ -47,8 +47,8 @@ Rendering options:
                                 (Default: 1)
   --display-server <addr:port>  Connect to display server at given address and port
                                 to display the image as it's being rendered.
-  --force-diffuse               Convert all materials to be diffuse.)"
-  --fullscreen                  Render fullscreen. Only supported with --interactive.
+  --force-diffuse               Convert all materials to be diffuse.)
+  --fullscreen                  Render fullscreen. Only supported with --interactive.)"
 #ifdef PBRT_BUILD_GPU_RENDERER
             R"(
   --gpu                         Use the GPU for rendering. (Default: disabled)
