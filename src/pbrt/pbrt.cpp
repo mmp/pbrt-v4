@@ -15,6 +15,7 @@
 #include <pbrt/util/colorspace.h>
 #include <pbrt/util/display.h>
 #include <pbrt/util/error.h>
+#include <pbrt/util/gui.h>
 #include <pbrt/util/memory.h>
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/print.h>
@@ -122,6 +123,10 @@ void InitPBRT(const PBRTOptions &opt) {
     }
 
     InitBufferCaches();
+
+    if (Options->interactive) {
+        GUI::Initialize();
+    }
 
     if (!Options->displayServer.empty())
         ConnectToDisplayServer(Options->displayServer);

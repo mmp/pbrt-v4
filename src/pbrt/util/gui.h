@@ -57,6 +57,9 @@ class GUI {
     void cursorPosCallback(GLFWwindow *window, double xpos, double ypos);
     void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods);
 
+    static void Initialize();
+    static Point2i GetResolution();
+
   private:
     bool processKeys();
     bool processMouse();

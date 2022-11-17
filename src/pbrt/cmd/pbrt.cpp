@@ -48,6 +48,7 @@ Rendering options:
   --display-server <addr:port>  Connect to display server at given address and port
                                 to display the image as it's being rendered.
   --force-diffuse               Convert all materials to be diffuse.)"
+  --fullscreen                  Render fullscreen. Only supported with --interactive.
 #ifdef PBRT_BUILD_GPU_RENDERER
             R"(
   --gpu                         Use the GPU for rendering. (Default: disabled)
@@ -181,6 +182,7 @@ int main(int argc, char *argv[]) {
                      onError) ||
             ParseArg(&iter, args.end(), "log-file", &options.logFile, onError) ||
             ParseArg(&iter, args.end(), "interactive", &options.interactive, onError) ||
+            ParseArg(&iter, args.end(), "fullscreen", &options.fullscreen, onError) ||
             ParseArg(&iter, args.end(), "mse-reference-image", &options.mseReferenceImage,
                      onError) ||
             ParseArg(&iter, args.end(), "mse-reference-out", &options.mseReferenceOutput,
@@ -256,6 +258,14 @@ int main(int argc, char *argv[]) {
     if (options.interactive && !(options.useGPU || options.wavefront))
         ErrorExit("The --interactive option is only supported with the --gpu "
                   "and --wavefront integrators.");
+
+    if (options.fullscreen && !options.interactive) {
+        ErrorExit("The --fullscreen option is only supported in interactive mode");
+    }
+
+    if (options.interactive && options.quickRender) {
+        ErrorExit("The --quick option is not supported in interactive mode");
+    }
 
     options.logLevel = LogLevelFromString(logLevel);
 
