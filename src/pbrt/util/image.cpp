@@ -393,12 +393,12 @@ Image::Image(PixelFormat format, Point2i resolution,
       p16(alloc),
       p32(alloc) {
     if (Is8Bit(format)) {
-        p8.resize(NChannels() * resolution[0] * resolution[1]);
+        p8.resize(NChannels() * size_t(resolution[0]) * size_t(resolution[1]));
         CHECK(encoding);
     } else if (Is16Bit(format))
-        p16.resize(NChannels() * resolution[0] * resolution[1]);
+        p16.resize(NChannels() * size_t(resolution[0]) * size_t(resolution[1]));
     else if (Is32Bit(format))
-        p32.resize(NChannels() * resolution[0] * resolution[1]);
+        p32.resize(NChannels() * size_t(resolution[0]) * size_t(resolution[1]));
     else
         LOG_FATAL("Unhandled format in Image::Image()");
 }
@@ -568,7 +568,7 @@ ImageChannelValues Image::MAE(const ImageChannelDesc &desc, const Image &ref,
 
     ImageChannelValues error(desc.size());
     for (int c = 0; c < desc.size(); ++c)
-        error[c] = sumError[c] / (Resolution().x * Resolution().y);
+        error[c] = sumError[c] / (Float(Resolution().x) * Float(Resolution().y));
     return error;
 }
 
@@ -602,7 +602,7 @@ ImageChannelValues Image::MSE(const ImageChannelDesc &desc, const Image &ref,
 
     ImageChannelValues mse(desc.size());
     for (int c = 0; c < desc.size(); ++c)
-        mse[c] = sumSE[c] / (Resolution().x * Resolution().y);
+        mse[c] = sumSE[c] / (Float(Resolution().x) * Float(Resolution().y));
     return mse;
 }
 
@@ -634,7 +634,7 @@ ImageChannelValues Image::MRSE(const ImageChannelDesc &desc, const Image &ref,
 
     ImageChannelValues mrse(desc.size());
     for (int c = 0; c < desc.size(); ++c)
-        mrse[c] = sumRSE[c] / (Resolution().x * Resolution().y);
+        mrse[c] = sumRSE[c] / (Float(Resolution().x) * Float(Resolution().y));
     return mrse;
 }
 
@@ -650,7 +650,7 @@ ImageChannelValues Image::Average(const ImageChannelDesc &desc) const {
 
     ImageChannelValues average(desc.size());
     for (int c = 0; c < desc.size(); ++c)
-        average[c] = sum[c] / (Resolution().x * Resolution().y);
+        average[c] = sum[c] / (Float(Resolution().x) * Float(Resolution().y));
     return average;
 }
 
@@ -922,7 +922,7 @@ ImageAndMetadata Image::Read(std::string name, Allocator alloc, ColorEncoding en
 
 bool Image::Write(std::string name, const ImageMetadata &metadata) const {
     if (metadata.pixelBounds)
-        CHECK_EQ(metadata.pixelBounds->Area(), resolution.x * resolution.y);
+        CHECK_EQ(metadata.pixelBounds->Area(), size_t(resolution.x) * size_t(resolution.y));
 
     if (HasExtension(name, "exr"))
         return WriteEXR(name, metadata);
@@ -1428,7 +1428,7 @@ std::string Image::ToString() const {
 
 std::unique_ptr<uint8_t[]> Image::QuantizePixelsToU256(int *nOutOfGamut) const {
     std::unique_ptr<uint8_t[]> u256 =
-        std::make_unique<uint8_t[]>(NChannels() * resolution.x * resolution.y);
+        std::make_unique<uint8_t[]>(NChannels() * size_t(resolution.x) * size_t(resolution.y));
     for (int y = 0; y < resolution.y; ++y)
         for (int x = 0; x < resolution.x; ++x)
             for (int c = 0; c < NChannels(); ++c) {
@@ -1614,7 +1614,7 @@ static int readWord(FILE *fp, char *buffer, int bufferLength) {
 static ImageAndMetadata ReadPFM(const std::string &filename, Allocator alloc) {
     pstd::vector<float> rgb32(alloc);
     char buffer[BUFFER_SIZE];
-    unsigned int nFloats;
+    size_t nFloats;
     int nChannels, width, height;
     float scale;
     bool fileLittleEndian;
@@ -1656,7 +1656,7 @@ static ImageAndMetadata ReadPFM(const std::string &filename, Allocator alloc) {
         ErrorExit("%s: unable to decode scale \"%s\"", filename, buffer);
 
     // read the data
-    nFloats = nChannels * width * height;
+    nFloats = nChannels * size_t(width) * size_t(height);
     rgb32.resize(nFloats);
     for (int y = height - 1; y >= 0; --y)
         if (fread(&rgb32[nChannels * y * width], sizeof(float), nChannels * width, fp) !=
@@ -1700,7 +1700,7 @@ static ImageAndMetadata ReadHDR(const std::string &filename, Allocator alloc) {
     if (!data)
         ErrorExit("%s: %s", filename, stbi_failure_reason());
 
-    pstd::vector<float> pixels(data, data + x * y * n, alloc);
+    pstd::vector<float> pixels(data, data + size_t(x) * size_t(y) * size_t(n), alloc);
     stbi_image_free(data);
 
     switch (n) {
@@ -1746,7 +1746,7 @@ static ImageAndMetadata ReadQOI(const std::string &filename, Allocator alloc) {
     Image image(PixelFormat::U256, Point2i(desc.width, desc.height), channelNames,
                 encoding, alloc);
     std::memcpy(image.RawPointer({0, 0}), pixels,
-                desc.width * desc.height * desc.channels);
+                size_t(desc.width) * size_t(desc.height) * desc.channels);
 
     free(pixels);
 
