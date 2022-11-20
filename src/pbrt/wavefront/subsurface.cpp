@@ -37,7 +37,7 @@ void WavefrontPathIntegrator::SampleSubsurface(int wavefrontDepth) {
             pstd::optional<BSSRDFProbeSegment> probeSeg = bssrdf.SampleSp(uc, u);
             if (probeSeg)
                 subsurfaceScatterQueue->Push(probeSeg->p0, probeSeg->p1, w.depth,
-                                             material, bssrdf, lambda, w.beta, w.inv_w_u,
+                                             material, bssrdf, lambda, w.beta, w.r_u,
                                              w.mediumInterface, w.etaScale, w.pixelIndex);
         });
 
@@ -62,7 +62,7 @@ void WavefrontPathIntegrator::SampleSubsurface(int wavefrontDepth) {
 
             Float pr = w.reservoirPDF * bssrdfSample.pdf[0];
             SampledSpectrum betap = w.beta * bssrdfSample.Sp / pr;
-            SampledSpectrum inv_w_u = w.inv_w_u * bssrdfSample.pdf / bssrdfSample.pdf[0];
+            SampledSpectrum r_u = w.r_u * bssrdfSample.pdf / bssrdfSample.pdf[0];
             SampledWavelengths lambda = w.lambda;
             RaySamples raySamples = pixelSampleState.samples[w.pixelIndex];
             Vector3f wo = bssrdfSample.wo;
@@ -83,25 +83,25 @@ void WavefrontPathIntegrator::SampleSubsurface(int wavefrontDepth) {
                     Vector3f wi = bsdfSample->wi;
                     SampledSpectrum beta =
                         betap * bsdfSample->f * AbsDot(wi, intr.ns) / bsdfSample->pdf;
-                    SampledSpectrum indir_inv_w_u = inv_w_u;
+                    SampledSpectrum indir_r_u = r_u;
 
                     PBRT_DBG("%s f*cos[0] %f bsdfSample->pdf %f f*cos/pdf %f\n",
                              ConcreteBxDF::Name(), bsdfSample->f[0] * AbsDot(wi, intr.ns),
                              bsdfSample->pdf,
                              bsdfSample->f[0] * AbsDot(wi, intr.ns) / bsdfSample->pdf);
 
-                    SampledSpectrum inv_w_l;
+                    SampledSpectrum r_l;
                     if (bsdfSample->pdfIsProportional)
-                        inv_w_l = inv_w_u / bsdf.PDF<ConcreteBxDF>(wo, bsdfSample->wi);
+                        r_l = r_u / bsdf.PDF<ConcreteBxDF>(wo, bsdfSample->wi);
                     else
-                        inv_w_l = inv_w_u / bsdfSample->pdf;
+                        r_l = r_u / bsdfSample->pdf;
 
                     Float etaScale = w.etaScale;
                     if (bsdfSample->IsTransmission())
                         etaScale *= Sqr(bsdfSample->eta);
 
                     // Russian roulette
-                    SampledSpectrum rrBeta = beta * etaScale / indir_inv_w_u.Average();
+                    SampledSpectrum rrBeta = beta * etaScale / indir_r_u.Average();
                     if (rrBeta.MaxComponentValue() < 1 && w.depth > 1) {
                         Float q = std::max<Float>(0, 1 - rrBeta.MaxComponentValue());
                         if (raySamples.indirect.rr < q) {
@@ -125,23 +125,23 @@ void WavefrontPathIntegrator::SampleSubsurface(int wavefrontDepth) {
 
                         LightSampleContext ctx(intr.pi, intr.n, intr.ns);
                         nextRayQueue->PushIndirectRay(
-                            ray, w.depth + 1, ctx, beta, indir_inv_w_u, inv_w_l, lambda,
+                            ray, w.depth + 1, ctx, beta, indir_r_u, r_l, lambda,
                             etaScale, bsdfSample->IsSpecular(), anyNonSpecularBounces,
                             w.pixelIndex);
 
                         PBRT_DBG("Spawned indirect ray at depth %d. "
-                                 "Specular %d beta %f %f %f %f indir_inv_w_u %f %f %f %f "
-                                 "inv_w_l %f "
+                                 "Specular %d beta %f %f %f %f indir_r_u %f %f %f %f "
+                                 "r_l %f "
                                  "%f %f %f "
-                                 "beta/indir_inv_w_u %f %f %f %f\n",
+                                 "beta/indir_r_u %f %f %f %f\n",
                                  w.depth + 1, int(bsdfSample->IsSpecular()), beta[0],
-                                 beta[1], beta[2], beta[3], indir_inv_w_u[0],
-                                 indir_inv_w_u[1], indir_inv_w_u[2], indir_inv_w_u[3],
-                                 inv_w_l[0], inv_w_l[1], inv_w_l[2], inv_w_l[3],
-                                 SafeDiv(beta, indir_inv_w_u)[0],
-                                 SafeDiv(beta, indir_inv_w_u)[1],
-                                 SafeDiv(beta, indir_inv_w_u)[2],
-                                 SafeDiv(beta, indir_inv_w_u)[3]);
+                                 beta[1], beta[2], beta[3], indir_r_u[0],
+                                 indir_r_u[1], indir_r_u[2], indir_r_u[3],
+                                 r_l[0], r_l[1], r_l[2], r_l[3],
+                                 SafeDiv(beta, indir_r_u)[0],
+                                 SafeDiv(beta, indir_r_u)[1],
+                                 SafeDiv(beta, indir_r_u)[2],
+                                 SafeDiv(beta, indir_r_u)[3]);
                     }
                 }
             }
@@ -174,22 +174,22 @@ void WavefrontPathIntegrator::SampleSubsurface(int wavefrontDepth) {
                     ls->L[0], ls->L[1], ls->L[2], ls->L[3], ls->pdf);
 
                 Float lightPDF = ls->pdf * sampledLight->p;
-                // This causes inv_w_u to be zero for the shadow ray, so that
+                // This causes r_u to be zero for the shadow ray, so that
                 // part of MIS just becomes a no-op.
                 Float bsdfPDF =
                     IsDeltaLight(light.Type()) ? 0.f : bsdf.PDF<ConcreteBxDF>(wo, wi);
-                SampledSpectrum inv_w_l = inv_w_u * lightPDF;
-                inv_w_u *= bsdfPDF;
+                SampledSpectrum r_l = r_u * lightPDF;
+                r_u *= bsdfPDF;
 
                 SampledSpectrum Ld = beta * ls->L;
 
                 PBRT_DBG("depth %d Ld %f %f %f %f "
                          "new beta %f %f %f %f beta/uni %f %f %f %f Ld/uni %f %f %f %f\n",
                          w.depth, Ld[0], Ld[1], Ld[2], Ld[3], beta[0], beta[1], beta[2],
-                         beta[3], SafeDiv(beta, inv_w_u)[0], SafeDiv(beta, inv_w_u)[1],
-                         SafeDiv(beta, inv_w_u)[2], SafeDiv(beta, inv_w_u)[3],
-                         SafeDiv(Ld, inv_w_u)[0], SafeDiv(Ld, inv_w_u)[1],
-                         SafeDiv(Ld, inv_w_u)[2], SafeDiv(Ld, inv_w_u)[3]);
+                         beta[3], SafeDiv(beta, r_u)[0], SafeDiv(beta, r_u)[1],
+                         SafeDiv(beta, r_u)[2], SafeDiv(beta, r_u)[3],
+                         SafeDiv(Ld, r_u)[0], SafeDiv(Ld, r_u)[1],
+                         SafeDiv(Ld, r_u)[2], SafeDiv(Ld, r_u)[3]);
 
                 Ray ray = SpawnRayTo(intr.pi, intr.n, time, ls->pLight.pi, ls->pLight.n);
                 if (haveMedia)
@@ -198,7 +198,7 @@ void WavefrontPathIntegrator::SampleSubsurface(int wavefrontDepth) {
                                                         : w.mediumInterface.inside;
 
                 shadowRayQueue->Push(ShadowRayWorkItem{ray, 1 - ShadowEpsilon, lambda, Ld,
-                                                       inv_w_u, inv_w_l, w.pixelIndex});
+                                                       r_u, r_l, w.pixelIndex});
             }
         });
 

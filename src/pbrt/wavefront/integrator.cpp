@@ -509,18 +509,18 @@ void WavefrontPathIntegrator::HandleEscapedRays() {
                     PBRT_DBG("depth %d specularBounce %d pdf uni %f %f %f %f "
                              "pdf nee %f %f %f %f\n",
                              w.depth, w.specularBounce,
-                             w.inv_w_u[0], w.inv_w_u[1], w.inv_w_u[2], w.inv_w_u[3],
-                             w.inv_w_l[0], w.inv_w_l[1], w.inv_w_l[2], w.inv_w_l[3]);
+                             w.r_u[0], w.r_u[1], w.r_u[2], w.r_u[3],
+                             w.r_l[0], w.r_l[1], w.r_l[2], w.r_l[3]);
 
                     if (w.depth == 0 || w.specularBounce) {
-                        L += w.beta * Le / w.inv_w_u.Average();
+                        L += w.beta * Le / w.r_u.Average();
                     } else {
                         // Compute MIS-weighted radiance contribution from infinite light
                         LightSampleContext ctx = w.prevIntrCtx;
                         Float lightChoicePDF = lightSampler.PMF(ctx, light);
-                        SampledSpectrum inv_w_l =
-                            w.inv_w_l * lightChoicePDF * light.PDF_Li(ctx, w.rayd, true);
-                        L += w.beta * Le / (w.inv_w_u + inv_w_l).Average();
+                        SampledSpectrum r_l =
+                            w.r_l * lightChoicePDF * light.PDF_Li(ctx, w.rayd, true);
+                        L += w.beta * Le / (w.r_u + r_l).Average();
                     }
                 }
             }
@@ -550,7 +550,7 @@ void WavefrontPathIntegrator::HandleEmissiveIntersection() {
             // Compute area light's weighted radiance contribution to the path
             SampledSpectrum L(0.f);
             if (w.depth == 0 || w.specularBounce) {
-                L = w.beta * Le / w.inv_w_u.Average();
+                L = w.beta * Le / w.r_u.Average();
             } else {
                 // Compute MIS-weighted radiance contribution from area light
                 Vector3f wi = -w.wo;
@@ -558,9 +558,9 @@ void WavefrontPathIntegrator::HandleEmissiveIntersection() {
                 Float lightChoicePDF = lightSampler.PMF(ctx, w.areaLight);
                 Float lightPDF = lightChoicePDF * w.areaLight.PDF_Li(ctx, wi, true);
 
-                SampledSpectrum inv_w_u = w.inv_w_u;
-                SampledSpectrum inv_w_l = w.inv_w_l * lightPDF;
-                L = w.beta * Le / (inv_w_u + inv_w_l).Average();
+                SampledSpectrum r_u = w.r_u;
+                SampledSpectrum r_l = w.r_l * lightPDF;
+                L = w.beta * Le / (r_u + r_l).Average();
             }
 
             PBRT_DBG("Added L %f %f %f %f for pixel index %d\n", L[0], L[1], L[2], L[3],
