@@ -268,7 +268,7 @@ std::map<int, TriQuadMesh> OptiXAggregate::PreparePLYMeshes(
             plyMesh.ConvertToOnlyTriangles();
 
             Float edgeLength =
-                shape.parameters.GetOneFloat("displacement.edgelength", 1.f);
+                shape.parameters.GetOneFloat("edgelength", 1.f);
             edgeLength *= Options->displacementEdgeScale;
 
             std::string displacementTexName = shape.parameters.GetTexture("displacement");
