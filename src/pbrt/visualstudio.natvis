@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+	<Type Name="pbrt::TaggedPointer&lt;*&gt;">
+		<DisplayString Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==0"  Optional="true">nullptr</DisplayString>
+		<DisplayString Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==1"  Optional="true">{($T1*)(bits &amp; 0x1FFFFFFFFFFFFFF)}</DisplayString>
+		<DisplayString Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==2"  Optional="true">{($T2*)(bits &amp; 0x1FFFFFFFFFFFFFF)}</DisplayString>
+		<DisplayString Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==3"  Optional="true">{($T3*)(bits &amp; 0x1FFFFFFFFFFFFFF)}</DisplayString>
+		<DisplayString Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==4"  Optional="true">{($T4*)(bits &amp; 0x1FFFFFFFFFFFFFF)}</DisplayString>
+		<DisplayString Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==5"  Optional="true">{($T5*)(bits &amp; 0x1FFFFFFFFFFFFFF)}</DisplayString>
+		<DisplayString Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==6"  Optional="true">{($T6*)(bits &amp; 0x1FFFFFFFFFFFFFF)}</DisplayString>
+		<DisplayString Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==7"  Optional="true">{($T7*)(bits &amp; 0x1FFFFFFFFFFFFFF)}</DisplayString>
+		<DisplayString Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==8"  Optional="true">{($T8*)(bits &amp; 0x1FFFFFFFFFFFFFF)}</DisplayString>
+		<DisplayString Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==9"  Optional="true">{($T9*)(bits &amp; 0x1FFFFFFFFFFFFFF)}</DisplayString>
+		<DisplayString Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==10" Optional="true">{($T10*)(bits &amp; 0x1FFFFFFFFFFFFFF)}</DisplayString>
+		<DisplayString Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==11" Optional="true">{($T11*)(bits &amp; 0x1FFFFFFFFFFFFFF)}</DisplayString>
+		<DisplayString Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==12" Optional="true">{($T12*)(bits &amp; 0x1FFFFFFFFFFFFFF)}</DisplayString>
+		<DisplayString Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==13" Optional="true">{($T13*)(bits &amp; 0x1FFFFFFFFFFFFFF)}</DisplayString>
+		<DisplayString Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==14" Optional="true">{($T14*)(bits &amp; 0x1FFFFFFFFFFFFFF)}</DisplayString>
+		<DisplayString Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==15" Optional="true">{($T15*)(bits &amp; 0x1FFFFFFFFFFFFFF)}</DisplayString>
+		<DisplayString>unknown</DisplayString>
+		<Expand>
+			<Item Name="tag">((bits &amp; 0xFE00000000000000) &gt;&gt; 57)</Item>
+			<Item Name="ptr" Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==1"  Optional="true">($T1*)(bits &amp; 0x1FFFFFFFFFFFFFF)</Item>
+			<Item Name="ptr" Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==2"  Optional="true">($T2*)(bits &amp; 0x1FFFFFFFFFFFFFF)</Item>
+			<Item Name="ptr" Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==3"  Optional="true">($T3*)(bits &amp; 0x1FFFFFFFFFFFFFF)</Item>
+			<Item Name="ptr" Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==4"  Optional="true">($T4*)(bits &amp; 0x1FFFFFFFFFFFFFF)</Item>
+			<Item Name="ptr" Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==5"  Optional="true">($T5*)(bits &amp; 0x1FFFFFFFFFFFFFF)</Item>
+			<Item Name="ptr" Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==6"  Optional="true">($T6*)(bits &amp; 0x1FFFFFFFFFFFFFF)</Item>
+			<Item Name="ptr" Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==7"  Optional="true">($T7*)(bits &amp; 0x1FFFFFFFFFFFFFF)</Item>
+			<Item Name="ptr" Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==8"  Optional="true">($T8*)(bits &amp; 0x1FFFFFFFFFFFFFF)</Item>
+			<Item Name="ptr" Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==9"  Optional="true">($T9*)(bits &amp; 0x1FFFFFFFFFFFFFF)</Item>
+			<Item Name="ptr" Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==10" Optional="true">($T10*)(bits &amp; 0x1FFFFFFFFFFFFFF)</Item>
+			<Item Name="ptr" Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==11" Optional="true">($T11*)(bits &amp; 0x1FFFFFFFFFFFFFF)</Item>
+			<Item Name="ptr" Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==12" Optional="true">($T12*)(bits &amp; 0x1FFFFFFFFFFFFFF)</Item>
+			<Item Name="ptr" Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==13" Optional="true">($T13*)(bits &amp; 0x1FFFFFFFFFFFFFF)</Item>
+			<Item Name="ptr" Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==14" Optional="true">($T14*)(bits &amp; 0x1FFFFFFFFFFFFFF)</Item>
+			<Item Name="ptr" Condition="((bits &amp; 0xFE00000000000000) &gt;&gt; 57)==15" Optional="true">($T15*)(bits &amp; 0x1FFFFFFFFFFFFFF)</Item>
+		</Expand>
+	</Type>
+</AutoVisualizer>

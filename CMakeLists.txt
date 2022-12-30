@@ -531,6 +531,10 @@ set (PBRT_SOURCE
 
   src/pbrt/cmd/pspec_gpu.cpp
   )
+  
+if (MSVC)
+    set (PBRT_SOURCE ${PBRT_SOURCE} src/pbrt/visualstudio.natvis)
+endif ()
 
 set (PBRT_SOURCE_HEADERS
   src/pbrt/bsdf.h
