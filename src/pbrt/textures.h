@@ -117,7 +117,7 @@ class SphericalMapping {
     PBRT_CPU_GPU
     TexCoord2D Map(TextureEvalContext ctx) const {
         Point3f pt = textureFromRender(ctx.p);
-        // Compute $\partial s/\partial \pt{}$ and $\partial t/\partial \pt{}$ for
+        // Compute $\partial\,s/\partial\,\pt{}$ and $\partial\,t/\partial\,\pt{}$ for
         // spherical mapping
         Float x2y2 = Sqr(pt.x) + Sqr(pt.y);
         Float sqrtx2y2 = std::sqrt(x2y2);

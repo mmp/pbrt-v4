@@ -186,7 +186,7 @@ class PaddedSobolSampler {
 
         int dim = dimension;
         dimension += 2;
-        // Return randomized 2D Sobol' sample
+        // Return randomized 2D Sobol\+$'$ sample
         return Point2f(SampleDimension(0, index, uint32_t(hash)),
                        SampleDimension(1, index, hash >> 32));
     }
@@ -258,7 +258,7 @@ class ZSobolSampler {
     Float Get1D() {
         uint64_t sampleIndex = GetSampleIndex();
         ++dimension;
-        // Generate 1D Sobol$'$ sample at _sampleIndex_
+        // Generate 1D Sobol\+$'$ sample at _sampleIndex_
         uint32_t sampleHash = Hash(dimension, seed);
         if (randomize == RandomizeStrategy::None)
             return SobolSample(sampleIndex, 0, NoRandomizer());
@@ -274,7 +274,7 @@ class ZSobolSampler {
     Point2f Get2D() {
         uint64_t sampleIndex = GetSampleIndex();
         dimension += 2;
-        // Generate 2D Sobol sample at _sampleIndex_
+        // Generate 2D Sobol\+$'$ sample at _sampleIndex_
         uint64_t bits = Hash(dimension, seed);
         uint32_t sampleHash[2] = {uint32_t(bits), uint32_t(bits >> 32)};
         if (randomize == RandomizeStrategy::None)
@@ -334,7 +334,7 @@ class ZSobolSampler {
         bool pow2Samples = log2SamplesPerPixel & 1;
         int lastDigit = pow2Samples ? 1 : 0;
         for (int i = nBase4Digits - 1; i >= lastDigit; --i) {
-            // Randomly permute $i$th base 4 digit in _mortonIndex_
+            // Randomly permute $i$th base-4 digit in _mortonIndex_
             int digitShift = 2 * i - (pow2Samples ? 1 : 0);
             int digit = (mortonIndex >> digitShift) & 3;
             // Choose permutation _p_ to use for _digit_
@@ -525,7 +525,7 @@ class SobolSampler {
     Point2f GetPixel2D() {
         Point2f u(SobolSample(sobolIndex, 0, NoRandomizer()),
                   SobolSample(sobolIndex, 1, NoRandomizer()));
-        // Remap Sobol$'$ dimensions used for pixel samples
+        // Remap Sobol\+$'$ dimensions used for pixel samples
         for (int dim = 0; dim < 2; ++dim) {
             DCHECK_RARE(1e-7, u[dim] * scale - pixel[dim] < 0);
             DCHECK_RARE(1e-7, u[dim] * scale - pixel[dim] > 1);
@@ -542,11 +542,11 @@ class SobolSampler {
     // SobolSampler Private Methods
     PBRT_CPU_GPU
     Float SampleDimension(int dimension) const {
-        // Return un-randomized Sobol$'$ sample if appropriate
+        // Return un-randomized Sobol\+$'$ sample if appropriate
         if (randomize == RandomizeStrategy::None)
             return SobolSample(sobolIndex, dimension, NoRandomizer());
 
-        // Return randomized Sobol$'$ sample using _randomize_
+        // Return randomized Sobol\+$'$ sample using _randomize_
         uint32_t hash = Hash(dimension, seed);
         if (randomize == RandomizeStrategy::PermuteDigits)
             return SobolSample(sobolIndex, dimension, BinaryPermuteScrambler(hash));

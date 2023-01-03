@@ -338,7 +338,7 @@ PBRT_CPU_GPU inline constexpr Float EvaluatePolynomial(Float t, C c, Args... cRe
 
 // http://www.plunk.org/~hatch/rightway.html
 PBRT_CPU_GPU inline Float SinXOverX(Float x) {
-    if (1 + x * x == 1)
+    if (1 - x * x == 1)
         return 1;
     return std::sin(x) / x;
 }

@@ -168,13 +168,13 @@ template <typename R>
 PBRT_CPU_GPU inline Float SobolSample(int64_t a, int dimension, R randomizer) {
     DCHECK_LT(dimension, NSobolDimensions);
     DCHECK(a >= 0 && a < (1ull << SobolMatrixSize));
-    // Compute initial Sobol sample _v_ using generator matrices
+    // Compute initial Sobol\+$'$ sample _v_ using generator matrices
     uint32_t v = 0;
     for (int i = dimension * SobolMatrixSize; a != 0; a >>= 1, i++)
         if (a & 1)
             v ^= SobolMatrices32[i];
 
-    // Randomize Sobol sample and return floating-point value
+    // Randomize Sobol\+$'$ sample and return floating-point value
     v = randomizer(v);
     return std::min(v * 0x1p-32f, FloatOneMinusEpsilon);
 }

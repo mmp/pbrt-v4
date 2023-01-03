@@ -69,9 +69,9 @@ class PowerLightSampler {
     pstd::optional<SampledLight> Sample(Float u) const {
         if (!aliasTable.size())
             return {};
-        Float pdf;
-        int lightIndex = aliasTable.Sample(u, &pdf);
-        return SampledLight{lights[lightIndex], pdf};
+        Float pmf;
+        int lightIndex = aliasTable.Sample(u, &pmf);
+        return SampledLight{lights[lightIndex], pmf};
     }
 
     PBRT_CPU_GPU
@@ -172,11 +172,11 @@ class CompactLightBounds {
             cosTheta_w = std::abs(cosTheta_w);
         Float sinTheta_w = SafeSqrt(1 - Sqr(cosTheta_w));
 
-        // Compute $\cos \theta_\roman{b}$ for reference point
+        // Compute $\cos\,\theta_\roman{\+b}$ for reference point
         Float cosTheta_b = BoundSubtendedDirections(bounds, p).cosTheta;
         Float sinTheta_b = SafeSqrt(1 - Sqr(cosTheta_b));
 
-        // Compute $\cos \theta'$ and test against $\cos \theta_\roman{e}$
+        // Compute $\cos\,\theta'$ and test against $\cos\,\theta_\roman{e}$
         Float sinTheta_o = SafeSqrt(1 - Sqr(cosTheta_o));
         Float cosTheta_x = cosSubClamped(sinTheta_w, cosTheta_w, sinTheta_o, cosTheta_o);
         Float sinTheta_x = sinSubClamped(sinTheta_w, cosTheta_w, sinTheta_o, cosTheta_o);
@@ -187,7 +187,7 @@ class CompactLightBounds {
         // Return final importance at reference point
         Float importance = phi * cosThetap / d2;
         DCHECK_GE(importance, -1e-3);
-        // Account for $\cos \theta_\roman{i}$ in importance at surfaces
+        // Account for $\cos\theta_\roman{i}$ in importance at surfaces
         if (n != Normal3f(0, 0, 0)) {
             Float cosTheta_i = AbsDot(wi, n);
             Float sinTheta_i = SafeSqrt(1 - Sqr(cosTheta_i));
@@ -273,8 +273,8 @@ class BVHLightSampler {
             u /= pInfinite;
             int index =
                 std::min<int>(u * infiniteLights.size(), infiniteLights.size() - 1);
-            Float pdf = pInfinite / infiniteLights.size();
-            return SampledLight{infiniteLights[index], pdf};
+            Float pmf = pInfinite / infiniteLights.size();
+            return SampledLight{infiniteLights[index], pmf};
 
         } else {
             // Traverse light BVH to sample light
@@ -285,7 +285,7 @@ class BVHLightSampler {
             Normal3f n = ctx.ns;
             u = std::min<Float>((u - pInfinite) / (1 - pInfinite), OneMinusEpsilon);
             int nodeIndex = 0;
-            Float pdf = 1 - pInfinite;
+            Float pmf = 1 - pInfinite;
 
             while (true) {
                 // Process light BVH node for light sampling
@@ -301,9 +301,9 @@ class BVHLightSampler {
                         return {};
 
                     // Randomly sample light BVH child node
-                    Float nodePDF;
-                    int child = SampleDiscrete(ci, u, &nodePDF, &u);
-                    pdf *= nodePDF;
+                    Float nodePMF;
+                    int child = SampleDiscrete(ci, u, &nodePMF, &u);
+                    pmf *= nodePMF;
                     nodeIndex = (child == 0) ? (nodeIndex + 1) : node.childOrLightIndex;
 
                 } else {
@@ -312,7 +312,7 @@ class BVHLightSampler {
                         DCHECK_GT(node.lightBounds.Importance(p, n, allLightBounds), 0);
                     if (nodeIndex > 0 ||
                         node.lightBounds.Importance(p, n, allLightBounds) > 0)
-                        return SampledLight{lights[node.childOrLightIndex], pdf};
+                        return SampledLight{lights[node.childOrLightIndex], pmf};
                     return {};
                 }
             }
@@ -321,11 +321,11 @@ class BVHLightSampler {
 
     PBRT_CPU_GPU
     Float PMF(const LightSampleContext &ctx, Light light) const {
-        // Handle infinite _light_ PDF computation
+        // Handle infinite _light_ PMF computation
         if (!lightToBitTrail.HasKey(light))
             return 1.f / (infiniteLights.size() + (nodes.empty() ? 0 : 1));
 
-        // Initialize local variables for BVH traversal for PDF computation
+        // Initialize local variables for BVH traversal for PMF computation
         uint32_t bitTrail = lightToBitTrail[light];
         Point3f p = ctx.p();
         Normal3f n = ctx.ns;
@@ -333,23 +333,23 @@ class BVHLightSampler {
         Float pInfinite = Float(infiniteLights.size()) /
                           Float(infiniteLights.size() + (nodes.empty() ? 0 : 1));
 
-        Float pdf = 1 - pInfinite;
+        Float pmf = 1 - pInfinite;
         int nodeIndex = 0;
 
-        // Compute light's PDF by walking down tree nodes to the light
+        // Compute light's PMF by walking down tree nodes to the light
         while (true) {
             const LightBVHNode *node = &nodes[nodeIndex];
             if (node->isLeaf) {
                 DCHECK_EQ(light, lights[node->childOrLightIndex]);
-                return pdf;
+                return pmf;
             }
-            // Compute child importances and update PDF for current node
+            // Compute child importances and update PMF for current node
             const LightBVHNode *child0 = &nodes[nodeIndex + 1];
             const LightBVHNode *child1 = &nodes[node->childOrLightIndex];
             Float ci[2] = {child0->lightBounds.Importance(p, n, allLightBounds),
                            child1->lightBounds.Importance(p, n, allLightBounds)};
             DCHECK_GT(ci[bitTrail & 1], 0);
-            pdf *= ci[bitTrail & 1] / (ci[0] + ci[1]);
+            pmf *= ci[bitTrail & 1] / (ci[0] + ci[1]);
 
             // Use _bitTrail_ to find next node index and update its value
             nodeIndex = (bitTrail & 1) ? node->childOrLightIndex : (nodeIndex + 1);

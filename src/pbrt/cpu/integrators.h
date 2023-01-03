@@ -62,7 +62,7 @@ class Integrator {
     std::vector<Light> infiniteLights;
 
   protected:
-    // Integrator Private Methods
+    // Integrator Protected Methods
     Integrator(Primitive aggregate, std::vector<Light> lights)
         : aggregate(aggregate), lights(lights) {
         // Integrator constructor implementation

@@ -32,7 +32,7 @@ class BufferCache {
     // BufferCache Public Methods
     const T *LookupOrAdd(pstd::span<const T> buf, Allocator alloc) {
         ++nBufferCacheLookups;
-        // Return pointer to data if _buf_ contents is already in the cache
+        // Return pointer to data if _buf_ contents are already in the cache
         Buffer lookupBuffer(buf.data(), buf.size());
         int shardIndex = uint32_t(lookupBuffer.hash) >> (32 - logShards);
         DCHECK(shardIndex >= 0 && shardIndex < nShards);

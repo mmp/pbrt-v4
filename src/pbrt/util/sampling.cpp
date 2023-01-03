@@ -59,7 +59,7 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v, 
         *pdf = (A <= 0) ? 0 : 1 / A;
     }
 
-    // Find $\cos \beta'$ for point along _b_ for sampled area
+    // Find $\cos\beta'$ for point along _b_ for sampled area
     Float cosAlpha = std::cos(alpha), sinAlpha = std::sin(alpha);
     Float sinPhi = std::sin(Ap_pi) * cosAlpha - std::cos(Ap_pi) * sinAlpha;
     Float cosPhi = std::cos(Ap_pi) * cosAlpha + std::sin(Ap_pi) * sinAlpha;
@@ -345,7 +345,7 @@ Point2f InvertSphericalRectangleSample(Point3f pRef, Point3f s, Vector3f ex, Vec
 }
 
 Vector3f SampleHenyeyGreenstein(Vector3f wo, Float g, Point2f u, Float *pdf) {
-    // Compute $\cos \theta$ for Henyey--Greenstein sample
+    // Compute $\cos\theta$ for Henyey--Greenstein sample
     Float cosTheta;
     if (std::abs(g) < 1e-3f)
         cosTheta = 1 - 2 * u[0];
@@ -576,7 +576,7 @@ AliasTable::AliasTable(pstd::span<const Float> weights, Allocator alloc)
 
     // Process under and over work item together
     while (!under.empty() && !over.empty()) {
-        // Remove an item from each alias table work list
+        // Remove items _un_ and _ov_ from the alias table work lists
         Outcome un = under.back(), ov = over.back();
         under.pop_back();
         over.pop_back();

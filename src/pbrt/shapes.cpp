@@ -211,7 +211,7 @@ pstd::optional<TriangleIntersection> IntersectTriangle(const Ray &ray, Float tMa
     Float e1 = DifferenceOfProducts(p2t.x, p0t.y, p2t.y, p0t.x);
     Float e2 = DifferenceOfProducts(p0t.x, p1t.y, p0t.y, p1t.x);
 
-    // Fall back to double precision test at triangle edges
+    // Fall back to double-precision test at triangle edges
     if (sizeof(Float) == sizeof(float) && (e0 == 0.0f || e1 == 0.0f || e2 == 0.0f)) {
         double p2txp1ty = (double)p2t.x * (double)p1t.y;
         double p2typ1tx = (double)p2t.y * (double)p1t.x;
@@ -677,6 +677,7 @@ bool Curve::RecursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Poin
         Point3f pc =
             EvaluateCubicBezier(pstd::span<const Point3f>(cp), Clamp(w, 0, 1), &dpcdw);
         Float ptCurveDist2 = Sqr(pc.x) + Sqr(pc.y);
+
         if (ptCurveDist2 > Sqr(hitWidth) * 0.25f)
             return false;
         if (pc.z < 0 || pc.z > rayLength * tMax)
@@ -1284,9 +1285,9 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,
     }
     // Sample direction to rectangular bilinear patch
     Float pdf = 1;
-    // Warp uniform sample _u_ to account for incident $\cos \theta$ factor
+    // Warp uniform sample _u_ to account for incident $\cos\theta$ factor
     if (ctx.ns != Normal3f(0, 0, 0)) {
-        // Compute $\cos \theta$ weights for rectangle seen from reference point
+        // Compute $\cos\theta$ weights for rectangle seen from reference point
         pstd::array<Float, 4> w =
             pstd::array<Float, 4>{std::max<Float>(0.01, AbsDot(v00, ctx.ns)),
                                   std::max<Float>(0.01, AbsDot(v10, ctx.ns)),
@@ -1355,7 +1356,7 @@ Float BilinearPatch::PDF(const ShapeSampleContext &ctx, Vector3f wi) const {
         // Return PDF for sample in spherical rectangle
         Float pdf = 1 / SphericalQuadArea(v00, v10, v11, v01);
         if (ctx.ns != Normal3f(0, 0, 0)) {
-            // Compute $\cos \theta$ weights for rectangle seen from reference point
+            // Compute $\cos\theta$ weights for rectangle seen from reference point
             pstd::array<Float, 4> w =
                 pstd::array<Float, 4>{std::max<Float>(0.01, AbsDot(v00, ctx.ns)),
                                       std::max<Float>(0.01, AbsDot(v10, ctx.ns)),

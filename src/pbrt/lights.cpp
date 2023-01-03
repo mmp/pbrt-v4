@@ -133,11 +133,11 @@ Float LightBounds::Importance(Point3f p, Normal3f n) const {
         cosTheta_w = std::abs(cosTheta_w);
     Float sinTheta_w = SafeSqrt(1 - Sqr(cosTheta_w));
 
-    // Compute $\cos \theta_\roman{b}$ for reference point
+    // Compute $\cos\,\theta_\roman{\+b}$ for reference point
     Float cosTheta_b = BoundSubtendedDirections(bounds, p).cosTheta;
     Float sinTheta_b = SafeSqrt(1 - Sqr(cosTheta_b));
 
-    // Compute $\cos \theta'$ and test against $\cos \theta_\roman{e}$
+    // Compute $\cos\,\theta'$ and test against $\cos\,\theta_\roman{e}$
     Float sinTheta_o = SafeSqrt(1 - Sqr(cosTheta_o));
     Float cosTheta_x = cosSubClamped(sinTheta_w, cosTheta_w, sinTheta_o, cosTheta_o);
     Float sinTheta_x = sinSubClamped(sinTheta_w, cosTheta_w, sinTheta_o, cosTheta_o);
@@ -148,7 +148,7 @@ Float LightBounds::Importance(Point3f p, Normal3f n) const {
     // Return final importance at reference point
     Float importance = phi * cosThetap / d2;
     DCHECK_GE(importance, -1e-3);
-    // Account for $\cos \theta_\roman{i}$ in importance at surfaces
+    // Account for $\cos\theta_\roman{i}$ in importance at surfaces
     if (n != Normal3f(0, 0, 0)) {
         Float cosTheta_i = AbsDot(wi, n);
         Float sinTheta_i = SafeSqrt(1 - Sqr(cosTheta_i));
@@ -1260,7 +1260,7 @@ Float PortalImageInfiniteLight::PDF_Li(LightSampleContext ctx, Vector3f w,
     // Return PDF for sampling $(u,v)$ from reference point
     pstd::optional<Bounds2f> b = ImageBounds(ctx.p());
     if (!b)
-        return {};
+        return 0;
     Float pdf = distribution.PDF(*uv, *b);
     return pdf / duv_dw;
 }
