@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+	<Type Name="pbrt::TaggedPointer&lt;*&gt;">
+		<Intrinsic Name="_tag" Expression="(bits &amp; 0xFE00000000000000) &gt;&gt; 57"/>
+		<Intrinsic Name="_ptr" Expression="bits &amp; 0x1FFFFFFFFFFFFFF"/>
+		<DisplayString Condition="_tag()==0"  Optional="true">nullptr</DisplayString>
+		<DisplayString Condition="_tag()==1"  Optional="true">{($T1*)_ptr()}</DisplayString>
+		<DisplayString Condition="_tag()==2"  Optional="true">{($T2*)_ptr()}</DisplayString>
+		<DisplayString Condition="_tag()==3"  Optional="true">{($T3*)_ptr()}</DisplayString>
+		<DisplayString Condition="_tag()==4"  Optional="true">{($T4*)_ptr()}</DisplayString>
+		<DisplayString Condition="_tag()==5"  Optional="true">{($T5*)_ptr()}</DisplayString>
+		<DisplayString Condition="_tag()==6"  Optional="true">{($T6*)_ptr()}</DisplayString>
+		<DisplayString Condition="_tag()==7"  Optional="true">{($T7*)_ptr()}</DisplayString>
+		<DisplayString Condition="_tag()==8"  Optional="true">{($T8*)_ptr()}</DisplayString>
+		<DisplayString Condition="_tag()==9"  Optional="true">{($T9*)_ptr()}</DisplayString>
+		<DisplayString Condition="_tag()==10" Optional="true">{($T10*)_ptr()}</DisplayString>
+		<DisplayString Condition="_tag()==11" Optional="true">{($T11*)_ptr()}</DisplayString>
+		<DisplayString Condition="_tag()==12" Optional="true">{($T12*)_ptr()}</DisplayString>
+		<DisplayString Condition="_tag()==13" Optional="true">{($T13*)_ptr()}</DisplayString>
+		<DisplayString Condition="_tag()==14" Optional="true">{($T14*)_ptr()}</DisplayString>
+		<DisplayString Condition="_tag()==15" Optional="true">{($T15*)_ptr()}</DisplayString>
+		<DisplayString>unknown</DisplayString>
+		<Expand>
+			<Item Name="tag">((bits &amp; 0xFE00000000000000) &gt;&gt; 57)</Item>
+			<Item Name="ptr" Condition="_tag()==1"  Optional="true">($T1*)_ptr()</Item>
+			<Item Name="ptr" Condition="_tag()==2"  Optional="true">($T2*)_ptr()</Item>
+			<Item Name="ptr" Condition="_tag()==3"  Optional="true">($T3*)_ptr()</Item>
+			<Item Name="ptr" Condition="_tag()==4"  Optional="true">($T4*)_ptr()</Item>
+			<Item Name="ptr" Condition="_tag()==5"  Optional="true">($T5*)_ptr()</Item>
+			<Item Name="ptr" Condition="_tag()==6"  Optional="true">($T6*)_ptr()</Item>
+			<Item Name="ptr" Condition="_tag()==7"  Optional="true">($T7*)_ptr()</Item>
+			<Item Name="ptr" Condition="_tag()==8"  Optional="true">($T8*)_ptr()</Item>
+			<Item Name="ptr" Condition="_tag()==9"  Optional="true">($T9*)_ptr()</Item>
+			<Item Name="ptr" Condition="_tag()==10" Optional="true">($T10*)_ptr()</Item>
+			<Item Name="ptr" Condition="_tag()==11" Optional="true">($T11*)_ptr()</Item>
+			<Item Name="ptr" Condition="_tag()==12" Optional="true">($T12*)_ptr()</Item>
+			<Item Name="ptr" Condition="_tag()==13" Optional="true">($T13*)_ptr()</Item>
+			<Item Name="ptr" Condition="_tag()==14" Optional="true">($T14*)_ptr()</Item>
+			<Item Name="ptr" Condition="_tag()==15" Optional="true">($T15*)_ptr()</Item>
+		</Expand>
+	</Type>
+
+	<Type Name="pstd::array&lt;*&gt;">
+		<DisplayString>{{ size={$T2} }}</DisplayString>
+		<Expand>
+			<ArrayItems>
+				<Size>$T2</Size>
+				<ValuePointer>values</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+	
+	<Type Name="pstd::optional&lt;*&gt;">
+		<DisplayString Condition="!set">null</DisplayString>
+		<DisplayString Condition="set">{reinterpret_cast&lt;$T1*&gt;(&amp;optionalValue)}</DisplayString>
+		<Expand>
+			<Item Condition="set" Name="ptr">reinterpret_cast&lt;$T1*&gt;(&amp;optionalValue)</Item>
+		</Expand>
+	</Type>
+
+	<Type Name="pstd::span&lt;*&gt;">
+		<DisplayString>{{ size={n} }}</DisplayString>
+		<Expand>
+			<ArrayItems>
+				<Size>n</Size>
+				<ValuePointer>ptr</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+
+	<Type Name="pstd::vector&lt;*&gt;">
+		<DisplayString>{{ size={nStored} }}</DisplayString>
+		<Expand>
+			<Item Name="[capacity]">nAlloc</Item>
+			<Item Name="[allocator]">alloc</Item>
+			<ArrayItems>
+				<Size>nStored</Size>
+				<ValuePointer>ptr</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+
+	
+	
+	<!--
+		Copyright (c) Microsoft Corporation.
+		SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+	-->
+	<!--
+		Tuple uses a bit of a SFINAE-style technique in order to allow us to write less code.
+		It uses Condition="(void)<expr>, true", along with Optional="true".
+		This allows us to check if <expr> compiles, and if so, use that "branch".
+		from https://github.com/microsoft/STL/blob/main/stl/debugger/STL.natvis with some name replacements
+	-->
+
+	<Type Name="pstd::tuple&lt;&gt;">
+		<DisplayString IncludeView="noparens;noparensasptr"></DisplayString>
+		<DisplayString>({*this,view(noparens)})</DisplayString>
+		<Expand/>
+	</Type>
+
+	<Type Name="pstd::tuple&lt;*&gt;">
+		<DisplayString IncludeView="noparens" Optional="true" Condition="(void)((Base *)this)->value, true">
+			{value}, {*((Base *) this),view(noparens)}
+		</DisplayString>
+		<DisplayString IncludeView="noparens">{value}</DisplayString>
+		<DisplayString>({*this,view(noparens)})</DisplayString>
+		<Expand>
+			<Item Name="[0]">value</Item>
+			<Item Name="[1]" Optional="true">((Base *) this)->value</Item>
+			<Item Name="[2]" Optional="true">((Base::Base *) this)->value</Item>
+			<Item Name="[3]" Optional="true">((Base::Base::Base *) this)->value</Item>
+			<Item Name="[4]" Optional="true">((Base::Base::Base::Base *) this)->value</Item>
+			<Synthetic Name="[...]" Optional="true" Condition="(void)((Base::Base::Base::Base::Base *) this)->value, true">
+				<DisplayString>Next five elements:</DisplayString>
+			</Synthetic>
+			<ExpandedItem Optional="true">*((Base::Base::Base::Base::Base *) this)</ExpandedItem>
+		</Expand>
+	</Type>
+
+	<Type Name="pstd::tuple&lt;*&gt;" IncludeView="asptr;noparensasptr">
+		<DisplayString IncludeView="noparensasptr" Optional="true" Condition="(void)((Base *)this)->value, true">
+			{value}, {*((Base *) this),view(noparensasptr)}
+		</DisplayString>
+		<DisplayString IncludeView="noparensasptr">{&amp;value}</DisplayString>
+		<DisplayString>({*this,view(noparensasptr)})</DisplayString>
+		<Expand>
+			<Item Name="[0]">&amp;value</Item>
+			<Item Name="[1]">&amp;((Base *) this)->value</Item>
+			<Item Name="[2]" Optional="true">&amp;((Base::Base *) this)->value</Item>
+			<Item Name="[3]" Optional="true">&amp;((Base::Base::Base *) this)->value</Item>
+			<Item Name="[4]" Optional="true">&amp;((Base::Base::Base::Base *) this)->value</Item>
+			<Synthetic Name="[...]" Optional="true" Condition="(void)((Base::Base::Base::Base::Base *) this)->value, true">
+				<DisplayString>Next five elements:</DisplayString>
+			</Synthetic>
+			<ExpandedItem Optional="true">*((Base::Base::Base::Base::Base *) this),view(asptr)</ExpandedItem>
+		</Expand>
+	</Type>
+	
+</AutoVisualizer>
