@@ -35,12 +35,12 @@ jobs:
       run: nvcc -V
 
     - name: Checkout pbrt
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         submodules: true
 
     - name: Checkout rgb2spectrum tables
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: mmp/rgb2spectrum
         path: build
@@ -52,7 +52,7 @@ jobs:
         key: optix-7.12345
 
     - name: Checkout OptiX headers
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         ssh-key: ${{ secrets.CHECKOUT_KEY }}
         repository: mmp/optix-headers
