@@ -1136,7 +1136,7 @@ SampledSpectrum BxDF::rho(Vector3f wo, pstd::span<const Float> uc,
     for (size_t i = 0; i < uc.size(); ++i) {
         // Compute estimate of $\rho_\roman{hd}$
         pstd::optional<BSDFSample> bs = Sample_f(wo, uc[i], u2[i]);
-        if (bs)
+        if (bs && bs->pdf > 0)
             r += bs->f * AbsCosTheta(bs->wi) / bs->pdf;
     }
     return r / uc.size();
@@ -1154,7 +1154,7 @@ SampledSpectrum BxDF::rho(pstd::span<const Point2f> u1, pstd::span<const Float> 
             continue;
         Float pdfo = UniformHemispherePDF();
         pstd::optional<BSDFSample> bs = Sample_f(wo, uc[i], u2[i]);
-        if (bs)
+        if (bs && bs->pdf > 0)
             r += bs->f * AbsCosTheta(bs->wi) * AbsCosTheta(wo) / (pdfo * bs->pdf);
     }
     return r / (Pi * uc.size());
