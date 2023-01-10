@@ -636,7 +636,7 @@ class polymorphic_allocator {
     [[nodiscard]] Tp *allocate(size_t n) {
         return static_cast<Tp *>(resource()->allocate(n * sizeof(Tp), alignof(Tp)));
     }
-    void deallocate(Tp *p, size_t n) { resource()->deallocate(p, n); }
+    void deallocate(Tp *p, size_t n) { resource()->deallocate(p, n * sizeof(Tp)); }
 
     void *allocate_bytes(size_t nbytes, size_t alignment = alignof(max_align_t)) {
         return resource()->allocate(nbytes, alignment);
