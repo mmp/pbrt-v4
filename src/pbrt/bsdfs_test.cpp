@@ -681,6 +681,8 @@ TEST(Hair, WhiteFurnace) {
             // More samples for the smooth case, since we're sampling blindly.
             int count = (beta_m < .5 || beta_n < .5) ? 100000 : 20000;
 
+            if (NSpectrumSamples < 4) count *= 4;
+
             for (int i = 0; i < count; ++i) {
                 SampledWavelengths lambda =
                     SampledWavelengths::SampleVisible(RadicalInverse(0, i));

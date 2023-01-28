@@ -241,26 +241,31 @@ std::vector<std::pair<Sampler, std::string>> GetSamplers(const Point2i &resoluti
     if (!samplers.empty())
         return samplers;
 
-    samplers.push_back(std::make_pair(new HaltonSampler(256, resolution), "Halton 256"));
+    int sqrtSpp = 16;
+    if (NSpectrumSamples < 4)
+        sqrtSpp *= 2;
+    int spp = sqrtSpp * sqrtSpp;
+
+    samplers.push_back(std::make_pair(new HaltonSampler(spp, resolution), "Halton"));
     samplers.push_back(
-        std::make_pair(new PaddedSobolSampler(256, RandomizeStrategy::PermuteDigits),
-                       "Padded Sobol 256"));
+        std::make_pair(new PaddedSobolSampler(spp, RandomizeStrategy::PermuteDigits),
+                       "Padded Sobolspp"));
     samplers.push_back(std::make_pair(
-        new ZSobolSampler(256, Point2i(16, 16), RandomizeStrategy::PermuteDigits),
-        "Z Sobol 256"));
+        new ZSobolSampler(spp, Point2i(16, 16), RandomizeStrategy::PermuteDigits),
+        "Z Sobol"));
     samplers.push_back(
-        std::make_pair(new SobolSampler(256, resolution, RandomizeStrategy::None),
-                       "Sobol 256 Not Randomized"));
+        std::make_pair(new SobolSampler(spp, resolution, RandomizeStrategy::None),
+                       "Sobol Not Randomized"));
     samplers.push_back(std::make_pair(
-        new SobolSampler(256, resolution, RandomizeStrategy::PermuteDigits),
-        "Sobol 256 XOR Scramble"));
+        new SobolSampler(spp, resolution, RandomizeStrategy::PermuteDigits),
+        "Sobol XOR Scramble"));
     samplers.push_back(
-        std::make_pair(new SobolSampler(256, resolution, RandomizeStrategy::Owen),
-                       "Sobol 256 Owen Scramble"));
-    samplers.push_back(std::make_pair(new IndependentSampler(256), "Independent 256"));
+        std::make_pair(new SobolSampler(spp, resolution, RandomizeStrategy::Owen),
+                       "Sobol Owen Scramble"));
+    samplers.push_back(std::make_pair(new IndependentSampler(spp), "Independent"));
     samplers.push_back(
-        std::make_pair(new StratifiedSampler(16, 16, true), "Stratified 16x16"));
-    samplers.push_back(std::make_pair(new PMJ02BNSampler(256), "PMJ02bn 256"));
+        std::make_pair(new StratifiedSampler(sqrtSpp,sqrtSpp, true), "Stratified"));
+    samplers.push_back(std::make_pair(new PMJ02BNSampler(spp), "PMJ02bn"));
 
     return samplers;
 }
