@@ -23,8 +23,12 @@ system will be useful to some people in its current form and that any bugs
 in the current implementation might be found now, allowing us to correct
 them before the book is final.
 
-A number of scenes for pbrt-v4 are [available in a git
-repository](https://github.com/mmp/pbrt-v4-scenes).
+Resources
+---------
+
+* A number of scenes for pbrt-v4 are [available in a git repository](https://github.com/mmp/pbrt-v4-scenes).
+* The [pbrt-v4 User's Guide](https://pbrt.org/users-guide-v4.html).
+* Documentation on the [pbrt-v4 Scene Description Format](https://pbrt.org/fileformat-v4.html).
 
 Features
 --------
