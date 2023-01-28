@@ -108,6 +108,7 @@ static std::map<std::string, CommandUsage> commandUsage = {
                        replace the pixel with the median of the 3x3 neighboring
                        pixels. Default: infinity (i.e., disabled).
     --flipy            Flip the image along the y axis
+    --fp16             Convert image to fp16 pixel format.
     --gamma <v>        Apply a gamma curve with exponent v. (Default: 1 (none)).
     --maxluminance <n> Luminance value mapped to white by tonemapping.
                        Default: 1
@@ -1646,6 +1647,7 @@ int convert(std::vector<std::string> args) {
     Float despikeLimit = Infinity;
     bool preserveColors = false;
     bool bw = false;
+    bool fp16 = false;
     std::string inFile, outFile;
     std::string colorspace;
     std::string channelNames;
@@ -1665,6 +1667,7 @@ int convert(std::vector<std::string> args) {
             ParseArg(&iter, args.end(), "colorspace", &colorspace, onError) ||
             ParseArg(&iter, args.end(), "crop", pstd::MakeSpan(cropWindow), onError) ||
             ParseArg(&iter, args.end(), "despike", &despikeLimit, onError) ||
+            ParseArg(&iter, args.end(), "fp16", &fp16, onError) ||
             ParseArg(&iter, args.end(), "flipy", &flipy, onError) ||
             ParseArg(&iter, args.end(), "gamma", &gamma, onError) ||
             ParseArg(&iter, args.end(), "maxluminance", &maxY, onError) ||
@@ -1971,6 +1974,9 @@ int convert(std::vector<std::string> args) {
             outMetadata.pixelBounds->pMax.y = by[1];
         }
     }
+
+    if (fp16)
+        image = image.ConvertToFormat(PixelFormat::Half);
 
     if (!image.Write(outFile, outMetadata))
         return 1;
