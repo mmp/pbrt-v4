@@ -114,7 +114,9 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL Linux)
 else ()
   message (SEND_ERROR "Unknown system name: " + CMAKE_SYSTEM_NAME)
 endif()
-
+if (CMAKE_SYSTEM_NAME STREQUAL Darwin)
+  add_definitions(-Wno-deprecated-declarations) # silent deprecated 'snprintf' message under MacOS arm64
+endif()
 # libgoogle-perftools-dev
 find_library (PROFILE_LIB profiler)
 if (NOT PROFILE_LIB)
