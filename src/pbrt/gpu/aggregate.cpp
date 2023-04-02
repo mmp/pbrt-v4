@@ -1061,7 +1061,11 @@ OptixModule OptiXAggregate::createOptiXModule(OptixDeviceContext optixContext,
     char log[4096];
     size_t logSize = sizeof(log);
     OptixModule optixModule;
+#if (OPTIX_VERSION >= 70700)
+    OPTIX_CHECK_WITH_LOG(optixModuleCreate(
+#else
     OPTIX_CHECK_WITH_LOG(optixModuleCreateFromPTX(
+#endif
                              optixContext, &moduleCompileOptions, &pipelineCompileOptions,
                              ptx, strlen(ptx), log, &logSize, &optixModule),
                          log);
@@ -1253,11 +1257,13 @@ OptiXAggregate::OptiXAggregate(
 
     OptixPipelineLinkOptions pipelineLinkOptions = {};
     pipelineLinkOptions.maxTraceDepth = 2;
+#if (OPTIX_VERSION < 70700)
 #ifndef NDEBUG
     pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
 #else
     pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
 #endif
+#endif // OPTIX_VERSION
 
     OPTIX_CHECK_WITH_LOG(
         optixPipelineCreate(optixContext, &pipelineCompileOptions, &pipelineLinkOptions,
