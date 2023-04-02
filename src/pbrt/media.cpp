@@ -545,7 +545,7 @@ NanoVDBMedium::NanoVDBMedium(const Transform &renderFromMedium, Spectrum sigma_a
     majorantGridRes = Point3i(1, 1, 1);
     Float minDensity, maxDensity;
     densityFloatGrid->tree().extrema(minDensity, maxDensity);
-    majorantGrid.push_back(maxDensity);
+    majorantGrid.Set(0, 0, 0, maxDensity);
 #else
     LOG_VERBOSE("Starting nanovdb grid GetMaxDensityGrid()");
 
