@@ -15,8 +15,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        optix: [ optix-7.1.0, optix-7.2.0, optix-7.3.0, optix-7.4.0 optix-7.5.0 ]
-        cuda: [ '11.2.2', '11.4.3', '11.5.2', '11.6.1', '11.7.0' ]  # 11.3.0 fails for unclear reasons
+        optix: [ optix-7.3.0, optix-7.4.0 optix-7.5.0, optix-7.7.0 ]
+        cuda: [ '11.5.2', '11.6.1', '11.7.0', '12.1.0' ]  # 11.3.0 fails for unclear reasons
         os: [ ubuntu-20.04, windows-latest ]
 
     name: GPU Build Only (${{ matrix.os }}, CUDA ${{ matrix.cuda }}, ${{ matrix.optix }})
@@ -24,7 +24,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: jimver/cuda-toolkit@v0.2.6
+    - uses: jimver/cuda-toolkit@v0.2.10
       id: cuda-toolkit
       with:
         cuda: ${{ matrix.cuda }}
@@ -77,3 +77,12 @@ jobs:
     - name: Build
       # We need to limit the number of jobs so that it doesn't OOM 
       run: cmake --build build --parallel 3 --config Release
+
+    - name: Save Windows executable
+      if: ${{ matrix.os == 'windows-latest' }}
+      uses: actions/upload-artifact@v3
+      with:
+        name: pbrt.exe
+        path: pbrt.exe
+
+
