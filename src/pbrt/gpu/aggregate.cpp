@@ -453,13 +453,21 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
             input.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
             input.triangleArray.vertexStrideInBytes = sizeof(Point3f);
             input.triangleArray.numVertices = mesh->nVertices;
-            pDeviceDevicePtrs[meshIndex] = CUdeviceptr(mesh->p);
+            Point3f *pGPU;
+            CUDA_CHECK(cudaMalloc(&pGPU, mesh->nVertices * sizeof(Point3f)));
+            CUDA_CHECK(cudaMemcpy(pGPU, mesh->p, mesh->nVertices * sizeof(Point3f),
+                                  cudaMemcpyHostToDevice));
+            pDeviceDevicePtrs[meshIndex] = CUdeviceptr(pGPU);
             input.triangleArray.vertexBuffers = &pDeviceDevicePtrs[meshIndex];
 
             input.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
             input.triangleArray.indexStrideInBytes = 3 * sizeof(int);
             input.triangleArray.numIndexTriplets = mesh->nTriangles;
-            input.triangleArray.indexBuffer = CUdeviceptr(mesh->vertexIndices);
+            int *indicesGPU;
+            CUDA_CHECK(cudaMalloc(&indicesGPU, mesh->nTriangles * 3 * sizeof(int)));
+            CUDA_CHECK(cudaMemcpy(indicesGPU, mesh->vertexIndices, mesh->nTriangles * 3 * sizeof(int),
+                                  cudaMemcpyHostToDevice));
+            input.triangleArray.indexBuffer = CUdeviceptr(indicesGPU);
 
             FloatTexture alphaTexture = getAlphaTexture(shape, floatTextures, alloc);
             Material material = getMaterial(shape, namedMaterials, materials);
