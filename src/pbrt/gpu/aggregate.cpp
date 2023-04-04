@@ -1069,14 +1069,21 @@ OptixModule OptiXAggregate::createOptiXModule(OptixDeviceContext optixContext,
     char log[4096];
     size_t logSize = sizeof(log);
     OptixModule optixModule;
+
 #if (OPTIX_VERSION >= 70700)
-    OPTIX_CHECK_WITH_LOG(optixModuleCreate(
+#define OPTIX_MODULE_CREATE_FN optixModuleCreate
 #else
-    OPTIX_CHECK_WITH_LOG(optixModuleCreateFromPTX(
+#define OPTIX_MODULE_CREATE_FN optixModuleCreateFromPTX
 #endif
-                             optixContext, &moduleCompileOptions, &pipelineCompileOptions,
-                             ptx, strlen(ptx), log, &logSize, &optixModule),
-                         log);
+
+    OPTIX_CHECK_WITH_LOG(
+        OPTIX_MODULE_CREATE_FN(
+            optixContext, &moduleCompileOptions, &pipelineCompileOptions,
+            ptx, strlen(ptx), log, &logSize, &optixModule
+        ),
+        log
+    );
+
     LOG_VERBOSE("%s", log);
 
     return optixModule;
