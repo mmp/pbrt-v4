@@ -251,7 +251,6 @@ BVHBuildNode *BVHAggregate::buildRecursive(ThreadLocal<Allocator> &threadAllocat
             }
             case SplitMethod::EqualCounts: {
                 // Partition primitives into equally sized subsets
-                mid = bvhPrimitives.size() / 2;
                 std::nth_element(bvhPrimitives.begin(), bvhPrimitives.begin() + mid,
                                  bvhPrimitives.end(),
                                  [dim](const BVHPrimitive &a, const BVHPrimitive &b) {
@@ -265,7 +264,6 @@ BVHBuildNode *BVHAggregate::buildRecursive(ThreadLocal<Allocator> &threadAllocat
                 // Partition primitives using approximate SAH
                 if (bvhPrimitives.size() <= 2) {
                     // Partition primitives into equally sized subsets
-                    mid = bvhPrimitives.size() / 2;
                     std::nth_element(bvhPrimitives.begin(), bvhPrimitives.begin() + mid,
                                      bvhPrimitives.end(),
                                      [dim](const BVHPrimitive &a, const BVHPrimitive &b) {
