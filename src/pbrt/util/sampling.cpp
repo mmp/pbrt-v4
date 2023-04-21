@@ -345,6 +345,14 @@ Point2f InvertSphericalRectangleSample(Point3f pRef, Point3f s, Vector3f ex, Vec
 }
 
 Vector3f SampleHenyeyGreenstein(Vector3f wo, Float g, Point2f u, Float *pdf) {
+    // When g \approx -1 and u[0] \approx 0 or with g \approx 1 and u[0]
+    // \approx 1, the computation of cosTheta below is unstable and can
+    // give, leading to NaNs. For now we limit g to the range where it is
+    // still ok; it would be nice to come up with a numerically robust
+    // rewrite of the computation instead, but with |g| \approx 1, the
+    // sampling distribution has a very sharp turn to deal with.
+    g = Clamp(g, -.99, .99);
+
     // Compute $\cos\theta$ for Henyey--Greenstein sample
     Float cosTheta;
     if (std::abs(g) < 1e-3f)

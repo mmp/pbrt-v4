@@ -1315,3 +1315,15 @@ TEST(SummedArea, NonCellAligned) {
         }
     }
 }
+
+TEST(Sampling, HGExtremes) {
+    Float cosTheta;
+
+    for (Float g : { -.999f, .999f, -1.f, 1.f }) {
+        for (Float u : { 0.f, OneMinusEpsilon }) {
+            Float pdf;
+            Vector3f w = SampleHenyeyGreenstein(Vector3f(0,0,-1),  g, Point2f(u, 0.5), &pdf);
+            EXPECT_FALSE(w.HasNaN());
+        }
+    }
+}
