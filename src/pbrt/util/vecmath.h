@@ -158,19 +158,24 @@ class Tuple2 {
     PBRT_CPU_GPU
     T operator[](int i) const {
         DCHECK(i >= 0 && i <= 1);
-        return (i == 0) ? x : y;
+        return xy[i];
     }
 
     PBRT_CPU_GPU
     T &operator[](int i) {
         DCHECK(i >= 0 && i <= 1);
-        return (i == 0) ? x : y;
+        return xy[i];
     }
 
     std::string ToString() const { return internal::ToString2(x, y); }
 
     // Tuple2 Public Members
-    T x{}, y{};
+    union{ 
+            struct{
+                T x{}, y{};
+            };
+            T xy[2];
+    }; 
 };
 
 // Tuple2 Inline Functions
@@ -273,21 +278,13 @@ class Tuple3 {
     PBRT_CPU_GPU
     T operator[](int i) const {
         DCHECK(i >= 0 && i <= 2);
-        if (i == 0)
-            return x;
-        if (i == 1)
-            return y;
-        return z;
+        return xyz[i];
     }
 
     PBRT_CPU_GPU
     T &operator[](int i) {
         DCHECK(i >= 0 && i <= 2);
-        if (i == 0)
-            return x;
-        if (i == 1)
-            return y;
-        return z;
+        return xyz[i];
     }
 
     template <typename U>
@@ -379,7 +376,12 @@ class Tuple3 {
     std::string ToString() const { return internal::ToString3(x, y, z); }
 
     // Tuple3 Public Members
-    T x{}, y{}, z{};
+    union{ 
+            struct{
+                T x{}, y{}, z{};
+            };
+            T xyz[3];
+    }; 
 };
 
 // Tuple3 Inline Functions
