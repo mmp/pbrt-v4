@@ -910,7 +910,7 @@ inline BSDF Material::GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
         }
     };
 
-    return Dispatch(getBSDF);
+    return DispatchCPU(getBSDF);
 }
 
 template <typename TextureEvaluator>
@@ -934,7 +934,7 @@ inline BSSRDF Material::GetBSSRDF(TextureEvaluator texEval, MaterialEvalContext 
             return BSSRDF(bssrdf);
         }
     };
-    return Dispatch(get);
+    return DispatchCPU(get);
 }
 
 inline bool Material::HasSubsurfaceScattering() const {
