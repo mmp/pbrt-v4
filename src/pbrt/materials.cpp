@@ -372,6 +372,8 @@ CoatedConductorBxDF CoatedConductorMaterial::GetBxDF(TextureEvaluator texEval,
         ce = SampledSpectrum(1.f);
         ck = 2 * Sqrt(r) / Sqrt(ClampZero(SampledSpectrum(1) - r));
     }
+    ce /= ieta;
+    ck /= ieta;
 
     Float curough = texEval(conductorURoughness, ctx);
     Float cvrough = texEval(conductorVRoughness, ctx);
