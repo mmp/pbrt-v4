@@ -367,7 +367,7 @@ CoatedConductorBxDF CoatedConductorMaterial::GetBxDF(TextureEvaluator texEval,
         ce = texEval(conductorEta, ctx, lambda);
         ck = texEval(k, ctx, lambda);
     } else {
-        // Avoid r==0 NaN case...
+        // Avoid r==1 NaN case...
         SampledSpectrum r = Clamp(texEval(reflectance, ctx, lambda), 0, .9999);
         ce = SampledSpectrum(1.f);
         ck = 2 * Sqrt(r) / Sqrt(ClampZero(SampledSpectrum(1) - r));
