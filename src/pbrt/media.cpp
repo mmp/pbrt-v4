@@ -212,8 +212,9 @@ STAT_MEMORY_COUNTER("Memory/Volume grids", volumeGridBytes);
 GridMedium::GridMedium(const Bounds3f &bounds, const Transform &renderFromMedium,
                        Spectrum sigma_a, Spectrum sigma_s, Float sigmaScale, Float g,
                        SampledGrid<Float> d,
-                       pstd::optional<SampledGrid<Float>> temperature, Spectrum Le,
-                       SampledGrid<Float> LeGrid, Allocator alloc)
+                       pstd::optional<SampledGrid<Float>> temperature,
+                       Float temperatureScale, Float temperatureOffset,
+                       Spectrum Le, SampledGrid<Float> LeGrid, Allocator alloc)
     : bounds(bounds),
       renderFromMedium(renderFromMedium),
       sigma_a_spec(sigma_a, alloc),
@@ -221,6 +222,8 @@ GridMedium::GridMedium(const Bounds3f &bounds, const Transform &renderFromMedium
       densityGrid(std::move(d)),
       phase(g),
       temperatureGrid(std::move(temperature)),
+      temperatureScale(temperatureScale),
+      temperatureOffset(temperatureOffset),
       Le_spec(Le, alloc),
       LeScale(std::move(LeGrid)),
       majorantGrid(bounds, {16, 16, 16}, alloc) {
@@ -316,9 +319,14 @@ GridMedium *GridMedium::Create(const ParameterDictionary &parameters,
         sigma_s = alloc.new_object<ConstantSpectrum>(1.f);
     Float sigmaScale = parameters.GetOneFloat("scale", 1.f);
 
+    Float temperatureOffset = parameters.GetOneFloat("temperatureoffset",
+                                                     parameters.GetOneFloat("temperaturecutoff", 0.f));
+    Float temperatureScale = parameters.GetOneFloat("temperaturescale", 1.f);
+
     return alloc.new_object<GridMedium>(
         Bounds3f(p0, p1), renderFromMedium, sigma_a, sigma_s, sigmaScale, g,
-        std::move(densityGrid), std::move(temperatureGrid), Le, std::move(LeGrid), alloc);
+        std::move(densityGrid), std::move(temperatureGrid), temperatureScale,
+        temperatureOffset, Le, std::move(LeGrid), alloc);
 }
 
 std::string GridMedium::ToString() const {

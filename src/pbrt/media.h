@@ -271,6 +271,7 @@ class GridMedium {
     GridMedium(const Bounds3f &bounds, const Transform &renderFromMedium,
                Spectrum sigma_a, Spectrum sigma_s, Float sigmaScale, Float g,
                SampledGrid<Float> density, pstd::optional<SampledGrid<Float>> temperature,
+               Float temperatureScale, Float temperatureOffset,
                Spectrum Le, SampledGrid<Float> LeScale, Allocator alloc);
 
     static GridMedium *Create(const ParameterDictionary &parameters,
@@ -303,7 +304,12 @@ class GridMedium {
                 // Compute emitted radiance using _temperatureGrid_ or _Le_spec_
                 if (temperatureGrid) {
                     Float temp = temperatureGrid->Lookup(p);
-                    Le = scale * BlackbodySpectrum(temp).Sample(lambda);
+                    // Added after book publication: optionally offset and scale
+                    // temperature based on user-supplied parameters. (Match
+                    // NanoVDBMedium functionality.)
+                    temp = (temp - temperatureOffset) * temperatureScale;
+                    if (temp > 100.f)
+                        Le = scale * BlackbodySpectrum(temp).Sample(lambda);
                 } else
                     Le = scale * Le_spec.Sample(lambda);
             }
@@ -341,6 +347,7 @@ class GridMedium {
     DenselySampledSpectrum Le_spec;
     SampledGrid<Float> LeScale;
     bool isEmissive;
+    Float temperatureScale, temperatureOffset;
     MajorantGrid majorantGrid;
 };
 
