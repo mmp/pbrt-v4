@@ -773,10 +773,10 @@ class SampledGrid {
         CHECK_EQ(nx * ny * nz, values.size());
     }
 
-    size_t BytesAllocated() const { return values.size() * sizeof(T); }
-    int XSize() const { return nx; }
-    int YSize() const { return ny; }
-    int zSize() const { return nz; }
+    PBRT_CPU_GPU size_t BytesAllocated() const { return values.size() * sizeof(T); }
+    PBRT_CPU_GPU int XSize() const { return nx; }
+    PBRT_CPU_GPU int YSize() const { return ny; }
+    PBRT_CPU_GPU int ZSize() const { return nz; }
 
     const_iterator begin() const { return values.begin(); }
     const_iterator end() const { return values.end(); }
