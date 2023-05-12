@@ -1005,6 +1005,23 @@ add_sanitizers (plytool)
 set_property (TARGET plytool PROPERTY FOLDER "cmd")
 
 ######################
+# nanovdb2pbrt
+
+add_executable (nanovdb2pbrt src/pbrt/cmd/nanovdb2pbrt.cpp)
+add_executable (pbrt::nanovdb2pbrt ALIAS nanovdb2pbrt)
+
+target_compile_definitions (nanovdb2pbrt PRIVATE ${PBRT_DEFINITIONS})
+target_compile_options (nanovdb2pbrt PUBLIC ${PBRT_CXX_FLAGS})
+target_include_directories (nanovdb2pbrt PUBLIC src src/ext)
+target_link_libraries (nanovdb2pbrt PRIVATE ${ALL_PBRT_LIBS} pbrt_warnings pbrt_opt)
+
+set_target_properties (nanovdb2pbrt PROPERTIES OUTPUT_NAME nanovdb2pbrt)
+
+add_sanitizers (nanovdb2pbrt)
+
+set_property (TARGET nanovdb2pbrt PROPERTY FOLDER "cmd")
+
+######################
 # cyhair2pbrt
 
 add_executable (cyhair2pbrt src/pbrt/cmd/cyhair2pbrt.cpp)
