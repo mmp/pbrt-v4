@@ -646,7 +646,7 @@ int splitn(std::vector<std::string> args) {
                     result.SetChannels({x, y}, desc, {rgb.r, rgb.g, rgb.b});
     };
 
-    CHECK_LT(crops.size(), sizeof(edges) / sizeof(edges[0]));
+    CHECK_LE(crops.size(), sizeof(edges) / sizeof(edges[0]));
     ImageChannelDesc cropDesc = cropsImage.GetChannelDesc({"R", "G", "B"});
     CHECK(bool(cropDesc));
 
