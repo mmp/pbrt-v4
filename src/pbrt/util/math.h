@@ -590,7 +590,7 @@ PBRT_CPU_GPU inline CompensatedFloat InnerProduct(Float a, Float b) {
 }
 
 // Accurate dot products with FMA: Graillat et al.,
-// http://rnc7.loria.fr/louvet_poster.pdf
+// https://www-pequan.lip6.fr/~graillat/papers/posterRNC7.pdf
 //
 // Accurate summation, dot product and polynomial evaluation in complex
 // floating point arithmetic, Graillat and Menissier-Morain.
