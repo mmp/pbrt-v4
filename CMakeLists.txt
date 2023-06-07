@@ -57,7 +57,7 @@ function (CHECK_EXT NAME DIR HASH)
   endif (GIT_FOUND)
 endfunction ()
 
-check_ext ("OpenEXR" "openexr/OpenEXR" 5cfb5dab6dfada731586b0281bdb15ee75e26782)
+check_ext ("OpenEXR" "openexr/OpenEXR" ff21ca074b31bfc46532f858fcfffcd9d0bc8f20)
 check_ext ("OpenVDB" "openvdb/nanovdb" 414bed84c2fc22e188eac7b611aa85c7edd7a5a9)
 check_ext ("Ptex" "ptex/src" 4cd8e9a6db2b06e478dfbbd8c26eb6df97f84483)
 check_ext ("double-conversion" "double-conversion/cmake" cc1f75a114aca8d2af69f73a5a959aecbab0e87a)
