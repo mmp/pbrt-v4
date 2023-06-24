@@ -491,7 +491,7 @@ std::string SubsurfaceMaterial::ToString() const {
     return StringPrintf("[ SubsurfaceMaterial displacement: %s normalMap: %s scale: %f "
                         "sigma_a: %s sigma_s: %s reflectance: %s mfp: %s uRoughness: %s "
                         "vRoughness: %s scale: %f eta: %f remapRoughness: %s ]",
-                        displacement, scale, sigma_a, sigma_s, reflectance, mfp,
+                        displacement, normalMap, scale, sigma_a, sigma_s, reflectance, mfp,
                         uRoughness, vRoughness, scale, eta, remapRoughness);
 }
 
