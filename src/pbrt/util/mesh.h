@@ -99,13 +99,15 @@ struct TriQuadMesh {
         outputMesh.ConvertToOnlyTriangles();
         if (outputMesh.n.empty())
             outputMesh.ComputeNormals();
+        std::vector<int> oldTriIndices(outputMesh.triIndices);
         outputMesh.triIndices.clear();
 
         // Refine
         HashMap<std::pair<int, int>, int, HashIntPair> edgeSplit({});
-        for (int i = 0; i < triIndices.size() / 3; ++i)
-            outputMesh.Refine(dist, maxDist, triIndices[3 * i], triIndices[3 * i + 1],
-                              triIndices[3 * i + 2], edgeSplit);
+        for (int i = 0; i < oldTriIndices.size() / 3; ++i)
+            outputMesh.Refine(dist, maxDist, oldTriIndices[3 * i],
+                              oldTriIndices[3 * i + 1], oldTriIndices[3 * i + 2],
+                              edgeSplit);
 
         // Displace
         displace(outputMesh.p.data(), outputMesh.n.data(), outputMesh.uv.data(),
