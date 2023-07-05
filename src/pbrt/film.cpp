@@ -696,17 +696,17 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
                  "Albedo.R",
                  "Albedo.G",
                  "Albedo.B",
-                 "Px",
-                 "Py",
-                 "Pz",
+                 "P.X",
+                 "P.Y",
+                 "P.Z",
                  "dzdx",
                  "dzdy",
-                 "Nx",
-                 "Ny",
-                 "Nz",
-                 "Nsx",
-                 "Nsy",
-                 "Nsz",
+                 "N.X",
+                 "N.Y",
+                 "N.Z",
+                 "Ns.X",
+                 "Ns.Y",
+                 "Ns.Z",
                  "u",
                  "v",
                  "Variance.R",
@@ -717,10 +717,10 @@ Image GBufferFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
                  "RelativeVariance.B"});
 
     ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
-    ImageChannelDesc pDesc = image.GetChannelDesc({"Px", "Py", "Pz"});
+    ImageChannelDesc pDesc = image.GetChannelDesc({"P.X", "P.Y", "P.Z"});
     ImageChannelDesc dzDesc = image.GetChannelDesc({"dzdx", "dzdy"});
-    ImageChannelDesc nDesc = image.GetChannelDesc({"Nx", "Ny", "Nz"});
-    ImageChannelDesc nsDesc = image.GetChannelDesc({"Nsx", "Nsy", "Nsz"});
+    ImageChannelDesc nDesc = image.GetChannelDesc({"N.X", "N.Y", "N.Z"});
+    ImageChannelDesc nsDesc = image.GetChannelDesc({"Ns.X", "Ns.Y", "Ns.Z"});
     ImageChannelDesc uvDesc = image.GetChannelDesc({"u", "v"});
     ImageChannelDesc albedoRgbDesc =
         image.GetChannelDesc({"Albedo.R", "Albedo.G", "Albedo.B"});
