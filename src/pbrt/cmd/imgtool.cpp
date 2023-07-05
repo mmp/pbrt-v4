@@ -483,7 +483,7 @@ int assemble(std::vector<std::string> args) {
             }
             if (Union(*metadata.pixelBounds, fullBounds) != fullBounds) {
                 Warning("%s: pixel bounds (%d, %d) - (%d, %d) in EXR file isn't inside "
-                        "the the full image (0, 0) - (%d, %d). "
+                        "the full image (0, 0) - (%d, %d). "
                         "Ignoring this file.",
                         file, metadata.pixelBounds->pMin.x, metadata.pixelBounds->pMin.y,
                         metadata.pixelBounds->pMax.x, metadata.pixelBounds->pMax.y,
