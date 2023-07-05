@@ -2250,7 +2250,7 @@ int denoise_optix(std::vector<std::string> args) {
     ImageChannelDesc desc[3] = {
         image.GetChannelDesc({"R", "G", "B"}),
         image.GetChannelDesc({"Albedo.R", "Albedo.G", "Albedo.B"}),
-        image.GetChannelDesc({"Nsx", "Nsy", "Nsz"})};
+        image.GetChannelDesc({"Ns.X", "Ns.Y", "Ns.Z"})};
     if (!desc[0]) {
         Error("%s: image doesn't have R, G, B channels.", inFilename);
         return 1;
@@ -2262,10 +2262,14 @@ int denoise_optix(std::vector<std::string> args) {
         nLayers = 1;
     }
     if (!desc[2]) {
-        Warning("%s: image doesn't have Nsx, Nsy, Nsz channels. "
-                "Denoising quality may suffer.",
-                inFilename);
-        nLayers = 1;
+        // Try the old naming scheme
+        desc[2] = image.GetChannelDesc({"Nsx", "Nsy", "Nsz"});
+        if (!desc[2]) {
+            Warning("%s: image doesn't have Ns.X, Ns.Y, Ns.Z channels. "
+                    "Denoising quality may suffer.",
+                    inFilename);
+            nLayers = 1;
+        }
     }
 
     Denoiser denoiser((Vector2i)image.Resolution(), nLayers == 3);
