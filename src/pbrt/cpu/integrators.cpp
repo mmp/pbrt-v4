@@ -272,19 +272,17 @@ void RayIntegrator::EvaluatePixelSample(Point2i pPixel, int sampleIndex, Sampler
             L = SampledSpectrum(0.f);
         }
 
-        if (cameraRay)
-            PBRT_DBG(
-                "%s\n",
-                StringPrintf("Camera sample: %s -> ray %s -> L = %s, visibleSurface %s",
-                             cameraSample, cameraRay->ray, L,
-                             (visibleSurface ? visibleSurface.ToString() : "(none)"))
-                    .c_str());
-        else
-            PBRT_DBG("%s\n",
-                     StringPrintf("Camera sample: %s -> no ray generated", cameraSample)
-                         .c_str());
+        PBRT_DBG(
+            "%s\n",
+            StringPrintf("Camera sample: %s -> ray %s -> L = %s, visibleSurface %s",
+                         cameraSample, cameraRay->ray, L,
+                         (visibleSurface ? visibleSurface.ToString() : "(none)"))
+                .c_str());
+    } else {
+	    PBRT_DBG("%s\n",
+	             StringPrintf("Camera sample: %s -> no ray generated", cameraSample)
+			             .c_str());
     }
-
     // Add camera ray's contribution to image
     camera.GetFilm().AddSample(pPixel, L, lambda, &visibleSurface,
                                cameraSample.filterWeight);
