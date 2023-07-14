@@ -2247,6 +2247,7 @@ int denoise_optix(std::vector<std::string> args) {
     CUDA_CHECK(cudaFree(nullptr));
 
     int nLayers = 3;
+    bool oldNormalNaming = false;
     ImageChannelDesc desc[3] = {
         image.GetChannelDesc({"R", "G", "B"}),
         image.GetChannelDesc({"Albedo.R", "Albedo.G", "Albedo.B"}),
@@ -2264,7 +2265,9 @@ int denoise_optix(std::vector<std::string> args) {
     if (!desc[2]) {
         // Try the old naming scheme
         desc[2] = image.GetChannelDesc({"Nsx", "Nsy", "Nsz"});
-        if (!desc[2]) {
+        if (desc[2])
+            oldNormalNaming = true;
+        else {
             Warning("%s: image doesn't have Ns.X, Ns.Y, Ns.Z channels. "
                     "Denoising quality may suffer.",
                     inFilename);
@@ -2302,7 +2305,10 @@ int denoise_optix(std::vector<std::string> args) {
     Normal3f *normalGPU = nullptr;
     if (nLayers == 3) {
         albedoGPU = (RGB *)copyChannelsToGPU({"Albedo.R", "Albedo.G", "Albedo.B"});
-        normalGPU = (Normal3f *)copyChannelsToGPU({"Nsx", "Nsy", "Nsz"}, true);
+        if (oldNormalNaming)
+            normalGPU = (Normal3f *)copyChannelsToGPU({"Nsx", "Nsy", "Nsz"}, true);
+        else
+            normalGPU = (Normal3f *)copyChannelsToGPU({"Ns.X", "Ns.Y", "Ns.Z"}, true);
     }
 
     RGB *rgbResultGPU;
