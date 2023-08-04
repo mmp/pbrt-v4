@@ -451,12 +451,29 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
             input.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
 
             input.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
-            input.triangleArray.vertexStrideInBytes = sizeof(Point3f);
             input.triangleArray.numVertices = mesh->nVertices;
+#ifdef PBRT_FLOAT_AS_DOUBLE
+            // Convert the vertex positions to 32-bit floats before giving
+            // them to OptiX, since it doesn't support double-precision
+            // geometry.
+            input.triangleArray.vertexStrideInBytes = 3 * sizeof(float);
+            float *pGPU;
+            std::vector<float> p32(3 * mesh->nVertices);
+            for (int i = 0; i < mesh->nVertices; i++) {
+                p32[3*i] = mesh->p[i].x;
+                p32[3*i+1] = mesh->p[i].y;
+                p32[3*i+2] = mesh->p[i].z;
+            }
+            CUDA_CHECK(cudaMalloc(&pGPU, mesh->nVertices * 3 * sizeof(float)));
+            CUDA_CHECK(cudaMemcpy(pGPU, p32.data(), mesh->nVertices * 3 *  sizeof(float),
+                                  cudaMemcpyHostToDevice));
+#else
+            input.triangleArray.vertexStrideInBytes = sizeof(Point3f);
             Point3f *pGPU;
             CUDA_CHECK(cudaMalloc(&pGPU, mesh->nVertices * sizeof(Point3f)));
             CUDA_CHECK(cudaMemcpy(pGPU, mesh->p, mesh->nVertices * sizeof(Point3f),
                                   cudaMemcpyHostToDevice));
+#endif
             pDeviceDevicePtrs[meshIndex] = CUdeviceptr(pGPU);
             input.triangleArray.vertexBuffers = &pDeviceDevicePtrs[meshIndex];
 
