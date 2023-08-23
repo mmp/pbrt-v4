@@ -628,10 +628,11 @@ GoniometricLight *GoniometricLight::Create(const Transform &renderFromLight,
                       "a light.",
                       texname);
 
-        if (imageAndMetadata.image.Resolution().x !=
-            imageAndMetadata.image.Resolution().y)
+        if (imageAndMetadata.image.IsNonSquare())
             ErrorExit("%s: image resolution (%d, %d) is non-square. It's unlikely "
-                      "this is an equal-area environment map.",
+                      "that this is an equal-area environment map. Consider to use "
+                      "the command makeequiarea of the helper program imgtool to "
+                      "resolve this issue.",
                       texname, imageAndMetadata.image.Resolution().x,
                       imageAndMetadata.image.Resolution().y);
 
@@ -1022,9 +1023,11 @@ ImageInfiniteLight::ImageInfiniteLight(Transform renderFromLight, Image im,
                   filename);
     CHECK_EQ(3, channelDesc.size());
     CHECK(channelDesc.IsIdentity());
-    if (image.Resolution().x != image.Resolution().y)
+    if (image.IsNonSquare())
         ErrorExit("%s: image resolution (%d, %d) is non-square. It's unlikely "
-                  "this is an equal area environment map.",
+                  "that this is an equal-area environment map. Consider to use "
+                  "the command makeequiarea of the helper program imgtool to "
+                  "resolve this issue.",
                   filename, image.Resolution().x, image.Resolution().y);
     Array2D<Float> d = image.GetSamplingDistribution();
     Bounds2f domain = Bounds2f(Point2f(0, 0), Point2f(1, 1));
@@ -1124,9 +1127,11 @@ PortalImageInfiniteLight::PortalImageInfiniteLight(
     CHECK_EQ(3, channelDesc.size());
     CHECK(channelDesc.IsIdentity());
 
-    if (equalAreaImage.Resolution().x != equalAreaImage.Resolution().y)
+    if (equalAreaImage.IsNonSquare())
         ErrorExit("%s: image resolution (%d, %d) is non-square. It's unlikely "
-                  "this is an equal area environment map.",
+                  "that this is an equal-area environment map. Consider to use "
+                  "the command makeequiarea of the helper program imgtool to "
+                  "resolve this issue.",
                   filename, equalAreaImage.Resolution().x, equalAreaImage.Resolution().y);
 
     if (p.size() != 4)
