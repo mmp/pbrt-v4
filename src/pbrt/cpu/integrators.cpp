@@ -1418,8 +1418,6 @@ AOIntegrator::AOIntegrator(bool cosSample, Float maxDist, Camera camera, Sampler
 SampledSpectrum AOIntegrator::Li(RayDifferential ray, SampledWavelengths &lambda,
                                  Sampler sampler, ScratchBuffer &scratchBuffer,
                                  VisibleSurface *visibleSurface) const {
-    SampledSpectrum L(0.f);
-
     // Intersect _ray_ with scene and store intersection in _isect_
     pstd::optional<ShapeIntersection> si;
 retry:
