@@ -306,6 +306,9 @@ static __device__ inline SurfaceInteraction getQuadricIntersection(
     Vector3f wo = -Vector3f(rd.x, rd.y, rd.z);
     Float time = optixGetRayTime();
 
+    Transform worldFromInstance = getWorldFromInstance();
+    wo = worldFromInstance.ApplyInverse(wo);
+
     SurfaceInteraction intr;
     if (const Sphere *sphere = rec.shape.CastOrNullptr<Sphere>())
         intr = sphere->InteractionFromIntersection(si, wo, time);
@@ -395,6 +398,9 @@ getBilinearPatchIntersection(Point2f uv) {
 
     float3 rd = optixGetWorldRayDirection();
     Vector3f wo = -Vector3f(rd.x, rd.y, rd.z);
+
+    Transform worldFromInstance = getWorldFromInstance();
+    wo = worldFromInstance.ApplyInverse(wo);
 
     return BilinearPatch::InteractionFromIntersection(rec.mesh, optixGetPrimitiveIndex(),
                                                       uv, optixGetRayTime(), wo);
