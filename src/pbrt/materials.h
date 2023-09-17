@@ -95,7 +95,7 @@ inline PBRT_CPU_GPU void NormalMap(const Image &normalMap,
     ns = Normalize(ns);
 
     // Transform tangent-space normal to rendering space
-    Frame frame = Frame::FromZ(ctx.shading.n);
+    Frame frame = Frame::FromXZ(Normalize(ctx.shading.dpdu), Vector3f(ctx.shading.n));
     ns = frame.FromLocal(ns);
 
     // Find $\dpdu$ and $\dpdv$ that give shading normal
