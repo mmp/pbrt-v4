@@ -530,7 +530,7 @@ void eval_jacobian(const double *coeffs, const double *rgb, double **jac) {
     }
 }
 
-double gauss_newton(const double rgb[3], double coeffs[3], int it = 15) {
+void gauss_newton(const double rgb[3], double coeffs[3], int it = 15) {
     double r = 0;
     for (int i = 0; i < it; ++i) {
         double J0[3], J1[3], J2[3], *J[3] = {J0, J1, J2};
@@ -567,7 +567,6 @@ double gauss_newton(const double rgb[3], double coeffs[3], int it = 15) {
         if (r < 1e-6)
             break;
     }
-    return std::sqrt(r);
 }
 
 static Gamut parse_gamut(const char *str) {
@@ -841,8 +840,7 @@ int main(int argc, char **argv) {
                     rgb[(l + 1) % 3] = x * b;
                     rgb[(l + 2) % 3] = y * b;
 
-                    double resid = gauss_newton(rgb, coeffs);
-                    (void)resid;
+                    gauss_newton(rgb, coeffs);
 
                     double c0 = 360.0, c1 = 1.0 / (830.0 - 360.0);
                     double A = coeffs[0], B = coeffs[1], C = coeffs[2];
@@ -863,8 +861,7 @@ int main(int argc, char **argv) {
                     rgb[(l + 1) % 3] = x * b;
                     rgb[(l + 2) % 3] = y * b;
 
-                    double resid = gauss_newton(rgb, coeffs);
-                    (void)resid;
+                    gauss_newton(rgb, coeffs);
 
                     double c0 = 360.0, c1 = 1.0 / (830.0 - 360.0);
                     double A = coeffs[0], B = coeffs[1], C = coeffs[2];
