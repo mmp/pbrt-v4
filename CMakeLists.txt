@@ -125,6 +125,11 @@ else ()
   message (STATUS "Found -lprofiler: ${PROFILE_LIB}")
 endif ()
 
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_COMPILER_VERSION GREATER_EQUAL 14)
+  message (STATUS "Disabling -ffp-contract (thanks, clang 14!)")
+  list (APPEND PBRT_CXX_FLAGS "-ffp-contract=off")
+endif ()
+
 add_library (pbrt_warnings INTERFACE)
 target_compile_options (
     pbrt_warnings
