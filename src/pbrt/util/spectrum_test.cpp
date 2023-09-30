@@ -109,7 +109,7 @@ TEST(Spectrum, MaxValue) {
             EXPECT_LE(sr(lambda), m);
 
         RGBUnboundedSpectrum su(*RGBColorSpace::sRGB, 10 * rgb);
-        m = su.MaxValue() * 1.00001f * 10.f;
+        m = su.MaxValue() * 1.00001f;
         for (Float lambda = 360; lambda < 830; lambda += .92)
             EXPECT_LE(su(lambda), m);
 
