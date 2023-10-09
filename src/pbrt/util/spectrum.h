@@ -85,7 +85,6 @@ DenselySampledSpectrum D(Float T, Allocator alloc);
 
 Float SpectrumToPhotometric(Spectrum s);
 
-Float SpectrumToPhotometric(Spectrum s);
 XYZ SpectrumToXYZ(Spectrum s);
 
 // SampledSpectrum Definition
