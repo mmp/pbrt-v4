@@ -1454,7 +1454,7 @@ retry:
         Ray r = isect.SpawnRay(wi);
         if (!IntersectP(r, maxDist)) {
             return illumScale * illuminant.Sample(lambda) *
-                   SampledSpectrum(Dot(wi, n) / (Pi * pdf));
+                   Dot(wi, n) / (Pi * pdf);
         }
     }
     return SampledSpectrum(0.);
