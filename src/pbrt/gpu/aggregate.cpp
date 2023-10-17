@@ -1055,7 +1055,7 @@ OptixPipelineCompileOptions OptiXAggregate::getPipelineCompileOptions() {
     pipelineCompileOptions.exceptionFlags =
         (OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW | OPTIX_EXCEPTION_FLAG_TRACE_DEPTH);
 #if (OPTIX_VERSION < 80000)
-    // This flag is remove since OptiX 8.0.0
+    // This flag is removed since OptiX 8.0.0
     pipelineCompileOptions.exceptionFlags |= OPTIX_EXCEPTION_FLAG_DEBUG;
 #endif
     pipelineCompileOptions.pipelineLaunchParamsVariableName = "params";
