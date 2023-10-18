@@ -1053,8 +1053,11 @@ OptixPipelineCompileOptions OptiXAggregate::getPipelineCompileOptions() {
     pipelineCompileOptions.numAttributeValues = 4;
     // OPTIX_EXCEPTION_FLAG_NONE;
     pipelineCompileOptions.exceptionFlags =
-        (OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW | OPTIX_EXCEPTION_FLAG_TRACE_DEPTH |
-         OPTIX_EXCEPTION_FLAG_DEBUG);
+        (OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW | OPTIX_EXCEPTION_FLAG_TRACE_DEPTH);
+#if (OPTIX_VERSION < 80000)
+    // This flag is removed since OptiX 8.0.0
+    pipelineCompileOptions.exceptionFlags |= OPTIX_EXCEPTION_FLAG_DEBUG;
+#endif
     pipelineCompileOptions.pipelineLaunchParamsVariableName = "params";
 
     return pipelineCompileOptions;
