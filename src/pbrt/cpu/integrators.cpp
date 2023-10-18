@@ -2126,7 +2126,7 @@ SampledSpectrum G(const Integrator &integrator, Sampler sampler, const Vertex &v
     return g * integrator.Tr(v0.GetInteraction(), v1.GetInteraction(), lambda);
 }
 
-Float MISWeight(const Integrator &integrator, Vertex *lightVertices,
+Float MISWeight(const Integrator &integrator, Camera camera, Vertex *lightVertices,
                 Vertex *cameraVertices, Vertex &sampled, int s, int t,
                 LightSampler lightSampler) {
     if (s + t == 2)
@@ -2177,10 +2177,16 @@ Float MISWeight(const Integrator &integrator, Vertex *lightVertices,
     if (qsMinus)
         a7 = {&qsMinus->pdfRev, qs->PDF(integrator, pt, *qsMinus)};
 
+    Film film = camera.GetFilm();
+    Float splatScale = Float(film.FullResolution().x) * Float(film.FullResolution().y) /
+        Float(film.PixelBounds().Area());
+
     // Consider hypothetical connection strategies along the camera subpath
     Float ri = 1;
     for (int i = t - 1; i > 0; --i) {
         ri *= remap0(cameraVertices[i].pdfRev) / remap0(cameraVertices[i].pdfFwd);
+        // See https://github.com/mmp/pbrt-v4/issues/347
+        if (i == 1) ri /= splatScale;
         if (!cameraVertices[i].delta && !cameraVertices[i - 1].delta)
             sumRi += ri;
     }
@@ -2195,6 +2201,8 @@ Float MISWeight(const Integrator &integrator, Vertex *lightVertices,
             sumRi += ri;
     }
 
+    // See https://github.com/mmp/pbrt-v4/issues/347
+    if (t == 1) sumRi /= splatScale;
     return 1 / (1 + sumRi);
 }
 
@@ -2345,8 +2353,14 @@ SampledSpectrum ConnectBDPT(const Integrator &integrator, SampledWavelengths &la
                 if (qs.IsOnSurface())
                     L *= AbsDot(cs->wi, qs.ns());
                 DCHECK(!L.HasNaNs());
-                if (L)
+                if (L) {
                     L *= integrator.Tr(cs->pRef, cs->pLens, lambda);
+
+                    // See https://github.com/mmp/pbrt-v4/issues/347
+                    Film film = camera.GetFilm();
+                    L *= Float(film.FullResolution().x) * Float(film.FullResolution().y) /
+                        Float(film.PixelBounds().Area());
+                }
             }
         }
 
@@ -2418,7 +2432,7 @@ SampledSpectrum ConnectBDPT(const Integrator &integrator, SampledWavelengths &la
         ++zeroRadiancePaths;
     pathLength << s + t - 2;
     // Compute MIS weight for connection strategy
-    Float misWeight = L ? MISWeight(integrator, lightVertices, cameraVertices, sampled, s,
+    Float misWeight = L ? MISWeight(integrator, camera, lightVertices, cameraVertices, sampled, s,
                                     t, lightSampler)
                         : 0.f;
     PBRT_DBG("MIS weight for (s,t) = (%d, %d) connection: %f\n", s, t, misWeight);
