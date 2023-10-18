@@ -63,7 +63,6 @@ void RenderWavefront(BasicScene &scene) {
 #endif  // PBRT_BUILD_GPU_RENDERER
 
     ImageMetadata metadata;
-    metadata.samplesPerPixel = integrator->sampler.SamplesPerPixel();
     integrator->camera.InitMetadata(&metadata);
     metadata.renderTimeSeconds = seconds;
     metadata.samplesPerPixel = integrator->sampler.SamplesPerPixel();
