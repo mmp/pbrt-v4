@@ -316,7 +316,7 @@ int LUPDecompose(double **A, int N, double Tol, int *P) {
 /* INPUT: A,P filled in LUPDecompose; b - rhs vector; N - dimension
  * OUTPUT: x - solution vector of A*x=b
  */
-void LUPSolve(double **A, int *P, double *b, int N, double *x) {
+void LUPSolve(double **const A, const int *P, const double *b, int N, double *x) {
     for (int i = 0; i < N; i++) {
         x[i] = b[P[i]];
 
