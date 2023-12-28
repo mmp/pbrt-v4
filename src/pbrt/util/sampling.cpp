@@ -73,7 +73,7 @@ pstd::array<Float, 3> SampleSphericalTriangle(const pstd::array<Point3f, 3> &v, 
     CHECK(!IsNaN(cosBp));
     cosBp = Clamp(cosBp, -1, 1);
 
-    // Sample $c'$ along the arc between $b'$ and $a$
+    // Sample $c'$ along the arc between $a$ and $c$
     Float sinBp = SafeSqrt(1 - Sqr(cosBp));
     Vector3f cp = cosBp * a + sinBp * Normalize(GramSchmidt(c, a));
 
