@@ -177,6 +177,7 @@ BVHAggregate::BVHAggregate(std::vector<Primitive> prims, int maxPrimsInNode,
 
     // Convert BVH into compact representation in _nodes_ array
     bvhPrimitives.resize(0);
+    bvhPrimitives.shrink_to_fit();
     LOG_VERBOSE("BVH created with %d nodes for %d primitives (%.2f MB)",
                 totalNodes.load(), (int)primitives.size(),
                 float(totalNodes.load() * sizeof(LinearBVHNode)) / (1024.f * 1024.f));
