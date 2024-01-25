@@ -577,6 +577,7 @@ SpectrumDirectionMixTexture *SpectrumDirectionMixTexture::Create(
         parameters.GetSpectrumTexture("tex2", one, spectrumType, alloc), dir);
 }
 
+static std::mutex ptexMutex;
 static Ptex::PtexCache *cache;
 
 STAT_COUNTER("Texture/Ptex lookups", nLookups);
@@ -595,8 +596,7 @@ struct : public PtexErrorHandler {
 PtexTextureBase::PtexTextureBase(const std::string &filename, ColorEncoding encoding,
                                  Float scale)
     : filename(filename), encoding(encoding), scale(scale) {
-    std::mutex mutex;
-    mutex.lock();
+    ptexMutex.lock();
     if (!cache) {
         int maxFiles = 100;
         size_t maxMem = 1ull << 32;  // 4GB
@@ -606,7 +606,7 @@ PtexTextureBase::PtexTextureBase(const std::string &filename, ColorEncoding enco
                                         &errorHandler);
         // TODO? cache->setSearchPath(...);
     }
-    mutex.unlock();
+    ptexMutex.unlock();
 
     // Issue an error if the texture doesn't exist or has an unsupported
     // number of channels.
