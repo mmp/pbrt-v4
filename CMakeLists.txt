@@ -7,8 +7,12 @@ project (PBRT-V4 LANGUAGES CXX C)
 set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if (NOT DEFINED PBRT_SOURCE_CODE)
+  set (PBRT_SOURCE_CODE ${CMAKE_SOURCE_DIR})
+endif ()
+
 # For sanitizers
-list (INSERT CMAKE_MODULE_PATH 0 "${CMAKE_SOURCE_DIR}/cmake")
+list (INSERT CMAKE_MODULE_PATH 0 "${PBRT_SOURCE_CODE}/cmake")
 
 # Configuration options
 
@@ -20,6 +24,8 @@ option (PBRT_NVML "Use NVML for GPU performance measurement" OFF)
 option (PBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES "Use pregenerated rgbspectrum_*.cpp files rather than running rgb2spec_opt to generate them at build time" OFF)
 set (PBRT_OPTIX7_PATH $ENV{PBRT_OPTIX7_PATH} CACHE PATH "Path to OptiX 7 SDK")
 set (PBRT_GPU_SHADER_MODEL "" CACHE STRING "")
+
+
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message (STATUS "Setting build type to 'Release' as none was specified.")
@@ -235,10 +241,10 @@ of CUDA installed, please update your PATH.")
             # Get CUDA compute capability
             set (CHECK_CUDA_OUTPUT_EXE ${CMAKE_BINARY_DIR}/checkcuda)
             if (MSVC)
-                execute_process (COMMAND ${CMAKE_CUDA_COMPILER} -lcuda ${CMAKE_SOURCE_DIR}/cmake/checkcuda.cu -ccbin ${CMAKE_CXX_COMPILER} -o ${CHECK_CUDA_OUTPUT_EXE}
+                execute_process (COMMAND ${CMAKE_CUDA_COMPILER} -lcuda ${PBRT_SOURCE_CODE}/cmake/checkcuda.cu -ccbin ${CMAKE_CXX_COMPILER} -o ${CHECK_CUDA_OUTPUT_EXE}
                                  RESULT_VARIABLE BUILD_CHECK_CUDA_RETURN_CODE)
             else  ()
-                execute_process (COMMAND ${CMAKE_CUDA_COMPILER} -lcuda ${CMAKE_SOURCE_DIR}/cmake/checkcuda.cu -o ${CHECK_CUDA_OUTPUT_EXE}
+                execute_process (COMMAND ${CMAKE_CUDA_COMPILER} -lcuda ${PBRT_SOURCE_CODE}/cmake/checkcuda.cu -o ${CHECK_CUDA_OUTPUT_EXE}
                                  RESULT_VARIABLE BUILD_CHECK_CUDA_RETURN_CODE)
             endif ()
 
@@ -798,13 +804,13 @@ target_link_libraries (soac PRIVATE pbrt_warnings pbrt_opt)
 set_target_properties (soac PROPERTIES OUTPUT_NAME soac)
 
 add_custom_command (OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/pbrt_soa.h
-    COMMAND soac ${CMAKE_SOURCE_DIR}/src/pbrt/pbrt.soa > ${CMAKE_CURRENT_BINARY_DIR}/pbrt_soa.h
-    DEPENDS soac ${CMAKE_SOURCE_DIR}/src/pbrt/pbrt.soa)
+    COMMAND soac ${PBRT_SOURCE_CODE}/src/pbrt/pbrt.soa > ${CMAKE_CURRENT_BINARY_DIR}/pbrt_soa.h
+    DEPENDS soac ${PBRT_SOURCE_CODE}/src/pbrt/pbrt.soa)
 set (PBRT_SOA_GENERATED ${CMAKE_CURRENT_BINARY_DIR}/pbrt_soa.h)
 
 add_custom_command (OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/wavefront_workitems_soa.h
-    COMMAND soac ${CMAKE_SOURCE_DIR}/src/pbrt/wavefront/workitems.soa > ${CMAKE_CURRENT_BINARY_DIR}/wavefront_workitems_soa.h
-    DEPENDS soac ${CMAKE_SOURCE_DIR}/src/pbrt/wavefront/workitems.soa)
+    COMMAND soac ${PBRT_SOURCE_CODE}/src/pbrt/wavefront/workitems.soa > ${CMAKE_CURRENT_BINARY_DIR}/wavefront_workitems_soa.h
+    DEPENDS soac ${PBRT_SOURCE_CODE}/src/pbrt/wavefront/workitems.soa)
 set (PBRT_SOA_GENERATED ${PBRT_SOA_GENERATED} ${CMAKE_CURRENT_BINARY_DIR}/wavefront_workitems_soa.h)
 
 add_custom_target (pbrt_soa_generated DEPENDS ${PBRT_SOA_GENERATED})
