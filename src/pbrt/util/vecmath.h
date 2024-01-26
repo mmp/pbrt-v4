@@ -1724,11 +1724,6 @@ PBRT_CPU_GPU inline bool SameHemisphere(Vector3f w, Vector3f wp) {
     return w.z * wp.z > 0;
 }
 
-PBRT_CPU_GPU
-inline bool SameHemisphere(Vector3f w, Normal3f wp) {
-    return w.z * wp.z > 0;
-}
-
 // OctahedralVector Definition
 class OctahedralVector {
   public:
