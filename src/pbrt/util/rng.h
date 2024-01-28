@@ -76,9 +76,6 @@ inline T RNG::Uniform() {
 }
 
 template <>
-inline uint32_t RNG::Uniform<uint32_t>();
-
-template <>
 inline uint32_t RNG::Uniform<uint32_t>() {
     uint64_t oldstate = state;
     state = oldstate * PCG32_MULT + inc;
