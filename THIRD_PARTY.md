@@ -22,3 +22,11 @@ pbrt-v4 also includes spectral data from the following sources:
   domain CC0.
 * Camera sensor measurement data from https://github.com/ampas/rawtoaces,
   Copyright © 2017 Academy of Motion Picture Arts and Sciences.
+
+## Install using vcpkg
+
+```bash
+vcpkg install double-conversion
+vcpkg install glfw3
+vcpkg install glad
+```
