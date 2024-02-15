@@ -11,7 +11,7 @@
 
 #include <libdeflate.h>
 
-#include <filesystem/path.h>
+#include <filesystem>
 #include <algorithm>
 #include <cctype>
 #include <climits>
@@ -30,11 +30,13 @@
 
 namespace pbrt {
 
-static filesystem::path searchDirectory;
+namespace fs=std::filesystem;
+
+static fs::path searchDirectory;
 
 void SetSearchDirectory(std::string filename) {
-    filesystem::path path(filename);
-    if (!path.is_directory())
+    fs::path path(filename);
+    if (!fs::is_directory(path))
         path = path.parent_path();
     searchDirectory = path;
 }
@@ -42,7 +44,7 @@ void SetSearchDirectory(std::string filename) {
 static bool IsAbsolutePath(std::string filename) {
     if (filename.empty())
         return false;
-    return filesystem::path(filename).is_absolute();
+    return fs::path(filename).is_absolute();
 }
 
 bool HasExtension(std::string filename, std::string e) {
@@ -50,7 +52,7 @@ bool HasExtension(std::string filename, std::string e) {
     if (!ext.empty() && ext[0] == '.')
         ext.erase(0, 1);
 
-    std::string filenameExtension = filesystem::path(filename).extension();
+    std::string filenameExtension = fs::path(filename).extension();
     if (ext.size() > filenameExtension.size())
         return false;
     return std::equal(ext.rbegin(), ext.rend(), filenameExtension.rbegin(),
@@ -58,7 +60,7 @@ bool HasExtension(std::string filename, std::string e) {
 }
 
 std::string RemoveExtension(std::string filename) {
-    std::string ext = filesystem::path(filename).extension();
+    std::string ext = fs::path(filename).extension();
     if (ext.empty())
         return filename;
     std::string f = filename;
@@ -70,17 +72,17 @@ std::string ResolveFilename(std::string filename) {
     if (searchDirectory.empty() || filename.empty() || IsAbsolutePath(filename))
         return filename;
 
-    filesystem::path filepath = searchDirectory / filesystem::path(filename);
-    if (filepath.exists())
-        return filepath.make_absolute().str();
+    fs::path filepath = searchDirectory / fs::path(filename);
+    if (fs::exists(filepath))
+        return fs::canonical(filepath).string();
     return filename;
 }
 
 std::vector<std::string> MatchingFilenames(std::string filenameBase) {
     std::vector<std::string> filenames;
 
-    filesystem::path basePath(filenameBase);
-    std::string dirStr = basePath.parent_path().str();
+    fs::path basePath(filenameBase);
+    std::string dirStr = basePath.parent_path().string();
     if (dirStr.empty())
         dirStr = ".";
 #ifdef PBRT_IS_WINDOWS
@@ -88,15 +90,15 @@ std::vector<std::string> MatchingFilenames(std::string filenameBase) {
 #else
     DIR *dir = opendir(dirStr.c_str());
     if (!dir)
-        ErrorExit("%s: unable to open directory\n", basePath.parent_path().str().c_str());
+        ErrorExit("%s: unable to open directory\n", basePath.parent_path().string().c_str());
 
     struct dirent *ent;
-    size_t n = basePath.filename().size();
+    size_t n = basePath.filename().string().size();
     while ((ent = readdir(dir)) != nullptr) {
         if (ent->d_type == DT_REG &&
             strncmp(basePath.filename().c_str(), ent->d_name, n) == 0)
             filenames.push_back(
-                (basePath.parent_path() / filesystem::path(ent->d_name)).str());
+                (basePath.parent_path() / fs::path(ent->d_name)).string());
     }
     closedir(dir);
 #endif

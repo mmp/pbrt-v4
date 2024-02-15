@@ -66,7 +66,6 @@ endfunction ()
 check_ext ("OpenEXR" "openexr/OpenEXR" 5cfb5dab6dfada731586b0281bdb15ee75e26782)
 check_ext ("OpenVDB" "openvdb/nanovdb" 414bed84c2fc22e188eac7b611aa85c7edd7a5a9)
 check_ext ("Ptex" "ptex/src" 4cd8e9a6db2b06e478dfbbd8c26eb6df97f84483)
-check_ext ("filesystem" "filesystem/filesystem" c5f9de30142453eb3c6fe991e82dfc2583373116)
 check_ext ("glfw" "glfw/docs" 4cb36872a5fe448c205d0b46f0e8c8b57530cfe0)
 check_ext ("libdeflate" "libdeflate/common" 1fd0bea6ca2073c68493632dafc4b1ddda1bcbc3)
 check_ext ("lodepng" "lodepng/examples" 8c6a9e30576f07bf470ad6f09458a2dcd7a6a84a)
@@ -859,7 +858,6 @@ target_include_directories (pbrt_lib PUBLIC
   ${OPENEXR_INCLUDE}
   ${ZLIB_INCLUDE_DIRS}
   ${LIBDEFLATE_INCLUDE_DIRS}
-  ${FILESYSTEM_INCLUDE}
   ${PTEX_INCLUDE}
   ${DOUBLE_CONVERSION_INCLUDE}
   ${NANOVDB_INCLUDE}

@@ -11,9 +11,6 @@
 	path = src/ext/openexr
 	url = https://github.com/mmp/openexr.git
 	branch = zlibstatic-export-workaround
-[submodule "src/ext/filesystem"]
-	path = src/ext/filesystem
-	url = https://github.com/wjakob/filesystem.git
 [submodule "src/ext/openvdb"]
 	path = src/ext/openvdb
 	url = https://github.com/AcademySoftwareFoundation/openvdb.git

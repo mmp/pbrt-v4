@@ -3,7 +3,6 @@ pbrt-v4 makes use of the following third-party libraries and data. Thanks
 to all of the developers who have made these available!
 
 * [double-conversion](https://github.com/google/double-conversion)
-* [filesystem](https://github.com/wjakob/filesystem)
 * [googletest](https://github.com/google/googletest)
 * [lodepng](https://lodev.org/lodepng/)
 * [OpenEXR](http:://www.openexr.com)
