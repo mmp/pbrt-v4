@@ -4,9 +4,6 @@
 [submodule "src/ext/ptex"]
 	path = src/ext/ptex
 	url = https://github.com/wdas/ptex.git
-[submodule "src/ext/double-conversion"]
-	path = src/ext/double-conversion
-	url = https://github.com/mmp/double-conversion.git
 [submodule "src/ext/stb"]
 	path = src/ext/stb
 	url = https://github.com/nothings/stb.git
@@ -36,4 +33,3 @@
 [submodule "src/ext/glfw"]
 	path = src/ext/glfw
 	url = https://github.com/glfw/glfw.git
-
