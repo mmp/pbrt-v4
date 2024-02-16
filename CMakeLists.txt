@@ -863,11 +863,7 @@ set_property(TARGET pbrt_lib PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 target_include_directories (pbrt_lib PUBLIC
   src
   src/ext
-  ${OPENEXR_INCLUDE}
-  ${ZLIB_INCLUDE_DIRS}
-  ${NANOVDB_INCLUDE}
   ${CMAKE_CURRENT_BINARY_DIR}
-  ${GLFW_INCLUDE}
 )
 
 if (PBRT_CUDA_ENABLED AND PBRT_OPTIX7_PATH)
@@ -890,7 +886,6 @@ set (ALL_PBRT_LIBS
   ${CMAKE_THREAD_LIBS_INIT}
   OpenEXR::OpenEXR
   Ptex::Ptex
-  ${ZLIB_LIBRARIES}
   $<IF:$<TARGET_EXISTS:libdeflate::libdeflate_shared>,libdeflate::libdeflate_shared,libdeflate::libdeflate_static>
   double-conversion::double-conversion
   ${PBRT_CUDA_LIB}
