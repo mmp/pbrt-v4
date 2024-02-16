@@ -17,7 +17,7 @@
 
 // No need, since we need to do our own file i/o to support UTF-8 filenames.
 #define LODEPNG_NO_COMPILE_DISK
-#include <lodepng/lodepng.h>
+#include <lodepng.h>
 
 #ifndef PBRT_IS_GPU_CODE
 // Work around conflict with "half".

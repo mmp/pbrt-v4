@@ -67,7 +67,6 @@ check_ext ("OpenEXR" "openexr/OpenEXR" 5cfb5dab6dfada731586b0281bdb15ee75e26782)
 check_ext ("OpenVDB" "openvdb/nanovdb" 414bed84c2fc22e188eac7b611aa85c7edd7a5a9)
 check_ext ("Ptex" "ptex/src" 4cd8e9a6db2b06e478dfbbd8c26eb6df97f84483)
 check_ext ("libdeflate" "libdeflate/common" 1fd0bea6ca2073c68493632dafc4b1ddda1bcbc3)
-check_ext ("lodepng" "lodepng/examples" 8c6a9e30576f07bf470ad6f09458a2dcd7a6a84a)
 check_ext ("qoi" "qoi" 028c75fd26e5e0758c7c711216c00404994c1ad3)
 check_ext ("stb" "stb/tools" af1a5bc352164740c1cc1354942b1c6b72eacb8a)
 check_ext ("utf8proc" "utf8proc/bench" 2484e2ed5e1d9c19edcccf392a7d9920ad90dfaf)
@@ -92,6 +91,10 @@ include_directories(${GLFW_INCLUDE_DIR})
 find_package(double-conversion CONFIG REQUIRED)
 find_path(DOUBLE_CONVERSION_INCLUDE_DIR double-conversion/double-conversion.h)
 include_directories(${DOUBLE_CONVERSION_INCLUDE_DIR})
+
+find_package(lodepng CONFIG REQUIRED)
+find_path(LODEPNG_INCLUDE_DIR lodepng.h)
+include_directories(${LODEPNG_INCLUDE_DIR})
 
 set_property (GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -847,7 +850,7 @@ add_library (pbrt_lib STATIC
   ${PBRT_GPU_SOURCE_HEADERS}
 
   src/ext/gtest/gtest-all.cc
-  src/ext/lodepng/lodepng.cpp
+  # src/ext/lodepng/lodepng.cpp
   src/ext/rply/rply.cpp
   )
 add_library (pbrt::pbrt_lib ALIAS pbrt_lib)
