@@ -65,7 +65,6 @@ endfunction ()
 
 check_ext ("OpenEXR" "openexr/OpenEXR" 5cfb5dab6dfada731586b0281bdb15ee75e26782)
 check_ext ("OpenVDB" "openvdb/nanovdb" 414bed84c2fc22e188eac7b611aa85c7edd7a5a9)
-check_ext ("qoi" "qoi" 028c75fd26e5e0758c7c711216c00404994c1ad3)
 check_ext ("utf8proc" "utf8proc/bench" 2484e2ed5e1d9c19edcccf392a7d9920ad90dfaf)
 check_ext ("zlib" "zlib/doc" 54d591eabf9fe0e84c725638f8d5d8d202a093fa)
 add_compile_definitions ("$<$<CONFIG:DEBUG>:PBRT_DEBUG_BUILD>")
@@ -108,6 +107,9 @@ include_directories(${RPLY_INCLUDE_DIR})
 find_package(libdeflate CONFIG REQUIRED)
 find_path(LIBDEFLATE_INCLUDE_DIR libdeflate.h)
 include_directories(${LIBDEFLATE_INCLUDE_DIR})
+
+find_path(QOI_INCLUDE_DIR qoi.h)
+include_directories(${QOI_INCLUDE_DIR})
 
 set_property (GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -878,7 +880,6 @@ set_property(TARGET pbrt_lib PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 target_include_directories (pbrt_lib PUBLIC
   src
   src/ext
-  ${QOI_INCLUDE}
   ${OPENEXR_INCLUDE}
   ${ZLIB_INCLUDE_DIRS}
   ${NANOVDB_INCLUDE}

@@ -142,7 +142,7 @@ add_subdirectory (utf8proc)
 ###########################################################################
 # qoi
 
-set (QOI_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/qoi PARENT_SCOPE)
+# set (QOI_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/qoi PARENT_SCOPE)
 
 ###########################################################################
 # glfw / glad
