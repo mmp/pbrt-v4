@@ -135,9 +135,9 @@ set_property (TARGET flip_lib PROPERTY FOLDER "ext")
 ###########################################################################
 # utf8proc
 
-set (UTF8PROC_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/utf8proc PARENT_SCOPE)
+# set (UTF8PROC_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/utf8proc PARENT_SCOPE)
 
-add_subdirectory (utf8proc)
+# add_subdirectory (utf8proc)
 
 ###########################################################################
 # qoi
