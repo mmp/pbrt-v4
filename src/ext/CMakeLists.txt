@@ -10,12 +10,12 @@ endif ()
 ###########################################################################
 # stb
 
-set (STB_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/stb PARENT_SCOPE)
+# set (STB_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/stb PARENT_SCOPE)
 
 ###########################################################################
 # filesystem
 
-set (FILESYSTEM_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/filesystem PARENT_SCOPE)
+# set (FILESYSTEM_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/filesystem PARENT_SCOPE)
 
 ###########################################################################
 # # libdeflate
@@ -116,7 +116,7 @@ endif ()
 ###########################################################################
 # double-conversion
 
-set (DOUBLE_CONVERSION_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/double-conversion PARENT_SCOPE)
+# set (DOUBLE_CONVERSION_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/double-conversion PARENT_SCOPE)
 
 ###########################################################################
 # nanovdb
@@ -147,8 +147,8 @@ set_property (TARGET flip_lib PROPERTY FOLDER "ext")
 ###########################################################################
 # glfw / glad
 
-set (GLFW_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/glfw/include PARENT_SCOPE)
-set (GLAD_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/glad/include PARENT_SCOPE)
+# set (GLFW_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/glfw/include PARENT_SCOPE)
+# set (GLAD_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/glad/include PARENT_SCOPE)
 
 set (GLFW_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 set (GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
