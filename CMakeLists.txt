@@ -65,7 +65,6 @@ endfunction ()
 
 check_ext ("OpenEXR" "openexr/OpenEXR" 5cfb5dab6dfada731586b0281bdb15ee75e26782)
 check_ext ("OpenVDB" "openvdb/nanovdb" 414bed84c2fc22e188eac7b611aa85c7edd7a5a9)
-check_ext ("libdeflate" "libdeflate/common" 1fd0bea6ca2073c68493632dafc4b1ddda1bcbc3)
 check_ext ("qoi" "qoi" 028c75fd26e5e0758c7c711216c00404994c1ad3)
 check_ext ("utf8proc" "utf8proc/bench" 2484e2ed5e1d9c19edcccf392a7d9920ad90dfaf)
 check_ext ("zlib" "zlib/doc" 54d591eabf9fe0e84c725638f8d5d8d202a093fa)
@@ -105,6 +104,10 @@ include_directories(${STB_INCLUDE_DIR})
 find_package(rply CONFIG REQUIRED)
 find_path(RPLY_INCLUDE_DIR rply/rply.h)
 include_directories(${RPLY_INCLUDE_DIR})
+
+find_package(libdeflate CONFIG REQUIRED)
+find_path(LIBDEFLATE_INCLUDE_DIR libdeflate.h)
+include_directories(${LIBDEFLATE_INCLUDE_DIR})
 
 set_property (GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -905,7 +908,7 @@ set (ALL_PBRT_LIBS
   ${OPENEXR_LIBS}
   Ptex::Ptex
   ${ZLIB_LIBRARIES}
-  ${LIBDEFLATE_LIBRARIES}
+  $<IF:$<TARGET_EXISTS:libdeflate::libdeflate_shared>,libdeflate::libdeflate_shared,libdeflate::libdeflate_static>
   double-conversion::double-conversion
   ${PBRT_CUDA_LIB}
   utf8proc

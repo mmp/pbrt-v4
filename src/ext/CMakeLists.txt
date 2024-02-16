@@ -18,14 +18,14 @@ set (STB_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/stb PARENT_SCOPE)
 set (FILESYSTEM_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/filesystem PARENT_SCOPE)
 
 ###########################################################################
-# libdeflate
+# # libdeflate
 
-add_subdirectory (libdeflate)
+# add_subdirectory (libdeflate)
 
-set (LIBDEFLATE_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/libdeflate PARENT_SCOPE)
-set (LIBDEFLATE_LIBRARIES deflate::deflate PARENT_SCOPE)
+# set (LIBDEFLATE_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/libdeflate PARENT_SCOPE)
+# set (LIBDEFLATE_LIBRARIES deflate::deflate PARENT_SCOPE)
 
-set_property (TARGET deflate PROPERTY FOLDER "ext")
+# set_property (TARGET deflate PROPERTY FOLDER "ext")
 
 ###########################################################################
 # zlib

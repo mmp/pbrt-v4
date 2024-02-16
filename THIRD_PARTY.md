@@ -33,6 +33,7 @@ vcpkg install lodepng
 vcpkg install ptex
 vcpkg install stb
 vcpkg install rply
+vcpkg install libdeflate
 
 cmake -B build -S . "-DCMAKE_TOOLCHAIN_FILE=/home/lizz/dev/vcpkg/scripts/buildsystems/vcpkg.cmake"
 cmake --build build -j
