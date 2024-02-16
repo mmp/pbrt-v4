@@ -906,6 +906,7 @@ set (ALL_PBRT_LIBS
   utf8proc
   glfw
   glad::glad
+  lodepng
   OpenGL::GL)
 
 if (PBRT_CUDA_ENABLED)
