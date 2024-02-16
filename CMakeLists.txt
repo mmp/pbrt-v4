@@ -872,7 +872,6 @@ target_include_directories (pbrt_lib PUBLIC
   ${ZLIB_INCLUDE_DIRS}
   ${LIBDEFLATE_INCLUDE_DIRS}
   ${PTEX_INCLUDE}
-  ${DOUBLE_CONVERSION_INCLUDE}
   ${NANOVDB_INCLUDE}
   ${CMAKE_CURRENT_BINARY_DIR}
   ${GLFW_INCLUDE}
@@ -1096,7 +1095,6 @@ add_executable (pbrt_test src/pbrt/cmd/pbrt_test.cpp ${PBRT_TEST_SOURCE})
 
 target_link_libraries (pbrt_test PRIVATE ${ALL_PBRT_LIBS} pbrt_opt pbrt_warnings)
 target_compile_definitions (pbrt_test PRIVATE ${PBRT_DEFINITIONS})
-target_include_directories (pbrt_test PRIVATE src src/ext ${DOUBLE_CONVERSION_INCLUDE})
 target_compile_options(pbrt_test PUBLIC ${PBRT_CXX_FLAGS})
 
 add_sanitizers (pbrt_test)
