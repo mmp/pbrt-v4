@@ -52,7 +52,7 @@ bool HasExtension(std::string filename, std::string e) {
     if (!ext.empty() && ext[0] == '.')
         ext.erase(0, 1);
 
-    std::string filenameExtension = fs::path(filename).extension();
+    std::string filenameExtension = fs::path(filename).extension().string();
     if (ext.size() > filenameExtension.size())
         return false;
     return std::equal(ext.rbegin(), ext.rend(), filenameExtension.rbegin(),
@@ -60,7 +60,7 @@ bool HasExtension(std::string filename, std::string e) {
 }
 
 std::string RemoveExtension(std::string filename) {
-    std::string ext = fs::path(filename).extension();
+    std::string ext = fs::path(filename).extension().string();
     if (ext.empty())
         return filename;
     std::string f = filename;
