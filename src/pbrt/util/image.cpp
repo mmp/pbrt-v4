@@ -44,7 +44,7 @@
 #define STBI_NO_PIC
 #define STBI_ASSERT CHECK
 #define STBI_WINDOWS_UTF8
-#include <stb/stb_image.h>
+#include <stb_image.h>
 
 #define QOI_NO_STDIO
 #define QOI_IMPLEMENTATION
