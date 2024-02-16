@@ -102,6 +102,10 @@ find_package(Stb REQUIRED)
 find_path(STB_INCLUDE_DIR stb_image.h)
 include_directories(${STB_INCLUDE_DIR})
 
+find_package(rply CONFIG REQUIRED)
+find_path(RPLY_INCLUDE_DIR rply/rply.h)
+include_directories(${RPLY_INCLUDE_DIR})
+
 set_property (GLOBAL PROPERTY USE_FOLDERS ON)
 
 if (MSVC)
@@ -856,7 +860,6 @@ add_library (pbrt_lib STATIC
   ${PBRT_GPU_SOURCE_HEADERS}
 
   src/ext/gtest/gtest-all.cc
-  src/ext/rply/rply.cpp
   )
 add_library (pbrt::pbrt_lib ALIAS pbrt_lib)
 

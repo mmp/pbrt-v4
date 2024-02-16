@@ -32,6 +32,7 @@ vcpkg install glad
 vcpkg install lodepng
 vcpkg install ptex
 vcpkg install stb
+vcpkg install rply
 
 cmake -B build -S . "-DCMAKE_TOOLCHAIN_FILE=/home/lizz/dev/vcpkg/scripts/buildsystems/vcpkg.cmake"
 cmake --build build -j
