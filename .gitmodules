@@ -1,6 +1,3 @@
-[submodule "src/ext/zlib"]
-	path = src/ext/zlib
-	url = https://github.com/mitsuba-renderer/zlib.git
 [submodule "src/ext/openexr"]
 	path = src/ext/openexr
 	url = https://github.com/mmp/openexr.git
