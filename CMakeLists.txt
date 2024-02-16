@@ -912,6 +912,7 @@ set (ALL_PBRT_LIBS
   glfw
   glad::glad
   lodepng
+  rply::rply
   OpenGL::GL)
 
 if (PBRT_CUDA_ENABLED)
