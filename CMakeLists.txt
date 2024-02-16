@@ -63,8 +63,6 @@ function (CHECK_EXT NAME DIR HASH)
   endif (GIT_FOUND)
 endfunction ()
 
-check_ext ("OpenEXR" "openexr/OpenEXR" 5cfb5dab6dfada731586b0281bdb15ee75e26782)
-check_ext ("OpenVDB" "openvdb/nanovdb" 414bed84c2fc22e188eac7b611aa85c7edd7a5a9)
 add_compile_definitions ("$<$<CONFIG:DEBUG>:PBRT_DEBUG_BUILD>")
 
 enable_testing ()
@@ -112,6 +110,17 @@ include_directories(${QOI_INCLUDE_DIR})
 find_package(unofficial-utf8proc CONFIG REQUIRED)
 find_path(UTF8PROC_INCLUDE_DIR utf8proc.h)
 include_directories(${UTF8PROC_INCLUDE_DIR})
+
+find_package(OpenEXR CONFIG REQUIRED)
+find_path(OPENEXR_INCLUDE_DIR OpenEXR/ImfHeader.h)
+include_directories(${OPENEXR_INCLUDE_DIR})
+
+find_package(OpenVDB CONFIG REQUIRED COMPONENTS nanovdb)
+find_path(NANOVDB_INCLUDE_DIR nanovdb/NanoVDB.h)
+include_directories(${NANOVDB_INCLUDE_DIR})
+
+find_path(IMATH_INCLUDE_DIR Imath/half.h)
+include_directories(${IMATH_INCLUDE_DIR}/Imath)
 
 enable_testing()
 find_package(GTest CONFIG REQUIRED)
@@ -910,7 +919,7 @@ endif()
 set (ALL_PBRT_LIBS
   pbrt_lib
   ${CMAKE_THREAD_LIBS_INIT}
-  ${OPENEXR_LIBS}
+  OpenEXR::OpenEXR
   Ptex::Ptex
   ${ZLIB_LIBRARIES}
   $<IF:$<TARGET_EXISTS:libdeflate::libdeflate_shared>,libdeflate::libdeflate_shared,libdeflate::libdeflate_static>
@@ -922,6 +931,7 @@ set (ALL_PBRT_LIBS
   lodepng
   rply::rply
   GTest::gtest
+  OpenVDB::nanovdb
   OpenGL::GL)
 
 if (PBRT_CUDA_ENABLED)

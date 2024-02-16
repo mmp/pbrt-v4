@@ -1,8 +1,0 @@
-[submodule "src/ext/openexr"]
-	path = src/ext/openexr
-	url = https://github.com/mmp/openexr.git
-	branch = zlibstatic-export-workaround
-[submodule "src/ext/openvdb"]
-	path = src/ext/openvdb
-	url = https://github.com/AcademySoftwareFoundation/openvdb.git
-	branch = feature/nanovdb

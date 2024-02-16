@@ -21,17 +21,17 @@
 
 #ifndef PBRT_IS_GPU_CODE
 // Work around conflict with "half".
-#include <ImfChannelList.h>
-#include <ImfChromaticitiesAttribute.h>
-#include <ImfFloatAttribute.h>
-#include <ImfFrameBuffer.h>
-#include <ImfHeader.h>
-#include <ImfInputFile.h>
-#include <ImfIntAttribute.h>
-#include <ImfMatrixAttribute.h>
-#include <ImfOutputFile.h>
-#include <ImfStringAttribute.h>
-#include <ImfStringVectorAttribute.h>
+#include <OpenEXR/ImfChannelList.h>
+#include <OpenEXR/ImfChromaticitiesAttribute.h>
+#include <OpenEXR/ImfFloatAttribute.h>
+#include <OpenEXR/ImfFrameBuffer.h>
+#include <OpenEXR/ImfHeader.h>
+#include <OpenEXR/ImfInputFile.h>
+#include <OpenEXR/ImfIntAttribute.h>
+#include <OpenEXR/ImfMatrixAttribute.h>
+#include <OpenEXR/ImfOutputFile.h>
+#include <OpenEXR/ImfStringAttribute.h>
+#include <OpenEXR/ImfStringVectorAttribute.h>
 #endif
 
 #include <algorithm>
