@@ -113,6 +113,11 @@ find_package(unofficial-utf8proc CONFIG REQUIRED)
 find_path(UTF8PROC_INCLUDE_DIR utf8proc.h)
 include_directories(${UTF8PROC_INCLUDE_DIR})
 
+enable_testing()
+find_package(GTest CONFIG REQUIRED)
+find_path(GTEST_INCLUDE_DIR gtest/gtest.h)
+include_directories(${GTEST_INCLUDE_DIR})
+
 set_property (GLOBAL PROPERTY USE_FOLDERS ON)
 
 if (MSVC)
@@ -865,8 +870,6 @@ add_library (pbrt_lib STATIC
   ${PBRT_WAVEFRONT_SOURCE_HEADERS}
   ${PBRT_GPU_SOURCE}
   ${PBRT_GPU_SOURCE_HEADERS}
-
-  src/ext/gtest/gtest-all.cc
   )
 add_library (pbrt::pbrt_lib ALIAS pbrt_lib)
 
@@ -918,6 +921,7 @@ set (ALL_PBRT_LIBS
   glad::glad
   lodepng
   rply::rply
+  GTest::gtest
   OpenGL::GL)
 
 if (PBRT_CUDA_ENABLED)

@@ -36,6 +36,7 @@ vcpkg install rply
 vcpkg install libdeflate
 vcpkg install qoi
 vcpkg install utf8proc
+vcpkg install gtest
 
 cmake -B build -S . "-DCMAKE_TOOLCHAIN_FILE=/home/lizz/dev/vcpkg/scripts/buildsystems/vcpkg.cmake"
 cmake --build build -j
