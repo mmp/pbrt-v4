@@ -34,38 +34,7 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     "MinSizeRel" "RelWithDebInfo")
 endif ()
 
-function (CHECK_EXT NAME DIR HASH)
-  if (NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/ext/${DIR}")
-    message (FATAL_ERROR "The ${NAME} submodule directory is missing! "
-      "Either that submodule was recently added to pbrt or you did not clone the project with --recursive. "
-      "In order to update the submodules, run:\n"
-      "  \"git submodule update --init --recursive\"")
-  endif ()
-
-  find_package(Git)
-  if (GIT_FOUND)
-    execute_process (
-      COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
-      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/ext/${DIR}"
-      RESULT_VARIABLE "git_return"
-      ERROR_QUIET
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-      OUTPUT_VARIABLE "git_hash")
-    if (NOT ${git_hash} MATCHES "^${HASH}")
-      message (FATAL_ERROR "The ${CMAKE_CURRENT_SOURCE_DIR}/src/ext/${DIR} "
-        "submodule isn't up to date (${git_hash} vs ${HASH}). Please run:\n"
-        "  \"git submodule update --recursive\"")
-    else ()
-      message (STATUS "${NAME} at commit: ${git_hash}")
-    endif()
-  else (GIT_FOUND)
-    message (STATUS "git not found: unable to verify revisions in submodules")
-  endif (GIT_FOUND)
-endfunction ()
-
 add_compile_definitions ("$<$<CONFIG:DEBUG>:PBRT_DEBUG_BUILD>")
-
-enable_testing ()
 
 find_package (Sanitizers)
 find_package (Threads)
