@@ -86,7 +86,12 @@ find_path(GLAD_INCLUDE_DIR glad/glad.h)
 include_directories(${GLAD_INCLUDE_DIR})
 
 find_package(glfw3 CONFIG REQUIRED)
+find_path(GLFW_INCLUDE_DIR GLFW/glfw3.h)
+include_directories(${GLFW_INCLUDE_DIR})
+
 find_package(double-conversion CONFIG REQUIRED)
+find_path(DOUBLE_CONVERSION_INCLUDE_DIR double-conversion/double-conversion.h)
+include_directories(${DOUBLE_CONVERSION_INCLUDE_DIR})
 
 set_property (GLOBAL PROPERTY USE_FOLDERS ON)
 
