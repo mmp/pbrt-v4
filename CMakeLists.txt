@@ -81,6 +81,13 @@ find_package (Threads)
 
 find_package(OpenGL REQUIRED)
 
+find_package(glad CONFIG REQUIRED)
+find_path(GLAD_INCLUDE_DIR glad/glad.h)
+include_directories(${GLAD_INCLUDE_DIR})
+
+find_package(glfw3 CONFIG REQUIRED)
+find_package(double-conversion CONFIG REQUIRED)
+
 set_property (GLOBAL PROPERTY USE_FOLDERS ON)
 
 if (MSVC)
@@ -862,7 +869,6 @@ target_include_directories (pbrt_lib PUBLIC
   ${NANOVDB_INCLUDE}
   ${CMAKE_CURRENT_BINARY_DIR}
   ${GLFW_INCLUDE}
-  ${GLAD_INCLUDE}
 )
 
 if (PBRT_CUDA_ENABLED AND PBRT_OPTIX7_PATH)
@@ -887,11 +893,11 @@ set (ALL_PBRT_LIBS
   Ptex_static
   ${ZLIB_LIBRARIES}
   ${LIBDEFLATE_LIBRARIES}
-  double-conversion
+  double-conversion::double-conversion
   ${PBRT_CUDA_LIB}
   utf8proc
   glfw
-  glad
+  glad::glad
   OpenGL::GL)
 
 if (PBRT_CUDA_ENABLED)

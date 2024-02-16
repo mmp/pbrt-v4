@@ -29,4 +29,7 @@ pbrt-v4 also includes spectral data from the following sources:
 vcpkg install double-conversion
 vcpkg install glfw3
 vcpkg install glad
+
+cmake -B build -S . "-DCMAKE_TOOLCHAIN_FILE=/home/lizz/dev/vcpkg/scripts/buildsystems/vcpkg.cmake"
+cmake --build build -j
 ```
