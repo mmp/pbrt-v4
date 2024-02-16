@@ -64,7 +64,7 @@ std::string RemoveExtension(std::string filename) {
     if (ext.empty())
         return filename;
     std::string f = filename;
-    f.erase(f.end() - ext.size() - 1, f.end());
+    f.erase(f.end() - ext.size(), f.end());
     return f;
 }
 
