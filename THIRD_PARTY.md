@@ -30,6 +30,7 @@ vcpkg install double-conversion
 vcpkg install glfw3
 vcpkg install glad
 vcpkg install lodepng
+vcpkg install ptex
 
 cmake -B build -S . "-DCMAKE_TOOLCHAIN_FILE=/home/lizz/dev/vcpkg/scripts/buildsystems/vcpkg.cmake"
 cmake --build build -j

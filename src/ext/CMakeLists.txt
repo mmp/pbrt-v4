@@ -113,12 +113,6 @@ if (WIN32)
   add_definitions (/DPTEX_STATIC)
 endif ()
 
-add_subdirectory (ptex)
-
-set_property (TARGET Ptex_static ptxinfo halftest ftest rtest wtest PROPERTY FOLDER "ext/ptex")
-
-set (PTEX_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/ptex/src/ptex PARENT_SCOPE)
-
 ###########################################################################
 # double-conversion
 

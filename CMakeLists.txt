@@ -65,7 +65,6 @@ endfunction ()
 
 check_ext ("OpenEXR" "openexr/OpenEXR" 5cfb5dab6dfada731586b0281bdb15ee75e26782)
 check_ext ("OpenVDB" "openvdb/nanovdb" 414bed84c2fc22e188eac7b611aa85c7edd7a5a9)
-check_ext ("Ptex" "ptex/src" 4cd8e9a6db2b06e478dfbbd8c26eb6df97f84483)
 check_ext ("libdeflate" "libdeflate/common" 1fd0bea6ca2073c68493632dafc4b1ddda1bcbc3)
 check_ext ("qoi" "qoi" 028c75fd26e5e0758c7c711216c00404994c1ad3)
 check_ext ("stb" "stb/tools" af1a5bc352164740c1cc1354942b1c6b72eacb8a)
@@ -95,6 +94,10 @@ include_directories(${DOUBLE_CONVERSION_INCLUDE_DIR})
 find_package(lodepng CONFIG REQUIRED)
 find_path(LODEPNG_INCLUDE_DIR lodepng.h)
 include_directories(${LODEPNG_INCLUDE_DIR})
+
+find_package(ptex CONFIG REQUIRED)
+find_path(PTEX_INCLUDE_DIR Ptexture.h)
+include_directories(${PTEX_INCLUDE_DIR})
 
 set_property (GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -871,7 +874,6 @@ target_include_directories (pbrt_lib PUBLIC
   ${OPENEXR_INCLUDE}
   ${ZLIB_INCLUDE_DIRS}
   ${LIBDEFLATE_INCLUDE_DIRS}
-  ${PTEX_INCLUDE}
   ${NANOVDB_INCLUDE}
   ${CMAKE_CURRENT_BINARY_DIR}
   ${GLFW_INCLUDE}
@@ -896,7 +898,7 @@ set (ALL_PBRT_LIBS
   pbrt_lib
   ${CMAKE_THREAD_LIBS_INIT}
   ${OPENEXR_LIBS}
-  Ptex_static
+  Ptex::Ptex
   ${ZLIB_LIBRARIES}
   ${LIBDEFLATE_LIBRARIES}
   double-conversion::double-conversion
