@@ -850,7 +850,6 @@ add_library (pbrt_lib STATIC
   ${PBRT_GPU_SOURCE_HEADERS}
 
   src/ext/gtest/gtest-all.cc
-  # src/ext/lodepng/lodepng.cpp
   src/ext/rply/rply.cpp
   )
 add_library (pbrt::pbrt_lib ALIAS pbrt_lib)
