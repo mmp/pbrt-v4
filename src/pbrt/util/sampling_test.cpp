@@ -23,11 +23,10 @@
 
 using namespace pbrt;
 
-namespace pbrt{
+namespace pbrt {
 
-    void TestCompareDistributions(const PiecewiseConstant1D &da,
-                                         const PiecewiseConstant1D &db, Float eps = 1e-5){
-ASSERT_EQ(da.func.size(), db.func.size());
+void TestCompareDistributions(const PiecewiseConstant1D &da, const PiecewiseConstant1D &db, Float eps = 1e-5) {
+    ASSERT_EQ(da.func.size(), db.func.size());
     ASSERT_EQ(da.cdf.size(), db.cdf.size());
     ASSERT_EQ(da.min, db.min);
     ASSERT_EQ(da.max, db.max);
@@ -36,20 +35,18 @@ ASSERT_EQ(da.func.size(), db.func.size());
         Float err = std::abs(pdfa - pdfb) / ((pdfa + pdfb) / 2);
         EXPECT_LT(err, eps) << pdfa << " - " << pdfb;
     }
-                                         }
+}
 
-void TestCompareDistributions(const PiecewiseConstant2D &da,
-                                         const PiecewiseConstant2D &db, Float eps = 1e-5){
-TestCompareDistributions(da.pMarginal, db.pMarginal, eps);
+void TestCompareDistributions(const PiecewiseConstant2D &da, const PiecewiseConstant2D &db, Float eps = 1e-5) {
+    TestCompareDistributions(da.pMarginal, db.pMarginal, eps);
 
     ASSERT_EQ(da.pConditionalV.size(), db.pConditionalV.size());
     ASSERT_EQ(da.domain, db.domain);
     for (size_t i = 0; i < da.pConditionalV.size(); ++i)
-        TestCompareDistributions(da.pConditionalV[i],
-                                                      db.pConditionalV[i], eps);
-                                         }
-
+        TestCompareDistributions(da.pConditionalV[i], db.pConditionalV[i], eps);
 }
+
+} // namespace pbrt
 
 TEST(SampleDiscrete, Basics) {
     Float pdf;
