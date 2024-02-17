@@ -608,9 +608,6 @@ class PiecewiseConstant1D {
         return (func.capacity() + cdf.capacity()) * sizeof(Float);
     }
 
-    static void TestCompareDistributions(const PiecewiseConstant1D &da,
-                                         const PiecewiseConstant1D &db, Float eps = 1e-5);
-
     std::string ToString() const {
         return StringPrintf("[ PiecewiseConstant1D func: %s cdf: %s "
                             "min: %f max: %f funcInt: %f ]",
@@ -731,8 +728,6 @@ class PiecewiseConstant2D {
                             "pMarginal: %s ]",
                             domain, pConditionalV, pMarginal);
     }
-    static void TestCompareDistributions(const PiecewiseConstant2D &da,
-                                         const PiecewiseConstant2D &db, Float eps = 1e-5);
 
     PiecewiseConstant2D(pstd::span<const Float> func, int nu, int nv, Bounds2f domain,
                         Allocator alloc = {})
@@ -792,6 +787,9 @@ class PiecewiseConstant2D {
             return {};
         return Point2f(*cInv, *mInv);
     }
+    friend void TestCompareDistributions(const PiecewiseConstant2D &da,
+                                         const PiecewiseConstant2D &db, Float eps);
+
 
   private:
     // PiecewiseConstant2D Private Members

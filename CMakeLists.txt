@@ -34,55 +34,67 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     "MinSizeRel" "RelWithDebInfo")
 endif ()
 
-function (CHECK_EXT NAME DIR HASH)
-  if (NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/ext/${DIR}")
-    message (FATAL_ERROR "The ${NAME} submodule directory is missing! "
-      "Either that submodule was recently added to pbrt or you did not clone the project with --recursive. "
-      "In order to update the submodules, run:\n"
-      "  \"git submodule update --init --recursive\"")
-  endif ()
-
-  find_package(Git)
-  if (GIT_FOUND)
-    execute_process (
-      COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
-      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/ext/${DIR}"
-      RESULT_VARIABLE "git_return"
-      ERROR_QUIET
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-      OUTPUT_VARIABLE "git_hash")
-    if (NOT ${git_hash} MATCHES "^${HASH}")
-      message (FATAL_ERROR "The ${CMAKE_CURRENT_SOURCE_DIR}/src/ext/${DIR} "
-        "submodule isn't up to date (${git_hash} vs ${HASH}). Please run:\n"
-        "  \"git submodule update --recursive\"")
-    else ()
-      message (STATUS "${NAME} at commit: ${git_hash}")
-    endif()
-  else (GIT_FOUND)
-    message (STATUS "git not found: unable to verify revisions in submodules")
-  endif (GIT_FOUND)
-endfunction ()
-
-check_ext ("OpenEXR" "openexr/OpenEXR" 5cfb5dab6dfada731586b0281bdb15ee75e26782)
-check_ext ("OpenVDB" "openvdb/nanovdb" 414bed84c2fc22e188eac7b611aa85c7edd7a5a9)
-check_ext ("Ptex" "ptex/src" 4cd8e9a6db2b06e478dfbbd8c26eb6df97f84483)
-check_ext ("double-conversion" "double-conversion/cmake" cc1f75a114aca8d2af69f73a5a959aecbab0e87a)
-check_ext ("filesystem" "filesystem/filesystem" c5f9de30142453eb3c6fe991e82dfc2583373116)
-check_ext ("glfw" "glfw/docs" 4cb36872a5fe448c205d0b46f0e8c8b57530cfe0)
-check_ext ("libdeflate" "libdeflate/common" 1fd0bea6ca2073c68493632dafc4b1ddda1bcbc3)
-check_ext ("lodepng" "lodepng/examples" 8c6a9e30576f07bf470ad6f09458a2dcd7a6a84a)
-check_ext ("qoi" "qoi" 028c75fd26e5e0758c7c711216c00404994c1ad3)
-check_ext ("stb" "stb/tools" af1a5bc352164740c1cc1354942b1c6b72eacb8a)
-check_ext ("utf8proc" "utf8proc/bench" 2484e2ed5e1d9c19edcccf392a7d9920ad90dfaf)
-check_ext ("zlib" "zlib/doc" 54d591eabf9fe0e84c725638f8d5d8d202a093fa)
 add_compile_definitions ("$<$<CONFIG:DEBUG>:PBRT_DEBUG_BUILD>")
-
-enable_testing ()
 
 find_package (Sanitizers)
 find_package (Threads)
 
 find_package(OpenGL REQUIRED)
+
+find_package(glad CONFIG REQUIRED)
+find_path(GLAD_INCLUDE_DIR glad/glad.h)
+include_directories(${GLAD_INCLUDE_DIR})
+
+find_package(glfw3 CONFIG REQUIRED)
+find_path(GLFW_INCLUDE_DIR GLFW/glfw3.h)
+include_directories(${GLFW_INCLUDE_DIR})
+
+find_package(double-conversion CONFIG REQUIRED)
+find_path(DOUBLE_CONVERSION_INCLUDE_DIR double-conversion/double-conversion.h)
+include_directories(${DOUBLE_CONVERSION_INCLUDE_DIR})
+
+find_package(lodepng CONFIG REQUIRED)
+find_path(LODEPNG_INCLUDE_DIR lodepng.h)
+include_directories(${LODEPNG_INCLUDE_DIR})
+
+find_package(ptex CONFIG REQUIRED)
+find_path(PTEX_INCLUDE_DIR Ptexture.h)
+include_directories(${PTEX_INCLUDE_DIR})
+
+find_package(Stb REQUIRED)
+find_path(STB_INCLUDE_DIR stb_image.h)
+include_directories(${STB_INCLUDE_DIR})
+
+find_package(rply CONFIG REQUIRED)
+find_path(RPLY_INCLUDE_DIR rply/rply.h)
+include_directories(${RPLY_INCLUDE_DIR})
+
+find_package(libdeflate CONFIG REQUIRED)
+find_path(LIBDEFLATE_INCLUDE_DIR libdeflate.h)
+include_directories(${LIBDEFLATE_INCLUDE_DIR})
+
+find_path(QOI_INCLUDE_DIR qoi.h)
+include_directories(${QOI_INCLUDE_DIR})
+
+find_package(unofficial-utf8proc CONFIG REQUIRED)
+find_path(UTF8PROC_INCLUDE_DIR utf8proc.h)
+include_directories(${UTF8PROC_INCLUDE_DIR})
+
+find_package(OpenEXR CONFIG REQUIRED)
+find_path(OPENEXR_INCLUDE_DIR OpenEXR/ImfHeader.h)
+include_directories(${OPENEXR_INCLUDE_DIR})
+
+find_package(OpenVDB CONFIG REQUIRED COMPONENTS nanovdb)
+find_path(NANOVDB_INCLUDE_DIR nanovdb/NanoVDB.h)
+include_directories(${NANOVDB_INCLUDE_DIR})
+
+find_path(IMATH_INCLUDE_DIR Imath/half.h)
+include_directories(${IMATH_INCLUDE_DIR}/Imath)
+
+enable_testing()
+find_package(GTest CONFIG REQUIRED)
+find_path(GTEST_INCLUDE_DIR gtest/gtest.h)
+include_directories(${GTEST_INCLUDE_DIR})
 
 set_property (GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -413,7 +425,7 @@ int main() {
    fstat(fd, &s);
    size_t len = s.st_size;
    void *ptr = mmap(0, len, PROT_READ, MAP_FILE | MAP_SHARED, fd, 0);
-   munmap(ptr, len);   
+   munmap(ptr, len);
 }
 " HAVE_MMAP)
 
@@ -545,7 +557,7 @@ set (PBRT_SOURCE
 
   src/pbrt/cmd/pspec_gpu.cpp
   )
-  
+
 if (MSVC)
     set (PBRT_SOURCE ${PBRT_SOURCE} src/pbrt/visualstudio.natvis)
 endif ()
@@ -572,7 +584,7 @@ set (PBRT_SOURCE_HEADERS
   src/pbrt/scene.h
   src/pbrt/shapes.h
   src/pbrt/textures.h
-  )  
+  )
 
 SET (PBRT_CPU_SOURCE
   src/pbrt/cpu/aggregates.cpp
@@ -836,10 +848,6 @@ add_library (pbrt_lib STATIC
   ${PBRT_WAVEFRONT_SOURCE_HEADERS}
   ${PBRT_GPU_SOURCE}
   ${PBRT_GPU_SOURCE_HEADERS}
-
-  src/ext/gtest/gtest-all.cc
-  src/ext/lodepng/lodepng.cpp
-  src/ext/rply/rply.cpp
   )
 add_library (pbrt::pbrt_lib ALIAS pbrt_lib)
 
@@ -855,18 +863,7 @@ set_property(TARGET pbrt_lib PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 target_include_directories (pbrt_lib PUBLIC
   src
   src/ext
-  ${STB_INCLUDE}
-  ${QOI_INCLUDE}
-  ${OPENEXR_INCLUDE}
-  ${ZLIB_INCLUDE_DIRS}
-  ${LIBDEFLATE_INCLUDE_DIRS}
-  ${FILESYSTEM_INCLUDE}
-  ${PTEX_INCLUDE}
-  ${DOUBLE_CONVERSION_INCLUDE}
-  ${NANOVDB_INCLUDE}
   ${CMAKE_CURRENT_BINARY_DIR}
-  ${GLFW_INCLUDE}
-  ${GLAD_INCLUDE}
 )
 
 if (PBRT_CUDA_ENABLED AND PBRT_OPTIX7_PATH)
@@ -887,15 +884,17 @@ endif()
 set (ALL_PBRT_LIBS
   pbrt_lib
   ${CMAKE_THREAD_LIBS_INIT}
-  ${OPENEXR_LIBS}
-  Ptex_static
-  ${ZLIB_LIBRARIES}
-  ${LIBDEFLATE_LIBRARIES}
-  double-conversion
+  OpenEXR::OpenEXR
+  Ptex::Ptex
+  $<IF:$<TARGET_EXISTS:libdeflate::libdeflate_shared>,libdeflate::libdeflate_shared,libdeflate::libdeflate_static>
+  double-conversion::double-conversion
   ${PBRT_CUDA_LIB}
   utf8proc
   glfw
-  glad
+  glad::glad
+  lodepng
+  rply::rply
+  OpenVDB::nanovdb
   OpenGL::GL)
 
 if (PBRT_CUDA_ENABLED)
@@ -930,7 +929,7 @@ target_link_libraries (rgb2spec_opt PRIVATE ${CMAKE_THREAD_LIBS_INIT} pbrt_opt p
 
 if (NOT PBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES)
   add_custom_command (OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/rgbspectrum_aces.cpp
-      COMMAND rgb2spec_opt 64 ${CMAKE_CURRENT_BINARY_DIR}/rgbspectrum_aces.cpp ACES2065_1 
+      COMMAND rgb2spec_opt 64 ${CMAKE_CURRENT_BINARY_DIR}/rgbspectrum_aces.cpp ACES2065_1
       DEPENDS rgb2spec_opt)
 
   add_custom_command (OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/rgbspectrum_dci_p3.cpp
@@ -1084,9 +1083,8 @@ set (PBRT_TEST_SOURCE
 
 add_executable (pbrt_test src/pbrt/cmd/pbrt_test.cpp ${PBRT_TEST_SOURCE})
 
-target_link_libraries (pbrt_test PRIVATE ${ALL_PBRT_LIBS} pbrt_opt pbrt_warnings)
+target_link_libraries (pbrt_test PRIVATE ${ALL_PBRT_LIBS} GTest::gtest pbrt_opt pbrt_warnings)
 target_compile_definitions (pbrt_test PRIVATE ${PBRT_DEFINITIONS})
-target_include_directories (pbrt_test PRIVATE src src/ext ${DOUBLE_CONVERSION_INCLUDE})
 target_compile_options(pbrt_test PUBLIC ${PBRT_CXX_FLAGS})
 
 add_sanitizers (pbrt_test)

@@ -3,7 +3,6 @@ pbrt-v4 makes use of the following third-party libraries and data. Thanks
 to all of the developers who have made these available!
 
 * [double-conversion](https://github.com/google/double-conversion)
-* [filesystem](https://github.com/wjakob/filesystem)
 * [googletest](https://github.com/google/googletest)
 * [lodepng](https://lodev.org/lodepng/)
 * [OpenEXR](http:://www.openexr.com)
@@ -24,4 +23,23 @@ pbrt-v4 also includes spectral data from the following sources:
 * Camera sensor measurement data from https://github.com/ampas/rawtoaces,
   Copyright © 2017 Academy of Motion Picture Arts and Sciences.
 
+## Install using vcpkg
 
+```bash
+vcpkg install double-conversion
+vcpkg install glfw3
+vcpkg install glad
+vcpkg install lodepng
+vcpkg install ptex
+vcpkg install stb
+vcpkg install rply
+vcpkg install libdeflate
+vcpkg install qoi
+vcpkg install utf8proc
+vcpkg install gtest
+vcpkg install openexr
+vcpkg install 'openvdb[nanovdb]'
+
+cmake -B build -S . "-DCMAKE_TOOLCHAIN_FILE=/home/lizz/dev/vcpkg/scripts/buildsystems/vcpkg.cmake"
+cmake --build build -j
+```

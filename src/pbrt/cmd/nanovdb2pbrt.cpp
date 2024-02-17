@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
         ErrorExit("%s: didn't find \"%s\" grid.", filename, grid);
     const nanovdb::FloatGrid *floatGrid = nanoGrid.grid<float>();
 
-    nanovdb::BBox<nanovdb::Vec3R> bbox = floatGrid->worldBBox();
+    nanovdb::BBox<nanovdb::Vec3d> bbox = floatGrid->worldBBox();
     Bounds3f bounds(Point3f(bbox.min()[0], bbox.min()[1], bbox.min()[2]),
                     Point3f(bbox.max()[0], bbox.max()[1], bbox.max()[2]));
 
@@ -169,5 +169,3 @@ int main(int argc, char *argv[]) {
     }
     printf("]\n");
 }
-
-

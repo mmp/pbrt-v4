@@ -6,3 +6,4 @@ src/build
 .ipynb_checkpoints/
 build/
 .cache/
+.vscode/

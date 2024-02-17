@@ -22,7 +22,7 @@
 #include <pbrt/util/spectrum.h>
 #include <pbrt/util/stats.h>
 
-#include <ImfThreading.h>
+#include <OpenEXR/ImfThreading.h>
 
 #include <stdlib.h>
 

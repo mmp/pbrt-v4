@@ -17,21 +17,21 @@
 
 // No need, since we need to do our own file i/o to support UTF-8 filenames.
 #define LODEPNG_NO_COMPILE_DISK
-#include <lodepng/lodepng.h>
+#include <lodepng.h>
 
 #ifndef PBRT_IS_GPU_CODE
 // Work around conflict with "half".
-#include <ImfChannelList.h>
-#include <ImfChromaticitiesAttribute.h>
-#include <ImfFloatAttribute.h>
-#include <ImfFrameBuffer.h>
-#include <ImfHeader.h>
-#include <ImfInputFile.h>
-#include <ImfIntAttribute.h>
-#include <ImfMatrixAttribute.h>
-#include <ImfOutputFile.h>
-#include <ImfStringAttribute.h>
-#include <ImfStringVectorAttribute.h>
+#include <OpenEXR/ImfChannelList.h>
+#include <OpenEXR/ImfChromaticitiesAttribute.h>
+#include <OpenEXR/ImfFloatAttribute.h>
+#include <OpenEXR/ImfFrameBuffer.h>
+#include <OpenEXR/ImfHeader.h>
+#include <OpenEXR/ImfInputFile.h>
+#include <OpenEXR/ImfIntAttribute.h>
+#include <OpenEXR/ImfMatrixAttribute.h>
+#include <OpenEXR/ImfOutputFile.h>
+#include <OpenEXR/ImfStringAttribute.h>
+#include <OpenEXR/ImfStringVectorAttribute.h>
 #endif
 
 #include <algorithm>
@@ -44,11 +44,11 @@
 #define STBI_NO_PIC
 #define STBI_ASSERT CHECK
 #define STBI_WINDOWS_UTF8
-#include <stb/stb_image.h>
+#include <stb_image.h>
 
 #define QOI_NO_STDIO
 #define QOI_IMPLEMENTATION
-#include <qoi/qoi.h>
+#include <qoi.h>
 
 namespace pbrt {
 
