@@ -787,6 +787,9 @@ class PiecewiseConstant2D {
             return {};
         return Point2f(*cInv, *mInv);
     }
+    friend void TestCompareDistributions(const PiecewiseConstant2D &da,
+                                         const PiecewiseConstant2D &db, Float eps);
+
 
   private:
     // PiecewiseConstant2D Private Members
