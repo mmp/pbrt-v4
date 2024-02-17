@@ -416,7 +416,7 @@ TEST(PiecewiseConstant2D, FromFuncLInfinity) {
         Float(Sqr(0.25) * Float(1)),   Float(Sqr(0.5) * Float(1)),
         Float(Sqr(0.75) * Float(1)),   Float(Sqr(1) * Float(1))};
     PiecewiseConstant2D dExact(exact, 4, 2);
-    PiecewiseConstant2D::TestCompareDistributions(dSampled, dExact);
+    TestCompareDistributions(dSampled, dExact);
 }
 
 TEST(PiecewiseConstant2D, Integral) {
