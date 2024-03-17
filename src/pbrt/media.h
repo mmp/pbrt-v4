@@ -39,35 +39,101 @@ namespace pbrt {
 bool GetMediumScatteringProperties(const std::string &name, Spectrum *sigma_a,
                                    Spectrum *sigma_s, Allocator alloc);
 
+class PhaseFunctionBase {
+  public:
+    enum PhaseFunctionType {
+        HENYEY_GREENSTEIN,
+        EXPONENTIATED_COSINE,
+    };
+
+    PhaseFunctionBase(PhaseFunctionType type): type(type) {}
+
+
+    PhaseFunctionType type;
+
+    PBRT_CPU_GPU
+    virtual Float p(Vector3f wo, Vector3f wi) const = 0; 
+
+    PBRT_CPU_GPU
+    virtual pstd::optional<PhaseFunctionSample> Sample_p(Vector3f wo, Point2f u) const = 0;
+
+    PBRT_CPU_GPU
+    Float PDF(Vector3f wo, Vector3f wi) const { return p(wo, wi); }
+
+    static const char *Name() { return "Base"; }
+
+    virtual std::string ToString() const = 0;
+};
+
 // HGPhaseFunction Definition
-class HGPhaseFunction {
+class HGPhaseFunction : public PhaseFunctionBase {
   public:
     // HGPhaseFunction Public Methods
     HGPhaseFunction() = default;
     PBRT_CPU_GPU
-    HGPhaseFunction(Float g) : g(g) {}
+    HGPhaseFunction(Float g) : PhaseFunctionBase(PhaseFunctionBase::HENYEY_GREENSTEIN), g(g) {}
 
     PBRT_CPU_GPU
-    Float p(Vector3f wo, Vector3f wi) const { return HenyeyGreenstein(Dot(wo, wi), g); }
+    Float p(Vector3f wo, Vector3f wi) const override { return HenyeyGreenstein(Dot(wo, wi), g); }
 
     PBRT_CPU_GPU
-    pstd::optional<PhaseFunctionSample> Sample_p(Vector3f wo, Point2f u) const {
+    pstd::optional<PhaseFunctionSample> Sample_p(Vector3f wo, Point2f u) const override {
         Float pdf;
         Vector3f wi = SampleHenyeyGreenstein(wo, g, u, &pdf);
         return PhaseFunctionSample{pdf, wi, pdf};
     }
 
-    PBRT_CPU_GPU
-    Float PDF(Vector3f wo, Vector3f wi) const { return p(wo, wi); }
-
     static const char *Name() { return "Henyey-Greenstein"; }
 
-    std::string ToString() const;
+    std::string ToString() const override;
 
   private:
     // HGPhaseFunction Private Members
     Float g;
 };
+
+class ExponentiatedCosinePhaseFunction : public PhaseFunctionBase {
+  public:
+    ExponentiatedCosinePhaseFunction() = default;
+    PBRT_CPU_GPU
+    ExponentiatedCosinePhaseFunction(Float n) : PhaseFunctionBase(PhaseFunctionBase::EXPONENTIATED_COSINE), n(n) {}
+
+    // use HGPhaseFunction methods for now
+    PBRT_CPU_GPU
+    Float p(Vector3f wo, Vector3f wi) const override { return ExponentiatedCosine(Dot(wo, wi), n); }
+
+    PBRT_CPU_GPU
+    pstd::optional<PhaseFunctionSample> Sample_p(Vector3f wo, Point2f u) const override {
+        Float pdf;
+        Vector3f wi = SampleExponentiatedCosine(wo, n, u, &pdf);
+        return PhaseFunctionSample{pdf, wi, pdf};
+    }
+
+    static const char *Name() { return "Exponentiated Cosine"; }
+
+    std::string ToString() const override;
+
+  private:
+    // ExponentiatedCosinePhaseFunction Private Members
+    Float n;
+};
+
+// deletion function for phase functions
+static void DeletePhaseFunction(PhaseFunctionBase *phase, Allocator alloc) {
+    switch (phase->type) {
+        case PhaseFunctionBase::HENYEY_GREENSTEIN: {
+            HGPhaseFunction *hg_phase = static_cast<HGPhaseFunction *>(phase);
+            alloc.delete_object(hg_phase);
+            break;
+        }
+        case PhaseFunctionBase::EXPONENTIATED_COSINE: {
+            ExponentiatedCosinePhaseFunction *exponentiated_cosine_phase = static_cast<ExponentiatedCosinePhaseFunction *>(phase);
+            alloc.delete_object(exponentiated_cosine_phase);
+            break;
+        }
+        default: break;
+    }
+}
 
 // MediumProperties Definition
 struct MediumProperties {
@@ -221,14 +287,21 @@ class HomogeneousMedium {
 
     // HomogeneousMedium Public Methods
     HomogeneousMedium(Spectrum sigma_a, Spectrum sigma_s, Float sigmaScale, Spectrum Le,
-                      Float LeScale, Float g, Allocator alloc)
+                      Float LeScale, PhaseFunctionBase *phase, Allocator alloc)
         : sigma_a_spec(sigma_a, alloc),
           sigma_s_spec(sigma_s, alloc),
           Le_spec(Le, alloc),
-          phase(g) {
+          // phase_info(phase_type, phase_params),
+          // phase_type(phase_type),
+          phase(phase),
+          alloc(alloc) {
         sigma_a_spec.Scale(sigmaScale);
         sigma_s_spec.Scale(sigmaScale);
         Le_spec.Scale(LeScale);
+    }
+
+    ~HomogeneousMedium() {
+        DeletePhaseFunction(phase, alloc);
     }
 
     static HomogeneousMedium *Create(const ParameterDictionary &parameters,
@@ -242,7 +315,7 @@ class HomogeneousMedium {
         SampledSpectrum sigma_a = sigma_a_spec.Sample(lambda);
         SampledSpectrum sigma_s = sigma_s_spec.Sample(lambda);
         SampledSpectrum Le = Le_spec.Sample(lambda);
-        return MediumProperties{sigma_a, sigma_s, &phase, Le};
+        return MediumProperties{sigma_a, sigma_s, phase, Le};
     }
 
     PBRT_CPU_GPU
@@ -258,7 +331,11 @@ class HomogeneousMedium {
   private:
     // HomogeneousMedium Private Data
     DenselySampledSpectrum sigma_a_spec, sigma_s_spec, Le_spec;
-    HGPhaseFunction phase;
+    // PhaseFunctionInfo phase_info;
+    // PhaseFunctionInfo::PhaseFunctionType phase_type;
+    PhaseFunctionBase *phase;
+    Allocator alloc; // needed to destroy phase function
+    // HGPhaseFunction phase;
 };
 
 // GridMedium Definition
@@ -269,10 +346,14 @@ class GridMedium {
 
     // GridMedium Public Methods
     GridMedium(const Bounds3f &bounds, const Transform &renderFromMedium,
-               Spectrum sigma_a, Spectrum sigma_s, Float sigmaScale, Float g,
+               Spectrum sigma_a, Spectrum sigma_s, Float sigmaScale, PhaseFunctionBase *phase,
                SampledGrid<Float> density, pstd::optional<SampledGrid<Float>> temperature,
                Float temperatureScale, Float temperatureOffset,
                Spectrum Le, SampledGrid<Float> LeScale, Allocator alloc);
+
+    ~GridMedium() {
+        DeletePhaseFunction(phase, alloc);
+    }
 
     static GridMedium *Create(const ParameterDictionary &parameters,
                               const Transform &renderFromMedium, const FileLoc *loc,
@@ -315,7 +396,7 @@ class GridMedium {
             }
         }
 
-        return MediumProperties{sigma_a, sigma_s, &phase, Le};
+        return MediumProperties{sigma_a, sigma_s, phase, Le};
     }
 
     PBRT_CPU_GPU
@@ -342,7 +423,9 @@ class GridMedium {
     Transform renderFromMedium;
     DenselySampledSpectrum sigma_a_spec, sigma_s_spec;
     SampledGrid<Float> densityGrid;
-    HGPhaseFunction phase;
+    PhaseFunctionBase *phase;
+    Allocator alloc; // needed to destroy phase function
+    // HGPhaseFunction phase;
     pstd::optional<SampledGrid<Float>> temperatureGrid;
     DenselySampledSpectrum Le_spec;
     SampledGrid<Float> LeScale;
@@ -358,11 +441,15 @@ class RGBGridMedium {
     using MajorantIterator = DDAMajorantIterator;
 
     // RGBGridMedium Public Methods
-    RGBGridMedium(const Bounds3f &bounds, const Transform &renderFromMedium, Float g,
+    RGBGridMedium(const Bounds3f &bounds, const Transform &renderFromMedium, PhaseFunctionBase *phase,
                   pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_a,
                   pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_s,
                   Float sigmaScale, pstd::optional<SampledGrid<RGBIlluminantSpectrum>> Le,
                   Float LeScale, Allocator alloc);
+
+    ~RGBGridMedium() {
+        DeletePhaseFunction(phase, alloc);
+    }
 
     static RGBGridMedium *Create(const ParameterDictionary &parameters,
                                  const Transform &renderFromMedium, const FileLoc *loc,
@@ -397,7 +484,7 @@ class RGBGridMedium {
             Le = LeScale * LeGrid->Lookup(p, convert);
         }
 
-        return MediumProperties{sigma_a, sigma_s, &phase, Le};
+        return MediumProperties{sigma_a, sigma_s, phase, Le};
     }
 
     PBRT_CPU_GPU
@@ -420,7 +507,8 @@ class RGBGridMedium {
     Transform renderFromMedium;
     pstd::optional<SampledGrid<RGBIlluminantSpectrum>> LeGrid;
     Float LeScale;
-    HGPhaseFunction phase;
+    PhaseFunctionBase *phase;
+    Allocator alloc;
     pstd::optional<SampledGrid<RGBUnboundedSpectrum>> sigma_aGrid, sigma_sGrid;
     Float sigmaScale;
     MajorantGrid majorantGrid;
@@ -446,16 +534,21 @@ class CloudMedium {
     }
 
     CloudMedium(const Bounds3f &bounds, const Transform &renderFromMedium,
-                Spectrum sigma_a, Spectrum sigma_s, Float g, Float density,
+                Spectrum sigma_a, Spectrum sigma_s, PhaseFunctionBase *phase, Float density,
                 Float wispiness, Float frequency, Allocator alloc)
         : bounds(bounds),
           renderFromMedium(renderFromMedium),
           sigma_a_spec(sigma_a, alloc),
           sigma_s_spec(sigma_s, alloc),
-          phase(g),
+          phase(phase),
+          alloc(alloc),
           density(density),
           wispiness(wispiness),
           frequency(frequency) {}
+
+    ~CloudMedium() {
+        DeletePhaseFunction(phase, alloc);
+    }
 
     PBRT_CPU_GPU
     bool IsEmissive() const { return false; }
@@ -467,7 +560,7 @@ class CloudMedium {
         SampledSpectrum sigma_a = density * sigma_a_spec.Sample(lambda);
         SampledSpectrum sigma_s = density * sigma_s_spec.Sample(lambda);
 
-        return MediumProperties{sigma_a, sigma_s, &phase, SampledSpectrum(0.f)};
+        return MediumProperties{sigma_a, sigma_s, phase, SampledSpectrum(0.f)};
     }
 
     PBRT_CPU_GPU
@@ -519,7 +612,8 @@ class CloudMedium {
     // CloudMedium Private Members
     Bounds3f bounds;
     Transform renderFromMedium;
-    HGPhaseFunction phase;
+    PhaseFunctionBase *phase;
+    Allocator alloc;
     DenselySampledSpectrum sigma_a_spec, sigma_s_spec;
     Float density, wispiness, frequency;
 };
@@ -607,9 +701,13 @@ class NanoVDBMedium {
     std::string ToString() const;
 
     NanoVDBMedium(const Transform &renderFromMedium, Spectrum sigma_a, Spectrum sigma_s,
-                  Float sigmaScale, Float g, nanovdb::GridHandle<NanoVDBBuffer> dg,
+                  Float sigmaScale, PhaseFunctionBase *phase, nanovdb::GridHandle<NanoVDBBuffer> dg,
                   nanovdb::GridHandle<NanoVDBBuffer> tg, Float LeScale,
                   Float temperatureOffset, Float temperatureScale, Allocator alloc);
+
+    ~NanoVDBMedium() {
+        DeletePhaseFunction(phase, alloc);
+    }
 
     PBRT_CPU_GPU
     bool IsEmissive() const { return temperatureFloatGrid && LeScale > 0; }
@@ -628,7 +726,7 @@ class NanoVDBMedium {
         using Sampler = nanovdb::SampleFromVoxels<nanovdb::FloatGrid::TreeType, 1, false>;
         Float d = Sampler(densityFloatGrid->tree())(pIndex);
 
-        return MediumProperties{sigma_a * d, sigma_s * d, &phase, Le(p, lambda)};
+        return MediumProperties{sigma_a * d, sigma_s * d, phase, Le(p, lambda)};
     }
 
     PBRT_CPU_GPU
@@ -669,7 +767,8 @@ class NanoVDBMedium {
     Bounds3f bounds;
     Transform renderFromMedium;
     DenselySampledSpectrum sigma_a_spec, sigma_s_spec;
-    HGPhaseFunction phase;
+    PhaseFunctionBase *phase;
+    Allocator alloc;
     MajorantGrid majorantGrid;
     nanovdb::GridHandle<NanoVDBBuffer> densityGrid;
     nanovdb::GridHandle<NanoVDBBuffer> temperatureGrid;

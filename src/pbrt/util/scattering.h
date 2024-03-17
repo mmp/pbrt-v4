@@ -57,6 +57,11 @@ PBRT_CPU_GPU inline Float HenyeyGreenstein(Float cosTheta, Float g) {
     return Inv4Pi * (1 - Sqr(g)) / (denom * SafeSqrt(denom));
 }
 
+PBRT_CPU_GPU inline Float ExponentiatedCosine(Float cosTheta, Float n) {
+    // don't need to clamp n?
+    return (n + 1) / (2 * Pi) * Pow(cosTheta, n);
+}
+
 // Fresnel Inline Functions
 PBRT_CPU_GPU inline Float FrDielectric(Float cosTheta_i, Float eta) {
     cosTheta_i = Clamp(cosTheta_i, -1, 1);

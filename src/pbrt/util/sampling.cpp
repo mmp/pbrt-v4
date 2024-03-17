@@ -373,6 +373,25 @@ PBRT_CPU_GPU Vector3f SampleHenyeyGreenstein(Vector3f wo, Float g, Point2f u, Fl
     return wi;
 }
 
+Vector3f SampleExponentiatedCosine(Vector3f wo, Float n, Point2f u, Float *pdf) {
+    // Compute $\cos\theta$ for Exponentiated Cosine sample
+    Float cosTheta;
+    if (n >= (-1.f - 1e-3f) && n <= (-1.f + 1e-3f))
+        cosTheta = 1 - u[0];
+    else 
+        cosTheta = Pow(1 - u[0], 1 / (n + 1));
+
+    // Compute direction _wi_ for Exponentiated Cosine sample
+    Float sinTheta = SafeSqrt(1 - Sqr(cosTheta));
+    Float phi = 2 * Pi * u[1];
+    Frame wFrame = Frame::FromZ(wo);
+    Vector3f wi = wFrame.FromLocal(SphericalDirection(sinTheta, cosTheta, phi));
+
+    if (pdf)
+        *pdf = ExponentiatedCosine(cosTheta, n);
+    return wi;
+}
+
 Point2f RejectionSampleDisk(RNG &rng) {
     Point2f p;
     do {

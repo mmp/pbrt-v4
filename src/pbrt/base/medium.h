@@ -25,9 +25,17 @@ struct PhaseFunctionSample {
 };
 
 // PhaseFunction Definition
-class HGPhaseFunction;
+class PhaseFunctionBase;
+// class HGPhaseFunction;
 
-class PhaseFunction : public TaggedPointer<HGPhaseFunction> {
+// other PhaseFunctions to use
+/*
+class MiePhaseFunction;
+class ExpCosPhaseFunction;
+class RayleighPhaseFunction;
+*/
+
+class PhaseFunction : public TaggedPointer<PhaseFunctionBase> {
   public:
     // PhaseFunction Interface
     using TaggedPointer::TaggedPointer;

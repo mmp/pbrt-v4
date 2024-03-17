@@ -54,6 +54,9 @@ PBRT_CPU_GPU
 Vector3f SampleHenyeyGreenstein(Vector3f wo, Float g, Point2f u, Float *pdf = nullptr);
 
 PBRT_CPU_GPU
+Vector3f SampleExponentiatedCosine(Vector3f wo, Float n, Point2f u, Float *pdf = nullptr);
+
+PBRT_CPU_GPU
 Float SampleCatmullRom(pstd::span<const Float> nodes, pstd::span<const Float> f,
                        pstd::span<const Float> cdf, Float sample, Float *fval = nullptr,
                        Float *pdf = nullptr);

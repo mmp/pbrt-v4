@@ -289,6 +289,10 @@ PBRT_CPU_GPU inline constexpr T Sqr(T v) {
     return v * v;
 }
 
+PBRT_CPU_GPU inline constexpr Float Pow(Float base, Float exp) {
+    return std::pow(base, exp);
+}
+
 // Would be nice to allow Float to be a template type here, but it is tricky:
 // https://stackoverflow.com/questions/5101516/why-function-template-cannot-be-partially-specialized
 template <int n>

@@ -71,6 +71,11 @@ std::string HGPhaseFunction::ToString() const {
     return StringPrintf("[ HGPhaseFunction g: %f ]", g);
 }
 
+// ExponentiatedCosine Method Definitions
+std::string ExponentiatedCosinePhaseFunction::ToString() const {
+    return StringPrintf("[ ExponentiatedCosinePhaseFunction n: %f ]", n);
+}
+
 struct MeasuredSS {
     const char *name;
     RGB sigma_prime_s, sigma_a;  // mm^-1
@@ -194,9 +199,22 @@ HomogeneousMedium *HomogeneousMedium::Create(const ParameterDictionary &paramete
         LeScale /= SpectrumToPhotometric(Le);
 
     Float sigmaScale = parameters.GetOneFloat("scale", 1.f);
-    Float g = parameters.GetOneFloat("g", 0.0f);
+    std::string type = parameters.GetOneString("phase_function", HGPhaseFunction::Name());
+    PhaseFunctionBase *phase;
+    if (type == HGPhaseFunction::Name()) {
+        Float g = parameters.GetOneFloat("g", 0.0f);
 
-    return alloc.new_object<HomogeneousMedium>(sig_a, sig_s, sigmaScale, Le, LeScale, g,
+        HGPhaseFunction *hg_phase = alloc.new_object<HGPhaseFunction>(g);
+        phase = dynamic_cast<PhaseFunctionBase *>(hg_phase);
+    } else if (type == ExponentiatedCosinePhaseFunction::Name()) {
+        Float n = parameters.GetOneFloat("n", 1.f);
+        
+        // create new object with allocator, delete in HomogeneousMedium
+        ExponentiatedCosinePhaseFunction *exponentiated_cosine_phase = alloc.new_object<ExponentiatedCosinePhaseFunction>(n);
+        phase = dynamic_cast<PhaseFunctionBase *>(exponentiated_cosine_phase);
+    }
+
+    return alloc.new_object<HomogeneousMedium>(sig_a, sig_s, sigmaScale, Le, LeScale, phase,
                                                alloc);
 }
 
@@ -210,7 +228,7 @@ STAT_MEMORY_COUNTER("Memory/Volume grids", volumeGridBytes);
 
 // GridMedium Method Definitions
 GridMedium::GridMedium(const Bounds3f &bounds, const Transform &renderFromMedium,
-                       Spectrum sigma_a, Spectrum sigma_s, Float sigmaScale, Float g,
+                       Spectrum sigma_a, Spectrum sigma_s, Float sigmaScale, PhaseFunctionBase *phase,
                        SampledGrid<Float> d,
                        pstd::optional<SampledGrid<Float>> temperature,
                        Float temperatureScale, Float temperatureOffset,
@@ -220,7 +238,8 @@ GridMedium::GridMedium(const Bounds3f &bounds, const Transform &renderFromMedium
       sigma_a_spec(sigma_a, alloc),
       sigma_s_spec(sigma_s, alloc),
       densityGrid(std::move(d)),
-      phase(g),
+      phase(phase),
+      alloc(alloc),
       temperatureGrid(std::move(temperature)),
       temperatureScale(temperatureScale),
       temperatureOffset(temperatureOffset),
@@ -309,6 +328,8 @@ GridMedium *GridMedium::Create(const ParameterDictionary &parameters,
     Point3f p1 = parameters.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
 
     Float g = parameters.GetOneFloat("g", 0.);
+    HGPhaseFunction *hg_phase = alloc.new_object<HGPhaseFunction>(g);
+    PhaseFunctionBase *phase = dynamic_cast<PhaseFunctionBase *>(hg_phase);
     Spectrum sigma_a =
         parameters.GetOneSpectrum("sigma_a", nullptr, SpectrumType::Unbounded, alloc);
     if (!sigma_a)
@@ -324,7 +345,7 @@ GridMedium *GridMedium::Create(const ParameterDictionary &parameters,
     Float temperatureScale = parameters.GetOneFloat("temperaturescale", 1.f);
 
     return alloc.new_object<GridMedium>(
-        Bounds3f(p0, p1), renderFromMedium, sigma_a, sigma_s, sigmaScale, g,
+        Bounds3f(p0, p1), renderFromMedium, sigma_a, sigma_s, sigmaScale, phase,
         std::move(densityGrid), std::move(temperatureGrid), temperatureScale,
         temperatureOffset, Le, std::move(LeGrid), alloc);
 }
@@ -337,7 +358,7 @@ std::string GridMedium::ToString() const {
 
 // RGBGridMedium Method Definitions
 RGBGridMedium::RGBGridMedium(const Bounds3f &bounds, const Transform &renderFromMedium,
-                             Float g,
+                             PhaseFunctionBase *phase,
                              pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbA,
                              pstd::optional<SampledGrid<RGBUnboundedSpectrum>> rgbS,
                              Float sigmaScale,
@@ -345,7 +366,8 @@ RGBGridMedium::RGBGridMedium(const Bounds3f &bounds, const Transform &renderFrom
                              Float LeScale, Allocator alloc)
     : bounds(bounds),
       renderFromMedium(renderFromMedium),
-      phase(g),
+      phase(phase),
+      alloc(alloc),
       sigma_aGrid(std::move(rgbA)),
       sigma_sGrid(std::move(rgbS)),
       sigmaScale(sigmaScale),
@@ -445,9 +467,11 @@ RGBGridMedium *RGBGridMedium::Create(const ParameterDictionary &parameters,
     Point3f p1 = parameters.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
     Float LeScale = parameters.GetOneFloat("Lescale", 1.f);
     Float g = parameters.GetOneFloat("g", 0.f);
+    HGPhaseFunction *hg_phase = alloc.new_object<HGPhaseFunction>(g);
+    PhaseFunctionBase *phase = dynamic_cast<PhaseFunctionBase *>(hg_phase);
     Float sigmaScale = parameters.GetOneFloat("scale", 1.f);
 
-    return alloc.new_object<RGBGridMedium>(Bounds3f(p0, p1), renderFromMedium, g,
+    return alloc.new_object<RGBGridMedium>(Bounds3f(p0, p1), renderFromMedium, phase,
                                            std::move(sigma_aGrid), std::move(sigma_sGrid),
                                            sigmaScale, std::move(LeGrid), LeScale, alloc);
 }
@@ -464,6 +488,8 @@ CloudMedium *CloudMedium::Create(const ParameterDictionary &parameters,
                                  Allocator alloc) {
     Float density = parameters.GetOneFloat("density", 1);
     Float g = parameters.GetOneFloat("g", 0.);
+    HGPhaseFunction *hg_phase = alloc.new_object<HGPhaseFunction>(g);
+    PhaseFunctionBase *phase = dynamic_cast<PhaseFunctionBase *>(hg_phase);
     Float wispiness = parameters.GetOneFloat("wispiness", 1);
     Float frequency = parameters.GetOneFloat("frequency", 5);
     Spectrum sigma_a =
@@ -479,7 +505,7 @@ CloudMedium *CloudMedium::Create(const ParameterDictionary &parameters,
     Point3f p1 = parameters.GetOnePoint3f("p1", Point3f(1.f, 1.f, 1.f));
 
     return alloc.new_object<CloudMedium>(Bounds3f(p0, p1), renderFromMedium, sigma_a,
-                                         sigma_s, g, density, wispiness, frequency,
+                                         sigma_s, phase, density, wispiness, frequency,
                                          alloc);
 }
 
@@ -509,7 +535,7 @@ static nanovdb::GridHandle<Buffer> readGrid(const std::string &filename,
 }
 
 NanoVDBMedium::NanoVDBMedium(const Transform &renderFromMedium, Spectrum sigma_a,
-                             Spectrum sigma_s, Float sigmaScale, Float g,
+                             Spectrum sigma_s, Float sigmaScale, PhaseFunctionBase *phase,
                              nanovdb::GridHandle<NanoVDBBuffer> dg,
                              nanovdb::GridHandle<NanoVDBBuffer> tg, Float LeScale,
                              Float temperatureOffset, Float temperatureScale,
@@ -517,7 +543,8 @@ NanoVDBMedium::NanoVDBMedium(const Transform &renderFromMedium, Spectrum sigma_a
     : renderFromMedium(renderFromMedium),
       sigma_a_spec(sigma_a, alloc),
       sigma_s_spec(sigma_s, alloc),
-      phase(g),
+      phase(phase),
+      alloc(alloc),
       majorantGrid(Bounds3f(), {64, 64, 64}, alloc),
       densityGrid(std::move(dg)),
       temperatureGrid(std::move(tg)),
@@ -649,6 +676,8 @@ NanoVDBMedium *NanoVDBMedium::Create(const ParameterDictionary &parameters,
     Float temperatureScale = parameters.GetOneFloat("temperaturescale", 1.f);
 
     Float g = parameters.GetOneFloat("g", 0.);
+    HGPhaseFunction *hg_phase = alloc.new_object<HGPhaseFunction>(g);
+    PhaseFunctionBase *phase = dynamic_cast<PhaseFunctionBase *>(hg_phase);
     Spectrum sigma_a =
         parameters.GetOneSpectrum("sigma_a", nullptr, SpectrumType::Unbounded, alloc);
     if (!sigma_a)
@@ -660,7 +689,7 @@ NanoVDBMedium *NanoVDBMedium::Create(const ParameterDictionary &parameters,
     Float sigmaScale = parameters.GetOneFloat("scale", 1.f);
 
     return alloc.new_object<NanoVDBMedium>(
-        renderFromMedium, sigma_a, sigma_s, sigmaScale, g, std::move(densityGrid),
+        renderFromMedium, sigma_a, sigma_s, sigmaScale, phase, std::move(densityGrid),
         std::move(temperatureGrid), LeScale, temperatureOffset, temperatureScale, alloc);
 }
 
