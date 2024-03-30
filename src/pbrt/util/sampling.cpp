@@ -374,12 +374,11 @@ PBRT_CPU_GPU Vector3f SampleHenyeyGreenstein(Vector3f wo, Float g, Point2f u, Fl
 }
 
 Vector3f SampleExponentiatedCosine(Vector3f wo, Float n, Point2f u, Float *pdf) {
+    if (n < .0f) 
+        n = .0f;
+
     // Compute $\cos\theta$ for Exponentiated Cosine sample
-    Float cosTheta;
-    if (n >= (-1.f - 1e-3f) && n <= (-1.f + 1e-3f))
-        cosTheta = 1 - u[0];
-    else 
-        cosTheta = Pow(1 - u[0], 1 / (n + 1));
+    Float cosTheta = Pow(1 - u[0], 1 / (n + 1));
 
     // Compute direction _wi_ for Exponentiated Cosine sample
     Float sinTheta = SafeSqrt(1 - Sqr(cosTheta));

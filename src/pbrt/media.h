@@ -80,7 +80,7 @@ class HGPhaseFunction : public PhaseFunctionBase {
     pstd::optional<PhaseFunctionSample> Sample_p(Vector3f wo, Point2f u) const override {
         Float pdf;
         Vector3f wi = SampleHenyeyGreenstein(wo, g, u, &pdf);
-        return PhaseFunctionSample{pdf, wi, pdf};
+        return PhaseFunctionSample{p(wo, wi), wi, pdf};
     }
 
     static const char *Name() { return "Henyey-Greenstein"; }
@@ -106,7 +106,7 @@ class ExponentiatedCosinePhaseFunction : public PhaseFunctionBase {
     pstd::optional<PhaseFunctionSample> Sample_p(Vector3f wo, Point2f u) const override {
         Float pdf;
         Vector3f wi = SampleExponentiatedCosine(wo, n, u, &pdf);
-        return PhaseFunctionSample{pdf, wi, pdf};
+        return PhaseFunctionSample{p(wo, wi), wi, pdf};
     }
 
     static const char *Name() { return "Exponentiated Cosine"; }

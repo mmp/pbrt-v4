@@ -58,9 +58,10 @@ PBRT_CPU_GPU inline Float HenyeyGreenstein(Float cosTheta, Float g) {
 }
 
 PBRT_CPU_GPU inline Float ExponentiatedCosine(Float cosTheta, Float n) {
-    // don't need to clamp n?
-    return (n + 1) / (2 * Pi) * Pow(cosTheta, n); 
-        // Inv4Pi * (n + 1) * Pow(cosTheta, n);
+    // n must be greater than 0
+    if (n < .0f)
+        n = .0f;
+    return (n + 1) / (2 * Pi) * Pow(cosTheta, n);
 }
 
 // Fresnel Inline Functions
