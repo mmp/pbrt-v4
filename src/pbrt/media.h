@@ -47,7 +47,7 @@ class PhaseFunctionBase {
     };
 
     PhaseFunctionBase(PhaseFunctionType type): type(type) {}
-
+    PhaseFunctionBase() = default;
 
     PhaseFunctionType type;
 

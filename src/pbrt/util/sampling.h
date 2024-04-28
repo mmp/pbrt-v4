@@ -392,7 +392,9 @@ PBRT_CPU_GPU inline Point2f InvertUniformHemisphereSample(Vector3f w) {
 }
 
 PBRT_CPU_GPU inline Vector3f SampleUniformSphere(Point2f u) {
+    // u is in [0, 1) I think
     Float z = 1 - 2 * u[0];
+    // z will be in [-1, 1]
     Float r = SafeSqrt(1 - Sqr(z));
     Float phi = 2 * Pi * u[1];
     return {r * std::cos(phi), r * std::sin(phi), z};

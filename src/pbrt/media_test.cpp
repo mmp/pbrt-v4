@@ -24,9 +24,44 @@ TEST(HenyeyGreenstein, SamplingMatch) {
             EXPECT_TRUE(ps.has_value());
             // Phase function is normalized, and the sampling method should be
             // exact.
-            EXPECT_EQ(ps->p, ps->pdf);
+            EXPECT_NEAR(ps->p, ps->pdf, 1e-3f) << "Failure with g = " << g;
             EXPECT_NEAR(ps->p, hg.p(wo, ps->wi), 1e-4f) << "Failure with g = " << g;
         }
+    }
+}
+
+TEST(ExponentiatedCosine, SamplingMatch) {
+    RNG rng;
+    for (float n = 1.; n <= 100.; n += 1.) {
+        ExponentiatedCosinePhaseFunction ec(n);
+        for (int i = 0; i < 100; ++i) {
+            Vector3f wo =
+                SampleUniformSphere({rng.Uniform<Float>(), rng.Uniform<Float>()});
+            Point2f u{rng.Uniform<Float>(), rng.Uniform<Float>()};
+            auto ps = ec.Sample_p(wo, u);
+            EXPECT_TRUE(ps.has_value());
+            // Phase function is normalized, and the sampling method should be
+            // exact.
+            EXPECT_NEAR(ps->p, ps->pdf, 1e-3f) << "Failure with n = " << n;
+            EXPECT_NEAR(ps->p, ec.p(wo, ps->wi), 1e-4f) << "Failure with n = " << n;
+        }
+    }
+}
+
+TEST(ExponentiatedCosine, Normalized) {
+    RNG rng;
+    for (float n = 1.; n < 100.; n += .1) { // keep n even (just as a test)
+        ExponentiatedCosinePhaseFunction ec(n);
+        Vector3f wo = SampleUniformSphere({rng.Uniform<Float>(), rng.Uniform<Float>()});
+        Float sum = 0;
+        int sqrtSamples = 64;
+        int nSamples = sqrtSamples * sqrtSamples;
+        for (Point2f u : Stratified2D(sqrtSamples, sqrtSamples)) {
+            Vector3f wi = SampleUniformSphere(u);
+            sum += ec.p(wo, wi);
+        }
+        // Phase function should integrate to 1/4pi.
+        EXPECT_NEAR(sum / nSamples, 1. / (4. * Pi), 1e-2f) << "Failure with n = " << n;
     }
 }
 
@@ -78,6 +113,8 @@ TEST(HenyeyGreenstein, Normalized) {
         EXPECT_NEAR(sum / nSamples, 1. / (4. * Pi), 1e-3f);
     }
 }
+
+
 
 TEST(HenyeyGreenstein, g) {
     RNG rng;

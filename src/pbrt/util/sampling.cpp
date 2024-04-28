@@ -359,6 +359,7 @@ PBRT_CPU_GPU Vector3f SampleHenyeyGreenstein(Vector3f wo, Float g, Point2f u, Fl
     if (std::abs(g) < 1e-3f)
         cosTheta = 1 - 2 * u[0];
     else
+        // I think the minus sign needs to be removed
         cosTheta =
             -1 / (2 * g) * (1 + Sqr(g) - Sqr((1 - Sqr(g)) / (1 + g - 2 * g * u[0])));
 
@@ -374,11 +375,14 @@ PBRT_CPU_GPU Vector3f SampleHenyeyGreenstein(Vector3f wo, Float g, Point2f u, Fl
 }
 
 Vector3f SampleExponentiatedCosine(Vector3f wo, Float n, Point2f u, Float *pdf) {
-    if (n < .0f) 
-        n = .0f;
+    // n MUST BE greater than 0
+    CHECK_GT(n, .0f);
 
     // Compute $\cos\theta$ for Exponentiated Cosine sample
+    // Maps random variable to cos([0, pi/2])
     Float cosTheta = Pow(1 - u[0], 1 / (n + 1));
+    // Just in case cosTheta is ever less than 0
+    if (cosTheta < .0f) cosTheta = .0f;
 
     // Compute direction _wi_ for Exponentiated Cosine sample
     Float sinTheta = SafeSqrt(1 - Sqr(cosTheta));
