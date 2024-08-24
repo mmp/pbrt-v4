@@ -63,7 +63,7 @@ MitchellFilter *MitchellFilter::Create(const ParameterDictionary &parameters,
 }
 
 // Sinc Filter Method Definitions
-Float LanczosSincFilter::Integral() const {
+PBRT_CPU_GPU Float LanczosSincFilter::Integral() const {
     Float sum = 0;
     int sqrtSamples = 64;
     int nSamples = sqrtSamples * sqrtSamples;

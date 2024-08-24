@@ -71,15 +71,15 @@ class RNG {
 
 // RNG Inline Method Definitions
 template <typename T>
-inline T RNG::Uniform() {
+PBRT_CPU_GPU inline T RNG::Uniform() {
     return T::unimplemented;
 }
 
 template <>
-inline uint32_t RNG::Uniform<uint32_t>();
+PBRT_CPU_GPU inline uint32_t RNG::Uniform<uint32_t>();
 
 template <>
-inline uint32_t RNG::Uniform<uint32_t>() {
+PBRT_CPU_GPU inline uint32_t RNG::Uniform<uint32_t>() {
     uint64_t oldstate = state;
     state = oldstate * PCG32_MULT + inc;
     uint32_t xorshifted = (uint32_t)(((oldstate >> 18u) ^ oldstate) >> 27u);
@@ -88,13 +88,13 @@ inline uint32_t RNG::Uniform<uint32_t>() {
 }
 
 template <>
-inline uint64_t RNG::Uniform<uint64_t>() {
+PBRT_CPU_GPU inline uint64_t RNG::Uniform<uint64_t>() {
     uint64_t v0 = Uniform<uint32_t>(), v1 = Uniform<uint32_t>();
     return (v0 << 32) | v1;
 }
 
 template <>
-inline int32_t RNG::Uniform<int32_t>() {
+PBRT_CPU_GPU inline int32_t RNG::Uniform<int32_t>() {
     // https://stackoverflow.com/a/13208789
     uint32_t v = Uniform<uint32_t>();
     if (v <= (uint32_t)std::numeric_limits<int32_t>::max())
@@ -105,7 +105,7 @@ inline int32_t RNG::Uniform<int32_t>() {
 }
 
 template <>
-inline int64_t RNG::Uniform<int64_t>() {
+PBRT_CPU_GPU inline int64_t RNG::Uniform<int64_t>() {
     // https://stackoverflow.com/a/13208789
     uint64_t v = Uniform<uint64_t>();
     if (v <= (uint64_t)std::numeric_limits<int64_t>::max())
@@ -116,7 +116,7 @@ inline int64_t RNG::Uniform<int64_t>() {
            std::numeric_limits<int64_t>::min();
 }
 
-inline void RNG::SetSequence(uint64_t sequenceIndex, uint64_t seed) {
+PBRT_CPU_GPU inline void RNG::SetSequence(uint64_t sequenceIndex, uint64_t seed) {
     state = 0u;
     inc = (sequenceIndex << 1u) | 1u;
     Uniform<uint32_t>();
@@ -125,16 +125,16 @@ inline void RNG::SetSequence(uint64_t sequenceIndex, uint64_t seed) {
 }
 
 template <>
-inline float RNG::Uniform<float>() {
+PBRT_CPU_GPU inline float RNG::Uniform<float>() {
     return std::min<float>(OneMinusEpsilon, Uniform<uint32_t>() * 0x1p-32f);
 }
 
 template <>
-inline double RNG::Uniform<double>() {
+PBRT_CPU_GPU inline double RNG::Uniform<double>() {
     return std::min<double>(OneMinusEpsilon, Uniform<uint64_t>() * 0x1p-64);
 }
 
-inline void RNG::Advance(int64_t idelta) {
+PBRT_CPU_GPU inline void RNG::Advance(int64_t idelta) {
     uint64_t curMult = PCG32_MULT, curPlus = inc, accMult = 1u;
     uint64_t accPlus = 0u, delta = (uint64_t)idelta;
     while (delta > 0) {

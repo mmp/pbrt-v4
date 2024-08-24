@@ -765,29 +765,29 @@ class DebugMLTSampler : public MLTSampler {
     std::vector<Float> u;
 };
 
-inline void Sampler::StartPixelSample(Point2i p, int sampleIndex, int dimension) {
+PBRT_CPU_GPU inline void Sampler::StartPixelSample(Point2i p, int sampleIndex, int dimension) {
     auto start = [&](auto ptr) {
         return ptr->StartPixelSample(p, sampleIndex, dimension);
     };
     return Dispatch(start);
 }
 
-inline int Sampler::SamplesPerPixel() const {
+PBRT_CPU_GPU inline int Sampler::SamplesPerPixel() const {
     auto spp = [&](auto ptr) { return ptr->SamplesPerPixel(); };
     return Dispatch(spp);
 }
 
-inline Float Sampler::Get1D() {
+PBRT_CPU_GPU inline Float Sampler::Get1D() {
     auto get = [&](auto ptr) { return ptr->Get1D(); };
     return Dispatch(get);
 }
 
-inline Point2f Sampler::Get2D() {
+PBRT_CPU_GPU inline Point2f Sampler::Get2D() {
     auto get = [&](auto ptr) { return ptr->Get2D(); };
     return Dispatch(get);
 }
 
-inline Point2f Sampler::GetPixel2D() {
+PBRT_CPU_GPU inline Point2f Sampler::GetPixel2D() {
     auto get = [&](auto ptr) { return ptr->GetPixel2D(); };
     return Dispatch(get);
 }

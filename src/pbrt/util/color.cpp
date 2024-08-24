@@ -4,11 +4,6 @@
 
 #include <pbrt/util/color.h>
 
-#if defined(PBRT_BUILD_GPU_RENDERER)
-#include <cuda.h>
-#include <cuda_runtime.h>
-#endif
-
 #include <pbrt/options.h>
 #include <pbrt/util/check.h>
 #include <pbrt/util/error.h>
@@ -33,7 +28,7 @@ std::string RGBSigmoidPolynomial::ToString() const {
 }
 
 // RGBToSpectrumTable Method Definitions
-RGBSigmoidPolynomial RGBToSpectrumTable::operator()(RGB rgb) const {
+PBRT_CPU_GPU RGBSigmoidPolynomial RGBToSpectrumTable::operator()(RGB rgb) const {
     DCHECK(rgb[0] >= 0.f && rgb[1] >= 0.f && rgb[2] >= 0.f && rgb[0] <= 1.f &&
            rgb[1] <= 1.f && rgb[2] <= 1.f);
 
@@ -187,21 +182,21 @@ std::string XYZ::ToString() const {
 }
 
 // ColorEncoding Method Definitions
-void sRGBColorEncoding::FromLinear(pstd::span<const Float> vin,
+PBRT_CPU_GPU void sRGBColorEncoding::FromLinear(pstd::span<const Float> vin,
                                    pstd::span<uint8_t> vout) const {
     DCHECK_EQ(vin.size(), vout.size());
     for (size_t i = 0; i < vin.size(); ++i)
         vout[i] = LinearToSRGB8(vin[i]);
 }
 
-void sRGBColorEncoding::ToLinear(pstd::span<const uint8_t> vin,
+PBRT_CPU_GPU void sRGBColorEncoding::ToLinear(pstd::span<const uint8_t> vin,
                                  pstd::span<Float> vout) const {
     DCHECK_EQ(vin.size(), vout.size());
     for (size_t i = 0; i < vin.size(); ++i)
         vout[i] = SRGB8ToLinear(vin[i]);
 }
 
-Float sRGBColorEncoding::ToFloatLinear(Float v) const {
+PBRT_CPU_GPU Float sRGBColorEncoding::ToFloatLinear(Float v) const {
     return SRGBToLinear(v);
 }
 
@@ -249,7 +244,7 @@ const ColorEncoding ColorEncoding::Get(const std::string &name, Allocator alloc)
     }
 }
 
-GammaColorEncoding::GammaColorEncoding(Float gamma) : gamma(gamma) {
+PBRT_CPU_GPU GammaColorEncoding::GammaColorEncoding(Float gamma) : gamma(gamma) {
     for (int i = 0; i < 256; ++i) {
         Float v = Float(i) / 255.f;
         applyLUT[i] = std::pow(v, gamma);
@@ -260,18 +255,18 @@ GammaColorEncoding::GammaColorEncoding(Float gamma) : gamma(gamma) {
     }
 }
 
-void GammaColorEncoding::ToLinear(pstd::span<const uint8_t> vin,
+PBRT_CPU_GPU void GammaColorEncoding::ToLinear(pstd::span<const uint8_t> vin,
                                   pstd::span<Float> vout) const {
     DCHECK_EQ(vin.size(), vout.size());
     for (size_t i = 0; i < vin.size(); ++i)
         vout[i] = applyLUT[vin[i]];
 }
 
-Float GammaColorEncoding::ToFloatLinear(Float v) const {
+PBRT_CPU_GPU Float GammaColorEncoding::ToFloatLinear(Float v) const {
     return std::pow(v, gamma);
 }
 
-void GammaColorEncoding::FromLinear(pstd::span<const Float> vin,
+PBRT_CPU_GPU void GammaColorEncoding::FromLinear(pstd::span<const Float> vin,
                                     pstd::span<uint8_t> vout) const {
     DCHECK_EQ(vin.size(), vout.size());
     for (size_t i = 0; i < vin.size(); ++i)

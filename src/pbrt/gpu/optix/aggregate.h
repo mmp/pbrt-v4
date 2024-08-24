@@ -2,13 +2,13 @@
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
 
-#ifndef PBRT_GPU_AGGREGATE_H
-#define PBRT_GPU_AGGREGATE_H
+#ifndef PBRT_GPU_OPTIX_AGGREGATE_H
+#define PBRT_GPU_OPTIX_AGGREGATE_H
 
 #include <pbrt/pbrt.h>
 
 #include <pbrt/gpu/memory.h>
-#include <pbrt/gpu/optix.h>
+#include <pbrt/gpu/optix/optix.h>
 #include <pbrt/scene.h>
 #include <pbrt/util/containers.h>
 #include <pbrt/util/pstd.h>

@@ -756,13 +756,13 @@ Spectrum GetNamedSpectrum(std::string name);
 std::string FindMatchingNamedSpectrum(Spectrum s);
 
 namespace Spectra {
-inline const DenselySampledSpectrum &X();
-inline const DenselySampledSpectrum &Y();
-inline const DenselySampledSpectrum &Z();
+PBRT_CPU_GPU inline const DenselySampledSpectrum &X();
+PBRT_CPU_GPU inline const DenselySampledSpectrum &Y();
+PBRT_CPU_GPU inline const DenselySampledSpectrum &Z();
 }  // namespace Spectra
 
 // Spectrum Inline Functions
-inline Float InnerProduct(Spectrum f, Spectrum g) {
+PBRT_CPU_GPU inline Float InnerProduct(Spectrum f, Spectrum g) {
     Float integral = 0;
     for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda)
         integral += f(lambda) * g(lambda);
@@ -770,17 +770,17 @@ inline Float InnerProduct(Spectrum f, Spectrum g) {
 }
 
 // Spectrum Inline Method Definitions
-inline Float Spectrum::operator()(Float lambda) const {
+PBRT_CPU_GPU inline Float Spectrum::operator()(Float lambda) const {
     auto op = [&](auto ptr) { return (*ptr)(lambda); };
     return Dispatch(op);
 }
 
-inline SampledSpectrum Spectrum::Sample(const SampledWavelengths &lambda) const {
+PBRT_CPU_GPU inline SampledSpectrum Spectrum::Sample(const SampledWavelengths &lambda) const {
     auto samp = [&](auto ptr) { return ptr->Sample(lambda); };
     return Dispatch(samp);
 }
 
-inline Float Spectrum::MaxValue() const {
+PBRT_CPU_GPU inline Float Spectrum::MaxValue() const {
     auto max = [&](auto ptr) { return ptr->MaxValue(); };
     return Dispatch(max);
 }

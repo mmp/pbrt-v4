@@ -319,16 +319,16 @@ StratifiedSampler *StratifiedSampler::Create(const ParameterDictionary &paramete
 }
 
 // MLTSampler Method Definitions
-Float MLTSampler::Get1D() {
+PBRT_CPU_GPU Float MLTSampler::Get1D() {
     int index = GetNextIndex();
     EnsureReady(index);
     return X[index].value;
 }
 
-Point2f MLTSampler::Get2D() {
+PBRT_CPU_GPU Point2f MLTSampler::Get2D() {
     return {Get1D(), Get1D()};
 }
-Point2f MLTSampler::GetPixel2D() {
+PBRT_CPU_GPU Point2f MLTSampler::GetPixel2D() {
     return Get2D();
 }
 
@@ -337,17 +337,17 @@ Sampler MLTSampler::Clone(Allocator alloc) {
     return {};
 }
 
-void MLTSampler::StartIteration() {
+PBRT_CPU_GPU void MLTSampler::StartIteration() {
     currentIteration++;
     largeStep = rng.Uniform<Float>() < largeStepProbability;
 }
 
-void MLTSampler::Accept() {
+PBRT_CPU_GPU void MLTSampler::Accept() {
     if (largeStep)
         lastLargeStepIteration = currentIteration;
 }
 
-void MLTSampler::EnsureReady(int index) {
+PBRT_CPU_GPU void MLTSampler::EnsureReady(int index) {
 #ifdef PBRT_IS_GPU_CODE
     LOG_FATAL("MLTSampler not supported on GPU--needs vector resize...");
     return;
@@ -380,14 +380,14 @@ void MLTSampler::EnsureReady(int index) {
 #endif
 }
 
-void MLTSampler::Reject() {
+PBRT_CPU_GPU void MLTSampler::Reject() {
     for (auto &X_i : X)
         if (X_i.lastModificationIteration == currentIteration)
             X_i.Restore();
     --currentIteration;
 }
 
-void MLTSampler::StartStream(int index) {
+PBRT_CPU_GPU void MLTSampler::StartStream(int index) {
     DCHECK_LT(index, streamCount);
     streamIndex = index;
     sampleIndex = 0;

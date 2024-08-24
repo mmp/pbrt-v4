@@ -24,7 +24,7 @@
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/util/GridHandle.h>
 #include <nanovdb/util/SampleFromVoxels.h>
-#ifdef PBRT_BUILD_GPU_RENDERER
+#if defined(PBRT_BUILD_GPU_RENDERER) && defined(__NVCC__)
 #include <nanovdb/util/CudaDeviceBuffer.h>
 #endif  // PBRT_BUILD_GPU_RENDERER
 
@@ -678,28 +678,28 @@ class NanoVDBMedium {
     Float LeScale, temperatureOffset, temperatureScale;
 };
 
-inline Float PhaseFunction::p(Vector3f wo, Vector3f wi) const {
+PBRT_CPU_GPU inline Float PhaseFunction::p(Vector3f wo, Vector3f wi) const {
     auto p = [&](auto ptr) { return ptr->p(wo, wi); };
     return Dispatch(p);
 }
 
-inline pstd::optional<PhaseFunctionSample> PhaseFunction::Sample_p(Vector3f wo,
+PBRT_CPU_GPU inline pstd::optional<PhaseFunctionSample> PhaseFunction::Sample_p(Vector3f wo,
                                                                    Point2f u) const {
     auto sample = [&](auto ptr) { return ptr->Sample_p(wo, u); };
     return Dispatch(sample);
 }
 
-inline Float PhaseFunction::PDF(Vector3f wo, Vector3f wi) const {
+PBRT_CPU_GPU inline Float PhaseFunction::PDF(Vector3f wo, Vector3f wi) const {
     auto pdf = [&](auto ptr) { return ptr->PDF(wo, wi); };
     return Dispatch(pdf);
 }
 
-inline pstd::optional<RayMajorantSegment> RayMajorantIterator::Next() {
+PBRT_CPU_GPU inline pstd::optional<RayMajorantSegment> RayMajorantIterator::Next() {
     auto next = [](auto ptr) { return ptr->Next(); };
     return Dispatch(next);
 }
 
-inline MediumProperties Medium::SamplePoint(Point3f p,
+PBRT_CPU_GPU inline MediumProperties Medium::SamplePoint(Point3f p,
                                             const SampledWavelengths &lambda) const {
     auto sample = [&](auto ptr) { return ptr->SamplePoint(p, lambda); };
     return Dispatch(sample);

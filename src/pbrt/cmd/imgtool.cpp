@@ -7,7 +7,9 @@
 #include <pbrt/filters.h>
 #include <pbrt/options.h>
 #ifdef PBRT_BUILD_GPU_RENDERER
-#include <pbrt/gpu/denoiser.h>
+#ifndef __HIP_PLATFORM_AMD__
+#include <pbrt/gpu/optix/denoiser.h>
+#endif // __HIP_PLATFORM_AMD__
 #include <pbrt/gpu/util.h>
 #endif  // PBRT_BUILD_GPU_RENDERER
 #include <pbrt/util/args.h>

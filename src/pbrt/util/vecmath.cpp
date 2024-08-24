@@ -53,7 +53,7 @@ std::string Quaternion::ToString() const {
 }
 
 // DirectionCone Function Definitions
-DirectionCone Union(const DirectionCone &a, const DirectionCone &b) {
+PBRT_CPU_GPU DirectionCone Union(const DirectionCone &a, const DirectionCone &b) {
     // Handle the cases where one or both cones are empty
     if (a.IsEmpty())
         return b;

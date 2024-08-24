@@ -584,30 +584,30 @@ class RealisticCamera : public CameraBase {
     pstd::vector<Bounds2f> exitPupilBounds;
 };
 
-inline pstd::optional<CameraRay> Camera::GenerateRay(CameraSample sample,
+PBRT_CPU_GPU inline pstd::optional<CameraRay> Camera::GenerateRay(CameraSample sample,
                                                      SampledWavelengths &lambda) const {
     auto generate = [&](auto ptr) { return ptr->GenerateRay(sample, lambda); };
     return Dispatch(generate);
 }
 
-inline Film Camera::GetFilm() const {
+PBRT_CPU_GPU inline Film Camera::GetFilm() const {
     auto getfilm = [&](auto ptr) { return ptr->GetFilm(); };
     return Dispatch(getfilm);
 }
 
-inline Float Camera::SampleTime(Float u) const {
+PBRT_CPU_GPU inline Float Camera::SampleTime(Float u) const {
     auto sample = [&](auto ptr) { return ptr->SampleTime(u); };
     return Dispatch(sample);
 }
 
-inline const CameraTransform &Camera::GetCameraTransform() const {
+PBRT_CPU_GPU inline const CameraTransform &Camera::GetCameraTransform() const {
     auto gtc = [&](auto ptr) -> const CameraTransform & {
         return ptr->GetCameraTransform();
     };
     return Dispatch(gtc);
 }
 
-inline void Camera::Approximate_dp_dxy(Point3f p, Normal3f n, Float time,
+PBRT_CPU_GPU inline void Camera::Approximate_dp_dxy(Point3f p, Normal3f n, Float time,
                                        int samplesPerPixel, Vector3f *dpdx,
                                        Vector3f *dpdy) const {
     if constexpr (AllInheritFrom<CameraBase>(Camera::Types())) {
