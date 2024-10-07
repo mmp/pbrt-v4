@@ -788,7 +788,7 @@ class SpotLight : public LightBase {
     Float scale, cosFalloffStart, cosFalloffEnd;
 };
 
-inline pstd::optional<LightLiSample> Light::SampleLi(LightSampleContext ctx, Point2f u,
+PBRT_CPU_GPU inline pstd::optional<LightLiSample> Light::SampleLi(LightSampleContext ctx, Point2f u,
                                                      SampledWavelengths lambda,
                                                      bool allowIncompletePDF) const {
     auto sample = [&](auto ptr) {
@@ -797,25 +797,26 @@ inline pstd::optional<LightLiSample> Light::SampleLi(LightSampleContext ctx, Poi
     return Dispatch(sample);
 }
 
-inline Float Light::PDF_Li(LightSampleContext ctx, Vector3f wi,
+PBRT_CPU_GPU inline Float Light::PDF_Li(LightSampleContext ctx, Vector3f wi,
                            bool allowIncompletePDF) const {
     auto pdf = [&](auto ptr) { return ptr->PDF_Li(ctx, wi, allowIncompletePDF); };
     return Dispatch(pdf);
 }
 
-inline SampledSpectrum Light::L(Point3f p, Normal3f n, Point2f uv, Vector3f w,
+PBRT_CPU_GPU inline SampledSpectrum Light::L(Point3f p, Normal3f n, Point2f uv, Vector3f w,
                                 const SampledWavelengths &lambda) const {
     CHECK(Type() == LightType::Area);
     auto l = [&](auto ptr) { return ptr->L(p, n, uv, w, lambda); };
     return Dispatch(l);
 }
 
-inline SampledSpectrum Light::Le(const Ray &ray, const SampledWavelengths &lambda) const {
+PBRT_CPU_GPU inline SampledSpectrum Light::Le(const Ray &ray,
+                                              const SampledWavelengths &lambda) const {
     auto le = [&](auto ptr) { return ptr->Le(ray, lambda); };
     return Dispatch(le);
 }
 
-inline LightType Light::Type() const {
+PBRT_CPU_GPU inline LightType Light::Type() const {
     auto t = [&](auto ptr) { return ptr->Type(); };
     return Dispatch(t);
 }

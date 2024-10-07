@@ -914,7 +914,7 @@ inline BSDF Material::GetBSDF(TextureEvaluator texEval, MaterialEvalContext ctx,
 }
 
 template <typename TextureEvaluator>
-inline bool Material::CanEvaluateTextures(TextureEvaluator texEval) const {
+PBRT_CPU_GPU inline bool Material::CanEvaluateTextures(TextureEvaluator texEval) const {
     auto eval = [&](auto ptr) { return ptr->CanEvaluateTextures(texEval); };
     return Dispatch(eval);
 }
@@ -937,17 +937,17 @@ inline BSSRDF Material::GetBSSRDF(TextureEvaluator texEval, MaterialEvalContext 
     return DispatchCPU(get);
 }
 
-inline bool Material::HasSubsurfaceScattering() const {
+PBRT_CPU_GPU inline bool Material::HasSubsurfaceScattering() const {
     auto has = [&](auto ptr) { return ptr->HasSubsurfaceScattering(); };
     return Dispatch(has);
 }
 
-inline FloatTexture Material::GetDisplacement() const {
+PBRT_CPU_GPU inline FloatTexture Material::GetDisplacement() const {
     auto disp = [&](auto ptr) { return ptr->GetDisplacement(); };
     return Dispatch(disp);
 }
 
-inline const Image *Material::GetNormalMap() const {
+PBRT_CPU_GPU inline const Image *Material::GetNormalMap() const {
     auto nmap = [&](auto ptr) { return ptr->GetNormalMap(); };
     return Dispatch(nmap);
 }

@@ -62,24 +62,24 @@ std::string CameraTransform::ToString() const {
 }
 
 // Camera Method Definitions
-pstd::optional<CameraRayDifferential> Camera::GenerateRayDifferential(
+PBRT_CPU_GPU pstd::optional<CameraRayDifferential> Camera::GenerateRayDifferential(
     CameraSample sample, SampledWavelengths &lambda) const {
     auto gen = [&](auto ptr) { return ptr->GenerateRayDifferential(sample, lambda); };
     return Dispatch(gen);
 }
 
-SampledSpectrum Camera::We(const Ray &ray, SampledWavelengths &lambda,
+PBRT_CPU_GPU SampledSpectrum Camera::We(const Ray &ray, SampledWavelengths &lambda,
                            Point2f *pRaster2) const {
     auto we = [&](auto ptr) { return ptr->We(ray, lambda, pRaster2); };
     return Dispatch(we);
 }
 
-void Camera::PDF_We(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
+PBRT_CPU_GPU void Camera::PDF_We(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
     auto pdf = [&](auto ptr) { return ptr->PDF_We(ray, pdfPos, pdfDir); };
     return Dispatch(pdf);
 }
 
-pstd::optional<CameraWiSample> Camera::SampleWi(const Interaction &ref, Point2f u,
+PBRT_CPU_GPU pstd::optional<CameraWiSample> Camera::SampleWi(const Interaction &ref, Point2f u,
                                                 SampledWavelengths &lambda) const {
     auto sample = [&](auto ptr) { return ptr->SampleWi(ref, u, lambda); };
     return Dispatch(sample);
@@ -113,7 +113,7 @@ CameraBase::CameraBase(CameraBaseParameters p)
                 "the system may crash as a result of this.");
 }
 
-pstd::optional<CameraRayDifferential> CameraBase::GenerateRayDifferential(
+PBRT_CPU_GPU pstd::optional<CameraRayDifferential> CameraBase::GenerateRayDifferential(
     Camera camera, CameraSample sample, SampledWavelengths &lambda) {
     // Generate regular camera ray _cr_ for ray differential
     pstd::optional<CameraRay> cr = camera.GenerateRay(sample, lambda);
@@ -281,7 +281,7 @@ CameraBaseParameters::CameraBaseParameters(const CameraTransform &cameraTransfor
 }
 
 // OrthographicCamera Method Definitions
-pstd::optional<CameraRay> OrthographicCamera::GenerateRay(
+PBRT_CPU_GPU pstd::optional<CameraRay> OrthographicCamera::GenerateRay(
     CameraSample sample, SampledWavelengths &lambda) const {
     // Compute raster and camera sample positions
     Point3f pFilm = Point3f(sample.pFilm.x, sample.pFilm.y, 0);
@@ -305,7 +305,7 @@ pstd::optional<CameraRay> OrthographicCamera::GenerateRay(
     return CameraRay{RenderFromCamera(ray)};
 }
 
-pstd::optional<CameraRayDifferential> OrthographicCamera::GenerateRayDifferential(
+PBRT_CPU_GPU pstd::optional<CameraRayDifferential> OrthographicCamera::GenerateRayDifferential(
     CameraSample sample, SampledWavelengths &lambda) const {
     // Compute main orthographic viewing ray
     // Compute raster and camera sample positions
@@ -401,7 +401,7 @@ OrthographicCamera *OrthographicCamera::Create(const ParameterDictionary &parame
 }
 
 // PerspectiveCamera Method Definitions
-pstd::optional<CameraRay> PerspectiveCamera::GenerateRay(
+PBRT_CPU_GPU pstd::optional<CameraRay> PerspectiveCamera::GenerateRay(
     CameraSample sample, SampledWavelengths &lambda) const {
     // Compute raster and camera sample positions
     Point3f pFilm = Point3f(sample.pFilm.x, sample.pFilm.y, 0);
@@ -426,7 +426,7 @@ pstd::optional<CameraRay> PerspectiveCamera::GenerateRay(
     return CameraRay{RenderFromCamera(ray)};
 }
 
-pstd::optional<CameraRayDifferential> PerspectiveCamera::GenerateRayDifferential(
+PBRT_CPU_GPU pstd::optional<CameraRayDifferential> PerspectiveCamera::GenerateRayDifferential(
     CameraSample sample, SampledWavelengths &lambda) const {
     // Compute raster and camera sample positions
     Point3f pFilm = Point3f(sample.pFilm.x, sample.pFilm.y, 0);
@@ -527,7 +527,7 @@ PerspectiveCamera *PerspectiveCamera::Create(const ParameterDictionary &paramete
                                                lensradius, focaldistance);
 }
 
-SampledSpectrum PerspectiveCamera::We(const Ray &ray, SampledWavelengths &lambda,
+PBRT_CPU_GPU SampledSpectrum PerspectiveCamera::We(const Ray &ray, SampledWavelengths &lambda,
                                       Point2f *pRasterOut) const {
     // Check if ray is forward-facing with respect to the camera
     Float cosTheta = Dot(ray.d, RenderFromCamera(Vector3f(0, 0, 1), ray.time));
@@ -555,7 +555,7 @@ SampledSpectrum PerspectiveCamera::We(const Ray &ray, SampledWavelengths &lambda
     return SampledSpectrum(1 / (A * lensArea * Pow<4>(cosTheta)));
 }
 
-void PerspectiveCamera::PDF_We(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
+PBRT_CPU_GPU void PerspectiveCamera::PDF_We(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
     // Return zero PDF values if ray direction is not front-facing
     Float cosTheta = Dot(ray.d, RenderFromCamera(Vector3f(0, 0, 1), ray.time));
     if (cosTheta <= cosTotalWidth) {
@@ -581,7 +581,7 @@ void PerspectiveCamera::PDF_We(const Ray &ray, Float *pdfPos, Float *pdfDir) con
     *pdfDir = 1 / (A * Pow<3>(cosTheta));
 }
 
-pstd::optional<CameraWiSample> PerspectiveCamera::SampleWi(
+PBRT_CPU_GPU pstd::optional<CameraWiSample> PerspectiveCamera::SampleWi(
     const Interaction &ref, Point2f u, SampledWavelengths &lambda) const {
     // Uniformly sample a lens interaction _lensIntr_
     Point2f pLens = lensRadius * SampleUniformDiskConcentric(u);
@@ -607,7 +607,7 @@ pstd::optional<CameraWiSample> PerspectiveCamera::SampleWi(
 }
 
 // SphericalCamera Method Definitions
-pstd::optional<CameraRay> SphericalCamera::GenerateRay(CameraSample sample,
+PBRT_CPU_GPU pstd::optional<CameraRay> SphericalCamera::GenerateRay(CameraSample sample,
                                                        SampledWavelengths &lambda) const {
     // Compute spherical camera ray direction
     Point2f uv(sample.pFilm.x / film.FullResolution().x,
@@ -746,7 +746,7 @@ RealisticCamera::RealisticCamera(CameraBaseParameters baseParameters,
     FindMinimumDifferentials(this);
 }
 
-Float RealisticCamera::TraceLensesFromFilm(const Ray &rCamera, Ray *rOut) const {
+PBRT_CPU_GPU Float RealisticCamera::TraceLensesFromFilm(const Ray &rCamera, Ray *rOut) const {
     Float elementZ = 0, weight = 1;
     // Transform _rCamera_ from camera to lens system space
     Ray rLens(Point3f(rCamera.o.x, rCamera.o.y, -rCamera.o.z),
@@ -894,7 +894,7 @@ Bounds2f RealisticCamera::BoundExitPupil(Float filmX0, Float filmX1) const {
     return pupilBounds;
 }
 
-pstd::optional<ExitPupilSample> RealisticCamera::SampleExitPupil(Point2f pFilm,
+PBRT_CPU_GPU pstd::optional<ExitPupilSample> RealisticCamera::SampleExitPupil(Point2f pFilm,
                                                                  Point2f uLens) const {
     // Find exit pupil bound for sample distance from film center
     Float rFilm = std::sqrt(Sqr(pFilm.x) + Sqr(pFilm.y));
@@ -916,7 +916,7 @@ pstd::optional<ExitPupilSample> RealisticCamera::SampleExitPupil(Point2f pFilm,
     return ExitPupilSample{pPupil, pdf};
 }
 
-pstd::optional<CameraRay> RealisticCamera::GenerateRay(CameraSample sample,
+PBRT_CPU_GPU pstd::optional<CameraRay> RealisticCamera::GenerateRay(CameraSample sample,
                                                        SampledWavelengths &lambda) const {
     // Find point on film, _pFilm_, corresponding to _sample.pFilm_
     Point2f s(sample.pFilm.x / film.FullResolution().x,
@@ -956,7 +956,7 @@ std::string RealisticCamera::LensElementInterface::ToString() const {
                         curvatureRadius, thickness, eta, apertureRadius);
 }
 
-Float RealisticCamera::TraceLensesFromScene(const Ray &rCamera, Ray *rOut) const {
+PBRT_CPU_GPU Float RealisticCamera::TraceLensesFromScene(const Ray &rCamera, Ray *rOut) const {
     Float elementZ = -LensFrontZ();
     // Transform _rCamera_ from camera to lens system space
     const Transform LensFromCamera = Scale(1, 1, -1);

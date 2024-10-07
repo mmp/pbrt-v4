@@ -233,22 +233,22 @@ class TriangleFilter {
     Vector2f radius;
 };
 
-inline Float Filter::Evaluate(Point2f p) const {
+PBRT_CPU_GPU inline Float Filter::Evaluate(Point2f p) const {
     auto eval = [&](auto ptr) { return ptr->Evaluate(p); };
     return Dispatch(eval);
 }
 
-inline FilterSample Filter::Sample(Point2f u) const {
+PBRT_CPU_GPU inline FilterSample Filter::Sample(Point2f u) const {
     auto sample = [&](auto ptr) { return ptr->Sample(u); };
     return Dispatch(sample);
 }
 
-inline Vector2f Filter::Radius() const {
+PBRT_CPU_GPU inline Vector2f Filter::Radius() const {
     auto radius = [&](auto ptr) { return ptr->Radius(); };
     return Dispatch(radius);
 }
 
-inline Float Filter::Integral() const {
+PBRT_CPU_GPU inline Float Filter::Integral() const {
     auto integral = [&](auto ptr) { return ptr->Integral(); };
     return Dispatch(integral);
 }

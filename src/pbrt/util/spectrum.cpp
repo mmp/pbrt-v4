@@ -65,7 +65,7 @@ std::string Spectrum::ToString() const {
 }
 
 // Spectrum Method Definitions
-Float PiecewiseLinearSpectrum::operator()(Float lambda) const {
+PBRT_CPU_GPU Float PiecewiseLinearSpectrum::operator()(Float lambda) const {
     // Handle _PiecewiseLinearSpectrum_ corner cases
     if (lambdas.empty() || lambda < lambdas.front() || lambda > lambdas.back())
         return 0;
@@ -77,7 +77,7 @@ Float PiecewiseLinearSpectrum::operator()(Float lambda) const {
     return Lerp(t, values[o], values[o + 1]);
 }
 
-Float PiecewiseLinearSpectrum::MaxValue() const {
+PBRT_CPU_GPU Float PiecewiseLinearSpectrum::MaxValue() const {
     if (values.empty())
         return 0;
     return *std::max_element(values.begin(), values.end());
@@ -166,7 +166,7 @@ std::string BlackbodySpectrum::ToString() const {
     return StringPrintf("[ BlackbodySpectrum T: %f ]", T);
 }
 
-SampledSpectrum ConstantSpectrum::Sample(const SampledWavelengths &) const {
+PBRT_CPU_GPU SampledSpectrum ConstantSpectrum::Sample(const SampledWavelengths &) const {
     return SampledSpectrum(c);
 }
 
@@ -206,7 +206,7 @@ std::string SampledWavelengths::ToString() const {
     return r;
 }
 
-XYZ SampledSpectrum::ToXYZ(const SampledWavelengths &lambda) const {
+PBRT_CPU_GPU XYZ SampledSpectrum::ToXYZ(const SampledWavelengths &lambda) const {
     // Sample the $X$, $Y$, and $Z$ matching curves at _lambda_
     SampledSpectrum X = Spectra::X().Sample(lambda);
     SampledSpectrum Y = Spectra::Y().Sample(lambda);
@@ -219,31 +219,31 @@ XYZ SampledSpectrum::ToXYZ(const SampledWavelengths &lambda) const {
            CIE_Y_integral;
 }
 
-Float SampledSpectrum::y(const SampledWavelengths &lambda) const {
+PBRT_CPU_GPU Float SampledSpectrum::y(const SampledWavelengths &lambda) const {
     SampledSpectrum Ys = Spectra::Y().Sample(lambda);
     SampledSpectrum pdf = lambda.PDF();
     return SafeDiv(Ys * *this, pdf).Average() / CIE_Y_integral;
 }
 
-RGB SampledSpectrum::ToRGB(const SampledWavelengths &lambda,
+PBRT_CPU_GPU RGB SampledSpectrum::ToRGB(const SampledWavelengths &lambda,
                            const RGBColorSpace &cs) const {
     XYZ xyz = ToXYZ(lambda);
     return cs.ToRGB(xyz);
 }
 
-RGBAlbedoSpectrum::RGBAlbedoSpectrum(const RGBColorSpace &cs, RGB rgb) {
+PBRT_CPU_GPU RGBAlbedoSpectrum::RGBAlbedoSpectrum(const RGBColorSpace &cs, RGB rgb) {
     DCHECK_LE(std::max({rgb.r, rgb.g, rgb.b}), 1);
     DCHECK_GE(std::min({rgb.r, rgb.g, rgb.b}), 0);
     rsp = cs.ToRGBCoeffs(rgb);
 }
 
-RGBUnboundedSpectrum::RGBUnboundedSpectrum(const RGBColorSpace &cs, RGB rgb) {
+PBRT_CPU_GPU RGBUnboundedSpectrum::RGBUnboundedSpectrum(const RGBColorSpace &cs, RGB rgb) {
     Float m = std::max({rgb.r, rgb.g, rgb.b});
     scale = 2 * m;
     rsp = cs.ToRGBCoeffs(scale ? rgb / scale : RGB(0, 0, 0));
 }
 
-RGBIlluminantSpectrum::RGBIlluminantSpectrum(const RGBColorSpace &cs, RGB rgb)
+PBRT_CPU_GPU RGBIlluminantSpectrum::RGBIlluminantSpectrum(const RGBColorSpace &cs, RGB rgb)
     : illuminant(&cs.illuminant) {
     Float m = std::max({rgb.r, rgb.g, rgb.b});
     scale = 2 * m;

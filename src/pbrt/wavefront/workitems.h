@@ -343,7 +343,7 @@ class RayQueue : public WorkQueue<RayWorkItem> {
 };
 
 // RayQueue Inline Methods
-inline int RayQueue::PushCameraRay(const Ray &ray, const SampledWavelengths &lambda,
+PBRT_CPU_GPU inline int RayQueue::PushCameraRay(const Ray &ray, const SampledWavelengths &lambda,
                                    int pixelIndex) {
     int index = AllocateEntry();
     DCHECK(!ray.HasNaN());
@@ -397,7 +397,7 @@ class EscapedRayQueue : public WorkQueue<EscapedRayWorkItem> {
     using WorkQueue::Push;
 };
 
-inline int EscapedRayQueue::Push(RayWorkItem r) {
+PBRT_CPU_GPU inline int EscapedRayQueue::Push(RayWorkItem r) {
     return Push(EscapedRayWorkItem{r.ray.o, r.ray.d, r.depth, r.lambda, r.pixelIndex,
                                    r.beta, (int)r.specularBounce, r.r_u, r.r_l,
                                    r.prevIntrCtx});

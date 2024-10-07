@@ -34,7 +34,7 @@
 
 namespace pbrt {
 
-void Film::AddSplat(Point2f p, SampledSpectrum v, const SampledWavelengths &lambda) {
+PBRT_CPU_GPU void Film::AddSplat(Point2f p, SampledSpectrum v, const SampledWavelengths &lambda) {
     auto splat = [&](auto ptr) { return ptr->AddSplat(p, v, lambda); };
     return Dispatch(splat);
 }
@@ -175,7 +175,7 @@ FilmBaseParameters::FilmBaseParameters(const ParameterDictionary &parameters,
 }
 
 // FilmBase Method Definitions
-Bounds2f FilmBase::SampleBounds() const {
+PBRT_CPU_GPU Bounds2f FilmBase::SampleBounds() const {
     Vector2f radius = filter.Radius();
     return Bounds2f(pixelBounds.pMin - radius + Vector2f(0.5f, 0.5f),
                     pixelBounds.pMax + radius - Vector2f(0.5f, 0.5f));
@@ -188,7 +188,7 @@ std::string FilmBase::BaseToString() const {
 }
 
 // VisibleSurface Method Definitions
-VisibleSurface::VisibleSurface(const SurfaceInteraction &si, SampledSpectrum albedo,
+PBRT_CPU_GPU VisibleSurface::VisibleSurface(const SurfaceInteraction &si, SampledSpectrum albedo,
                                const SampledWavelengths &lambda)
     : albedo(albedo) {
     set = true;
@@ -496,7 +496,7 @@ RGBFilm::RGBFilm(FilmBaseParameters p, const RGBColorSpace *colorSpace,
     outputRGBFromSensorRGB = colorSpace->RGBFromXYZ * sensor->XYZFromSensorRGB;
 }
 
-void RGBFilm::AddSplat(Point2f p, SampledSpectrum L, const SampledWavelengths &lambda) {
+PBRT_CPU_GPU void RGBFilm::AddSplat(Point2f p, SampledSpectrum L, const SampledWavelengths &lambda) {
     CHECK(!L.HasNaNs());
     // Convert sample radiance to _PixelSensor_ RGB
     RGB rgb = sensor->ToSensorRGB(L, lambda);
@@ -585,7 +585,7 @@ RGBFilm *RGBFilm::Create(const ParameterDictionary &parameters, Float exposureTi
 }
 
 // GBufferFilm Method Definitions
-void GBufferFilm::AddSample(Point2i pFilm, SampledSpectrum L,
+PBRT_CPU_GPU void GBufferFilm::AddSample(Point2i pFilm, SampledSpectrum L,
                             const SampledWavelengths &lambda,
                             const VisibleSurface *visibleSurface, Float weight) {
     RGB rgb = sensor->ToSensorRGB(L, lambda);
@@ -656,7 +656,7 @@ GBufferFilm::GBufferFilm(FilmBaseParameters p, const AnimatedTransform &outputFr
     outputRGBFromSensorRGB = colorSpace->RGBFromXYZ * sensor->XYZFromSensorRGB;
 }
 
-void GBufferFilm::AddSplat(Point2f p, SampledSpectrum v,
+PBRT_CPU_GPU void GBufferFilm::AddSplat(Point2f p, SampledSpectrum v,
                            const SampledWavelengths &lambda) {
     // NOTE: same code as RGBFilm::AddSplat()...
     CHECK(!v.HasNaNs());
@@ -886,7 +886,7 @@ SpectralFilm::SpectralFilm(FilmBaseParameters p, Float lambdaMin, Float lambdaMa
     }
 }
 
-RGB SpectralFilm::GetPixelRGB(Point2i p, Float splatScale) const {
+PBRT_CPU_GPU RGB SpectralFilm::GetPixelRGB(Point2i p, Float splatScale) const {
     // Note: this is effectively the same as RGBFilm::GetPixelRGB
 
     const Pixel &pixel = pixels[p];
@@ -906,7 +906,7 @@ RGB SpectralFilm::GetPixelRGB(Point2i p, Float splatScale) const {
     return rgb;
 }
 
-void SpectralFilm::AddSplat(Point2f p, SampledSpectrum L,
+PBRT_CPU_GPU void SpectralFilm::AddSplat(Point2f p, SampledSpectrum L,
                             const SampledWavelengths &lambda) {
     // This, too, is similar to RGBFilm::AddSplat(), with additions for
     // spectra.

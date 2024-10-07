@@ -252,7 +252,7 @@ ConductorMaterial *ConductorMaterial::Create(const TextureParameterDictionary &p
 
 // CoatedDiffuseMaterial Method Definitions
 template <typename TextureEvaluator>
-CoatedDiffuseBxDF CoatedDiffuseMaterial::GetBxDF(TextureEvaluator texEval,
+PBRT_CPU_GPU CoatedDiffuseBxDF CoatedDiffuseMaterial::GetBxDF(TextureEvaluator texEval,
                                                  const MaterialEvalContext &ctx,
                                                  SampledWavelengths &lambda) const {
     // Initialize diffuse component of plastic material
@@ -283,10 +283,10 @@ CoatedDiffuseBxDF CoatedDiffuseMaterial::GetBxDF(TextureEvaluator texEval,
 }
 
 // Explicit template instantiation
-template CoatedDiffuseBxDF CoatedDiffuseMaterial::GetBxDF(
+template PBRT_CPU_GPU CoatedDiffuseBxDF CoatedDiffuseMaterial::GetBxDF(
     BasicTextureEvaluator, const MaterialEvalContext &ctx,
     SampledWavelengths &lambda) const;
-template CoatedDiffuseBxDF CoatedDiffuseMaterial::GetBxDF(
+template PBRT_CPU_GPU CoatedDiffuseBxDF CoatedDiffuseMaterial::GetBxDF(
     UniversalTextureEvaluator, const MaterialEvalContext &ctx,
     SampledWavelengths &lambda) const;
 
@@ -343,7 +343,7 @@ CoatedDiffuseMaterial *CoatedDiffuseMaterial::Create(
 }
 
 template <typename TextureEvaluator>
-CoatedConductorBxDF CoatedConductorMaterial::GetBxDF(TextureEvaluator texEval,
+PBRT_CPU_GPU CoatedConductorBxDF CoatedConductorMaterial::GetBxDF(TextureEvaluator texEval,
                                                      const MaterialEvalContext &ctx,
                                                      SampledWavelengths &lambda) const {
     Float iurough = texEval(interfaceURoughness, ctx);
@@ -391,10 +391,10 @@ CoatedConductorBxDF CoatedConductorMaterial::GetBxDF(TextureEvaluator texEval,
                                maxDepth, nSamples);
 }
 
-template CoatedConductorBxDF CoatedConductorMaterial::GetBxDF(
+template PBRT_CPU_GPU CoatedConductorBxDF CoatedConductorMaterial::GetBxDF(
     BasicTextureEvaluator, const MaterialEvalContext &ctx,
     SampledWavelengths &lambda) const;
-template CoatedConductorBxDF CoatedConductorMaterial::GetBxDF(
+template PBRT_CPU_GPU CoatedConductorBxDF CoatedConductorMaterial::GetBxDF(
     UniversalTextureEvaluator, const MaterialEvalContext &ctx,
     SampledWavelengths &lambda) const;
 

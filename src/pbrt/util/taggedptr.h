@@ -358,19 +358,19 @@ PBRT_CPU_GPU R Dispatch(F &&func, void *ptr, int index) {
 }
 
 template <typename F, typename R, typename T>
-auto DispatchCPU(F &&func, const void *ptr, int index) {
+PBRT_CPU_GPU auto DispatchCPU(F &&func, const void *ptr, int index) {
     DCHECK_EQ(0, index);
     return func((const T *)ptr);
 }
 
 template <typename F, typename R, typename T>
-auto DispatchCPU(F &&func, void *ptr, int index) {
+PBRT_CPU_GPU auto DispatchCPU(F &&func, void *ptr, int index) {
     DCHECK_EQ(0, index);
     return func((T *)ptr);
 }
 
 template <typename F, typename R, typename T0, typename T1>
-auto DispatchCPU(F &&func, const void *ptr, int index) {
+PBRT_CPU_GPU auto DispatchCPU(F &&func, const void *ptr, int index) {
     DCHECK_GE(index, 0);
     DCHECK_LT(index, 2);
 
@@ -381,7 +381,7 @@ auto DispatchCPU(F &&func, const void *ptr, int index) {
 }
 
 template <typename F, typename R, typename T0, typename T1>
-auto DispatchCPU(F &&func, void *ptr, int index) {
+PBRT_CPU_GPU auto DispatchCPU(F &&func, void *ptr, int index) {
     DCHECK_GE(index, 0);
     DCHECK_LT(index, 2);
 
@@ -392,7 +392,7 @@ auto DispatchCPU(F &&func, void *ptr, int index) {
 }
 
 template <typename F, typename R, typename T0, typename T1, typename T2>
-auto DispatchCPU(F &&func, const void *ptr, int index) {
+PBRT_CPU_GPU auto DispatchCPU(F &&func, const void *ptr, int index) {
     DCHECK_GE(index, 0);
     DCHECK_LT(index, 3);
 
@@ -407,7 +407,7 @@ auto DispatchCPU(F &&func, const void *ptr, int index) {
 }
 
 template <typename F, typename R, typename T0, typename T1, typename T2>
-auto DispatchCPU(F &&func, void *ptr, int index) {
+PBRT_CPU_GPU auto DispatchCPU(F &&func, void *ptr, int index) {
     DCHECK_GE(index, 0);
     DCHECK_LT(index, 3);
 
@@ -422,7 +422,7 @@ auto DispatchCPU(F &&func, void *ptr, int index) {
 }
 
 template <typename F, typename R, typename T0, typename T1, typename T2, typename T3>
-auto DispatchCPU(F &&func, const void *ptr, int index) {
+PBRT_CPU_GPU auto DispatchCPU(F &&func, const void *ptr, int index) {
     DCHECK_GE(index, 0);
     DCHECK_LT(index, 4);
 
@@ -439,7 +439,7 @@ auto DispatchCPU(F &&func, const void *ptr, int index) {
 }
 
 template <typename F, typename R, typename T0, typename T1, typename T2, typename T3>
-auto DispatchCPU(F &&func, void *ptr, int index) {
+PBRT_CPU_GPU auto DispatchCPU(F &&func, void *ptr, int index) {
     DCHECK_GE(index, 0);
     DCHECK_LT(index, 4);
 
@@ -457,7 +457,7 @@ auto DispatchCPU(F &&func, void *ptr, int index) {
 
 template <typename F, typename R, typename T0, typename T1, typename T2, typename T3,
           typename T4>
-auto DispatchCPU(F &&func, const void *ptr, int index) {
+PBRT_CPU_GPU auto DispatchCPU(F &&func, const void *ptr, int index) {
     DCHECK_GE(index, 0);
     DCHECK_LT(index, 5);
 
@@ -477,7 +477,7 @@ auto DispatchCPU(F &&func, const void *ptr, int index) {
 
 template <typename F, typename R, typename T0, typename T1, typename T2, typename T3,
           typename T4>
-auto DispatchCPU(F &&func, void *ptr, int index) {
+PBRT_CPU_GPU auto DispatchCPU(F &&func, void *ptr, int index) {
     DCHECK_GE(index, 0);
     DCHECK_LT(index, 5);
 
@@ -497,7 +497,7 @@ auto DispatchCPU(F &&func, void *ptr, int index) {
 
 template <typename F, typename R, typename T0, typename T1, typename T2, typename T3,
           typename T4, typename T5>
-auto DispatchCPU(F &&func, const void *ptr, int index) {
+PBRT_CPU_GPU auto DispatchCPU(F &&func, const void *ptr, int index) {
     DCHECK_GE(index, 0);
     DCHECK_LT(index, 6);
 
@@ -519,7 +519,7 @@ auto DispatchCPU(F &&func, const void *ptr, int index) {
 
 template <typename F, typename R, typename T0, typename T1, typename T2, typename T3,
           typename T4, typename T5>
-auto DispatchCPU(F &&func, void *ptr, int index) {
+PBRT_CPU_GPU auto DispatchCPU(F &&func, void *ptr, int index) {
     DCHECK_GE(index, 0);
     DCHECK_LT(index, 6);
 
@@ -541,7 +541,7 @@ auto DispatchCPU(F &&func, void *ptr, int index) {
 
 template <typename F, typename R, typename T0, typename T1, typename T2, typename T3,
           typename T4, typename T5, typename T6>
-auto DispatchCPU(F &&func, const void *ptr, int index) {
+PBRT_CPU_GPU auto DispatchCPU(F &&func, const void *ptr, int index) {
     DCHECK_GE(index, 0);
     DCHECK_LT(index, 7);
 
@@ -565,7 +565,7 @@ auto DispatchCPU(F &&func, const void *ptr, int index) {
 
 template <typename F, typename R, typename T0, typename T1, typename T2, typename T3,
           typename T4, typename T5, typename T6>
-auto DispatchCPU(F &&func, void *ptr, int index) {
+PBRT_CPU_GPU auto DispatchCPU(F &&func, void *ptr, int index) {
     DCHECK_GE(index, 0);
     DCHECK_LT(index, 7);
 
@@ -589,7 +589,7 @@ auto DispatchCPU(F &&func, void *ptr, int index) {
 
 template <typename F, typename R, typename T0, typename T1, typename T2, typename T3,
           typename T4, typename T5, typename T6, typename T7>
-auto DispatchCPU(F &&func, const void *ptr, int index) {
+PBRT_CPU_GPU auto DispatchCPU(F &&func, const void *ptr, int index) {
     DCHECK_GE(index, 0);
     DCHECK_LT(index, 8);
 
@@ -615,7 +615,7 @@ auto DispatchCPU(F &&func, const void *ptr, int index) {
 
 template <typename F, typename R, typename T0, typename T1, typename T2, typename T3,
           typename T4, typename T5, typename T6, typename T7>
-auto DispatchCPU(F &&func, void *ptr, int index) {
+PBRT_CPU_GPU auto DispatchCPU(F &&func, void *ptr, int index) {
     DCHECK_GE(index, 0);
     DCHECK_LT(index, 8);
 
@@ -642,7 +642,7 @@ auto DispatchCPU(F &&func, void *ptr, int index) {
 template <typename F, typename R, typename T0, typename T1, typename T2, typename T3,
           typename T4, typename T5, typename T6, typename T7, typename... Ts,
           typename = typename std::enable_if_t<(sizeof...(Ts) > 0)>>
-auto DispatchCPU(F &&func, const void *ptr, int index) {
+PBRT_CPU_GPU auto DispatchCPU(F &&func, const void *ptr, int index) {
     DCHECK_GE(index, 0);
 
     switch (index) {
@@ -670,7 +670,7 @@ auto DispatchCPU(F &&func, const void *ptr, int index) {
 template <typename F, typename R, typename T0, typename T1, typename T2, typename T3,
           typename T4, typename T5, typename T6, typename T7, typename... Ts,
           typename = typename std::enable_if_t<(sizeof...(Ts) > 0)>>
-auto DispatchCPU(F &&func, void *ptr, int index) {
+PBRT_CPU_GPU auto DispatchCPU(F &&func, void *ptr, int index) {
     DCHECK_GE(index, 0);
 
     switch (index) {
@@ -770,6 +770,7 @@ class TaggedPointer {
 
     PBRT_CPU_GPU
     unsigned int Tag() const { return ((bits & tagMask) >> tagShift); }
+
     template <typename T>
     PBRT_CPU_GPU bool Is() const {
         return Tag() == TypeIndex<T>();
@@ -851,7 +852,7 @@ class TaggedPointer {
     }
 
     template <typename F>
-    decltype(auto) DispatchCPU(F &&func) const {
+    PBRT_CPU_GPU decltype(auto) DispatchCPU(F &&func) const {
         DCHECK(ptr());
         using R = typename detail::ReturnTypeConst<F, Ts...>::type;
         return detail::DispatchCPU<F, R, Ts...>(func, ptr(), Tag() - 1);

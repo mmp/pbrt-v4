@@ -2,8 +2,8 @@
 // The pbrt source code is licensed under the Apache License, Version 2.0.
 // SPDX: Apache-2.0
 
-#ifndef PBRT_GPU_OPTIX_H
-#define PBRT_GPU_OPTIX_H
+#ifndef PBRT_GPU_OPTIX_OPTIX_H
+#define PBRT_GPU_OPTIX_OPTIX_H
 
 #include <pbrt/pbrt.h>
 
@@ -69,4 +69,4 @@ struct RayIntersectParameters {
 
 }  // namespace pbrt
 
-#endif  // PBRT_GPU_OPTIX_H
+#endif  // PBRT_GPU_OPTIX_OPTIX_H

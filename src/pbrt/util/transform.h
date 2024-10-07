@@ -269,7 +269,7 @@ PBRT_CPU_GPU inline Transform RotateFromTo(Vector3f from, Vector3f to) {
     return Transform(r, Transpose(r));
 }
 
-inline Vector3fi Transform::operator()(const Vector3fi &v) const {
+PBRT_CPU_GPU inline Vector3fi Transform::operator()(const Vector3fi &v) const {
     Float x = Float(v.x), y = Float(v.y), z = Float(v.z);
     Vector3f vOutError;
     if (v.IsExact()) {
@@ -307,7 +307,7 @@ inline Vector3fi Transform::operator()(const Vector3fi &v) const {
 
 // Transform Inline Methods
 template <typename T>
-inline Point3<T> Transform::operator()(Point3<T> p) const {
+PBRT_CPU_GPU inline Point3<T> Transform::operator()(Point3<T> p) const {
     T xp = m[0][0] * p.x + m[0][1] * p.y + m[0][2] * p.z + m[0][3];
     T yp = m[1][0] * p.x + m[1][1] * p.y + m[1][2] * p.z + m[1][3];
     T zp = m[2][0] * p.x + m[2][1] * p.y + m[2][2] * p.z + m[2][3];
@@ -319,21 +319,21 @@ inline Point3<T> Transform::operator()(Point3<T> p) const {
 }
 
 template <typename T>
-inline Vector3<T> Transform::operator()(Vector3<T> v) const {
+PBRT_CPU_GPU inline Vector3<T> Transform::operator()(Vector3<T> v) const {
     return Vector3<T>(m[0][0] * v.x + m[0][1] * v.y + m[0][2] * v.z,
                       m[1][0] * v.x + m[1][1] * v.y + m[1][2] * v.z,
                       m[2][0] * v.x + m[2][1] * v.y + m[2][2] * v.z);
 }
 
 template <typename T>
-inline Normal3<T> Transform::operator()(Normal3<T> n) const {
+PBRT_CPU_GPU inline Normal3<T> Transform::operator()(Normal3<T> n) const {
     T x = n.x, y = n.y, z = n.z;
     return Normal3<T>(mInv[0][0] * x + mInv[1][0] * y + mInv[2][0] * z,
                       mInv[0][1] * x + mInv[1][1] * y + mInv[2][1] * z,
                       mInv[0][2] * x + mInv[1][2] * y + mInv[2][2] * z);
 }
 
-inline Ray Transform::operator()(const Ray &r, Float *tMax) const {
+PBRT_CPU_GPU inline Ray Transform::operator()(const Ray &r, Float *tMax) const {
     Point3fi o = (*this)(Point3fi(r.o));
     Vector3f d = (*this)(r.d);
     // Offset ray origin to edge of error bounds and compute _tMax_
@@ -347,7 +347,7 @@ inline Ray Transform::operator()(const Ray &r, Float *tMax) const {
     return Ray(Point3f(o), d, r.time, r.medium);
 }
 
-inline RayDifferential Transform::operator()(const RayDifferential &r,
+PBRT_CPU_GPU inline RayDifferential Transform::operator()(const RayDifferential &r,
                                              Float *tMax) const {
     Ray tr = (*this)(Ray(r), tMax);
     RayDifferential ret(tr.o, tr.d, tr.time, tr.medium);
@@ -359,12 +359,12 @@ inline RayDifferential Transform::operator()(const RayDifferential &r,
     return ret;
 }
 
-inline Transform::Transform(const Frame &frame)
+PBRT_CPU_GPU inline Transform::Transform(const Frame &frame)
     : Transform(SquareMatrix<4>(frame.x.x, frame.x.y, frame.x.z, 0, frame.y.x, frame.y.y,
                                 frame.y.z, 0, frame.z.x, frame.z.y, frame.z.z, 0, 0, 0, 0,
                                 1)) {}
 
-inline Transform::Transform(Quaternion q) {
+PBRT_CPU_GPU inline Transform::Transform(Quaternion q) {
     Float xx = q.v.x * q.v.x, yy = q.v.y * q.v.y, zz = q.v.z * q.v.z;
     Float xy = q.v.x * q.v.y, xz = q.v.x * q.v.z, yz = q.v.y * q.v.z;
     Float wx = q.v.x * q.w, wy = q.v.y * q.w, wz = q.v.z * q.w;
@@ -384,7 +384,7 @@ inline Transform::Transform(Quaternion q) {
 }
 
 template <typename T>
-inline Point3<T> Transform::ApplyInverse(Point3<T> p) const {
+PBRT_CPU_GPU inline Point3<T> Transform::ApplyInverse(Point3<T> p) const {
     T x = p.x, y = p.y, z = p.z;
     T xp = (mInv[0][0] * x + mInv[0][1] * y) + (mInv[0][2] * z + mInv[0][3]);
     T yp = (mInv[1][0] * x + mInv[1][1] * y) + (mInv[1][2] * z + mInv[1][3]);
@@ -398,7 +398,7 @@ inline Point3<T> Transform::ApplyInverse(Point3<T> p) const {
 }
 
 template <typename T>
-inline Vector3<T> Transform::ApplyInverse(Vector3<T> v) const {
+PBRT_CPU_GPU inline Vector3<T> Transform::ApplyInverse(Vector3<T> v) const {
     T x = v.x, y = v.y, z = v.z;
     return Vector3<T>(mInv[0][0] * x + mInv[0][1] * y + mInv[0][2] * z,
                       mInv[1][0] * x + mInv[1][1] * y + mInv[1][2] * z,
@@ -406,14 +406,14 @@ inline Vector3<T> Transform::ApplyInverse(Vector3<T> v) const {
 }
 
 template <typename T>
-inline Normal3<T> Transform::ApplyInverse(Normal3<T> n) const {
+PBRT_CPU_GPU inline Normal3<T> Transform::ApplyInverse(Normal3<T> n) const {
     T x = n.x, y = n.y, z = n.z;
     return Normal3<T>(m[0][0] * x + m[1][0] * y + m[2][0] * z,
                       m[0][1] * x + m[1][1] * y + m[2][1] * z,
                       m[0][2] * x + m[1][2] * y + m[2][2] * z);
 }
 
-inline Ray Transform::ApplyInverse(const Ray &r, Float *tMax) const {
+PBRT_CPU_GPU inline Ray Transform::ApplyInverse(const Ray &r, Float *tMax) const {
     Point3fi o = ApplyInverse(Point3fi(r.o));
     Vector3f d = ApplyInverse(r.d);
     // Offset ray origin to edge of error bounds and compute _tMax_
@@ -428,7 +428,7 @@ inline Ray Transform::ApplyInverse(const Ray &r, Float *tMax) const {
     return Ray(Point3f(o), d, r.time, r.medium);
 }
 
-inline RayDifferential Transform::ApplyInverse(const RayDifferential &r,
+PBRT_CPU_GPU inline RayDifferential Transform::ApplyInverse(const RayDifferential &r,
                                                Float *tMax) const {
     Ray tr = ApplyInverse(Ray(r), tMax);
     RayDifferential ret(tr.o, tr.d, tr.time, tr.medium);

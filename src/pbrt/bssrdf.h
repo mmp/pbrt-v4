@@ -288,7 +288,7 @@ PBRT_CPU_GPU inline void SubsurfaceFromDiffuse(const BSSRDFTable &t,
     }
 }
 
-inline pstd::optional<BSSRDFProbeSegment> BSSRDF::SampleSp(Float u1, Point2f u2) const {
+PBRT_CPU_GPU inline pstd::optional<BSSRDFProbeSegment> BSSRDF::SampleSp(Float u1, Point2f u2) const {
     auto sample = [&](auto ptr) { return ptr->SampleSp(u1, u2); };
     return Dispatch(sample);
 }

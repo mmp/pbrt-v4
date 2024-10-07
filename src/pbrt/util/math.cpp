@@ -43,7 +43,7 @@ std::string SquareMatrix<N>::ToString() const {
 
 // General case
 template <int N>
-pstd::optional<SquareMatrix<N>> Inverse(const SquareMatrix<N> &m) {
+PBRT_CPU_GPU pstd::optional<SquareMatrix<N>> Inverse(const SquareMatrix<N> &m) {
     int indxc[N], indxr[N];
     int ipiv[N] = {0};
     Float minv[N][N];
@@ -106,8 +106,8 @@ pstd::optional<SquareMatrix<N>> Inverse(const SquareMatrix<N> &m) {
 }
 
 template class SquareMatrix<2>;
-template pstd::optional<SquareMatrix<2>> Inverse(const SquareMatrix<2> &);
-template SquareMatrix<2> operator*(const SquareMatrix<2> &m1, const SquareMatrix<2> &m2);
+template PBRT_CPU_GPU pstd::optional<SquareMatrix<2>> Inverse(const SquareMatrix<2> &);
+template PBRT_CPU_GPU SquareMatrix<2> operator*(const SquareMatrix<2> &m1, const SquareMatrix<2> &m2);
 
 template class SquareMatrix<3>;
 template class SquareMatrix<4>;
@@ -154,7 +154,7 @@ std::string Interval::ToString() const {
 }
 
 // Spline Interpolation Function Definitions
-bool CatmullRomWeights(pstd::span<const Float> nodes, Float x, int *offset,
+PBRT_CPU_GPU bool CatmullRomWeights(pstd::span<const Float> nodes, Float x, int *offset,
                        pstd::span<Float> weights) {
     CHECK_GE(weights.size(), 4);
     // Return _false_ if _x_ is out of bounds
@@ -200,7 +200,7 @@ bool CatmullRomWeights(pstd::span<const Float> nodes, Float x, int *offset,
     return true;
 }
 
-Float CatmullRom(pstd::span<const Float> nodes, pstd::span<const Float> f, Float x) {
+PBRT_CPU_GPU Float CatmullRom(pstd::span<const Float> nodes, pstd::span<const Float> f, Float x) {
     CHECK_EQ(nodes.size(), f.size());
     if (!(x >= nodes.front() && x <= nodes.back()))
         return 0;
@@ -224,7 +224,7 @@ Float CatmullRom(pstd::span<const Float> nodes, pstd::span<const Float> f, Float
            (t3 - t2) * d1;
 }
 
-Float InvertCatmullRom(pstd::span<const Float> nodes, pstd::span<const Float> f,
+PBRT_CPU_GPU Float InvertCatmullRom(pstd::span<const Float> nodes, pstd::span<const Float> f,
                        Float u) {
     // Stop when _u_ is out of bounds
     if (!(u > f.front()))
@@ -264,7 +264,7 @@ Float InvertCatmullRom(pstd::span<const Float> nodes, pstd::span<const Float> f,
     return x0 + t * width;
 }
 
-Float IntegrateCatmullRom(pstd::span<const Float> nodes, pstd::span<const Float> f,
+PBRT_CPU_GPU Float IntegrateCatmullRom(pstd::span<const Float> nodes, pstd::span<const Float> f,
                           pstd::span<Float> cdf) {
     CHECK_EQ(nodes.size(), f.size());
     Float sum = 0;
@@ -289,7 +289,7 @@ Float IntegrateCatmullRom(pstd::span<const Float> nodes, pstd::span<const Float>
 
 // Square--Sphere Mapping Function Definitions
 // Via source code from Clarberg: Fast Equal-Area Mapping of the (Hemi)Sphere using SIMD
-Vector3f EqualAreaSquareToSphere(Point2f p) {
+PBRT_CPU_GPU Vector3f EqualAreaSquareToSphere(Point2f p) {
     CHECK(p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1);
     // Transform _p_ to $[-1,1]^2$ and compute absolute values
     Float u = 2 * p.x - 1, v = 2 * p.y - 1;
@@ -314,7 +314,7 @@ Vector3f EqualAreaSquareToSphere(Point2f p) {
 }
 
 // Via source code from Clarberg: Fast Equal-Area Mapping of the (Hemi)Sphere using SIMD
-Point2f EqualAreaSphereToSquare(Vector3f d) {
+PBRT_CPU_GPU Point2f EqualAreaSphereToSquare(Vector3f d) {
     DCHECK(LengthSquared(d) > .999 && LengthSquared(d) < 1.001);
     Float x = std::abs(d.x), y = std::abs(d.y), z = std::abs(d.z);
 
@@ -360,7 +360,7 @@ Point2f EqualAreaSphereToSquare(Vector3f d) {
     return Point2f(0.5f * (u + 1), 0.5f * (v + 1));
 }
 
-Point2f WrapEqualAreaSquare(Point2f uv) {
+PBRT_CPU_GPU Point2f WrapEqualAreaSquare(Point2f uv) {
     if (uv[0] < 0) {
         uv[0] = -uv[0];     // mirror across u = 0
         uv[1] = 1 - uv[1];  // mirror across v = 0.5

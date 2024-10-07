@@ -66,7 +66,7 @@ std::string ToString(PixelFormat format) {
     }
 }
 
-int TexelBytes(PixelFormat format) {
+PBRT_CPU_GPU int TexelBytes(PixelFormat format) {
     switch (format) {
     case PixelFormat::U256:
         return 1;
@@ -1019,7 +1019,7 @@ bool Image::Write(std::string name, const ImageMetadata &metadata) const {
 
 ///////////////////////////////////////////////////////////////////////////
 // OpenEXR
-
+#ifndef PBRT_IS_GPU_CODE
 static Imf::FrameBuffer imageToFrameBuffer(const Image &image,
                                            const ImageChannelDesc &desc,
                                            const Imath::Box2i &dataWindow) {
@@ -1812,5 +1812,6 @@ fail:
     fclose(fp);
     return false;
 }
+#endif
 
 }  // namespace pbrt

@@ -38,7 +38,7 @@ std::string MediumInteraction::ToString() const {
 }
 
 // SurfaceInteraction Method Definitions
-void SurfaceInteraction::ComputeDifferentials(const RayDifferential &ray, Camera camera,
+PBRT_CPU_GPU void SurfaceInteraction::ComputeDifferentials(const RayDifferential &ray, Camera camera,
                                               int samplesPerPixel) {
     if (GetOptions().disableTextureFiltering) {
         dudx = dudy = dvdx = dvdy = 0;
@@ -88,7 +88,7 @@ void SurfaceInteraction::ComputeDifferentials(const RayDifferential &ray, Camera
     dvdy = IsFinite(dvdy) ? Clamp(dvdy, -1e8f, 1e8f) : 0.f;
 }
 
-void SurfaceInteraction::SkipIntersection(RayDifferential *ray, Float t) const {
+PBRT_CPU_GPU void SurfaceInteraction::SkipIntersection(RayDifferential *ray, Float t) const {
     *((Ray *)ray) = SpawnRay(ray->d);
     if (ray->hasDifferentials) {
         ray->rxOrigin = ray->rxOrigin + t * ray->rxDirection;
@@ -96,7 +96,7 @@ void SurfaceInteraction::SkipIntersection(RayDifferential *ray, Float t) const {
     }
 }
 
-RayDifferential SurfaceInteraction::SpawnRay(const RayDifferential &rayi,
+PBRT_CPU_GPU RayDifferential SurfaceInteraction::SpawnRay(const RayDifferential &rayi,
                                              const BSDF &bsdf, Vector3f wi, int flags,
                                              Float eta) const {
     RayDifferential rd(SpawnRay(wi));
@@ -210,7 +210,7 @@ BSSRDF SurfaceInteraction::GetBSSRDF(const RayDifferential &ray,
     return material.GetBSSRDF(UniversalTextureEvaluator(), *this, lambda, scratchBuffer);
 }
 
-SampledSpectrum SurfaceInteraction::Le(Vector3f w,
+PBRT_CPU_GPU SampledSpectrum SurfaceInteraction::Le(Vector3f w,
                                        const SampledWavelengths &lambda) const {
     return areaLight ? areaLight.L(p(), n, uv, w, lambda) : SampledSpectrum(0.f);
 }

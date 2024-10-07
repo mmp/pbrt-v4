@@ -879,7 +879,7 @@ class Quaternion {
 // Vector2 Inline Functions
 template <typename T>
 template <typename U>
-Vector2<T>::Vector2(Point2<U> p) : Tuple2<pbrt::Vector2, T>(T(p.x), T(p.y)) {}
+PBRT_CPU_GPU Vector2<T>::Vector2(Point2<U> p) : Tuple2<pbrt::Vector2, T>(T(p.x), T(p.y)) {}
 
 template <typename T>
 PBRT_CPU_GPU inline auto Dot(Vector2<T> v1, Vector2<T> v2) ->
@@ -926,7 +926,7 @@ PBRT_CPU_GPU inline auto DistanceSquared(Point2<T> p1, Point2<T> p2) ->
 // Vector3 Inline Functions
 template <typename T>
 template <typename U>
-Vector3<T>::Vector3(Point3<U> p) : Tuple3<pbrt::Vector3, T>(T(p.x), T(p.y), T(p.z)) {}
+PBRT_CPU_GPU Vector3<T>::Vector3(Point3<U> p) : Tuple3<pbrt::Vector3, T>(T(p.x), T(p.y), T(p.z)) {}
 
 template <typename T>
 PBRT_CPU_GPU inline Vector3<T> Cross(Vector3<T> v1, Normal3<T> v2) {
@@ -1023,7 +1023,7 @@ PBRT_CPU_GPU inline void CoordinateSystem(Normal3<T> v1, Vector3<T> *v2, Vector3
 
 template <typename T>
 template <typename U>
-Vector3<T>::Vector3(Normal3<U> n) : Tuple3<pbrt::Vector3, T>(T(n.x), T(n.y), T(n.z)) {}
+PBRT_CPU_GPU Vector3<T>::Vector3(Normal3<U> n) : Tuple3<pbrt::Vector3, T>(T(n.x), T(n.y), T(n.z)) {}
 
 // Point3 Inline Functions
 template <typename T>
@@ -1926,7 +1926,7 @@ class Frame {
 };
 
 // Frame Inline Functions
-inline Frame::Frame(Vector3f x, Vector3f y, Vector3f z) : x(x), y(y), z(z) {
+PBRT_CPU_GPU inline Frame::Frame(Vector3f x, Vector3f y, Vector3f z) : x(x), y(y), z(z) {
     DCHECK_LT(std::abs(LengthSquared(x) - 1), 1e-4);
     DCHECK_LT(std::abs(LengthSquared(y) - 1), 1e-4);
     DCHECK_LT(std::abs(LengthSquared(z) - 1), 1e-4);

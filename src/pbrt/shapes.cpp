@@ -25,21 +25,17 @@
 #include <pbrt/util/splines.h>
 #include <pbrt/util/stats.h>
 
-#if defined(PBRT_BUILD_GPU_RENDERER)
-#include <cuda.h>
-#endif
-
 #include <algorithm>
 
 namespace pbrt {
 
 // Sphere Method Definitions
-Bounds3f Sphere::Bounds() const {
+PBRT_CPU_GPU Bounds3f Sphere::Bounds() const {
     return (*renderFromObject)(
         Bounds3f(Point3f(-radius, -radius, zMin), Point3f(radius, radius, zMax)));
 }
 
-pstd::optional<ShapeSample> Sphere::Sample(Point2f u) const {
+PBRT_CPU_GPU pstd::optional<ShapeSample> Sphere::Sample(Point2f u) const {
     Point3f pObj = Point3f(0, 0, 0) + radius * SampleUniformSphere(u);
     // Reproject _pObj_ to sphere surface and compute _pObjError_
     pObj *= radius / Distance(pObj, Point3f(0, 0, 0));
@@ -85,12 +81,12 @@ Sphere *Sphere::Create(const Transform *renderFromObject,
 }
 
 // Disk Method Definitions
-Bounds3f Disk::Bounds() const {
+PBRT_CPU_GPU Bounds3f Disk::Bounds() const {
     return (*renderFromObject)(
         Bounds3f(Point3f(-radius, -radius, height), Point3f(radius, radius, height)));
 }
 
-DirectionCone Disk::NormalBounds() const {
+PBRT_CPU_GPU DirectionCone Disk::NormalBounds() const {
     Normal3f n = (*renderFromObject)(Normal3f(0, 0, 1));
     if (reverseOrientation)
         n = -n;
@@ -119,7 +115,7 @@ Disk *Disk::Create(const Transform *renderFromObject, const Transform *objectFro
 }
 
 // Cylinder Method Definitions
-Bounds3f Cylinder::Bounds() const {
+PBRT_CPU_GPU Bounds3f Cylinder::Bounds() const {
     return (*renderFromObject)(
         Bounds3f({-radius, -radius, zMin}, {radius, radius, zMax}));
 }
@@ -161,15 +157,15 @@ void Triangle::Init(Allocator alloc) {
     allMeshes = alloc.new_object<pstd::vector<const TriangleMesh *>>(alloc);
 #if defined(PBRT_BUILD_GPU_RENDERER)
     if (Options->useGPU)
-        CUDA_CHECK(
-            cudaMemcpyToSymbol(allTriangleMeshesGPU, &allMeshes, sizeof(allMeshes)));
+        CUDA_CHECK(cudaMemcpyToSymbol((const void *)&allTriangleMeshesGPU,
+                                     (const void *)&allMeshes, sizeof(allMeshes)));
 #endif
 }
 
 STAT_MEMORY_COUNTER("Memory/Triangles", triangleBytes);
 
 // Triangle Functions
-pstd::optional<TriangleIntersection> IntersectTriangle(const Ray &ray, Float tMax,
+PBRT_CPU_GPU pstd::optional<TriangleIntersection> IntersectTriangle(const Ray &ray, Float tMax,
                                                        Point3f p0, Point3f p1,
                                                        Point3f p2) {
     // Return no intersection if triangle is degenerate
@@ -291,7 +287,7 @@ pstd::vector<Shape> Triangle::CreateTriangles(const TriangleMesh *mesh, Allocato
     return tris;
 }
 
-Bounds3f Triangle::Bounds() const {
+PBRT_CPU_GPU Bounds3f Triangle::Bounds() const {
     // Get triangle vertices in _p0_, _p1_, and _p2_
     const TriangleMesh *mesh = GetMesh();
     const int *v = &mesh->vertexIndices[3 * triIndex];
@@ -300,7 +296,7 @@ Bounds3f Triangle::Bounds() const {
     return Union(Bounds3f(p0, p1), p2);
 }
 
-DirectionCone Triangle::NormalBounds() const {
+PBRT_CPU_GPU DirectionCone Triangle::NormalBounds() const {
     // Get triangle vertices in _p0_, _p1_, and _p2_
     const TriangleMesh *mesh = GetMesh();
     const int *v = &mesh->vertexIndices[3 * triIndex];
@@ -317,7 +313,7 @@ DirectionCone Triangle::NormalBounds() const {
     return DirectionCone(Vector3f(n));
 }
 
-pstd::optional<ShapeIntersection> Triangle::Intersect(const Ray &ray, Float tMax) const {
+PBRT_CPU_GPU pstd::optional<ShapeIntersection> Triangle::Intersect(const Ray &ray, Float tMax) const {
 #ifndef PBRT_IS_GPU_CODE
     ++nTriTests;
 #endif
@@ -338,7 +334,7 @@ pstd::optional<ShapeIntersection> Triangle::Intersect(const Ray &ray, Float tMax
     return ShapeIntersection{intr, triIsect->t};
 }
 
-bool Triangle::IntersectP(const Ray &ray, Float tMax) const {
+PBRT_CPU_GPU bool Triangle::IntersectP(const Ray &ray, Float tMax) const {
 #ifndef PBRT_IS_GPU_CODE
     ++nTriTests;
 #endif
@@ -520,7 +516,7 @@ pstd::vector<Shape> CreateCurve(const Transform *renderFromObject,
 }
 
 // Curve Method Definitions
-Bounds3f Curve::Bounds() const {
+PBRT_CPU_GPU Bounds3f Curve::Bounds() const {
     pstd::span<const Point3f> cpSpan(common->cpObj);
     Bounds3f objBounds = BoundCubicBezier(cpSpan, uMin, uMax);
     // Expand _objBounds_ by maximum curve width over $u$ range
@@ -531,7 +527,7 @@ Bounds3f Curve::Bounds() const {
     return (*common->renderFromObject)(objBounds);
 }
 
-Float Curve::Area() const {
+PBRT_CPU_GPU Float Curve::Area() const {
     pstd::array<Point3f, 4> cpObj =
         CubicBezierControlPoints(pstd::MakeConstSpan(common->cpObj), uMin, uMax);
     Float width0 = Lerp(uMin, common->width[0], common->width[1]);
@@ -737,23 +733,23 @@ bool Curve::RecursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Poin
     }
 }
 
-pstd::optional<ShapeSample> Curve::Sample(Point2f u) const {
+PBRT_CPU_GPU pstd::optional<ShapeSample> Curve::Sample(Point2f u) const {
     LOG_FATAL("Curve::Sample not implemented.");
     return {};
 }
 
-Float Curve::PDF(const Interaction &) const {
+PBRT_CPU_GPU Float Curve::PDF(const Interaction &) const {
     LOG_FATAL("Curve::PDF not implemented.");
     return {};
 }
 
-pstd::optional<ShapeSample> Curve::Sample(const ShapeSampleContext &ctx,
+PBRT_CPU_GPU pstd::optional<ShapeSample> Curve::Sample(const ShapeSampleContext &ctx,
                                           Point2f u) const {
     LOG_FATAL("Curve::Sample not implemented.");
     return {};
 }
 
-Float Curve::PDF(const ShapeSampleContext &ctx, Vector3f wi) const {
+PBRT_CPU_GPU Float Curve::PDF(const ShapeSampleContext &ctx, Vector3f wi) const {
     LOG_FATAL("Curve::PDF not implemented.");
     return {};
 }
@@ -1030,8 +1026,9 @@ void BilinearPatch::Init(Allocator alloc) {
     allMeshes = alloc.new_object<pstd::vector<const BilinearPatchMesh *>>(alloc);
 #if defined(PBRT_BUILD_GPU_RENDERER)
     if (Options->useGPU)
-        CUDA_CHECK(
-            cudaMemcpyToSymbol(allBilinearMeshesGPU, &allMeshes, sizeof(allMeshes)));
+        CUDA_CHECK(cudaMemcpyToSymbol((const void *)&allBilinearMeshesGPU,
+                                     (const void *)&allMeshes,
+                                     sizeof(allMeshes)));
 #endif
 }
 
@@ -1070,7 +1067,7 @@ BilinearPatch::BilinearPatch(const BilinearPatchMesh *mesh, int meshIndex, int b
     }
 }
 
-Bounds3f BilinearPatch::Bounds() const {
+PBRT_CPU_GPU Bounds3f BilinearPatch::Bounds() const {
     const BilinearPatchMesh *mesh = GetMesh();
     // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const int *v = &mesh->vertexIndices[4 * blpIndex];
@@ -1080,7 +1077,7 @@ Bounds3f BilinearPatch::Bounds() const {
     return Union(Bounds3f(p00, p01), Bounds3f(p10, p11));
 }
 
-DirectionCone BilinearPatch::NormalBounds() const {
+PBRT_CPU_GPU DirectionCone BilinearPatch::NormalBounds() const {
     const BilinearPatchMesh *mesh = GetMesh();
     // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const int *v = &mesh->vertexIndices[4 * blpIndex];
@@ -1128,7 +1125,7 @@ DirectionCone BilinearPatch::NormalBounds() const {
     return DirectionCone(n, Clamp(cosTheta, -1, 1));
 }
 
-pstd::optional<ShapeIntersection> BilinearPatch::Intersect(const Ray &ray,
+PBRT_CPU_GPU pstd::optional<ShapeIntersection> BilinearPatch::Intersect(const Ray &ray,
                                                            Float tMax) const {
     const BilinearPatchMesh *mesh = GetMesh();
     // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
@@ -1145,7 +1142,7 @@ pstd::optional<ShapeIntersection> BilinearPatch::Intersect(const Ray &ray,
     return ShapeIntersection{intr, blpIsect->t};
 }
 
-bool BilinearPatch::IntersectP(const Ray &ray, Float tMax) const {
+PBRT_CPU_GPU bool BilinearPatch::IntersectP(const Ray &ray, Float tMax) const {
     const BilinearPatchMesh *mesh = GetMesh();
     // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const int *v = &mesh->vertexIndices[4 * blpIndex];
@@ -1155,7 +1152,7 @@ bool BilinearPatch::IntersectP(const Ray &ray, Float tMax) const {
     return IntersectBilinearPatch(ray, tMax, p00, p10, p01, p11).has_value();
 }
 
-pstd::optional<ShapeSample> BilinearPatch::Sample(Point2f u) const {
+PBRT_CPU_GPU pstd::optional<ShapeSample> BilinearPatch::Sample(Point2f u) const {
     const BilinearPatchMesh *mesh = GetMesh();
     // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const int *v = &mesh->vertexIndices[4 * blpIndex];
@@ -1216,7 +1213,7 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(Point2f u) const {
                        pdf / Length(Cross(dpdu, dpdv))};
 }
 
-Float BilinearPatch::PDF(const Interaction &intr) const {
+PBRT_CPU_GPU Float BilinearPatch::PDF(const Interaction &intr) const {
     const BilinearPatchMesh *mesh = GetMesh();
     // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const int *v = &mesh->vertexIndices[4 * blpIndex];
@@ -1254,7 +1251,7 @@ Float BilinearPatch::PDF(const Interaction &intr) const {
     return pdf / Length(Cross(dpdu, dpdv));
 }
 
-pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,
+PBRT_CPU_GPU pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,
                                                   Point2f u) const {
     const BilinearPatchMesh *mesh = GetMesh();
     // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
@@ -1329,7 +1326,7 @@ pstd::optional<ShapeSample> BilinearPatch::Sample(const ShapeSampleContext &ctx,
     return ShapeSample{Interaction(p, n, ctx.time, st), pdf};
 }
 
-Float BilinearPatch::PDF(const ShapeSampleContext &ctx, Vector3f wi) const {
+PBRT_CPU_GPU Float BilinearPatch::PDF(const ShapeSampleContext &ctx, Vector3f wi) const {
     const BilinearPatchMesh *mesh = GetMesh();
     // Get bilinear patch vertices in _p00_, _p01_, _p10_, and _p11_
     const int *v = &mesh->vertexIndices[4 * blpIndex];

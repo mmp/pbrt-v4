@@ -694,17 +694,17 @@ SET (PBRT_UTIL_SOURCE_HEADERS
 
 if (PBRT_CUDA_ENABLED)
   set (PBRT_GPU_SOURCE
-    src/pbrt/gpu/aggregate.cpp
-    src/pbrt/gpu/denoiser.cpp
+    src/pbrt/gpu/optix/aggregate.cpp
+    src/pbrt/gpu/optix/denoiser.cpp
     src/pbrt/gpu/memory.cpp
     src/pbrt/gpu/util.cpp
   )
   set (PBRT_GPU_SOURCE_HEADERS
-    src/pbrt/gpu/aggregate.h
+    src/pbrt/gpu/optix/aggregate.h
     src/pbrt/gpu/cudagl.h
-    src/pbrt/gpu/denoiser.h
+    src/pbrt/gpu/optix/denoiser.h
     src/pbrt/gpu/memory.h
-    src/pbrt/gpu/optix.h
+    src/pbrt/gpu/optix/optix.h
     src/pbrt/gpu/util.h
   )
 
@@ -770,7 +770,7 @@ if (PBRT_CUDA_ENABLED)
     PROPERTIES LANGUAGE CUDA
   )
 
-  cuda_compile_and_embed (PBRT_EMBEDDED_PTX src/pbrt/gpu/optix.cu optix.cu)
+  cuda_compile_and_embed (PBRT_EMBEDDED_PTX src/pbrt/gpu/optix/optix.cu optix.cu)
 endif ()
 
 source_group ("Source Files" FILES ${PBRT_SOURCE})

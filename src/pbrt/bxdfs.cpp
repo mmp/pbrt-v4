@@ -74,7 +74,7 @@ std::string LayeredBxDF<TopBxDF, BottomBxDF, twoSided>::ToString() const {
 }
 
 // DielectricBxDF Method Definitions
-pstd::optional<BSDFSample> DielectricBxDF::Sample_f(
+PBRT_CPU_GPU pstd::optional<BSDFSample> DielectricBxDF::Sample_f(
     Vector3f wo, Float uc, Point2f u, TransportMode mode,
     BxDFReflTransFlags sampleFlags) const {
     if (eta == 1 || mfDistrib.EffectivelySmooth()) {
@@ -169,7 +169,7 @@ pstd::optional<BSDFSample> DielectricBxDF::Sample_f(
     }
 }
 
-SampledSpectrum DielectricBxDF::f(Vector3f wo, Vector3f wi, TransportMode mode) const {
+PBRT_CPU_GPU SampledSpectrum DielectricBxDF::f(Vector3f wo, Vector3f wi, TransportMode mode) const {
     if (eta == 1 || mfDistrib.EffectivelySmooth())
         return SampledSpectrum(0.f);
     // Evaluate rough dielectric BSDF
@@ -208,7 +208,7 @@ SampledSpectrum DielectricBxDF::f(Vector3f wo, Vector3f wi, TransportMode mode) 
     }
 }
 
-Float DielectricBxDF::PDF(Vector3f wo, Vector3f wi, TransportMode mode,
+PBRT_CPU_GPU Float DielectricBxDF::PDF(Vector3f wo, Vector3f wi, TransportMode mode,
                           BxDFReflTransFlags sampleFlags) const {
     if (eta == 1 || mfDistrib.EffectivelySmooth())
         return 0;
@@ -272,7 +272,7 @@ std::string ConductorBxDF::ToString() const {
 }
 
 // HairBxDF Method Definitions
-HairBxDF::HairBxDF(Float h, Float eta, const SampledSpectrum &sigma_a, Float beta_m,
+PBRT_CPU_GPU HairBxDF::HairBxDF(Float h, Float eta, const SampledSpectrum &sigma_a, Float beta_m,
                    Float beta_n, Float alpha)
     : h(h), eta(eta), sigma_a(sigma_a), beta_m(beta_m), beta_n(beta_n) {
     CHECK(h >= -1 && h <= 1);
@@ -300,7 +300,7 @@ HairBxDF::HairBxDF(Float h, Float eta, const SampledSpectrum &sigma_a, Float bet
     }
 }
 
-SampledSpectrum HairBxDF::f(Vector3f wo, Vector3f wi, TransportMode mode) const {
+PBRT_CPU_GPU SampledSpectrum HairBxDF::f(Vector3f wo, Vector3f wi, TransportMode mode) const {
     // Compute hair coordinate system terms related to _wo_
     Float sinTheta_o = wo.x;
     Float cosTheta_o = SafeSqrt(1 - Sqr(sinTheta_o));
@@ -365,7 +365,7 @@ SampledSpectrum HairBxDF::f(Vector3f wo, Vector3f wi, TransportMode mode) const 
     return fsum;
 }
 
-pstd::array<Float, HairBxDF::pMax + 1> HairBxDF::ApPDF(Float cosTheta_o) const {
+PBRT_CPU_GPU pstd::array<Float, HairBxDF::pMax + 1> HairBxDF::ApPDF(Float cosTheta_o) const {
     // Initialize array of $A_p$ values for _cosTheta_o_
     Float sinTheta_o = SafeSqrt(1 - Sqr(cosTheta_o));
     // Compute $\cos\,\thetat$ for refracted ray
@@ -394,7 +394,7 @@ pstd::array<Float, HairBxDF::pMax + 1> HairBxDF::ApPDF(Float cosTheta_o) const {
     return apPDF;
 }
 
-pstd::optional<BSDFSample> HairBxDF::Sample_f(Vector3f wo, Float uc, Point2f u,
+PBRT_CPU_GPU pstd::optional<BSDFSample> HairBxDF::Sample_f(Vector3f wo, Float uc, Point2f u,
                                               TransportMode mode,
                                               BxDFReflTransFlags sampleFlags) const {
     // Compute hair coordinate system terms related to _wo_
@@ -489,7 +489,7 @@ pstd::optional<BSDFSample> HairBxDF::Sample_f(Vector3f wo, Float uc, Point2f u,
     return BSDFSample(f(wo, wi, mode), wi, pdf, Flags());
 }
 
-Float HairBxDF::PDF(Vector3f wo, Vector3f wi, TransportMode mode,
+PBRT_CPU_GPU Float HairBxDF::PDF(Vector3f wo, Vector3f wi, TransportMode mode,
                     BxDFReflTransFlags sampleFlags) const {
     // TODO? flags...
 
@@ -545,7 +545,7 @@ Float HairBxDF::PDF(Vector3f wo, Vector3f wi, TransportMode mode,
     return pdf;
 }
 
-RGBUnboundedSpectrum HairBxDF::SigmaAFromConcentration(Float ce, Float cp) {
+PBRT_CPU_GPU RGBUnboundedSpectrum HairBxDF::SigmaAFromConcentration(Float ce, Float cp) {
     RGB eumelaninSigma_a(0.419f, 0.697f, 1.37f);
     RGB pheomelaninSigma_a(0.187f, 0.4f, 1.05f);
     RGB sigma_a = ce * eumelaninSigma_a + cp * pheomelaninSigma_a;
@@ -556,7 +556,7 @@ RGBUnboundedSpectrum HairBxDF::SigmaAFromConcentration(Float ce, Float cp) {
 #endif
 }
 
-SampledSpectrum HairBxDF::SigmaAFromReflectance(const SampledSpectrum &c, Float beta_n,
+PBRT_CPU_GPU SampledSpectrum HairBxDF::SigmaAFromReflectance(const SampledSpectrum &c, Float beta_n,
                                                 const SampledWavelengths &lambda) {
     SampledSpectrum sigma_a;
     for (int i = 0; i < NSpectrumSamples; ++i)
@@ -996,7 +996,8 @@ MeasuredBxDFData *MeasuredBxDF::BRDFDataFromFile(const std::string &filename,
 }
 
 // MeasuredBxDF Method Definitions
-SampledSpectrum MeasuredBxDF::f(Vector3f wo, Vector3f wi, TransportMode mode) const {
+PBRT_CPU_GPU SampledSpectrum MeasuredBxDF::f(Vector3f wo, Vector3f wi,
+                                             TransportMode mode) const {
     // Check for valid reflection configurations
     if (!SameHemisphere(wo, wi))
         return SampledSpectrum(0);
@@ -1032,7 +1033,7 @@ SampledSpectrum MeasuredBxDF::f(Vector3f wo, Vector3f wi, TransportMode mode) co
            (4 * brdf->sigma.Evaluate(u_wo) * CosTheta(wi));
 }
 
-pstd::optional<BSDFSample> MeasuredBxDF::Sample_f(Vector3f wo, Float uc, Point2f u,
+PBRT_CPU_GPU pstd::optional<BSDFSample> MeasuredBxDF::Sample_f(Vector3f wo, Float uc, Point2f u,
                                                   TransportMode mode,
                                                   BxDFReflTransFlags sampleFlags) const {
     // Check flags and detect interactions in lower hemisphere
@@ -1083,7 +1084,7 @@ pstd::optional<BSDFSample> MeasuredBxDF::Sample_f(Vector3f wo, Float uc, Point2f
     return BSDFSample(fr, wi, pdf * lum_pdf, BxDFFlags::GlossyReflection);
 }
 
-Float MeasuredBxDF::PDF(Vector3f wo, Vector3f wi, TransportMode mode,
+PBRT_CPU_GPU Float MeasuredBxDF::PDF(Vector3f wo, Vector3f wi, TransportMode mode,
                         BxDFReflTransFlags sampleFlags) const {
     if (!(sampleFlags & BxDFReflTransFlags::Reflection))
         return 0;
@@ -1127,7 +1128,7 @@ std::string NormalizedFresnelBxDF::ToString() const {
 }
 
 // BxDF Method Definitions
-SampledSpectrum BxDF::rho(Vector3f wo, pstd::span<const Float> uc,
+PBRT_CPU_GPU SampledSpectrum BxDF::rho(Vector3f wo, pstd::span<const Float> uc,
                           pstd::span<const Point2f> u2) const {
     if (wo.z == 0)
         return {};

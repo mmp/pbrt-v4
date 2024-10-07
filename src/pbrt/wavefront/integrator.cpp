@@ -9,7 +9,7 @@
 #include <pbrt/film.h>
 #include <pbrt/filters.h>
 #ifdef PBRT_BUILD_GPU_RENDERER
-#include <pbrt/gpu/aggregate.h>
+#include <pbrt/gpu/optix/aggregate.h>
 #include <pbrt/gpu/memory.h>
 #endif  // PBRT_BUILD_GPU_RENDERER
 #include <pbrt/lights.h>
