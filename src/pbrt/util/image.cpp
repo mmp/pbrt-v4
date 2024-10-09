@@ -557,7 +557,7 @@ ImageChannelValues Image::MAE(const ImageChannelDesc &desc, const Image &ref,
             ImageChannelValues vref = ref.GetChannels({x, y}, refDesc);
 
             for (int c = 0; c < desc.size(); ++c) {
-                double error = double(v[c]) - double(vref[c]);
+                double error = std::abs(double(v[c]) - double(vref[c]));
                 if (IsInf(error))
                     continue;
                 sumError[c] += error;
