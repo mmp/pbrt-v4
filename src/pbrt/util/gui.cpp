@@ -185,11 +185,11 @@ static void glfwKeyCallback(GLFWwindow* window, int key, int scan, int action, i
 }
 
 void GUI::mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
-    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+    if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_PRESS) {
         pressed = true;
         glfwGetCursorPos(window, &lastX, &lastY);
     }
-    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
+    if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_RELEASE) {
         pressed = false;
     }
 }
