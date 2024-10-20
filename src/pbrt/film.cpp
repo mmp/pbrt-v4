@@ -882,7 +882,7 @@ SpectralFilm::SpectralFilm(FilmBaseParameters p, Float lambdaMin, Float lambdaMa
         pixel.weightSums = bucketWeightBuffer;
         bucketWeightBuffer += nBuckets;
         pixel.bucketSplats = splatBuffer;
-        splatBuffer += NSpectrumSamples;
+        splatBuffer += nBuckets;
     }
 }
 
