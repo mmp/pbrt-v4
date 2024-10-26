@@ -18,9 +18,6 @@ PBRT_CONST RGBColorSpace *RGBColorSpace_Rec2020;
 PBRT_CONST RGBColorSpace *RGBColorSpace_ACES2065_1;
 #endif
 
-// Color Space Constants
-extern const SquareMatrix<3> LMSFromXYZ, XYZFromLMS;
-
 // RGBColorSpace Method Definitions
 RGBColorSpace::RGBColorSpace(Point2f r, Point2f g, Point2f b, Spectrum illuminant,
                              const RGBToSpectrumTable *rgbToSpec, Allocator alloc)
