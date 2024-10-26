@@ -42,7 +42,9 @@ Denoiser::Denoiser(Vector2i resolution, bool haveAlbedoAndNormal)
     OptixDenoiserOptions options = {};
 #if (OPTIX_VERSION >= 80000)
     options.denoiseAlpha = OPTIX_DENOISER_ALPHA_MODE_COPY;
-#elif (OPTIX_VERSION >= 70300)
+#endif
+
+#if (OPTIX_VERSION >= 70300)
     if (haveAlbedoAndNormal)
         options.guideAlbedo = options.guideNormal = 1;
 
