@@ -43,11 +43,7 @@ Float SpectrumToPhotometric(Spectrum s) {
     if (s.Is<RGBIlluminantSpectrum>())
         s = s.Cast<RGBIlluminantSpectrum>()->Illuminant();
 
-    Float y = 0;
-    for (Float lambda = Lambda_min; lambda <= Lambda_max; ++lambda)
-        y += Spectra::Y()(lambda) * s(lambda);
-
-    return y;
+    return InnerProduct(&Spectra::Y(), s);
 }
 
 XYZ SpectrumToXYZ(Spectrum s) {
