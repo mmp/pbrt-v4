@@ -2867,7 +2867,7 @@ void SPPMIntegrator::Render() {
             Options->disableWavelengthJitter ? Float(0.5) : RadicalInverse(1, iter);
         const SampledWavelengths passLambda = film.SampleWavelengths(uLambda);
 
-        Float timeSample = samplerPrototype.Get1D();
+        Float timeSample = RadicalInverse(2, iter);
 
         ParallelFor2D(pixelBounds, [&](Bounds2i tileBounds) {
             // Follow camera paths for _tileBounds_ in image for SPPM
