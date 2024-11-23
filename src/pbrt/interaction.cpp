@@ -97,7 +97,7 @@ PBRT_CPU_GPU void SurfaceInteraction::SkipIntersection(RayDifferential *ray, Flo
 }
 
 PBRT_CPU_GPU RayDifferential SurfaceInteraction::SpawnRay(const RayDifferential &rayi,
-                                             const BSDF &bsdf, Vector3f wi, int flags,
+                                             Vector3f wi, int flags,
                                              Float eta) const {
     RayDifferential rd(SpawnRay(wi));
     if (rayi.hasDifferentials) {

@@ -592,7 +592,7 @@ void LightPathIntegrator::EvaluatePixelSample(Point2i pPixel, int sampleIndex,
         if (!bs)
             break;
         beta *= bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
-        ray = isect.SpawnRay(ray, bsdf, bs->wi, bs->flags, bs->eta);
+        ray = isect.SpawnRay(ray, bs->wi, bs->flags, bs->eta);
     }
 }
 
@@ -745,7 +745,7 @@ SampledSpectrum PathIntegrator::Li(RayDifferential ray, SampledWavelengths &lamb
             etaScale *= Sqr(bs->eta);
         prevIntrCtx = si->intr;
 
-        ray = isect.SpawnRay(ray, bsdf, bs->wi, bs->flags, bs->eta);
+        ray = isect.SpawnRay(ray, bs->wi, bs->flags, bs->eta);
 
         // Possibly terminate the path with Russian roulette
         SampledSpectrum rrBeta = beta * etaScale;
@@ -1182,7 +1182,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
         anyNonSpecularBounces |= !bs->IsSpecular();
         if (bs->IsTransmission())
             etaScale *= Sqr(bs->eta);
-        ray = isect.SpawnRay(ray, bsdf, bs->wi, bs->flags, bs->eta);
+        ray = isect.SpawnRay(ray, bs->wi, bs->flags, bs->eta);
 
         // Account for attenuated subsurface scattering, if applicable
         BSSRDF bssrdf = isect.GetBSSRDF(ray, lambda, camera, scratchBuffer);
@@ -2096,7 +2096,7 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
         pdfFwd = bs->pdfIsProportional ? bsdf.PDF(wo, bs->wi, mode) : bs->pdf;
         anyNonSpecularBounces |= !bs->IsSpecular();
         beta *= bs->f * AbsDot(bs->wi, isect.shading.n) / bs->pdf;
-        ray = isect.SpawnRay(ray, bsdf, bs->wi, bs->flags, bs->eta);
+        ray = isect.SpawnRay(ray, bs->wi, bs->flags, bs->eta);
 
         // Compute path probabilities at surface vertex
         // TODO: confirm. I believe that !mode is right. Interestingly,
@@ -2988,7 +2988,7 @@ void SPPMIntegrator::Render() {
                             break;
                         beta /= 1 - q;
                     }
-                    ray = isect.SpawnRay(ray, bsdf, bs->wi, bs->flags, bs->eta);
+                    ray = isect.SpawnRay(ray, bs->wi, bs->flags, bs->eta);
                     prevIntrCtx = LightSampleContext(isect);
                 }
             }
