@@ -36,11 +36,6 @@ jobs:
     - name: Get cmake
       uses: lukka/get-cmake@latest
 
-    - name: Install OpenEXR
-      env:
-          HOMEBREW_NO_INSTALL_CLEANUP: 1
-      run: brew install openexr
-
     - name: Configure
       run: |
         cd build
