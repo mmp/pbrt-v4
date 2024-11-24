@@ -17,30 +17,33 @@ jobs:
         config: [ '', '-DPBRT_DBG_LOGGING=True', '-DPBRT_FLOAT_AS_DOUBLE=True' ]
         compilers:
         - {
-            cc: "gcc-9",
-            cxx: "g++-9",
-          }
-        - {
             cc: "gcc-10",
             cxx: "g++-10",
           }
         - {
-            cc: "clang-10",
-            cxx: "clang++-10",
+            cc: "gcc-11",
+            cxx: "g++-11",
           }
         - {
-            cc: "clang-11",
-            cxx: "clang++-11",
+            cc: "gcc-12",
+            cxx: "g++-12",
           }
-# WAR github actions flakiness
-#        - {
-#            cc: "clang-12",
-#            cxx: "clang++-12",
-#          }
+        - {
+            cc: "clang-16",
+            cxx: "clang++-16",
+          }
+        - {
+            cc: "clang-17",
+            cxx: "clang++-17",
+          }
+        - {
+            cc: "clang-18",
+            cxx: "clang++-18",
+          }
 
       fail-fast: false
 
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     name: Build and test ${{ matrix.compilers.cxx }} - ${{ matrix.config }}
 
     steps:
