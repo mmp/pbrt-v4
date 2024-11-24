@@ -57,7 +57,7 @@ set (ZLIB_LIBRARIES ${ZLIB_LIBARIES} PARENT_SCOPE)
 ###########################################################################
 # OpenEXR
 
-find_package (OpenEXR 2.3) # 2.3 is the first version compatible with C++17
+find_package (OpenEXR)
 
 if (OPENEXR_FOUND)
   message (STATUS "Found OpenEXR version ${OPENEXR_VERSION}")
