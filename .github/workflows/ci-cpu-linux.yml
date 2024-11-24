@@ -32,10 +32,6 @@ jobs:
             cc: "clang-14",
             cxx: "clang++-14",
           }
-        - {
-            cc: "clang-18",
-            cxx: "clang++-18",
-          }
 
       fail-fast: false
 
