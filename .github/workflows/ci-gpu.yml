@@ -24,7 +24,7 @@ jobs:
       matrix:
         optix: [ optix-7.5.0, optix-7.7.0, optix-8.0.0 ]
         cuda: [ '11.5.2', '11.6.1', '11.7.0', '12.1.0' ]  # 11.3.0 fails for unclear reasons
-        os: [ ubuntu-20.04, windows-latest ]
+        os: [ ubuntu-22.04, windows-latest ]
 
     name: GPU Build Only (${{ matrix.os }}, CUDA ${{ matrix.cuda }}, ${{ matrix.optix }})
 
@@ -68,13 +68,9 @@ jobs:
     - name: Get cmake
       uses: lukka/get-cmake@latest
 
-    - name: Install OpenEXR
-      if: ${{ matrix.os == 'ubuntu-20.04' }}
-      run: sudo apt-get -y install libopenexr-dev
-
     - name: Install OpenGL
-      if: ${{ matrix.os == 'ubuntu-20.04' }}
-      run: sudo apt-get install -y --no-install-recommends libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxext-dev libxfixes-dev libgl1-mesa-dev
+      if: ${{ matrix.os == 'ubuntu-22.04' }}
+      run: sudo apt-get install -y --no-install-recommends libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxext-dev libxfixes-dev libgl1-mesa-dev libwayland-bin libwayland-dev wayland-protocols libxkbcommon-dev libxkbcommon-x11-0
 
     - name: Configure
       run: |
