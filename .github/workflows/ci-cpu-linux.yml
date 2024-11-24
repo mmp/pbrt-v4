@@ -62,7 +62,7 @@ jobs:
       run: sudo apt-get -y install libopenexr-dev
 
     - name: Install OpenGL
-      run: sudo apt-get install -y --no-install-recommends libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxext-dev libxfixes-dev libgl1-mesa-dev
+      run: sudo apt-get install -y --no-install-recommends libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxext-dev libxfixes-dev libgl1-mesa-dev libwayland-bin libwayland-dev wayland-protocols
 
     - name: Install compilers
       run: sudo apt-get -y install ${{ matrix.compilers.cc }} ${{ matrix.compilers.cxx }}
