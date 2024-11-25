@@ -23,6 +23,11 @@
 
 #include <Ptexture.h>
 
+// Windows strikes again.
+#ifdef RGB
+#undef RGB
+#endif
+
 namespace pbrt {
 
 std::string TextureEvalContext::ToString() const {

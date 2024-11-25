@@ -36,10 +36,16 @@ jobs:
     - name: Get cmake
       uses: lukka/get-cmake@latest
 
+    - name: Install pkgconfig and zlib
+      run: |
+        choco install pkgconfiglite
+        vcpkg install zlib:x64-windows
+        vcpkg install zlib:x64-windows-static
+
     - name: Configure
       run: |
         cd build
-        cmake .. -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True ${{ matrix.config }}
+        cmake .. -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT"/scripts/buildsystems/vcpkg.cmake -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True ${{ matrix.config }}
       
     - name: Build
       run: cmake --build build --parallel --config Release
