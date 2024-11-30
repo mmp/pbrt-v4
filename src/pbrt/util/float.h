@@ -203,7 +203,7 @@ inline PBRT_CPU_GPU Float AddRoundUp(Float a, Float b) {
 #else
     return __fadd_ru(a, b);
 #endif
-#else  // GPU
+#else  // CPU
     return NextFloatUp(a + b);
 #endif
 }
@@ -214,7 +214,7 @@ inline PBRT_CPU_GPU Float AddRoundDown(Float a, Float b) {
 #else
     return __fadd_rd(a, b);
 #endif
-#else  // GPU
+#else  // CPU
     return NextFloatDown(a + b);
 #endif
 }
@@ -233,7 +233,7 @@ inline PBRT_CPU_GPU Float MulRoundUp(Float a, Float b) {
 #else
     return __fmul_ru(a, b);
 #endif
-#else  // GPU
+#else  // CPU
     return NextFloatUp(a * b);
 #endif
 }
@@ -245,7 +245,7 @@ inline PBRT_CPU_GPU Float MulRoundDown(Float a, Float b) {
 #else
     return __fmul_rd(a, b);
 #endif
-#else  // GPU
+#else  // CPU
     return NextFloatDown(a * b);
 #endif
 }
@@ -257,7 +257,7 @@ inline PBRT_CPU_GPU Float DivRoundUp(Float a, Float b) {
 #else
     return __fdiv_ru(a, b);
 #endif
-#else  // GPU
+#else  // CPU
     return NextFloatUp(a / b);
 #endif
 }
@@ -269,7 +269,7 @@ inline PBRT_CPU_GPU Float DivRoundDown(Float a, Float b) {
 #else
     return __fdiv_rd(a, b);
 #endif
-#else  // GPU
+#else  // CPU
     return NextFloatDown(a / b);
 #endif
 }
@@ -281,7 +281,7 @@ inline PBRT_CPU_GPU Float SqrtRoundUp(Float a) {
 #else
     return __fsqrt_ru(a);
 #endif
-#else  // GPU
+#else  // CPU
     return NextFloatUp(std::sqrt(a));
 #endif
 }
@@ -293,7 +293,7 @@ inline PBRT_CPU_GPU Float SqrtRoundDown(Float a) {
 #else
     return __fsqrt_rd(a);
 #endif
-#else  // GPU
+#else  // CPU
     return std::max<Float>(0, NextFloatDown(std::sqrt(a)));
 #endif
 }
@@ -305,7 +305,7 @@ inline PBRT_CPU_GPU Float FMARoundUp(Float a, Float b, Float c) {
 #else
     return __fma_ru(a, b, c);
 #endif
-#else  // GPU
+#else  // CPU
     return NextFloatUp(FMA(a, b, c));
 #endif
 }
@@ -317,7 +317,7 @@ inline PBRT_CPU_GPU Float FMARoundDown(Float a, Float b, Float c) {
 #else
     return __fma_rd(a, b, c);
 #endif
-#else  // GPU
+#else  // CPU
     return NextFloatDown(FMA(a, b, c));
 #endif
 }
