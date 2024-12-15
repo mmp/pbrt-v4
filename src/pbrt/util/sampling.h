@@ -1300,7 +1300,7 @@ class PiecewiseLinear2D {
   private:
     using FloatStorage = pstd::vector<float>;
 
-#if !defined(_MSC_VER) && !defined(__CUDACC__)
+#if !defined(_MSC_VER) && !(defined(__CUDACC__) || defined(__HIPCC__))
     static constexpr size_t ArraySize = Dimension;
 #else
     static constexpr size_t ArraySize = (Dimension != 0) ? Dimension : 1;

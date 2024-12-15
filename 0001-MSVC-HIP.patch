@@ -1,0 +1,24 @@
+From 56933471af36147e1032fbbc7912ca0088797b78 Mon Sep 17 00:00:00 2001
+From: Aaryaman Vasishta <aaryaman.vasishta@amd.com>
+Date: Sun, 10 Dec 2023 18:40:22 +0900
+Subject: [PATCH] Fix BitScanreverse by including intrin.h for MSVC
+
+---
+ common/compiler_msc.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/common/compiler_msc.h b/common/compiler_msc.h
+index 18cfa12..2eafd55 100644
+--- a/common/compiler_msc.h
++++ b/common/compiler_msc.h
+@@ -4,6 +4,7 @@
+ 
+ #include <stdint.h>
+ #include <stdlib.h> /* for _byteswap_*() */
++#include <intrin.h>
+ 
+ #define LIBEXPORT	__declspec(dllexport)
+ 
+-- 
+2.33.0.windows.2
+

@@ -25,7 +25,7 @@
 
 namespace pbrt {
 
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && defined(__CUDACC__)
 
 #define ShadowEpsilon 0.0001f
 #define Pi Float(3.14159265358979323846)

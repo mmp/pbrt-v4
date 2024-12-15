@@ -18,8 +18,12 @@
 #include <utility>
 #include <vector>
 
+#if defined(__HIPCC__)
+#include <pbrt/util/hip_aliases.h>
+#else
 #include <cuda.h>
 #include <cuda_runtime_api.h>
+#endif
 
 #ifdef NVTX
 #ifdef UNICODE
@@ -38,6 +42,7 @@
         LOG_FATAL("CUDA error: %s", cudaGetErrorString(error)); \
     } else /* eat semicolon */
 
+#ifdef __NVCC__  // only used in denoiser.cpp
 #define CU_CHECK(EXPR)                                              \
     do {                                                            \
         CUresult result = EXPR;                                     \
@@ -47,6 +52,7 @@
             LOG_FATAL("CUDA error: %s", str);                       \
         }                                                           \
     } while (false) /* eat semicolon */
+#endif
 
 namespace pbrt {
 
@@ -64,15 +70,20 @@ inline int GetBlockSize(const char *description, F kernel) {
         return iter->second;
 
     int minGridSize, blockSize;
+// this API is not reliable in HIP sometimes returning even negative values
+#ifdef __HIPCC__  
+    blockSize = 64;
+#else
     CUDA_CHECK(
         cudaOccupancyMaxPotentialBlockSize(&minGridSize, &blockSize, kernel, 0, 0));
+#endif
     kernelBlockSizes[index] = blockSize;
     LOG_VERBOSE("[%s]: block size %d", description, blockSize);
 
     return blockSize;
 }
 
-#ifdef __NVCC__
+#if defined(__NVCC__) || defined(__HIPCC__)
 template <typename F>
 __global__ void Kernel(F func, int nItems) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -113,7 +124,7 @@ void GPUParallelFor(const char *description, int nItems, F func) {
 #endif
 }
 
-#endif  // __NVCC__
+#endif  // __NVCC__ || __HIPCC__
 
 // GPU Synchronization Function Declarations
 void GPUWait();
