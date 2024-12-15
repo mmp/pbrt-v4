@@ -62,9 +62,9 @@ struct PBRTOptions : BasicPBRTOptions {
 extern PBRTOptions *Options;
 
 #if defined(PBRT_BUILD_GPU_RENDERER)
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIPCC__)
 extern __constant__ BasicPBRTOptions OptionsGPU;
-#endif  // __CUDACC__
+#endif  // __CUDACC__ || __HIPCC__
 
 void CopyOptionsToGPU();
 #endif  // PBRT_BUILD_GPU_RENDERER

@@ -812,7 +812,7 @@ inline Cylinder::Cylinder(const Transform *renderFromObject,
       phiMax(Radians(Clamp(phiMax, 0, 360))) {}
 
 // Triangle Declarations
-#if defined(PBRT_BUILD_GPU_RENDERER) && defined(__CUDACC__)
+#if defined(PBRT_BUILD_GPU_RENDERER) && (defined(__HIPCC__) || defined(__CUDACC__))
 extern PBRT_GPU pstd::vector<const TriangleMesh *> *allTriangleMeshesGPU;
 #endif
 
@@ -1264,7 +1264,7 @@ class Curve {
 };
 
 // BilinearPatch Declarations
-#if defined(PBRT_BUILD_GPU_RENDERER) && defined(__CUDACC__)
+#if defined(PBRT_BUILD_GPU_RENDERER) && (defined(__HIPCC__) || defined(__CUDACC__))
 extern PBRT_GPU pstd::vector<const BilinearPatchMesh *> *allBilinearMeshesGPU;
 #endif
 

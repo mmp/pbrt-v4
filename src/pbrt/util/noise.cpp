@@ -53,7 +53,7 @@ static PBRT_CONST int NoisePerm[2 * NoisePermSize] = {
 };
 
 // Noise Function Definitions
-Float Noise(Float x, Float y, Float z) {
+PBRT_CPU_GPU Float Noise(Float x, Float y, Float z) {
     // Compute noise cell coordinates and offsets
     // Avoid overflow when computing deltas if the coordinates are too large to store in
     // int32s.
@@ -87,11 +87,11 @@ Float Noise(Float x, Float y, Float z) {
     return Lerp(wz, y0, y1);
 }
 
-Float Noise(Point3f p) {
+PBRT_CPU_GPU Float Noise(Point3f p) {
     return Noise(p.x, p.y, p.z);
 }
 
-inline Float Grad(int x, int y, int z, Float dx, Float dy, Float dz) {
+PBRT_CPU_GPU inline Float Grad(int x, int y, int z, Float dx, Float dy, Float dz) {
     int h = NoisePerm[NoisePerm[NoisePerm[x] + y] + z];
     h &= 15;
     Float u = h < 8 || h == 12 || h == 13 ? dx : dy;
@@ -99,11 +99,11 @@ inline Float Grad(int x, int y, int z, Float dx, Float dy, Float dz) {
     return ((h & 1) ? -u : u) + ((h & 2) ? -v : v);
 }
 
-inline Float NoiseWeight(Float t) {
+PBRT_CPU_GPU inline Float NoiseWeight(Float t) {
     return 6 * Pow<5>(t) - 15 * Pow<4>(t) + 10 * Pow<3>(t);
 }
 
-Vector3f DNoise(Point3f p) {
+PBRT_CPU_GPU Vector3f DNoise(Point3f p) {
     Float delta = .01f;
     Float n = Noise(p);
     Point3f noiseDelta(Noise(p + Vector3f(delta, 0, 0)), Noise(p + Vector3f(0, delta, 0)),
@@ -111,7 +111,8 @@ Vector3f DNoise(Point3f p) {
     return (noiseDelta - Point3f(n, n, n)) / delta;
 }
 
-Float FBm(Point3f p, Vector3f dpdx, Vector3f dpdy, Float omega, int maxOctaves) {
+PBRT_CPU_GPU Float FBm(Point3f p, Vector3f dpdx, Vector3f dpdy, Float omega,
+                       int maxOctaves) {
     // Compute number of octaves for antialiased FBm
     Float len2 = std::max(LengthSquared(dpdx), LengthSquared(dpdy));
     Float n = Clamp(-1 - Log2(len2) / 2, 0, maxOctaves);
@@ -130,7 +131,7 @@ Float FBm(Point3f p, Vector3f dpdx, Vector3f dpdy, Float omega, int maxOctaves) 
     return sum;
 }
 
-Float Turbulence(Point3f p, Vector3f dpdx, Vector3f dpdy, Float omega, int maxOctaves) {
+PBRT_CPU_GPU Float Turbulence(Point3f p, Vector3f dpdx, Vector3f dpdy, Float omega, int maxOctaves) {
     // Compute number of octaves for antialiased FBm
     Float len2 = std::max(LengthSquared(dpdx), LengthSquared(dpdy));
     Float n = Clamp(-1 - Log2(len2) / 2, 0, maxOctaves);

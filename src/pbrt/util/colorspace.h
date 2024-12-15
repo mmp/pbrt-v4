@@ -11,6 +11,9 @@
 #include <pbrt/util/math.h>
 #include <pbrt/util/spectrum.h>
 #include <pbrt/util/vecmath.h>
+#ifdef PBRT_BUILD_GPU_RENDERER
+#include <pbrt/gpu/util.h>
+#endif
 
 #include <string>
 

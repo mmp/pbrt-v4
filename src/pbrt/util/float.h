@@ -57,7 +57,7 @@ template <typename T>
 inline PBRT_CPU_GPU typename std::enable_if_t<std::is_floating_point_v<T>, bool> IsNaN(
     T v) {
 #ifdef PBRT_IS_GPU_CODE
-    return isnan(v);
+    return isnan((float)v);
 #else
     return std::isnan(v);
 #endif
@@ -197,24 +197,24 @@ inline constexpr Float gamma(int n) {
 }
 
 inline PBRT_CPU_GPU Float AddRoundUp(Float a, Float b) {
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && !defined(__CUDACC__)
 #ifdef PBRT_FLOAT_AS_DOUBLE
     return __dadd_ru(a, b);
 #else
     return __fadd_ru(a, b);
 #endif
-#else  // CPU
+#else  // CPU or HIP
     return NextFloatUp(a + b);
 #endif
 }
 inline PBRT_CPU_GPU Float AddRoundDown(Float a, Float b) {
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && !defined(__CUDACC__)
 #ifdef PBRT_FLOAT_AS_DOUBLE
     return __dadd_rd(a, b);
 #else
     return __fadd_rd(a, b);
 #endif
-#else  // CPU
+#else  // CPU or HIP
     return NextFloatDown(a + b);
 #endif
 }
@@ -227,97 +227,97 @@ inline PBRT_CPU_GPU Float SubRoundDown(Float a, Float b) {
 }
 
 inline PBRT_CPU_GPU Float MulRoundUp(Float a, Float b) {
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && !defined(__CUDACC__)
 #ifdef PBRT_FLOAT_AS_DOUBLE
     return __dmul_ru(a, b);
 #else
     return __fmul_ru(a, b);
 #endif
-#else  // CPU
+#else  // CPU or HIP
     return NextFloatUp(a * b);
 #endif
 }
 
 inline PBRT_CPU_GPU Float MulRoundDown(Float a, Float b) {
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && !defined(__CUDACC__)
 #ifdef PBRT_FLOAT_AS_DOUBLE
     return __dmul_rd(a, b);
 #else
     return __fmul_rd(a, b);
 #endif
-#else  // CPU
+#else  // CPU or HIP
     return NextFloatDown(a * b);
 #endif
 }
 
 inline PBRT_CPU_GPU Float DivRoundUp(Float a, Float b) {
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && !defined(__CUDACC__)
 #ifdef PBRT_FLOAT_AS_DOUBLE
     return __ddiv_ru(a, b);
 #else
     return __fdiv_ru(a, b);
 #endif
-#else  // CPU
+#else  // CPU or HIP
     return NextFloatUp(a / b);
 #endif
 }
 
 inline PBRT_CPU_GPU Float DivRoundDown(Float a, Float b) {
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && !defined(__CUDACC__)
 #ifdef PBRT_FLOAT_AS_DOUBLE
     return __ddiv_rd(a, b);
 #else
     return __fdiv_rd(a, b);
 #endif
-#else  // CPU
+#else  // CPU or HIP
     return NextFloatDown(a / b);
 #endif
 }
 
 inline PBRT_CPU_GPU Float SqrtRoundUp(Float a) {
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && !defined(__CUDACC__)
 #ifdef PBRT_FLOAT_AS_DOUBLE
     return __dsqrt_ru(a);
 #else
     return __fsqrt_ru(a);
 #endif
-#else  // CPU
+#else  // CPU or HIP
     return NextFloatUp(std::sqrt(a));
 #endif
 }
 
 inline PBRT_CPU_GPU Float SqrtRoundDown(Float a) {
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && !defined(__CUDACC__)
 #ifdef PBRT_FLOAT_AS_DOUBLE
     return __dsqrt_rd(a);
 #else
     return __fsqrt_rd(a);
 #endif
-#else  // CPU
+#else  // CPU or HIP
     return std::max<Float>(0, NextFloatDown(std::sqrt(a)));
 #endif
 }
 
 inline PBRT_CPU_GPU Float FMARoundUp(Float a, Float b, Float c) {
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && !defined(__CUDACC__)
 #ifdef PBRT_FLOAT_AS_DOUBLE
     return __fma_ru(a, b, c);  // FIXME: what to do here?
 #else
     return __fma_ru(a, b, c);
 #endif
-#else  // CPU
+#else  // CPU or HIP
     return NextFloatUp(FMA(a, b, c));
 #endif
 }
 
 inline PBRT_CPU_GPU Float FMARoundDown(Float a, Float b, Float c) {
-#ifdef PBRT_IS_GPU_CODE
+#if defined(PBRT_IS_GPU_CODE) && !defined(__CUDACC__)
 #ifdef PBRT_FLOAT_AS_DOUBLE
     return __fma_rd(a, b, c);  // FIXME: what to do here?
 #else
     return __fma_rd(a, b, c);
 #endif
-#else  // CPU
+#else  // CPU or HIP
     return NextFloatDown(FMA(a, b, c));
 #endif
 }

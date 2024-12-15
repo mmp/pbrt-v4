@@ -422,7 +422,7 @@ class Image {
 };
 
 // Image Inline Method Definitions
-inline void Image::SetChannel(Point2i p, int c, Float value) {
+PBRT_CPU_GPU inline void Image::SetChannel(Point2i p, int c, Float value) {
     // CHECK(!IsNaN(value));
     if (IsNaN(value)) {
 #ifndef PBRT_IS_GPU_CODE

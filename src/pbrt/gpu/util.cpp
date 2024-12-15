@@ -76,21 +76,27 @@ void GPUInit() {
 #endif
     CUDA_CHECK(cudaSetDevice(device));
 
+// there was a bug in HIP stating unsupported while actually supported
+// not sure whether has been fixed
+#ifdef __NVCC__ 
     int hasUnifiedAddressing;
     CUDA_CHECK(cudaDeviceGetAttribute(&hasUnifiedAddressing, cudaDevAttrUnifiedAddressing,
                                       device));
     if (!hasUnifiedAddressing)
         LOG_FATAL("The selected GPU device (%d) does not support unified addressing.",
                   device);
+#endif
 
     CUDA_CHECK(cudaDeviceSetLimit(cudaLimitStackSize, 8192));
     size_t stackSize;
     CUDA_CHECK(cudaDeviceGetLimit(&stackSize, cudaLimitStackSize));
     LOG_VERBOSE("Reset stack size to %d", stackSize);
 
+#ifdef __NVCC__
     CUDA_CHECK(cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 32 * 1024 * 1024));
 
     CUDA_CHECK(cudaDeviceSetCacheConfig(cudaFuncCachePreferL1));
+#endif
 
 #ifdef NVTX
 #ifdef PBRT_IS_WINDOWS

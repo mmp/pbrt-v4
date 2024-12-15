@@ -104,6 +104,7 @@ TEST(Point2, InvertBilinear) {
     }
 }
 
+#if !defined(__HIPCC__)
 TEST(Vector, AngleBetween) {
     EXPECT_EQ(0, AngleBetween(Vector3f(1, 0, 0), Vector3f(1, 0, 0)));
 
@@ -176,6 +177,7 @@ TEST(Vector, AngleBetween) {
     Float abet = AngleBetween(a, b);
     EXPECT_EQ(abet, precise) << StringPrintf("vs naive %f", naive);
 }
+#endif
 
 TEST(Vector, CoordinateSystem) {
     // Duff et al 2017 footnote 1

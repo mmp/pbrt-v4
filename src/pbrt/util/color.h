@@ -476,18 +476,18 @@ class GammaColorEncoding {
     pstd::array<Float, 1024> inverseLUT;
 };
 
-inline void ColorEncoding::ToLinear(pstd::span<const uint8_t> vin,
+PBRT_CPU_GPU inline void ColorEncoding::ToLinear(pstd::span<const uint8_t> vin,
                                     pstd::span<Float> vout) const {
     auto tolin = [&](auto ptr) { return ptr->ToLinear(vin, vout); };
     Dispatch(tolin);
 }
 
-inline Float ColorEncoding::ToFloatLinear(Float v) const {
+PBRT_CPU_GPU inline Float ColorEncoding::ToFloatLinear(Float v) const {
     auto tfl = [&](auto ptr) { return ptr->ToFloatLinear(v); };
     return Dispatch(tfl);
 }
 
-inline void ColorEncoding::FromLinear(pstd::span<const Float> vin,
+PBRT_CPU_GPU inline void ColorEncoding::FromLinear(pstd::span<const Float> vin,
                                       pstd::span<uint8_t> vout) const {
     auto fl = [&](auto ptr) { return ptr->FromLinear(vin, vout); };
     Dispatch(fl);

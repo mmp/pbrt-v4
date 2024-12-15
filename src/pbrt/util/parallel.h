@@ -213,7 +213,7 @@ class AtomicDouble {
     void Add(double v) {
 #if (defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600)
         atomicAdd(&value, v);
-#elif defined(__CUDA_ARCH__)
+#elif defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
         uint64_t old = bits, assumed;
 
         do {
@@ -235,7 +235,7 @@ class AtomicDouble {
     // AtomicDouble Private Data
 #if (defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 600)
     double value;
-#elif defined(__CUDA_ARCH__)
+#elif (defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__))
     uint64_t bits;
 #else
     std::atomic<uint64_t> bits;

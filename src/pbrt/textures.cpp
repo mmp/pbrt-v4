@@ -180,7 +180,7 @@ std::string SpectrumBilerpTexture::ToString() const {
 }
 
 // CheckerboardTexture Function Definitions
-Float Checkerboard(TextureEvalContext ctx, TextureMapping2D map2D,
+PBRT_CPU_GPU Float Checkerboard(TextureEvalContext ctx, TextureMapping2D map2D,
                    TextureMapping3D map3D) {
     // Define 1D checkerboard filtered integral functions
     auto d = [](Float x) {
@@ -285,7 +285,7 @@ std::string SpectrumCheckerboardTexture::ToString() const {
 }
 
 // InsidePolkaDot Function Definition
-bool InsidePolkaDot(Point2f st) {
+PBRT_CPU_GPU bool InsidePolkaDot(Point2f st) {
     // Compute cell indices (_sCell_,_tCell_ for dots
     int sCell = pstd::floor(st[0] + .5f), tCell = pstd::floor(st[1] + .5f);
 
@@ -356,10 +356,10 @@ std::string FBmTexture::ToString() const {
 }
 
 // SpectrumImageTexture Method Definitions
-SampledSpectrum SpectrumImageTexture::Evaluate(TextureEvalContext ctx,
+PBRT_CPU_GPU SampledSpectrum SpectrumImageTexture::Evaluate(TextureEvalContext ctx,
                                                SampledWavelengths lambda) const {
 #ifdef PBRT_IS_GPU_CODE
-    assert(!"Should not be called in GPU code");
+    CHECK(!"Should not be called in GPU code");
     return SampledSpectrum(0);
 #else
     // Apply texture mapping and flip $t$ coordinate for image texture lookup
@@ -477,7 +477,7 @@ SpectrumImageTexture *SpectrumImageTexture::Create(
 }
 
 // MarbleTexture Method Definitions
-SampledSpectrum MarbleTexture::Evaluate(TextureEvalContext ctx,
+PBRT_CPU_GPU SampledSpectrum MarbleTexture::Evaluate(TextureEvalContext ctx,
                                         SampledWavelengths lambda) const {
     TexCoord3D c = mapping.Map(ctx);
     c.p *= scale;
@@ -695,7 +695,7 @@ std::string SpectrumPtexTexture::ToString() const {
     return StringPrintf("[ SpectrumPtexTexture %s ]", BaseToString());
 }
 
-Float FloatPtexTexture::Evaluate(TextureEvalContext ctx) const {
+PBRT_CPU_GPU Float FloatPtexTexture::Evaluate(TextureEvalContext ctx) const {
 #ifdef PBRT_IS_GPU_CODE
     LOG_FATAL("Ptex not supported with GPU renderer");
     return 0;
@@ -709,7 +709,7 @@ Float FloatPtexTexture::Evaluate(TextureEvalContext ctx) const {
 #endif
 }
 
-SampledSpectrum SpectrumPtexTexture::Evaluate(TextureEvalContext ctx,
+PBRT_CPU_GPU SampledSpectrum SpectrumPtexTexture::Evaluate(TextureEvalContext ctx,
                                               SampledWavelengths lambda) const {
 #ifdef PBRT_IS_GPU_CODE
     LOG_FATAL("Ptex not supported with GPU renderer");
@@ -1562,11 +1562,11 @@ SpectrumTexture SpectrumTexture::Create(const std::string &name,
 }
 
 // UniversalTextureEvaluator Method Definitions
-Float UniversalTextureEvaluator::operator()(FloatTexture tex, TextureEvalContext ctx) {
+PBRT_CPU_GPU Float UniversalTextureEvaluator::operator()(FloatTexture tex, TextureEvalContext ctx) {
     return tex.Evaluate(ctx);
 }
 
-SampledSpectrum UniversalTextureEvaluator::operator()(SpectrumTexture tex,
+PBRT_CPU_GPU SampledSpectrum UniversalTextureEvaluator::operator()(SpectrumTexture tex,
                                                       TextureEvalContext ctx,
                                                       SampledWavelengths lambda) {
     return tex.Evaluate(ctx, lambda);
