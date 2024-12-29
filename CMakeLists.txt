@@ -1032,6 +1032,17 @@ add_sanitizers (nanovdb2pbrt)
 
 set_property (TARGET nanovdb2pbrt PROPERTY FOLDER "cmd")
 
+# Only do this if both targets actually exist
+if (TARGET Ptex_static AND TARGET zlibstatic)
+  install(
+    TARGETS zlibstatic
+    EXPORT Ptex             # Same export set name as used by Ptex
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+  )
+endif()
+
 ######################
 # cyhair2pbrt
 
