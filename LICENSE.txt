@@ -1,4 +1,4 @@
-All of the modifications made in commit ID dfd293c76b33ec03df55284283622868ea10aea9 are covered by the MIT license (below).
+All of the modifications made in commit ID 14582eebabcf1ca33323e6b6d6757a49d2306dbf are covered by the MIT license (below).
 The rest would be covered by the existing Apache license.
 
 ---------------------------------------------------------
