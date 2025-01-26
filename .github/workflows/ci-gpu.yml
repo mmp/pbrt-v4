@@ -24,14 +24,14 @@ jobs:
       matrix:
         optix: [ optix-7.5.0, optix-7.7.0, optix-8.1.0 ]
         cuda: [ '11.7.0', '12.2.2', '12.6.3', '12.8.0' ]
-        os: [ ubuntu-24.04, ubuntu-20.04, windows-latest ]
+        os: [ ubuntu-latest, ubuntu-20.04, windows-latest ]
 
     name: GPU Build Only (${{ matrix.os }}, CUDA ${{ matrix.cuda }}, ${{ matrix.optix }})
 
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: jimver/cuda-toolkit@v0.2.20
+    - uses: jimver/cuda-toolkit@v0.2.21
       id: cuda-toolkit
       with:
         cuda: ${{ matrix.cuda }}
