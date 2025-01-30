@@ -63,7 +63,7 @@ function (CHECK_EXT NAME DIR HASH)
   endif (GIT_FOUND)
 endfunction ()
 
-check_ext ("OpenEXR" "openexr/OpenEXR" ca757f97033ae7cfcc6130f23c0e9ee86b108b07)
+check_ext ("OpenEXR" "openexr/src" f723c3940fff287c0a26b425b90a8e764823bfd4)
 check_ext ("OpenVDB" "openvdb/nanovdb" 414bed84c2fc22e188eac7b611aa85c7edd7a5a9)
 check_ext ("Ptex" "ptex/src" 054047d02b9e06e690420b407114d2872435b953)
 check_ext ("double-conversion" "double-conversion/cmake" cc1f75a114aca8d2af69f73a5a959aecbab0e87a)
@@ -104,6 +104,17 @@ endif ()
 set (BUILD_SHARED_LIBS OFF)
 
 add_subdirectory (${CMAKE_CURRENT_SOURCE_DIR}/src/ext)
+
+find_package(OpenEXR 3.1.1)
+
+if (OPENEXR_FOUND)
+  message (STATUS "Found OpenEXR version ${OPENEXR_VERSION}")
+else ()
+  message (STATUS "OpenEXR not found; building it from scratch.")
+  add_subdirectory (src/ext/openexr)
+  set_property (TARGET IlmThread Iex OpenEXR
+                PROPERTY FOLDER "ext/OpenEXR")
+endif ()
 
 ########################################
 # os/compiler-specific stuff
@@ -857,7 +868,6 @@ target_include_directories (pbrt_lib PUBLIC
   src/ext
   ${STB_INCLUDE}
   ${QOI_INCLUDE}
-  ${OPENEXR_INCLUDE}
   ${ZLIB_INCLUDE_DIRS}
   ${LIBDEFLATE_INCLUDE_DIRS}
   ${FILESYSTEM_INCLUDE}
@@ -875,7 +885,7 @@ endif ()
 
 target_compile_options (pbrt_lib PUBLIC ${PBRT_CXX_FLAGS})
 
-target_link_libraries (pbrt_lib PRIVATE pbrt_warnings pbrt_opt $<$<BOOL:PBRT_CUDA_ENABLED>:cuda_build_configuration>)
+target_link_libraries (pbrt_lib PRIVATE OpenEXR::OpenEXR pbrt_warnings pbrt_opt $<$<BOOL:PBRT_CUDA_ENABLED>:cuda_build_configuration>)
 
 add_sanitizers (pbrt_lib)
 
@@ -887,7 +897,7 @@ endif()
 set (ALL_PBRT_LIBS
   pbrt_lib
   ${CMAKE_THREAD_LIBS_INIT}
-  ${OPENEXR_LIBS}
+  OpenEXR::OpenEXR
   Ptex_static
   ${ZLIB_LIBRARIES}
   ${LIBDEFLATE_LIBRARIES}
