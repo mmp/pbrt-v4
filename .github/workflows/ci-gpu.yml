@@ -97,7 +97,7 @@ jobs:
 
     - name: Save Windows executable
       if: ${{ matrix.os == 'windows-latest' }}
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pbrt.exe
         path: pbrt.exe
