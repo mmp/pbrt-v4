@@ -243,9 +243,9 @@ inline Float InvertNormalSample(Float x, Float mu = 0, Float sigma = 1) {
 }
 
 PBRT_CPU_GPU inline Point2f SampleTwoNormal(Point2f u, Float mu = 0, Float sigma = 1) {
-    Float r2 = -2 * std::log(1 - u[0]);
-    return {mu + sigma * std::sqrt(r2 * std::cos(2 * Pi * u[1])),
-            mu + sigma * std::sqrt(r2 * std::sin(2 * Pi * u[1]))};
+    Float r2 = -2 * std::log1p(-u[0]); // log(1-u[0]), robustly.
+    return {mu + sigma * std::sqrt(r2) * std::cos(2 * Pi * u[1]),
+            mu + sigma * std::sqrt(r2) * std::sin(2 * Pi * u[1])};
 }
 
 PBRT_CPU_GPU inline Float LogisticPDF(Float x, Float s) {
