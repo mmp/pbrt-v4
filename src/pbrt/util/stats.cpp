@@ -448,11 +448,15 @@ void StatsAccumulator::WritePixelImages() const {
     // FIXME: do this where?
     CHECK(stats->pixelTime.Write(pixelStatsBaseName + "-time.exr"));
 
+    auto rewriteSlashes = [](std::string s) {
+        for (size_t i = 0; i < s.size(); ++i)
+            if (s[i] == '/')
+                s[i] = '_';
+        return s;
+    };
+
     for (size_t i = 0; i < stats->pixelCounterImages.size(); ++i) {
-        std::string n = pixelStatsBaseName + "-" + stats->pixelCounterNames[i] + ".exr";
-        for (size_t j = 0; j < n.size(); ++j)
-            if (n[j] == '/')
-                n[j] = '_';
+        std::string n = pixelStatsBaseName + "-" + rewriteSlashes(stats->pixelCounterNames[i]) + ".exr";
 
         auto AllZero = [](const Image &im) {
             for (int y = 0; y < im.Resolution().y; ++y)
@@ -466,10 +470,7 @@ void StatsAccumulator::WritePixelImages() const {
     }
 
     for (size_t i = 0; i < stats->pixelRatioImages.size(); ++i) {
-        std::string n = pixelStatsBaseName + "-" + stats->pixelRatioNames[i] + ".exr";
-        for (size_t j = 0; j < n.size(); ++j)
-            if (n[j] == '/')
-                n[j] = '_';
+        std::string n = pixelStatsBaseName + "-" + rewriteSlashes(stats->pixelRatioNames[i]) + ".exr";
 
         auto AllZero = [](const Image &im) {
             for (int y = 0; y < im.Resolution().y; ++y)
