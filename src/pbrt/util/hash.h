@@ -27,7 +27,7 @@ PBRT_CPU_GPU inline uint64_t MurmurHash64A(const unsigned char *key, size_t len,
 
     while (key != end) {
         uint64_t k;
-        std::memcpy(&k, key, sizeof(uint64_t));
+        memcpy(&k, key, sizeof(uint64_t));
         key += 8;
 
         k *= m;
@@ -67,7 +67,7 @@ PBRT_CPU_GPU inline uint64_t MurmurHash64A(const unsigned char *key, size_t len,
 // http://zimbry.blogspot.ch/2011/09/better-bit-mixing-improving-on.html
 PBRT_CPU_GPU inline uint64_t MixBits(uint64_t v);
 
-inline uint64_t MixBits(uint64_t v) {
+PBRT_CPU_GPU inline uint64_t MixBits(uint64_t v) {
     v ^= (v >> 31);
     v *= 0x7fb5d329728ea185;
     v ^= (v >> 27);

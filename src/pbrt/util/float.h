@@ -16,7 +16,13 @@
 #include <string>
 
 #if defined(PBRT_BUILD_GPU_RENDERER) && defined(PBRT_IS_GPU_CODE)
+#if defined(__HIPCC__)
+#include <hip/hip_runtime.h>
+#include <hip/math_functions.h>
+#include <hip/hip_fp16.h>
+#else
 #include <cuda_fp16.h>
+#endif
 #endif
 
 namespace pbrt {
@@ -57,7 +63,7 @@ template <typename T>
 inline PBRT_CPU_GPU typename std::enable_if_t<std::is_floating_point_v<T>, bool> IsNaN(
     T v) {
 #ifdef PBRT_IS_GPU_CODE
-    return isnan(v);
+    return isnan((float)v);
 #else
     return std::isnan(v);
 #endif
@@ -199,9 +205,9 @@ inline constexpr Float gamma(int n) {
 inline PBRT_CPU_GPU Float AddRoundUp(Float a, Float b) {
 #ifdef PBRT_IS_GPU_CODE
 #ifdef PBRT_FLOAT_AS_DOUBLE
-    return __dadd_ru(a, b);
+    return __dadd_rn(a, b);
 #else
-    return __fadd_ru(a, b);
+    return __fadd_rn(a, b);
 #endif
 #else  // CPU
     return NextFloatUp(a + b);
@@ -210,9 +216,9 @@ inline PBRT_CPU_GPU Float AddRoundUp(Float a, Float b) {
 inline PBRT_CPU_GPU Float AddRoundDown(Float a, Float b) {
 #ifdef PBRT_IS_GPU_CODE
 #ifdef PBRT_FLOAT_AS_DOUBLE
-    return __dadd_rd(a, b);
+    return __dadd_rn(a, b);
 #else
-    return __fadd_rd(a, b);
+    return __fadd_rn(a, b);
 #endif
 #else  // CPU
     return NextFloatDown(a + b);
@@ -229,9 +235,9 @@ inline PBRT_CPU_GPU Float SubRoundDown(Float a, Float b) {
 inline PBRT_CPU_GPU Float MulRoundUp(Float a, Float b) {
 #ifdef PBRT_IS_GPU_CODE
 #ifdef PBRT_FLOAT_AS_DOUBLE
-    return __dmul_ru(a, b);
+    return __dmul_rn(a, b);
 #else
-    return __fmul_ru(a, b);
+    return __fmul_rn(a, b);
 #endif
 #else  // CPU
     return NextFloatUp(a * b);
@@ -241,9 +247,9 @@ inline PBRT_CPU_GPU Float MulRoundUp(Float a, Float b) {
 inline PBRT_CPU_GPU Float MulRoundDown(Float a, Float b) {
 #ifdef PBRT_IS_GPU_CODE
 #ifdef PBRT_FLOAT_AS_DOUBLE
-    return __dmul_rd(a, b);
+    return __dmul_rn(a, b);
 #else
-    return __fmul_rd(a, b);
+    return __fmul_rn(a, b);
 #endif
 #else  // CPU
     return NextFloatDown(a * b);
@@ -253,9 +259,9 @@ inline PBRT_CPU_GPU Float MulRoundDown(Float a, Float b) {
 inline PBRT_CPU_GPU Float DivRoundUp(Float a, Float b) {
 #ifdef PBRT_IS_GPU_CODE
 #ifdef PBRT_FLOAT_AS_DOUBLE
-    return __ddiv_ru(a, b);
+    return __ddiv_rn(a, b);
 #else
-    return __fdiv_ru(a, b);
+    return __fdiv_rn(a, b);
 #endif
 #else  // CPU
     return NextFloatUp(a / b);
@@ -265,9 +271,9 @@ inline PBRT_CPU_GPU Float DivRoundUp(Float a, Float b) {
 inline PBRT_CPU_GPU Float DivRoundDown(Float a, Float b) {
 #ifdef PBRT_IS_GPU_CODE
 #ifdef PBRT_FLOAT_AS_DOUBLE
-    return __ddiv_rd(a, b);
+    return __ddiv_rn(a, b);
 #else
-    return __fdiv_rd(a, b);
+    return __fdiv_rn(a, b);
 #endif
 #else  // CPU
     return NextFloatDown(a / b);
@@ -277,9 +283,9 @@ inline PBRT_CPU_GPU Float DivRoundDown(Float a, Float b) {
 inline PBRT_CPU_GPU Float SqrtRoundUp(Float a) {
 #ifdef PBRT_IS_GPU_CODE
 #ifdef PBRT_FLOAT_AS_DOUBLE
-    return __dsqrt_ru(a);
+    return __dsqrt_rn(a);
 #else
-    return __fsqrt_ru(a);
+    return __fsqrt_rn(a);
 #endif
 #else  // CPU
     return NextFloatUp(std::sqrt(a));
@@ -289,9 +295,9 @@ inline PBRT_CPU_GPU Float SqrtRoundUp(Float a) {
 inline PBRT_CPU_GPU Float SqrtRoundDown(Float a) {
 #ifdef PBRT_IS_GPU_CODE
 #ifdef PBRT_FLOAT_AS_DOUBLE
-    return __dsqrt_rd(a);
+    return __dsqrt_rn(a);
 #else
-    return __fsqrt_rd(a);
+    return __fsqrt_rn(a);
 #endif
 #else  // CPU
     return std::max<Float>(0, NextFloatDown(std::sqrt(a)));
@@ -301,9 +307,9 @@ inline PBRT_CPU_GPU Float SqrtRoundDown(Float a) {
 inline PBRT_CPU_GPU Float FMARoundUp(Float a, Float b, Float c) {
 #ifdef PBRT_IS_GPU_CODE
 #ifdef PBRT_FLOAT_AS_DOUBLE
-    return __fma_ru(a, b, c);  // FIXME: what to do here?
+    return __fma_rn(a, b, c);  // FIXME: what to do here?
 #else
-    return __fma_ru(a, b, c);
+    return __fma_rn(a, b, c);
 #endif
 #else  // CPU
     return NextFloatUp(FMA(a, b, c));
@@ -313,9 +319,9 @@ inline PBRT_CPU_GPU Float FMARoundUp(Float a, Float b, Float c) {
 inline PBRT_CPU_GPU Float FMARoundDown(Float a, Float b, Float c) {
 #ifdef PBRT_IS_GPU_CODE
 #ifdef PBRT_FLOAT_AS_DOUBLE
-    return __fma_rd(a, b, c);  // FIXME: what to do here?
+    return __fma_rn(a, b, c);  // FIXME: what to do here?
 #else
-    return __fma_rd(a, b, c);
+    return __fma_rn(a, b, c);
 #endif
 #else  // CPU
     return NextFloatDown(FMA(a, b, c));

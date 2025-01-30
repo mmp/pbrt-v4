@@ -34,9 +34,13 @@
 
 #include <glad/glad.h>
 
+#if defined(__HIPCC__)
+#include <pbrt/util/hip_aliases.h>
+#else
 #include <cuda.h>
 #include <cuda_gl_interop.h>
 #include <cuda_runtime.h>
+#endif
 
 #define GL_CHECK(call)                                                   \
     do {                                                                 \
@@ -370,6 +374,15 @@ CUDAOutputBuffer<PIXEL_FORMAT>::CUDAOutputBuffer(int32_t width, int32_t height) 
                           nullptr, GL_STREAM_DRAW));
     GL_CHECK(glBindBuffer(GL_ARRAY_BUFFER, 0u));
 
+#ifdef __HIPCC__
+    uint32_t num_gl_devices = 0;
+
+    int glDevice;
+    cudaGLGetDevices(&num_gl_devices, &glDevice, 1, cudaGLDeviceListAll);
+
+    if (glDevice != current_device)
+        LOG_FATAL("Multi-GPU not supported with GL interop yet");
+#endif
     CUDA_CHECK(cudaGraphicsGLRegisterBuffer(&m_cuda_gfx_resource, m_pbo,
                                             cudaGraphicsMapFlagsWriteDiscard));
 

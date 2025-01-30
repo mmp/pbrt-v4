@@ -8,8 +8,12 @@
 #include <pbrt/util/check.h>
 #include <pbrt/util/log.h>
 
+#if defined(__HIPCC__)
+#include <pbrt/util/hip_aliases.h>
+#else
 #include <cuda.h>
 #include <cuda_runtime.h>
+#endif
 
 namespace pbrt {
 

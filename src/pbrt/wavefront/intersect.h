@@ -54,7 +54,7 @@ inline PBRT_CPU_GPU void EnqueueWorkAfterIntersection(
         intr.mediumInterface ? *intr.mediumInterface : MediumInterface(rayMedium);
 
     if (rayMedium) {
-        assert(mediumSampleQueue);
+        CHECK(mediumSampleQueue);
         PBRT_DBG("Enqueuing into medium sample queue\n");
         mediumSampleQueue->Push(MediumSampleWorkItem{r.ray,
                                                      r.depth,

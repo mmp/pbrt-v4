@@ -16,7 +16,11 @@
 #include <thread>
 
 #ifdef PBRT_BUILD_GPU_RENDERER
+#if defined(__HIPCC__)
+#include <pbrt/util/hip_aliases.h>
+#else
 #include <cuda_runtime.h>
+#endif
 #include <vector>
 #endif
 
