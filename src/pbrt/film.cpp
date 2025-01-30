@@ -1050,6 +1050,13 @@ SpectralFilm *SpectralFilm::Create(const ParameterDictionary &parameters,
     int nBuckets = parameters.GetOneInt("nbuckets", 16);
     Float lambdaMin = parameters.GetOneFloat("lambdamin", Lambda_min);
     Float lambdaMax = parameters.GetOneFloat("lambdamax", Lambda_max);
+    if (lambdaMin < Lambda_min || lambdaMax > Lambda_max)
+        ErrorExit("Unfortunately pbrt must be recompiled to render wavelengths "
+                  "beyond the [%f,%f] range ([%f,%f] was specified). Please "
+                  "update Lambda_min and/or Lambda_max as necessary in "
+                  "src/pbrt/util/spectrum.h and recompile.", Lambda_min, Lambda_max,
+                  lambdaMin, lambdaMax);
+
     Float maxComponentValue = parameters.GetOneFloat("maxcomponentvalue", Infinity);
 
     return alloc.new_object<SpectralFilm>(filmBaseParameters, lambdaMin, lambdaMax,
