@@ -29,7 +29,9 @@
 #endif
 #endif  // PBRT_IS_WINDOWS
 
-#ifndef PBRT_USE_LEGACY_CUDA_ATOMICS
+// There is no way to read cuda architecture on host side.
+// Bypass the compilation error by including this header file whenever it exists.
+#if __has_include(<cuda/atomic>)
 #include <cuda/atomic>
 #endif
 

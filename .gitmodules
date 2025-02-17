@@ -12,8 +12,7 @@
 	url = https://github.com/nothings/stb.git
 [submodule "src/ext/openexr"]
 	path = src/ext/openexr
-	url = https://github.com/mmp/openexr.git
-	branch = zlibstatic-export-workaround
+	url = https://github.com/AcademySoftwareFoundation/openexr
 [submodule "src/ext/filesystem"]
 	path = src/ext/filesystem
 	url = https://github.com/wjakob/filesystem.git
