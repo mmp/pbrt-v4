@@ -29,6 +29,7 @@
 #endif
 #endif  // PBRT_IS_WINDOWS
 
+// https://github.com/mmp/pbrt-v4/issues/429
 // There is no way to read cuda architecture on host side.
 // Bypass the compilation error by including this header file whenever it exists.
 #if __has_include(<cuda/atomic>)

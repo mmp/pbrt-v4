@@ -1390,6 +1390,11 @@ OptiXAggregate::OptiXAggregate(
         BVH bvh;
         int sbtOffset;
     };
+
+    // https://github.com/JamesFang795/pbrt-v4/issues/1
+    // In a GPU build, RunAsync is instantiated and creates a BVH object on the device side.
+    // Avoid such nvcc behavior by not using RunAsync in GPU builds.
+#ifndef PBRT_BUILD_GPU_RENDERER
     AsyncJob<GAS> *triJob = RunAsync([&]() {
         BVH triangleBVH = buildBVHForTriangles(
             scene.shapes, plyMeshes, optixContext, hitPGTriangle, anyhitPGShadowTriangle,
@@ -1417,7 +1422,28 @@ OptiXAggregate::OptiXAggregate(
         int quadricSBTOffset = addHGRecords(quadricBVH);
         return GAS{quadricBVH, quadricSBTOffset};
     });
+#else
+    BVH triangleBVH = buildBVHForTriangles(
+        scene.shapes, plyMeshes, optixContext, hitPGTriangle, anyhitPGShadowTriangle,
+        hitPGRandomHitTriangle, textures.floatTextures, namedMaterials, materials, media,
+        shapeIndexToAreaLights, threadAllocators, threadCUDAStreams);
+    int sbtOffset = addHGRecords(triangleBVH);
+    GAS triGAS{triangleBVH, sbtOffset};
 
+    BVH blpBVH = buildBVHForBLPs(
+        scene.shapes, optixContext, hitPGBilinearPatch, anyhitPGShadowBilinearPatch,
+        hitPGRandomHitBilinearPatch, textures.floatTextures, namedMaterials, materials,
+        media, shapeIndexToAreaLights, threadAllocators, threadCUDAStreams);
+    int bilinearSBTOffset = addHGRecords(blpBVH);
+    GAS blpGAS{blpBVH, bilinearSBTOffset};
+
+    BVH quadricBVH = buildBVHForQuadrics(
+        scene.shapes, optixContext, hitPGQuadric, anyhitPGShadowQuadric,
+        hitPGRandomHitQuadric, textures.floatTextures, namedMaterials, materials, media,
+        shapeIndexToAreaLights, threadAllocators, threadCUDAStreams);
+    int quadricSBTOffset = addHGRecords(quadricBVH);
+    GAS quadricGAS{quadricBVH, quadricSBTOffset};
+#endif
     ///////////////////////////////////////////////////////////////////////////
     // Create IASes for instance definitions
     // TODO: better name here...
@@ -1535,8 +1561,13 @@ OptiXAggregate::OptiXAggregate(
     gasInstance.flags =
         OPTIX_INSTANCE_FLAG_NONE;  // TODO: OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT
     LOG_VERBOSE("Starting to consume top-level GAS futures");
+
+#ifndef PBRT_BUILD_GPU_RENDERER
     for (AsyncJob<GAS> *job : {triJob, blpJob, quadricJob}) {
         GAS gas = job->GetResult();
+#else
+    for (auto && gas : {triGAS, blpGAS, quadricGAS} ) {
+#endif
         if (gas.bvh.traversableHandle) {
             gasInstance.traversableHandle = gas.bvh.traversableHandle;
             gasInstance.sbtOffset = gas.sbtOffset;
