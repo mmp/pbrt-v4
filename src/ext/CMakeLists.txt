@@ -53,11 +53,8 @@ endif ()
 
 set (ZLIB_INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS} PARENT_SCOPE)
 set (ZLIB_LIBRARIES ${ZLIB_LIBARIES} PARENT_SCOPE)
-
-###########################################################################
-# openexr
-
-find_package(OpenEXR)
+set (ZLIB_INCLUDE_DIR ${ZLIB_INCLUDE_DIR} PARENT_SCOPE)
+set (ZLIB_LIBRARY ${ZLIB_LIBRARY} PARENT_SCOPE)
 
 ###########################################################################
 # ptex
