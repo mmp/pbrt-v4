@@ -1,7 +1,7 @@
 """
 LLDB Formatters
 
-1. Load Manually (everytime)
+1. Load Manually (every time)
     use lldb command 'command script import [PATH]/pbrt_lldbdataformatters.py' (without the quotes)
 
 2. Load Automatically (add to ~/.lldbinit)

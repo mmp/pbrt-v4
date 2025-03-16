@@ -677,7 +677,7 @@ int splitn(std::vector<std::string> args) {
     }
 
     // TODO: we could try to be more clever about carrying through more
-    // metadata, when applciable.
+    // metadata, when applicable.
     ImageMetadata outMetadata;
     outMetadata.colorSpace = colorSpace;
 
@@ -2387,7 +2387,7 @@ int main(int argc, char *argv[]) {
     else if (cmd == "splitn")
         return splitn(args);
     else if (cmd == "noisybit") {
-        // hack for brute force comptuation of ideal filter weights.
+        // hack for brute force computation of ideal filter weights.
 
         argv += 2;
         std::string filename;
