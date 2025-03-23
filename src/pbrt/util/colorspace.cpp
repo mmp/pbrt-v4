@@ -3,10 +3,6 @@
 // SPDX: Apache-2.0
 
 #include <pbrt/util/colorspace.h>
-
-#ifdef PBRT_BUILD_GPU_RENDERER
-#include <pbrt/gpu/util.h>
-#endif
 #include <pbrt/options.h>
 
 namespace pbrt {
@@ -40,7 +36,7 @@ SquareMatrix<3> ConvertRGBColorSpace(const RGBColorSpace &from, const RGBColorSp
     return to.RGBFromXYZ * from.XYZFromRGB;
 }
 
-RGBSigmoidPolynomial RGBColorSpace::ToRGBCoeffs(RGB rgb) const {
+PBRT_CPU_GPU RGBSigmoidPolynomial RGBColorSpace::ToRGBCoeffs(RGB rgb) const {
     DCHECK(rgb.r >= 0 && rgb.g >= 0 && rgb.b >= 0);
     return (*rgbToSpectrumTable)(ClampZero(rgb));
 }

@@ -44,16 +44,17 @@ extern FILE *logFile;
 PBRT_CPU_GPU
 void Log(LogLevel level, const char *file, int line, const char *s);
 
-PBRT_CPU_GPU [[noreturn]] void LogFatal(LogLevel level, const char *file, int line,
-                                        const char *s);
+template <typename... Args>
+PBRT_CPU_GPU inline void LogFatal(LogLevel level, const char *file, int line,
+                                  const char *fmt, Args &&...args);
+
+#ifndef __HIPCC__
+PBRT_CPU_GPU void LogFatal(LogLevel level, const char *file, int line, const char *s);
 
 template <typename... Args>
 PBRT_CPU_GPU inline void Log(LogLevel level, const char *file, int line, const char *fmt,
                              Args &&...args);
-
-template <typename... Args>
-PBRT_CPU_GPU [[noreturn]] inline void LogFatal(LogLevel level, const char *file, int line,
-                                               const char *fmt, Args &&...args);
+#endif
 
 #define TO_STRING(x) TO_STRING2(x)
 #define TO_STRING2(x) #x
@@ -61,6 +62,23 @@ PBRT_CPU_GPU [[noreturn]] inline void LogFatal(LogLevel level, const char *file,
 #ifdef PBRT_IS_GPU_CODE
 
 extern __constant__ LogLevel LOGGING_LogLevelGPU;
+
+// printing may cause hang in the device code
+#ifdef __HIP_DEVICE_COMPILE__
+
+#define LOG_VERBOSE(...) \
+    do {                 \
+    } while (false) /* swallow semicolon */
+
+#define LOG_ERROR(...) \
+    do {               \
+    } while (false) /* swallow semicolon */
+
+#define LOG_FATAL(...) \
+    do {               \
+    } while (false) /* swallow semicolon */
+
+#else
 
 #define LOG_VERBOSE(...)                               \
     (pbrt::LogLevel::Verbose >= LOGGING_LogLevelGPU && \
@@ -72,6 +90,8 @@ extern __constant__ LogLevel LOGGING_LogLevelGPU;
 
 #define LOG_FATAL(...) \
     pbrt::LogFatal(pbrt::LogLevel::Fatal, __FILE__, __LINE__, __VA_ARGS__)
+
+#endif
 
 #else
 
@@ -96,9 +116,9 @@ extern __constant__ LogLevel LOGGING_LogLevelGPU;
 namespace pbrt {
 
 template <typename... Args>
-inline void Log(LogLevel level, const char *file, int line, const char *fmt,
-                Args &&...args) {
-#ifdef PBRT_IS_GPU_CODE
+PBRT_CPU_GPU inline void Log(LogLevel level, const char *file, int line, const char *fmt,
+                             Args &&...args) {
+#if defined(PBRT_IS_GPU_CODE)
     Log(level, file, line, fmt);  // just the format string #yolo
 #else
     std::string s = StringPrintf(fmt, std::forward<Args>(args)...);
@@ -107,9 +127,9 @@ inline void Log(LogLevel level, const char *file, int line, const char *fmt,
 }
 
 template <typename... Args>
-inline void LogFatal(LogLevel level, const char *file, int line, const char *fmt,
-                     Args &&...args) {
-#ifdef PBRT_IS_GPU_CODE
+PBRT_CPU_GPU inline void LogFatal(LogLevel level, const char *file, int line,
+                                  const char *fmt, Args &&...args) {
+#if defined(PBRT_IS_GPU_CODE) || defined(__HIPCC__)
     LogFatal(level, file, line, fmt);  // just the format string #yolo
 #else
     std::string s = StringPrintf(fmt, std::forward<Args>(args)...);

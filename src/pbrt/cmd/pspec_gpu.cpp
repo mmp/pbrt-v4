@@ -16,8 +16,12 @@
 #include <pbrt/util/image.h>
 #include <pbrt/util/vecmath.h>
 
+#if defined(__HIPCC__)
+#include <pbrt/util/hip_aliases.h>
+#else
 #include <cuda.h>
 #include <cuda_runtime_api.h>
+#endif
 
 #include <vector>
 

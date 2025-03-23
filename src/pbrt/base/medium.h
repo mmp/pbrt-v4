@@ -88,7 +88,6 @@ class Medium
 
     std::string ToString() const;
 
-    PBRT_CPU_GPU
     bool IsEmissive() const;
 
     PBRT_CPU_GPU

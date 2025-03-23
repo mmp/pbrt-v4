@@ -60,7 +60,7 @@ class array<T, 0> {
     array() = default;
 
     PBRT_CPU_GPU
-    void fill(const T &v) { assert(!"should never be called"); }
+    void fill(const T &v) { CHECK(!"should never be called"); }
 
     PBRT_CPU_GPU
     bool operator==(const array<T, 0> &a) const { return true; }
@@ -81,13 +81,13 @@ class array<T, 0> {
 
     PBRT_CPU_GPU
     T &operator[](size_t i) {
-        assert(!"should never be called");
+        CHECK(!"should never be called");
         static T t;
         return t;
     }
     PBRT_CPU_GPU
     const T &operator[](size_t i) const {
-        assert(!"should never be called");
+        CHECK(!"should never be called");
         static T t;
         return t;
     }
@@ -253,7 +253,7 @@ class optional {
     bool has_value() const { return set; }
 
   private:
-#ifdef __NVCC__
+#if defined(__NVCC__) || defined(__HIPCC__)
     // Work-around NVCC bug
     PBRT_CPU_GPU
     T *ptr() { return reinterpret_cast<T *>(&optionalValue); }

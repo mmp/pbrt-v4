@@ -18,11 +18,11 @@
 #endif  // PBRT_IS_WINDOWS
 
 // GPU Macro Definitions
-#if defined(__CUDA_ARCH__)
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
 #define PBRT_IS_GPU_CODE
 #endif
 
-#if defined(PBRT_BUILD_GPU_RENDERER) && defined(__CUDACC__)
+#if defined(PBRT_BUILD_GPU_RENDERER) && (defined(__CUDACC__) || defined(__HIPCC__))
 #ifndef PBRT_NOINLINE
 #define PBRT_NOINLINE __attribute__((noinline))
 #endif

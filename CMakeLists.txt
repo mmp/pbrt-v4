@@ -64,7 +64,7 @@ function (CHECK_EXT NAME DIR HASH)
 endfunction ()
 
 check_ext ("OpenEXR" "openexr/src" f723c3940fff287c0a26b425b90a8e764823bfd4)
-check_ext ("OpenVDB" "openvdb/nanovdb" 414bed84c2fc22e188eac7b611aa85c7edd7a5a9)
+check_ext ("OpenVDB" "openvdb/nanovdb" 385516321b272c423e2a514b41bd21ce6ffdda72)
 check_ext ("Ptex" "ptex/src" 054047d02b9e06e690420b407114d2872435b953)
 check_ext ("double-conversion" "double-conversion/cmake" cc1f75a114aca8d2af69f73a5a959aecbab0e87a)
 check_ext ("filesystem" "filesystem/filesystem" c5f9de30142453eb3c6fe991e82dfc2583373116)

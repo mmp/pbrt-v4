@@ -66,7 +66,14 @@ void RenderWavefront(BasicScene &scene) {
     integrator->camera.InitMetadata(&metadata);
     metadata.renderTimeSeconds = seconds;
     metadata.samplesPerPixel = integrator->sampler.SamplesPerPixel();
+    // multithreading somehow hangs in HIP
+#ifdef __HIPCC__
+    if (Options->useGPU) DisableThreadPool();
+#endif
     integrator->film.WriteImage(metadata);
+#ifdef __HIPCC__
+    if (Options->useGPU) ReenableThreadPool();
+#endif
 }
 
 }  // namespace pbrt

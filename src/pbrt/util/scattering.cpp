@@ -7,7 +7,7 @@
 namespace pbrt {
 
 // BSSRDF Utility Functions
-Float FresnelMoment1(Float eta) {
+PBRT_CPU_GPU Float FresnelMoment1(Float eta) {
     Float eta2 = eta * eta, eta3 = eta2 * eta, eta4 = eta3 * eta, eta5 = eta4 * eta;
     if (eta < 1)
         return 0.45966f - 1.73965f * eta + 3.37668f * eta2 - 3.904945 * eta3 +
@@ -17,7 +17,7 @@ Float FresnelMoment1(Float eta) {
                1.27198f * eta4 + 0.12746f * eta5;
 }
 
-Float FresnelMoment2(Float eta) {
+PBRT_CPU_GPU Float FresnelMoment2(Float eta) {
     Float eta2 = eta * eta, eta3 = eta2 * eta, eta4 = eta3 * eta, eta5 = eta4 * eta;
     if (eta < 1) {
         return 0.27614f - 0.87350f * eta + 1.12077f * eta2 - 0.65095f * eta3 +

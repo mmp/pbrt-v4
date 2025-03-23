@@ -36,8 +36,12 @@
 #include <map>
 
 #ifdef PBRT_BUILD_GPU_RENDERER
+#if defined(__HIPCC__)
+#include <pbrt/util/hip_aliases.h>
+#else
 #include <cuda.h>
 #include <cuda_runtime.h>
+#endif
 #endif  // PBRT_BUILD_GPU_RENDERER
 
 namespace pbrt {
@@ -154,13 +158,27 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
     filter = film.GetFilter();
     sampler = scene.GetSampler();
 
+    // Compute number of scanlines to render per pass
+    Vector2i resolution = film.PixelBounds().Diagonal();
+    // TODO: make this configurable. Base it on the amount of GPU memory?
+    int maxSamples = 1024 * 1024;
+    scanlinesPerPass = std::max(1, maxSamples / resolution.x);
+    int nPasses = (resolution.y + scanlinesPerPass - 1) / scanlinesPerPass;
+    scanlinesPerPass = (resolution.y + nPasses - 1) / nPasses;
+    maxQueueSize = resolution.x * scanlinesPerPass;
+
     if (Options->useGPU) {
 #ifdef PBRT_BUILD_GPU_RENDERER
         CUDATrackedMemoryResource *mr =
             dynamic_cast<CUDATrackedMemoryResource *>(memoryResource);
         CHECK(mr);
+#ifdef __HIPCC__
+        // TODO: use HIPRT
+#else
         aggregate = new OptiXAggregate(scene, mr, textures, shapeIndexToAreaLights, media,
                                        namedMaterials, materials);
+#endif
+
 #else
         LOG_FATAL("Options->useGPU was set without PBRT_BUILD_GPU_RENDERER enabled");
 #endif
@@ -224,14 +242,6 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
     }
 #endif  // PBRT_BUILD_GPU_RENDERER
 
-    // Compute number of scanlines to render per pass
-    Vector2i resolution = film.PixelBounds().Diagonal();
-    // TODO: make this configurable. Base it on the amount of GPU memory?
-    int maxSamples = 1024 * 1024;
-    scanlinesPerPass = std::max(1, maxSamples / resolution.x);
-    int nPasses = (resolution.y + scanlinesPerPass - 1) / scanlinesPerPass;
-    scanlinesPerPass = (resolution.y + nPasses - 1) / nPasses;
-    maxQueueSize = resolution.x * scanlinesPerPass;
     LOG_VERBOSE("Will render in %d passes %d scanlines per pass\n", nPasses,
                 scanlinesPerPass);
 
