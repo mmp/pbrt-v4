@@ -851,6 +851,7 @@ add_library (pbrt_lib STATIC
   src/ext/gtest/gtest-all.cc
   src/ext/lodepng/lodepng.cpp
   src/ext/rply/rply.cpp
+  src/pbrt/cmd/nvdb_to_vdb.cpp
   )
 add_library (pbrt::pbrt_lib ALIAS pbrt_lib)
 
@@ -1054,6 +1055,34 @@ if (TARGET Ptex_static AND TARGET zlibstatic)
 endif()
 
 ######################
+# nvdb_to_vdb
+
+include_directories(
+    /opt/homebrew/include
+    /opt/homebrew/include/openvdb
+    /opt/homebrew/include/openvdb/include
+    /opt/homebrew/Cellar/openvdb
+    /opt/homebrew/Cellar/openvdb/include
+)
+
+list(APPEND CMAKE_MODULE_PATH "/usr/local/lib/cmake/OpenVDB")
+
+find_package(OpenVDB "12.0.1" REQUIRED COMPONENTS openvdb nanovdb)
+
+add_executable(nvdb_to_vdb src/pbrt/cmd/nvdb_to_vdb.cpp)
+add_executable (pbrt::nvdb_to_vdb ALIAS nvdb_to_vdb)
+
+target_compile_definitions (nvdb_to_vdb PRIVATE ${PBRT_DEFINITIONS})
+target_compile_options (nvdb_to_vdb PUBLIC ${PBRT_CXX_FLAGS})
+target_include_directories (nvdb_to_vdb PUBLIC src src/ext)
+target_link_libraries (nvdb_to_vdb PRIVATE ${ALL_PBRT_LIBS} pbrt_warnings pbrt_opt)
+
+add_sanitizers (nvdb_to_vdb)
+
+
+
+
+######################
 # cyhair2pbrt
 
 add_executable (cyhair2pbrt src/pbrt/cmd/cyhair2pbrt.cpp)
@@ -1134,3 +1163,7 @@ install (TARGETS
   DESTINATION
   lib
   )
+
+file(COPY ${CMAKE_SOURCE_DIR}/scenes DESTINATION ${CMAKE_BINARY_DIR})
+
+

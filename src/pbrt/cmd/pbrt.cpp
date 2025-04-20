@@ -269,6 +269,7 @@ int main(int argc, char *argv[]) {
 
     options.logLevel = LogLevelFromString(logLevel);
 
+    // EXPLOSION: STARTING POINT
     // Initialize pbrt
     InitPBRT(options);
 

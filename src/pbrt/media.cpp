@@ -208,6 +208,7 @@ std::string HomogeneousMedium::ToString() const {
 
 STAT_MEMORY_COUNTER("Memory/Volume grids", volumeGridBytes);
 
+// EXPLOSION: THIS IS WHERE TEMPERATURE GRID -> EMISSION
 // GridMedium Method Definitions
 GridMedium::GridMedium(const Bounds3f &bounds, const Transform &renderFromMedium,
                        Spectrum sigma_a, Spectrum sigma_s, Float sigmaScale, Float g,
@@ -235,7 +236,7 @@ GridMedium::GridMedium(const Bounds3f &bounds, const Transform &renderFromMedium
     if (temperatureGrid)
         volumeGridBytes += temperatureGrid->BytesAllocated();
 
-    isEmissive = temperatureGrid ? true : (Le_spec.MaxValue() > 0);
+    isEmissive = temperatureGrid ? true : (Le_spec.MaxValue() > 0); // EXPLOSION: maybe take grid here to initialize S0 point lights?
 
     // Initialize _majorantGrid_ for _GridMedium_
     for (int z = 0; z < majorantGrid.res.z; ++z)

@@ -254,7 +254,7 @@ void BasicSceneBuilder::LightSource(const std::string &name, ParsedParameterVect
     VERIFY_WORLD("LightSource");
     ParameterDictionary dict(std::move(params), graphicsState.lightAttributes,
                              graphicsState.colorSpace);
-    scene->AddLight(LightSceneEntity(name, std::move(dict), loc, RenderFromObject(),
+    scene->AddLight(LightSceneEntity(name, std::move(dict), loc, RenderFromObject(), // EXPLOSION: where single light is added
                                      graphicsState.currentOutsideMedium));
 }
 
