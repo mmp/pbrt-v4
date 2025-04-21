@@ -6,5 +6,8 @@ src/build
 .ipynb_checkpoints/
 build/
 .cache/
-scenes/
+scenes/**/*.vdb  
+scenes/**/*.nvdb
 **/CMakeLists.txt.user
+data/
+output_renders/

@@ -1,0 +1,51 @@
+ColorSpace "aces2065-1"
+Film "rgb"
+    "string filename" [ "ground_explosion.exr" ]
+    "integer yresolution" [ 1440 ]
+    "integer xresolution" [ 1920 ]
+PixelFilter "gaussian"
+    "float xradius" [ 2 ]
+    "float yradius" [ 2 ]
+
+Integrator "volpath"
+    "integer maxdepth" [ 40 ]
+Accelerator "bvh"
+Transform [ 1 0 0 0 0 0.99254614 0.12186934 0 0 0.12186934 -0.99254614 0 0 -35.430065 247.52719 1  ]
+Camera "perspective"
+    "float screenwindow" [ -1 1 -0.75 0.75 ]
+    "float fov" [ 45.000042 ]
+
+WorldBegin
+
+
+
+AttributeBegin
+	MakeNamedMedium "/obj/ground_explosion/RENDER-0"
+		"float Lescale" [ 0.125 ]
+		"string filename" [ "explosion2.nvdb" ]
+		"float temperaturescale" [ 4500 ]
+		"float scale" [ 5 ]
+		"rgb sigma_a" [ 0.4 0.4 0.4 ]
+		"rgb sigma_s" [ 0.9 0.9 0.9 ]
+		"string type" [ "nanovdb" ]
+
+	Material "interface"
+	MediumInterface "/obj/ground_explosion/RENDER-0" ""
+	Shape "trianglemesh"
+		"point3 P" [ 33.000008 -0.074999996 31.900047 -30.29999 -0.074999996 
+					 31.900047 33.000008 89.475 31.900047 -30.29999 89.475 31.900047 
+					 -30.29999 -0.074999996 -35.599953 33.000008 -0.074999996 
+					 -35.599953 -30.29999 89.475 -35.599953 33.000008 89.475 
+					 -35.599953 ]
+		"integer indices" [ 0 3 1 0 2 3 4 7 5 4 6 7 6 2 7 6 3 2 5 1 4 5 0 1 5 
+							2 0 5 7 2 1 6 4 1 3 6 ]
+AttributeEnd
+
+AttributeBegin
+    ConcatTransform [ 1000 0 0 0 0 1000 0 0 0 0 1000 0 0 -0.05 0 1  ]
+
+    AttributeBegin
+        ConcatTransform [ 1 0 0 0 0 0 -1 0 0 1 0 0 0 0 0 1  ]
+        Shape "disk"
+    AttributeEnd
+AttributeEnd

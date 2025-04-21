@@ -1,0 +1,58 @@
+LookAt 15 120 5       -.5 0 30   0 0 1
+#LookAt 00 400 0       -20 0 150   0 0 1
+
+Camera "perspective"
+    "float fov" 37
+
+Film "rgb"
+  "integer xresolution" 1300 #5200 #1300
+  "integer yresolution" 1800 #7200 #1800
+  "string sensor" "nikon_d850"
+  "float whitebalance" 6000
+  "float iso" 100
+  "string filename" "__OUTPUT_PATH__"
+
+Integrator "volpath" "integer maxdepth" 100 #5000
+Sampler "halton" "integer pixelsamples" 16 #256
+# Volume "step size" 0.1
+
+WorldBegin
+
+# uniform blue-ish illumination from all directions
+#LightSource "infinite" "rgb L" [ .1 .1 .1 ]
+
+# approximate the sun
+#LightSource "distant"  "point3 from" [ -30 40  100 ]
+#   "blackbody L" 3000 "float scale" 1.5
+
+AttributeBegin
+# Scale 1 1 1.6
+# Rotate 90 1 0 0
+Translate 12 50 5
+	MakeNamedMedium "kaboom"
+		"float Lescale" [ 0.125 ]
+		"string filename" [ "__NVDB_PATH__" ]
+		"float temperaturescale" [ 4500 ]
+		"float scale" [ 5 ]
+		"spectrum sigma_s" [200 10 900 10] "spectrum sigma_a" [200 10 900 10]
+		"string type" [ "nanovdb" ]
+
+	Material "interface"
+	MediumInterface "kaboom" ""
+AttributeEnd
+
+AttributeBegin
+MediumInterface "kaboom" ""
+Material "interface"
+Translate 0 40 0
+Shape "sphere" "float radius" 80
+AttributeEnd
+
+AttributeBegin
+Translate 0 -50 0
+
+Material "coateddiffuse" "rgb reflectance" [ .4 .4 .4 ] "float roughness" .001
+
+Translate 0 0 -4
+Shape "disk" "float radius" 1000
+AttributeEnd
