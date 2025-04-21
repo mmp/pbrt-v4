@@ -1087,31 +1087,75 @@ add_sanitizers (nvdb_to_vdb)
 ######################
 # vdb_to_nvdb
 
-include_directories(
-    /opt/homebrew/include
-    /opt/homebrew/include/openvdb
-    /opt/homebrew/include/openvdb/include
-    /opt/homebrew/Cellar/openvdb
-    /opt/homebrew/Cellar/openvdb/include
+# include_directories(
+#     /opt/homebrew/include
+#     /opt/homebrew/include/openvdb
+#     /opt/homebrew/include/openvdb/include
+#     /opt/homebrew/Cellar/openvdb
+#     /opt/homebrew/Cellar/openvdb/include
+# )
+
+# list(APPEND CMAKE_MODULE_PATH "/usr/local/lib/cmake/OpenVDB")
+
+# find_package(OpenVDB "12.0.1" REQUIRED COMPONENTS openvdb nanovdb)
+
+# add_executable(vdb_to_nvdb src/pbrt/cmd/vdb_to_nvdb.cpp
+#     src/pbrt/cmd/vdb_to_nvdb.cpp)
+# add_executable (pbrt::vdb_to_nvdb ALIAS vdb_to_nvdb)
+
+# #target_compile_definitions (vdb_to_nvdb PRIVATE ${PBRT_DEFINITIONS})
+# #target_compile_options (vdb_to_nvdb PUBLIC ${PBRT_CXX_FLAGS})
+# target_include_directories (vdb_to_nvdb PUBLIC src src/ext)
+# #target_link_libraries (vdb_to_nvdb PRIVATE ${ALL_PBRT_LIBS} pbrt_warnings pbrt_opt)
+
+# target_compile_definitions(vdb_to_nvdb PRIVATE "NANOVDB_USE_OPENVDB")
+# target_link_libraries(vdb_to_nvdb OpenVDB::openvdb OpenVDB::nanovdb)
+
+# add_sanitizers (vdb_to_nvdb)
+
+# Allow the user to specify the OpenVDB installation path
+set(OpenVDB_ROOT "" CACHE PATH "Path to OpenVDB installation")
+
+# Add common system paths for CMake module lookup
+list(APPEND CMAKE_MODULE_PATH
+    ${OpenVDB_ROOT}
+    /usr/local/lib/cmake/OpenVDB
+    /usr/lib/cmake/OpenVDB
+    /opt/homebrew/lib/cmake/OpenVDB
+    /opt/local/lib/cmake/OpenVDB
 )
 
-list(APPEND CMAKE_MODULE_PATH "/usr/local/lib/cmake/OpenVDB")
+# Try to find OpenVDB (includes nanovdb as component)
+find_package(OpenVDB 12.0.1 REQUIRED COMPONENTS openvdb nanovdb)
 
-find_package(OpenVDB "12.0.1" REQUIRED COMPONENTS openvdb nanovdb)
+# Show what we found
+message(STATUS "OpenVDB include dirs: ${OpenVDB_INCLUDE_DIRS}")
+message(STATUS "OpenVDB libraries: ${OpenVDB_LIBRARIES}")
 
-add_executable(vdb_to_nvdb src/pbrt/cmd/vdb_to_nvdb.cpp
-    src/pbrt/cmd/vdb_to_nvdb.cpp)
-add_executable (pbrt::vdb_to_nvdb ALIAS vdb_to_nvdb)
+# Add executable
+add_executable(vdb_to_nvdb
+    src/pbrt/cmd/vdb_to_nvdb.cpp
+)
 
-#target_compile_definitions (vdb_to_nvdb PRIVATE ${PBRT_DEFINITIONS})
-#target_compile_options (vdb_to_nvdb PUBLIC ${PBRT_CXX_FLAGS})
-target_include_directories (vdb_to_nvdb PUBLIC src src/ext)
-#target_link_libraries (vdb_to_nvdb PRIVATE ${ALL_PBRT_LIBS} pbrt_warnings pbrt_opt)
+add_executable(pbrt::vdb_to_nvdb ALIAS vdb_to_nvdb)
 
+# Include project sources
+target_include_directories(vdb_to_nvdb
+    PUBLIC src src/ext
+    PRIVATE ${OpenVDB_INCLUDE_DIRS}
+)
+
+# Compile-time definitions
 target_compile_definitions(vdb_to_nvdb PRIVATE "NANOVDB_USE_OPENVDB")
-target_link_libraries(vdb_to_nvdb OpenVDB::openvdb OpenVDB::nanovdb)
 
-add_sanitizers (vdb_to_nvdb)
+# Link with OpenVDB libraries
+target_link_libraries(vdb_to_nvdb
+    PRIVATE OpenVDB::openvdb OpenVDB::nanovdb
+)
+
+# Add sanitizers if available
+add_sanitizers(vdb_to_nvdb)
+
 
 
 ######################
