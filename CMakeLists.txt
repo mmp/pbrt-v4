@@ -852,6 +852,9 @@ add_library (pbrt_lib STATIC
   src/ext/lodepng/lodepng.cpp
   src/ext/rply/rply.cpp
   src/pbrt/cmd/nvdb_to_vdb.cpp
+  src/light_heirarchy/kdtree3d.h src/light_heirarchy/kdtree3d.cpp
+  src/light_heirarchy/Vector3f.h
+  src/light_heirarchy/lighting_grid_hierarchy.h src/light_heirarchy/lighting_grid_hierarchy.cpp
   )
 add_library (pbrt::pbrt_lib ALIAS pbrt_lib)
 
@@ -1069,7 +1072,8 @@ list(APPEND CMAKE_MODULE_PATH "/usr/local/lib/cmake/OpenVDB")
 
 find_package(OpenVDB "12.0.1" REQUIRED COMPONENTS openvdb nanovdb)
 
-add_executable(nvdb_to_vdb src/pbrt/cmd/nvdb_to_vdb.cpp)
+add_executable(nvdb_to_vdb src/pbrt/cmd/nvdb_to_vdb.cpp
+    src/pbrt/cmd/vdb_to_nvdb.cpp)
 add_executable (pbrt::nvdb_to_vdb ALIAS nvdb_to_vdb)
 
 target_compile_definitions (nvdb_to_vdb PRIVATE ${PBRT_DEFINITIONS})
@@ -1080,6 +1084,34 @@ target_link_libraries (nvdb_to_vdb PRIVATE ${ALL_PBRT_LIBS} pbrt_warnings pbrt_o
 add_sanitizers (nvdb_to_vdb)
 
 
+######################
+# vdb_to_nvdb
+
+include_directories(
+    /opt/homebrew/include
+    /opt/homebrew/include/openvdb
+    /opt/homebrew/include/openvdb/include
+    /opt/homebrew/Cellar/openvdb
+    /opt/homebrew/Cellar/openvdb/include
+)
+
+list(APPEND CMAKE_MODULE_PATH "/usr/local/lib/cmake/OpenVDB")
+
+find_package(OpenVDB "12.0.1" REQUIRED COMPONENTS openvdb nanovdb)
+
+add_executable(vdb_to_nvdb src/pbrt/cmd/vdb_to_nvdb.cpp
+    src/pbrt/cmd/vdb_to_nvdb.cpp)
+add_executable (pbrt::vdb_to_nvdb ALIAS vdb_to_nvdb)
+
+#target_compile_definitions (vdb_to_nvdb PRIVATE ${PBRT_DEFINITIONS})
+#target_compile_options (vdb_to_nvdb PUBLIC ${PBRT_CXX_FLAGS})
+target_include_directories (vdb_to_nvdb PUBLIC src src/ext)
+#target_link_libraries (vdb_to_nvdb PRIVATE ${ALL_PBRT_LIBS} pbrt_warnings pbrt_opt)
+
+target_compile_definitions(vdb_to_nvdb PRIVATE "NANOVDB_USE_OPENVDB")
+target_link_libraries(vdb_to_nvdb OpenVDB::openvdb OpenVDB::nanovdb)
+
+add_sanitizers (vdb_to_nvdb)
 
 
 ######################
