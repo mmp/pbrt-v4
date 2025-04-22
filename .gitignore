@@ -11,3 +11,5 @@ scenes/**/*.nvdb
 **/CMakeLists.txt.user
 data/
 output_renders/
+
+.vscode/

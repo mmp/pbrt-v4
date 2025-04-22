@@ -7,40 +7,46 @@
 
 struct KDNode {
     Vector3f point;
+    float intensity;
     std::unique_ptr<KDNode> left;
     std::unique_ptr<KDNode> right;
 
-    KDNode(const Vector3f& pt) : point(pt) {}
+    KDNode(const Vector3f pos, const float intensity) : point(pos), intensity(intensity) {}
 };
 
 class KDTree {
 public:
 
-    KDTree(const std::vector<Vector3f>& points) {
-        root = build(points, 0);
+    KDTree(const std::vector<std::pair<Vector3f, float>>& lights) {
+        root = build(lights, 0);
     }
 
-    void radiusSearch(const Vector3f& target, float radius, std::vector<Vector3f>& results) const {
+    // TODO: modify to return intensity, not point (fixed)
+    void radiusSearch(const Vector3f& target, float radius, std::vector<KDNode*>& results) const {
         radiusSearchRecursive(root.get(), target, radius * radius, 0, results);
     }
+
+    // TODO: needs lookup for a single node given position
 
 private:
     std::unique_ptr<KDNode> root;
 
-    std::unique_ptr<KDNode> build(std::vector<Vector3f> points, int depth) {
+    std::unique_ptr<KDNode> build(std::vector<std::pair<Vector3f,float>> points, int depth) {
         if (points.empty()) return nullptr;
 
         int axis = depth % 3;
         size_t median = points.size() / 2;
+
+        // Sorts based on position
         std::nth_element(points.begin(), points.begin() + median, points.end(),
-                         [axis](const Vector3f& a, const Vector3f& b) {
-                             return a[axis] < b[axis];
-                         });
+            [axis](const std::pair<Vector3f, float>& a, const std::pair<Vector3f, float>& b) {
+                return a.first[axis] < b.first[axis];
+            });
 
-        std::unique_ptr<KDNode> node = std::make_unique<KDNode>(points[median]);
+        std::unique_ptr<KDNode> node = std::make_unique<KDNode>(points[median].first, points[median].second);
 
-        std::vector<Vector3f> leftPoints(points.begin(), points.begin() + median);
-        std::vector<Vector3f> rightPoints(points.begin() + median + 1, points.end());
+        std::vector<std::pair<Vector3f,float>> leftPoints(points.begin(), points.begin() + median);
+        std::vector<std::pair<Vector3f,float>> rightPoints(points.begin() + median + 1, points.end());
 
         node->left = build(leftPoints, depth + 1);
         node->right = build(rightPoints, depth + 1);
@@ -49,11 +55,11 @@ private:
     }
 
     void radiusSearchRecursive(KDNode* node, const Vector3f& target, float radiusSquared,
-                               int depth, std::vector<Vector3f>& results) const {
+                               int depth, std::vector<KDNode*>& results) const {
         if (!node) return;
 
         if (target.distanceSquared(node->point) <= radiusSquared) {
-            results.push_back(node->point);
+            results.push_back(node);
         }
 
         int axis = depth % 3;
