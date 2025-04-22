@@ -278,7 +278,7 @@ int main(int argc, char *argv[]) {
         ParseFiles(&formattingTarget, filenames);
     } else {
         // Parse provided scene description files
-        BasicScene scene;
+        BasicScene scene; // EXPLOSION: add lights to this scene
         BasicSceneBuilder builder(&scene);
         ParseFiles(&builder, filenames);
 

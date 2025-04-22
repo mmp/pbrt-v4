@@ -27,7 +27,7 @@ WorldBegin
 
 AttributeBegin
 # Scale 1 1 1.6
-# Rotate 90 1 0 0
+Rotate 90 1 0 0
 Translate 12 50 5
 	MakeNamedMedium "kaboom"
 		"float Lescale" [ 0.125 ]

@@ -19,34 +19,34 @@
 
 using namespace pbrt;
 
-template <typename BufferT>
-void findMinMax(const nanovdb::GridHandle<BufferT>& handle) {
-    auto* grid = handle.template grid<float>();  // Important: use 'template' keyword for templated member
-    if (!grid) {
-        std::cerr << "Grid is not float type!" << std::endl;
-        return;
-    }
+// template <typename BufferT>
+// void findMinMax(const nanovdb::GridHandle<BufferT>& handle) {
+//     auto* grid = handle.template grid<float>();  // Important: use 'template' keyword for templated member
+//     if (!grid) {
+//         std::cerr << "Grid is not float type!" << std::endl;
+//         return;
+//     }
 
-    auto acc = grid->getAccessor();
-    auto bbox = grid->indexBBox();
-    float minVal = std::numeric_limits<float>::max();
-    float maxVal = std::numeric_limits<float>::lowest();
+//     auto acc = grid->getAccessor();
+//     auto bbox = grid->indexBBox();
+//     float minVal = std::numeric_limits<float>::max();
+//     float maxVal = std::numeric_limits<float>::lowest();
 
-    for (int x = bbox.min().x(); x <= bbox.max().x(); ++x) {
-        for (int y = bbox.min().y(); y <= bbox.max().y(); ++y) {
-            for (int z = bbox.min().z(); z <= bbox.max().z(); ++z) {
-                nanovdb::Coord ijk(x, y, z);
-                if (acc.isValueOn(ijk)) {
-                    float val = acc.getValue(ijk);
-                    minVal = std::min(minVal, val);
-                    maxVal = std::max(maxVal, val);
-                }
-            }
-        }
-    }
+//     for (int x = bbox.min().x(); x <= bbox.max().x(); ++x) {
+//         for (int y = bbox.min().y(); y <= bbox.max().y(); ++y) {
+//             for (int z = bbox.min().z(); z <= bbox.max().z(); ++z) {
+//                 nanovdb::Coord ijk(x, y, z);
+//                 if (acc.isValueOn(ijk)) {
+//                     float val = acc.getValue(ijk);
+//                     minVal = std::min(minVal, val);
+//                     maxVal = std::max(maxVal, val);
+//                 }
+//             }
+//         }
+//     }
 
-    std::cout << "Min: " << minVal << ", Max: " << maxVal << std::endl;
-}
+//     std::cout << "Min: " << minVal << ", Max: " << maxVal << std::endl;
+// }
 
 template <typename Buffer>
 static nanovdb::GridHandle<Buffer> readGrid(const std::string &filename,
@@ -58,7 +58,7 @@ static nanovdb::GridHandle<Buffer> readGrid(const std::string &filename,
         grid =
             nanovdb::io::readGrid<Buffer>(filename, gridName, 0 /* not verbose */, buf);
 
-        findMinMax(grid);
+        // findMinMax(grid);
 
     } catch (const std::exception &e) {
         ErrorExit("nanovdb: %s: %s", filename, e.what());
@@ -68,8 +68,8 @@ static nanovdb::GridHandle<Buffer> readGrid(const std::string &filename,
         if (!grid.gridMetaData()->isFogVolume() && !grid.gridMetaData()->isUnknown())
             ErrorExit("%s: \"%s\" isn't a FogVolume grid?", filename, gridName);
 
-        LOG_VERBOSE("%s: found %d \"%s\" voxels", filename,
-                    grid.gridMetaData()->activeVoxelCount(), gridName);
+        // LOG_VERBOSE("%s: found %d \"%s\" voxels", filename,
+        //             grid.gridMetaData()->activeVoxelCount(), gridName);
     }
 
     return grid;

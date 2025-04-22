@@ -76,7 +76,7 @@ void RenderCPU(BasicScene &parsedScene) {
 
     bool haveLights = !lights.empty();
     for (const auto &m : media)
-        haveLights |= m.second.IsEmissive();
+        haveLights |= m.second.IsEmissive(); // EXPLOSION: emmited here
 
     if (!haveLights && parsedScene.integrator.name != "ambientocclusion" &&
         parsedScene.integrator.name != "aov")

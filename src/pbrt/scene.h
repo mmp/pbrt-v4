@@ -360,7 +360,7 @@ class BasicScene {
     std::vector<SceneEntity> materials;
 
     std::mutex lightMutex;
-    std::vector<AsyncJob<Light> *> lightJobs;
+    std::vector<AsyncJob<Light> *> lightJobs; // EXPLOSION: data structure that holds lights
 
     std::mutex areaLightMutex;
     std::vector<SceneEntity> areaLights;

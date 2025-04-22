@@ -24,6 +24,8 @@
 #include <algorithm>
 #include <cmath>
 
+#include "../light_heirarchy/lighting_grid_hierarchy.h"
+
 namespace pbrt {
 
 std::string MediumInterface::ToString() const {
@@ -238,6 +240,9 @@ GridMedium::GridMedium(const Bounds3f &bounds, const Transform &renderFromMedium
 
     isEmissive = temperatureGrid ? true : (Le_spec.MaxValue() > 0); // EXPLOSION: maybe take grid here to initialize S0 point lights?
 
+    if (temperatureGrid)
+        lighting_grid_hierarchy::extract_lights(temperatureGrid.value());
+
     // Initialize _majorantGrid_ for _GridMedium_
     for (int z = 0; z < majorantGrid.res.z; ++z)
         for (int y = 0; y < majorantGrid.res.y; ++y)
@@ -245,6 +250,8 @@ GridMedium::GridMedium(const Bounds3f &bounds, const Transform &renderFromMedium
                 Bounds3f bounds = majorantGrid.VoxelBounds(x, y, z);
                 majorantGrid.Set(x, y, z, densityGrid.MaxValue(bounds));
             }
+
+
 }
 
 GridMedium *GridMedium::Create(const ParameterDictionary &parameters,
