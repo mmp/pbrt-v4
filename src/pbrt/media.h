@@ -628,7 +628,7 @@ class NanoVDBMedium {
         using Sampler = nanovdb::SampleFromVoxels<nanovdb::FloatGrid::TreeType, 1, false>;
         Float d = Sampler(densityFloatGrid->tree())(pIndex);
 
-        return MediumProperties{sigma_a * d, sigma_s * d, &phase, Le(p, lambda)};
+        return MediumProperties{sigma_a * d, sigma_s * d, &phase, Le(p, lambda)}; // EXPLOSION: Le passed here
     }
 
     PBRT_CPU_GPU
@@ -652,7 +652,7 @@ class NanoVDBMedium {
   private:
     // NanoVDBMedium Private Methods
     PBRT_CPU_GPU
-    SampledSpectrum Le(Point3f p, const SampledWavelengths &lambda) const {
+    SampledSpectrum Le(Point3f p, const SampledWavelengths &lambda) const { // EXPLOSION: need to override this with our total illum
         if (!temperatureFloatGrid)
             return SampledSpectrum(0.f);
         nanovdb::Vec3<float> pIndex =

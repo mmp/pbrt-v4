@@ -29,6 +29,19 @@ public:
     // TODO: needs lookup for a single node given position
 
 private:
+    // put this, for example, in KDTree.h or a shared Lights.h
+struct LightRecord
+{
+    Vector3f pos;   // world-space position of the light
+
+    // you can decide what you store for intensity:
+    //  * float  I            – already a luminance
+    //  * Vector3f rgb        – if you keep RGB, we'll convert to luminance
+
+    float  I;       // simplest: store luminance directly
+    // Vector3f rgb;   // <-- alternate form if you need full colour
+};
+
     std::unique_ptr<KDNode> root;
 
     std::unique_ptr<KDNode> build(std::vector<std::pair<Vector3f,float>> points, int depth) {
