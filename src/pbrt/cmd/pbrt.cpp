@@ -271,7 +271,8 @@ int main(int argc, char *argv[]) {
 
     // EXPLOSION: STARTING POINT
     // Initialize pbrt
-    InitPBRT(options);
+    InitPBRT(options); // TODO: maybe initialize LGH in here?
+    
 
     if (format || toPly || options.upgrade) {
         FormattingParserTarget formattingTarget(toPly, options.upgrade);
@@ -280,7 +281,7 @@ int main(int argc, char *argv[]) {
         // Parse provided scene description files
         BasicScene scene; // EXPLOSION: add lights to this scene
         BasicSceneBuilder builder(&scene);
-        ParseFiles(&builder, filenames);
+        ParseFiles(&builder, filenames); // Parses file into scene
 
         // Render the scene
         if (Options->useGPU || Options->wavefront)

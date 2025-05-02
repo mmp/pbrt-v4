@@ -258,7 +258,7 @@ class SimpleVolPathIntegrator : public RayIntegrator {
 };
 
 // VolPathIntegrator Definition
-class VolPathIntegrator : public RayIntegrator {
+class VolPathIntegrator : public RayIntegrator { // EXPLOSION: VolPathIntegrator
   public:
     // VolPathIntegrator Public Methods
     VolPathIntegrator(int maxDepth, Camera camera, Sampler sampler, Primitive aggregate,

@@ -41,6 +41,7 @@
 #include <pbrt/util/string.h>
 
 #include <algorithm>
+#include "../light_heirarchy/lighting_grid_hierarchy.h"
 
 namespace pbrt {
 
@@ -976,6 +977,18 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             uint64_t hash1 = Hash(sampler.Get1D());
             RNG rng(hash0, hash1);
 
+            if (ray.medium.Is<NanoVDBMedium>()) {
+                printf("     Shape intersection: %s\n", si.value().ToString().c_str());
+                // TODO: i dont think ray origin is the correct point to be sampling. Where's thein
+                float estimated_intensity = ray.medium.Cast<NanoVDBMedium>()->m_lgh->get_total_illum(ray.o);
+                SampledSpectrum estimatedLighting(estimated_intensity);
+                L += estimatedLighting;
+                printf("Intensity: %f at point %f %f %f\n", estimated_intensity, ray.o.x, ray.o.y, ray.o.z);
+            }
+            else {
+            
+            // .Is(pbrt::NanoVDBMedium); // EXPLOSION TODO: replace SampleT_maj with total illum!
+
             SampledSpectrum T_maj = SampleT_maj(
                 ray, tMax, sampler.Get1D(), rng, lambda,
                 [&](Point3f p, MediumProperties mp, SampledSpectrum sigma_maj,
@@ -1075,6 +1088,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             beta *= T_maj / T_maj[0];
             r_u *= T_maj / T_maj[0];
             r_l *= T_maj / T_maj[0];
+            }
         }
         // Handle surviving unscattered rays
         // Add emitted light at volume path vertex or from the environment
@@ -1339,7 +1353,7 @@ SampledSpectrum VolPathIntegrator::SampleLd(const Interaction &intr, const BSDF 
         if (lightRay.medium) {
             Float tMax = si ? si->tHit : (1 - ShadowEpsilon);
             Float u = rng.Uniform<Float>();
-            SampledSpectrum T_maj =
+            SampledSpectrum T_maj = // EXPLOSION: looks like this is how transmittance is calculated...
                 SampleT_maj(lightRay, tMax, u, rng, lambda,
                             [&](Point3f p, MediumProperties mp, SampledSpectrum sigma_maj,
                                 SampledSpectrum T_maj) {

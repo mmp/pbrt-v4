@@ -24,8 +24,6 @@
 #include <algorithm>
 #include <cmath>
 
-#include "../light_heirarchy/lighting_grid_hierarchy.h"
-
 namespace pbrt {
 
 std::string MediumInterface::ToString() const {
@@ -210,7 +208,6 @@ std::string HomogeneousMedium::ToString() const {
 
 STAT_MEMORY_COUNTER("Memory/Volume grids", volumeGridBytes);
 
-// EXPLOSION: THIS IS WHERE TEMPERATURE GRID -> EMISSION
 // GridMedium Method Definitions
 GridMedium::GridMedium(const Bounds3f &bounds, const Transform &renderFromMedium,
                        Spectrum sigma_a, Spectrum sigma_s, Float sigmaScale, Float g,
@@ -238,10 +235,7 @@ GridMedium::GridMedium(const Bounds3f &bounds, const Transform &renderFromMedium
     if (temperatureGrid)
         volumeGridBytes += temperatureGrid->BytesAllocated();
 
-    isEmissive = temperatureGrid ? true : (Le_spec.MaxValue() > 0); // EXPLOSION: maybe take grid here to initialize S0 point lights?
-
-    if (temperatureGrid)
-        lighting_grid_hierarchy::extract_lights(temperatureGrid.value());
+    isEmissive = temperatureGrid ? true : (Le_spec.MaxValue() > 0); 
 
     // Initialize _majorantGrid_ for _GridMedium_
     for (int z = 0; z < majorantGrid.res.z; ++z)
@@ -551,6 +545,12 @@ NanoVDBMedium::NanoVDBMedium(const Transform &renderFromMedium, Spectrum sigma_a
         bounds =
             Union(bounds, Bounds3f(Point3f(bbox.min()[0], bbox.min()[1], bbox.min()[2]),
                                    Point3f(bbox.max()[0], bbox.max()[1], bbox.max()[2])));
+
+        // TODO: allow pbrt command or pbrt file to alter parameters, name depth and voxel size
+        m_lgh = alloc.new_object<LGH>(temperatureFloatGrid, 1, 0.1f, 1);
+
+    } else {
+        LOG_FATAL("NO TEMPERATURE GRID!!!");
     }
 
     majorantGrid.bounds = bounds;
@@ -633,6 +633,7 @@ std::string NanoVDBMedium::ToString() const {
                         bounds, LeScale, temperatureOffset, temperatureScale);
 }
 
+// EXPLOSION TODO: initializel LGH here?
 NanoVDBMedium *NanoVDBMedium::Create(const ParameterDictionary &parameters,
                                      const Transform &renderFromMedium,
                                      const FileLoc *loc, Allocator alloc) {
@@ -665,7 +666,7 @@ NanoVDBMedium *NanoVDBMedium::Create(const ParameterDictionary &parameters,
         parameters.GetOneSpectrum("sigma_s", nullptr, SpectrumType::Unbounded, alloc);
     if (!sigma_s)
         sigma_s = alloc.new_object<ConstantSpectrum>(1.f);
-    Float sigmaScale = parameters.GetOneFloat("scale", 1.f);
+    Float sigmaScale = parameters.GetOneFloat("scale", 1.f);    
 
     return alloc.new_object<NanoVDBMedium>(
         renderFromMedium, sigma_a, sigma_s, sigmaScale, g, std::move(densityGrid),

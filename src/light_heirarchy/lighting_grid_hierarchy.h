@@ -4,6 +4,7 @@
 #include "kdtree3d.h"
 #include "pbrt/util/containers.h"
 #include "pbrt/pbrt.h"
+#include <nanovdb/NanoVDB.h>
 
 class LGH
 {
@@ -25,11 +26,13 @@ public:
     //     }
     // };
 
+    // TODO: separate into constructor and initialization function
     // TODO: fix inputs
-    LGH(pbrt::SampledGrid<float> temperature_grid, int depth, float base_voxel_size);
+    // LGH(pbrt::SampledGrid<float> temperature_grid, int depth, float base_voxel_size, float transmission);
+    LGH(const nanovdb::FloatGrid* temperature_grid, int depth, float base_voxel_size, float transmission);
 
     float get_intensity(int L, Vector3f targetPos, KDNode* light, float radius);
-    float get_total_illum(Vector3f pos);
+    float get_total_illum(pbrt::Point3f pos);
 
     const float TEMP_THRESHOLD = 1.0f;
 
@@ -39,8 +42,11 @@ public:
     const float alpha = 1.0f;
     const int l_max;
 
+    // TODO: remove this to use pbrt transmission instead
+    const float transmission;
+
 private:
-    void create_S0(pbrt::SampledGrid<float> temperature_grid);
+    void create_S0(const nanovdb::FloatGrid* temperature_grid);
     void deriveNewS(int l);//, KDTree S0);
     Vector3f calcNewPos(int l, Vector3f target_light_pos, std::vector<KDNode*> j_lights);//const Vector3f& gv, int l, const KDTree& S0) const;
     float calcNewI(int l, Vector3f target_light_pos, std::vector<KDNode*> j_lights); //const Vector3f& gv, int l, const KDTree& S0) const;
@@ -50,9 +56,8 @@ private:
     std::vector<KDTree*> lighting_grids;
     std::vector<float> h;
 
-    float XSize;
-    float YSize;
-    float ZSize;
+    Vector3f BBoxMin;
+    Vector3f BBoxMax;
 };
 
 #endif // LIGHTING_GRID_HIERARCHY_H

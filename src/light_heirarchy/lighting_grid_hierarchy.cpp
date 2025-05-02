@@ -1,17 +1,22 @@
 #include "lighting_grid_hierarchy.h"
 
-LGH::LGH(pbrt::SampledGrid<float> temperature_grid, int depth, float base_voxel_size) 
-    : l_max(depth)
+// LGH::LGH(pbrt::SampledGrid<float> temperature_grid, int depth, float base_voxel_size, float transmission) 
+LGH::LGH(const nanovdb::FloatGrid* temperature_grid, int depth, float base_voxel_size, float transmission) 
+    : l_max(depth), transmission(transmission)
 {
-    XSize = temperature_grid.XSize();
-    YSize = temperature_grid.YSize();
-    ZSize = temperature_grid.ZSize();
+    auto worldBBox = temperature_grid->worldBBox();
+    nanovdb::Vec3f minBBox = worldBBox.min();
+    BBoxMin = Vector3f(minBBox[0], minBBox[1], minBBox[2]);
+
+    nanovdb::Vec3f maxBBox = worldBBox.max();
+    BBoxMin = Vector3f(maxBBox[0], maxBBox[1], maxBBox[2]);
 
     // Initialize h
     for (int i=0; i<depth; i++) {
         h.push_back(base_voxel_size * pow(2,i));
     }
 
+    // TODO: should I pass in the accessor? Do I need the grid?
     // Initialize S0
     create_S0(temperature_grid);
 
@@ -29,15 +34,19 @@ LGH::LGH(pbrt::SampledGrid<float> temperature_grid, int depth, float base_voxel_
 }
 
 
-void LGH::create_S0(pbrt::SampledGrid<float> temperature_grid)
+void LGH::create_S0(const nanovdb::FloatGrid* temperature_grid)
 {
     float h_0 = this->h[0];
 
     std::vector<std::pair<Vector3f,float>> lights;
-    for (float x = h_0; x < XSize; x += h_0) {
-        for (float y = h_0; y < YSize; y += h_0) {
-            for (float z = h_0; z < ZSize; z += h_0) {
-                float temperature = temperature_grid.Lookup(pbrt::Point3f(x,y,z));
+    for (float x = BBoxMin.x + h_0/2; x < BBoxMax.x; x += h_0) {
+        for (float y = BBoxMin.y + h_0/2; y < BBoxMax.y; y += h_0) {
+            for (float z = BBoxMin.z + h_0/2; z < BBoxMax.z; z += h_0) {
+                nanovdb::Vec3f pIndex = temperature_grid->worldToIndexF(nanovdb::Vec3f(x,y,z));
+                // TODO: actually do weighted sample for more accurate temperature
+                using Sampler = nanovdb::SampleFromVoxels<nanovdb::FloatGrid::TreeType, 1, false>;
+                float temperature = Sampler(temperature_grid->tree())(pIndex);
+
                 if (temperature < TEMP_THRESHOLD) {
                     // TODO: derive intensity from temperature
                     lights.emplace_back(Vector3f(x,y,z), temperature);
@@ -59,9 +68,9 @@ void LGH::deriveNewS(int l)//, const KDTree& S0, const pbrt::SampledGrid<float>&
     std::vector<std::pair<Vector3f,float>> lights;
 
     // iterate over grid vertices of level l
-    for (float x = .0f; x < XSize; x += h_l)
-    for (float y = .0f; y < YSize; y += h_l)
-    for (float z = .0f; z < ZSize; z += h_l)
+    for (float x = BBoxMin.x; x < BBoxMax.x; x += h_l)
+    for (float y = BBoxMin.y; y < BBoxMax.y; y += h_l)
+    for (float z = BBoxMin.z; z < BBoxMax.z; z += h_l)
     {
         Vector3f target_light_pos(x,y,z);             // grid-vertex position q_i
     
@@ -192,7 +201,7 @@ float LGH::get_intensity(int L, Vector3f targetPos, KDNode* light, float radius)
 }
 
 // TODO: replace Le in pbrt
-float LGH::get_total_illum(Vector3f pos)
+float LGH::get_total_illum(pbrt::Point3f pos)
 {
     float total_intensity = 0;
     for (int l=0; l<l_max; l++) {

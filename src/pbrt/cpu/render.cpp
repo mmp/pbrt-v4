@@ -26,7 +26,7 @@ void RenderCPU(BasicScene &parsedScene) {
     ThreadLocal<Allocator> threadAllocators([]() { return Allocator(); });
 
     // Create media first (so have them for the camera...)
-    std::map<std::string, Medium> media = parsedScene.CreateMedia();
+    std::map<std::string, Medium> media = parsedScene.CreateMedia(); // EXPLOSION Actually created media i think?
 
     // Textures
     LOG_VERBOSE("Starting textures");
@@ -37,6 +37,8 @@ void RenderCPU(BasicScene &parsedScene) {
     std::map<int, pstd::vector<Light> *> shapeIndexToAreaLights;
     std::vector<Light> lights =
         parsedScene.CreateLights(textures, &shapeIndexToAreaLights);
+
+    // EXPLOSION TODO: add point lights here from explosion data
 
     LOG_VERBOSE("Starting materials");
     std::map<std::string, pbrt::Material> namedMaterials;

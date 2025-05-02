@@ -33,6 +33,8 @@
 #include <memory>
 #include <vector>
 
+#include "../light_heirarchy/lighting_grid_hierarchy.h"
+
 namespace pbrt {
 
 // Media Function Declarations
@@ -649,6 +651,8 @@ class NanoVDBMedium {
         return DDAMajorantIterator(ray, tMin, tMax, &majorantGrid, sigma_t);
     }
 
+    LGH* m_lgh;
+
   private:
     // NanoVDBMedium Private Methods
     PBRT_CPU_GPU
@@ -663,6 +667,12 @@ class NanoVDBMedium {
         if (temp <= 100.f)
             return SampledSpectrum(0.f);
         return LeScale * BlackbodySpectrum(temp).Sample(lambda);
+        // TODO: find a way to switch between this and lgh lighting (global flag? less than ideal but)
+        // How can we access LGH class here?
+        // Ah, maybe I make LGH an object of this class. Would make it easy to initialize/use
+        // Hard part would be getting transmission and setting lights in scene for base example
+
+        m_lgh->get_total_illum(p);
     }
 
     // NanoVDBMedium Private Members
