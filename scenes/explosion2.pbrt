@@ -1,6 +1,6 @@
 ColorSpace "aces2065-1"
 Film "rgb"
-    "string filename" [ "ground_explosion.exr" ]
+    "string filename" [ "ground_explosion_LGH_S1.exr" ]
     "integer yresolution" [ 1440 ]
     "integer xresolution" [ 1920 ]
 PixelFilter "gaussian"

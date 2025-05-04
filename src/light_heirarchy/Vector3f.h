@@ -1,3 +1,5 @@
+#include <cmath>
+
 struct Vector3f {
     float x, y, z;
 

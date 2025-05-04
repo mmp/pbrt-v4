@@ -547,7 +547,7 @@ NanoVDBMedium::NanoVDBMedium(const Transform &renderFromMedium, Spectrum sigma_a
                                    Point3f(bbox.max()[0], bbox.max()[1], bbox.max()[2])));
 
         // TODO: allow pbrt command or pbrt file to alter parameters, name depth and voxel size
-        m_lgh = alloc.new_object<LGH>(temperatureFloatGrid, 1, 0.1f, 1);
+        m_lgh = alloc.new_object<LGH>(temperatureFloatGrid, 3, 0.1f, 1, renderFromMedium);
 
     } else {
         LOG_FATAL("NO TEMPERATURE GRID!!!");
@@ -565,6 +565,7 @@ NanoVDBMedium::NanoVDBMedium(const Transform &renderFromMedium, Spectrum sigma_a
 #else
     LOG_VERBOSE("Starting nanovdb grid GetMaxDensityGrid()");
 
+    // EXPLOSION: For aman, turn density grid into majorant grid
     int gridSize = majorantGrid.res.x * majorantGrid.res.y * majorantGrid.res.z;
     ParallelFor(0, gridSize, [&](size_t index) {
         // Indices into majorantGrid

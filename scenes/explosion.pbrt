@@ -27,8 +27,8 @@ WorldBegin
 
 AttributeBegin
 # Scale 1 1 1.6
-Rotate 90 1 0 0
-Translate 12 50 5
+#Rotate 90 1 0 0
+#Translate 12 50 5
 	MakeNamedMedium "kaboom"
 		"float Lescale" [ 0.125 ]
 		"string filename" [ "explosion2.nvdb" ]
@@ -44,7 +44,7 @@ AttributeEnd
 AttributeBegin
 MediumInterface "kaboom" ""
 Material "interface"
-Translate 0 40 0
+#Translate 0 40 0
 Shape "sphere" "float radius" 80
 AttributeEnd
 

@@ -978,12 +978,37 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             RNG rng(hash0, hash1);
 
             if (ray.medium.Is<NanoVDBMedium>()) {
-                printf("     Shape intersection: %s\n", si.value().ToString().c_str());
-                // TODO: i dont think ray origin is the correct point to be sampling. Where's thein
-                float estimated_intensity = ray.medium.Cast<NanoVDBMedium>()->m_lgh->get_total_illum(ray.o);
-                SampledSpectrum estimatedLighting(estimated_intensity);
-                L += estimatedLighting;
-                printf("Intensity: %f at point %f %f %f\n", estimated_intensity, ray.o.x, ray.o.y, ray.o.z);
+                // if (si)
+                    // printf("     Shape intersection: %s\n", si.value().ToString().c_str());
+
+                // TODO:
+
+                int steps = 0;
+
+                // March through volume
+                SampledSpectrum T_maj = SampleT_maj(
+                    ray, tMax, sampler.Get1D(), rng, lambda,
+                    [&](Point3f p, MediumProperties mp, SampledSpectrum sigma_maj,
+                        SampledSpectrum T_maj) {
+
+                        // TODO: convert intensity to SampledSpectrum, see nanovdbmedium blackbody calculation
+
+                        // TODO: pass in rng
+                        SampledSpectrum estimated_lighting = ray.medium.Cast<NanoVDBMedium>()->m_lgh->get_total_illum(p, lambda);
+                        // printf("\tStep %d: \tpoint %f %f %f\tIntensity: %f,\ttransmittance: %s\n", steps, estimated_intensity, ray.o.x, ray.o.y, ray.o.z, T_maj.ToString().c_str());
+                        // SampledSpectrum estimatedLighting(estimated_intensity);
+
+                        // Only care about transmission because not randomly sampling
+                        L += T_maj * estimated_lighting;
+                        steps++;
+                        return true;
+
+                    });
+
+                // Calculate transmittance (note this has to be done for every call to get_intensity, not here
+                    // The ray is from target point to the light
+                    // What
+
             }
             else {
             

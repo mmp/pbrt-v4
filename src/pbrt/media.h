@@ -672,7 +672,7 @@ class NanoVDBMedium {
         // Ah, maybe I make LGH an object of this class. Would make it easy to initialize/use
         // Hard part would be getting transmission and setting lights in scene for base example
 
-        m_lgh->get_total_illum(p);
+        // m_lgh->get_total_illum(p);
     }
 
     // NanoVDBMedium Private Members
@@ -741,6 +741,8 @@ PBRT_CPU_GPU SampledSpectrum SampleT_maj(Ray ray, Float tMax, Float u, RNG &rng,
     return ray.medium.Dispatch(sample);
 }
 
+
+// EXPLOSION: the actual part that marches through the entire volume ray
 template <typename ConcreteMedium, typename F>
 PBRT_CPU_GPU SampledSpectrum SampleT_maj(Ray ray, Float tMax, Float u, RNG &rng,
                                          const SampledWavelengths &lambda, F callback) {
