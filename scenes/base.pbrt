@@ -51,8 +51,6 @@ AttributeEnd
 AttributeBegin
 Translate 0 -50 0
 
-Material "coateddiffuse" "rgb reflectance" [ .4 .4 .4 ] "float roughness" .001
-
 Translate 0 0 -4
 Shape "disk" "float radius" 1000
 AttributeEnd

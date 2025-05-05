@@ -10,7 +10,7 @@ Film "rgb"
   "string sensor" "nikon_d850"
   "float whitebalance" 6000
   "float iso" 100
-  "string filename" "explosion2_samples_nolighting.exr"
+  "string filename" "explosion_lgh.exr"
 
 Integrator "volpath" "integer maxdepth" 100 #5000
 Sampler "halton" "integer pixelsamples" 16 #256

@@ -5,6 +5,7 @@
 #include "pbrt/pbrt.h"
 #include "pbrt/util/transform.h"
 #include <nanovdb/NanoVDB.h>
+#include <pbrt/samplers.h>
 
 class LGH
 {
@@ -14,8 +15,18 @@ public:
     // LGH(pbrt::SampledGrid<float> temperature_grid, int depth, float base_voxel_size, float transmission);
     LGH(const nanovdb::FloatGrid* temperature_grid, int depth, float base_voxel_size, float transmission, pbrt::Transform transform);
 
-    float get_intensity(int L, Vector3f targetPos, KDNode* light, float radius);
-    pbrt::SampledSpectrum get_total_illum(pbrt::Point3f pos, pbrt::SampledWavelengths lambda);//, NanoVDBMedium* medium);
+    pbrt::SampledSpectrum get_intensity(int L,
+                                        Vector3f targetPos,
+                                        KDNode* light,
+                                        float radius,
+                                        pbrt::SampledWavelengths lambda,
+                                        pbrt::Sampler sampler,
+                                        pbrt::Medium medium);
+
+    pbrt::SampledSpectrum get_total_illum(pbrt::Point3f pos,
+                                          pbrt::SampledWavelengths lambda,
+                                          pbrt::Sampler sampler,
+                                          pbrt::Medium medium);
 
     const float TEMP_THRESHOLD = 1.0f;
 

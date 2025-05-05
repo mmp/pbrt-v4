@@ -1,6 +1,6 @@
 ColorSpace "aces2065-1"
 Film "rgb"
-    "string filename" [ "ground_explosion_LGH_S1.exr" ]
+    "string filename" [ "ground_explosion_LGH_S0.exr" ]
     "integer yresolution" [ 1440 ]
     "integer xresolution" [ 1920 ]
 PixelFilter "gaussian"
@@ -22,7 +22,7 @@ WorldBegin
 AttributeBegin
 	MakeNamedMedium "/obj/ground_explosion/RENDER-0"
 		"float Lescale" [ 0.125 ]
-		"string filename" [ "explosion2.nvdb" ]
+		"string filename" [ "explosion.nvdb" ]
 		"float temperaturescale" [ 4500 ]
 		"float scale" [ 5 ]
 		"rgb sigma_a" [ 0.4 0.4 0.4 ]

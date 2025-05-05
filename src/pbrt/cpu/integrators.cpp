@@ -978,6 +978,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
             RNG rng(hash0, hash1);
 
             if (ray.medium.Is<NanoVDBMedium>()) {
+                // printf("using LGH\n");
                 // if (si)
                     // printf("     Shape intersection: %s\n", si.value().ToString().c_str());
 
@@ -991,12 +992,8 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                     [&](Point3f p, MediumProperties mp, SampledSpectrum sigma_maj,
                         SampledSpectrum T_maj) {
 
-                        // TODO: convert intensity to SampledSpectrum, see nanovdbmedium blackbody calculation
-
-                        // TODO: pass in rng
-                        SampledSpectrum estimated_lighting = ray.medium.Cast<NanoVDBMedium>()->m_lgh->get_total_illum(p, lambda);
-                        // printf("\tStep %d: \tpoint %f %f %f\tIntensity: %f,\ttransmittance: %s\n", steps, estimated_intensity, ray.o.x, ray.o.y, ray.o.z, T_maj.ToString().c_str());
-                        // SampledSpectrum estimatedLighting(estimated_intensity);
+                        SampledSpectrum estimated_lighting = ray.medium.Cast<NanoVDBMedium>()->m_lgh->get_total_illum(p, lambda, sampler, ray.medium);
+                        // printf("\tStep %d: \tpoint %f %f %f\tIntensity: %f,\ttransmittance: %s\n", steps, estimated_intensity, p.x, p.y, p.z, T_maj.ToString().c_str());
 
                         // Only care about transmission because not randomly sampling
                         L += T_maj * estimated_lighting;
@@ -1011,9 +1008,6 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
 
             }
             else {
-            
-            // .Is(pbrt::NanoVDBMedium); // EXPLOSION TODO: replace SampleT_maj with total illum!
-
             SampledSpectrum T_maj = SampleT_maj(
                 ray, tMax, sampler.Get1D(), rng, lambda,
                 [&](Point3f p, MediumProperties mp, SampledSpectrum sigma_maj,

@@ -2,6 +2,7 @@
 #include "nanovdb/util/SampleFromVoxels.h"
 #include "pbrt/util/spectrum.h"
 #include <stdio.h>
+#include <pbrt/media.h>
 
 // LGH::LGH(pbrt::SampledGrid<float> temperature_grid, int depth, float base_voxel_size, float transmission) 
 LGH::LGH(const nanovdb::FloatGrid* temperature_grid, int depth, float base_voxel_size, float transmission, pbrt::Transform transform)
@@ -63,7 +64,7 @@ void LGH::create_S0(const nanovdb::FloatGrid* temperature_grid)
             for (float z = BBoxMin.z + h_0/2; z < BBoxMax.z; z += h_0) {
 
                 // TODO: is the worldBBox in world space including the transform or without??
-                pbrt::Point3f p = medium_transform.ApplyInverse(pbrt::Point3f(x,y,z));
+                // pbrt::Point3f p = medium_transform.ApplyInverse(pbrt::Point3f(x,y,z));
 
 
                 nanovdb::Vec3f pIndex = temperature_grid->worldToIndexF(nanovdb::Vec3f(x, y, z));
@@ -108,7 +109,6 @@ void LGH::deriveNewS(int l)
     {
         Vector3f target_light_pos(x,y,z);             // grid-vertex position q_i
     
-        const float h_l     = this->h[l];
         KDTree* lighting_grid_j = lighting_grids[l-1];
     
         // TODO: double check is radius is correct for 2x2x2 grid, used diagonal of cube
@@ -118,7 +118,7 @@ void LGH::deriveNewS(int l)
         // TODO: either the radius I gave or the radiusSearch function is broken
         float radius = sqrt(3) * h[l-1];
         std::vector<KDNode*> j_lights;
-        lighting_grid_j->radiusSearch(target_light_pos, radius , j_lights);
+        lighting_grid_j->radiusSearch(target_light_pos, radius, j_lights);
 
         // printf("radius search lights: %lu\n", j_lights.size());
 
@@ -128,6 +128,8 @@ void LGH::deriveNewS(int l)
     }
 
     lighting_grids[l] = new KDTree(lights);
+    printf("=============================\nCreated %lu lights in S%d\n=============================", lights.size(), l);
+
 }
 
 float calcTrilinearWeight(Vector3f p, Vector3f q, float h_l) {
@@ -185,18 +187,31 @@ float LGH::blendingFunction(int level, float d, float r_l)
     return 0;
 }
 
-float LGH::get_intensity(int L, Vector3f targetPos, KDNode* light, float radius)
+pbrt::SampledSpectrum LGH::get_intensity(int L,
+                                         Vector3f targetPos,
+                                         KDNode* light,
+                                         float radius,
+                                         pbrt::SampledWavelengths lambda,
+                                         pbrt::Sampler sampler,
+                                         pbrt::Medium medium)
 {
-    // TODO: get Transmission function somehow
     // V = Tr(x, light->point)
 
     // Calculate tranmittance
+    Vector3f dir = light->point - targetPos;
 
-    // TODO: create ray, rng, and lambda
-    // SampledSpectrum V = SampleT_maj(ray, tMax, rng.Uniform<Float>(), rng, lambda,
-    //             [&](Point3f p, MediumProperties mp, SampledSpectrum sigma_maj, SampledSpectrum T_maj) {
-    //     return true;
-    //             });
+    // TODO: need to set Medium otherwise will not work!!!, also look what time does?
+    pbrt::Ray ray = pbrt::Ray(pbrt::Point3f(targetPos.x, targetPos.y, targetPos.z), pbrt::Vector3f(dir.x, dir.y, dir.z), 0, medium);
+    float tMax = Length(ray.d);
+    // Initialize _RNG_ for sampling the majorant transmittance
+    uint64_t hash0 = pbrt::Hash(sampler.Get1D());
+    uint64_t hash1 = pbrt::Hash(sampler.Get1D());
+    pbrt::RNG rng(hash0, hash1);
+
+    pbrt::SampledSpectrum V = SampleT_maj(ray, tMax, sampler.Get1D(), rng, lambda,
+                [&](pbrt::Point3f p, pbrt::MediumProperties mp, pbrt::SampledSpectrum sigma_maj, pbrt::SampledSpectrum T_maj) {
+        return true;
+                });
 
 
     float d = targetPos.distance(light->point);
@@ -211,21 +226,29 @@ float LGH::get_intensity(int L, Vector3f targetPos, KDNode* light, float radius)
         printf("LIGHT INTENSITY NEGATIVE!!! L: %d, %f\n", L, light->intensity);
     }
 
-    return g * B * light->intensity; // * V
+    if (light->intensity * 800 < 10) {
+        // printf("Too low light intensity L: %d, %f\n", L, light->intensity * 4500);
+        return pbrt::SampledSpectrum(0);
+    }
+
+    // TODO: may need to do this as well. Not sure how much transmittance will impact
+    // light->intensity *= 4500 * 5;// * 10000;
+
+    // printf("Light intensity: %f, transmittance: %s, d: %f, B: %f\n", light->intensity * 500, V.ToString().c_str(), d, B);
+
+
+    return g * B * pbrt::BlackbodySpectrum(light->intensity * 800).Sample(lambda) * V;
 }
 
-// TODO: replace Le in pbrt
-pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos, pbrt::SampledWavelengths lambda)
+pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos,
+                                           pbrt::SampledWavelengths lambda,
+                                           pbrt::Sampler sampler,
+                                           pbrt::Medium medium)
 {
 
-    // Convert point from world space to grid space
+    // Note that pos passed in callback is in medium local space! Convert to world-space to access lights
     pos = medium_transform.ApplyInverse(pos);
 
-
-    // temp = (temp - temperatureOffset) * temperatureScale;
-    // if (temp <= 100.f)
-    //     return SampledSpectrum(0.f);
-    // return LeScale * BlackbodySpectrum(temp).Sample(lambda);
 
     // nanovdb::Vec3f pIndex = m_temperature_grid->worldToIndexF(nanovdb::Vec3f(p.x, p.y, p.z));
     // TODO: actually do weighted sample for more accurate temperature
@@ -234,8 +257,8 @@ pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos, pbrt::SampledWavel
     Vector3f v_pos(pos.x, pos.y, pos.z);
 
     int numLightsCaptured = 0;
-    int numLightsS0;
-    float total_intensity = 0;
+    int numLightsS0 = 0;
+    pbrt::SampledSpectrum total_intensity(0);
     for (int l=0; l<=l_max; l++) {
         float radius = alpha * h[l];
 
@@ -243,39 +266,21 @@ pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos, pbrt::SampledWavel
         lighting_grids[l]->radiusSearch(v_pos, radius, results);
         numLightsCaptured += results.size();
 
+        // TODO: for some reason, levels beyond 0 do nothing
         if (l == 0)
             numLightsS0 = results.size();
         //printf("  radius search size: %lu\n", results.size());
         
         for (auto light : results) {
-            total_intensity += get_intensity(l, v_pos, light, radius);
+            total_intensity += get_intensity(l, v_pos, light, radius, lambda, sampler, medium);
         }
     }
 
-    printf("  captured lights %d, S0: %d\n", numLightsCaptured, numLightsS0);
-
-    // TODO: most total_intensity values seem to be 0 and idk why, could be because of radius search?
-
-    // total_intensity *= 4500 * 5;// * 10000;
-    // printf("tota")
-
-    // total_intensity = std::clamp(total_intensity, 1000.f, 10000.f);
-
-    if (total_intensity < 0) {
-        LOG_FATAL("NEGATIVE INTENSITY!!! %f\n", total_intensity);
-        return pbrt::SampledSpectrum(0.f);
-    }
-
-    if (total_intensity == 0) {
-        return pbrt::SampledSpectrum(0.f);
-    }
-    // else if (total_intensity < 100) {
-    //     return pbrt::SampledSpectrum(0.f);
-    // }
+    // printf("  captured lights %d, S0: %d\n", numLightsCaptured, numLightsS0);
 
     // printf("\tIntensity: %f, point %f %f %f\t\n", total_intensity, v_pos.x, v_pos.y, v_pos.z);
 
-    return 0.125 * pbrt::BlackbodySpectrum(total_intensity).Sample(lambda);
+    return 0.125 * total_intensity;
 
     // return total_intensity;
 }

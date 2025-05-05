@@ -3,7 +3,6 @@
 #include "Vector3f.h"
 #include <vector>
 #include <memory>
-#include <limits>
 
 struct KDNode {
     Vector3f point;
