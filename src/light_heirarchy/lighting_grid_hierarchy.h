@@ -15,7 +15,8 @@ public:
     // LGH(pbrt::SampledGrid<float> temperature_grid, int depth, float base_voxel_size, float transmission);
     LGH(const nanovdb::FloatGrid* temperature_grid, int depth, float base_voxel_size, float transmission, pbrt::Transform transform);
 
-    pbrt::SampledSpectrum get_intensity(int L,
+    // pbrt::SampledSpectrum
+    float get_intensity(int L,
                                         Vector3f targetPos,
                                         KDNode* light,
                                         float radius,

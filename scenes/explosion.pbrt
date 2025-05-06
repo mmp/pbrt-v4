@@ -10,9 +10,9 @@ Film "rgb"
   "string sensor" "nikon_d850"
   "float whitebalance" 6000
   "float iso" 100
-  "string filename" "explosion_lgh.exr"
+  "string filename" "explosion2_lgh.exr"
 
-Integrator "volpath" "integer maxdepth" 100 #5000
+Integrator "volpath" "integer maxdepth" 10 #100 #5000
 Sampler "halton" "integer pixelsamples" 16 #256
 # Volume "step size" 0.1
 
@@ -27,8 +27,8 @@ WorldBegin
 
 AttributeBegin
 # Scale 1 1 1.6
-#Rotate 90 1 0 0
-#Translate 12 50 5
+Rotate 90 1 0 0
+Translate 10 0 -70
 	MakeNamedMedium "kaboom"
 		"float Lescale" [ 0.125 ]
 		"string filename" [ "explosion2.nvdb" ]
@@ -44,14 +44,14 @@ AttributeEnd
 AttributeBegin
 MediumInterface "kaboom" ""
 Material "interface"
-#Translate 0 40 0
+Translate 0 40 0
 Shape "sphere" "float radius" 80
 AttributeEnd
 
 AttributeBegin
 Translate 0 -50 0
 
-Material "coateddiffuse" "rgb reflectance" [ .4 .4 .4 ] "float roughness" .001
+#Material "coateddiffuse" "rgb reflectance" [ .4 .4 .4 ] "float roughness" .001
 
 Translate 0 0 -4
 Shape "disk" "float radius" 1000

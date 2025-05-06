@@ -547,7 +547,7 @@ NanoVDBMedium::NanoVDBMedium(const Transform &renderFromMedium, Spectrum sigma_a
                                    Point3f(bbox.max()[0], bbox.max()[1], bbox.max()[2])));
 
         // TODO: allow pbrt command or pbrt file to alter parameters, name depth and voxel size
-        m_lgh = alloc.new_object<LGH>(temperatureFloatGrid, 0, 0.1f, 1, renderFromMedium);
+        m_lgh = alloc.new_object<LGH>(temperatureFloatGrid, 5, .1f, 1, renderFromMedium);
 
     } else {
         LOG_FATAL("NO TEMPERATURE GRID!!!");

@@ -187,7 +187,8 @@ float LGH::blendingFunction(int level, float d, float r_l)
     return 0;
 }
 
-pbrt::SampledSpectrum LGH::get_intensity(int L,
+// pbrt::SampledSpectrum
+float LGH::get_intensity(int L,
                                          Vector3f targetPos,
                                          KDNode* light,
                                          float radius,
@@ -226,10 +227,10 @@ pbrt::SampledSpectrum LGH::get_intensity(int L,
         printf("LIGHT INTENSITY NEGATIVE!!! L: %d, %f\n", L, light->intensity);
     }
 
-    if (light->intensity * 800 < 10) {
-        // printf("Too low light intensity L: %d, %f\n", L, light->intensity * 4500);
-        return pbrt::SampledSpectrum(0);
-    }
+    // if (light->intensity * 800 < 10) {
+    //     // printf("Too low light intensity L: %d, %f\n", L, light->intensity * 4500);
+    //     return pbrt::SampledSpectrum(0);
+    // }
 
     // TODO: may need to do this as well. Not sure how much transmittance will impact
     // light->intensity *= 4500 * 5;// * 10000;
@@ -237,7 +238,7 @@ pbrt::SampledSpectrum LGH::get_intensity(int L,
     // printf("Light intensity: %f, transmittance: %s, d: %f, B: %f\n", light->intensity * 500, V.ToString().c_str(), d, B);
 
 
-    return g * B * pbrt::BlackbodySpectrum(light->intensity * 800).Sample(lambda) * V;
+    return g * B * light->intensity;//pbrt::BlackbodySpectrum(light->intensity * 800).Sample(lambda) * V;
 }
 
 pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos,
@@ -257,8 +258,9 @@ pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos,
     Vector3f v_pos(pos.x, pos.y, pos.z);
 
     int numLightsCaptured = 0;
-    int numLightsS0 = 0;
-    pbrt::SampledSpectrum total_intensity(0);
+    int numLightsS0, numLightsS1 = 0;
+    // pbrt::SampledSpectrum
+    float total_intensity(0);
     for (int l=0; l<=l_max; l++) {
         float radius = alpha * h[l];
 
@@ -269,6 +271,9 @@ pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos,
         // TODO: for some reason, levels beyond 0 do nothing
         if (l == 0)
             numLightsS0 = results.size();
+        if (l==1)
+            numLightsS1 = results.size();
+
         //printf("  radius search size: %lu\n", results.size());
         
         for (auto light : results) {
@@ -276,11 +281,14 @@ pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos,
         }
     }
 
-    // printf("  captured lights %d, S0: %d\n", numLightsCaptured, numLightsS0);
+    if (total_intensity < 100) {
+        return pbrt::SampledSpectrum(0);
+    }
+
+    // printf("  captured lights %d, S0: %d, S1: %d\n", numLightsCaptured, numLightsS0, numLightsS1);
 
     // printf("\tIntensity: %f, point %f %f %f\t\n", total_intensity, v_pos.x, v_pos.y, v_pos.z);
 
-    return 0.125 * total_intensity;
-
-    // return total_intensity;
+    // return 0.125 * total_intensity;
+    return 0.125 * pbrt::BlackbodySpectrum(total_intensity).Sample(lambda);
 }
