@@ -3,6 +3,7 @@
 #include "pbrt/util/spectrum.h"
 #include <stdio.h>
 #include <pbrt/media.h>
+#include <array>
 
 // LGH::LGH(pbrt::SampledGrid<float> temperature_grid, int depth, float base_voxel_size, float transmission) 
 LGH::LGH(const nanovdb::FloatGrid* temperature_grid, int depth, float base_voxel_size, float transmission, pbrt::Transform transform)
@@ -39,10 +40,12 @@ LGH::LGH(const nanovdb::FloatGrid* temperature_grid, int depth, float base_voxel
     // TODO: should I pass in the accessor? Do I need the grid?
     // Initialize S0
     create_S0(temperature_grid);
+    prefilter_density_field(0, h[0], temperature_grid);
 
     // Create rest of S_l
     for (int i=1; i<=depth; i++) {
         deriveNewS(i);
+        prefilter_density_field(i, h[i], temperature_grid);
     }
 
     if (lighting_grids.size() != l_max + 1) {
@@ -291,4 +294,50 @@ pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos,
 
     // return 0.125 * total_intensity;
     return 0.125 * pbrt::BlackbodySpectrum(total_intensity).Sample(lambda);
+}
+
+// Pyramid filter function (from reference image, Eq. 6)
+static float pyramid_filter(int i, int j, int k, int h_l) {
+    // i, j, k in {-1, 0, 1}
+    // h_l is the filter size (should be 3 for 3x3x3)
+    return (1.0f / 8.0f) * (1.0f - std::abs(i) / float(h_l)) * (1.0f - std::abs(j) / float(h_l)) * (1.0f - std::abs(k) / float(h_l));
+}
+
+void LGH::prefilter_density_field(int level, float h_l, const nanovdb::FloatGrid* density_grid) {
+    std::vector<float> densities;
+    std::vector<Vector3f> vertices;
+
+    // For each grid vertex at this level
+    for (float x = BBoxMin.x; x < BBoxMax.x; x += h_l)
+    for (float y = BBoxMin.y; y < BBoxMax.y; y += h_l)
+    for (float z = BBoxMin.z; z < BBoxMax.z; z += h_l) {
+        Vector3f v(x, y, z);
+        float filtered_density = 0.0f;
+        // 3x3x3 stencil centered at v
+        for (int dx = -1; dx <= 1; ++dx)
+        for (int dy = -1; dy <= 1; ++dy)
+        for (int dz = -1; dz <= 1; ++dz) {
+            float nx = x + dx * h_l;
+            float ny = y + dy * h_l;
+            float nz = z + dz * h_l;
+            // Check bounds
+            if (nx < BBoxMin.x || nx >= BBoxMax.x ||
+                ny < BBoxMin.y || ny >= BBoxMax.y ||
+                nz < BBoxMin.z || nz >= BBoxMax.z)
+                continue;
+            // Convert to grid index
+            nanovdb::Vec3f pIndex = density_grid->worldToIndexF(nanovdb::Vec3f(nx, ny, nz));
+            using Sampler = nanovdb::SampleFromVoxels<nanovdb::FloatGrid::TreeType, 1, false>;
+            float density = Sampler(density_grid->tree())(pIndex);
+            float w = pyramid_filter(dx, dy, dz, 2); // h_l=2 for 3x3x3
+            filtered_density += w * density;
+        }
+        densities.push_back(filtered_density);
+        vertices.push_back(v);
+    }
+    // Store for this level
+    if (filtered_densities.size() <= level) filtered_densities.resize(level+1);
+    if (grid_vertices.size() <= level) grid_vertices.resize(level+1);
+    filtered_densities[level] = std::move(densities);
+    grid_vertices[level] = std::move(vertices);
 }

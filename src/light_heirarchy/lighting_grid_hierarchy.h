@@ -56,6 +56,15 @@ private:
 
     Vector3f BBoxMin;
     Vector3f BBoxMax;
+
+    // --- Shadow map support ---
+    // For each level, store a vector of filtered densities (one per grid vertex)
+    std::vector<std::vector<float>> filtered_densities;
+    // For each level, store the grid vertex positions (to match filtered_densities)
+    std::vector<std::vector<Vector3f>> grid_vertices;
+
+    // Pre-filter the density field for a given level
+    void prefilter_density_field(int level, float h_l, const nanovdb::FloatGrid* density_grid);
 };
 
 #endif // LIGHTING_GRID_HIERARCHY_H
