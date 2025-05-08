@@ -1,7 +1,7 @@
 ColorSpace "aces2065-1"
 
 Film "rgb"
-    "string filename" [ "ground_explosion_lgh_test4.exr" ]
+    "string filename" [ "__OUTPUT_PATH__" ]
     "integer yresolution" [ 1440 ]
     "integer xresolution" [ 1920 ]
     #"float whitebalance" 6000
@@ -13,7 +13,7 @@ PixelFilter "gaussian"
 
 Integrator "volpath"
     "integer maxdepth" [ 40 ]
-#Sampler "halton" "integer pixelsamples" 64 #256
+# Sampler "halton" "integer pixelsamples" 64 #256
 Accelerator "bvh"
 Transform [ 1 0 0 0 0 0.99254614 0.12186934 0 0 0.12186934 -0.99254614 0 0 -35.430065 247.52719 1  ]
 Camera "perspective"
@@ -25,16 +25,16 @@ WorldBegin
 
 
 AttributeBegin
-#Scale 3 3 3
+#Scale 2 2 2
 #Translate 0 0 50
 	MakeNamedMedium "/obj/ground_explosion/RENDER-0"
 		"float Lescale" [ 0.125 ]
-		"string filename" [ "explosion2.nvdb" ]
+		"string filename" [ "__NVDB_PATH__" ]
 		"float temperaturescale" [ 4500 ]
 		"float scale" [ 5 ]
-		#"rgb sigma_a" [ 0.4 0.4 0.4 ] # absorption
-		#"rgb sigma_s" [ 0.9 0.9 0.9 ] # scattering
-                "spectrum sigma_s" [200 10 900 10] "spectrum sigma_a" [200 10 900 10]
+		"rgb sigma_a" [ 0.4 0.4 0.4 ] # absorption
+		"rgb sigma_s" [ 0.9 0.9 0.9 ] # scattering
+                #"spectrum sigma_s" [200 10 900 10] "spectrum sigma_a" [200 10 900 10]
 		"string type" [ "nanovdb" ]
 
 	Material "interface"
