@@ -293,5 +293,6 @@ int main(int argc, char *argv[]) {
         // Clean up after rendering the scene
         CleanupPBRT();
     }
+
     return 0;
 }

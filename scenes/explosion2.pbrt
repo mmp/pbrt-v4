@@ -1,7 +1,7 @@
 ColorSpace "aces2065-1"
 
 Film "rgb"
-    "string filename" [ "ground_explosion_lgh_test4.exr" ]
+    "string filename" [ "ground_explosion_lgh_sigma400_100.exr" ]
     "integer yresolution" [ 1440 ]
     "integer xresolution" [ 1920 ]
     #"float whitebalance" 6000

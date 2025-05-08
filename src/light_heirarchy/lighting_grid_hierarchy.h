@@ -13,7 +13,7 @@ public:
     // TODO: separate into constructor and initialization function
     // TODO: fix inputs
     // LGH(pbrt::SampledGrid<float> temperature_grid, int depth, float base_voxel_size, float transmission);
-    LGH(const nanovdb::FloatGrid* temperature_grid, int depth, float base_voxel_size, float transmission, pbrt::Transform transform);
+    LGH(const nanovdb::FloatGrid* temperature_grid, const nanovdb::FloatGrid* density_grid, int depth, float base_voxel_size, float transmission, pbrt::Transform transform);
 
     pbrt::SampledSpectrum get_intensity(int L,
                                         Vector3f targetPos,
@@ -26,7 +26,10 @@ public:
     pbrt::SampledSpectrum get_total_illum(pbrt::Point3f pos,
                                           pbrt::SampledWavelengths lambda,
                                           pbrt::Sampler sampler,
-                                          pbrt::Medium medium);
+                                          pbrt::Medium medium,
+                                          pbrt::RNG rng,
+                                          float tMax,
+                                          pbrt::Ray ray);
 
     const float TEMP_THRESHOLD = 1.0f;
 
@@ -41,6 +44,7 @@ public:
     // TODO: remove this to use pbrt transmission instead
     const float transmission;
     const nanovdb::FloatGrid* m_temperature_grid;
+    const nanovdb::FloatGrid* m_density_grid;
 
 private:
     void create_S0(const nanovdb::FloatGrid* temperature_grid);

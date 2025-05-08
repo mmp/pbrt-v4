@@ -760,7 +760,7 @@ PBRT_CPU_GPU SampledSpectrum SampleT_maj(Ray ray, Float tMax, Float u, RNG &rng,
     while (!done) {
         // Get next majorant segment from iterator and sample it
         pstd::optional<RayMajorantSegment> seg = iter.Next();
-        if (!seg)
+        if (!seg) // EXPLOSION TODO: maybe check if no segment ever hit?
             return T_maj;
         // Handle zero-valued majorant for current segment
         if (seg->sigma_maj[0] == 0) {

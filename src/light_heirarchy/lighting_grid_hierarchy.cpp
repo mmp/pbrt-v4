@@ -3,9 +3,10 @@
 #include "pbrt/util/spectrum.h"
 #include <stdio.h>
 #include <pbrt/media.h>
+#include <cmath>
 
 // LGH::LGH(pbrt::SampledGrid<float> temperature_grid, int depth, float base_voxel_size, float transmission) 
-LGH::LGH(const nanovdb::FloatGrid* temperature_grid, int depth, float base_voxel_size, float transmission, pbrt::Transform transform)
+LGH::LGH(const nanovdb::FloatGrid* temperature_grid, const nanovdb::FloatGrid* density_grid, int depth, float base_voxel_size, float transmission, pbrt::Transform transform)
     : l_max(depth), transmission(transmission), medium_transform(transform)
 {
     auto worldBBox = temperature_grid->worldBBox();
@@ -18,6 +19,7 @@ LGH::LGH(const nanovdb::FloatGrid* temperature_grid, int depth, float base_voxel
     printf("Min Bounds: %f %f %f, Max Bounds: %f %f %f", BBoxMin.x, BBoxMin.y, BBoxMin.z, BBoxMax.x, BBoxMax.y, BBoxMax.z);
 
     this->m_temperature_grid = temperature_grid;
+    m_density_grid = density_grid;
 
     // Initialize h
     for (int i=0; i<=depth; i++) {
@@ -150,7 +152,6 @@ float LGH::calcNewI(int l, Vector3f target_light_pos, std::vector<KDNode*> j_lig
         float w = calcTrilinearWeight(j_light->point, target_light_pos, this->h[l]);
         I_sum += w * j_light->intensity;
     }
-
     return I_sum;
 }
 
@@ -164,7 +165,7 @@ Vector3f LGH::calcNewPos(int l, Vector3f target_light_pos, std::vector<KDNode*> 
         float w = calcTrilinearWeight(j_light->point, target_light_pos, this->h[l]);
         float v = w * j_light->intensity * 1000; // TODO: what is the luminance component? What exactly is intensity data structure?
         p_num += v * j_light->point;
-        p_denom = v;
+        p_denom += v;
     }
 
     return p_num/p_denom;
@@ -205,25 +206,117 @@ pbrt::SampledSpectrum LGH::get_intensity(int L,
     // TODO: check how much time this transmittance calc adds
     Vector3f dir = light->point - targetPos;
 
-    pbrt::Ray ray = pbrt::Ray(pbrt::Point3f(targetPos.x, targetPos.y, targetPos.z), pbrt::Vector3f(dir.x, dir.y, dir.z), 0, medium);
-    float tMax = Length(ray.d);
+    // pbrt::Ray ray = pbrt::Ray(pbrt::Point3f(targetPos.x, targetPos.y, targetPos.z), pbrt::Vector3f(dir.x, dir.y, dir.z), 0, medium);
+
+    // TODO: i dont think tmax is right
+    // float tMax = 1e10;//Length(ray.d);
+    // ray.d = Normalize(ray.d);
+
+    // printf("tmax: %f\n", tMax);
     // Initialize _RNG_ for sampling the majorant transmittance
-    uint64_t hash0 = pbrt::Hash(sampler.Get1D());
-    uint64_t hash1 = pbrt::Hash(sampler.Get1D());
-    pbrt::RNG rng(hash0, hash1);
+    // uint64_t hash0 = pbrt::Hash(sampler.Get1D());
+    // uint64_t hash1 = pbrt::Hash(sampler.Get1D());
+    // pbrt::RNG rng(hash0, hash1);
 
-    pbrt::SampledSpectrum V = SampleT_maj(ray, tMax, sampler.Get1D(), rng, lambda,
-                [&](pbrt::Point3f p, pbrt::MediumProperties mp, pbrt::SampledSpectrum sigma_maj, pbrt::SampledSpectrum T_maj) {
-        return true;
-                });//.y(lambda);
+    pbrt::SampledSpectrum V(1.f);
 
-    V = pbrt::Clamp(V, 0.f, 1.f);
+    //     //pbrt::SampledSpectrum V =
+    // SampleT_maj(ray, tMax, rng.Uniform<float>(), rng, lambda,
+    //     [&](pbrt::Point3f p, pbrt::MediumProperties mp, pbrt::SampledSpectrum sigma_maj, pbrt::SampledSpectrum T_maj) {
+    //         // printf("sigma_maj: %s, t_maj: %s, a: %s, s: %s\n", sigma_maj.ToString().c_str(), T_maj.ToString().c_str(), mp.sigma_a.ToString().c_str(), mp.sigma_s.ToString().c_str());
+    //         // Null-collision transmittance estimation
+
+    //         p = ray.o;
+    //         while (Length(p-ray.o) < light->point.distance(targetPos)) {
+    //             // Extinction: sigma_t = sigma_a + sigma_s
+    //             pbrt::SampledSpectrum sigma_t = mp.sigma_a + mp.sigma_s;
+
+    //             // // Null-collision cross section
+    //             // pbrt::SampledSpectrum sigma_n = ClampZero(sigma_maj - sigma_t);
+
+    //             // // Probability of null collision (used to weight the sample)
+    //             // float pr = T_maj[0] * sigma_maj[0];  // scalar for importance sampling weight
+
+    //             // // Transmittance update for null collision
+    //             // Tr *= T_maj * sigma_n / pr;
+
+    //             const float ds = 0.03f;
+
+    //             // // March towards light to calculate occlusion with larger steps for less shadowing
+    //             float shadow_ds = ds * 1.5f;
+
+    //             nanovdb::Vec3f pIndex = m_density_grid->worldToIndexF(nanovdb::Vec3f(p.x, p.y, p.z));
+    //             // TODO: actually do weighted sample for more accurate temperature
+
+    //             using Sampler = nanovdb::SampleFromVoxels<nanovdb::FloatGrid::TreeType, 1, false>;
+    //             float rs = Sampler(m_density_grid->tree())(pIndex);
+
+    //             //     // Apply lighter non-linear density mapping for less dramatic shadows
+    //             //     rs = pow(rs, 1.2f) * 0.8f;
+    //             // V *= std::exp(-sigma_t.y(lambda) * rs * shadow_ds);
+    //             V *= std::exp(-4.5 * rs * shadow_ds);
+
+    //             // if (V.MaxComponentValue() != 1)
+    //             // printf("Transmission: %s, trMax:%f\n", V.ToString().c_str(), V.MaxComponentValue());
+
+    //             // // Optional: early termination if weight is too low
+    //             if (V.MaxComponentValue() < 1e-3f) {
+    //                 // printf("     \nSTOPPINGGG Transmission: %s, tMax:%f\n\n", Tr.ToString().c_str(), tMax);
+    //                 return false; // stop sampling
+    //             }
+
+    //             p += ds * ray.d;
+    //         }
+
+    //         return false; // keep sampling
+    //     });//.y(lambda);
+
+    Vector3f p = targetPos;
+    while (p.distance(targetPos) < light->point.distance(targetPos)) {
+        // Extinction: sigma_t = sigma_a + sigma_s
+
+        // TODO: NOTE THIS VALUE IS UNTESTED. Needs to be greater than 80 at least
+        float sigma_t = 400;//4.5f * 20;
+
+        // March towards light to calculate occlusion with larger steps for less shadowing
+        // TODO: make relative to h?
+        float shadow_ds = .1;
+
+        nanovdb::Vec3f pIndex = m_density_grid->worldToIndexF(nanovdb::Vec3f(p.x, p.y, p.z));
+        using Sampler = nanovdb::SampleFromVoxels<nanovdb::FloatGrid::TreeType, 1, false>;
+        float rs = Sampler(m_density_grid->tree())(pIndex);
+
+        // Apply lighter non-linear density mapping for less dramatic shadows
+        rs = pow(rs, 1.2f) * 0.8f;
+        V *= std::exp(-sigma_t * rs * shadow_ds);
+
+        // if (V.MaxComponentValue() != 1)
+        // printf("Transmission: %s, trMax:%f\n", V.ToString().c_str(), V.MaxComponentValue());
+
+        // // Optional: early termination if weight is too low
+        if (V.MaxComponentValue() < 1e-3f) {
+            // printf("     \nSTOPPINGGG Transmission: %s, tMax:%f\n\n", Tr.ToString().c_str(), tMax);
+            break;
+        }
+
+        p += shadow_ds * dir;
+    }
+
+        // Tr_sum += V;
+    // }
+    // pbrt::SampledSpectrum V = Tr_sum / float(nSamples);
+
+    // float V = 1;
+
+
+    // if (V.MaxComponentValue() != 1)
+        // printf("transmittance: %s, tMax: %f\n", V.ToString().c_str(), tMax);
 
 
     float d = targetPos.distance(light->point);
 
     // TODO: figure out good scale for light fall-off, make sure it is relative to size of explosion
-    float g = 1.f / pow(d,2); // Light fall-off, good with d * 50
+    float g = 1.f / (1 + pow(d,2)); // Light fall-off, good with d * 50
     g = std::min(1.f, g);
 
     float B = blendingFunction(L, d, radius);
@@ -248,28 +341,25 @@ pbrt::SampledSpectrum LGH::get_intensity(int L,
     // printf("Light intensity: %f, transmittance: %s, g: %f, B: %f\n", light->intensity * 1000, V.ToString().c_str(), g, B);
 
 
-    return g * B * pbrt::BlackbodySpectrum(light->intensity * 1000).Sample(lambda) * V; //light->intensity * V;//
+    // TODO NOTE * 200 untested. No idea what value it should be
+    return g * B * pbrt::BlackbodySpectrum(light->intensity * 1000).Sample(lambda) * V * 200; //light->intensity * V;//
 }
 
 pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos,
                                            pbrt::SampledWavelengths lambda,
                                            pbrt::Sampler sampler,
-                                           pbrt::Medium medium)
+                                           pbrt::Medium medium,
+                                           pbrt::RNG rng,
+                                           float tMax,
+                                           pbrt::Ray ray)
 {
-
     // Note that pos passed in callback is in medium local space! Convert to world-space to access lights
     pos = medium_transform.ApplyInverse(pos);
-
-
-    // nanovdb::Vec3f pIndex = m_temperature_grid->worldToIndexF(nanovdb::Vec3f(p.x, p.y, p.z));
-    // TODO: actually do weighted sample for more accurate temperature
-    // Vector3f v_pos(pIndex[0], pIndex[1], pIndex[2]);
 
     Vector3f v_pos(pos.x, pos.y, pos.z);
 
     int numLightsCaptured = 0;
     int numLightsS0, numLightsS1, numLightsS2, numLightsS3, numLightsS4, numLightsS5 = 0;
-
 
     pbrt::SampledSpectrum total_intensity(0);
     for (int l=0; l<=l_max; l++) {
@@ -278,37 +368,11 @@ pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos,
         std::vector<KDNode*> results;
         lighting_grids[l]->radiusSearch(v_pos, radius, results);
         numLightsCaptured += results.size();
-
-        // if (l == 0)
-        //     numLightsS0 = results.size();
-        // if (l==1)
-        //     numLightsS1 = results.size();
-        // if (l==2)
-        //     numLightsS2 = results.size();
-        // if (l==3)
-        //     numLightsS3 = results.size();
-        // if (l==4)
-        //     numLightsS4 = results.size();
-        // if (l==5)
-        //     numLightsS5 = results.size();
-
-        //printf("  radius search size: %lu\n", results.size());
         
         for (auto light : results) {
             total_intensity += get_intensity(l, v_pos, light, radius, lambda, sampler, medium);
         }
     }
-
-    // if (total_intensity < 100) {
-    //     return pbrt::SampledSpectrum(0);
-    // }
-
-    // printf("  captured lights %d, S0: %d, S1: %d, S2: %d, S3: %d, S4: %d, S5: %d\n", numLightsCaptured, numLightsS0, numLightsS1, numLightsS2, numLightsS3, numLightsS4, numLightsS5);
-
-    // printf("\tIntensity: %f, point %f %f %f\t\n", total_intensity, v_pos.x, v_pos.y, v_pos.z);
-
-    // return 0.125 * total_intensity;
-    // auto test = pbrt::BlackbodySpectrum(total_intensity).Sample(lambda);
 
     return 0.125 * total_intensity; //pbrt::BlackbodySpectrum(total_intensity).Sample(lambda);
 }

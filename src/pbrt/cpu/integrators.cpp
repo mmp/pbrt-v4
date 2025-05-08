@@ -991,17 +991,19 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                     ray, tMax, sampler.Get1D(), rng, lambda,
                     [&](Point3f p, MediumProperties mp, SampledSpectrum sigma_maj,
                         SampledSpectrum T_maj) {
+                        // printf("     EXPECTED: sigma_maj: %s, t_maj: %s, a: %s, s: %s\n", sigma_maj.ToString().c_str(), T_maj.ToString().c_str(), mp.sigma_a.ToString().c_str(), mp.sigma_s.ToString().c_str());
 
-                        SampledSpectrum estimated_lighting = ray.medium.Cast<NanoVDBMedium>()->m_lgh->get_total_illum(p, lambda, sampler, ray.medium);
+                        SampledSpectrum estimated_lighting = ray.medium.Cast<NanoVDBMedium>()->m_lgh->get_total_illum(p, lambda, sampler, ray.medium, rng, tMax, ray);
                         // printf("\tStep %d: \tpoint %f %f %f\tIntensity: %f,\ttransmittance: %s\n", steps, estimated_intensity, p.x, p.y, p.z, T_maj.ToString().c_str());
 
                         // Only care about transmission because not randomly sampling
                         L += T_maj * estimated_lighting;
                         steps++;
-                        printf("Transmission: %s\n", T_maj.ToString().c_str());
+                        // printf("Ray: %s, Transmission: %s, tMax:%f\n", ray.ToString().c_str(), T_maj.ToString().c_str(), tMax);
                         return true;
 
                     });
+                // printf("Ray: %s, Transmission: %s, tMax:%f\n", ray.ToString().c_str(), T_maj.ToString().c_str(), tMax);
 
                 // Calculate transmittance (note this has to be done for every call to get_intensity, not here
                     // The ray is from target point to the light
