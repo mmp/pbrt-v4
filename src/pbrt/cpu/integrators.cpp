@@ -998,7 +998,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                         // Only care about transmission because not randomly sampling
                         L += T_maj * estimated_lighting;
                         steps++;
-                        printf("Transmission: %s\n", T_maj.ToString().c_str());
+                        //printf("Transmission: %s\n", T_maj.ToString().c_str());
                         return true;
 
                     });

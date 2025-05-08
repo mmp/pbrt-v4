@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <pbrt/media.h>
 #include <array>
+#include <cmath>
 
 // LGH::LGH(pbrt::SampledGrid<float> temperature_grid, int depth, float base_voxel_size, float transmission) 
 LGH::LGH(const nanovdb::FloatGrid* temperature_grid, int depth, float base_voxel_size, float transmission, pbrt::Transform transform)
@@ -46,6 +47,15 @@ LGH::LGH(const nanovdb::FloatGrid* temperature_grid, int depth, float base_voxel
     for (int i=1; i<=depth; i++) {
         deriveNewS(i);
         prefilter_density_field(i, h[i], temperature_grid);
+        // Compute cube maps for each light in this level
+        auto& grid = *lighting_grids[i];
+        std::vector<KDNode*> nodes;
+        // Collect all nodes (lights) in this grid
+        grid.radiusSearch(Vector3f(0,0,0), 1e6, nodes); // large radius to get all
+        printf("Number of lights in S%d: %lu\n", i, nodes.size());
+        for (size_t j = 0; j < 500; ++j) {
+            compute_cube_map_for_light(i, j, nodes[j]->point, h[i], h[i], temperature_grid);
+        }
     }
 
     if (lighting_grids.size() != l_max + 1) {
@@ -116,22 +126,18 @@ void LGH::deriveNewS(int l)
     
         // TODO: double check is radius is correct for 2x2x2 grid, used diagonal of cube
         // I SEE THE PROBLEM: currently position based on illumination centers not vertices (so not 2x2x2 grid!)
-        // Should the estimated lighting determine radius based on vertex position or illumination centers? Because to do radius search in this part, we need to use vertex positions. illum centers!
+        // Should the estimated lighting determine radius based on vertex position or illumination centers? Because to do radius search in this part, we need to use vertex positions
 
-        // TODO: it looks like real implementation uses exactly 8 lights...
-        // Update: I believe this works as intended
+        // TODO: either the radius I gave or the radiusSearch function is broken
         float radius = sqrt(3) * h[l-1];
         std::vector<KDNode*> j_lights;
         lighting_grid_j->radiusSearch(target_light_pos, radius, j_lights);
-        // while(j_lights.size() > 8) {
-        //     j_lights.pop_back();
-        // }
 
-        // printf("  level: %d, radius search lights: %lu\n", l, j_lights.size());
+        // printf("radius search lights: %lu\n", j_lights.size());
 
         float     I  = calcNewI (l, target_light_pos, j_lights);          // Eq (1)
         Vector3f  p  = calcNewPos(l, target_light_pos, j_lights);         // Eq (2)
-        if (I>0.f) lights.emplace_back(p,I); // TODO: Change threshold!!!
+        if (I>0.f) lights.emplace_back(p,I);
     }
 
     lighting_grids[l] = new KDTree(lights);
@@ -148,7 +154,7 @@ float calcTrilinearWeight(Vector3f p, Vector3f q, float h_l) {
 // -------- intensity (Eq 1) ----------------------------------------------
 float LGH::calcNewI(int l, Vector3f target_light_pos, std::vector<KDNode*> j_lights) //const Vector3f& gv, int l, const KDTree& S0) const
 {
-    float I_sum(0);
+    float I_sum;
     for (auto j_light : j_lights) {
         float w = calcTrilinearWeight(j_light->point, target_light_pos, this->h[l]);
         I_sum += w * j_light->intensity;
@@ -160,12 +166,12 @@ float LGH::calcNewI(int l, Vector3f target_light_pos, std::vector<KDNode*> j_lig
 // -------- illumination centre (Eq 2) ------------------------------------
 Vector3f LGH::calcNewPos(int l, Vector3f target_light_pos, std::vector<KDNode*> j_lights) //const Vector3f& gv, int l, const KDTree& S0) const
 {
-    Vector3f p_num(0,0,0);
-    float p_denom(0);
+    Vector3f p_num;
+    float p_denom;
 
     for (auto j_light : j_lights) {
         float w = calcTrilinearWeight(j_light->point, target_light_pos, this->h[l]);
-        float v = w * j_light->intensity * 1000; // TODO: what is the luminance component? What exactly is intensity data structure?
+        float v = w * j_light->intensity; // TODO: what is the luminance component? What exactly is intensity data structure?
         p_num += v * j_light->point;
         p_denom = v;
     }
@@ -194,7 +200,8 @@ float LGH::blendingFunction(int level, float d, float r_l)
     return 0;
 }
 
-pbrt::SampledSpectrum LGH::get_intensity(int L,
+// pbrt::SampledSpectrum
+float LGH::get_intensity(int L,
                                          Vector3f targetPos,
                                          KDNode* light,
                                          float radius,
@@ -205,9 +212,9 @@ pbrt::SampledSpectrum LGH::get_intensity(int L,
     // V = Tr(x, light->point)
 
     // Calculate tranmittance
-    // TODO: check how much time this transmittance calc adds
     Vector3f dir = light->point - targetPos;
 
+    // TODO: need to set Medium otherwise will not work!!!, also look what time does?
     pbrt::Ray ray = pbrt::Ray(pbrt::Point3f(targetPos.x, targetPos.y, targetPos.z), pbrt::Vector3f(dir.x, dir.y, dir.z), 0, medium);
     float tMax = Length(ray.d);
     // Initialize _RNG_ for sampling the majorant transmittance
@@ -218,40 +225,33 @@ pbrt::SampledSpectrum LGH::get_intensity(int L,
     pbrt::SampledSpectrum V = SampleT_maj(ray, tMax, sampler.Get1D(), rng, lambda,
                 [&](pbrt::Point3f p, pbrt::MediumProperties mp, pbrt::SampledSpectrum sigma_maj, pbrt::SampledSpectrum T_maj) {
         return true;
-                });//.y(lambda);
-
-    V = pbrt::Clamp(V, 0.f, 1.f);
+                });
 
 
     float d = targetPos.distance(light->point);
-
-    // TODO: figure out good scale for light fall-off, make sure it is relative to size of explosion
-    float g = 1.f / pow(d,2); // Light fall-off, good with d * 50
-    g = std::min(1.f, g);
-
+    float g = 1.f / pow(d,2); // Light fall-off
     float B = blendingFunction(L, d, radius);
 
     if (B < 0) {
         LOG_FATAL("Blending function should never be negative! %f", B);
     }
 
-    if (B > 1) {
-        printf("B large: %f\n", B);
-    }
-
     if (light->intensity < 0) {
         printf("LIGHT INTENSITY NEGATIVE!!! L: %d, %f\n", L, light->intensity);
     }
 
-    if (light->intensity * 1000 < 10) {
-        // printf("Too low light intensity L: %d, %f\n", L, light->intensity * 4500);
-        return pbrt::SampledSpectrum(0);
-    }
+    // if (light->intensity * 800 < 10) {
+    //     // printf("Too low light intensity L: %d, %f\n", L, light->intensity * 4500);
+    //     return pbrt::SampledSpectrum(0);
+    // }
 
-    // printf("Light intensity: %f, transmittance: %s, g: %f, B: %f\n", light->intensity * 1000, V.ToString().c_str(), g, B);
+    // TODO: may need to do this as well. Not sure how much transmittance will impact
+    // light->intensity *= 4500 * 5;// * 10000;
+
+    // printf("Light intensity: %f, transmittance: %s, d: %f, B: %f\n", light->intensity * 500, V.ToString().c_str(), d, B);
 
 
-    return g * B * pbrt::BlackbodySpectrum(light->intensity * 1000).Sample(lambda) * V; //light->intensity * V;//
+    return g * B * light->intensity;//pbrt::BlackbodySpectrum(light->intensity * 800).Sample(lambda) * V;
 }
 
 pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos,
@@ -271,10 +271,9 @@ pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos,
     Vector3f v_pos(pos.x, pos.y, pos.z);
 
     int numLightsCaptured = 0;
-    int numLightsS0, numLightsS1, numLightsS2, numLightsS3, numLightsS4, numLightsS5 = 0;
-
-
-    pbrt::SampledSpectrum total_intensity(0);
+    int numLightsS0, numLightsS1 = 0;
+    // pbrt::SampledSpectrum
+    float total_intensity(0);
     for (int l=0; l<=l_max; l++) {
         float radius = alpha * h[l];
 
@@ -282,18 +281,11 @@ pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos,
         lighting_grids[l]->radiusSearch(v_pos, radius, results);
         numLightsCaptured += results.size();
 
-        // if (l == 0)
-        //     numLightsS0 = results.size();
-        // if (l==1)
-        //     numLightsS1 = results.size();
-        // if (l==2)
-        //     numLightsS2 = results.size();
-        // if (l==3)
-        //     numLightsS3 = results.size();
-        // if (l==4)
-        //     numLightsS4 = results.size();
-        // if (l==5)
-        //     numLightsS5 = results.size();
+        // TODO: for some reason, levels beyond 0 do nothing
+        if (l == 0)
+            numLightsS0 = results.size();
+        if (l==1)
+            numLightsS1 = results.size();
 
         //printf("  radius search size: %lu\n", results.size());
         
@@ -302,18 +294,16 @@ pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos,
         }
     }
 
-    // if (total_intensity < 100) {
-    //     return pbrt::SampledSpectrum(0);
-    // }
+    if (total_intensity < 100) {
+        return pbrt::SampledSpectrum(0);
+    }
 
-    // printf("  captured lights %d, S0: %d, S1: %d, S2: %d, S3: %d, S4: %d, S5: %d\n", numLightsCaptured, numLightsS0, numLightsS1, numLightsS2, numLightsS3, numLightsS4, numLightsS5);
+    // printf("  captured lights %d, S0: %d, S1: %d\n", numLightsCaptured, numLightsS0, numLightsS1);
 
     // printf("\tIntensity: %f, point %f %f %f\t\n", total_intensity, v_pos.x, v_pos.y, v_pos.z);
 
     // return 0.125 * total_intensity;
-    // auto test = pbrt::BlackbodySpectrum(total_intensity).Sample(lambda);
-
-    return 0.125 * total_intensity; //pbrt::BlackbodySpectrum(total_intensity).Sample(lambda);
+    return 0.125 * pbrt::BlackbodySpectrum(total_intensity).Sample(lambda);
 }
 
 // Pyramid filter function (from reference image, Eq. 6)
@@ -360,4 +350,115 @@ void LGH::prefilter_density_field(int level, float h_l, const nanovdb::FloatGrid
     if (grid_vertices.size() <= level) grid_vertices.resize(level+1);
     filtered_densities[level] = std::move(densities);
     grid_vertices[level] = std::move(vertices);
+}
+
+// Helper: directions for cube map faces
+static const Vector3f cube_face_dirs[6][3] = {
+    { {1,0,0}, {0,1,0}, {0,0,1} },   // +X
+    { {-1,0,0}, {0,1,0}, {0,0,-1} }, // -X
+    { {0,1,0}, {1,0,0}, {0,0,1} },   // +Y
+    { {0,-1,0}, {1,0,0}, {0,0,-1} }, // -Y
+    { {0,0,1}, {1,0,0}, {0,1,0} },   // +Z
+    { {0,0,-1}, {1,0,0}, {0,-1,0} }  // -Z
+};
+
+// Pyramidal filter function (Eq. 6)
+static float lambda_pyramid(int i, int j, int k, float h) {
+    return (1.0f / 8.0f) * (1.0f - std::abs(i) / h) * (1.0f - std::abs(j) / h) * (1.0f - std::abs(k) / h);
+}
+
+// Trilinear interpolation for filtered density field
+float LGH::filtered_density_at(int level, const Vector3f& pos) const {
+    // Find the 8 grid vertices surrounding pos at this level
+    float h_l = h[level];
+    Vector3f grid_pos = (pos - BBoxMin) / h_l;
+    int x0 = static_cast<int>(std::floor(grid_pos.x));
+    int y0 = static_cast<int>(std::floor(grid_pos.y));
+    int z0 = static_cast<int>(std::floor(grid_pos.z));
+    float fx = grid_pos.x - x0;
+    float fy = grid_pos.y - y0;
+    float fz = grid_pos.z - z0;
+    float result = 0.0f;
+    for (int dx = 0; dx <= 1; ++dx)
+    for (int dy = 0; dy <= 1; ++dy)
+    for (int dz = 0; dz <= 1; ++dz) {
+        int xi = x0 + dx;
+        int yi = y0 + dy;
+        int zi = z0 + dz;
+        int idx = (xi * ((int)((BBoxMax.y - BBoxMin.y) / h_l) + 1) + yi) * ((int)((BBoxMax.z - BBoxMin.z) / h_l) + 1) + zi;
+        if (xi < 0 || yi < 0 || zi < 0 || xi >= (int)((BBoxMax.x - BBoxMin.x) / h_l) + 1 || yi >= (int)((BBoxMax.y - BBoxMin.y) / h_l) + 1 || zi >= (int)((BBoxMax.z - BBoxMin.z) / h_l) + 1)
+            continue;
+        float w = ((dx ? fx : 1 - fx) * (dy ? fy : 1 - fy) * (dz ? fz : 1 - fz));
+        result += w * filtered_densities[level][idx];
+    }
+    return result;
+}
+
+// Filtered density at x with filter size delta, using Eq. 7
+float LGH::filtered_density_with_filter(const Vector3f& pos, float delta) const {
+    // Find the two levels such that h_{l-1} <= delta <= h_l
+    int l = 0;
+    while (l + 1 < (int)h.size() && h[l + 1] < delta) ++l;
+    int l0 = l, l1 = std::min(l + 1, (int)h.size() - 1);
+    float h0 = h[l0], h1 = h[l1];
+    float rho0 = filtered_density_at(l0, pos);
+    float rho1 = filtered_density_at(l1, pos);
+    if (h1 == h0) return rho0;
+    float t = (delta - h0) / (h1 - h0);
+    return (1 - t) * rho0 + t * rho1;
+}
+
+// Update compute_cube_map_for_light to use the variable filter size and filtered density
+void LGH::compute_cube_map_for_light(int level, int light_idx, const Vector3f& light_pos, float r_e, float h0, const nanovdb::FloatGrid* density_grid) {
+    int resolution = static_cast<int>(std::ceil(2 * r_e / h0));
+    CubeMap cmap;
+    cmap.resolution = resolution;
+    cmap.r_e = r_e;
+    cmap.h = h0;
+    float s_li = h0; // TODO: use the correct s_{l,i} if available
+    for (int face = 0; face < 6; ++face) {
+        cmap.faces[face].resize(resolution, std::vector<float>(resolution, 0.0f));
+        for (int u = 0; u < resolution; ++u) {
+            for (int v = 0; v < resolution; ++v) {
+                float s = 2.0f * (u + 0.5f) / resolution - 1.0f;
+                float t = 2.0f * (v + 0.5f) / resolution - 1.0f;
+                Vector3f x = cube_face_dirs[face][0];
+                Vector3f y = cube_face_dirs[face][1];
+                Vector3f z = cube_face_dirs[face][2];
+                Vector3f dir = (x * s + y * t + z).abs();
+                dir = dir / std::sqrt(dir.x*dir.x + dir.y*dir.y + dir.z*dir.z);
+                float shadow = 0.0f;
+                float step = h0;
+                for (float d = 0; d < 2 * r_e; d += step) {
+                    Vector3f p = light_pos + dir * d;
+                    float delta = 0.0f;
+                    if (d <= r_e) {
+                        delta = (1 - d / r_e) * s_li + (d / r_e) * h0;
+                    } else {
+                        delta = 0.0f;
+                    }
+                    float filtered_density = (delta > 0) ? filtered_density_with_filter(p, delta) : 0.0f;
+                    shadow += filtered_density * step;
+                }
+                cmap.faces[face][u][v] = shadow;
+            }
+        }
+    }
+    if (shadow_cube_maps.size() <= level) shadow_cube_maps.resize(level+1);
+    if (shadow_cube_maps[level].size() <= light_idx) shadow_cube_maps[level].resize(light_idx+1);
+    shadow_cube_maps[level][light_idx] = std::move(cmap);
+    int total_texels = 6 * resolution * resolution;
+    float expected_texels = 24.0f * (r_e / h0) * (r_e / h0);
+    printf("Cube map: %d texels (expected: %.1f)\n", total_texels, expected_texels);
+    for (int face = 0; face < 6; ++face) {
+    std::ostringstream oss;
+    oss << "shadowmap_L" << level << "_light" << light_idx << "_face" << face << ".pgm";
+    save_cube_map_face_as_pgm(cmap.faces[face], oss.str());
+}
+}
+
+float LGH::lookup_shadow(int level, int light_idx, const Vector3f& light_pos, const Vector3f& target_pos) const {
+    // TODO: Implement cube map lookup based on direction from light_pos to target_pos
+    // For now, return 0 (no shadow)
+    return 0.0f;
 }

@@ -6,6 +6,10 @@
 #include "pbrt/util/transform.h"
 #include <nanovdb/NanoVDB.h>
 #include <pbrt/samplers.h>
+#include <array>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
 
 class LGH
 {
@@ -14,8 +18,30 @@ public:
     // TODO: fix inputs
     // LGH(pbrt::SampledGrid<float> temperature_grid, int depth, float base_voxel_size, float transmission);
     LGH(const nanovdb::FloatGrid* temperature_grid, int depth, float base_voxel_size, float transmission, pbrt::Transform transform);
+    
 
-    pbrt::SampledSpectrum get_intensity(int L,
+void save_cube_map_face_as_pgm(const std::vector<std::vector<float>>& face, const std::string& filename) {
+    int res = face.size();
+    std::ofstream ofs(filename, std::ios::binary);
+    ofs << "P5\n" << res << " " << res << "\n255\n";
+    // Find min/max for normalization
+    float min_val = face[0][0], max_val = face[0][0];
+    for (const auto& row : face)
+        for (float v : row) {
+            min_val = std::min(min_val, v);
+            max_val = std::max(max_val, v);
+        }
+    float scale = (max_val > min_val) ? 255.0f / (max_val - min_val) : 1.0f;
+    for (const auto& row : face)
+        for (float v : row) {
+            unsigned char pixel = static_cast<unsigned char>(std::clamp((v - min_val) * scale, 0.0f, 255.0f));
+            ofs.write(reinterpret_cast<char*>(&pixel), 1);
+        }
+    ofs.close();
+}
+
+    // pbrt::SampledSpectrum
+    float get_intensity(int L,
                                         Vector3f targetPos,
                                         KDNode* light,
                                         float radius,
@@ -42,6 +68,11 @@ public:
     const float transmission;
     const nanovdb::FloatGrid* m_temperature_grid;
 
+    // Compute cube map for a light at a given level
+    void compute_cube_map_for_light(int level, int light_idx, const Vector3f& light_pos, float r_e, float h, const nanovdb::FloatGrid* density_grid);
+    // Lookup shadow from cube map
+    float lookup_shadow(int level, int light_idx, const Vector3f& light_pos, const Vector3f& target_pos) const;
+
 private:
     void create_S0(const nanovdb::FloatGrid* temperature_grid);
     void deriveNewS(int l);//, KDTree S0);
@@ -64,6 +95,21 @@ private:
 
     // Pre-filter the density field for a given level
     void prefilter_density_field(int level, float h_l, const nanovdb::FloatGrid* density_grid);
+
+    // Cube map structure: 6 faces, each face is a 2D array of floats
+    struct CubeMap {
+        std::array<std::vector<std::vector<float>>, 6> faces; // [face][u][v]
+        int resolution; // texels per face edge
+        float r_e;      // effective radius for this level
+        float h;        // voxel size for this level
+    };
+    // For each level, for each light, store a cube map
+    std::vector<std::vector<CubeMap>> shadow_cube_maps;
+
+    // Filtered density at a point for a given level (trilinear interpolation)
+    float filtered_density_at(int level, const Vector3f& pos) const;
+    // Filtered density at a point with filter size delta (pyramidal interpolation)
+    float filtered_density_with_filter(const Vector3f& pos, float delta) const;
 };
 
 #endif // LIGHTING_GRID_HIERARCHY_H
