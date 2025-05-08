@@ -73,6 +73,65 @@ void save_cube_map_face_as_pgm(const std::vector<std::vector<float>>& face, cons
     // Lookup shadow from cube map
     float lookup_shadow(int level, int light_idx, const Vector3f& light_pos, const Vector3f& target_pos) const;
 
+    // Save cube map visualization functions
+    void save_cube_map_face_as_ppm(const std::vector<std::vector<float>>& face_data, const std::string& filename);
+    void save_all_cube_maps();
+
+    // Display cube map visualization functions
+    void display_cube_map_face(const std::vector<std::vector<float>>& face_data, int face_idx);
+    void display_all_cube_maps();
+
+    // // Save cube map as a cross-shaped visualization
+    // void save_cube_map_cross(const CubeMap& cmap, const std::string& filename) {
+    //     int res = cmap.resolution;
+    //     // Create a cross-shaped image (3x4 faces)
+    //     std::vector<std::vector<float>> cross(res * 3, std::vector<float>(res * 4, 0.0f));
+        
+    //     // Layout:
+    //     //    +Y
+    //     // -X +Z +X
+    //     //    -Y
+    //     //    -Z
+        
+    //     // Copy each face to its position in the cross
+    //     for (int i = 0; i < res; ++i) {
+    //         for (int j = 0; j < res; ++j) {
+    //             // +Y face (top)
+    //             cross[i][j + res] = cmap.faces[2][i][j];
+    //             // -X face (left)
+    //             cross[i + res][j] = cmap.faces[1][i][j];
+    //             // +Z face (center)
+    //             cross[i + res][j + res] = cmap.faces[4][i][j];
+    //             // +X face (right)
+    //             cross[i + res][j + 2*res] = cmap.faces[0][i][j];
+    //             // -Y face (bottom)
+    //             cross[i + 2*res][j + res] = cmap.faces[3][i][j];
+    //             // -Z face (bottom)
+    //             cross[i + 2*res][j + 3*res] = cmap.faces[5][i][j];
+    //         }
+    //     }
+        
+    //     // Save as PGM
+    //     std::ofstream ofs(filename, std::ios::binary);
+    //     ofs << "P5\n" << res * 4 << " " << res * 3 << "\n255\n";
+        
+    //     // Find min/max for normalization
+    //     float min_val = cross[0][0], max_val = cross[0][0];
+    //     for (const auto& row : cross)
+    //         for (float v : row) {
+    //             min_val = std::min(min_val, v);
+    //             max_val = std::max(max_val, v);
+    //         }
+    //     float scale = (max_val > min_val) ? 255.0f / (max_val - min_val) : 1.0f;
+        
+    //     for (const auto& row : cross)
+    //         for (float v : row) {
+    //             unsigned char pixel = static_cast<unsigned char>(std::clamp((v - min_val) * scale, 0.0f, 255.0f));
+    //             ofs.write(reinterpret_cast<char*>(&pixel), 1);
+    //         }
+    //     ofs.close();
+    // }
+
 private:
     void create_S0(const nanovdb::FloatGrid* temperature_grid);
     void deriveNewS(int l);//, KDTree S0);

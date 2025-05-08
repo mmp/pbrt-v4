@@ -8,10 +8,12 @@
 struct KDNode {
     Vector3f point;
     float intensity;
+    int idx;  // Index of the light in its level
     std::unique_ptr<KDNode> left;
     std::unique_ptr<KDNode> right;
 
-    KDNode(const Vector3f pos, const float intensity) : point(pos), intensity(intensity) {}
+    KDNode(const Vector3f pos, const float intensity, int idx = -1) 
+        : point(pos), intensity(intensity), idx(idx) {}
 };
 
 class KDTree {
@@ -36,7 +38,7 @@ public:
         } else {
             results = std::move(all);
         }
-    }
+}
 
     // TODO: needs lookup for a single node given position
 
@@ -68,7 +70,12 @@ struct LightRecord
                 return a.first[axis] < b.first[axis];
             });
 
-        std::unique_ptr<KDNode> node = std::make_unique<KDNode>(points[median].first, points[median].second);
+        // Create node with position, intensity, and index
+        std::unique_ptr<KDNode> node = std::make_unique<KDNode>(
+            points[median].first,  // position
+            points[median].second, // intensity
+            static_cast<int>(median)  // index
+        );
 
         std::vector<std::pair<Vector3f,float>> leftPoints(points.begin(), points.begin() + median);
         std::vector<std::pair<Vector3f,float>> rightPoints(points.begin() + median + 1, points.end());

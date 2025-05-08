@@ -5,6 +5,8 @@
 #include <pbrt/media.h>
 #include <array>
 #include <cmath>
+#include <sstream>
+#include <algorithm>  // for std::min, std::max
 
 // LGH::LGH(pbrt::SampledGrid<float> temperature_grid, int depth, float base_voxel_size, float transmission) 
 LGH::LGH(const nanovdb::FloatGrid* temperature_grid, int depth, float base_voxel_size, float transmission, pbrt::Transform transform)
@@ -43,9 +45,10 @@ LGH::LGH(const nanovdb::FloatGrid* temperature_grid, int depth, float base_voxel
     create_S0(temperature_grid);
     prefilter_density_field(0, h[0], temperature_grid);
     // Create rest of S_l
-    for (int i=1; i<=depth; i++) {
-        deriveNewS(i);
-        prefilter_density_field(i, h[i], temperature_grid);
+    for (int j=1; j<=depth; j++) {
+        int i=j-1;
+        deriveNewS(j);
+        prefilter_density_field(j, h[j], temperature_grid);
         // Compute cube maps for each light in this level
         auto& grid = *lighting_grids[i];
         std::vector<KDNode*> nodes;
@@ -61,6 +64,7 @@ LGH::LGH(const nanovdb::FloatGrid* temperature_grid, int depth, float base_voxel
     if (lighting_grids.size() != l_max + 1) {
         LOG_FATAL("Invalid number of grids");
     }
+    //display_all_cube_maps();
 }
 
 
@@ -75,25 +79,13 @@ void LGH::create_S0(const nanovdb::FloatGrid* temperature_grid)
     for (float x = BBoxMin.x + h_0/2; x < BBoxMax.x; x += h_0) {
         for (float y = BBoxMin.y + h_0/2; y < BBoxMax.y; y += h_0) {
             for (float z = BBoxMin.z + h_0/2; z < BBoxMax.z; z += h_0) {
-
-                // TODO: is the worldBBox in world space including the transform or without??
-                // pbrt::Point3f p = medium_transform.ApplyInverse(pbrt::Point3f(x,y,z));
-
-
                 nanovdb::Vec3f pIndex = temperature_grid->worldToIndexF(nanovdb::Vec3f(x, y, z));
-                // TODO: actually do weighted sample for more accurate temperature
-
                 using Sampler = nanovdb::SampleFromVoxels<nanovdb::FloatGrid::TreeType, 1, false>;
-                float temperature = Sampler(temperature_grid->tree())(pIndex);//(pbrt::Point3f(x,y,z));
+                float temperature = Sampler(temperature_grid->tree())(pIndex);
 
-                if (temperature > 0) {//TEMP_THRESHOLD) {
-                    // TODO: derive intensity from temperature
-                    // printf("S0 light: %f, pos: %f %f %f\n", temperature, x, y, z);
+                if (temperature > 0) {
                     lights.emplace_back(Vector3f(x,y,z), temperature);
                 }
-                // else {
-                //     printf("ZERO LIGHT: S0 light: %f, pos: %f %f %f\n", temperature, x, y, z);
-                // }
 
                 if (temperature < 0) {
                     printf("Temperature negative: %f , point %f %f %f", temperature, x, y, z);
@@ -101,8 +93,14 @@ void LGH::create_S0(const nanovdb::FloatGrid* temperature_grid)
             }
         }
     }
+    
+    // Assign indices to lights
+    for (size_t i = 0; i < lights.size(); ++i) {
+        lights[i].second = i;  // Store index in the second component
+    }
 
     this->lighting_grids[0] = new KDTree(lights);
+
     printf("=============================\nCreated %lu lights in S0\n=============================", lights.size());
 }
 
@@ -124,25 +122,22 @@ void LGH::deriveNewS(int l)
     
         KDTree* lighting_grid_j = lighting_grids[l-1];
     
-        // TODO: double check is radius is correct for 2x2x2 grid, used diagonal of cube
-        // I SEE THE PROBLEM: currently position based on illumination centers not vertices (so not 2x2x2 grid!)
-        // Should the estimated lighting determine radius based on vertex position or illumination centers? Because to do radius search in this part, we need to use vertex positions
-
-        // TODO: either the radius I gave or the radiusSearch function is broken
         float radius = sqrt(3) * h[l-1];
         std::vector<KDNode*> j_lights;
         lighting_grid_j->radiusSearch(target_light_pos, radius, j_lights);
-
-        // printf("radius search lights: %lu\n", j_lights.size());
 
         float     I  = calcNewI (l, target_light_pos, j_lights);          // Eq (1)
         Vector3f  p  = calcNewPos(l, target_light_pos, j_lights);         // Eq (2)
         if (I>0.f) lights.emplace_back(p,I);
     }
 
+    // Assign indices to lights
+    for (size_t i = 0; i < lights.size(); ++i) {
+        lights[i].second = i;  // Store index in the second component
+    }
+
     lighting_grids[l] = new KDTree(lights);
     printf("=============================\nCreated %lu lights in S%d\n=============================", lights.size(), l);
-
 }
 
 float calcTrilinearWeight(Vector3f p, Vector3f q, float h_l) {
@@ -202,32 +197,17 @@ float LGH::blendingFunction(int level, float d, float r_l)
 
 // pbrt::SampledSpectrum
 float LGH::get_intensity(int L,
-                                         Vector3f targetPos,
-                                         KDNode* light,
-                                         float radius,
-                                         pbrt::SampledWavelengths lambda,
-                                         pbrt::Sampler sampler,
-                                         pbrt::Medium medium)
+                         Vector3f targetPos,
+                         KDNode* light,
+                         float radius,
+                         pbrt::SampledWavelengths lambda,
+                         pbrt::Sampler sampler,
+                         pbrt::Medium medium)
 {
-    // V = Tr(x, light->point)
-
-    // Calculate tranmittance
-    Vector3f dir = light->point - targetPos;
-
-    // TODO: need to set Medium otherwise will not work!!!, also look what time does?
-    pbrt::Ray ray = pbrt::Ray(pbrt::Point3f(targetPos.x, targetPos.y, targetPos.z), pbrt::Vector3f(dir.x, dir.y, dir.z), 0, medium);
-    float tMax = Length(ray.d);
-    // Initialize _RNG_ for sampling the majorant transmittance
-    uint64_t hash0 = pbrt::Hash(sampler.Get1D());
-    uint64_t hash1 = pbrt::Hash(sampler.Get1D());
-    pbrt::RNG rng(hash0, hash1);
-
-    pbrt::SampledSpectrum V = SampleT_maj(ray, tMax, sampler.Get1D(), rng, lambda,
-                [&](pbrt::Point3f p, pbrt::MediumProperties mp, pbrt::SampledSpectrum sigma_maj, pbrt::SampledSpectrum T_maj) {
-        return true;
-                });
-
-
+    // Get shadow value from cube map
+    float shadow = lookup_shadow(L, light->idx, light->point, targetPos);
+    
+    // Calculate distance and falloff
     float d = targetPos.distance(light->point);
     float g = 1.f / pow(d,2); // Light fall-off
     float B = blendingFunction(L, d, radius);
@@ -240,18 +220,12 @@ float LGH::get_intensity(int L,
         printf("LIGHT INTENSITY NEGATIVE!!! L: %d, %f\n", L, light->intensity);
     }
 
-    // if (light->intensity * 800 < 10) {
-    //     // printf("Too low light intensity L: %d, %f\n", L, light->intensity * 4500);
-    //     return pbrt::SampledSpectrum(0);
-    // }
-
-    // TODO: may need to do this as well. Not sure how much transmittance will impact
-    // light->intensity *= 4500 * 5;// * 10000;
-
-    // printf("Light intensity: %f, transmittance: %s, d: %f, B: %f\n", light->intensity * 500, V.ToString().c_str(), d, B);
-
-
-    return g * B * light->intensity;//pbrt::BlackbodySpectrum(light->intensity * 800).Sample(lambda) * V;
+    // Convert spectral values to scalar
+    float spectral_intensity = pbrt::BlackbodySpectrum(light->intensity * 1000).Sample(lambda).Average();
+    
+    // Apply shadow to intensity
+    //return g * B * spectral_intensity * (1.0f - shadow);
+    return g * B * spectral_intensity;
 }
 
 pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos,
@@ -259,51 +233,45 @@ pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos,
                                            pbrt::Sampler sampler,
                                            pbrt::Medium medium)
 {
-
-    // Note that pos passed in callback is in medium local space! Convert to world-space to access lights
+    // Convert position from medium local space to world space
     pos = medium_transform.ApplyInverse(pos);
-
-
-    // nanovdb::Vec3f pIndex = m_temperature_grid->worldToIndexF(nanovdb::Vec3f(p.x, p.y, p.z));
-    // TODO: actually do weighted sample for more accurate temperature
-    // Vector3f v_pos(pIndex[0], pIndex[1], pIndex[2]);
-
     Vector3f v_pos(pos.x, pos.y, pos.z);
 
     int numLightsCaptured = 0;
-    int numLightsS0, numLightsS1 = 0;
-    // pbrt::SampledSpectrum
-    float total_intensity(0);
+    int numLightsS0 = 0, numLightsS1 = 0;
+    float total_intensity = 0.0f;
+
     for (int l=0; l<=l_max; l++) {
         float radius = alpha * h[l];
-
         std::vector<KDNode*> results;
         lighting_grids[l]->radiusSearch(v_pos, radius, results);
         numLightsCaptured += results.size();
 
-        // TODO: for some reason, levels beyond 0 do nothing
         if (l == 0)
             numLightsS0 = results.size();
-        if (l==1)
+        if (l == 1)
             numLightsS1 = results.size();
-
-        //printf("  radius search size: %lu\n", results.size());
         
         for (auto light : results) {
-            total_intensity += get_intensity(l, v_pos, light, radius, lambda, sampler, medium);
+            float intensity = get_intensity(l, v_pos, light, radius, lambda, sampler, medium);
+            if (std::isfinite(intensity)) {  // Check for NaN and infinity
+                total_intensity += intensity;
+            }
         }
     }
 
-    if (total_intensity < 100) {
-        return pbrt::SampledSpectrum(0);
+    // Check for invalid total intensity
+    if (!std::isfinite(total_intensity) || total_intensity < 0.0f) {
+        return pbrt::SampledSpectrum(0.0f);
     }
 
-    // printf("  captured lights %d, S0: %d, S1: %d\n", numLightsCaptured, numLightsS0, numLightsS1);
+    // Scale the intensity to a reasonable range for blackbody spectrum
+    float scaled_intensity = total_intensity * 1000.0f;  // Scale up for blackbody
+    if (scaled_intensity < 100.0f) {  // Minimum threshold for blackbody
+        return pbrt::SampledSpectrum(0.0f);
+    }
 
-    // printf("\tIntensity: %f, point %f %f %f\t\n", total_intensity, v_pos.x, v_pos.y, v_pos.z);
-
-    // return 0.125 * total_intensity;
-    return 0.125 * pbrt::BlackbodySpectrum(total_intensity).Sample(lambda);
+    return 0.125f * pbrt::BlackbodySpectrum(scaled_intensity).Sample(lambda);
 }
 
 // Pyramid filter function (from reference image, Eq. 6)
@@ -411,13 +379,27 @@ float LGH::filtered_density_with_filter(const Vector3f& pos, float delta) const 
 // Update compute_cube_map_for_light to use the variable filter size and filtered density
 void LGH::compute_cube_map_for_light(int level, int light_idx, const Vector3f& light_pos, float r_e, float h0, const nanovdb::FloatGrid* density_grid) {
     int resolution = static_cast<int>(std::ceil(2 * r_e / h0));
+    printf("\nCreating cube map for level %d, light %d:\n", level, light_idx);
+    printf("  Light position: (%f, %f, %f)\n", light_pos.x, light_pos.y, light_pos.z);
+    printf("  Effective radius (r_e): %f\n", r_e);
+    printf("  Base voxel size (h0): %f\n", h0);
+    printf("  Resolution: %d x %d\n", resolution, resolution);
+    
     CubeMap cmap;
     cmap.resolution = resolution;
     cmap.r_e = r_e;
     cmap.h = h0;
-    float s_li = h0; // TODO: use the correct s_{l,i} if available
+    
+    // Calculate s_{l,i} based on the level and light properties
+    float s_li = h[level]; // Use the grid spacing at this level as the base filter size
+    printf("  Filter size s_li: %f\n", s_li);
+    
     for (int face = 0; face < 6; ++face) {
+        printf("  Computing face %d\n", face);
         cmap.faces[face].resize(resolution, std::vector<float>(resolution, 0.0f));
+        float max_shadow = 0.0f;
+        float min_shadow = 1e10f;
+        
         for (int u = 0; u < resolution; ++u) {
             for (int v = 0; v < resolution; ++v) {
                 float s = 2.0f * (u + 0.5f) / resolution - 1.0f;
@@ -429,27 +411,38 @@ void LGH::compute_cube_map_for_light(int level, int light_idx, const Vector3f& l
                 dir = dir / std::sqrt(dir.x*dir.x + dir.y*dir.y + dir.z*dir.z);
                 float shadow = 0.0f;
                 float step = h0;
+                
+                // Use variable filter size based on distance from light
                 for (float d = 0; d < 2 * r_e; d += step) {
                     Vector3f p = light_pos + dir * d;
                     float delta = 0.0f;
                     if (d <= r_e) {
                         delta = (1 - d / r_e) * s_li + (d / r_e) * h0;
                     } else {
-                        delta = 0.0f;
+                        // Beyond r_e, use the base filter size
+                        delta = h0;
                     }
-                    float filtered_density = (delta > 0) ? filtered_density_with_filter(p, delta) : 0.0f;
+                    
+                    // Get filtered density using the variable filter size
+                    float filtered_density = filtered_density_with_filter(p, delta);
                     shadow += filtered_density * step;
+                    // shadow = 0.5;
                 }
                 cmap.faces[face][u][v] = shadow;
+                max_shadow = std::max(max_shadow, shadow);
+                min_shadow = std::min(min_shadow, shadow);
             }
         }
+        printf("    Face %d shadow range: [%f, %f]\n", face, min_shadow, max_shadow);
     }
+    
     if (shadow_cube_maps.size() <= level) shadow_cube_maps.resize(level+1);
     if (shadow_cube_maps[level].size() <= light_idx) shadow_cube_maps[level].resize(light_idx+1);
     shadow_cube_maps[level][light_idx] = std::move(cmap);
+    
     int total_texels = 6 * resolution * resolution;
     float expected_texels = 24.0f * (r_e / h0) * (r_e / h0);
-    //printf("Cube map: %d texels (expected: %.1f)\n", total_texels, expected_texels);
+    printf("Cube map: %d texels (expected: %.1f)\n", total_texels, expected_texels);
     int c=0;
 
 //     for (int face = 0; face < 6; ++face) {
@@ -464,7 +457,179 @@ void LGH::compute_cube_map_for_light(int level, int light_idx, const Vector3f& l
 }
 
 float LGH::lookup_shadow(int level, int light_idx, const Vector3f& light_pos, const Vector3f& target_pos) const {
-    // TODO: Implement cube map lookup based on direction from light_pos to target_pos
-    // For now, return 0 (no shadow)
-    return 0.0f;
+    // Check if shadow_cube_maps is properly initialized
+    if (shadow_cube_maps.empty() || level >= shadow_cube_maps.size()) {
+        return 0.0f;
+    }
+    
+    if (light_idx >= shadow_cube_maps[level].size()) {
+        return 0.0f;
+    }
+
+    // Get direction from light to target
+    Vector3f dir = target_pos - light_pos;
+    float dist = std::sqrt(dir.x*dir.x + dir.y*dir.y + dir.z*dir.z);
+    if (dist < 1e-6f) {
+        return 0.0f;
+    }
+    dir = dir / dist;  // Normalize
+
+    // Find the face with the largest absolute component
+    int face = 0;
+    float max_comp = std::abs(dir.x);
+    if (std::abs(dir.y) > max_comp) {
+        max_comp = std::abs(dir.y);
+        face = 2;
+    }
+    if (std::abs(dir.z) > max_comp) {
+        max_comp = std::abs(dir.z);
+        face = 4;
+    }
+    // Adjust face index based on sign
+    if (dir[face/2] < 0) face++;
+
+    // Get the cube map for this level and light
+    const CubeMap& cmap = shadow_cube_maps[level][light_idx];
+    if (face >= 6 || face < 0) {
+        return 0.0f;
+    }
+    const auto& face_data = cmap.faces[face];
+
+    // Convert direction to face-local coordinates
+    Vector3f x = cube_face_dirs[face][0];
+    Vector3f y = cube_face_dirs[face][1];
+    Vector3f z = cube_face_dirs[face][2];
+    
+    // Project direction onto face basis
+    float s = (dir.x*x.x + dir.y*x.y + dir.z*x.z) / (dir.x*z.x + dir.y*z.y + dir.z*z.z);
+    float t = (dir.x*y.x + dir.y*y.y + dir.z*y.z) / (dir.x*z.x + dir.y*z.y + dir.z*z.z);
+    
+    // Convert to pixel coordinates
+    float u = (s + 1.0f) * 0.5f * (cmap.resolution - 1);
+    float v = (t + 1.0f) * 0.5f * (cmap.resolution - 1);
+    
+    // Clamp coordinates to valid range
+    u = std::max(0.0f, std::min(u, static_cast<float>(cmap.resolution - 1)));
+    v = std::max(0.0f, std::min(v, static_cast<float>(cmap.resolution - 1)));
+    
+    // Get the nearest pixel value (no interpolation)
+    int u_idx = static_cast<int>(std::round(u));
+    int v_idx = static_cast<int>(std::round(v));
+    
+    // Ensure indices are within bounds
+    u_idx = std::min(std::max(0, u_idx), cmap.resolution - 1);
+    v_idx = std::min(std::max(0, v_idx), cmap.resolution - 1);
+    
+    // Return the shadow value from the specific face
+    //return 0.5; 
+    return face_data[u_idx][v_idx];
+}
+
+void LGH::save_cube_map_face_as_ppm(const std::vector<std::vector<float>>& face_data, const std::string& filename) {
+    FILE* fp = fopen(filename.c_str(), "wb");
+    if (!fp) {
+        printf("Error: Could not open file %s for writing\n", filename.c_str());
+        return;
+    }
+
+    int width = face_data.size();
+    int height = face_data[0].size();
+
+    // Write PPM header
+    fprintf(fp, "P6\n%d %d\n255\n", width, height);
+
+    // Write pixel data
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            float shadow = face_data[x][y];
+            // Convert shadow value to color
+            // Red channel: shadow value
+            // Green channel: 1 - shadow value
+            // Blue channel: 0.5
+            unsigned char r = static_cast<unsigned char>(shadow * 255);
+            unsigned char g = static_cast<unsigned char>((1.0f - shadow) * 255);
+            unsigned char b = static_cast<unsigned char>(128); // Fixed blue value
+            fwrite(&r, 1, 1, fp);
+            fwrite(&g, 1, 1, fp);
+            fwrite(&b, 1, 1, fp);
+        }
+    }
+
+    fclose(fp);
+    printf("Saved cube map face to %s\n", filename.c_str());
+}
+
+void LGH::save_all_cube_maps() {
+    for (size_t level = 0; level < shadow_cube_maps.size(); ++level) {
+        for (size_t light_idx = 0; light_idx < shadow_cube_maps[level].size(); ++light_idx) {
+            const CubeMap& cmap = shadow_cube_maps[level][light_idx];
+            for (int face = 0; face < 6; ++face) {
+                std::ostringstream oss;
+                oss << "shadowmap_L" << level << "_light" << light_idx << "_face" << face << ".ppm";
+                save_cube_map_face_as_ppm(cmap.faces[face], oss.str());
+            }
+        }
+    }
+}
+
+void LGH::display_cube_map_face(const std::vector<std::vector<float>>& face_data, int face_idx) {
+    // ANSI color codes
+    const char* colors[] = {
+        "\033[31m", // Red
+        "\033[32m", // Green
+        "\033[33m", // Yellow
+        "\033[34m", // Blue
+        "\033[35m", // Magenta
+        "\033[36m"  // Cyan
+    };
+    const char* reset = "\033[0m";
+
+    int width = face_data.size();
+    int height = face_data[0].size();
+    
+    // ASCII characters for different shadow values
+    const char* chars = " .:-=+*#%@";
+    int num_chars = strlen(chars);
+
+    printf("\nFace %d (%s%s%s):\n", face_idx, colors[face_idx], 
+           face_idx == 0 ? "+X" : face_idx == 1 ? "-X" : 
+           face_idx == 2 ? "+Y" : face_idx == 3 ? "-Y" :
+           face_idx == 4 ? "+Z" : "-Z", reset);
+
+    // Print top border
+    printf("┌");
+    for (int i = 0; i < width; i++) printf("─");
+    printf("┐\n");
+
+    // Print face data
+    for (int y = 0; y < height; y++) {
+        printf("│");
+        for (int x = 0; x < width; x++) {
+            float shadow = face_data[x][y];
+            int char_idx = static_cast<int>(shadow * (num_chars - 1));
+            char_idx = std::max(0, std::min(char_idx, num_chars - 1));
+            printf("%s%c%s", colors[face_idx], chars[char_idx], reset);
+        }
+        printf("│\n");
+    }
+
+    // Print bottom border
+    printf("└");
+    for (int i = 0; i < width; i++) printf("─");
+    printf("┘\n");
+}
+
+void LGH::display_all_cube_maps() {
+    for (size_t level = 0; level < shadow_cube_maps.size(); ++level) {
+        printf("\n\n=== Level %zu Cube Maps ===\n", level);
+        for (size_t light_idx = 0; light_idx < shadow_cube_maps[level].size(); ++light_idx) {
+            printf("\n--- Light %zu ---\n", light_idx);
+            const CubeMap& cmap = shadow_cube_maps[level][light_idx];
+            
+            // Display each face
+            for (int face = 0; face < 6; ++face) {
+                display_cube_map_face(cmap.faces[face], face);
+            }
+        }
+    }
 }
