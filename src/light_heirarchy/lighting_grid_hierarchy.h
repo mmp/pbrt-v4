@@ -17,6 +17,9 @@ public:
     // TODO: separate into constructor and initialization function
     // TODO: fix inputs
     // LGH(pbrt::SampledGrid<float> temperature_grid, int depth, float base_voxel_size, float transmission);
+    LGH(const nanovdb::FloatGrid* temperature_grid, const nanovdb::FloatGrid* density_grid, int depth, float base_voxel_size, float transmission, pbrt::Transform transform);
+
+    pbrt::SampledSpectrum get_intensity(int L,
     LGH(const nanovdb::FloatGrid* temperature_grid, int depth, float base_voxel_size, float transmission, pbrt::Transform transform);
     
 
@@ -52,7 +55,10 @@ void save_cube_map_face_as_pgm(const std::vector<std::vector<float>>& face, cons
     pbrt::SampledSpectrum get_total_illum(pbrt::Point3f pos,
                                           pbrt::SampledWavelengths lambda,
                                           pbrt::Sampler sampler,
-                                          pbrt::Medium medium);
+                                          pbrt::Medium medium,
+                                          pbrt::RNG rng,
+                                          float tMax,
+                                          pbrt::Ray ray);
 
     const float TEMP_THRESHOLD = 1.0f;
 
@@ -67,6 +73,7 @@ void save_cube_map_face_as_pgm(const std::vector<std::vector<float>>& face, cons
     // TODO: remove this to use pbrt transmission instead
     const float transmission;
     const nanovdb::FloatGrid* m_temperature_grid;
+    const nanovdb::FloatGrid* m_density_grid;
 
     // Compute cube map for a light at a given level
     void compute_cube_map_for_light(int level, int light_idx, const Vector3f& light_pos, float r_e, float h, const nanovdb::FloatGrid* density_grid);
