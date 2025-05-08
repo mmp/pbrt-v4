@@ -42,7 +42,6 @@ LGH::LGH(const nanovdb::FloatGrid* temperature_grid, int depth, float base_voxel
     // Initialize S0
     create_S0(temperature_grid);
     prefilter_density_field(0, h[0], temperature_grid);
-
     // Create rest of S_l
     for (int i=1; i<=depth; i++) {
         deriveNewS(i);
@@ -51,9 +50,10 @@ LGH::LGH(const nanovdb::FloatGrid* temperature_grid, int depth, float base_voxel
         auto& grid = *lighting_grids[i];
         std::vector<KDNode*> nodes;
         // Collect all nodes (lights) in this grid
-        grid.radiusSearch(Vector3f(0,0,0), 1e6, nodes); // large radius to get all
+        //grid.radiusSearch(Vector3f(0,0,0), 1e6, nodes); // large radius to get all
+        grid.getAllNodes(nodes, 500);
         printf("Number of lights in S%d: %lu\n", i, nodes.size());
-        for (size_t j = 0; j < 500; ++j) {
+        for (size_t j = 0; j < nodes.size(); ++j) {
             compute_cube_map_for_light(i, j, nodes[j]->point, h[i], h[i], temperature_grid);
         }
     }
@@ -449,12 +449,18 @@ void LGH::compute_cube_map_for_light(int level, int light_idx, const Vector3f& l
     shadow_cube_maps[level][light_idx] = std::move(cmap);
     int total_texels = 6 * resolution * resolution;
     float expected_texels = 24.0f * (r_e / h0) * (r_e / h0);
-    printf("Cube map: %d texels (expected: %.1f)\n", total_texels, expected_texels);
-    for (int face = 0; face < 6; ++face) {
-    std::ostringstream oss;
-    oss << "shadowmap_L" << level << "_light" << light_idx << "_face" << face << ".pgm";
-    save_cube_map_face_as_pgm(cmap.faces[face], oss.str());
-}
+    //printf("Cube map: %d texels (expected: %.1f)\n", total_texels, expected_texels);
+    int c=0;
+
+//     for (int face = 0; face < 6; ++face) {
+//     if (c>=1) {
+//         break;
+//     }
+//     c++;
+//     std::ostringstream oss;
+//     oss << "shadowmap_L" << level << "_light" << light_idx << "_face" << face << ".pgm";
+//     save_cube_map_face_as_pgm(cmap.faces[face], oss.str());
+// }
 }
 
 float LGH::lookup_shadow(int level, int light_idx, const Vector3f& light_pos, const Vector3f& target_pos) const {

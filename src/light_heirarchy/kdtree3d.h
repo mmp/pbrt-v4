@@ -3,6 +3,7 @@
 #include "Vector3f.h"
 #include <vector>
 #include <memory>
+#include <random>
 
 struct KDNode {
     Vector3f point;
@@ -23,6 +24,18 @@ public:
     // TODO: modify to return intensity, not point (fixed)
     void radiusSearch(const Vector3f& target, float radius, std::vector<KDNode*>& results) const {
         radiusSearchRecursive(root.get(), target, radius * radius, 0, results);
+    }
+    void getAllNodes(std::vector<KDNode*>& results, int num_samples = 0) const {
+        std::vector<KDNode*> all;
+        getAllNodesRecursive(root.get(), all);
+        if (num_samples > 0 && num_samples < (int)all.size()) {
+            std::random_device rd;
+            std::mt19937 g(rd());
+            std::shuffle(all.begin(), all.end(), g);
+            results.assign(all.begin(), all.begin() + num_samples);
+        } else {
+            results = std::move(all);
+        }
     }
 
     // TODO: needs lookup for a single node given position
@@ -86,5 +99,12 @@ struct LightRecord
             if (diff * diff <= radiusSquared)
                 radiusSearchRecursive(node->left.get(), target, radiusSquared, depth + 1, results);
         }
+    }
+    
+    void getAllNodesRecursive(KDNode* node, std::vector<KDNode*>& results) const {
+        if (!node) return;
+        results.push_back(node);
+        getAllNodesRecursive(node->left.get(), results);
+        getAllNodesRecursive(node->right.get(), results);
     }
 };
