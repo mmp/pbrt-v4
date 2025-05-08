@@ -113,18 +113,22 @@ void LGH::deriveNewS(int l)
     
         // TODO: double check is radius is correct for 2x2x2 grid, used diagonal of cube
         // I SEE THE PROBLEM: currently position based on illumination centers not vertices (so not 2x2x2 grid!)
-        // Should the estimated lighting determine radius based on vertex position or illumination centers? Because to do radius search in this part, we need to use vertex positions
+        // Should the estimated lighting determine radius based on vertex position or illumination centers? Because to do radius search in this part, we need to use vertex positions. illum centers!
 
-        // TODO: either the radius I gave or the radiusSearch function is broken
+        // TODO: it looks like real implementation uses exactly 8 lights...
+        // Update: I believe this works as intended
         float radius = sqrt(3) * h[l-1];
         std::vector<KDNode*> j_lights;
         lighting_grid_j->radiusSearch(target_light_pos, radius, j_lights);
+        // while(j_lights.size() > 8) {
+        //     j_lights.pop_back();
+        // }
 
-        // printf("radius search lights: %lu\n", j_lights.size());
+        // printf("  level: %d, radius search lights: %lu\n", l, j_lights.size());
 
         float     I  = calcNewI (l, target_light_pos, j_lights);          // Eq (1)
         Vector3f  p  = calcNewPos(l, target_light_pos, j_lights);         // Eq (2)
-        if (I>0.f) lights.emplace_back(p,I);
+        if (I>0.f) lights.emplace_back(p,I); // TODO: Change threshold!!!
     }
 
     lighting_grids[l] = new KDTree(lights);
@@ -141,7 +145,7 @@ float calcTrilinearWeight(Vector3f p, Vector3f q, float h_l) {
 // -------- intensity (Eq 1) ----------------------------------------------
 float LGH::calcNewI(int l, Vector3f target_light_pos, std::vector<KDNode*> j_lights) //const Vector3f& gv, int l, const KDTree& S0) const
 {
-    float I_sum;
+    float I_sum(0);
     for (auto j_light : j_lights) {
         float w = calcTrilinearWeight(j_light->point, target_light_pos, this->h[l]);
         I_sum += w * j_light->intensity;
@@ -153,12 +157,12 @@ float LGH::calcNewI(int l, Vector3f target_light_pos, std::vector<KDNode*> j_lig
 // -------- illumination centre (Eq 2) ------------------------------------
 Vector3f LGH::calcNewPos(int l, Vector3f target_light_pos, std::vector<KDNode*> j_lights) //const Vector3f& gv, int l, const KDTree& S0) const
 {
-    Vector3f p_num;
-    float p_denom;
+    Vector3f p_num(0,0,0);
+    float p_denom(0);
 
     for (auto j_light : j_lights) {
         float w = calcTrilinearWeight(j_light->point, target_light_pos, this->h[l]);
-        float v = w * j_light->intensity; // TODO: what is the luminance component? What exactly is intensity data structure?
+        float v = w * j_light->intensity * 1000; // TODO: what is the luminance component? What exactly is intensity data structure?
         p_num += v * j_light->point;
         p_denom = v;
     }
@@ -187,8 +191,7 @@ float LGH::blendingFunction(int level, float d, float r_l)
     return 0;
 }
 
-// pbrt::SampledSpectrum
-float LGH::get_intensity(int L,
+pbrt::SampledSpectrum LGH::get_intensity(int L,
                                          Vector3f targetPos,
                                          KDNode* light,
                                          float radius,
@@ -199,9 +202,9 @@ float LGH::get_intensity(int L,
     // V = Tr(x, light->point)
 
     // Calculate tranmittance
+    // TODO: check how much time this transmittance calc adds
     Vector3f dir = light->point - targetPos;
 
-    // TODO: need to set Medium otherwise will not work!!!, also look what time does?
     pbrt::Ray ray = pbrt::Ray(pbrt::Point3f(targetPos.x, targetPos.y, targetPos.z), pbrt::Vector3f(dir.x, dir.y, dir.z), 0, medium);
     float tMax = Length(ray.d);
     // Initialize _RNG_ for sampling the majorant transmittance
@@ -212,33 +215,40 @@ float LGH::get_intensity(int L,
     pbrt::SampledSpectrum V = SampleT_maj(ray, tMax, sampler.Get1D(), rng, lambda,
                 [&](pbrt::Point3f p, pbrt::MediumProperties mp, pbrt::SampledSpectrum sigma_maj, pbrt::SampledSpectrum T_maj) {
         return true;
-                });
+                });//.y(lambda);
+
+    V = pbrt::Clamp(V, 0.f, 1.f);
 
 
     float d = targetPos.distance(light->point);
-    float g = 1.f / pow(d,2); // Light fall-off
+
+    // TODO: figure out good scale for light fall-off, make sure it is relative to size of explosion
+    float g = 1.f / pow(d,2); // Light fall-off, good with d * 50
+    g = std::min(1.f, g);
+
     float B = blendingFunction(L, d, radius);
 
     if (B < 0) {
         LOG_FATAL("Blending function should never be negative! %f", B);
     }
 
+    if (B > 1) {
+        printf("B large: %f\n", B);
+    }
+
     if (light->intensity < 0) {
         printf("LIGHT INTENSITY NEGATIVE!!! L: %d, %f\n", L, light->intensity);
     }
 
-    // if (light->intensity * 800 < 10) {
-    //     // printf("Too low light intensity L: %d, %f\n", L, light->intensity * 4500);
-    //     return pbrt::SampledSpectrum(0);
-    // }
+    if (light->intensity * 1000 < 10) {
+        // printf("Too low light intensity L: %d, %f\n", L, light->intensity * 4500);
+        return pbrt::SampledSpectrum(0);
+    }
 
-    // TODO: may need to do this as well. Not sure how much transmittance will impact
-    // light->intensity *= 4500 * 5;// * 10000;
-
-    // printf("Light intensity: %f, transmittance: %s, d: %f, B: %f\n", light->intensity * 500, V.ToString().c_str(), d, B);
+    // printf("Light intensity: %f, transmittance: %s, g: %f, B: %f\n", light->intensity * 1000, V.ToString().c_str(), g, B);
 
 
-    return g * B * light->intensity;//pbrt::BlackbodySpectrum(light->intensity * 800).Sample(lambda) * V;
+    return g * B * pbrt::BlackbodySpectrum(light->intensity * 1000).Sample(lambda) * V; //light->intensity * V;//
 }
 
 pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos,
@@ -258,9 +268,10 @@ pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos,
     Vector3f v_pos(pos.x, pos.y, pos.z);
 
     int numLightsCaptured = 0;
-    int numLightsS0, numLightsS1 = 0;
-    // pbrt::SampledSpectrum
-    float total_intensity(0);
+    int numLightsS0, numLightsS1, numLightsS2, numLightsS3, numLightsS4, numLightsS5 = 0;
+
+
+    pbrt::SampledSpectrum total_intensity(0);
     for (int l=0; l<=l_max; l++) {
         float radius = alpha * h[l];
 
@@ -268,11 +279,18 @@ pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos,
         lighting_grids[l]->radiusSearch(v_pos, radius, results);
         numLightsCaptured += results.size();
 
-        // TODO: for some reason, levels beyond 0 do nothing
-        if (l == 0)
-            numLightsS0 = results.size();
-        if (l==1)
-            numLightsS1 = results.size();
+        // if (l == 0)
+        //     numLightsS0 = results.size();
+        // if (l==1)
+        //     numLightsS1 = results.size();
+        // if (l==2)
+        //     numLightsS2 = results.size();
+        // if (l==3)
+        //     numLightsS3 = results.size();
+        // if (l==4)
+        //     numLightsS4 = results.size();
+        // if (l==5)
+        //     numLightsS5 = results.size();
 
         //printf("  radius search size: %lu\n", results.size());
         
@@ -281,14 +299,16 @@ pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos,
         }
     }
 
-    if (total_intensity < 100) {
-        return pbrt::SampledSpectrum(0);
-    }
+    // if (total_intensity < 100) {
+    //     return pbrt::SampledSpectrum(0);
+    // }
 
-    // printf("  captured lights %d, S0: %d, S1: %d\n", numLightsCaptured, numLightsS0, numLightsS1);
+    // printf("  captured lights %d, S0: %d, S1: %d, S2: %d, S3: %d, S4: %d, S5: %d\n", numLightsCaptured, numLightsS0, numLightsS1, numLightsS2, numLightsS3, numLightsS4, numLightsS5);
 
     // printf("\tIntensity: %f, point %f %f %f\t\n", total_intensity, v_pos.x, v_pos.y, v_pos.z);
 
     // return 0.125 * total_intensity;
-    return 0.125 * pbrt::BlackbodySpectrum(total_intensity).Sample(lambda);
+    // auto test = pbrt::BlackbodySpectrum(total_intensity).Sample(lambda);
+
+    return 0.125 * total_intensity; //pbrt::BlackbodySpectrum(total_intensity).Sample(lambda);
 }

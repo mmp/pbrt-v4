@@ -24,9 +24,9 @@ def process_frame(nvdb_file, frame_id, basename, pbrt_dir, output_dir, base_pbrt
         f.write(pbrt_content)
 
     # Step 3: Render PBRT
-    subprocess.run(["./build/pbrt", pbrt_file], check=True)
+    subprocess.run(["./build_release/pbrt", pbrt_file], check=True)
 
-def render(nvdb_dir, basename, base_pbrt_file, output_dir):
+def render(nvdb_dir, basename, base_pbrt_file, output_dir, min_frame_id, max_frame_id):
     pbrt_dir = tempfile.mkdtemp(prefix="pbrt_")
 
     os.makedirs(output_dir, exist_ok=True)
@@ -44,11 +44,13 @@ def render(nvdb_dir, basename, base_pbrt_file, output_dir):
         for nvdb_file in nvdb_files:
             frame_id = extract_frame_number(nvdb_file, basename)
             if frame_id:
-                found_ids.append(int(frame_id))
-                frame_map[frame_id] = nvdb_file
+                if int(frame_id) >= min_frame_id and (int(frame_id) <= max_frame_id or max_frame_id < 0):
+                    found_ids.append(int(frame_id))
+                    frame_map[frame_id] = nvdb_file
 
         found_ids.sort()
-        expected_ids = list(range(1, found_ids[-1] + 1))
+        max_expected_id = found_ids[-1] + 1 if max_frame_id == -1 else max_frame_id
+        expected_ids = list(range(min_frame_id, max_expected_id))
         missing_ids = [i for i in expected_ids if i not in found_ids]
 
         if missing_ids:
@@ -69,19 +71,25 @@ def render(nvdb_dir, basename, base_pbrt_file, output_dir):
             ]
             for future in as_completed(futures):
                 future.result()
+        # for frame_id in found_ids:
+        #     print(f"▶️  Rendering frame {frame_id:04d}")
+        #     process_frame(frame_map[frame_id], frame_id, basename,
+        #                   pbrt_dir, output_dir, base_pbrt_content)
 
     finally:
         print(f"\n🧹 Cleaning up temporary directories:\n  PBRT: {pbrt_dir}")
         shutil.rmtree(pbrt_dir)
 
 if __name__ == "__main__":
-    if len(sys.argv) != 5:
-        print("Usage: python batch_render_nvdb.py <nvdb_folder> <nvdb_basename> <base_pbrt_file> <output_exr_dir>")
+    if len(sys.argv) not in [5, 7]:
+        print("Usage: python batch_render_nvdb.py <nvdb_folder> <nvdb_basename> <base_pbrt_file> <output_exr_dir> <min_frame_id> <max_frame_id>")
         sys.exit(1)
 
     nvdb_folder = sys.argv[1]
     nvdb_basename = sys.argv[2]
     base_pbrt_file = sys.argv[3]
     output_exr_dir = sys.argv[4]
+    min_frame_id = int(sys.argv[5]) if len(sys.argv) == 6 else 1
+    max_frame_id = int(sys.argv[6]) if len(sys.argv) == 7 else -1
 
-    render(nvdb_folder, nvdb_basename, base_pbrt_file, output_exr_dir)
+    render(nvdb_folder, nvdb_basename, base_pbrt_file, output_exr_dir, min_frame_id, max_frame_id)
