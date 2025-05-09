@@ -145,7 +145,7 @@ CubeDS LGH::create_cube_map(int                level,
 {
     // Face resolution: power‑of‑two mip chain (feel free to swap strategy)
     const int resolution = 1 << level;     // 2^level
-    sigma_t = 200;
+    sigma_t = 300;
 
     CubeMap cube_map;
     cube_map.Texels.reserve(6 * resolution * resolution);
@@ -416,7 +416,7 @@ pbrt::SampledSpectrum LGH::get_intensity(int L,
 
 
     // TODO NOTE * 200 untested. No idea what value it should be
-    return g * B * pbrt::BlackbodySpectrum(light->intensity * 1500).Sample(lambda) * V * 1400; //light->intensity * V;//
+    return g * B * pbrt::BlackbodySpectrum(light->intensity * 1500).Sample(lambda) * V * 1000; //light->intensity * V;//
 }
 
 pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos,
