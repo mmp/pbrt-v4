@@ -1,10 +1,13 @@
+#ifndef VECTOR3F_H
+#define VECTOR3F_H
+
 #include <cmath>
 
 struct Vector3f {
     float x, y, z;
 
-    Vector3f(float x = 0, float y = 0, float z = 0)
-        : x(x), y(y), z(z) {}
+    Vector3f() : x(0), y(0), z(0) {}
+    Vector3f(float x, float y, float z) : x(x), y(y), z(z) {}
 
     float distanceSquared(const Vector3f& other) const {
         float dx = x - other.x;
@@ -14,7 +17,7 @@ struct Vector3f {
     }
 
     float distance(const Vector3f& other) const {
-        return sqrt(distanceSquared(other));
+        return std::sqrt(distanceSquared(other));
     }
 
     float operator[](int index) const {
@@ -38,19 +41,41 @@ struct Vector3f {
         return *this;
     }
 
-    Vector3f abs() const {
-        return Vector3f(fabs(x), fabs(y), fabs(z));
+    Vector3f& operator-=(const Vector3f& other) {
+        x -= other.x;
+        y -= other.y;
+        z -= other.z;
+        return *this;
     }
 
-    Vector3f operator/(float scalar) const {
-        return Vector3f(x / scalar, y / scalar, z / scalar);
+    Vector3f& operator*=(float scalar) {
+        x *= scalar;
+        y *= scalar;
+        z *= scalar;
+        return *this;
+    }
+
+    Vector3f& operator/=(float scalar) {
+        x /= scalar;
+        y /= scalar;
+        z /= scalar;
+        return *this;
+    }
+
+    Vector3f abs() const {
+        return Vector3f(std::abs(x), std::abs(y), std::abs(z));
     }
 
     Vector3f operator*(float scalar) const {
         return Vector3f(x * scalar, y * scalar, z * scalar);
     }
-};
 
-inline Vector3f operator*(float scalar, const Vector3f& v) {
-    return v * scalar;
-}
+    Vector3f operator/(float scalar) const {
+        return Vector3f(x / scalar, y / scalar, z / scalar);
+    }
+};
+inline Vector3f operator*(float scalar, const Vector3f& vec) {
+        return vec * scalar;
+    }
+
+#endif // VECTOR3F_H
