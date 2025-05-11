@@ -8,6 +8,10 @@
 #include <functional>  
 #include <vector>
 enum class Face { PosX, NegX, PosY, NegY, PosZ, NegZ };
+inline float dot(const Vector3f& a, const Vector3f& b)
+    { return a.x*b.x + a.y*b.y + a.z*b.z; }
+inline float length(const Vector3f& a) { return std::sqrt(dot(a,a)); }
+inline Vector3f normalise(const Vector3f& a) {if (length(a) != 0) return a * (1.f/length(a)); else return a; }
 // LGH::LGH(pbrt::SampledGrid<float> temperature_grid, int depth, float base_voxel_size, float transmission) 
 LGH::LGH(const nanovdb::FloatGrid* temperature_grid, const nanovdb::FloatGrid* density_grid, int depth, float base_voxel_size, float transmission, pbrt::Transform transform)
     : l_max(depth), transmission(transmission), medium_transform(transform)
@@ -103,10 +107,7 @@ using CubeMap = CubeDS;   // Alias for clarity
 //     { return {a.x-b.x, a.y-b.y, a.z-b.z}; }
 // inline Vector3f operator*(const Vector3f& a, float s)
 //     { return {a.x*s, a.y*s, a.z*s}; }
-inline float dot(const Vector3f& a, const Vector3f& b)
-    { return a.x*b.x + a.y*b.y + a.z*b.z; }
-inline float length(const Vector3f& a) { return std::sqrt(dot(a,a)); }
-inline Vector3f normalise(const Vector3f& a) { return a * (1.f/length(a)); }
+
 
 // -------------------------------------------------------------------------
 // Ray‑march helper – Beer–Lambert transmittance between two points
@@ -144,8 +145,8 @@ CubeDS LGH::create_cube_map(int                level,
                         float              sigma_t)
 {
     // Face resolution: power‑of‑two mip chain (feel free to swap strategy)
-    const int resolution = 1 << level;     // 2^level
-    sigma_t = 300;
+    int resolution = pow(2, level+2);  // 2^level
+    sigma_t = 275;//250;
 
     CubeMap cube_map;
     cube_map.Texels.reserve(6 * resolution * resolution);
@@ -160,7 +161,7 @@ CubeDS LGH::create_cube_map(int                level,
                 Vector3f centre =
                     texel_center(face, u, v, resolution, h);
 
-                    Vector3f dir = light_pos - centre;
+                    Vector3f dir = normalise( light_pos - centre);
 
                     Vector3f p = centre;
                     while (p.distance(centre) < light_pos.distance(centre)) {
@@ -416,7 +417,7 @@ pbrt::SampledSpectrum LGH::get_intensity(int L,
 
 
     // TODO NOTE * 200 untested. No idea what value it should be
-    return g * B * pbrt::BlackbodySpectrum(light->intensity * 1500).Sample(lambda) * V * 1000; //light->intensity * V;//
+    return g * B * pbrt::BlackbodySpectrum(light->intensity * 1500).Sample(lambda) * V *1500;//* 1000; //light->intensity * V;//
 }
 
 pbrt::SampledSpectrum LGH::get_total_illum(pbrt::Point3f pos,
