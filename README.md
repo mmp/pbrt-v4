@@ -228,3 +228,24 @@ is straightforward:
 ```bash
 $ imgtool denoise-optix noisy.exr --outfile denoised.exr
 ```
+
+## Qt GUI Launcher (`pbrtqtgui`)
+
+pbrt also includes a simple Qt-based GUI launcher, `pbrtqtgui`, to make it easier to configure and run renders.
+
+**Building:**
+The GUI launcher is built by default if Qt5 (version 5.x) is found on your system during CMake configuration. If Qt5 is not found, `pbrtqtgui` will not be built, but the rest of pbrt will build as usual.
+
+**Running:**
+After building pbrt, you can find the `pbrtqtgui` executable in your build directory (e.g., alongside the `pbrt` executable). Run it like any other application.
+
+**Features:**
+-   Select a `.pbrt` scene file.
+-   Specify an output file for batch rendering.
+-   Toggle interactive mode.
+-   Toggle GPU rendering (or use `--wavefront` for interactive CPU).
+-   Set the number of threads for CPU batch rendering.
+-   Start the render and view pbrt's console output directly in the GUI.
+-   Basic status updates on the rendering process.
+
+This provides a convenient alternative to using `pbrt` directly from the command line for common rendering tasks.
