@@ -52,7 +52,7 @@ if (NOT ZLIB_FOUND)
 endif ()
 
 set (ZLIB_INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS} PARENT_SCOPE)
-set (ZLIB_LIBRARIES ${ZLIB_LIBARIES} PARENT_SCOPE)
+set (ZLIB_LIBRARIES ${ZLIB_LIBRARIES} PARENT_SCOPE)
 
 ###########################################################################
 # openexr
