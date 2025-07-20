@@ -111,6 +111,10 @@ if (OPENEXR_FOUND)
   message (STATUS "Found OpenEXR version ${OPENEXR_VERSION}")
 else ()
   message (STATUS "OpenEXR not found; building it from scratch.")
+  set (BUILD_TESTING OFF CACHE BOOL " " FORCE)
+  set (OPENEXR_BUILD_TOOLS OFF CACHE BOOL " " FORCE)
+  set (OPENEXR_BUILD_EXAMPLES OFF CACHE BOOL " " FORCE)
+  
   add_subdirectory (src/ext/openexr)
   set_property (TARGET IlmThread Iex OpenEXR
                 PROPERTY FOLDER "ext/OpenEXR")
