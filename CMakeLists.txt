@@ -6,6 +6,7 @@ project (PBRT-V4 LANGUAGES CXX C)
 
 set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
+set (CMAKE_POLICY_VERSION_MINIMUM 3.5)
 
 if (NOT DEFINED PBRT_SOURCE_CODE)
   set (PBRT_SOURCE_CODE ${CMAKE_SOURCE_DIR})
@@ -111,6 +112,10 @@ if (OPENEXR_FOUND)
   message (STATUS "Found OpenEXR version ${OPENEXR_VERSION}")
 else ()
   message (STATUS "OpenEXR not found; building it from scratch.")
+  set (BUILD_TESTING OFF CACHE BOOL " " FORCE)
+  set (OPENEXR_BUILD_TOOLS OFF CACHE BOOL " " FORCE)
+  set (OPENEXR_BUILD_EXAMPLES OFF CACHE BOOL " " FORCE)
+  
   add_subdirectory (src/ext/openexr)
   set_property (TARGET IlmThread Iex OpenEXR
                 PROPERTY FOLDER "ext/OpenEXR")

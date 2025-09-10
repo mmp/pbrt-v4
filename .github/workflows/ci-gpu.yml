@@ -62,7 +62,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         ssh-key: ${{ secrets.CHECKOUT_KEY }}
-        repository: mmp/optix-headers
+        repository: NVIDIA/optix-dev
         path: optix
 
     - name: Get cmake
