@@ -36,11 +36,9 @@ jobs:
     - name: Get cmake
       uses: lukka/get-cmake@latest
 
-    - name: Install pkgconfig and zlib
+    - name: Install pkgconfig
       run: |
         choco install pkgconfiglite
-        vcpkg install zlib:x64-windows
-        vcpkg install zlib:x64-windows-static
 
     - name: Configure
       run: |
