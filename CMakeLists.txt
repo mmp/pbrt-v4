@@ -707,6 +707,7 @@ if (PBRT_CUDA_ENABLED)
   set (PBRT_GPU_SOURCE
     src/pbrt/gpu/optix/aggregate.cpp
     src/pbrt/gpu/optix/denoiser.cpp
+    src/pbrt/gpu/optix/scaler.cpp
     src/pbrt/gpu/memory.cpp
     src/pbrt/gpu/util.cpp
   )
@@ -714,6 +715,7 @@ if (PBRT_CUDA_ENABLED)
     src/pbrt/gpu/optix/aggregate.h
     src/pbrt/gpu/cudagl.h
     src/pbrt/gpu/optix/denoiser.h
+    src/pbrt/gpu/optix/scaler.h
     src/pbrt/gpu/memory.h
     src/pbrt/gpu/optix/optix.h
     src/pbrt/gpu/util.h
