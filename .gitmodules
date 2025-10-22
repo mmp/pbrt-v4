@@ -1,6 +1,3 @@
-[submodule "src/ext/zlib"]
-	path = src/ext/zlib
-	url = https://github.com/mitsuba-renderer/zlib.git
 [submodule "src/ext/ptex"]
 	path = src/ext/ptex
 	url = https://github.com/wdas/ptex.git
@@ -36,3 +33,6 @@
 	path = src/ext/glfw
 	url = https://github.com/glfw/glfw.git
 
+[submodule "src/ext/zlib"]
+	path = src/ext/zlib
+	url = https://github.com/madler/zlib.git

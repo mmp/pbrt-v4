@@ -82,7 +82,10 @@ add_subdirectory (double-conversion)
 
 set (DOUBLE_CONVERSION_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/double-conversion PARENT_SCOPE)
 
-set_property (TARGET double-conversion cctest PROPERTY FOLDER "ext")
+set_property (TARGET double-conversion PROPERTY FOLDER "ext")
+if (TARGET cctest)
+  set_property (TARGET cctest PROPERTY FOLDER "ext")
+endif()
 
 ###########################################################################
 # nanovdb
