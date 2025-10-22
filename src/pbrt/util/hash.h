@@ -77,8 +77,8 @@ inline uint64_t MixBits(uint64_t v) {
 }
 
 template <typename T>
-PBRT_CPU_GPU inline uint64_t HashBuffer(const T *ptr, size_t size, uint64_t seed = 0) {
-    return MurmurHash64A((const unsigned char *)ptr, size, seed);
+PBRT_CPU_GPU inline uint64_t HashBuffer(const T *ptr, size_t nElements, uint64_t seed = 0) {
+    return MurmurHash64A((const unsigned char *)ptr, nElements * sizeof(T), seed);
 }
 
 template <typename... Args>
