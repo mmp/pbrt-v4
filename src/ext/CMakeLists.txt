@@ -2,9 +2,9 @@
 cmake_minimum_required (VERSION 3.12)
 
 if (MSVC)
-  add_definitions(/D _CRT_SECURE_NO_WARNINGS /Dstrdup=_strdup
-    /wd4018 /wd4100 /wd4101 /wd4127 /wd4146 /wd4232 /wd4242 /wd4244 /wd4245 /wd4267 /wd4305 /wd4309 
-    /wd4310 /wd4334 /wd4456 /wd4464 /wd4668 /wd4701 /wd4703 /wd4711 /wd4756 /wd4820 /wd5045 /wd5250)
+    add_definitions(/D _CRT_SECURE_NO_WARNINGS /Dstrdup=_strdup
+            /wd4018 /wd4100 /wd4101 /wd4127 /wd4146 /wd4232 /wd4242 /wd4244 /wd4245 /wd4267 /wd4305 /wd4309
+            /wd4310 /wd4334 /wd4456 /wd4464 /wd4668 /wd4701 /wd4703 /wd4711 /wd4756 /wd4820 /wd5045 /wd5250)
 endif ()
 
 ###########################################################################
@@ -32,27 +32,26 @@ set_property (TARGET deflate PROPERTY FOLDER "ext")
 
 find_package (ZLIB)
 if (NOT ZLIB_FOUND)
-  # Build zlib
-  set (ZLIB_BUILD_STATIC_LIBS ON CACHE BOOL " " FORCE)
-  set (ZLIB_BUILD_SHARED_LIBS OFF CACHE BOOL " " FORCE)
-  add_subdirectory (zlib)
+    # Build zlib
+    set (ZLIB_BUILD_STATIC_LIBS ON CACHE BOOL " " FORCE)
+    set (ZLIB_BUILD_SHARED_LIBS OFF CACHE BOOL " " FORCE)
+    add_subdirectory (zlib)
 
-  set (ZLIB_LIBRARIES zlibstatic)
-  set (ZLIB_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/zlib ${CMAKE_CURRENT_BINARY_DIR}/zlib)
+    # Set as CACHE variables so they are visible to OpenEXR find_package
+    set (ZLIB_LIBRARIES zlibstatic CACHE STRING "zlib library" FORCE)
+    set (ZLIB_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/zlib ${CMAKE_CURRENT_BINARY_DIR}/zlib CACHE STRING "zlib include dirs" FORCE)
+    set (ZLIB_LIBRARY zlibstatic CACHE STRING "zlib library" FORCE)
+    set (ZLIB_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/zlib ${CMAKE_CURRENT_BINARY_DIR}/zlib CACHE STRING "zlib include dir" FORCE)
+    set (ZLIB_FOUND TRUE CACHE BOOL "zlib found" FORCE)
 
-  # try to make openexr happy about this...
-  set (ZLIB_LIBRARY zlibstatic)
-  set (ZLIB_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/zlib ${CMAKE_CURRENT_BINARY_DIR}/zlib)
-  set (ZLIB_FOUND TRUE)
+    set_property (TARGET zlibstatic PROPERTY FOLDER "ext")
 
-  set_property (TARGET zlibstatic PROPERTY FOLDER "ext")
-
-  add_library (ZLIB::ZLIB ALIAS zlibstatic)
-  include_directories(${ZLIB_INCLUDE_DIRS})  # yuck, but so openexr/ptex can find zlib.h...
+    add_library (ZLIB::ZLIB ALIAS zlibstatic)
+    include_directories(${ZLIB_INCLUDE_DIRS})  # yuck, but so openexr/ptex can find zlib.h...
 endif ()
 
 set (ZLIB_INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS} PARENT_SCOPE)
-set (ZLIB_LIBRARIES ${ZLIB_LIBARIES} PARENT_SCOPE)
+set (ZLIB_LIBRARIES ${ZLIB_LIBRARIES} PARENT_SCOPE)
 
 ###########################################################################
 # openexr
@@ -66,7 +65,7 @@ set (PTEX_BUILD_SHARED_LIBS OFF CACHE BOOL " " FORCE)
 
 set (CMAKE_MACOSX_RPATH 1)
 if (WIN32)
-  add_definitions (/DPTEX_STATIC)
+    add_definitions (/DPTEX_STATIC)
 endif ()
 
 add_subdirectory (ptex)
@@ -129,4 +128,3 @@ add_subdirectory (glad)
 
 set_property (TARGET glfw PROPERTY FOLDER "ext")
 set_property (TARGET glad PROPERTY FOLDER "ext")
-

@@ -72,8 +72,6 @@ jobs:
       if: ${{ matrix.os == 'windows-latest' }}
       run: |
         choco install pkgconfiglite
-        vcpkg install zlib:x64-windows
-        vcpkg install zlib:x64-windows-static
 
     - name: Install OpenGL
       if: ${{ matrix.os == 'ubuntu-20.04' }}
