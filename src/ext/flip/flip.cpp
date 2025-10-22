@@ -49,6 +49,7 @@
 #include <iostream>
 #include <fstream>
 #include <cassert>
+#include <cstdint>
 
 namespace flip_detail {
 
