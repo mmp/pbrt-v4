@@ -590,7 +590,8 @@ TEST(PointVector, Interval) {
 
     p += v;
     p = (p - v);
-    p = p + 4 * v;
+    Vector3<Interval> scaled = Interval(4) * v;
+    p = static_cast<Point3<Interval>>(p) + scaled;
     Interval d = Dot(v, v);
     d = DistanceSquared(p, q);
     d = Distance(p, q);
