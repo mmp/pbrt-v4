@@ -73,7 +73,7 @@ check_ext ("libdeflate" "libdeflate/common" 1fd0bea6ca2073c68493632dafc4b1ddda1b
 check_ext ("lodepng" "lodepng/examples" 8c6a9e30576f07bf470ad6f09458a2dcd7a6a84a)
 check_ext ("qoi" "qoi" 028c75fd26e5e0758c7c711216c00404994c1ad3)
 check_ext ("stb" "stb/tools" af1a5bc352164740c1cc1354942b1c6b72eacb8a)
-check_ext ("utf8proc" "utf8proc/bench" 4fe73fa141c517263c9cd0c7b66901b2b18f0fab)
+check_ext ("utf8proc" "utf8proc/bench" d7bf128df773c2a1a7242eb80e51e91a769fc985)
 check_ext ("zlib" "zlib/doc" 5a82f71ed1dfc0bec044d9702463dbdf84ea3b71)
 add_compile_definitions ("$<$<CONFIG:DEBUG>:PBRT_DEBUG_BUILD>")
 
