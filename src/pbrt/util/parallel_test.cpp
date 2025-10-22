@@ -50,13 +50,16 @@ TEST(Parallel, ForEachThread) {
 TEST(ThreadLocal, Consistency) {
     ThreadLocal<std::thread::id> tids([]() { return std::this_thread::get_id(); });
 
-    auto busywork = [](int64_t index) {
+    std::atomic<int64_t> dummy{0};
+    auto busywork = [&dummy](int64_t index) {
         // Do some busy work to burn some time
-        Float f = 1.141;
+        // Use the index to do a varying amount of computation
+        int64_t result = 0;
         for (int i = 0; i <= index; ++i)
             for (int j = 0; j <= index; ++j)
-                f *= std::sqrt(f);
-        EXPECT_NE(f, 1.141f);  // make sure it isn't optimized out
+                result += i * j;
+        // Store result in atomic to prevent optimization
+        dummy.fetch_add(result, std::memory_order_relaxed);
     };
 
     ParallelFor(0, 1000, [&](int64_t index) {
