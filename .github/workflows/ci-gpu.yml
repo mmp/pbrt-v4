@@ -22,16 +22,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        optix: [ optix-7.5.0, optix-7.7.0, optix-8.0.0 ]
-        cuda: [ '11.7.0', '12.1.0', '12.2.2', '12.3.2' ]
-        os: [ ubuntu-20.04, windows-latest ]
+        optix: [ optix-7.5.0, optix-7.7.0, optix-8.1.0 ]
+        cuda: [ '11.7.0', '12.2.2', '12.6.3', '12.8.0' ]
+        os: [ ubuntu-24.04, ubuntu-20.04, windows-latest ]
 
     name: GPU Build Only (${{ matrix.os }}, CUDA ${{ matrix.cuda }}, ${{ matrix.optix }})
 
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: jimver/cuda-toolkit@v0.2.19
+    - uses: jimver/cuda-toolkit@v0.2.21
       id: cuda-toolkit
       with:
         cuda: ${{ matrix.cuda }}
@@ -74,7 +74,7 @@ jobs:
         choco install pkgconfiglite
 
     - name: Install OpenGL
-      if: ${{ matrix.os == 'ubuntu-20.04' }}
+      if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'ubuntu-24.04' }}
       run: sudo apt-get install -y --no-install-recommends libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxext-dev libxfixes-dev libgl1-mesa-dev libwayland-bin libwayland-dev wayland-protocols libxkbcommon-dev libxkbcommon-x11-0
 
     - name: Configure (Windows)
@@ -84,7 +84,7 @@ jobs:
         cmake .. -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT"/scripts/buildsystems/vcpkg.cmake -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True -DPBRT_OPTIX7_PATH=../optix/${{ matrix.optix }} -DPBRT_GPU_SHADER_MODEL=sm_80
 
     - name: Configure (Linux)
-      if: ${{ matrix.os == 'ubuntu-20.04' }}
+      if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'ubuntu-24.04' }}
       run: |
         cd build
         cmake .. -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True -DPBRT_OPTIX7_PATH=../optix/${{ matrix.optix }} -DPBRT_GPU_SHADER_MODEL=sm_80
