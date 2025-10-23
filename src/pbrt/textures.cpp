@@ -1336,13 +1336,6 @@ GPUFloatImageTexture *GPUFloatImageTexture::Create(
     // Initialize _ImageTexture_ parameters
     Float maxAniso = parameters.GetOneFloat("maxanisotropy", 8.f);
     std::string filter = parameters.GetOneString("filter", "bilinear");
-    MIPMapFilterOptions filterOptions;
-    filterOptions.maxAnisotropy = maxAniso;
-    pstd::optional<FilterFunction> ff = ParseFilter(filter);
-    if (ff)
-        filterOptions.filter = *ff;
-    else
-        Error(loc, "%s: filter function unknown", filter);
 
     std::string wrapString = parameters.GetOneString("wrap", "repeat");
     pstd::optional<WrapMode> wrapMode = ParseWrapMode(wrapString.c_str());
