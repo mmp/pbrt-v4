@@ -1653,23 +1653,25 @@ class PiecewiseLinear2D {
         float param_weight[2 * ArraySize];
         uint32_t slice_offset = 0u;
 
-        for (size_t dim = 0; dim < Dimension; ++dim) {
-            if (m_param_size[dim] == 1) {
-                param_weight[2 * dim] = 1.f;
-                param_weight[2 * dim + 1] = 0.f;
-                continue;
+        if constexpr (Dimension > 0) {
+            for (size_t dim = 0; dim < Dimension; ++dim) {
+                if (m_param_size[dim] == 1) {
+                    param_weight[2 * dim] = 1.f;
+                    param_weight[2 * dim + 1] = 0.f;
+                    continue;
+                }
+
+                uint32_t param_index = FindInterval(m_param_size[dim], [&](uint32_t idx) {
+                    return m_param_values[dim][idx] <= param[dim];
+                });
+
+                float p0 = m_param_values[dim][param_index],
+                      p1 = m_param_values[dim][param_index + 1];
+
+                param_weight[2 * dim + 1] = Clamp((param[dim] - p0) / (p1 - p0), 0.f, 1.f);
+                param_weight[2 * dim] = 1.f - param_weight[2 * dim + 1];
+                slice_offset += m_param_strides[dim] * param_index;
             }
-
-            uint32_t param_index = FindInterval(m_param_size[dim], [&](uint32_t idx) {
-                return m_param_values[dim][idx] <= param[dim];
-            });
-
-            float p0 = m_param_values[dim][param_index],
-                  p1 = m_param_values[dim][param_index + 1];
-
-            param_weight[2 * dim + 1] = Clamp((param[dim] - p0) / (p1 - p0), 0.f, 1.f);
-            param_weight[2 * dim] = 1.f - param_weight[2 * dim + 1];
-            slice_offset += m_param_strides[dim] * param_index;
         }
 
         /* Compute linear interpolation weights */
