@@ -2,7 +2,9 @@
 
 cmake_minimum_required (VERSION 3.12)
 
-project (PBRT-V4 LANGUAGES CXX C)
+cmake_policy(SET CMP0146 NEW)
+
+project (PBRT-V4 LANGUAGES CXX C CUDA)
 
 set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -180,8 +182,6 @@ if (CMAKE_CUDA_COMPILER)
 was found. GPU support is therefore disabled. If you have multiple versions\
 of CUDA installed, please update your PATH.")
   else ()
-    find_package (CUDA REQUIRED)
-
     # This seems to be necessary starting with 3.17.1, but gives an error
     # about 17 being an unsupported version earlier...
     if (${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.17.0")
@@ -210,7 +210,6 @@ of CUDA installed, please update your PATH.")
     if ("${PBRT_OPTIX7_PATH}" STREQUAL "")
         message (WARNING "Found CUDA but PBRT_OPTIX7_PATH is not set. Disabling GPU compilation.")
     else ()
-        enable_language (CUDA)
         list (APPEND PBRT_DEFINITIONS "PBRT_BUILD_GPU_RENDERER")
         if (PBRT_NVTX)
             list (APPEND PBRT_DEFINITIONS "NVTX")
