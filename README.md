@@ -206,7 +206,7 @@ later.  Both Linux and Windows are supported.
 
 The build scripts automatically attempt to find a CUDA compiler, looking in
 the usual places; the cmake output will indicate whether it was successful.
-It is necessary to manually set the cmake `PBRT_OPTIX7_PATH` configuration
+It is necessary to manually set the cmake `PBRT_OPTIX_PATH` configuration
 option to point at an OptiX installation.  By default, the GPU shader model
 that pbrt targets is set automatically based on the GPU in the system.
 Alternatively, the `PBRT_GPU_SHADER_MODEL` option can be set manually
