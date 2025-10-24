@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        optix: [ optix-7.5.0, optix-7.7.0, optix-8.1.0 ]
+        optix: [ optix-7.7.0, optix-8.1.0, optix-9.0.0 ]
         cuda: [ '11.7.0', '12.2.2', '12.6.3', '12.8.0' ]
         os: [ ubuntu-24.04, ubuntu-20.04, windows-latest ]
 
