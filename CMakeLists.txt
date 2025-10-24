@@ -662,11 +662,13 @@ SET (PBRT_UTIL_SOURCE
 
 # A warning about a deprecated function in C++17 but the solution will only be
 # in C++26.
-set_source_files_properties(
-    src/pbrt/util/string.cpp
-    PROPERTIES
-    COMPILE_FLAGS "-Wno-deprecated-declarations"
-)
+if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    set_source_files_properties(
+        src/pbrt/util/string.cpp
+        PROPERTIES
+        COMPILE_FLAGS "-Wno-deprecated-declarations"
+    )
+endif()
 
 SET (PBRT_UTIL_SOURCE_HEADERS
   src/pbrt/util/args.h
