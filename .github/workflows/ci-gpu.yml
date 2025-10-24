@@ -52,12 +52,6 @@ jobs:
         repository: mmp/rgb2spectrum
         path: build
 
-    - name: Cache OptiX headers
-      uses: actions/cache@v4
-      with:
-        path: optix
-        key: optix-7.12345
-
     - name: Checkout OptiX headers
       uses: actions/checkout@v4
       with:
@@ -75,7 +69,9 @@ jobs:
 
     - name: Install OpenGL
       if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'ubuntu-24.04' }}
-      run: sudo apt-get install -y --no-install-recommends libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxext-dev libxfixes-dev libgl1-mesa-dev libwayland-bin libwayland-dev wayland-protocols libxkbcommon-dev libxkbcommon-x11-0
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxext-dev libxfixes-dev libgl1-mesa-dev libwayland-bin libwayland-dev wayland-protocols libxkbcommon-dev libxkbcommon-x11-0
 
     - name: Configure (Windows)
       if: ${{ matrix.os == 'windows-latest' }}
@@ -98,6 +94,6 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: pbrt.exe
-        path: pbrt.exe
+        path: build/Release/pbrt.exe
 
 
