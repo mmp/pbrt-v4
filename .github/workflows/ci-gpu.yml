@@ -23,7 +23,7 @@ jobs:
       fail-fast: false
       matrix:
         optix: [ optix-7.7.0, optix-8.1.0, optix-9.0.0 ]
-        cuda: [ '11.7.0', '12.2.2', '12.6.3', '12.8.0' ]
+        cuda: [ '12.2.2', '12.6.3', '12.8.0', '12.9.1', '13.0.1' ]
         os: [ ubuntu-24.04, ubuntu-20.04, windows-latest ]
 
     name: GPU Build Only (${{ matrix.os }}, CUDA ${{ matrix.cuda }}, ${{ matrix.optix }})
@@ -31,7 +31,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: jimver/cuda-toolkit@v0.2.21
+    - uses: jimver/cuda-toolkit@v0.2.28
       id: cuda-toolkit
       with:
         cuda: ${{ matrix.cuda }}
