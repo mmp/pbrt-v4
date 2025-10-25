@@ -35,8 +35,8 @@ jobs:
       id: cuda-toolkit
       with:
         cuda: ${{ matrix.cuda }}
-        method: 'network'
-        sub-packages: '[ "nvcc" ]'
+        use-github-cache: false
+        use-local-cache: false
    
     - name: Check NVCC
       run: nvcc -V
