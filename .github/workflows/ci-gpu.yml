@@ -77,13 +77,13 @@ jobs:
       if: ${{ matrix.os == 'windows-latest' }}
       run: |
         cd build
-        cmake .. -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT"/scripts/buildsystems/vcpkg.cmake -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True -DPBRT_OPTIX7_PATH=../optix/${{ matrix.optix }} -DPBRT_GPU_SHADER_MODEL=sm_80
+        cmake .. -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT"/scripts/buildsystems/vcpkg.cmake -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True -DPBRT_OPTIX_PATH=../optix/${{ matrix.optix }} -DPBRT_GPU_SHADER_MODEL=sm_80
 
     - name: Configure (Linux)
       if: ${{ matrix.os == 'ubuntu-20.04' || matrix.os == 'ubuntu-24.04' }}
       run: |
         cd build
-        cmake .. -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True -DPBRT_OPTIX7_PATH=../optix/${{ matrix.optix }} -DPBRT_GPU_SHADER_MODEL=sm_80
+        cmake .. -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True -DPBRT_OPTIX_PATH=../optix/${{ matrix.optix }} -DPBRT_GPU_SHADER_MODEL=sm_80
 
     - name: Build
       # We need to limit the number of jobs so that it doesn't OOM 
