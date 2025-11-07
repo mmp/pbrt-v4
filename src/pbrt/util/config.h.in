@@ -1,0 +1,9 @@
+#pragma once
+
+
+
+#include <string>
+
+const std::string SCENE_DIR = "@SCENE_DIR@";
+const std::string DEFAULT_PRIMITIVE_OUTPUT_FILE = "@PRIMITIVE_OUTPUT_FILE@";
+const std::string DEFAULT_PRIMITIVE_INPUT_FILE = "@PRIMITIVE_INPUT_FILE@";
