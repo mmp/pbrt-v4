@@ -20,7 +20,7 @@ SET(PRIMITIVE_OUTPUT_FILE "${CMAKE_SOURCE_DIR}/default_primtive_output.txt")
 SET(PRIMITIVE_INPUT_FILE "${CMAKE_SOURCE_DIR}/default_primtive_input.txt")
 
 configure_file(
-  ${CMAKE_SOURCE_DIR}/src/pbrt/util/config.h.in
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/pbrt/util/config.h.in
   ${CMAKE_CURRENT_BINARY_DIR}/config.h
 )
 
