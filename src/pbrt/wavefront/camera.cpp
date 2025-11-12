@@ -12,34 +12,38 @@
 #include <pbrt/util/vecmath.h>
 #include <pbrt/wavefront/integrator.h>
 
-namespace pbrt {
+namespace pbrt
+{
 
-// WavefrontPathIntegrator Camera Ray Methods
-void WavefrontPathIntegrator::GenerateCameraRays(int y0, Transform movingFromCamera,
-                                                 int sampleIndex) {
-    // Define _generateRays_ lambda function
-    auto generateRays = [=](auto sampler) {
-        using ConcreteSampler = std::remove_reference_t<decltype(*sampler)>;
-        if constexpr (!std::is_same_v<ConcreteSampler, MLTSampler> &&
-                      !std::is_same_v<ConcreteSampler, DebugMLTSampler>)
-            GenerateCameraRays<ConcreteSampler>(y0, movingFromCamera, sampleIndex);
-    };
+    // WavefrontPathIntegrator Camera Ray Methods
+    void WavefrontPathIntegrator::GenerateCameraRays(int y0, Transform movingFromCamera,
+        int sampleIndex)
+    {
+        // Define _generateRays_ lambda function
+        auto generateRays = [=](auto sampler)
+            {
+                using ConcreteSampler = std::remove_reference_t<decltype(*sampler)>;
+                if constexpr (!std::is_same_v<ConcreteSampler, MLTSampler> &&
+                    !std::is_same_v<ConcreteSampler, DebugMLTSampler>)
+                    GenerateCameraRays<ConcreteSampler>(y0, movingFromCamera, sampleIndex);
+            };
 
-    sampler.DispatchCPU(generateRays);
-}
+        sampler.DispatchCPU(generateRays);
+    }
 
-template <typename ConcreteSampler>
-void WavefrontPathIntegrator::GenerateCameraRays(int y0, Transform movingFromCamera,
-                                                 int sampleIndex) {
-    RayQueue *rayQueue = CurrentRayQueue(0);
-    ParallelFor(
-        "Generate camera rays", maxQueueSize, PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
+    template <typename ConcreteSampler>
+    void WavefrontPathIntegrator::GenerateCameraRays(int y0, Transform movingFromCamera,
+        int sampleIndex)
+    {
+        RayQueue* rayQueue = CurrentRayQueue(0);
+        ParallelFor(
+            "Generate camera rays", maxQueueSize, PBRT_CPU_GPU_LAMBDA(int pixelIndex) {
             // Enqueue camera ray and set pixel state for sample
             // Compute pixel coordinates for _pixelIndex_
             Bounds2i pixelBounds = film.PixelBounds();
             int xResolution = pixelBounds.pMax.x - pixelBounds.pMin.x;
             Point2i pPixel(pixelBounds.pMin.x + pixelIndex % xResolution,
-                           y0 + pixelIndex / xResolution);
+                y0 + pixelIndex / xResolution);
             pixelSampleState.pPixel[pixelIndex] = pPixel;
 
             // Test pixel coordinates against pixel bounds
@@ -70,13 +74,29 @@ void WavefrontPathIntegrator::GenerateCameraRays(int y0, Transform movingFromCam
             if (initializeVisibleSurface)
                 pixelSampleState.visibleSurface[pixelIndex] = VisibleSurface();
 
+            // Initialize ray data
+            inputRayData.rayo[pixelIndex] = cameraRay->ray.o;
+            inputRayData.rayd[pixelIndex] = cameraRay->ray.d;
+            inputRayData.pixelIdx[pixelIndex] = pixelIndex;
+            inputRayData.depth[pixelIndex] = 0;
+            inputRayData.sampleIdx[pixelIndex] = sampleIndex;
+
+            outputRayData.rayo[pixelIndex] = cameraRay->ray.o;
+            outputRayData.rayd[pixelIndex] = cameraRay->ray.d;
+            outputRayData.pixelIdx[pixelIndex] = pixelIndex;
+            outputRayData.depth[pixelIndex] = 0;
+            outputRayData.sampleIdx[pixelIndex] = sampleIndex;
+
+
             // Enqueue camera ray for intersection tests
-            if (cameraRay) {
+            if (cameraRay)
+            {
                 rayQueue->PushCameraRay(cameraRay->ray, lambda, pixelIndex);
                 pixelSampleState.cameraRayWeight[pixelIndex] = cameraRay->weight;
-            } else
+            }
+            else
                 pixelSampleState.cameraRayWeight[pixelIndex] = SampledSpectrum(0);
         });
-}
+    }
 
 }  // namespace pbrt

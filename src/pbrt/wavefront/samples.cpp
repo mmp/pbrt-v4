@@ -13,27 +13,31 @@
 #undef interface
 #endif  // interface
 
-namespace pbrt {
+namespace pbrt
+{
 
-// WavefrontPathIntegrator Sampler Methods
-void WavefrontPathIntegrator::GenerateRaySamples(int wavefrontDepth, int sampleIndex) {
-    auto generateSamples = [=](auto sampler) {
-        using ConcreteSampler = std::remove_reference_t<decltype(*sampler)>;
-        if constexpr (!std::is_same_v<ConcreteSampler, MLTSampler> &&
-                      !std::is_same_v<ConcreteSampler, DebugMLTSampler>)
-            GenerateRaySamples<ConcreteSampler>(wavefrontDepth, sampleIndex);
-    };
-    sampler.DispatchCPU(generateSamples);
-}
+    // WavefrontPathIntegrator Sampler Methods
+    void WavefrontPathIntegrator::GenerateRaySamples(int wavefrontDepth, int sampleIndex)
+    {
+        auto generateSamples = [=](auto sampler)
+            {
+                using ConcreteSampler = std::remove_reference_t<decltype(*sampler)>;
+                if constexpr (!std::is_same_v<ConcreteSampler, MLTSampler> &&
+                    !std::is_same_v<ConcreteSampler, DebugMLTSampler>)
+                    GenerateRaySamples<ConcreteSampler>(wavefrontDepth, sampleIndex);
+            };
+        sampler.DispatchCPU(generateSamples);
+    }
 
-template <typename ConcreteSampler>
-void WavefrontPathIntegrator::GenerateRaySamples(int wavefrontDepth, int sampleIndex) {
-    // Generate description string _desc_ for ray sample generation
-    std::string desc = std::string("Generate ray samples - ") + ConcreteSampler::Name();
+    template <typename ConcreteSampler>
+    void WavefrontPathIntegrator::GenerateRaySamples(int wavefrontDepth, int sampleIndex)
+    {
+        // Generate description string _desc_ for ray sample generation
+        std::string desc = std::string("Generate ray samples - ") + ConcreteSampler::Name();
 
-    RayQueue *rayQueue = CurrentRayQueue(wavefrontDepth);
-    ForAllQueued(
-        desc.c_str(), rayQueue, maxQueueSize, PBRT_CPU_GPU_LAMBDA(const RayWorkItem w) {
+        RayQueue* rayQueue = CurrentRayQueue(wavefrontDepth);
+        ForAllQueued(
+            desc.c_str(), rayQueue, maxQueueSize, PBRT_CPU_GPU_LAMBDA(const RayWorkItem w) {
             // Generate samples for ray segment at current sample index
             // Find first sample dimension
             int dimension = 6 + 7 * w.depth;
@@ -55,14 +59,20 @@ void WavefrontPathIntegrator::GenerateRaySamples(int wavefrontDepth, int sampleI
             rs.indirect.rr = pixelSampler.Get1D();
             // Possibly initialize subsurface subsurface samples in _rs_
             rs.haveSubsurface = haveSubsurface;
-            if (haveSubsurface) {
+            if (haveSubsurface)
+            {
                 rs.subsurface.uc = pixelSampler.Get1D();
                 rs.subsurface.u = pixelSampler.Get2D();
             }
 
+            //TODO: Consider if I need to take in the raysamples too, but not sure since I am not actually
+            // Considering training on this for now.
+            inputRayData.depth[w.pixelIndex] = wavefrontDepth;
+            outputRayData.depth[w.pixelIndex] = wavefrontDepth;
+
             // Store _RaySamples_ in pixel sample state
             pixelSampleState.samples[w.pixelIndex] = rs;
         });
-}
+    }
 
 }  // namespace pbrt

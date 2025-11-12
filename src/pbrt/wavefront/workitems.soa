@@ -37,6 +37,25 @@ soa PixelSampleState {
     RaySamples samples;
 };
 
+soa InputRayData {
+    Point3f rayo;
+    Vector3f rayd;
+    int pixelIdx;
+    int sampleIdx;
+    int depth;
+};
+
+soa OutputRayData {
+    Point3f rayo;
+    Vector3f rayd;
+    int pixelIdx;
+    int sampleIdx;
+    int depth;
+    SampledWavelengths lambda;
+    SampledSpectrum L;
+    SampledSpectrum cameraRayWeight;
+};
+
 soa RayWorkItem {
     Ray ray;
     int depth;

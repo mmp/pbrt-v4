@@ -631,6 +631,7 @@ SET(PBRT_WAVEFRONT_SOURCE
   src/pbrt/wavefront/surfscatter.cpp
   src/pbrt/wavefront/subsurface.cpp
   src/pbrt/wavefront/wavefront.cpp
+  src/pbrt/wavefront/copy.cpp
 )
 
 SET(PBRT_WAVEFRONT_SOURCE_HEADERS
