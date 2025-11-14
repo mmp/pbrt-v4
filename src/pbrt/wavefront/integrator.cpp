@@ -260,34 +260,32 @@ namespace pbrt
         rayQueues[1] = alloc.new_object<RayQueue>(maxQueueSize, alloc);
 
 
-        shadowRayQueue = alloc.new_object<ShadowRayQueue>(maxQueueSize * 2, alloc, "shadowRayQueue");
+        shadowRayQueue = alloc.new_object<ShadowRayQueue>(maxQueueSize, alloc);
 
         if (haveSubsurface)
         {
             bssrdfEvalQueue =
-                alloc.new_object<GetBSSRDFAndProbeRayQueue>(maxQueueSize, alloc, "bssrdfEvalQueue");
+                alloc.new_object<GetBSSRDFAndProbeRayQueue>(maxQueueSize, alloc);
             subsurfaceScatterQueue =
-                alloc.new_object<SubsurfaceScatterQueue>(maxQueueSize, alloc, "subsurfaceScatterQueue");
+                alloc.new_object<SubsurfaceScatterQueue>(maxQueueSize, alloc);
         }
 
         if (infiniteLights->size())
-            escapedRayQueue = alloc.new_object<EscapedRayQueue>(maxQueueSize, alloc, "escapedRayQueue");
-        hitAreaLightQueue = alloc.new_object<HitAreaLightQueue>(maxQueueSize, alloc, "hitAreaLightQueue");
+            escapedRayQueue = alloc.new_object<EscapedRayQueue>(maxQueueSize, alloc);
+        hitAreaLightQueue = alloc.new_object<HitAreaLightQueue>(maxQueueSize, alloc);
 
         basicEvalMaterialQueue = alloc.new_object<MaterialEvalQueue>(
             maxQueueSize, alloc,
-            pstd::MakeConstSpan(&haveBasicEvalMaterial[1], haveBasicEvalMaterial.size() - 1),
-            "basicEvalMaterialQueue"
+            pstd::MakeConstSpan(&haveBasicEvalMaterial[1], haveBasicEvalMaterial.size() - 1)
         );
         universalEvalMaterialQueue = alloc.new_object<MaterialEvalQueue>(
             maxQueueSize, alloc,
             pstd::MakeConstSpan(&haveUniversalEvalMaterial[1],
-                haveUniversalEvalMaterial.size() - 1),
-            "universalEvalMaterialQueue");
+                haveUniversalEvalMaterial.size() - 1));
 
         if (haveMedia)
         {
-            mediumSampleQueue = alloc.new_object<MediumSampleQueue>(maxQueueSize, alloc, "mediumSampleQueue");
+            mediumSampleQueue = alloc.new_object<MediumSampleQueue>(maxQueueSize, alloc);
 
             // TODO: in the presence of multiple PhaseFunction implementations,
             // it could be worthwhile to see which are present in the scene and
@@ -295,7 +293,7 @@ namespace pbrt
             pstd::array<bool, PhaseFunction::NumTags()> havePhase;
             havePhase.fill(true);
             mediumScatterQueue =
-                alloc.new_object<MediumScatterQueue>(maxQueueSize, alloc, havePhase, "mediumScatterQueue");
+                alloc.new_object<MediumScatterQueue>(maxQueueSize, alloc, havePhase);
         }
 
         stats = alloc.new_object<Stats>(maxDepth, alloc);
@@ -317,6 +315,7 @@ namespace pbrt
 
         if (shouldOutput)
         {
+            outputToFile = true;
             inputRayDataFile = new std::ofstream(DEFAULT_PRIMITIVE_INPUT_FILE, std::ios::app);
             outputRayDataFile = new std::ofstream(DEFAULT_PRIMITIVE_OUTPUT_FILE, std::ios::app);
         }

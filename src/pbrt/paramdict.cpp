@@ -723,7 +723,7 @@ namespace pbrt
 
         for (const ParsedParameter* p : params)
         {
-            if (p->mayBeUnused)
+            if (p->mayBeUnused || p->name == "shouldOutput")
                 continue;
 
             bool haveSeen =

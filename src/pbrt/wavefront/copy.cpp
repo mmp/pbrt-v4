@@ -10,13 +10,39 @@ namespace pbrt
 {
     void WavefrontPathIntegrator::OutputRayDataToFiles()
     {
-        if (!outputToFile || !outputRayDataFile) return;
+        if (!outputToFile || !outputRayDataFile || !inputRayDataFile) return;
         // INFO: Wait for GPU synchronization
 #ifdef PBRT_BUILD_GPU_RENDERER
         GPUWait();
 #endif
         // Copy data from GPU to CPU if using GPU rendering
         // The SOA data will be automatically synchronized when accessed on CPU
+
+        //For now, we just set a limit on the size of the files, set to 1GB for now
+                // Ensure file pointers are positioned at the end so writes append.
+        const uint64_t kMaxBytes = 1024ull * 1024ull * 1024ull;
+
+        auto outPos = outputRayDataFile->tellp();
+        auto inPos  = inputRayDataFile->tellp();
+
+        // If tellp() is not valid, try seeking to end and re-query.
+        if (outPos == std::streampos(-1) || inPos == std::streampos(-1)) {
+            outputRayDataFile->seekp(0, std::ios::end);
+            inputRayDataFile->seekp(0, std::ios::end);
+            outPos = outputRayDataFile->tellp();
+            inPos  = inputRayDataFile->tellp();
+        }
+
+        // If either file is already >= 1 GiB, don't write anything.
+        if ((outPos != std::streampos(-1) && static_cast<uint64_t>(outPos) >= kMaxBytes) ||
+            (inPos  != std::streampos(-1) && static_cast<uint64_t>(inPos)  >= kMaxBytes)) {
+            LOG_VERBOSE("Files are larger than 1GB, skipping outputting...\n");
+            return;
+        }
+
+        // Make sure we append to the end.
+        outputRayDataFile->seekp(0, std::ios::end);
+        inputRayDataFile->seekp(0, std::ios::end);
 
         // Loop over all pixel samples and write ray data to file
         for (int pixelIndex = 0; pixelIndex < maxQueueSize; ++pixelIndex)
@@ -35,7 +61,7 @@ namespace pbrt
             int oSampleIdx = outputRayData.sampleIdx[pixelIndex];
             SampledSpectrum L = outputRayData.L[pixelIndex];
 
-            std::string inputLine = StringPrintf("Pixel (o: %s, d: %s) PixelIdx (%d) Sample (%d) InitialDepth (%d)",
+            std::string inputLine = StringPrintf("Pixel (o: %s, d: %s) PixelIdx (%d) Sample (%d) InitialDepth (%d)\n",
                 iRayo.ToString(), iRayd.ToString(), pixelIndex, iSampleIdx, iDepth
             );
             inputRayDataFile->write(inputLine.c_str(), inputLine.length());
