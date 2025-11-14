@@ -163,12 +163,13 @@ namespace pbrt
         checkParameterTypes();
     }
 
-    ParameterDictionary::ParameterDictionary(const ParameterDictionary& other)
-        : params(other.params), colorSpace(other.colorSpace)
+    ParameterDictionary ParameterDictionary::Clone() const
     {
-        nOwnedParams = params.size();
-        CHECK(colorSpace);
-        checkParameterTypes();
+        ParameterDictionary res;
+        res.params = params;
+        res.colorSpace = colorSpace;
+        res.nOwnedParams = nOwnedParams;
+        return res;
     }
 
     ParameterDictionary::ParameterDictionary(ParsedParameterVector p0,

@@ -171,47 +171,48 @@ namespace pbrt
         Transform originalWorldFromCamera = Inverse(originalCameraFromWorld);
         //TODO: Loop to create many different cameras
         RNG rng;
-        for (int i = 1; i < renderOrientationCnt; ++i)
-        {
-            Point3f newCameraPos;
-            Vector3f newUp = camera.up;
-
-            Point2f u(rng.Uniform<Float>(), rng.Uniform<Float>());
-            Point3f newPos = sphereCentreCamera + SampleUniformSphere(u) * radius;
-            Vector3f viewDir = Normalize(sphereCentreCamera - newPos);
-            Vector3f up = camera.up;
-            //TODO: Deal with when up is not +z
-            if (std::abs(Dot(viewDir, up)) > 0.99f)
-                up = Vector3f(0, 1, 0);  // Switch if nearly aligned
-            up = Normalize(Cross(Cross(viewDir, up), viewDir));
-
-            //TODO: Have a look at situations where LookAt is not the last transform in ctm...
-            // Is that even a situation?
-            Transform newLookAt = pbrt::LookAt(newCameraPos, sphereCentreCamera, up);
-            Transform preLookAtTransform = originalCameraFromWorld * Inverse(originalLookAt);
-
-            Transform cameraFromWorld = preLookAtTransform * newLookAt;
-            Transform worldFromCamera = Inverse(cameraFromWorld);
-
-            const AnimatedTransform& originalRenderFromCamera = camera.cameraTransform.RenderFromCamera();
-            Float startTime = originalRenderFromCamera.startTime;
-            Float endTime = originalRenderFromCamera.endTime;
-
-            CameraTransform sampledTransform(
-                AnimatedTransform(worldFromCamera, startTime, worldFromCamera, endTime)
-            );
-
-            ParameterDictionary dictCopy = dict;
-            CameraSceneEntity c = CameraSceneEntity(name, std::move(dictCopy), loc, sampledTransform, graphicsState.currentOutsideMedium);
-            c.pos = newPos;
-            c.look = sphereCentreCamera;
-            c.up = up;
-            cameras.emplace(cameras.begin() + i, c);
-        }
-
         if (renderOrientationCnt > 1)
         {
-            cameras.emplace(cameras.begin(), CameraSceneEntity(name, std::move(ParameterDictionary(dict)), loc, cameraTransform,
+            for (int i = 1; i < renderOrientationCnt; ++i)
+            {
+                Point3f newCameraPos;
+                Vector3f newUp = camera.up;
+
+                Point2f u(rng.Uniform<Float>(), rng.Uniform<Float>());
+                Point3f newPos = sphereCentreCamera + SampleUniformSphere(u) * radius;
+                Vector3f viewDir = Normalize(sphereCentreCamera - newPos);
+                Vector3f up = camera.up;
+                //TODO: Deal with when up is not +z
+                if (std::abs(Dot(viewDir, up)) > 0.99f)
+                    up = Vector3f(0, 1, 0);  // Switch if nearly aligned
+                up = Normalize(Cross(Cross(viewDir, up), viewDir));
+
+                //TODO: Have a look at situations where LookAt is not the last transform in ctm...
+                // Is that even a situation?
+                Transform newLookAt = pbrt::LookAt(newCameraPos, sphereCentreCamera, up);
+                Transform preLookAtTransform = originalCameraFromWorld * Inverse(originalLookAt);
+
+                Transform cameraFromWorld = preLookAtTransform * newLookAt;
+                Transform worldFromCamera = Inverse(cameraFromWorld);
+
+                const AnimatedTransform& originalRenderFromCamera = camera.cameraTransform.RenderFromCamera();
+                Float startTime = originalRenderFromCamera.startTime;
+                Float endTime = originalRenderFromCamera.endTime;
+
+                CameraTransform sampledTransform(
+                    AnimatedTransform(worldFromCamera, startTime, worldFromCamera, endTime)
+                );
+
+                ParameterDictionary dictCopy = dict.Clone();
+                CameraSceneEntity c = CameraSceneEntity(name, std::move(dictCopy), loc, sampledTransform, graphicsState.currentOutsideMedium);
+                c.pos = newPos;
+                c.look = sphereCentreCamera;
+
+                c.up = up;
+                cameras.emplace(cameras.begin() + i, c);
+            }
+
+            cameras.emplace(cameras.begin(), CameraSceneEntity(name, std::move(dict.Clone()), loc, cameraTransform,
                 graphicsState.currentOutsideMedium));
         }
         camera = CameraSceneEntity(name, std::move(dict), loc, cameraTransform,

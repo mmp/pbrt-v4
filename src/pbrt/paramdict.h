@@ -105,7 +105,6 @@ namespace pbrt
     public:
         // ParameterDictionary Public Methods
         ParameterDictionary() = default;
-        ParameterDictionary(const ParameterDictionary& other);
         ParameterDictionary(ParsedParameterVector params, const RGBColorSpace* colorSpace);
 
         ParameterDictionary(ParsedParameterVector params0,
@@ -115,6 +114,8 @@ namespace pbrt
         std::string GetTexture(const std::string& name) const;
 
         std::vector<RGB> GetRGBArray(const std::string& name) const;
+
+        ParameterDictionary Clone() const;
 
         // For --upgrade only
         pstd::optional<RGB> GetOneRGB(const std::string& name) const;

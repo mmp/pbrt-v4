@@ -198,7 +198,7 @@ namespace pbrt
             }
 
             Material material = w.material;
-
+            
             const MixMaterial* mix = material.CastOrNullptr<MixMaterial>();
             while (mix)
             {
@@ -265,7 +265,7 @@ namespace pbrt
                     };
 
 
-                if (material.CanEvaluateTextures(BasicTextureEvaluator()))
+                if (material.CanEvaluateTextures(BasicTextureEvaluator())) 
                 {
                     material.Dispatch(checkBSDF);
                 }
@@ -274,10 +274,11 @@ namespace pbrt
                 {
                     // Surface has scattering BSDF - SimpleVolPathIntegrator doesn't support this
                     // For now, just skip the intersection like a media boundary
-                    ErrorExit("WavefrontPathIntegrator mimicing SimpleVolPathIntegrator does not support surface scattering...");
+                    //ErrorExit("WavefrontPathIntegrator mimicing SimpleVolPathIntegrator does not support surface scattering...");
+                    return;
                 }
-
-                // No valid scattering BSDF - treat as media boundary, skip intersection
+                else
+                    // No valid scattering BSDF - treat as media boundary, skip intersection
                 {
                     Interaction intrSkip(w.pi, w.n);
                     intrSkip.mediumInterface = &w.mediumInterface;
@@ -289,57 +290,62 @@ namespace pbrt
                 }
             }
 
-
-            if (w.areaLight)
+            if (!mimicSimple)
             {
-                PBRT_DBG(
-                    "Ray hit an area light: adding to hitAreaLightQueue pixel index %d "
-                    "depth %d\n",
-                    w.pixelIndex, w.depth);
-                hitAreaLightQueue->Push(HitAreaLightWorkItem{
-                    w.areaLight, Point3f(w.pi), w.n, w.uv, -ray.d, lambda, w.depth, beta,
-                    r_u, r_l, w.prevIntrCtx, w.specularBounce, w.pixelIndex });
-            }
 
-            FloatTexture displacement = material.GetDisplacement();
-
-            MaterialEvalQueue* q =
-                (material.CanEvaluateTextures(BasicTextureEvaluator()) &&
-                    (!displacement ||
-                        BasicTextureEvaluator().CanEvaluate({ displacement }, {})))
-                ? basicEvalMaterialQueue
-                : universalEvalMaterialQueue;
-
-            PBRT_DBG("Enqueuing for material eval, mtl tag %d", material.Tag());
-
-            auto enqueue = [=](auto ptr)
+                //TODO: Check if I can actually use this, might be relevant to infinit lights/might be done 
+                // In SimpleVolPathIntegrator too but for now not doing this
+                if (w.areaLight)
                 {
-                    using Material = typename std::remove_reference_t<decltype(*ptr)>;
-                    q->Push<MaterialEvalWorkItem<Material>>(
-                        MaterialEvalWorkItem<Material>{ptr,
-                        w.pi,
-                        w.n,
-                        w.dpdu,
-                        w.dpdv,
-                        ray.time,
-                        w.depth,
-                        w.ns,
-                        w.dpdus,
-                        w.dpdvs,
-                        w.dndus,
-                        w.dndvs,
-                        w.uv,
-                        w.faceIndex,
-                        lambda,
-                        w.pixelIndex,
-                        w.anyNonSpecularBounces,
-                        -ray.d,
-                        beta,
-                        r_u,
-                        w.etaScale,
-                        w.mediumInterface});
-                };
-            material.Dispatch(enqueue);
+                    PBRT_DBG(
+                        "Ray hit an area light: adding to hitAreaLightQueue pixel index %d "
+                        "depth %d\n",
+                        w.pixelIndex, w.depth);
+                    hitAreaLightQueue->Push(HitAreaLightWorkItem{
+                        w.areaLight, Point3f(w.pi), w.n, w.uv, -ray.d, lambda, w.depth, beta,
+                        r_u, r_l, w.prevIntrCtx, w.specularBounce, w.pixelIndex });
+                }
+
+                FloatTexture displacement = material.GetDisplacement();
+
+                MaterialEvalQueue* q =
+                    (material.CanEvaluateTextures(BasicTextureEvaluator()) &&
+                        (!displacement ||
+                            BasicTextureEvaluator().CanEvaluate({ displacement }, {})))
+                    ? basicEvalMaterialQueue
+                    : universalEvalMaterialQueue;
+
+                PBRT_DBG("Enqueuing for material eval, mtl tag %d", material.Tag());
+
+                auto enqueue = [=](auto ptr)
+                    {
+                        using Material = typename std::remove_reference_t<decltype(*ptr)>;
+                        q->Push<MaterialEvalWorkItem<Material>>(
+                            MaterialEvalWorkItem<Material>{ptr,
+                            w.pi,
+                            w.n,
+                            w.dpdu,
+                            w.dpdv,
+                            ray.time,
+                            w.depth,
+                            w.ns,
+                            w.dpdus,
+                            w.dpdvs,
+                            w.dndus,
+                            w.dndvs,
+                            w.uv,
+                            w.faceIndex,
+                            lambda,
+                            w.pixelIndex,
+                            w.anyNonSpecularBounces,
+                            -ray.d,
+                            beta,
+                            r_u,
+                            w.etaScale,
+                            w.mediumInterface});
+                    };
+                material.Dispatch(enqueue);
+            }
         });
 
         if (wavefrontDepth == maxDepth)
@@ -350,7 +356,7 @@ namespace pbrt
     }
 
     template <typename ConcretePhaseFunction>
-    void WavefrontPathIntegrator::SampleMediumScattering(int wavefrontDepth)
+    void WavefrontPathIntegrator::SampleMediumScattering(int wavefrontDepth) 
     {
         RayQueue* currentRayQueue = CurrentRayQueue(wavefrontDepth);
         RayQueue* nextRayQueue = NextRayQueue(wavefrontDepth);
@@ -396,16 +402,20 @@ namespace pbrt
                     Ray ray(w.p, ls->pLight.p() - w.p, w.time, w.medium);
 
                     // Enqueue shadow ray
-                    shadowRayQueue->Push(ShadowRayWorkItem{ ray, 1 - ShadowEpsilon,
-                                                           w.lambda, Ld, r_u, r_l,
-                                                           w.pixelIndex });
+                    if (!mimicSimple)
+                    {
+                        shadowRayQueue->Push(ShadowRayWorkItem{ ray, 1 - ShadowEpsilon,
+                                                               w.lambda, Ld, r_u, r_l,
+                                                               w.pixelIndex });
 
-                    PBRT_DBG("Enqueued medium shadow ray depth %d "
-                        "Ld %f %f %f %f r_u %f %f %f %f "
-                        "r_l %f %f %f %f pixel index %d\n",
-                        w.depth, Ld[0], Ld[1], Ld[2], Ld[3], r_u[0], r_u[1],
-                        r_u[2], r_u[3], r_l[0], r_l[1], r_l[2],
-                        r_l[3], w.pixelIndex);
+                        PBRT_DBG("Enqueued medium shadow ray depth %d "
+                            "Ld %f %f %f %f r_u %f %f %f %f "
+                            "r_l %f %f %f %f pixel index %d\n",
+                            w.depth, Ld[0], Ld[1], Ld[2], Ld[3], r_u[0], r_u[1],
+                            r_u[2], r_u[3], r_l[0], r_l[1], r_l[2],
+                            r_l[3], w.pixelIndex);
+
+                    }
                 }
             }
 

@@ -259,31 +259,35 @@ namespace pbrt
         rayQueues[0] = alloc.new_object<RayQueue>(maxQueueSize, alloc);
         rayQueues[1] = alloc.new_object<RayQueue>(maxQueueSize, alloc);
 
-        shadowRayQueue = alloc.new_object<ShadowRayQueue>(maxQueueSize, alloc);
+
+        shadowRayQueue = alloc.new_object<ShadowRayQueue>(maxQueueSize * 2, alloc, "shadowRayQueue");
 
         if (haveSubsurface)
         {
             bssrdfEvalQueue =
-                alloc.new_object<GetBSSRDFAndProbeRayQueue>(maxQueueSize, alloc);
+                alloc.new_object<GetBSSRDFAndProbeRayQueue>(maxQueueSize, alloc, "bssrdfEvalQueue");
             subsurfaceScatterQueue =
-                alloc.new_object<SubsurfaceScatterQueue>(maxQueueSize, alloc);
+                alloc.new_object<SubsurfaceScatterQueue>(maxQueueSize, alloc, "subsurfaceScatterQueue");
         }
 
         if (infiniteLights->size())
-            escapedRayQueue = alloc.new_object<EscapedRayQueue>(maxQueueSize, alloc);
-        hitAreaLightQueue = alloc.new_object<HitAreaLightQueue>(maxQueueSize, alloc);
+            escapedRayQueue = alloc.new_object<EscapedRayQueue>(maxQueueSize, alloc, "escapedRayQueue");
+        hitAreaLightQueue = alloc.new_object<HitAreaLightQueue>(maxQueueSize, alloc, "hitAreaLightQueue");
 
         basicEvalMaterialQueue = alloc.new_object<MaterialEvalQueue>(
             maxQueueSize, alloc,
-            pstd::MakeConstSpan(&haveBasicEvalMaterial[1], haveBasicEvalMaterial.size() - 1));
+            pstd::MakeConstSpan(&haveBasicEvalMaterial[1], haveBasicEvalMaterial.size() - 1),
+            "basicEvalMaterialQueue"
+        );
         universalEvalMaterialQueue = alloc.new_object<MaterialEvalQueue>(
             maxQueueSize, alloc,
             pstd::MakeConstSpan(&haveUniversalEvalMaterial[1],
-                haveUniversalEvalMaterial.size() - 1));
+                haveUniversalEvalMaterial.size() - 1),
+            "universalEvalMaterialQueue");
 
         if (haveMedia)
         {
-            mediumSampleQueue = alloc.new_object<MediumSampleQueue>(maxQueueSize, alloc);
+            mediumSampleQueue = alloc.new_object<MediumSampleQueue>(maxQueueSize, alloc, "mediumSampleQueue");
 
             // TODO: in the presence of multiple PhaseFunction implementations,
             // it could be worthwhile to see which are present in the scene and
@@ -291,7 +295,7 @@ namespace pbrt
             pstd::array<bool, PhaseFunction::NumTags()> havePhase;
             havePhase.fill(true);
             mediumScatterQueue =
-                alloc.new_object<MediumScatterQueue>(maxQueueSize, alloc, havePhase);
+                alloc.new_object<MediumScatterQueue>(maxQueueSize, alloc, havePhase, "mediumScatterQueue");
         }
 
         stats = alloc.new_object<Stats>(maxDepth, alloc);
@@ -487,6 +491,11 @@ namespace pbrt
                             break;
 
 
+
+                        //TODO: Potentially create separate kernel to copy out, but would require keeping track 
+                        // Of what the correct next queue would be to send for each ray after copying
+                        // So for now, I am just going to copy out the final values (aka not the value luminance/values)
+                        // After each wavefrontdepth
                         if (!mimicSimple)
                         {
 
@@ -497,12 +506,52 @@ namespace pbrt
 
                             SampleSubsurface(wavefrontDepth);
                         }
+                        else
+                        {
+                            // Do(
+                            //     "Reset shadowRayQueue", PBRT_CPU_GPU_LAMBDA() {
+                            //     stats->shadowRays[wavefrontDepth] += shadowRayQueue->Size();
+                            //     shadowRayQueue->Reset();
+                            // });
+                            // Do(
+                            //     "Reset mediumSampleQueue", PBRT_CPU_GPU_LAMBDA() {
+                            //     mediumSampleQueue->Reset();
+                            // });
 
+                            // Do(
+                            //     "Reset mediumScatterQueue", PBRT_CPU_GPU_LAMBDA() {
+                            //     mediumScatterQueue->Reset();
+                            // });
 
-                        //TODO: Potentially create separate kernel to copy out, but would require keeping track 
-                        // Of what the correct next queue would be to send for each ray after copying
-                        // So for now, I am just going to copy out the final values (aka not the value luminance/values)
-                        // After each wavefrontdepth
+                            // Do(
+                            //     "Reset escapedRayQueue", PBRT_CPU_GPU_LAMBDA() {
+                            //     mediumSampleQueue->Reset();
+                            // });
+
+                            // Do(
+                            //     "Reset hitAreaLightQueue", PBRT_CPU_GPU_LAMBDA() {
+                            //     hitAreaLightQueue->Reset();
+                            // });
+
+                            // Do(
+                            //     "Reset basicEvalMaterialQueue", PBRT_CPU_GPU_LAMBDA() {
+                            //     basicEvalMaterialQueue->Reset();
+                            // });
+
+                            // Do(
+                            //     "Reset universalEvalMaterialQueue", PBRT_CPU_GPU_LAMBDA() {
+                            //     universalEvalMaterialQueue->Reset();
+                            // });
+
+                            // Do(
+                            //     "Reset unibssrdfEvalQueueversalEvalMaterialQueue", PBRT_CPU_GPU_LAMBDA() {
+                            //     bssrdfEvalQueue->Reset();
+                            // });
+                            // Do(
+                            //     "Reset subsurfaceScatterQueue", PBRT_CPU_GPU_LAMBDA() {
+                            //     subsurfaceScatterQueue->Reset();
+                            // });
+                        }
                     }
 
                     OutputRayDataToFiles();
