@@ -301,7 +301,7 @@ int split(std::vector<std::string> args) {
 }
 
 int main(int argc, char *argv[]) {
-    InitPBRT(PBRTOptions());
+    InitPBRT(PBRTOptionsNN());
 
     if (argc < 2) {
         help();

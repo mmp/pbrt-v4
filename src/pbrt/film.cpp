@@ -34,6 +34,8 @@
 
 namespace pbrt {
 
+    int imagesWritten = 0;
+
 PBRT_CPU_GPU void Film::AddSplat(Point2f p, SampledSpectrum v, const SampledWavelengths &lambda) {
     auto splat = [&](auto ptr) { return ptr->AddSplat(p, v, lambda); };
     return Dispatch(splat);

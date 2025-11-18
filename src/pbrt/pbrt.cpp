@@ -56,8 +56,8 @@ static LONG WINAPI handleExceptions(PEXCEPTION_POINTERS info) {
 #endif  // PBRT_IS_WINDOWS
 
 // API Function Definitions
-void InitPBRT(const PBRTOptions &opt) {
-    Options = new PBRTOptions(opt);
+void InitPBRT(const PBRTOptionsNN &opt) {
+    Options = new PBRTOptionsNN(opt);
     // API Initialization
 
     Imf::setGlobalThreadCount(opt.nThreads ? opt.nThreads : AvailableCores());

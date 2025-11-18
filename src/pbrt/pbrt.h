@@ -162,6 +162,7 @@ class TextureParameterDictionary;
 struct ImageMetadata;
 struct MediumInterface;
 struct PBRTOptions;
+struct PBRTOptionsNN;
 
 class PiecewiseConstant1D;
 class PiecewiseConstant2D;
@@ -180,7 +181,7 @@ class ScratchBuffer;
 using Allocator = pstd::pmr::polymorphic_allocator<std::byte>;
 
 // Initialization and Cleanup Function Declarations
-void InitPBRT(const PBRTOptions &opt);
+void InitPBRT(const PBRTOptionsNN &opt);
 void CleanupPBRT();
 
 }  // namespace pbrt

@@ -302,7 +302,7 @@ int main(int argc, char *argv[]) {
     if (!(res & 1))
         ++res;
 
-    PBRTOptions options;
+    PBRTOptionsNN options;
     options.quiet = true;
 #ifdef PBRT_BUILD_GPU_RENDERER
     options.useGPU = true;

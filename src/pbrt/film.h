@@ -23,6 +23,7 @@
 #include <pbrt/util/spectrum.h>
 #include <pbrt/util/transform.h>
 #include <pbrt/util/vecmath.h>
+#include <pbrt/util/file.h>
 
 #include <atomic>
 #include <map>
@@ -177,6 +178,8 @@ struct FilmBaseParameters {
 };
 
 // FilmBase Definition
+
+extern int imagesWritten;
 class FilmBase {
   public:
     // FilmBase Public Methods
@@ -194,6 +197,15 @@ class FilmBase {
         CHECK_LE(pixelBounds.pMax.y, fullResolution.y);
         LOG_VERBOSE("Created film with full resolution %s, pixelBounds %s",
                     fullResolution, pixelBounds);
+
+
+        std::string basefilename = filename;
+
+        basefilename = RemoveExtension(basefilename);
+
+            //TODO: Improve to support different filename extensions
+        filename = StringPrintf("%s_%d%s", basefilename, imagesWritten, ".exr");
+        imagesWritten++;
     }
 
     PBRT_CPU_GPU

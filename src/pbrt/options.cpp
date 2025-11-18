@@ -11,7 +11,7 @@
 
 namespace pbrt {
 
-PBRTOptions *Options;
+PBRTOptionsNN *Options;
 
 #if defined(PBRT_BUILD_GPU_RENDERER)
 __constant__ BasicPBRTOptions OptionsGPU;
@@ -49,6 +49,26 @@ std::string PBRTOptions::ToString() const {
         recordPixelStatistics, printStatistics, pixelSamples, gpuDevice, quickRender, upgrade,
         imageFile, mseReferenceImage, mseReferenceOutput, debugStart, displayServer, cropWindow,
         pixelBounds, pixelMaterial, displacementEdgeScale);
+}
+
+std::string PBRTOptionsNN::ToString() const
+{
+        return StringPrintf(
+        "[ PBRTOptions seed: %s quiet: %s disablePixelJitter: %s "
+        "disableWavelengthJitter: %s disableTextureFiltering: %s disableImageTextures: %s "
+        "forceDiffuse: %s useGPU: %s wavefront: %s interactive: %s fullscreen %s "
+        "renderingSpace: %s nThreads: %s logLevel: %s logFile: %s logUtilization: %s "
+        "writePartialImages: %s recordPixelStatistics: %s "
+        "printStatistics: %s pixelSamples: %s gpuDevice: %s quickRender: %s upgrade: %s "
+        "imageFile: %s mseReferenceImage: %s mseReferenceOutput: %s debugStart: %s "
+        "displayServer: %s cropWindow: %s pixelBounds: %s pixelMaterial: %s "
+        "displacementEdgeScale: %f numberOfOrientations %s ]",
+        seed, quiet, disablePixelJitter, disableWavelengthJitter, disableTextureFiltering,
+        disableImageTextures, forceDiffuse, useGPU, wavefront, interactive, fullscreen,
+        renderingSpace, nThreads, logLevel, logFile, logUtilization, writePartialImages,
+        recordPixelStatistics, printStatistics, pixelSamples, gpuDevice, quickRender, upgrade,
+        imageFile, mseReferenceImage, mseReferenceOutput, debugStart, displayServer, cropWindow,
+        pixelBounds, pixelMaterial, displacementEdgeScale, numberOfOrientations);
 }
 
 }  // namespace pbrt

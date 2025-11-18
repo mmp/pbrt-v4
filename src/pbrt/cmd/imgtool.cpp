@@ -2466,7 +2466,7 @@ int scale_optix(std::vector<std::string> args) {
 #endif  // PBRT_BUILD_GPU_RENDERER
 
 int main(int argc, char *argv[]) {
-    PBRTOptions opt;
+    PBRTOptionsNN opt;
     InitPBRT(opt);
 
     if (argc < 2) {

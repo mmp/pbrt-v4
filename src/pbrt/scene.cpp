@@ -105,6 +105,9 @@ namespace pbrt
 
         ParameterDictionary dict({}, RGBColorSpace::sRGB);
         currentMaterialIndex = scene->AddMaterial(SceneEntity("diffuse", dict, {}));
+
+        const auto opt = reinterpret_cast<const PBRTOptionsNN&>(pbrt::GetOptions());
+        renderOrientationCnt = opt.numberOfOrientations;
     }
 
     void BasicSceneBuilder::ReverseOrientation(FileLoc loc)
@@ -173,6 +176,8 @@ namespace pbrt
         RNG rng;
         if (renderOrientationCnt > 1)
         {
+            cameras.reserve(renderOrientationCnt);
+            std::vector<CameraSceneEntity> sampled;
             for (int i = 1; i < renderOrientationCnt; ++i)
             {
                 Point3f newCameraPos;
@@ -209,11 +214,12 @@ namespace pbrt
                 c.look = sphereCentreCamera;
 
                 c.up = up;
-                cameras.emplace(cameras.begin() + i, c);
+                sampled.emplace_back(std::move(c));
             }
-
-            cameras.emplace(cameras.begin(), CameraSceneEntity(name, std::move(dict.Clone()), loc, cameraTransform,
-                graphicsState.currentOutsideMedium));
+            
+            
+            sampled.insert(sampled.begin(), CameraSceneEntity(name, std::move(dict), loc, cameraTransform, graphicsState.currentOutsideMedium));
+            cameras.insert(cameras.begin(), sampled.begin(), sampled.end());
         }
         camera = CameraSceneEntity(name, std::move(dict), loc, cameraTransform,
             graphicsState.currentOutsideMedium);
@@ -500,6 +506,11 @@ namespace pbrt
         const class Transform* renderFromInstance =
             transformCache.Lookup(RenderFromObject(0) * worldFromRender);
         instanceUses.push_back(InstanceSceneEntity(name, loc, renderFromInstance));
+    }
+
+    void BasicSceneBuilder::ResetScene()
+    {
+        scene->ResetOptions(filter, film, cameras, sampler, integrator, accelerator, &currentCamera);
     }
 
     void BasicSceneBuilder::EndOfFiles()
@@ -953,7 +964,57 @@ namespace pbrt
 
                 Camera c = Camera::Create(camera.name, camera.parameters, cameraMedium,
                     camera.cameraTransform, this->film, &camera.loc, alloc);
+                
+                LOG_VERBOSE("Finished creating camera");
+                return c;
+            });
+    }
 
+    void BasicScene::ResetOptions(SceneEntity filter, SceneEntity film, const std::vector<CameraSceneEntity>& cameras,
+            SceneEntity sampler, SceneEntity integ, SceneEntity accel, int* currentCamera)
+    {
+        //TODO: Check if anything else needs to be reconstructed
+        // Store information for specified integrator and accelerator
+        filmColorSpace = film.parameters.ColorSpace();
+        integrator = integ;
+        accelerator = accel;
+
+        // Immediately create filter and film
+        LOG_VERBOSE("Starting to create filter and film");
+        Allocator alloc = threadAllocators.Get();
+        Filter filt = Filter::Create(filter.name, filter.parameters, &filter.loc, alloc);
+
+        // It's a little ugly to poke into the camera's parameters here, but we
+        // have this circular dependency that Camera::Create() expects a
+        // Film, yet now the film needs to know the exposure time from
+        // the camera....
+        camera = nullptr;
+
+        const CameraSceneEntity& camera = cameras[*currentCamera];
+        Float exposureTime = camera.parameters.GetOneFloat("shutterclose", 1.f) -
+            camera.parameters.GetOneFloat("shutteropen", 0.f);
+        if (exposureTime <= 0)
+            ErrorExit(&camera.loc,
+                "The specified camera shutter times imply that the shutter "
+                "does not open.  A black image will result.");
+
+        this->film = Film::Create(film.name, film.parameters, exposureTime,
+            camera.cameraTransform, filt, &film.loc, alloc);
+        LOG_VERBOSE("Finished creating filter and film");
+
+        const int cameraIdx = *currentCamera;
+        // Enqueue asynchronous job to create camera
+        cameraJob = RunAsync([&cameras, cameraIdx, this]()
+            {
+                LOG_VERBOSE("Starting to create cameras");
+                Allocator alloc = threadAllocators.Get();
+                const CameraSceneEntity& camera = cameras[cameraIdx];
+                Medium cameraMedium = GetMedium(camera.medium, &camera.loc);
+
+                Camera c = Camera::Create(camera.name, camera.parameters, cameraMedium,
+                    camera.cameraTransform, this->film, &camera.loc, alloc);
+                LOG_VERBOSE("Creating camera %d", cameraIdx);
+                LOG_VERBOSE("Camera %s from CameraSceneEntity %s", c.ToString(), camera.ToString());
                 LOG_VERBOSE("Finished creating camera");
                 return c;
             });
@@ -977,7 +1038,7 @@ namespace pbrt
         // have this circular dependency that Camera::Create() expects a
         // Film, yet now the film needs to know the exposure time from
         // the camera....
-        const CameraSceneEntity& camera = cameras[0];
+        const CameraSceneEntity& camera = cameras[*currentCamera];
         Float exposureTime = camera.parameters.GetOneFloat("shutterclose", 1.f) -
             camera.parameters.GetOneFloat("shutteropen", 0.f);
         if (exposureTime <= 0)
@@ -999,21 +1060,25 @@ namespace pbrt
                     alloc);
             });
 
+        const int cameraIdx = *currentCamera;
         // Enqueue asynchronous job to create camera
-        cameraJob = RunAsync([cameras, currentCamera, this]()
+        cameraJob = RunAsync([&cameras, cameraIdx, this]()
             {
                 LOG_VERBOSE("Starting to create cameras");
                 Allocator alloc = threadAllocators.Get();
-                const CameraSceneEntity& camera = cameras[*currentCamera];
+                const CameraSceneEntity& camera = cameras[cameraIdx];
                 Medium cameraMedium = GetMedium(camera.medium, &camera.loc);
 
                 Camera c = Camera::Create(camera.name, camera.parameters, cameraMedium,
                     camera.cameraTransform, this->film, &camera.loc, alloc);
-
+                LOG_VERBOSE("Creating camera %d", cameraIdx);
+                LOG_VERBOSE("Camera %s from CameraSceneEntity %s", c.ToString(), camera.ToString());
                 LOG_VERBOSE("Finished creating camera");
                 return c;
             });
     }
+
+
 
     void BasicScene::AddMedium(MediumSceneEntity medium)
     {

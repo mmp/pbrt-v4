@@ -31,7 +31,7 @@ void usage(const std::string &msg = "") {
 }
 
 int main(int argc, char **argv) {
-    PBRTOptions opt;
+    PBRTOptionsNN opt;
     opt.quiet = true;
     std::string logLevel = "error";
     std::string testFilter;

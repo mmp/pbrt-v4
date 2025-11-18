@@ -91,8 +91,8 @@ namespace pbrt
         std::string ToString() const
         {
             return StringPrintf("[ CameraSeneEntity name: %s parameters: %s loc: %s "
-                "cameraTransform: %s medium: %s ]",
-                name, parameters, loc, cameraTransform, medium);
+                "cameraTransform: %s medium: %s  pos: %s look: %s up: %s]",
+                name, parameters, loc, cameraTransform, medium, pos, look, up);
         }
 
         CameraTransform cameraTransform;
@@ -307,6 +307,9 @@ namespace pbrt
         void SetOptions(SceneEntity filter, SceneEntity film, CameraSceneEntity camera,
             SceneEntity sampler, SceneEntity integrator, SceneEntity accelerator);
 
+        void ResetOptions(SceneEntity filter, SceneEntity film, const std::vector<CameraSceneEntity>& camera,
+            SceneEntity sampler, SceneEntity integrator, SceneEntity accelerator, int* currentCamera);
+
         void SetOptions(SceneEntity filter, SceneEntity film, const std::vector<CameraSceneEntity>& camera,
             SceneEntity sampler, SceneEntity integrator, SceneEntity accelerator, int* currentCamera);
 
@@ -330,6 +333,7 @@ namespace pbrt
             cameraJobMutex.lock();
             while (!camera)
             {
+                // TODO: Figure out why it is not updating the camera
                 pstd::optional<Camera> c = cameraJob->TryGetResult(&cameraJobMutex);
                 if (c)
                     camera = *c;
@@ -384,6 +388,7 @@ namespace pbrt
         std::vector<InstanceSceneEntity> instances;
         std::map<InternedString, InstanceDefinitionSceneEntity*> instanceDefinitions;
 
+        Film film;
     private:
         // BasicScene Private Methods
         Medium GetMedium(const std::string& name, const FileLoc* loc);
@@ -394,7 +399,7 @@ namespace pbrt
         AsyncJob<Sampler>* samplerJob = nullptr;
         mutable ThreadLocal<Allocator> threadAllocators;
         Camera camera;
-        Film film;
+
         std::mutex cameraJobMutex;
         AsyncJob<Camera>* cameraJob = nullptr;
         std::mutex samplerJobMutex;
@@ -478,6 +483,7 @@ namespace pbrt
         void ObjectBegin(const std::string& name, FileLoc loc);
         void ObjectEnd(FileLoc loc);
         void ObjectInstance(const std::string& name, FileLoc loc);
+        void ResetScene();
 
         void EndOfFiles();
 

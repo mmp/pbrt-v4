@@ -58,8 +58,15 @@ struct PBRTOptions : BasicPBRTOptions {
     std::string ToString() const;
 };
 
+struct PBRTOptionsNN : PBRTOptions
+{
+    int numberOfOrientations = 1;
+
+    std::string ToString() const;
+};
+
 // Options Global Variable Declaration
-extern PBRTOptions *Options;
+extern PBRTOptionsNN *Options;
 
 #if defined(PBRT_BUILD_GPU_RENDERER)
 #if defined(__CUDACC__)

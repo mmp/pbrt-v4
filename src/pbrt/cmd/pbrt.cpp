@@ -109,7 +109,7 @@ int main(int argc, char* argv[])
     std::vector<std::string> args = GetCommandLineArguments(argv);
 
     // Declare variables for parsed command line
-    PBRTOptions options;
+    PBRTOptionsNN options;
     std::vector<std::string> filenames;
     std::string logLevel = "error";
     std::string renderCoordSys = "cameraworld";
@@ -218,7 +218,9 @@ int main(int argc, char* argv[])
             ParseArg(&iter, args.end(), "wavefront", &options.wavefront, onError) ||
             ParseArg(&iter, args.end(), "write-partial-images",
                 &options.writePartialImages, onError) ||
-            ParseArg(&iter, args.end(), "upgrade", &options.upgrade, onError))
+            ParseArg(&iter, args.end(), "upgrade", &options.upgrade, onError) ||
+            ParseArg(&iter, args.end(), "number-of-orientations", &options.numberOfOrientations, onError)
+        )
         {
             // success
         }
@@ -312,17 +314,20 @@ int main(int argc, char* argv[])
         ParseFiles(&builder, filenames);
 
 
+        // if(options.numberOfOrientations > 1)
+        //     builder.renderOrientationCnt = options.numberOfOrientations;
+
         // Render the scene
-        if (Options->useGPU || Options->wavefront)
-            RenderWavefront(scene);
-        else
+        for (int i = 0; i < builder.renderOrientationCnt; ++i)
         {
-            for (int i = 0; i < builder.renderOrientationCnt; ++i)
+            if (Options->useGPU || Options->wavefront)
+                RenderWavefront(scene);
+            else
             {
                 RenderCPU(scene);
-                builder.currentCamera++;
             }
-
+            builder.currentCamera++;
+            builder.ResetScene();
         }
 
         LOG_VERBOSE("Memory used after post-render cleanup: %s", GetCurrentRSS());
