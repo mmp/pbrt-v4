@@ -73,6 +73,22 @@ namespace pbrt
         metadata.renderTimeSeconds = seconds;
         metadata.samplesPerPixel = integrator->sampler.SamplesPerPixel();
         integrator->film.WriteImage(metadata);
+
+#ifdef PBRT_BUILD_GPU_RENDERER
+        if (Options->useGPU)
+        {
+#ifdef PBRT_IS_WINDOWS
+            delete integrator;
+#else
+            Allocator alloc(&CUDATrackedMemoryResource::singleton);
+            alloc.delete_object(integrator);
+#endif
+        } else
+#endif
+        {
+
+            delete integrator;
+        }
     }
 
 }  // namespace pbrt
