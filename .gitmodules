@@ -36,3 +36,6 @@
 [submodule "src/ext/zlib"]
 	path = src/ext/zlib
 	url = https://github.com/madler/zlib.git
+[submodule "src/ext/instant-ngp"]
+	path = src/ext/instant-ngp
+	url = https://github.com/NVlabs/instant-ngp
