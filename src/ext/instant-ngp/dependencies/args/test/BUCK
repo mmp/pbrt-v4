@@ -1,0 +1,29 @@
+cxx_binary(
+  name = 'multiple-inclusion-1', 
+  srcs = [
+    'multiple_inclusion_1.cxx', 
+  ], 
+  deps = [
+    '//:args', 
+  ], 
+)
+
+cxx_binary(
+  name = 'multiple-inclusion-2', 
+  srcs = [
+    'multiple_inclusion_2.cxx', 
+  ], 
+  deps = [
+    '//:args', 
+  ], 
+)
+
+cxx_binary(
+  name = 'windows-h', 
+  srcs = [
+    'windows_h.cxx', 
+  ], 
+  deps = [
+    '//:args', 
+  ], 
+)

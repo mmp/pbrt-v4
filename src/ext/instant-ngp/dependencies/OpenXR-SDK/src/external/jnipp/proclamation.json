@@ -1,0 +1,20 @@
+{
+    "#": "This is a config file for Proclamation, the changelog combiner: https://gitlab.com/proclamation/proclamation",
+    "SPDX-License-Identifier: CC0-1.0": "",
+    "SPDX-FileCopyrightText: 2020 Collabora, Ltd. and the Proclamation contributors": "",
+    "$schema": "https://proclamation.gitlab.io/proclamation/proclamation.schema.json",
+    "project_name": "jnipp",
+    "base_url": "https://github.com/mitchdowd/jnipp",
+    "news_filename": "CHANGELOG.md",
+    "sections": {
+        "Changes": {
+            "directory": "changes/templates"
+        },
+        "Fixes": {
+            "directory": "changes/misc"
+        },
+        "Additions": {
+            "directory": "changes/script"
+        }
+    }
+}

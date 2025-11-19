@@ -1,0 +1,19 @@
+cxx_binary(
+  name = 'gitlike', 
+  srcs = [
+    'gitlike.cxx', 
+  ], 
+  deps = [
+    '//:args', 
+  ], 
+)
+
+cxx_binary(
+  name = 'completion', 
+  srcs = [
+    'completion.cxx', 
+  ], 
+  deps = [
+    '//:args', 
+  ], 
+)

@@ -1,0 +1,45 @@
+Sampler "halton"
+LookAt 00 120 50       7 0 17   0 0 1
+
+Camera "perspective"
+    "float fov" 25
+
+Film "rgb"
+  "integer xresolution" 1920
+  "integer yresolution" 1080
+  "string sensor" "nikon_d850"
+  "float whitebalance" 5000
+  "float iso" 90
+  "string filename" "bunny-cloud.exr"
+
+Integrator "simplevolpathnn" "integer maxdepth" 50
+
+WorldBegin
+
+AttributeBegin
+Rotate 10 1 0 0
+LightSource "infinite"
+  "string filename" "textures/sky.exr" "float scale" 4
+AttributeEnd
+
+AttributeBegin
+Rotate 180 0 0 1
+Rotate 90 1 0 0
+MakeNamedMedium "foo" "string type" "nanovdb"
+   "string filename" "bunny_cloud.nvdb"
+   "spectrum sigma_s" [200 10 900 10] "spectrum sigma_a" [200 .5 900 .5]
+AttributeEnd
+
+AttributeBegin
+MediumInterface "foo" ""
+Material "interface"
+Shape "sphere" "float radius" 45
+AttributeEnd
+
+#AttributeBegin
+#Translate 0 -50 0
+#
+#Material "coateddiffuse" "rgb reflectance" [ .4 .45 .35 ] "float roughness" 0
+#
+#Shape "disk" "float radius" 1000
+#AttributeEnd

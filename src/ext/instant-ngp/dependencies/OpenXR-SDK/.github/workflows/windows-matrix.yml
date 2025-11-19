@@ -1,0 +1,84 @@
+# Copyright 2021-2023, Collabora, Ltd.
+# SPDX-License-Identifier: CC0-1.0
+
+name: Windows builds
+on:
+  workflow_call:
+    inputs:
+      organizeAndRelease:
+        description: "Should we organize and release our artifacts?"
+        type: boolean
+        default: false
+  workflow_dispatch:
+
+jobs:
+  # generate_matrix:
+  #   runs-on: ubuntu-latest
+  #   outputs:
+  #     matrix: "${{ steps.set-matrix.outputs.matrix }}"
+  #   steps:
+  #     - uses: "actions/checkout@v4"
+  #     - id: set-matrix
+  #       run: "python3 .github/scripts/generate_windows_matrix_build.py matrix"
+  msvc-build:
+    # needs: generate_matrix
+    strategy:
+      fail-fast: true
+      # TODO: Fix matrix generation? Broke recently due to changes in github actions
+      # matrix: "${{fromJson(needs.generate_matrix.outputs.matrix)}}"
+      matrix:
+        preset:
+          - win32
+          - x64
+          - win32_uwp
+          - x64_uwp
+          - arm64_uwp
+          # - arm_uwp
+
+    uses: "./.github/workflows/msvc-build-preset.yml"
+    with:
+      preset: "${{ matrix.preset }}"
+      artifactName: "loader_${{ matrix.preset }}"
+      buildType: "RelWithDebInfo"
+
+  organize-and-release-artifacts:
+    if: inputs.organizeAndRelease
+    needs:
+      - msvc-build
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: "actions/checkout@v4"
+
+      - name: Retrieve artifacts
+        uses: "actions/download-artifact@v4"
+        with:
+          path: artifacts
+
+      - name: Organize artifacts
+        run: 'python .github/scripts/organize_windows_artifacts.py "${{ github.workspace }}" "${{ github.workspace }}/openxr_loader"'
+
+      - name: Upload combined artifact
+        uses: "actions/upload-artifact@v4"
+        with:
+          name: openxr_loader_windows
+          path: "${{ github.workspace }}/openxr_loader"
+
+      # NuGet stuff now
+
+      - name: Setup NuGet
+        uses: "NuGet/setup-nuget@323ab0502cd38fdc493335025a96c8fdb0edc71f"
+        with:
+          nuget-version: "5.x"
+
+      - name: Stage loader and headers for NuGet
+        shell: pwsh
+        run: '${{ github.workspace }}/.azure-pipelines/nuget/stage_nuget.ps1 "${{ github.workspace }}/openxr_loader" "${{ github.workspace }}/specification/Makefile" "${{ github.workspace }}/openxr_loader_staging"'
+
+      - name: Pack NuGet package
+        run: 'nuget pack "${{ github.workspace }}/openxr_loader_staging/OpenXR.Loader.nuspec" -OutputDirectory "${{ github.workspace }}/nuget"'
+
+      - name: Upload NuGet artifact
+        uses: "actions/upload-artifact@v4"
+        with:
+          name: NuGet
+          path: "${{ github.workspace }}/nuget"

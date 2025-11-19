@@ -1,0 +1,3 @@
+option('examples',  description: 'Build examples',   type: 'boolean', value: false)
+option('unittests', description: 'Build unit tests', type: 'boolean', value: false)
+

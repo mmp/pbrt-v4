@@ -1,0 +1,173 @@
+# Copyright (c) 2019-2025 The Khronos Group Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+parameters:
+  - name: sourceDir
+    type: string
+    default: "$(System.DefaultWorkingDirectory)"
+  - name: isSdkSourceRepo
+    type: boolean
+    default: true
+
+jobs:
+  # Build the loader, API layers, and samples on Linux
+  - job: linux_build
+    displayName: "Linux"
+    strategy:
+      matrix:
+        xlib:
+          buildType: RelWithDebInfo
+          presentationBackend: xlib
+        xcb:
+          buildType: RelWithDebInfo
+          presentationBackend: xcb
+        wayland:
+          buildType: RelWithDebInfo
+          presentationBackend: wayland
+    pool:
+      vmImage: "ubuntu-latest"
+    container: khronosgroup/docker-images:openxr-sdk.20240924@sha256:5e6a6f5d72dc4a20d5c33f12550fdd9b6a1206e94d6cf1382e0697a5726c424c
+
+    steps:
+      # First build as debug
+      - template: build_linux.yml
+        parameters:
+          sourceDir: ${{parameters.sourceDir}}
+          buildType: Debug
+          cmakeArgs: "-DPRESENTATION_BACKEND=$(PresentationBackend)"
+
+      # Then build release
+      - template: build_linux.yml
+        parameters:
+          sourceDir: ${{parameters.sourceDir}}
+          buildType: RelWithDebInfo
+          cmakeArgs: "-DPRESENTATION_BACKEND=$(PresentationBackend)"
+
+  # This job computes the product of the config dimensions
+  - job: generator
+    pool:
+      vmImage: "ubuntu-latest"
+    steps:
+      - task: PythonScript@0
+        name: winmatrix
+        inputs:
+          scriptPath: $(System.DefaultWorkingDirectory)/.azure-pipelines/shared/generate_windows_matrix_build.py
+          # argument sets the variable name defined by python script
+          arguments: winbuild
+          pythonInterpreter: /usr/bin/python3
+
+  # Build the loader, API layers, and samples on Windows
+  - job: windows_build
+    dependsOn: generator
+    displayName: "Windows MSVC"
+    variables:
+      VULKAN_SDK: "$(System.DefaultWorkingDirectory)\\vulkan_sdk\\$(VULKAN_SDK_VERSION)"
+    pool:
+      vmImage: "windows-latest"
+    # Use the json emitted by the generator job to set up this matrix
+    strategy:
+      matrix: $[ dependencies.generator.outputs['winmatrix.winbuild'] ]
+    steps:
+      - template: build_msvc.yml
+        parameters:
+          sourceDir: ${{parameters.sourceDir}}
+          buildType: $(buildType)
+          generator: "$(generator)"
+          cmakeArgs: $(cmakeArgs) -DBUILD_ALL_EXTENSIONS=ON -DINSTALL_TO_ARCHITECTURE_PREFIXES=ON
+          useVulkan: "true"
+
+      - task: PublishPipelineArtifact@1
+        displayName: Publish loader
+        condition: and(succeeded(), eq(variables.buildType, 'RelWithDebInfo'))
+        inputs:
+          path: ${{parameters.sourceDir}}/install
+          artifact: $(artifactName)
+
+  # Build the loader, API layers, and samples on Windows with MinGW
+  # - job: mingw_build
+  #   displayName: 'Windows MinGW'
+  #   variables:
+  #     VULKAN_SDK: "$(System.DefaultWorkingDirectory)\\vulkan_sdk\\$(VULKAN_SDK_VERSION)"
+  #   pool:
+  #     vmImage: 'windows-latest'
+  #   steps:
+  #     - template: build_mingw.yml
+  #       parameters:
+  #         sourceDir: ${{parameters.sourceDir}}
+  #         buildType: RelWithDebInfo
+  #         cmakeArgs: -DBUILD_ALL_EXTENSIONS=ON
+  #         useVulkan: 'true'
+
+  - job: combine_artifacts
+    dependsOn:
+      - generator
+      - windows_build
+    condition: ${{ eq(parameters.isSdkSourceRepo, true) }}
+    displayName: "Organize artifacts"
+    pool:
+      vmImage: "windows-latest"
+    steps:
+      - download: current
+        patterns: "**/*.dll"
+        displayName: Download dynamic libraries
+      - download: current
+        patterns: "**/*.pdb"
+        displayName: Download dynamic library symbols
+      - download: current
+        patterns: "**/*.lib"
+        displayName: Download link import libraries
+      - download: current
+        patterns: "**/*.h"
+        displayName: Download headers
+      - download: current
+        patterns: "**/*.cmake"
+        displayName: Download CMake scripts
+      - download: current
+        patterns: "**/*.exe"
+        displayName: Download executables
+      - download: current
+        patterns: "**/*.json"
+        displayName: Download manifests
+      # Use the specified version of Python from the tool cache
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: "3.10"
+      - task: PythonScript@0
+        displayName: Move artifact contents
+        inputs:
+          scriptPath: $(System.DefaultWorkingDirectory)/.azure-pipelines/shared/organize_windows_artifacts.py
+          arguments: $(Pipeline.Workspace) $(System.DefaultWorkingDirectory)/openxr_loader
+      - task: PublishPipelineArtifact@1
+        displayName: Publish combined artifact
+        condition: succeeded()
+        inputs:
+          path: $(System.DefaultWorkingDirectory)/openxr_loader
+          artifact: openxr_loader_windows
+
+      # NuGet stuff
+      # See:
+      # https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/tool/nuget?view=azure-devops
+      # https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/package/nuget?view=azure-devops
+
+      - task: PowerShell@2
+        displayName: Stage loader and headers for NuGet
+        inputs:
+          filePath: $(System.DefaultWorkingDirectory)/.azure-pipelines/nuget/stage_nuget.ps1
+          arguments: $(System.DefaultWorkingDirectory)/openxr_loader `
+            $(Build.SourcesDirectory)/specification/Makefile `
+            $(System.DefaultWorkingDirectory)/openxr_loader_staging
+      - task: NuGetToolInstaller@1
+        inputs:
+          versionSpec: ">=5.0.0"
+      - task: NuGetCommand@2
+        displayName: Package for NuGet
+        inputs:
+          command: pack
+          packagesToPack: $(System.DefaultWorkingDirectory)/openxr_loader_staging/OpenXR.Loader.nuspec
+          packDestination: $(System.DefaultWorkingDirectory)/nuget
+      - task: PublishPipelineArtifact@1
+        displayName: Publish NuGet Package
+        condition: succeeded()
+        inputs:
+          path: $(System.DefaultWorkingDirectory)/nuget
+          artifact: NuGet

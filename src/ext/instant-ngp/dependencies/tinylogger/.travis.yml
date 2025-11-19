@@ -1,0 +1,27 @@
+language: cpp
+sudo: false
+dist: trusty
+branches:
+  only:
+    - master
+matrix:
+  include:
+    - os: linux
+      compiler: gcc-4.8
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - cmake
+            - g++-4.8
+      script:
+        - cmake --version
+        - cmake -DCMAKE_CXX_COMPILER=g++-4.8 -DCMAKE_C_COMPILER=gcc-4.8
+        - make -j 2
+    - os: osx
+      compiler: clang
+      script:
+        - cmake --version
+        - cmake .
+        - make -j 2

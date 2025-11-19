@@ -1,0 +1,9 @@
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!--
+  Copyright (c) 2020-2025 The Khronos Group Inc.
+  SPDX-License-Identifier: CC-BY-4.0
+  -->
+  <PropertyGroup>
+    <OpenXRPackageRoot>$(MSBuildThisFileDirectory)..\..\</OpenXRPackageRoot>
+  </PropertyGroup>
+</Project>

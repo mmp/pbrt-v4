@@ -1,0 +1,66 @@
+# Copyright 2021-2024, Collabora, Ltd.
+# SPDX-License-Identifier: CC0-1.0
+
+on:
+  workflow_call:
+    inputs:
+      preset:
+        description: "CMake build preset"
+        type: string
+        required: true
+      buildType:
+        description: "Build configuration"
+        type: string
+        required: true
+        default: RelWithDebInfo
+      artifactName:
+        description: "Artifact name to upload to."
+        type: string
+        required: false
+      subdir:
+        description: "Subdir of the workspace to upload as an artifact."
+        type: string
+        default: install
+
+jobs:
+  msvc-build:
+    runs-on: windows-latest
+    env:
+      VULKAN_SDK_VERSION: "1.1.114.0"
+      INSTALL_DIR: "${{ github.workspace }}/install"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+          fetch-tags: "${{ !github.event.release }}"
+          fetch-depth: "${{ github.event.release && '0' || '1'}}"
+
+      - name: Get modern CMake and Ninja
+        uses: lukka/get-cmake@v4.0.3
+
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Install Vulkan SDK
+        run: ./.github/scripts/install_vulkan.ps1
+        if: "${{ !contains( inputs.preset, 'uwp') }}"
+        working-directory: "${{ github.workspace }}"
+        shell: pwsh
+
+      - name: Generate build system
+        shell: pwsh
+        run: |
+          Copy-Item .github/scripts/CMakePresets.json .
+          cmake --fresh --preset ${{ inputs.preset }} -S . -B $env:RUNNER_TEMP
+      - name: Build
+        run: "cmake --build $env:RUNNER_TEMP --parallel --clean-first --config ${{ inputs.buildType }}"
+
+      - name: Install
+        run: "cmake --build $env:RUNNER_TEMP --parallel --config ${{ inputs.buildType }} --target install"
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        if: inputs.artifactName
+        with:
+          name: "${{ inputs.artifactName }}"
+          path: "${{ github.workspace }}/${{ inputs.subdir }}"

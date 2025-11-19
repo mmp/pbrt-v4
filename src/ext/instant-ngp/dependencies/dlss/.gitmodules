@@ -1,0 +1,3 @@
+[submodule "NVIDIAImageScaling"]
+	path = NVIDIAImageScaling
+	url = https://github.com/NVIDIAGameWorks/NVIDIAImageScaling

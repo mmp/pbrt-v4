@@ -1,0 +1,180 @@
+language: cpp
+dist: trusty
+matrix:
+    include:
+        - os: linux
+          addons:
+              apt:
+                  sources: ['ubuntu-toolchain-r-test']
+                  packages: ['g++-4.9']
+          env: COMPILER=g++-4.9 CONFIG=Release FLAGS='--coverage' COVERAGE=1
+
+        - os: linux
+          addons:
+              apt:
+                  sources: ['ubuntu-toolchain-r-test']
+                  packages: ['g++-4.9']
+          env: COMPILER=g++-4.9 CONFIG=Debug
+
+        - os: linux
+          addons:
+              apt:
+                  sources: ['ubuntu-toolchain-r-test']
+                  packages: ['g++-5']
+          env: COMPILER=g++-5 CONFIG=Release
+
+        - os: linux
+          addons:
+              apt:
+                  sources: ['ubuntu-toolchain-r-test']
+                  packages: ['g++-5']
+          env: COMPILER=g++-5 CONFIG=Debug
+
+        - os: linux
+          addons:
+              apt:
+                  sources: ['ubuntu-toolchain-r-test']
+                  packages: ['g++-6']
+          env: COMPILER=g++-6 CONFIG=Release
+
+        - os: linux
+          addons:
+              apt:
+                  sources: ['ubuntu-toolchain-r-test']
+                  packages: ['g++-6']
+          env: COMPILER=g++-6 CONFIG=Debug FLAGS='-fsanitize=address,undefined -fno-sanitize-recover=all -fuse-ld=gold'
+
+        - os: linux
+          addons:
+              apt:
+                  sources: ['ubuntu-toolchain-r-test']
+                  packages: ['g++-7']
+          env: COMPILER=g++-7 CONFIG=Release
+
+        - os: linux
+          addons:
+              apt:
+                  sources: ['ubuntu-toolchain-r-test']
+                  packages: ['g++-7']
+          sudo: required
+          env: COMPILER=g++-7 CONFIG=Debug FLAGS='-fsanitize=address,undefined -fno-sanitize-recover=all -fuse-ld=gold'
+
+        - os: linux
+          addons:
+              apt:
+                  sources: ['ubuntu-toolchain-r-test']
+                  packages: ['g++-8']
+          env: COMPILER=g++-8 CONFIG=Release
+
+        - os: linux
+          addons:
+              apt:
+                  sources: ['ubuntu-toolchain-r-test']
+                  packages: ['g++-8']
+          sudo: required
+          env: COMPILER=g++-8 CONFIG=Debug FLAGS='-fsanitize=address,undefined -fno-sanitize-recover=all -fuse-ld=gold'
+
+        - os: linux
+          addons:
+              apt:
+                  sources: ['llvm-toolchain-precise-3.5', 'ubuntu-toolchain-r-test']
+                  packages: ['clang++-3.5']
+          env: COMPILER=clang++-3.5 CONFIG=Release
+
+        - os: linux
+          addons:
+              apt:
+                  sources: ['llvm-toolchain-precise-3.5', 'ubuntu-toolchain-r-test']
+                  packages: ['clang++-3.5']
+          env: COMPILER=clang++-3.5 CONFIG=Debug
+
+        - os: linux
+          addons:
+              apt:
+                  sources: ['llvm-toolchain-precise-3.6', 'ubuntu-toolchain-r-test']
+                  packages: ['clang++-3.6']
+          env: COMPILER=clang++-3.6 CONFIG=Release
+
+        - os: linux
+          addons:
+              apt:
+                  sources: ['llvm-toolchain-precise-3.6', 'ubuntu-toolchain-r-test']
+                  packages: ['clang++-3.6']
+          env: COMPILER=clang++-3.6 CONFIG=Debug
+
+        - os: linux
+          addons:
+              apt:
+                  sources: ['llvm-toolchain-precise-3.7', 'ubuntu-toolchain-r-test']
+                  packages: ['clang++-3.7']
+          env: COMPILER=clang++-3.7 CONFIG=Release
+
+        - os: linux
+          addons:
+              apt:
+                  sources: ['llvm-toolchain-precise-3.7', 'ubuntu-toolchain-r-test']
+                  packages: ['clang++-3.7']
+          env: COMPILER=clang++-3.7 CONFIG=Debug
+
+        - os: linux
+          addons:
+              apt:
+                  sources: ['llvm-toolchain-precise-3.8', 'ubuntu-toolchain-r-test']
+                  packages: ['clang++-3.8']
+          env: COMPILER=clang++-3.8 CONFIG=Release
+
+        - os: linux
+          addons:
+              apt:
+                  sources: ['llvm-toolchain-precise-3.8', 'ubuntu-toolchain-r-test']
+                  packages: ['clang++-3.8']
+          env: COMPILER=clang++-3.8 CONFIG=Debug
+
+        - os: linux
+          addons:
+              apt:
+                  sources: ['llvm-toolchain-precise-3.9', 'ubuntu-toolchain-r-test']
+                  packages: ['clang++-3.9']
+          env: COMPILER=clang++-3.9 CONFIG=Release
+
+        - os: linux
+          addons:
+              apt:
+                  sources: ['llvm-toolchain-precise-3.9', 'ubuntu-toolchain-r-test']
+                  packages: ['clang++-3.9']
+          env: COMPILER=clang++-3.9 CONFIG=Debug
+
+        - os: osx
+          osx_image: xcode7.3
+          compiler: clang
+          env: COMPILER=clang++ CONFIG=Release
+
+        - os: osx
+          osx_image: xcode7.3
+          compiler: clang
+          env: COMPILER=clang++ CONFIG=Debug
+
+        - os: osx
+          osx_image: xcode8
+          compiler: clang
+          env: COMPILER=clang++ CONFIG=Release
+
+        - os: osx
+          osx_image: xcode8
+          compiler: clang
+          env: COMPILER=clang++ CONFIG=Debug
+
+script:
+    - mkdir build
+    - cd build
+    - cmake -DCMAKE_BUILD_TYPE="${CONFIG}" -DCMAKE_CXX_COMPILER="${COMPILER}" -DCMAKE_CXX_FLAGS="${FLAGS}" ..
+    - make
+    - ctest -V
+
+before_install:
+  - pip install --user cpp-coveralls
+
+after_success:
+  - if [ "${COVERAGE}" = 1 ]; then coveralls --root .. -E ".*catch.*" -E ".*CMakeFiles.*" -E ".*gitlike.cxx.*" -E ".*test.*"; fi
+
+

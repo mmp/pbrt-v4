@@ -1,0 +1,134 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: OpenXR
+Upstream-Contact: Rylie Pavlik <openxr-speceditor AT khronos DOT org>
+Source: https://registry.khronos.org/OpenXR/
+
+Files: changes/conformance/*
+       changes/major/*
+       changes/registry/*
+       changes/sdk/*
+       changes/specification/*
+       changes/README.md
+       changes/template.md
+       HOTFIX
+Copyright: 2019-2025 The Khronos Group Inc.
+License: CC-BY-4.0
+
+Files: specification/config/copyright-spec.adoc
+Copyright: 2014-2025 The Khronos Group Inc
+License: LicenseRef-KhronosSpecCopyright-WithNormativeWording-v10
+
+Files: src/tests/hello_xr/android_resources/vulkan/mipmap-xxhdpi/ic_helloxr_launcher.png
+       src/tests/hello_xr/android_resources/vulkan/mipmap-mdpi/ic_helloxr_launcher.png
+       src/tests/hello_xr/android_resources/vulkan/mipmap-xhdpi/ic_helloxr_launcher.png
+       src/tests/hello_xr/android_resources/vulkan/mipmap-hdpi/ic_helloxr_launcher.png
+       src/tests/hello_xr/android_resources/vulkan/mipmap-xxxhdpi/ic_helloxr_launcher.png
+       src/tests/hello_xr/android_resources/opengles/mipmap-xxhdpi/ic_helloxr_launcher.png
+       src/tests/hello_xr/android_resources/opengles/mipmap-mdpi/ic_helloxr_launcher.png
+       src/tests/hello_xr/android_resources/opengles/mipmap-xhdpi/ic_helloxr_launcher.png
+       src/tests/hello_xr/android_resources/opengles/mipmap-hdpi/ic_helloxr_launcher.png
+       src/tests/hello_xr/android_resources/opengles/mipmap-xxxhdpi/ic_helloxr_launcher.png
+Copyright: Copyright (c) 2020-2025 The Khronos Group Inc.
+  Copyright (c) 2020, Google
+License: Apache-2.0
+Comment: Based on a Material Icons asset ("emoji-people") with added text
+  in "Miriam Libre" Bold, converted to path, and manually simplified.
+  Rasterized with Android Studio.
+
+Files: src/external/catch2/*
+Copyright: Copyright Catch2 Authors
+License: BSL-1.0
+Comment: Unmodified, vendored copy of Catch2 v3.7.1
+
+Files: src/external/jsoncpp/*
+Copyright: 2007-2010 Baptiste Lepilleur and The JsonCpp Authors
+License: MIT OR LicenseRef-jsoncpp-public-domain
+Comment: Unmodified, vendored copy of jsoncpp 1.9.6
+
+Files: src/external/tinygltf/README.md
+  src/external/tinygltf/tiny_gltf.cc
+  src/external/tinygltf/tiny_gltf.h
+Copyright: 2015-Present, Syoyo Fujita, Aurélien Chatelain and many contributors
+License: MIT
+Comment: Unmodified, vendored copy of a subset of the tiny-gltf repo v2.9.3
+
+Files: src/external/d3dx12/*
+Copyright: Copyright (c) Microsoft Corporation.
+License: MIT
+Comment: Unmodified, vendored copy of d3dx12.h from directx-vs-templates commit 86b9c45
+  This repo includes ifdefs to improve compatibility with older Windows SDK verions.
+
+Files: src/external/mikktspace/*
+Copyright: 2011 by Morten S. Mikkelsen
+License: Zlib
+Comment: Unmodified, vendored copy of MikkTSpace commit 3e895b4
+
+Files: src/external/basis_universal/*
+Copyright: 2019-2021 Binomial LLC
+License: Apache-2.0
+Comment: Unmodified, vendored subset of basis_universal commit 1.16.4
+
+Files: src/external/basis_universal/zstd/*
+Copyright: 2016-2021, Yann Collet, Facebook, Inc.
+License: BSD-3-Clause
+Comment: Vendored copy of single-file libraries included in the basis_universal repo.
+
+Files: src/external/jnipp/*
+Copyright: 2016-2020, Mitchell Dowd
+  2020, Collabora, Ltd.
+License: MIT
+Comment: Unmodified, vendored copy of commit v1.0.0-13-gcdd6293
+
+Files: src/external/metal-cpp/*
+Copyright: Copyright 2020-2022 Apple Inc.
+License: Apache-2.0
+Comment: Unmodified, vendored copy of metal-cpp_macOS13_iOS16.zip
+
+Files: external/python/jinja2/*
+  external/python/Jinja2-2.11.3.dist-info/*
+Copyright: 2013-2019 by the Jinja team
+  2007 Pallets
+License: BSD-3-Clause
+
+Files: external/python/markupsafe/*
+  external/python/MarkupSafe-1.1.1.dist-info/*
+Copyright: 2010 Pallets
+License: BSD-3-Clause
+
+Files: external/python/pyparsing/*
+  external/python/pyparsing-3.1.2.dist-info/*
+Copyright: 2003-2022, Paul T. McGuire <ptmcg.gm+pyparsing@gmail.com>
+License: BSD-3-Clause
+
+Files: specification/sources/chapters/extensions/epic/epic_view_configuration_fov.adoc
+Copyright: 2020, Epic Games, Inc.
+License: CC-BY-4.0
+Comment: In-line license comments requested, https://gitlab.khronos.org/openxr/openxr/-/issues/1422
+
+Files: specification/sources/chapters/extensions/ext/ext_performance_settings.adoc
+  specification/sources/chapters/extensions/ext/ext_thermal_query.adoc
+Copyright: 2017-2025 The Khronos Group Inc.
+License: CC-BY-4.0
+Comment: In-line license comments requested, https://gitlab.khronos.org/openxr/openxr/-/issues/1419
+
+Files: src/conformance/platform_specific/android_resources/mipmap-hdpi/*
+  src/conformance/platform_specific/android_resources/mipmap-mdpi/*
+  src/conformance/platform_specific/android_resources/mipmap-xhdpi/*
+  src/conformance/platform_specific/android_resources/mipmap-xxhdpi/*
+  src/conformance/platform_specific/android_resources/mipmap-xxxhdpi/*
+Copyright: 2020-2025 The Khronos Group Inc.
+  2020, Google
+License: Apache-2.0
+Comment: Generated .png versions of an icon, created in Android Studio
+  based on a Material Icons asset.
+
+Files: specification/scripts/vuidCounts.py
+Copyright: 2022-2025 The Khronos Group Inc.
+License: Apache-2.0
+Comment: File automatically rewritten by VUID assignment.
+
+Files: src/external/sanitizers-cmake/*
+Copyright: 2013 Matt Arsenault
+ 2015-2016 RWTH Aachen University, Federal Republic of Germany
+License: MIT
+Comment: SPDX-License-Identifier missing.

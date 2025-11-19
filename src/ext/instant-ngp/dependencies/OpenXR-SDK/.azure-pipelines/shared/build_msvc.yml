@@ -1,0 +1,53 @@
+# Copyright (c) 2019-2025 The Khronos Group Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+parameters:
+  - name: buildType
+    type: string
+    default: "Debug"
+  - name: generator
+    type: string
+    default: "Visual Studio 17 2022"
+  - name: cmakeArgs
+    type: string
+    default: ""
+  - name: sourceDir
+    type: string
+    default: "$(System.DefaultWorkingDirectory)"
+    # TODO should be boolean
+  - name: useVulkan
+    type: string
+    default: "true"
+
+steps:
+  - checkout: self
+    lfs: true
+
+  - powershell: ./.azure-pipelines/shared/install_vulkan.ps1
+    displayName: Install Vulkan SDK
+    workingDirectory: "${{ parameters.sourceDir }}"
+    condition: eq('${{ parameters.useVulkan}}', 'true')
+
+  - script: mkdir build
+    displayName: "Create build directory"
+    workingDirectory: "${{ parameters.sourceDir }}"
+
+  - script: |
+      set VULKAN_SDK=$(System.DefaultWorkingDirectory)\\vulkan_sdk\\$(VULKAN_SDK_VERSION)
+      cmake .. -G "${{ parameters.generator }}" ${{ parameters.cmakeArgs }}  -DCMAKE_INSTALL_PREFIX=${{ parameters.sourceDir }}/install
+    displayName: "Generate build system"
+    workingDirectory: "${{ parameters.sourceDir }}/build"
+
+  - task: MSBuild@1
+    displayName: Build all targets
+    inputs:
+      solution: "${{ parameters.sourceDir }}/build/ALL_BUILD.vcxproj"
+      maximumCpuCount: true
+      configuration: ${{ parameters.buildType }}
+
+  - task: MSBuild@1
+    displayName: Install build
+    inputs:
+      solution: "${{ parameters.sourceDir }}/build/INSTALL.vcxproj"
+      maximumCpuCount: true
+      configuration: ${{ parameters.buildType }}

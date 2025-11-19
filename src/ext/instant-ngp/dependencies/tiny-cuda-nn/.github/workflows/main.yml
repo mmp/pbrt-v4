@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build_linux:
+    name: Build on linux systems
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            cuda: "13.0"
+            arch: 120
+          - os: ubuntu-24.04
+            cuda: "12.8"
+            arch: 100
+          - os: ubuntu-24.04
+            cuda: "12.6"
+            arch: 89
+          - os: ubuntu-24.04
+            cuda: "12.5"
+            arch: 86
+          - os: ubuntu-22.04
+            cuda: "11.8"
+            arch: 89
+          - os: ubuntu-22.04
+            cuda: "11.7"
+            arch: 86
+          - os: ubuntu-22.04
+            cuda: "11.7"
+            arch: 75
+          - os: ubuntu-22.04
+            cuda: "11.7"
+            arch: 70
+          - os: ubuntu-22.04
+            cuda: "11.7"
+            arch: 61
+          - os: ubuntu-22.04
+            cuda: "11.7"
+            arch: 53
+          - os: ubuntu-22.04
+            cuda: "11.7"
+            arch: 37
+    env:
+      build_dir: "build"
+      config: "Release"
+      TCNN_CUDA_ARCHITECTURES: ${{ matrix.arch }}
+    steps:
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install cmake gcc g++
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install CUDA
+        env:
+          cuda: ${{ matrix.cuda }}
+        run: ./dependencies/cuda-cmake-github-actions/scripts/actions/install_cuda_ubuntu.sh
+        shell: bash
+      - name: CMake
+        run: cmake . -B ${{ env.build_dir }} -DCMAKE_BUILD_TYPE=${{ env.config }} -DTCNN_BUILD_TESTS=1
+      - name: Build
+        working-directory: ${{ env.build_dir }}
+        run: cmake --build . --target all --verbose -j `nproc`
+
+  build_windows:
+    name: Build on Windows
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-2025
+            visual_studio: "Visual Studio 17 2022"
+            cuda: "13.0.0"
+            arch: 120
+          - os: windows-2025
+            visual_studio: "Visual Studio 17 2022"
+            cuda: "12.9.1"
+            arch: 89
+          - os: windows-2022
+            visual_studio: "Visual Studio 17 2022"
+            cuda: "12.9.1"
+            arch: 86
+          - os: windows-2022
+            visual_studio: "Visual Studio 17 2022"
+            cuda: "12.6.3"
+            arch: 75
+          - os: windows-2022
+            visual_studio: "Visual Studio 17 2022"
+            cuda: "12.6.3"
+            arch: 70
+          - os: windows-2022
+            visual_studio: "Visual Studio 17 2022"
+            cuda: "12.6.3"
+            arch: 61
+          - os: windows-2022
+            visual_studio: "Visual Studio 17 2022"
+            cuda: "12.6.3"
+            arch: 53
+    env:
+      build_dir: "build"
+      config: "Release"
+      TCNN_CUDA_ARCHITECTURES: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Install CUDA
+        env:
+          cuda: ${{ matrix.cuda }}
+          visual_studio: ${{ matrix.visual_studio }}
+        shell: powershell
+        run: .\dependencies\cuda-cmake-github-actions\scripts\actions\install_cuda_windows.ps1
+      - name: CMake
+        run: cmake . -B ${{ env.build_dir }} -G "${{ matrix.visual_studio }}" -A x64 -DTCNN_BUILD_TESTS=1
+      - name: Build
+        working-directory: ${{ env.build_dir }}
+        run: cmake --build . --config ${{ env.config }} --target ALL_BUILD --verbose

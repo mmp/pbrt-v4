@@ -1,0 +1,13 @@
+# travis.yml for github.com/mateidavid/zstr
+
+language: cpp
+
+addons:
+  apt:
+    update: true
+
+before_install:
+  - sudo apt-get install -y zlib1g-dev
+
+script:
+  - make -C examples test

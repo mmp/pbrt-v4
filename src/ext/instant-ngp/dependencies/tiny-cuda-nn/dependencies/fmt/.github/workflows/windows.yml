@@ -1,0 +1,63 @@
+name: windows
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        # windows-2019 has MSVC 2019 installed;
+        # windows-2022 has MSVC 2022 installed:
+        # https://github.com/actions/virtual-environments.
+        os: [windows-2019]
+        platform: [Win32, x64]
+        build_type: [Debug, Release]
+        standard: [11, 17, 20]
+        include:
+          - os: windows-2019
+            platform: Win32
+            build_type: Debug
+            shared: -DBUILD_SHARED_LIBS=ON
+          - os: windows-2022
+            platform: x64
+            build_type: Debug
+            standard: 20
+        exclude:
+          - os: windows-2019
+            standard: 11
+            platform: Win32
+          - os: windows-2019
+            standard: 20
+            platform: Win32
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Create Build Environment
+      run: cmake -E make_directory ${{runner.workspace}}/build
+
+    - name: Configure
+      # Use a bash shell for $GITHUB_WORKSPACE.
+      shell: bash
+      working-directory: ${{runner.workspace}}/build
+      run: |
+        cmake -DCMAKE_BUILD_TYPE=${{matrix.build_type}} ${{matrix.shared}} \
+              -A ${{matrix.platform}} \
+              -DCMAKE_CXX_STANDARD=${{matrix.standard}} \
+              $GITHUB_WORKSPACE
+
+    - name: Build
+      working-directory: ${{runner.workspace}}/build
+      run: |
+        $threads = (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
+        cmake --build . --config ${{matrix.build_type}} --parallel $threads
+
+    - name: Test
+      working-directory: ${{runner.workspace}}/build
+      run: ctest -C ${{matrix.build_type}} -V
+      env:
+        CTEST_OUTPUT_ON_FAILURE: True

@@ -1,0 +1,29 @@
+# Copyright (c) 2019-2025 The Khronos Group Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+jobs:
+  - job: check_clang_format
+    displayName: "clang-format"
+    pool:
+      vmImage: "ubuntu-latest"
+    container: khronosgroup/docker-images:openxr.20240924@sha256:3d595e68d21b2bba12cb7bbfa8cb135f66a2d9b97efeda6de3c6c8412163c4b7
+
+    steps:
+      - checkout: self
+        lfs: true
+
+      - script: ./runClangFormat.sh
+        displayName: Run clang-format
+
+      - script: git diff --patch --exit-code > clang-format.patch
+        displayName: Save changes as diff
+
+      # In case of failure (clang-format changes needed) do these two things
+      - script: echo "The following files need clang-formatting:"; sed -n -e "s/^diff.* b\///p" clang-format.patch
+        condition: failed()
+      - task: PublishPipelineArtifact@1
+        displayName: Publish diff
+        condition: failed()
+        inputs:
+          path: $(System.DefaultWorkingDirectory)/clang-format.patch
+          artifact: clang-format-changes

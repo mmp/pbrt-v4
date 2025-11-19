@@ -1,0 +1,43 @@
+<Project ToolsVersion="4.0"
+    xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <!--
+    Copyright (c) 2020-2025 The Khronos Group Inc.
+    SPDX-License-Identifier: CC-BY-4.0
+    -->
+
+    <Choose>
+        <When Condition="'$(ApplicationType)|$(ApplicationTypeRevision)' == 'Windows Store|10.0'">
+            <PropertyGroup>
+                <OpenXRLoaderBinaryRoot>$(OpenXRPackageRoot)native\$(Platform)_uwp\release</OpenXRLoaderBinaryRoot>
+            </PropertyGroup>
+        </When>
+        <Otherwise>
+            <PropertyGroup>
+                <OpenXRLoaderBinaryRoot>$(OpenXRPackageRoot)native\$(Platform)\release</OpenXRLoaderBinaryRoot>
+            </PropertyGroup>
+        </Otherwise>
+    </Choose>
+
+    <ItemDefinitionGroup>
+        <ClCompile>
+            <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(OpenXRPackageRoot)include</AdditionalIncludeDirectories>
+        </ClCompile>
+        <Link>
+            <AdditionalDependencies>%(AdditionalDependencies);$(OpenXRLoaderBinaryRoot)\lib\openxr_loader.lib</AdditionalDependencies>
+        </Link>
+    </ItemDefinitionGroup>
+
+    <!-- Copy the OpenXR loader DLL to the output directory and include in packaging -->
+    <ItemGroup Condition="'$(OpenXRSkipLoaderCopy)'!='true'">
+        <None Include="$(OpenXRLoaderBinaryRoot)\bin\openxr_loader.dll">
+            <Link>%(Filename)%(Extension)</Link>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <DeploymentContent>true</DeploymentContent>
+        </None>
+    </ItemGroup>
+
+    <Target Name="EnsurePropsImported" BeforeTargets="PrepareForBuild">
+        <Error Condition="'$(OpenXRPackageRoot)'==''" Text="OpenXRPackageRoot property missing. Project is malformed. Try removing and re-adding the NuGet reference." />
+    </Target>
+
+</Project>

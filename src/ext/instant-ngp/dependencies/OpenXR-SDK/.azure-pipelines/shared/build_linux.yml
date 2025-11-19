@@ -1,0 +1,28 @@
+# Copyright (c) 2019-2025 The Khronos Group Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+parameters:
+  - name: buildType
+    type: string
+    default: "RelWithDebInfo"
+  - name: cmakeArgs
+    type: string
+    default: ""
+  - name: sourceDir
+    type: string
+    default: "$(Pipeline.Workspace)"
+  - name: buildDir
+    type: string
+    default: "$(Build.BinariesDirectory)"
+
+steps:
+  - script: "rm -rf ${{ parameters.buildDir }}"
+    displayName: "Clean up build directory"
+
+  - script: "cmake -G Ninja -S . -B ${{ parameters.buildDir }} -DCMAKE_BUILD_TYPE=${{ parameters.buildType }} ${{ parameters.cmakeArgs }}"
+    workingDirectory: "${{ parameters.sourceDir }}"
+    displayName: "Generate build system"
+
+  - script: "ninja -C ${{ parameters.buildDir }}"
+    workingDirectory: "${{ parameters.sourceDir }}"
+    displayName: "Compile"
