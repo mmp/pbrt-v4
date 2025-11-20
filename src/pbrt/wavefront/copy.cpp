@@ -44,6 +44,9 @@ namespace pbrt
         outputRayDataFile->seekp(0, std::ios::end);
         inputRayDataFile->seekp(0, std::ios::end);
 
+        Bounds2i pixelBounds = film.PixelBounds();
+        Vector2i resolution = pixelBounds.Diagonal();
+
         // Loop over all pixel samples and write ray data to file
         for (int pixelIndex = 0; pixelIndex < maxQueueSize; ++pixelIndex)
         {
@@ -60,14 +63,21 @@ namespace pbrt
             int oDepth = outputRayData.depth[pixelIndex];
             int oSampleIdx = outputRayData.sampleIdx[pixelIndex];
             SampledSpectrum L = outputRayData.L[pixelIndex];
+            SampledWavelengths lambda = outputRayData.lambda[pixelIndex];
+            //TODO: Set lambda in cpu side
+
+            
+            //TODO: Check if this is the correct way to get the pixelrgb
+            // RGB rgb = film.GetPixelRGB(p + pixelBounds.pMin);
+            RGB rgb = film.ToOutputRGB(L, lambda);
 
             std::string inputLine = StringPrintf("Pixel (o: %s, d: %s) PixelIdx (%d) Sample (%d) InitialDepth (%d)\n",
                 iRayo.ToString(), iRayd.ToString(), pixelIndex, iSampleIdx, iDepth
             );
             inputRayDataFile->write(inputLine.c_str(), inputLine.length());
 
-            std::string outputLine = StringPrintf("Pixel (o: %s, d: %s) PixelIdx (%d) Sample (%d) FinalDepth (%d) Luminance (%s)\n",
-                oRayo.ToString(), oRayd.ToString(), pixelIndex, oSampleIdx, oDepth, L.ToString());
+            std::string outputLine = StringPrintf("Pixel (o: %s, d: %s) PixelIdx (%d) Sample (%d) FinalDepth (%d) Luminance (%s) RGB (%s)\n",
+                oRayo.ToString(), oRayd.ToString(), pixelIndex, oSampleIdx, oDepth, L.ToString(), rgb.ToString());
             outputRayDataFile->write(outputLine.c_str(), outputLine.length());
         }
 
