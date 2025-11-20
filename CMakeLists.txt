@@ -1159,3 +1159,8 @@ install(TARGETS
   DESTINATION
   lib
 )
+
+if(CMAKE_CUDA_COMPILER)
+  add_subdirectory(src/ext/instant-ngp)
+  add_subdirectory(src/nn)
+endif()
