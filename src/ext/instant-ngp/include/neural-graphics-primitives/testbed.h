@@ -779,6 +779,8 @@ public:
 			GPUMemory<float> extra_dims_gpu; // if the model demands a latent code per training image, we put them in here.
 			GPUMemory<float> extra_dims_gradient_gpu;
 			std::vector<VarAdamOptimizer> extra_dims_opt;
+			GPUMemory<float> per_sample_extra_dims_gpu;
+			size_t per_sample_extra_dims_capacity = 0;
 
 			std::vector<float> get_extra_dims_cpu(int trainview) const;
 

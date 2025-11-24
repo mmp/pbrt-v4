@@ -78,7 +78,9 @@ __global__ void train_nerf(
 	float depth_supervision_lambda,
 	float near_distance,
 
-	ETrainMode training_mode
+	ETrainMode training_mode,
+	float* per_sample_extra_dims
+
 ) {
 	const uint32_t i = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -103,6 +105,18 @@ __global__ void train_nerf(
 	const vec2 principal_point = metadata[img].principal_point;
 	const float* extra_dims = extra_dims_gpu + img * N_EXTRA_DIMS;
 	const Lens lens = metadata[img].lens;
+
+	float* per_sample = nullptr;
+	if(
+		metadata[img].sample_indices &&
+		metadata[img].final_depths  &&
+		N_EXTRA_DIMS >= 2
+	)
+	{
+		per_sample = per_sample_extra_dims + i * N_EXTRA_DIMS;
+		per_sample[0] = metadata[img].sample_indices ? metadata[img].sample_indices[pix_idx] : 0.f;
+		per_sample[1] = metadata[img].final_depths ? metadata[img].final_depths[pix_idx] : 0.f;
+	}
 
 	const mat4x3 xform = get_xform_given_rolling_shutter(training_xforms[img], metadata[img].rolling_shutter, uv, motionblur_time);
 
@@ -191,10 +205,12 @@ __global__ void train_nerf(
 		constexpr uint32_t N_NERF_COORDS = sizeof(NerfCoordinate) / sizeof(float);
 		vec<N_NERF_COORDS + N_EXTRA_DIMS> nerf_in;
 		*(NerfCoordinate*)&nerf_in[0] = {warp_position(pos, aabb), warp_direction(ray.d), warp_dt(dt)};
-
+		
+		const float* extra_dims_src = per_sample ? per_sample : extra_dims;
+		
 		NGP_PRAGMA_UNROLL
 		for (uint32_t i = 0; i < N_EXTRA_DIMS; ++i) {
-			nerf_in[N_NERF_COORDS + i] = extra_dims[i];
+			nerf_in[N_NERF_COORDS + i] = extra_dims_src[i];
 		}
 
 		// Implicit sync is fine here, because the following nerf model wants synchronized warps anyway
@@ -335,9 +351,11 @@ __global__ void train_nerf(
 		vec<N_NERF_COORDS + N_EXTRA_DIMS> nerf_in;
 		*(NerfCoordinate*)&nerf_in[0] = {warp_position(pos, aabb), warp_direction(ray.d), warp_dt(dt)};
 
+		const float* extra_dims_src = per_sample ? per_sample : extra_dims;
+
 		NGP_PRAGMA_UNROLL
 		for (uint32_t i = 0; i < N_EXTRA_DIMS; ++i) {
-			nerf_in[N_NERF_COORDS + i] = extra_dims[i];
+			nerf_in[N_NERF_COORDS + i] = extra_dims_src[i];
 		}
 
 		// Implicit sync is fine here, because the following nerf model wants synchronized warps anyway

@@ -1,6 +1,3 @@
-
-
-
 #ifdef PBRT_GPU_BUILD_RENDERER
 
 /**
@@ -63,8 +60,13 @@
 */
 
 #include <neural-graphics-primitives/testbed.h>
+#include <neural-graphics-primitives/nerf_loader.h>
 #include <tiny-cuda-nn/common.h>
 #include <memory>
+
+using namespace tcnn;
+using namespace ngp;
+
 // TODO(main-nn-mirror-plan):
 // 1. Recreate the dataset ingestion pipeline from instant-ngp's load_nerf:
 //    - Parse your per-ray exports (origin, direction, metadata, radiance) and fill Ray arrays + float RGB buffers.
@@ -104,6 +106,36 @@
 //If radiance is spectral or multi-channel, increase NerfPayload::DIM_COL and adjust network_config.encoding.n_dims_to_encode so the MLP output matches your channel count.
 //Once these hooks are in place, you can iteratively phase out camera-derived math: set dummy transforms in the JSON, keep enable_ray_loading = true, and rely entirely on your ray bundles + radiance arrays. Next steps could be (1) design a compact binary that packs {origin, direction, metadata, radiance}, (2) extend the Ray struct and GPU kernels to read it, and (3) add a bespoke loader entry point (CLI flag or new TestbedMode) so you don’t have to spoof NeRF JSON forever.
 
+
+//!TODO: List & Recommendations
+//Here is the list of things you must do to ensure correct training:
+//
+//1. Normalize Your Latent Parameters (CRITICAL)
+//You need to scale sampleIdx and finalDepth to the [0, 1] range.
+//
+//Why: To prevent numerical instability.
+//How:
+//Find the maximum sample count (e.g., max_samples) and maximum depth (e.g., max_depth) in your dataset.
+//In main_nn.cu, when populating the buffers, convert the values to float and divide by the maximums.
+//Action: Change TrainingImageMetadata pointers to const float* instead of const int*, and perform the normalization in main_nn.cu.
+//2. Verify Network Input Dimensions
+//Ensure the network actually sees these dimensions.
+//
+//How: In testbed.cu, look for the log output starting with Color model:. It should show something like ... + 16 + 2 --> ... (where 2 is your extra dims).
+//Action: Run the program and check the console output.
+//3. Check "One-Blob" Encoding
+//If you are using the default "OneBlob" encoding for the extra dimensions (which is common for latent codes), it expects inputs in [0, 1].
+//
+//Action: Ensure your normalized values are strictly within [0, 1].
+//4. Validate Data Alignment
+//Ensure that sampleIdx and finalDepth actually align with the rays and rgbas.
+//
+//How: In main_nn.cu, you are grouping rays by sampleIdx. Ensure that frameRayData construction preserves the 1:1 mapping between rays[i] and sampleIndices[i]. (Your current code looks correct for this, but double-check your parsing logic).
+//**Recommended Fix for Normalization (
+//in main_nn.cu)**
+//
+//I recommend modifying main_nn.cu to normalize these values before uploading them.
+
 struct MetadataExtras
 {
     std::vector<GPUMemory<int>> sample_indices;
@@ -120,8 +152,8 @@ struct LoadedRayInfo {
     // uint16_t *depth_pixels = nullptr;
     Ray *rays = nullptr;
     // int *pixelIdx = nullptr;
-    int *sampleIdx = nullptr;
-    int *finalDepths = nullptr;
+    float *sampleIdx = nullptr;
+    float *finalDepths = nullptr;
     // float *luminances = nullptr;
     vec4 *rgba = nullptr;
     // float depth_scale = -1.f;
@@ -129,8 +161,6 @@ struct LoadedRayInfo {
 
 int load_ray_data_from_file(std::vector<LoadedRayInfo>& frameRayData, const fs::path& path)
 {
-    if(!ppRay | !ppPixelIdx | !ppSampleIdx | !ppFinalDepths | !ppLuminances) return;
-
     // TODO(parser-validation): handle unreadable files gracefully and replace this std::count usage
     // with an actual '\n' count (std::count expects a value, not a predicate lambda).
     std::ifstream f{native_string(path), std::ios::in | std::ios::ate};
@@ -139,8 +169,8 @@ int load_ray_data_from_file(std::vector<LoadedRayInfo>& frameRayData, const fs::
 
     // Create buffers to hold results of parsing
     Ray* rays = new Ray[count];
-    int* sampleIndices = new int[count];
-    int* finalDepths = new int[count];
+    float* sampleIndices = new float[count];
+    float* finalDepths = new float[count];
     vec4* rgbas = new vec4[count];
 
 
@@ -193,8 +223,8 @@ int load_ray_data_from_file(std::vector<LoadedRayInfo>& frameRayData, const fs::
         rgba = vec4(r, g, b, 1.0);
 
         rays[ptr] = {o, d};
-        sampleIndices[ptr] = sampleIdx;
-        finalDepths[ptr] = finalDepth;
+        sampleIndices[ptr] = (float)sampleIdx / 16.f;
+        finalDepths[ptr] = (float)finalDepth / 5.f;
         rgbas[ptr] = rgba;
         rayCount++;
 
@@ -203,14 +233,14 @@ int load_ray_data_from_file(std::vector<LoadedRayInfo>& frameRayData, const fs::
         if(currSampleIdx != sampleIdx)
         {
             Ray* frameRay = new Ray[rayCount];
-            int* frameSampleIndices = new int[rayCount];
-            int* frameFinalDepths = new int[rayCount];
+            float* frameSampleIndices = new float[rayCount];
+            float* frameFinalDepths = new float[rayCount];
             vec4* frameRGBAs = new vec4[rayCount];
 
             memcpy(frameRay, rays, rayCount*sizeof(Ray));
-            memcpy(frameSampleIndices, sampleIndices, rayCount*sizeof(int));
-            memcpy(frameFinalDepths, finalDepths, rayCount*sizeof(int));
-            memcpy(frameRGBAs, rgbas, rayCount*sizeof(int));
+            memcpy(frameSampleIndices, sampleIndices, rayCount*sizeof(float));
+            memcpy(frameFinalDepths, finalDepths, rayCount*sizeof(float));
+            memcpy(frameRGBAs, rgbas, rayCount*sizeof(float));
             ivec2 res{rayCount, 1};
             frameRayData.emplace_back({
                 res, 
@@ -219,7 +249,7 @@ int load_ray_data_from_file(std::vector<LoadedRayInfo>& frameRayData, const fs::
                 frameFinalDepths,
                 frameRGBAs
             });
-            frameidx++;
+            frameIdx++;
             currSampleIdx = sampleIdx;
             ptr = 0;
             rayCount = 0;
@@ -236,14 +266,14 @@ int load_ray_data_from_file(std::vector<LoadedRayInfo>& frameRayData, const fs::
     {
 
         Ray* frameRay = new Ray[rayCount];
-        int* frameSampleIndices = new int[rayCount];
-        int* frameFinalDepths = new int[rayCount];
+        float* frameSampleIndices = new float[rayCount];
+        float* frameFinalDepths = new float[rayCount];
         vec4* frameRGBAs = new vec4[rayCount];
         
         memcpy(frameRay, rays, rayCount*sizeof(Ray));
-        memcpy(frameSampleIndices, sampleIndices, rayCount*sizeof(int));
-        memcpy(frameFinalDepths, finalDepths, rayCount*sizeof(int));
-        memcpy(frameRGBAs, rgbas, rayCount*sizeof(int));
+        memcpy(frameSampleIndices, sampleIndices, rayCount*sizeof(float));
+        memcpy(frameFinalDepths, finalDepths, rayCount*sizeof(float));
+        memcpy(frameRGBAs, rgbas, rayCount*sizeof(float));
         ivec2 res{rayCount, 1};
         frameRayData.emplace_back({
             res, 
@@ -252,13 +282,13 @@ int load_ray_data_from_file(std::vector<LoadedRayInfo>& frameRayData, const fs::
             frameFinalDepths,
             frameRGBAs
         });
-        frameidx++;
+        frameIdx++;
         currSampleIdx = sampleIdx;
         ptr = 0;
         rayCount = 0;
     }
     
-    tlog::success() << "Loaded " << images.size() << "\n";        
+    tlog::success() << "Loaded " << frameRayData.size() << "\n";        
     CUDA_CHECK_THROW(cudaDeviceSynchronize());
 
     delete[] rays;
@@ -269,7 +299,7 @@ int load_ray_data_from_file(std::vector<LoadedRayInfo>& frameRayData, const fs::
     return frameIdx;
 }
 
-void load_nerf(const fs::path& data_path)
+void load_nerfdataset(NerfDataset& nerf_data, MetadataExtras& meta_extras, const fs::path& data_path)
 {
     // TODO(custom-dataset-export): before calling this, generate per-ray dumps containing
     // origin, direction, optional metadata, and supervised radiance. The instant-ngp loader
@@ -291,10 +321,8 @@ void load_nerf(const fs::path& data_path)
     }
     else
     {
-        throw std::runtime_error{"Nerf data path must be text or directory"}
+        throw std::runtime_error{"Nerf data path must be text or directory"};
     }
-
-    const auto prev_aabb_scale = m_nerf.training.dataset.aabb_scale;
 
     // TODO(custom-nngp-hookup): reuse the instant-ngp load_nerf to ingest your prepared files,
     // ensuring n_extra_learnable_dims and has_rays are set so the training loop sees the
@@ -303,11 +331,7 @@ void load_nerf(const fs::path& data_path)
     // and call set_training_image with the radiance buffers + ray pointers produced above.
     // TODO(frame-shape): for each ray chunk, set metadata[i].resolution = {n_rays, 1} (or W,H) so
     // batching knows the number of samples, and mark image_type = EImageDataType::Float, is_hdr=true.
-    NerfDataset nerf_data;
-    nerf_data.scale = 1.0;
-    nerf_data.is_hdr = true;
 
-    MetadataExtras meta_extras{};
 
     std::vector<LoadedRayInfo> frameRayData;
 
@@ -334,7 +358,18 @@ void load_nerf(const fs::path& data_path)
     
     // Now loaded all the frame data, now time to send it to NerfDataset
     int frameCount = frameRayData.size();
-    nerf_data = create_empty_nerf_dataset(frameCount);
+    // Create dataset with aabb_scale=1 and is_hdr=true
+    nerf_data = create_empty_nerf_dataset(frameCount, 1, true);
+    
+    // Override default scale/offset to ensure raw PBRT rays are not transformed
+    // (User must ensure rays are within [0,1] or [0, aabb_scale] if aabb_scale > 1)
+    //TODO: Check if I actually do want the default scale = 0.33
+    //TODO: Check if it has the correct aabb bounds
+    nerf_data.scale = 1.0f;
+    nerf_data.offset = vec3(0.0f);
+    
+    nerf_data.n_extra_learnable_dims = 2;
+    nerf_data.has_rays = true;
     meta_extras.sample_indices.resize(frameCount);
     meta_extras.final_depths.resize(frameCount);
     uint32_t frameIdx = 0;
@@ -351,11 +386,21 @@ void load_nerf(const fs::path& data_path)
 
         // TODO(training-upload): wrap each chunk in result.set_training_image(...) to push radiance data
         // plus rays into GPU memory and update metadata so the testbed can sample them.
-        nerf_data.set_training_image(frameIdx, frame.res, frame.rgbas, nullptr, 1.0f, false, 
+        nerf_data.set_training_image(frameIdx, 
+            frame.res, 
+            frame.rgbas, 
+            nullptr, 
+            1.0f, 
+            false, 
             EImageDataType::Float, 
             EDepthDataType::None,
-            rays=frame.rays
+            0.f,
+            false,
+            false,
+            0,            
+            frame.rays
         );
+
 
         auto& sample_buf = meta_extras.sample_indices[frameIdx];
         auto& final_depth_buf = meta_extras.final_depths[frameIdx];
@@ -368,6 +413,16 @@ void load_nerf(const fs::path& data_path)
         // Setup metadata buffers
         nerf_data.metadata[frameIdx].sample_indices = sample_buf.data();
         nerf_data.metadata[frameIdx].final_depths = final_depth_buf.data();
+
+        //TODO: Check if there are any other fields that I need to set for the metadata
+        nerf_data.metadata[frameIdx].image_data_type = EImageDataType::Float;
+        nerf_data.xforms[frameIdx] = matrix_t::identity();
+        nerf_data.metadata[frameIdx].camera_distortion = {};
+        nerf_data.metadata[frameIdx].resolution = frame.res;
+        nerf_data.metadata[frameIdx].principal_point = vec2(0.5f);
+        nerf_data.metadata[frameIdx].focal_length = vec2(1000.f);
+        nerf_data.metadata[frameIdx].rolling_shutter = vec3(0.f);
+        nerf_data.metadata[frameIdx].light_dir = vec3(0.f);
         
         nerf_data.update_metadata(frameIdx, frameIdx + 1);
 
@@ -381,13 +436,13 @@ void load_nerf(const fs::path& data_path)
 #endif
     }
 
-    nerf_data.n_extra_learnable_dims = 2;
+    
 
 
 }
 
 
-int main(int argc, char** argc)
+int main(int argc, char** argv)
 {
 
 
@@ -397,28 +452,49 @@ int main(int argc, char** argc)
     //TODO: format data in a way that load_file will work
 
     //NOTE: We use Nerf mode because Volume refers to NanoVDB
-    testbed.set_mode(ETestbedMode::Nerf);
+    fs::path data_path;
+    if (argc > 1) {
+        data_path = argv[1];
+    } else {
+        // Default or error
+        tlog::error() << "Please provide a data path.";
+        return 1;
+    }
+
     
 
     //INFO: Load Nerf data, because Volume data actually refers to NanoVDB
-    std::ifstream f{native_string(data_path), std::ios::in | std::ios::binary};
+    // std::ifstream f{native_string(data_path), std::ios::in | std::ios::binary}; // Removed as it's handled in load_nerfdataset
 
     //INFO: setting training data available to true
     testbed.m_training_data_available = true;
 
+    auto& training = testbed.m_nerf.training;
+    NerfDataset& nerf_data = training.dataset;
+    nerf_data.n_extra_learnable_dims = 2;
+    nerf_data.scale = 1.0;
+    nerf_data.is_hdr = true;
 
+    MetadataExtras meta_extras{};
 
     //TODO: Set training mode
-
+    testbed.set_mode(ETestbedMode::Nerf);
 
     //TODO: Load Nerf 
+    load_nerfdataset(nerf_data, meta_extras, data_path);
+    
+    // Reset network to ensure it picks up the new dimensions
+    testbed.reset_network();
 
-    //TODO: Load ngp Nerf
+    // Initialize training state (gradients, optimizers, etc.)
+    testbed.load_nerf_post();
 
-    //TODO: Post nerf operations
+    // Training loop
+    while (testbed.frame()) {
+        // The frame() function handles training steps if m_train is true.
+    }
 
-
-    //TODO: Do training here
+    return 0;
 }
 
 #

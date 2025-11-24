@@ -716,7 +716,8 @@ __global__ void generate_training_samples_nerf(
 	const float* __restrict__ cdf_img,
 	const ivec2 cdf_res,
 	const float* __restrict__ extra_dims_gpu,
-	uint32_t n_extra_dims
+	uint32_t n_extra_dims,
+	float* per_sample_extra_dims
 ) {
 	const uint32_t i = threadIdx.x + blockIdx.x * blockDim.x;
 	if (i >= n_rays) {
@@ -743,6 +744,20 @@ __global__ void generate_training_samples_nerf(
 	const vec2 principal_point = metadata[img].principal_point;
 	const float* extra_dims = extra_dims_gpu + img * n_extra_dims;
 	const Lens lens = metadata[img].lens;
+
+	float* per_sample = nullptr;
+	if(
+		metadata[img].sample_indices &&
+		metadata[img].final_depths  &&
+		n_extra_dims >= 2
+	)
+	{
+		per_sample = per_sample_extra_dims + i * n_extra_dims;
+		per_sample[0] = metadata[img].sample_indices ? metadata[img].sample_indices[pix_idx] : 0.f;
+		per_sample[1] = metadata[img].final_depths ? metadata[img].final_depths[pix_idx] : 0.f;
+	}
+
+	
 
 	const mat4x3 xform = get_xform_given_rolling_shutter(training_xforms[img], metadata[img].rolling_shutter, uv, motionblur_time);
 
@@ -831,7 +846,7 @@ __global__ void generate_training_samples_nerf(
 		uint32_t mip = mip_from_dt(dt, pos, max_mip);
 		if (density_grid_occupied_at(pos, density_grid, mip)) {
 			coords_out(j)->set_with_optional_extra_dims(
-				warp_position(pos, aabb), warped_dir, warp_dt(dt), extra_dims, coords_out.stride_in_bytes
+				warp_position(pos, aabb), warped_dir, warp_dt(dt), per_sample ? per_sample : extra_dims, coords_out.stride_in_bytes
 			);
 			++j;
 			t += dt;
@@ -3051,13 +3066,21 @@ void Testbed::train_nerf_step(uint32_t target_batch_size, Testbed::NerfCounters&
 	float* coords_gradient = std::get<8>(scratch);
 	float* max_level_compacted = std::get<9>(scratch);
 	uint32_t* ray_counter = std::get<10>(scratch);
-
+	
 	uint32_t max_inference;
 	if (counters.measured_batch_size_before_compaction == 0) {
 		counters.measured_batch_size_before_compaction = max_inference = max_samples;
 	} else {
 		max_inference = next_multiple(std::min(counters.measured_batch_size_before_compaction, max_samples), BATCH_SIZE_GRANULARITY);
 	}
+	
+	const uint32_t n_extra_dims = m_nerf.training.dataset.n_extra_dims;
+	const size_t per_sample_capacity = (size_t)max_samples * n_extra_dims;
+	if(n_extra_dims && m_nerf.training.per_sample_extra_dims_gpu.size() < per_sample_capacity)
+	{
+		m_nerf.training.per_sample_extra_dims_gpu.resize(per_sample_capacity);
+	}
+	float* per_sample_extra_dims = n_extra_dims ? m_nerf.training.per_sample_extra_dims_gpu.data() : nullptr;
 
 	GPUMatrix<float> compacted_coords_matrix((float*)coords_compacted, floats_per_coord, target_batch_size);
 	GPUMatrix<network_precision_t> compacted_rgbsigma_matrix(mlp_out, padded_output_width, target_batch_size);
@@ -3180,7 +3203,8 @@ void Testbed::train_nerf_step(uint32_t target_batch_size, Testbed::NerfCounters&
 				m_nerf.training.optimize_exposure ? m_nerf.training.cam_exposure_gradient_gpu.data() : nullptr,
 				m_nerf.training.depth_supervision_lambda,
 				m_nerf.training.near_distance,
-				m_nerf.training.train_mode
+				m_nerf.training.train_mode,
+				per_sample_extra_dims
 			);
 
 			CUDA_CHECK_THROW(cudaMemcpyAsync(
@@ -3223,7 +3247,8 @@ void Testbed::train_nerf_step(uint32_t target_batch_size, Testbed::NerfCounters&
 			sample_image_proportional_to_error ? m_nerf.training.error_map.cdf_img.data() : nullptr,
 			m_nerf.training.error_map.cdf_resolution,
 			m_nerf.training.extra_dims_gpu.data(),
-			m_nerf_network->n_extra_dims()
+			m_nerf_network->n_extra_dims(),
+			per_sample_extra_dims
 		);
 
 		if (hg_enc) {
