@@ -86,7 +86,6 @@ namespace pbrt
         } else
 #endif
         {
-
             delete integrator;
         }
     }

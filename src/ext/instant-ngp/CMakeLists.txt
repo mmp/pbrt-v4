@@ -15,7 +15,7 @@ project(instant-ngp
 )
 set(NGP_VERSION "${CMAKE_PROJECT_VERSION}")
 
-if (NOT NGP_DEPLOY)
+if(NOT NGP_DEPLOY)
 	set(NGP_VERSION "${NGP_VERSION}dev")
 endif()
 
@@ -28,18 +28,18 @@ option(NGP_BUILD_WITH_VULKAN "Build with Vulkan to enable DLSS support?" ON)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-###############################################################################
+# ##############################################################################
 # Build type and C++ compiler setup
-###############################################################################
+# ##############################################################################
 
 # Set a default configuration if none was specified
-if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 	message(STATUS "No release type specified. Setting to 'Release'.")
 	set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
 	set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo")
 endif()
 
-if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/dependencies/glfw/CMakeLists.txt")
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/dependencies/glfw/CMakeLists.txt")
 	message(FATAL_ERROR
 		"Some instant-ngp dependencies are missing. "
 		"If you forgot the \"--recursive\" flag when cloning this project, "
@@ -47,16 +47,16 @@ if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/dependencies/glfw/CMakeLists.txt")
 	)
 endif()
 
-if (APPLE)
+if(APPLE)
 	set(CMAKE_MACOSX_RPATH ON)
 endif()
 
-if (CMAKE_EXPORT_COMPILE_COMMANDS)
-    set(CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES})
-    set(CMAKE_CUDA_STANDARD_INCLUDE_DIRECTORIES ${CMAKE_CUDA_IMPLICIT_INCLUDE_DIRECTORIES})
+if(CMAKE_EXPORT_COMPILE_COMMANDS)
+	set(CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES})
+	set(CMAKE_CUDA_STANDARD_INCLUDE_DIRECTORIES ${CMAKE_CUDA_IMPLICIT_INCLUDE_DIRECTORIES})
 endif()
 
-if (MSVC)
+if(MSVC)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /D_CRT_SECURE_NO_WARNINGS")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP24")
 else()
@@ -66,31 +66,30 @@ endif()
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-###############################################################################
+# ##############################################################################
 # CUDA compiler setup
-###############################################################################
-
+# ##############################################################################
 set(CMAKE_CUDA_STANDARD 14)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_EXTENSIONS OFF)
 set(CUDA_LINK_LIBRARIES_KEYWORD PUBLIC)
 set(CMAKE_CUDA_RUNTIME_LIBRARY Shared)
 
-if (MSVC)
+if(MSVC)
 	list(APPEND CUDA_NVCC_FLAGS "-Xcompiler=/bigobj")
 else()
 	list(APPEND CUDA_NVCC_FLAGS "-Xcompiler=-Wno-float-conversion")
 	list(APPEND CUDA_NVCC_FLAGS "-Xcompiler=-fno-strict-aliasing")
 	list(APPEND CUDA_NVCC_FLAGS "-Xcompiler=-fPIC")
 endif()
+
 list(APPEND CUDA_NVCC_FLAGS "--extended-lambda")
 list(APPEND CUDA_NVCC_FLAGS "--expt-relaxed-constexpr")
 list(APPEND CUDA_NVCC_FLAGS "--use_fast_math")
 
-###############################################################################
+# ##############################################################################
 # Dependencies
-###############################################################################
-
+# ##############################################################################
 set(TCNN_BUILD_BENCHMARK OFF)
 set(TCNN_BUILD_EXAMPLES OFF)
 set(TCNN_BUILD_WITH_RTC ${NGP_BUILD_WITH_RTC})
@@ -99,9 +98,10 @@ add_subdirectory(dependencies/tiny-cuda-nn)
 
 set(CMAKE_CUDA_ARCHITECTURES ${TCNN_CUDA_ARCHITECTURES})
 
-if (NGP_BUILD_WITH_GUI)
+if(NGP_BUILD_WITH_GUI)
 	find_package(Vulkan)
-	if (Vulkan_FOUND AND NGP_BUILD_WITH_VULKAN)
+
+	if(Vulkan_FOUND AND NGP_BUILD_WITH_VULKAN)
 		set(NGP_VULKAN ON)
 		list(APPEND NGP_DEFINITIONS -DNGP_VULKAN -DGLFW_INCLUDE_VULKAN)
 		list(APPEND NGP_INCLUDE_DIRECTORIES "${Vulkan_INCLUDE_DIRS}")
@@ -111,7 +111,8 @@ if (NGP_BUILD_WITH_GUI)
 
 		# DLSS depends on vulkan, so appears here
 		list(APPEND NGP_INCLUDE_DIRECTORIES "dependencies/dlss/include")
-		if (MSVC)
+
+		if(MSVC)
 			list(APPEND NGP_LINK_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/dependencies/dlss/lib/Windows_x86_64/x86_64")
 			list(APPEND NGP_LIBRARIES "$<IF:$<CONFIG:Debug>,nvsdk_ngx_d_dbg,nvsdk_ngx_d>")
 		else()
@@ -120,7 +121,8 @@ if (NGP_BUILD_WITH_GUI)
 		endif()
 	else()
 		set(NGP_VULKAN OFF)
-		if (NGP_BUILD_WITH_VULKAN)
+
+		if(NGP_BUILD_WITH_VULKAN)
 			message(WARNING
 				"Vulkan was not found. Instant neural graphics primitives will still "
 				"compile and run correctly, but DLSS will not be supported."
@@ -129,11 +131,12 @@ if (NGP_BUILD_WITH_GUI)
 	endif()
 
 	# OpenXR
-	if (WIN32)
+	if(WIN32)
 		list(APPEND NGP_DEFINITIONS -DXR_USE_PLATFORM_WIN32 -DGLFW_EXPOSE_NATIVE_WGL)
-	elseif (UNIX AND NOT APPLE)
+	elseif(UNIX AND NOT APPLE)
 		list(APPEND NGP_DEFINITIONS -DGLFW_EXPOSE_NATIVE_GLX)
-		if (JK_USE_WAYLAND)
+
+		if(JK_USE_WAYLAND)
 			set(PRESENTATION_BACKEND wayland CACHE STRING " " FORCE)
 			set(BUILD_WITH_XLIB_HEADERS OFF CACHE BOOL " " FORCE)
 			set(BUILD_WITH_XCB_HEADERS OFF CACHE BOOL " " FORCE)
@@ -182,7 +185,7 @@ if (NGP_BUILD_WITH_GUI)
 
 	list(APPEND NGP_INCLUDE_DIRECTORIES "dependencies/glfw/include" "dependencies/imgui")
 
-	if (MSVC)
+	if(MSVC)
 		list(APPEND NGP_INCLUDE_DIRECTORIES "dependencies/gl3w")
 		list(APPEND GUI_SOURCES "dependencies/gl3w/GL/gl3w.c")
 		list(APPEND NGP_LIBRARIES opengl32 $<TARGET_OBJECTS:glfw_objects>)
@@ -215,26 +218,28 @@ list(APPEND NGP_INCLUDE_DIRECTORIES
 )
 
 find_package(OpenMP)
-if (OPENMP_FOUND)
+
+if(OPENMP_FOUND)
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
 
-if (NGP_BUILD_WITH_OPTIX)
+if(NGP_BUILD_WITH_OPTIX)
 	set(NGP_OPTIX ON)
-	list(APPEND NGP_INCLUDE_DIRECTORIES "dependencies/optix")
+	list(INSERT NGP_INCLUDE_DIRECTORIES 0 "${CMAKE_CURRENT_SOURCE_DIR}/dependencies/optix")
 	list(APPEND NGP_DEFINITIONS -DNGP_OPTIX)
 endif()
 
-if (NGP_BUILD_WITH_PYTHON_BINDINGS)
+if(NGP_BUILD_WITH_PYTHON_BINDINGS)
 	find_package(Python 3.7 COMPONENTS Interpreter Development)
-	if (Python_FOUND)
+
+	if(Python_FOUND)
 		add_subdirectory("dependencies/pybind11")
 	endif()
 endif()
 
 # Compile zlib (only on Windows)
-if (WIN32)
+if(WIN32)
 	set(ZLIB_USE_STATIC_LIBS ON CACHE BOOL " " FORCE)
 	set(ZLIB_BUILD_STATIC_LIBS ON CACHE BOOL " " FORCE)
 	set(ZLIB_BUILD_SHARED_LIBS OFF CACHE BOOL " " FORCE)
@@ -253,16 +258,16 @@ endif()
 add_subdirectory("dependencies/zstr")
 list(APPEND NGP_LIBRARIES zstr::zstr)
 
-
-###############################################################################
+# ##############################################################################
 # Program
-###############################################################################
-
+# ##############################################################################
 list(APPEND NGP_DEFINITIONS -DNGP_VERSION="${NGP_VERSION}")
 list(APPEND NGP_INCLUDE_DIRECTORIES "include")
-if (NOT MSVC)
+
+if(NOT MSVC)
 	list(APPEND NGP_LIBRARIES ${CMAKE_DL_LIBS})
 endif()
+
 list(APPEND NGP_SOURCES
 	${GUI_SOURCES}
 	src/camera_path.cu
@@ -291,7 +296,7 @@ get_filename_component(CUDA_COMPILER_BIN "${CMAKE_CUDA_COMPILER}" DIRECTORY)
 get_filename_component(CUDA_DIR "${CUDA_COMPILER_BIN}" DIRECTORY)
 set(CUDA_INCLUDE "${CUDA_DIR}/include")
 
-if (NGP_OPTIX)
+if(NGP_OPTIX)
 	add_library(optix_program OBJECT
 		src/optix/pathescape.cu
 		src/optix/raystab.cu
@@ -311,7 +316,8 @@ if (NGP_OPTIX)
 	set(OPTIX_PTX_HEADER ${CMAKE_CURRENT_BINARY_DIR}/optix_ptx.h)
 
 	find_program(bin_to_c NAMES bin2c PATHS ${CUDA_COMPILER_BIN})
-	if (NOT bin_to_c)
+
+	if(NOT bin_to_c)
 		message(FATAL_ERROR
 			"bin2c not found:\n"
 			"  CMAKE_CUDA_COMPILER='${CMAKE_CUDA_COMPILER}'\n"
@@ -336,7 +342,8 @@ endif()
 
 cmrc_add_resource_library(ngp-resources NAMESPACE ngp)
 list(APPEND NGP_LIBRARIES ngp-resources)
-if (NGP_BUILD_WITH_RTC)
+
+if(NGP_BUILD_WITH_RTC)
 	# Create local directory that can serve as cache for the runtime compiled artifacts
 	file(MAKE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/rtc/cache")
 
@@ -345,17 +352,23 @@ if (NGP_BUILD_WITH_RTC)
 endif()
 
 add_library(ngp STATIC ${NGP_SOURCES})
+
+if(NGP_OPTIX)
+	add_dependencies(ngp optix_program)
+endif()
+
 set_target_properties(ngp PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON CUDA_SEPARABLE_COMPILATION ON)
 target_compile_definitions(ngp PUBLIC ${NGP_DEFINITIONS})
 target_compile_options(ngp PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:${CUDA_NVCC_FLAGS}>)
-target_include_directories(ngp PUBLIC ${NGP_INCLUDE_DIRECTORIES})
+target_include_directories(ngp BEFORE PUBLIC ${NGP_INCLUDE_DIRECTORIES})
 target_link_directories(ngp PUBLIC ${NGP_LINK_DIRECTORIES})
 target_link_libraries(ngp PUBLIC ${NGP_LIBRARIES} tiny-cuda-nn)
 
 # Copy shared libraries to the binary directory as needed
-if (NGP_VULKAN)
+if(NGP_VULKAN)
 	set(NGX_BUILD_DIR "$<IF:$<CONFIG:Debug>,dev,rel>")
-	if (MSVC)
+
+	if(MSVC)
 		set(NGX_SHARED_LIB "${CMAKE_CURRENT_SOURCE_DIR}/dependencies/dlss/lib/Windows_x86_64/${NGX_BUILD_DIR}/nvngx_dlss.dll")
 	else()
 		set(NGX_SHARED_LIB "${CMAKE_CURRENT_SOURCE_DIR}/dependencies/dlss/lib/Linux_x86_64/${NGX_BUILD_DIR}/libnvidia-ngx-dlss.so.*")
@@ -364,41 +377,46 @@ if (NGP_VULKAN)
 	add_custom_command(TARGET ngp POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy "${NGX_SHARED_LIB}" "${CMAKE_CURRENT_BINARY_DIR}" COMMAND_EXPAND_LISTS)
 endif()
 
-if (MSVC)
+if(MSVC)
 	file(GLOB CUDA_DLLS "${CUDA_COMPILER_BIN}/cudart64*.dll" "${CUDA_COMPILER_BIN}/nvrtc*.dll")
 	list(FILTER CUDA_DLLS EXCLUDE REGEX "\\.alt\\.dll$")
-	if (CUDA_DLLS)
+
+	if(CUDA_DLLS)
 		add_custom_command(TARGET ngp POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy ${CUDA_DLLS} "${CMAKE_CURRENT_BINARY_DIR}" COMMAND_EXPAND_LISTS)
 	endif()
 endif()
 
-if (NGP_BUILD_EXECUTABLE)
+if(NGP_BUILD_EXECUTABLE)
 	add_executable(instant-ngp src/main.cu)
 	target_link_libraries(instant-ngp PRIVATE ngp)
 
 	# Link the executable to the project directory and copy over DLLs such that instant-ngp can be invoked without going into the build folder.
 	set(NGP_BINARY_FILE "\"${CMAKE_CURRENT_SOURCE_DIR}/$<TARGET_FILE_NAME:instant-ngp>\"")
-	if (MSVC)
+
+	if(MSVC)
 		add_custom_command(TARGET instant-ngp POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:instant-ngp> ${CMAKE_CURRENT_SOURCE_DIR})
 		file(GLOB NGP_REQUIRED_DLLS "${CUDA_COMPILER_BIN}/cudart64*.dll" "${CUDA_COMPILER_BIN}/nvrtc*.dll")
 		list(FILTER NGP_REQUIRED_DLLS EXCLUDE REGEX "\\.alt\\.dll$")
-		if (NGP_VULKAN)
+
+		if(NGP_VULKAN)
 			list(APPEND NGP_REQUIRED_DLLS "${NGX_SHARED_LIB}")
 		endif()
+
 		message("NGP_REQUIRED_DLLS: ${NGP_REQUIRED_DLLS}")
-		if (NGP_REQUIRED_DLLS)
+
+		if(NGP_REQUIRED_DLLS)
 			add_custom_command(TARGET instant-ngp POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy ${NGP_REQUIRED_DLLS} "${CMAKE_CURRENT_SOURCE_DIR}" COMMAND_EXPAND_LISTS)
 		endif()
 	else()
 		add_custom_command(TARGET instant-ngp POST_BUILD COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:instant-ngp> "${NGP_BINARY_FILE}")
 
-		if (NGP_VULKAN)
+		if(NGP_VULKAN)
 			add_custom_command(TARGET instant-ngp POST_BUILD COMMAND "ln" -s -f "${NGX_SHARED_LIB}" "${CMAKE_CURRENT_SOURCE_DIR}/")
 		endif()
 	endif()
 endif(NGP_BUILD_EXECUTABLE)
 
-if (Python_FOUND)
+if(Python_FOUND)
 	add_library(pyngp SHARED src/python_api.cu)
 	set_target_properties(pyngp PROPERTIES CXX_VISIBILITY_PRESET "hidden" CUDA_VISIBILITY_PRESET "hidden")
 	target_link_libraries(pyngp PRIVATE ngp PUBLIC ${PYTHON_LIBRARIES} pybind11::module)

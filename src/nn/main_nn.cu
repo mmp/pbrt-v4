@@ -63,6 +63,13 @@
 #include <neural-graphics-primitives/nerf_loader.h>
 #include <tiny-cuda-nn/common.h>
 #include <memory>
+#include <iostream>
+#include <string>
+#include <vector>
+#include <stdexcept>
+#include <algorithm>
+#include <fstream>
+#include <filesystem/directory.h>
 
 using namespace tcnn;
 using namespace ngp;
@@ -138,8 +145,8 @@ using namespace ngp;
 
 struct MetadataExtras
 {
-    std::vector<GPUMemory<int>> sample_indices;
-    std::vector<GPUMemory<int>> final_depths;
+    std::vector<GPUMemory<float>> sample_indices;
+    std::vector<GPUMemory<float>> final_depths;
 };
 
 struct LoadedRayInfo {
@@ -155,7 +162,7 @@ struct LoadedRayInfo {
     float *sampleIdx = nullptr;
     float *finalDepths = nullptr;
     // float *luminances = nullptr;
-    vec4 *rgba = nullptr;
+    vec4 *rgbas = nullptr;
     // float depth_scale = -1.f;
 };
 
@@ -164,8 +171,8 @@ int load_ray_data_from_file(std::vector<LoadedRayInfo>& frameRayData, const fs::
     // TODO(parser-validation): handle unreadable files gracefully and replace this std::count usage
     // with an actual '\n' count (std::count expects a value, not a predicate lambda).
     std::ifstream f{native_string(path), std::ios::in | std::ios::ate};
-    auto count = std::count(std::istreambuf_iterator<char>{f}, {}, [](char c){ return c == '\n';});
-    f.seekg(0, std::ios::begin);
+    auto count = std::count(std::istreambuf_iterator<char>{f}, std::istreambuf_iterator<char>{}, '\n');
+    f.seekg(0, std::ios::beg);
 
     // Create buffers to hold results of parsing
     Ray* rays = new Ray[count];
@@ -205,11 +212,11 @@ int load_ray_data_from_file(std::vector<LoadedRayInfo>& frameRayData, const fs::
             oBuf, dBuf, &pixelIdx, &sampleIdx, &finalDepth, &lum, rgbBuf
         );
         if(read != 7)
-            throw std::runtime_error("Failed to parse line, only %d items read", read);
+            throw std::runtime_error(std::string("Failed to parse line, only ") + std::to_string(read) + " items read");
 
         vec3 o;
         vec3 d;
-        vec4 rgb;
+        vec4 rgba;
         float ox, oy, oz;
         float dx, dy, dz;
         float r, g, b;
@@ -242,13 +249,13 @@ int load_ray_data_from_file(std::vector<LoadedRayInfo>& frameRayData, const fs::
             memcpy(frameFinalDepths, finalDepths, rayCount*sizeof(float));
             memcpy(frameRGBAs, rgbas, rayCount*sizeof(float));
             ivec2 res{rayCount, 1};
-            frameRayData.emplace_back({
-                res, 
-                frameRay, 
-                frameSampleIndices,
-                frameFinalDepths,
-                frameRGBAs
-            });
+            LoadedRayInfo info;
+            info.res = res;
+            info.rays = frameRay;
+            info.sampleIdx = frameSampleIndices;
+            info.finalDepths = frameFinalDepths;
+            info.rgbas = frameRGBAs;
+            frameRayData.push_back(info);
             frameIdx++;
             currSampleIdx = sampleIdx;
             ptr = 0;
@@ -275,15 +282,15 @@ int load_ray_data_from_file(std::vector<LoadedRayInfo>& frameRayData, const fs::
         memcpy(frameFinalDepths, finalDepths, rayCount*sizeof(float));
         memcpy(frameRGBAs, rgbas, rayCount*sizeof(float));
         ivec2 res{rayCount, 1};
-        frameRayData.emplace_back({
-            res, 
-            frameRay, 
-            frameSampleIndices,
-            frameFinalDepths,
-            frameRGBAs
-        });
+        LoadedRayInfo info;
+        info.res = res;
+        info.rays = frameRay;
+        info.sampleIdx = frameSampleIndices;
+        info.finalDepths = frameFinalDepths;
+        info.rgbas = frameRGBAs;
+        frameRayData.push_back(info);
         frameIdx++;
-        currSampleIdx = sampleIdx;
+        // currSampleIdx = sampleIdx; // Removed as sampleIdx is out of scope and not needed here
         ptr = 0;
         rayCount = 0;
     }
@@ -393,7 +400,7 @@ void load_nerfdataset(NerfDataset& nerf_data, MetadataExtras& meta_extras, const
             1.0f, 
             false, 
             EImageDataType::Float, 
-            EDepthDataType::None,
+            EDepthDataType::Float,
             0.f,
             false,
             false,
@@ -416,12 +423,13 @@ void load_nerfdataset(NerfDataset& nerf_data, MetadataExtras& meta_extras, const
 
         //TODO: Check if there are any other fields that I need to set for the metadata
         nerf_data.metadata[frameIdx].image_data_type = EImageDataType::Float;
-        nerf_data.xforms[frameIdx] = matrix_t::identity();
-        nerf_data.metadata[frameIdx].camera_distortion = {};
+        nerf_data.xforms[frameIdx].start = mat4x3::identity();
+        nerf_data.xforms[frameIdx].end = mat4x3::identity();
+        nerf_data.metadata[frameIdx].lens = {};
         nerf_data.metadata[frameIdx].resolution = frame.res;
         nerf_data.metadata[frameIdx].principal_point = vec2(0.5f);
         nerf_data.metadata[frameIdx].focal_length = vec2(1000.f);
-        nerf_data.metadata[frameIdx].rolling_shutter = vec3(0.f);
+        nerf_data.metadata[frameIdx].rolling_shutter = vec4(0.f);
         nerf_data.metadata[frameIdx].light_dir = vec3(0.f);
         
         nerf_data.update_metadata(frameIdx, frameIdx + 1);
@@ -432,7 +440,7 @@ void load_nerfdataset(NerfDataset& nerf_data, MetadataExtras& meta_extras, const
         delete[] frame.rays;
         delete[] frame.sampleIdx;
         delete[] frame.finalDepths;
-        delete[] frame.rgba;
+        delete[] frame.rgbas;
 #endif
     }
 
@@ -497,4 +505,4 @@ int main(int argc, char** argv)
     return 0;
 }
 
-#
+#endif

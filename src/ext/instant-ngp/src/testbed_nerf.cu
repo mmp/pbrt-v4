@@ -3074,7 +3074,7 @@ void Testbed::train_nerf_step(uint32_t target_batch_size, Testbed::NerfCounters&
 		max_inference = next_multiple(std::min(counters.measured_batch_size_before_compaction, max_samples), BATCH_SIZE_GRANULARITY);
 	}
 	
-	const uint32_t n_extra_dims = m_nerf.training.dataset.n_extra_dims;
+	const uint32_t n_extra_dims = m_nerf.training.dataset.n_extra_dims();
 	const size_t per_sample_capacity = (size_t)max_samples * n_extra_dims;
 	if(n_extra_dims && m_nerf.training.per_sample_extra_dims_gpu.size() < per_sample_capacity)
 	{
