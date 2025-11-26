@@ -170,8 +170,13 @@ int load_ray_data_from_file(std::vector<LoadedRayInfo>& frameRayData, const fs::
 {
     // TODO(parser-validation): handle unreadable files gracefully and replace this std::count usage
     // with an actual '\n' count (std::count expects a value, not a predicate lambda).
-    std::ifstream f{native_string(path), std::ios::in | std::ios::ate};
-    auto count = std::count(std::istreambuf_iterator<char>{f}, std::istreambuf_iterator<char>{}, '\n');
+    std::ifstream f{native_string(path), std::ios::in};
+    if (!f.is_open()) throw std::runtime_error("Failed to open file");
+    //TODO: Find faster way to get line count, for now it is harcoded (i know how much it is)
+
+    //auto count = std::count(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>(), '\n');
+    const int count = 21772800;
+    f.clear();
     f.seekg(0, std::ios::beg);
 
     // Create buffers to hold results of parsing
@@ -204,12 +209,12 @@ int load_ray_data_from_file(std::vector<LoadedRayInfo>& frameRayData, const fs::
         int pixelIdx;
         int sampleIdx;
         int finalDepth;
-        float lum;
+        char lumBuf[128];
         char rgbBuf[64];
 
         int read = std::sscanf(line.c_str(), 
-            "Pixel (o: %[^]], d: %[^]]) PixelIdx (%d) Sample (%d) FinalDepth (%d) Luminance (%f) RGB (%[^]])",
-            oBuf, dBuf, &pixelIdx, &sampleIdx, &finalDepth, &lum, rgbBuf
+            "Pixel (o: %[^]]], d: %[^]]]) PixelIdx (%d) Sample (%d) FinalDepth (%d) Luminance (%[^]]]) RGB (%[^]]])",
+            oBuf, dBuf, &pixelIdx, &sampleIdx, &finalDepth, lumBuf, rgbBuf
         );
         if(read != 7)
             throw std::runtime_error(std::string("Failed to parse line, only ") + std::to_string(read) + " items read");
@@ -222,7 +227,7 @@ int load_ray_data_from_file(std::vector<LoadedRayInfo>& frameRayData, const fs::
         float r, g, b;
         read = std::sscanf(oBuf, "[%f, %f, %f", &ox, &oy, &oz);
         read = std::sscanf(dBuf, "[%f, %f, %f", &dx, &dy, &dz);
-        read = std::sscanf(rgbBuf, "[%f, %f, %f", &r, &g, &b);
+        read = std::sscanf(rgbBuf, "[%f %f %f", &r, &g, &b);
 
 
         o = vec3(ox, oy, oz);
@@ -493,6 +498,8 @@ int main(int argc, char** argv)
     
     // Reset network to ensure it picks up the new dimensions
     testbed.reset_network();
+    
+
 
     // Initialize training state (gradients, optimizers, etc.)
     testbed.load_nerf_post();

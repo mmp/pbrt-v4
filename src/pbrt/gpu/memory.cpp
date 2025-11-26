@@ -35,6 +35,10 @@ void *CUDATrackedMemoryResource::do_allocate(size_t size, size_t alignment) {
     std::lock_guard<std::mutex> lock(mutex);
     allocations[ptr] = size;
     bytesAllocated += size;
+    
+    auto bytesAlloced = bytesAllocated.load();
+    LOG_VERBOSE("Allocated %d bytes of %d bytesAllocated, allocations now contain %d items", size, bytesAlloced, allocations.size());
+
 
     return ptr;
 }
@@ -53,19 +57,23 @@ void CUDATrackedMemoryResource::do_deallocate(void *p, size_t size, size_t align
     allocations.erase(iter);
     bytesAllocated -= size;
     auto bytesAlloced = bytesAllocated.load();
-    LOG_VERBOSE("Deallocated %d bytes of %d bytesAllocated, allocations now contain %d items", size, bytesAlloced, allocations.size());
+    // LOG_VERBOSE("Deallocated %d bytes of %d bytesAllocated, allocations now contain %d items", size, bytesAlloced, allocations.size());
 }
 
 void CUDATrackedMemoryResource::Free()
 {
-    const auto size = allocations.size();
-    for(auto& i : allocations)
-    {
-        void* p = i.first;
-        CUDA_CHECK(cudaFree(p));
-    }
+    // const auto size = allocations.size();
+    // for(auto& i : allocations)
+    // {
+    //     void* p = i.first;
+    //     CUDA_CHECK(cudaFree(p));
+    // }
 
-    allocations.clear();
+    // allocations.clear();
+
+    auto bytesAllocd = bytesAllocated.load();
+    auto allocs = allocations.size();
+    LOG_VERBOSE("Currently still %d bytes allocated from %d allocations", bytesAllocd, allocs);
 }
 
 void CUDATrackedMemoryResource::PrefetchToGPU() const {

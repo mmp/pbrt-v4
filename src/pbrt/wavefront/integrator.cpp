@@ -381,10 +381,10 @@ namespace pbrt
             lightSampler.Dispatch(lambda);
         }
 
-        CUDATrackedMemoryResource* mr =
-            dynamic_cast<CUDATrackedMemoryResource*>(memoryResource);
-        CHECK(mr);
-        mr->Free();
+        // CUDATrackedMemoryResource* mr =
+        //     dynamic_cast<CUDATrackedMemoryResource*>(memoryResource);
+        // CHECK(mr);
+        // mr->Free();
         
     }
 
