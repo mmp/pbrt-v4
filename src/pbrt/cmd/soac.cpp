@@ -444,6 +444,29 @@ int main(int argc, char *argv[]) {
         printf("    }\n");
         printf("\n");
 
+        printf("    void Free(Allocator alloc) {\n");
+        for (const auto &member : soa.members) {
+            for (int i = 0; i < member.names.size(); ++i) {
+                std::string name = member.names[i];
+                if (!member.arraySizes[i].empty()) {
+                    printf("        for (int i = 0; i < %s; ++i)\n",
+                           member.arraySizes[i].c_str());
+                    if (isFlatType(member.type) || member.numPointers > 0)
+                        printf("            alloc.deallocate_object(this->%s[i], nAlloc);\n",
+                               name.c_str());
+                    else
+                        printf("            this->%s[i].Free(alloc);\n", name.c_str());
+                } else {
+                    if (isFlatType(member.type) || member.numPointers > 0)
+                        printf("        alloc.deallocate_object(this->%s, nAlloc);\n",
+                               name.c_str());
+                    else
+                        printf("        this->%s.Free(alloc);\n", name.c_str());
+                }
+            }
+        }
+        printf("    }\n");
+
         // Member definitions
         printf("    int nAlloc;\n");
         for (const auto &member : soa.members) {

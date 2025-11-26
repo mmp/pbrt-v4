@@ -166,6 +166,10 @@ class MultiWorkQueue<TypePack<Ts...>> {
     PBRT_CPU_GPU
     void Reset() { (Get<Ts>()->Reset(), ...); }
 
+    void Free(Allocator alloc) {
+        (Get<Ts>()->Free(alloc), ...);
+    }
+
   private:
     // MultiWorkQueue Private Members
     pstd::tuple<WorkQueue<Ts>...> queues;

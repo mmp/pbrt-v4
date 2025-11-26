@@ -334,6 +334,58 @@ namespace pbrt
         {
             inputRayDataFile->close();
         }
+
+        StopDisplayThread();
+        ClearDisplayDynamic();
+
+#ifdef PBRT_BUILD_GPU_RENDERER
+        if (Options->useGPU)
+        {
+            if (displayRGB)
+                CUDA_CHECK(cudaFree(displayRGB));
+            if (displayRGBHost)
+                delete[] displayRGBHost;
+        }
+#endif
+
+        // Clean up allocated memory
+        Allocator alloc(memoryResource);
+
+        if (aggregate) delete aggregate;
+        if (infiniteLights) alloc.delete_object(infiniteLights);
+
+        if (rayQueues[0]) { rayQueues[0]->Free(alloc); alloc.delete_object(rayQueues[0]); }
+        if (rayQueues[1]) { rayQueues[1]->Free(alloc); alloc.delete_object(rayQueues[1]); }
+        if (shadowRayQueue) { shadowRayQueue->Free(alloc); alloc.delete_object(shadowRayQueue); }
+
+        if (bssrdfEvalQueue) { bssrdfEvalQueue->Free(alloc); alloc.delete_object(bssrdfEvalQueue); }
+        if (subsurfaceScatterQueue) { subsurfaceScatterQueue->Free(alloc); alloc.delete_object(subsurfaceScatterQueue); }
+
+        if (escapedRayQueue) { escapedRayQueue->Free(alloc); alloc.delete_object(escapedRayQueue); }
+        if (hitAreaLightQueue) { hitAreaLightQueue->Free(alloc); alloc.delete_object(hitAreaLightQueue); }
+
+        if (basicEvalMaterialQueue) { basicEvalMaterialQueue->Free(alloc); alloc.delete_object(basicEvalMaterialQueue); }
+        if (universalEvalMaterialQueue) { universalEvalMaterialQueue->Free(alloc); alloc.delete_object(universalEvalMaterialQueue); }
+
+        if (mediumSampleQueue) { mediumSampleQueue->Free(alloc); alloc.delete_object(mediumSampleQueue); }
+        if (mediumScatterQueue) { mediumScatterQueue->Free(alloc); alloc.delete_object(mediumScatterQueue); }
+
+        if (stats) alloc.delete_object(stats);
+
+        pixelSampleState.Free(alloc);
+        inputRayData.Free(alloc);
+        outputRayData.Free(alloc);
+
+        if (lightSampler) {
+            auto lambda = [&](auto ptr) { alloc.delete_object(ptr); };
+            lightSampler.Dispatch(lambda);
+        }
+
+        CUDATrackedMemoryResource* mr =
+            dynamic_cast<CUDATrackedMemoryResource*>(memoryResource);
+        CHECK(mr);
+        mr->Free();
+        
     }
 
     // WavefrontPathIntegrator Method Definitions
@@ -914,7 +966,7 @@ namespace pbrt
         {
             // Wait until rendering is all done before we start to shut down the
             // display stuff..
-            if (!Options->displayServer.empty())
+            if (!Options->displayServer.empty() && copyThread)
             {
                 *exitCopyThread = true;
                 copyThread->join();

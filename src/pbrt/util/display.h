@@ -36,6 +36,8 @@ void DisplayStatic(std::string title, const Image &image,
 void DisplayDynamic(std::string title, const Image &image,
                     pstd::optional<ImageChannelDesc> channelDesc = {});
 
+void ClearDisplayDynamic();
+
 template <typename T>
 inline typename std::enable_if_t<std::is_arithmetic_v<T>, void> DisplayStatic(
     const std::string &title, pstd::span<const T> values, int xResolution) {

@@ -20,7 +20,7 @@ namespace pbrt
 
         //For now, we just set a limit on the size of the files, set to 1GB for now
                 // Ensure file pointers are positioned at the end so writes append.
-        const uint64_t kMaxBytes = 1024ull * 1024ull * 1024ull;
+        const uint64_t kMaxBytes = 4 * 1024ull * 1024ull * 1024ull;
 
         auto outPos = outputRayDataFile->tellp();
         auto inPos  = inputRayDataFile->tellp();
@@ -71,10 +71,10 @@ namespace pbrt
             // RGB rgb = film.GetPixelRGB(p + pixelBounds.pMin);
             RGB rgb = film.ToOutputRGB(L, lambda);
 
-            std::string inputLine = StringPrintf("Pixel (o: %s, d: %s) PixelIdx (%d) Sample (%d) InitialDepth (%d)\n",
-                iRayo.ToString(), iRayd.ToString(), pixelIndex, iSampleIdx, iDepth
-            );
-            inputRayDataFile->write(inputLine.c_str(), inputLine.length());
+            // std::string inputLine = StringPrintf("Pixel (o: %s, d: %s) PixelIdx (%d) Sample (%d) InitialDepth (%d)\n",
+            //     iRayo.ToString(), iRayd.ToString(), pixelIndex, iSampleIdx, iDepth
+            // );
+            // inputRayDataFile->write(inputLine.c_str(), inputLine.length());
 
             std::string outputLine = StringPrintf("Pixel (o: %s, d: %s) PixelIdx (%d) Sample (%d) FinalDepth (%d) Luminance (%s) RGB (%s)\n",
                 oRayo.ToString(), oRayd.ToString(), pixelIndex, oSampleIdx, oDepth, L.ToString(), rgb.ToString());

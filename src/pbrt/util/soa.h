@@ -62,6 +62,13 @@ struct SOA<SampledSpectrum> {
         ptr1 = s.ptr1;
         return *this;
     }
+    void Free(Allocator alloc) {
+        if constexpr ((NSpectrumSamples % 4) == 0) {
+            alloc.deallocate_object(ptr4, nAlloc);
+        } else {
+            alloc.deallocate_object(ptr1, nAlloc);
+        }
+    }
     PBRT_CPU_GPU
     SampledSpectrum operator[](int i) const {
         SampledSpectrum s;
@@ -147,6 +154,15 @@ struct SOA<SampledWavelengths> {
         lambda1 = s.lambda1;
         pdf1 = s.pdf1;
         return *this;
+    }
+    void Free(Allocator alloc) {
+        if constexpr ((NSpectrumSamples % 4) == 0) {
+            alloc.deallocate_object(lambda4, nAlloc);
+            alloc.deallocate_object(pdf4, nAlloc);
+        } else {
+            alloc.deallocate_object(lambda1, nAlloc);
+            alloc.deallocate_object(pdf1, nAlloc);
+        }
     }
 
     PBRT_CPU_GPU

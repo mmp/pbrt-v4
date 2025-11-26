@@ -49,12 +49,21 @@ namespace pbrt
         SOA() = default;
 
         SOA(int size, Allocator alloc)
+            : nAlloc(size)
         {
             direct = alloc.allocate_object<Float4>(size);
             indirect = alloc.allocate_object<Float4>(size);
             subsurface = alloc.allocate_object<Float4>(size);
             mediaDist = alloc.allocate_object<Float>(size);
             mediaMode = alloc.allocate_object<Float>(size);
+        }
+
+        void Free(Allocator alloc) {
+            alloc.deallocate_object(direct, nAlloc);
+            alloc.deallocate_object(indirect, nAlloc);
+            alloc.deallocate_object(subsurface, nAlloc);
+            alloc.deallocate_object(mediaDist, nAlloc);
+            alloc.deallocate_object(mediaMode, nAlloc);
         }
 
         PBRT_CPU_GPU
@@ -108,6 +117,7 @@ namespace pbrt
             GetSetIndirector operator[](int i) { return GetSetIndirector{ this, i }; }
 
     private:
+        int nAlloc;
         Float4* PBRT_RESTRICT direct;
         Float4* PBRT_RESTRICT indirect;
         Float4* PBRT_RESTRICT subsurface;

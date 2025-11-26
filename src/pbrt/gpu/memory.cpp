@@ -43,6 +43,8 @@ void CUDATrackedMemoryResource::do_deallocate(void *p, size_t size, size_t align
     if (!p)
         return;
 
+    if(allocations.find(p) == allocations.end()) return;
+
     CUDA_CHECK(cudaFree(p));
 
     std::lock_guard<std::mutex> lock(mutex);
@@ -50,6 +52,20 @@ void CUDATrackedMemoryResource::do_deallocate(void *p, size_t size, size_t align
     DCHECK(iter != allocations.end());
     allocations.erase(iter);
     bytesAllocated -= size;
+    auto bytesAlloced = bytesAllocated.load();
+    LOG_VERBOSE("Deallocated %d bytes of %d bytesAllocated, allocations now contain %d items", size, bytesAlloced, allocations.size());
+}
+
+void CUDATrackedMemoryResource::Free()
+{
+    const auto size = allocations.size();
+    for(auto& i : allocations)
+    {
+        void* p = i.first;
+        CUDA_CHECK(cudaFree(p));
+    }
+
+    allocations.clear();
 }
 
 void CUDATrackedMemoryResource::PrefetchToGPU() const {
