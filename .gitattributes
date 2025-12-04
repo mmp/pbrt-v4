@@ -1,0 +1,2 @@
+*.jpg filter=lfs diff=lfs merge=lfs -text
+src/ext/instant-ngp/data/* filter=lfs diff=lfs merge=lfs -text
