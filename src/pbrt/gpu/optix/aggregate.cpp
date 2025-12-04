@@ -105,7 +105,8 @@ STAT_MEMORY_COUNTER("Memory/Acceleration structures", gpuBVHBytes);
 
 OptixTraversableHandle OptiXAggregate::buildOptixBVH(
     OptixDeviceContext optixContext, const std::vector<OptixBuildInput> &buildInputs,
-    ThreadLocal<cudaStream_t> &threadCUDAStreams) {
+    ThreadLocal<cudaStream_t> &threadCUDAStreams,
+    std::vector<CUdeviceptr> &bvhBuffers) {
     if (buildInputs.empty())
         return {};
 
@@ -153,6 +154,10 @@ OptixTraversableHandle OptiXAggregate::buildOptixBVH(
     if (compactedSize >= blasBufferSizes.outputSizeInBytes) {
         // No need to compact...
         gpuBVHBytes += blasBufferSizes.outputSizeInBytes;
+
+        static std::mutex mutex;
+        std::lock_guard<std::mutex> lock(mutex);
+        bvhBuffers.push_back((CUdeviceptr)outputBuffer);
     } else {
         // Compact the acceleration structure
         gpuBVHBytes += compactedSize;
@@ -166,10 +171,13 @@ OptixTraversableHandle OptiXAggregate::buildOptixBVH(
         CUDA_CHECK(cudaStreamSynchronize(buildStream));
 
         CUDA_CHECK(cudaFree(outputBuffer));
+
+        static std::mutex mutex;
+        std::lock_guard<std::mutex> lock(mutex);
+        bvhBuffers.push_back((CUdeviceptr)asBuffer);
     }
 
     CUDA_CHECK(cudaFree(compactedSizePtr));
-
     return traversableHandle;
 }
 
@@ -346,7 +354,8 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
     const std::vector<Material> &materials, const std::map<std::string, Medium> &media,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
     ThreadLocal<Allocator> &threadAllocators,
-    ThreadLocal<cudaStream_t> &threadCUDAStreams) {
+    ThreadLocal<cudaStream_t> &threadCUDAStreams,
+    std::vector<CUdeviceptr> &bvhBuffers) {
     // Count how many of the shapes are triangle meshes
     std::vector<size_t> meshIndexToShapeIndex;
     for (size_t i = 0; i < shapes.size(); ++i) {
@@ -536,7 +545,7 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
     });
 
     bvh.traversableHandle =
-        buildOptixBVH(optixContext, optixBuildInputs, threadCUDAStreams);
+        buildOptixBVH(optixContext, optixBuildInputs, threadCUDAStreams, bvhBuffers);
 
     return bvh;
 }
@@ -769,7 +778,8 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForBLPs(
     const std::vector<Material> &materials, const std::map<std::string, Medium> &media,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
     ThreadLocal<Allocator> &threadAllocators,
-    ThreadLocal<cudaStream_t> &threadCUDAStreams) {
+    ThreadLocal<cudaStream_t> &threadCUDAStreams,
+    std::vector<CUdeviceptr> &bvhBuffers) {
     // Count how many BLP meshes there are in shapes
     std::vector<size_t> meshIndexToShapeIndex;
     for (size_t i = 0; i < shapes.size(); ++i) {
@@ -902,7 +912,7 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForBLPs(
                                threadCUDAStreams.Get()));
 
     bvh.traversableHandle =
-        buildOptixBVH(optixContext, optixBuildInputs, threadCUDAStreams);
+        buildOptixBVH(optixContext, optixBuildInputs, threadCUDAStreams, bvhBuffers);
 
     CUDA_CHECK(cudaFree(deviceAABBs));
 
@@ -918,7 +928,8 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForQuadrics(
     const std::vector<Material> &materials, const std::map<std::string, Medium> &media,
     const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
     ThreadLocal<Allocator> &threadAllocators,
-    ThreadLocal<cudaStream_t> &threadCUDAStreams) {
+    ThreadLocal<cudaStream_t> &threadCUDAStreams,
+    std::vector<CUdeviceptr> &bvhBuffers) {
     int nQuadrics = 0;
     for (size_t shapeIndex = 0; shapeIndex < shapes.size(); ++shapeIndex) {
         const auto &s = shapes[shapeIndex];
@@ -1013,7 +1024,7 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForQuadrics(
                                cudaMemcpyHostToDevice, threadCUDAStreams.Get()));
 
     bvh.traversableHandle =
-        buildOptixBVH(optixContext, optixBuildInputs, threadCUDAStreams);
+        buildOptixBVH(optixContext, optixBuildInputs, threadCUDAStreams, bvhBuffers);
 
     CUDA_CHECK(cudaFree(deviceShapeAABBs));
 
@@ -1288,6 +1299,8 @@ OptiXAggregate::OptiXAggregate(
                                   hitPGRandomHitBilinearPatch,
                                   hitPGRandomHitQuadric};
 
+    programGroups.assign(std::begin(allPGs), std::end(allPGs));
+
     OptixPipelineCompileOptions pipelineCompileOptions = getPipelineCompileOptions();
 
     OptixPipelineLinkOptions pipelineLinkOptions = {};
@@ -1394,7 +1407,7 @@ OptiXAggregate::OptiXAggregate(
         BVH triangleBVH = buildBVHForTriangles(
             scene.shapes, plyMeshes, optixContext, hitPGTriangle, anyhitPGShadowTriangle,
             hitPGRandomHitTriangle, textures.floatTextures, namedMaterials, materials,
-            media, shapeIndexToAreaLights, threadAllocators, threadCUDAStreams);
+            media, shapeIndexToAreaLights, threadAllocators, threadCUDAStreams, bvhBuffers);
         int sbtOffset = addHGRecords(triangleBVH);
         return GAS{triangleBVH, sbtOffset};
     });
@@ -1404,7 +1417,7 @@ OptiXAggregate::OptiXAggregate(
             buildBVHForBLPs(scene.shapes, optixContext, hitPGBilinearPatch,
                             anyhitPGShadowBilinearPatch, hitPGRandomHitBilinearPatch,
                             textures.floatTextures, namedMaterials, materials, media,
-                            shapeIndexToAreaLights, threadAllocators, threadCUDAStreams);
+                            shapeIndexToAreaLights, threadAllocators, threadCUDAStreams, bvhBuffers);
         int bilinearSBTOffset = addHGRecords(blpBVH);
         return GAS{blpBVH, bilinearSBTOffset};
     });
@@ -1413,7 +1426,7 @@ OptiXAggregate::OptiXAggregate(
         BVH quadricBVH = buildBVHForQuadrics(
             scene.shapes, optixContext, hitPGQuadric, anyhitPGShadowQuadric,
             hitPGRandomHitQuadric, textures.floatTextures, namedMaterials, materials,
-            media, shapeIndexToAreaLights, threadAllocators, threadCUDAStreams);
+            media, shapeIndexToAreaLights, threadAllocators, threadCUDAStreams, bvhBuffers);
         int quadricSBTOffset = addHGRecords(quadricBVH);
         return GAS{quadricBVH, quadricSBTOffset};
     });
@@ -1457,7 +1470,7 @@ OptiXAggregate::OptiXAggregate(
         BVH triangleBVH = buildBVHForTriangles(
             def.second->shapes, meshes, optixContext, hitPGTriangle,
             anyhitPGShadowTriangle, hitPGRandomHitTriangle, textures.floatTextures,
-            namedMaterials, materials, media, {}, threadAllocators, threadCUDAStreams);
+            namedMaterials, materials, media, {}, threadAllocators, threadCUDAStreams, bvhBuffers);
         meshes.clear();
         if (triangleBVH.traversableHandle) {
             inst.handles[0] = triangleBVH.traversableHandle;
@@ -1469,7 +1482,7 @@ OptiXAggregate::OptiXAggregate(
             buildBVHForBLPs(def.second->shapes, optixContext, hitPGBilinearPatch,
                             anyhitPGShadowBilinearPatch, hitPGRandomHitBilinearPatch,
                             textures.floatTextures, namedMaterials, materials, media, {},
-                            threadAllocators, threadCUDAStreams);
+                            threadAllocators, threadCUDAStreams, bvhBuffers);
         if (blpBVH.traversableHandle) {
             inst.handles[1] = blpBVH.traversableHandle;
             inst.sbtOffsets[1] = addHGRecords(blpBVH);
@@ -1479,7 +1492,7 @@ OptiXAggregate::OptiXAggregate(
         BVH quadricBVH = buildBVHForQuadrics(
             def.second->shapes, optixContext, hitPGQuadric, anyhitPGShadowQuadric,
             hitPGRandomHitQuadric, textures.floatTextures, namedMaterials, materials,
-            media, {}, threadAllocators, threadCUDAStreams);
+            media, {}, threadAllocators, threadCUDAStreams, bvhBuffers);
         if (quadricBVH.traversableHandle) {
             inst.handles[2] = quadricBVH.traversableHandle;
             inst.sbtOffsets[2] = addHGRecords(quadricBVH);
@@ -1622,7 +1635,7 @@ OptiXAggregate::OptiXAggregate(
     buildInput.instanceArray.instances = instanceDevicePtr;
     buildInput.instanceArray.numInstances = iasInstances.size();
 
-    rootTraversable = buildOptixBVH(optixContext, {buildInput}, threadCUDAStreams);
+    rootTraversable = buildOptixBVH(optixContext, {buildInput}, threadCUDAStreams, bvhBuffers);
 
     CUDA_CHECK(cudaFree((void *)instanceDevicePtr));
     LOG_VERBOSE("Finished building top-level IAS");
@@ -1660,6 +1673,42 @@ OptiXAggregate::OptiXAggregate(
     if (Options->useGPU)
         ReenableThreadPool();
 #endif  // PBRT_IS_WINDOWS
+}
+
+OptiXAggregate::~OptiXAggregate() {
+    if (intersectSBT.hitgroupRecordBase)
+        CUDA_CHECK(cudaFree((void *)intersectSBT.hitgroupRecordBase));
+    if (shadowSBT.hitgroupRecordBase)
+        CUDA_CHECK(cudaFree((void *)shadowSBT.hitgroupRecordBase));
+    if (randomHitSBT.hitgroupRecordBase)
+        CUDA_CHECK(cudaFree((void *)randomHitSBT.hitgroupRecordBase));
+
+    Allocator alloc(memoryResource);
+    if (intersectSBT.raygenRecord) alloc.delete_object((RaygenRecord*)intersectSBT.raygenRecord);
+    if (intersectSBT.missRecordBase) alloc.delete_object((MissRecord*)intersectSBT.missRecordBase);
+    
+    if (shadowSBT.raygenRecord) alloc.delete_object((RaygenRecord*)shadowSBT.raygenRecord);
+    if (shadowSBT.missRecordBase) alloc.delete_object((MissRecord*)shadowSBT.missRecordBase);
+    
+    if (shadowTrSBT.raygenRecord) alloc.delete_object((RaygenRecord*)shadowTrSBT.raygenRecord);
+    if (shadowTrSBT.missRecordBase) alloc.delete_object((MissRecord*)shadowTrSBT.missRecordBase);
+    
+    if (randomHitSBT.raygenRecord) alloc.delete_object((RaygenRecord*)randomHitSBT.raygenRecord);
+
+    for (CUdeviceptr ptr : bvhBuffers)
+        CUDA_CHECK(cudaFree((void *)ptr));
+
+    for (ParamBufferState &ps : paramsPool) {
+        if (ps.ptr) CUDA_CHECK(cudaFree((void *)ps.ptr));
+        if (ps.hostPtr) CUDA_CHECK(cudaFreeHost(ps.hostPtr));
+        if (ps.finishedEvent) CUDA_CHECK(cudaEventDestroy(ps.finishedEvent));
+    }
+
+    if (optixPipeline) OPTIX_CHECK(optixPipelineDestroy(optixPipeline));
+    for (auto pg : programGroups)
+        if (pg) OPTIX_CHECK(optixProgramGroupDestroy(pg));
+    if (optixModule) OPTIX_CHECK(optixModuleDestroy(optixModule));
+    if (optixContext) OPTIX_CHECK(optixDeviceContextDestroy(optixContext));
 }
 
 OptiXAggregate::ParamBufferState &OptiXAggregate::getParamBuffer(

@@ -50,6 +50,10 @@ struct TrainingImageMetadata {
 
 	const float* depth = nullptr;
 	const Ray* rays = nullptr;
+	// const int* pixel_indices = nullptr;
+	const float* sample_indices = nullptr;
+	const float* final_depths = nullptr;
+
 
 	Lens lens = {};
 	ivec2 resolution = ivec2(0);

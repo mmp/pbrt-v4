@@ -311,6 +311,7 @@ int main(int argc, char* argv[])
         // Parse provided scene description files
         BasicScene scene;
         BasicSceneBuilder builder(&scene);
+        builder.currentCamera = 1;
         ParseFiles(&builder, filenames);
 
 
@@ -318,7 +319,9 @@ int main(int argc, char* argv[])
         //     builder.renderOrientationCnt = options.numberOfOrientations;
 
         // Render the scene
-        for (int i = 0; i < builder.renderOrientationCnt; ++i)
+
+
+        for (int i = builder.currentCamera; i < builder.renderOrientationCnt; ++i)
         {
             if (Options->useGPU || Options->wavefront)
                 RenderWavefront(scene);
@@ -326,8 +329,10 @@ int main(int argc, char* argv[])
             {
                 RenderCPU(scene);
             }
+
             builder.currentCamera++;
-            builder.ResetScene();
+            if(builder.currentCamera < builder.renderOrientationCnt)
+                builder.ResetScene();
         }
 
         LOG_VERBOSE("Memory used after post-render cleanup: %s", GetCurrentRSS());

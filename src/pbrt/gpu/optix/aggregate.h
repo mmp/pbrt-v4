@@ -35,6 +35,7 @@ class OptiXAggregate : public WavefrontAggregate {
                    const std::map<std::string, Medium> &media,
                    const std::map<std::string, pbrt::Material> &namedMaterials,
                    const std::vector<pbrt::Material> &materials);
+    ~OptiXAggregate();
 
     Bounds3f Bounds() const { return bounds; }
 
@@ -87,7 +88,8 @@ class OptiXAggregate : public WavefrontAggregate {
         const std::map<std::string, Medium> &media,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
         ThreadLocal<Allocator> &threadAllocators,
-        ThreadLocal<cudaStream_t> &threadCUDAStreams);
+        ThreadLocal<cudaStream_t> &threadCUDAStreams,
+        std::vector<CUdeviceptr> &bvhBuffers);
 
     static BilinearPatchMesh *diceCurveToBLP(const ShapeSceneEntity &shape, int nDiceU,
                                              int nDiceV, Allocator alloc);
@@ -102,7 +104,8 @@ class OptiXAggregate : public WavefrontAggregate {
         const std::map<std::string, Medium> &media,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
         ThreadLocal<Allocator> &threadAllocators,
-        ThreadLocal<cudaStream_t> &threadCUDAStreams);
+        ThreadLocal<cudaStream_t> &threadCUDAStreams,
+        std::vector<CUdeviceptr> &bvhBuffers);
 
     static BVH buildBVHForQuadrics(
         const std::vector<ShapeSceneEntity> &shapes, OptixDeviceContext optixContext,
@@ -114,7 +117,8 @@ class OptiXAggregate : public WavefrontAggregate {
         const std::map<std::string, Medium> &media,
         const std::map<int, pstd::vector<Light> *> &shapeIndexToAreaLights,
         ThreadLocal<Allocator> &threadAllocators,
-        ThreadLocal<cudaStream_t> &threadCUDAStreams);
+        ThreadLocal<cudaStream_t> &threadCUDAStreams,
+        std::vector<CUdeviceptr> &bvhBuffers);
 
     int addHGRecords(const BVH &bvh);
 
@@ -129,7 +133,8 @@ class OptiXAggregate : public WavefrontAggregate {
 
     static OptixTraversableHandle buildOptixBVH(
         OptixDeviceContext optixContext, const std::vector<OptixBuildInput> &buildInputs,
-        ThreadLocal<cudaStream_t> &threadCUDAStreams);
+        ThreadLocal<cudaStream_t> &threadCUDAStreams,
+        std::vector<CUdeviceptr> &bvhBuffers);
 
     CUDATrackedMemoryResource *memoryResource;
     std::mutex boundsMutex;
@@ -138,6 +143,8 @@ class OptiXAggregate : public WavefrontAggregate {
     OptixDeviceContext optixContext;
     OptixModule optixModule;
     OptixPipeline optixPipeline;
+    std::vector<OptixProgramGroup> programGroups;
+    std::vector<CUdeviceptr> bvhBuffers;
 
     struct ParamBufferState {
         bool used = false;

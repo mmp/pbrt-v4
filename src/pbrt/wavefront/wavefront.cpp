@@ -3,6 +3,7 @@
 // SPDX: Apache-2.0
 
 #include <pbrt/wavefront/wavefront.h>
+#include <pbrt/util/display.h>
 
 #ifdef PBRT_BUILD_GPU_RENDERER
 #include <pbrt/gpu/memory.h>
@@ -86,9 +87,11 @@ namespace pbrt
         } else
 #endif
         {
-
             delete integrator;
         }
+        
+        if (!Options->displayServer.empty())
+            ClearDisplayDynamic();
     }
 
 }  // namespace pbrt

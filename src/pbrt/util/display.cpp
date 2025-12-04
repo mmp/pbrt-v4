@@ -503,4 +503,9 @@ void DisplayDynamic(
     dynamicItems.push_back(DisplayItem(title, resolution, channelNames, getTileValues));
 }
 
+void ClearDisplayDynamic() {
+    std::lock_guard<std::mutex> lock(mutex);
+    dynamicItems.clear();
+}
+
 }  // namespace pbrt

@@ -35,6 +35,8 @@ class CUDATrackedMemoryResource : public CUDAMemoryResource {
   public:
     void *do_allocate(size_t size, size_t alignment);
     void do_deallocate(void *p, size_t bytes, size_t alignment);
+    void Free();
+
 
     bool do_is_equal(const memory_resource &other) const noexcept {
         return this == &other;

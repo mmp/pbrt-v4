@@ -567,6 +567,8 @@ NerfDataset load_nerf(const std::vector<fs::path>& jsonpaths, float sharpen_amou
 
 			int comp = 0;
 			if (equals_case_insensitive(path.extension(), "exr")) {
+				// TODO(custom-radiance-buffer): swap this image load with your precomputed float radiance tensor.
+				// Emit one value per ray (RGB or spectral) so Instant-NGP trains directly on supervised outputs.
 				dst.pixels = load_exr_to_gpu(&dst.res.x, &dst.res.y, path.str().c_str(), fix_premult);
 				dst.image_type = EImageDataType::Half;
 				dst.image_data_on_gpu = true;
@@ -659,6 +661,8 @@ NerfDataset load_nerf(const std::vector<fs::path>& jsonpaths, float sharpen_amou
 				}
 
 				for (uint32_t px = 0; px < n_pixels; ++px) {
+					// TODO(custom-ray-payload): extend the Ray struct & serialization to carry
+					// per-sample metadata (time, wavelength, roughness, etc.) before this conversion.
 					result.nerf_ray_to_ngp(dst.rays[px]);
 				}
 
@@ -698,6 +702,9 @@ NerfDataset load_nerf(const std::vector<fs::path>& jsonpaths, float sharpen_amou
 			result.metadata[i_img].lens = lens;
 			// see if there is a per-frame override
 			read_lens(frame, result.metadata[i_img].lens, result.metadata[i_img].principal_point, result.metadata[i_img].rolling_shutter);
+			// TODO(custom-extra-dims): when exporting data, fill result.n_extra_learnable_dims and per-frame
+			// metadata (light_dir, appearance embeddings, arbitrary scalars) so training batches can feed them
+			// alongside your hash-encoded position + ray inputs.
 
 			result.xforms[i_img].start = result.nerf_matrix_to_ngp(result.xforms[i_img].start);
 			result.xforms[i_img].end = result.nerf_matrix_to_ngp(result.xforms[i_img].end);
