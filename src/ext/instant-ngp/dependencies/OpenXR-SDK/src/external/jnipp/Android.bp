@@ -1,0 +1,23 @@
+
+cc_library_headers {
+    name: "libjnipp-headers",
+    export_include_dirs: ["."],
+    vendor_available: true,
+}
+
+cc_library_static {
+    name: "libjnipp",
+
+    srcs: [
+        "jnipp.cpp",
+    ],
+
+    cppflags: [ "-fexceptions" ],
+    header_libs: [
+        "libjnipp-headers",
+    ],
+    export_header_lib_headers: [
+        "libjnipp-headers"
+    ],
+    vendor_available: true,
+}

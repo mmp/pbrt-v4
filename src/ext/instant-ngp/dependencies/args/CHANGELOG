@@ -1,0 +1,21 @@
+* 6.0.0
+Change Reader to functor type, breaking change.
+Change Reader functor to allow any return type, but specifically need bool-testable return for NOEXCEPT use.
+Change List and Map templates into template templates to enforce proper type use and to clean up user template invocations (i.e. `args::ValueFlagList<std::string, std::unordered_set<std::string>>` becomes `args::ValueFlagList<std::string, std::unordered_set>`, also breaking change.
+
+* 5.0.0
+Implemented proper subparsers.
+Added better C++11 style.
+Improved documentation.
+
+* 4.0.0
+Changed all wording:
+
+ArgFlag -> ValueFlag
+Counter -> CounterFlag
+PosArg -> Positional
+
+Argument now solely refers to command line arguments.
+Value refers to the argument that flags or positionals can take and store.
+Positional is a positional option, which contains a value.
+Option refers to flags and positionals, which can contain values.

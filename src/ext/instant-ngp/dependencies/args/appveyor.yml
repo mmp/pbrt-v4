@@ -1,0 +1,23 @@
+os:
+    - Visual Studio 2019
+    - Visual Studio 2017
+    - Visual Studio 2015
+
+platform:
+    - Win32
+    - x64
+
+configuration:
+    - Debug
+    - Release
+
+before_build:
+    - cmake -H. -Bbuild -A%PLATFORM%
+
+build:
+    project: build\args.sln
+    verbosity: normal
+
+test_script:
+    - cd build
+    - ctest -V -C %CONFIGURATION%

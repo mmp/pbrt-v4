@@ -1,0 +1,54 @@
+# Compiled Object files
+*.slo
+*.lo
+*.o
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+
+# Temp files
+.*.sw?
+.sw?
+.hg
+*.d
+
+# Compiled Lua Files
+*.lc
+
+# Generated Documentation
+/doc/
+/html/
+/man/
+/latex/
+/userdoc.*
+
+# test and temp files
+*.pyc
+*.swp
+*.swo
+/log
+/ld
+
+# Executable
+argstest
+/build/
+CMakeCache.txt
+CMakeFiles
+cmake_install.cmake
+install_manifest.txt
+Makefile
+!/Makefile
+*-prefix
+gitlike
+/pages/
+
+# Buck
+/buck-out/
+/.buckd/
+.buckconfig.local

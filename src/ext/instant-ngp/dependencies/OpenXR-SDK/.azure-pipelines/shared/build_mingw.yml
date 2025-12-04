@@ -1,0 +1,48 @@
+# Copyright (c) 2019-2025 The Khronos Group Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+parameters:
+  - name: buildType
+    type: string
+    default: "Debug"
+  - name: cmakeArgs
+    type: string
+    default: ""
+  - name: sourceDir
+    type: string
+    default: "$(System.DefaultWorkingDirectory)"
+    # TODO should be boolean
+  - name: useVulkan
+    type: string
+    default: "true"
+
+steps:
+  - checkout: self
+    lfs: true
+
+  # - script: choco install -y ninja
+  #   displayName: 'Install Ninja'
+
+  - script: mkdir  $(System.DefaultWorkingDirectory)\\vulkan_sdk
+    displayName: "Make Vulkan SDK dir"
+
+  - powershell: ./.azure-pipelines/shared/install_vulkan.ps1
+    displayName: Install Vulkan SDK
+    workingDirectory: "${{ parameters.sourceDir }}"
+    condition: eq('${{ parameters.useVulkan}}', 'true')
+
+  - script: mkdir build
+    displayName: "Create build directory"
+    workingDirectory: "${{ parameters.sourceDir }}"
+
+  - script: |
+      set VULKAN_SDK=$(System.DefaultWorkingDirectory)\\vulkan_sdk\\$(VULKAN_SDK_VERSION)
+      cmake .. -G "MinGW Makefiles" ${{ parameters.cmakeArgs }} -DCMAKE_BUILD_TYPE=${{ parameters.buildType }} -DCMAKE_INSTALL_PREFIX=${{ parameters.sourceDir }}/install
+    displayName: "Generate build system"
+    workingDirectory: "${{ parameters.sourceDir }}/build"
+
+  - script: mingw32-make -C build -j
+    displayName: Build all targets
+
+  - script: mingw32-make -C build install
+    displayName: Install build

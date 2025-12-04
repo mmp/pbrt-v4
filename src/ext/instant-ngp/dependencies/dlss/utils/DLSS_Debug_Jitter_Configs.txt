@@ -1,0 +1,87 @@
+Jitter Offset Configurations
+
+To assist in debugging issues with sub-pixel jitter, the DLSS SDK library can optionally adjust the jitter offset components using the CTRL+ALT+F9 hotkey. The configurations are listed below and pressing the hotkey cycles through them in order.
+
+To exchange (ie swap) the X and Y offsets, use the CTRL+ALT+F10 hotkey.
+
+
+// By default, jitter offsets are used as sent from the engine 
+Config 0: OFF 
+
+
+// Combinations halving and negating both vector components
+Config 1:
+	JitterOffsetX *= 0.5f;
+	JitterOffsetY *= 0.5f;
+
+Config 2:
+	JitterOffsetX *= 0.5f;
+	JitterOffsetY *= -0.5f;
+	
+Config 3:
+	JitterOffsetX *= -0.5f;
+	JitterOffsetY *= 0.5f;
+	
+Config 4:
+	JitterOffsetX *= -0.5f;
+	JitterOffsetY *= -0.5f;
+	
+
+// Combinations doubling and negating both vector components
+Config 5:
+	JitterOffsetX *= 2.0f;
+	JitterOffsetY *= 2.0f;
+	
+Config 6:
+	JitterOffsetX *= 2.0f;
+	JitterOffsetY *= -2.0f;
+	
+Config 7:
+	JitterOffsetX *= -2.0f;
+	JitterOffsetY *= 2.0f;
+	
+Config 8:
+	JitterOffsetX *= -2.0f;
+	JitterOffsetY *= -2.0f;
+
+
+// Combinations negating one or both vector components 
+Config 9:
+	JitterOffsetX *= 1.0f;
+	JitterOffsetY *= -1.0f;
+	
+Config 10:
+	JitterOffsetX *= -1.0f;
+	JitterOffsetY *= 1.0f;
+	
+Config 11:
+	JitterOffsetX *= -1.0f;
+	JitterOffsetY *= -1.0f;
+
+
+// Combinations halving and negating individual vector components 
+Config 12:
+	JitterOffsetX *= 0.5f;
+	
+Config 13:
+	JitterOffsetY *= 0.5f;
+	
+Config 14:
+	JitterOffsetX *= -0.5f;
+	
+Config 15:
+	JitterOffsetY *= -0.5f;
+
+	
+// Combinations doubling and negating individual vector components 
+Config 16:
+	JitterOffsetX *= 2.0f;
+	
+Config 17:
+	JitterOffsetY *= 2.0f;
+	
+Config 18:
+	JitterOffsetX *= -2.0f;
+	
+Config 19:
+	JitterOffsetY *= -2.0f;

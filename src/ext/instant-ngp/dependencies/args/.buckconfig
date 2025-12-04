@@ -1,0 +1,7 @@
+[project]
+  ignore = .git
+
+[cxx]
+  should_remap_host_platform = true
+  untracked_headers = error
+  untracked_headers_whitelist = /usr/include/.*, /usr/lib/gcc/.*

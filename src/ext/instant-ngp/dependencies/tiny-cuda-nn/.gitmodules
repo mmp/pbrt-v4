@@ -1,0 +1,9 @@
+[submodule "dependencies/cutlass"]
+	path = dependencies/cutlass
+	url = https://github.com/NVIDIA/cutlass
+[submodule "dependencies/fmt"]
+	path = dependencies/fmt
+	url = https://github.com/fmtlib/fmt
+[submodule "dependencies/cmrc"]
+	path = dependencies/cmrc
+	url = https://github.com/vector-of-bool/cmrc

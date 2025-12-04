@@ -1,0 +1,24 @@
+{
+	"parent" : "base.json",
+	"encoding": {
+		"otype": "Frequency",
+		"n_frequencies": 10
+	},
+	"loss": {
+		"otype": "RelativeL2"
+	},
+	"optimizer": {
+		"nested": {
+			"nested":	{
+				"learning_rate": 3e-4
+			}
+		}
+	},
+	"network": {
+		"otype": "FullyFusedMLP",
+		"activation": "ReLU",
+		"output_activation": "None",
+		"n_neurons": 128,
+		"n_hidden_layers": 8
+	}
+}

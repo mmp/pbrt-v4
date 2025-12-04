@@ -1,0 +1,9 @@
+{
+	"parent" : "base.json",
+	"encoding": {
+		"otype": "Takikawa",
+		"n_levels": 10,
+		"starting_level": 4,
+		"sum_instead_of_concat": false
+	}
+}
