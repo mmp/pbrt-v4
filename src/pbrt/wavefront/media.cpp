@@ -82,28 +82,27 @@ void WavefrontPathIntegrator::SampleMediumInteraction(int wavefrontDepth) {
                                  (pr * r_e.Average());
                     }
 
-                    // Compute probabilities for each type of scattering.
-                    Float pAbsorb = mp.sigma_a[0] / sigma_maj[0];
-                    Float pScatter = mp.sigma_s[0] / sigma_maj[0];
-                    Float pNull = std::max<Float>(0, 1 - pAbsorb - pScatter);
+                    // Compute probabilities for each type of scattering
+                    // via direct threshold comparison (avoids SampleDiscrete overhead).
+                    const Float invSigmaMaj0 = 1.f / sigma_maj[0];
+                    const Float pAbsorb = mp.sigma_a[0] * invSigmaMaj0;
+                    const Float pScatter = mp.sigma_s[0] * invSigmaMaj0;
+                    const Float pAbsorbScatter = pAbsorb + pScatter;
                     PBRT_DBG("Medium scattering probabilities: %f %f %f\n", pAbsorb,
-                             pScatter, pNull);
+                             pScatter, std::max<Float>(0, 1 - pAbsorbScatter));
 
-                    // And randomly choose one.
-                    int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, uMode);
-
-                    if (mode == 0) {
+                    if (uMode < pAbsorb) {
                         // Absorption--done.
                         PBRT_DBG("absorbed\n");
                         beta = SampledSpectrum(0.f);
-                        // Tell the medium to stop traversal.
                         return false;
-                    } else if (mode == 1) {
+                    } else if (uMode < pAbsorbScatter) {
                         // Scattering.
                         PBRT_DBG("scattered\n");
-                        Float pr = T_maj[0] * mp.sigma_s[0];
-                        beta *= T_maj * mp.sigma_s / pr;
-                        r_u *= T_maj * mp.sigma_s / pr;
+                        const Float pr = T_maj[0] * mp.sigma_s[0];
+                        SampledSpectrum wt = T_maj * mp.sigma_s / pr;
+                        beta *= wt;
+                        r_u *= wt;
 
                         // Enqueue medium scattering work.
                         auto enqueue = [=](auto ptr) {

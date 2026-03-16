@@ -28,12 +28,24 @@
 #include <string>
 #include <vector>
 
+#if !defined(__CUDACC__) && !defined(PBRT_FLOAT_AS_DOUBLE) && \
+    (defined(__SSE2__) || defined(_M_AMD64) || defined(_M_X64) || \
+     (defined(_M_IX86_FP) && _M_IX86_FP >= 2))
+#define PBRT_SPECTRUM_USE_SSE
+#include <immintrin.h>
+#endif
+
 namespace pbrt {
 
 // Spectrum Constants
 constexpr Float Lambda_min = 360, Lambda_max = 830;
 
 static constexpr int NSpectrumSamples = 4;
+
+#ifdef PBRT_SPECTRUM_USE_SSE
+static_assert(NSpectrumSamples == 4,
+              "SSE spectrum optimization requires NSpectrumSamples == 4");
+#endif
 
 static constexpr Float CIE_Y_integral = 106.856895;
 
@@ -99,8 +111,14 @@ class SampledSpectrum {
 
     PBRT_CPU_GPU
     SampledSpectrum &operator-=(const SampledSpectrum &s) {
+#ifdef PBRT_SPECTRUM_USE_SSE
+        _mm_storeu_ps(values.data(),
+                      _mm_sub_ps(_mm_loadu_ps(values.data()),
+                                 _mm_loadu_ps(s.values.data())));
+#else
         for (int i = 0; i < NSpectrumSamples; ++i)
             values[i] -= s.values[i];
+#endif
         return *this;
     }
     PBRT_CPU_GPU
@@ -112,15 +130,26 @@ class SampledSpectrum {
     friend SampledSpectrum operator-(Float a, const SampledSpectrum &s) {
         DCHECK(!IsNaN(a));
         SampledSpectrum ret;
+#ifdef PBRT_SPECTRUM_USE_SSE
+        _mm_storeu_ps(ret.values.data(),
+                      _mm_sub_ps(_mm_set1_ps(a), _mm_loadu_ps(s.values.data())));
+#else
         for (int i = 0; i < NSpectrumSamples; ++i)
             ret.values[i] = a - s.values[i];
+#endif
         return ret;
     }
 
     PBRT_CPU_GPU
     SampledSpectrum &operator*=(const SampledSpectrum &s) {
+#ifdef PBRT_SPECTRUM_USE_SSE
+        _mm_storeu_ps(values.data(),
+                      _mm_mul_ps(_mm_loadu_ps(values.data()),
+                                 _mm_loadu_ps(s.values.data())));
+#else
         for (int i = 0; i < NSpectrumSamples; ++i)
             values[i] *= s.values[i];
+#endif
         return *this;
     }
     PBRT_CPU_GPU
@@ -131,16 +160,26 @@ class SampledSpectrum {
     PBRT_CPU_GPU
     SampledSpectrum operator*(Float a) const {
         DCHECK(!IsNaN(a));
-        SampledSpectrum ret = *this;
+        SampledSpectrum ret;
+#ifdef PBRT_SPECTRUM_USE_SSE
+        _mm_storeu_ps(ret.values.data(),
+                      _mm_mul_ps(_mm_loadu_ps(values.data()), _mm_set1_ps(a)));
+#else
         for (int i = 0; i < NSpectrumSamples; ++i)
-            ret.values[i] *= a;
+            ret.values[i] = values[i] * a;
+#endif
         return ret;
     }
     PBRT_CPU_GPU
     SampledSpectrum &operator*=(Float a) {
         DCHECK(!IsNaN(a));
+#ifdef PBRT_SPECTRUM_USE_SSE
+        _mm_storeu_ps(values.data(),
+                      _mm_mul_ps(_mm_loadu_ps(values.data()), _mm_set1_ps(a)));
+#else
         for (int i = 0; i < NSpectrumSamples; ++i)
             values[i] *= a;
+#endif
         return *this;
     }
     PBRT_CPU_GPU
@@ -148,10 +187,16 @@ class SampledSpectrum {
 
     PBRT_CPU_GPU
     SampledSpectrum &operator/=(const SampledSpectrum &s) {
+#ifdef PBRT_SPECTRUM_USE_SSE
+        _mm_storeu_ps(values.data(),
+                      _mm_div_ps(_mm_loadu_ps(values.data()),
+                                 _mm_loadu_ps(s.values.data())));
+#else
         for (int i = 0; i < NSpectrumSamples; ++i) {
             DCHECK_NE(0, s.values[i]);
             values[i] /= s.values[i];
         }
+#endif
         return *this;
     }
     PBRT_CPU_GPU
@@ -163,8 +208,13 @@ class SampledSpectrum {
     SampledSpectrum &operator/=(Float a) {
         DCHECK_NE(a, 0);
         DCHECK(!IsNaN(a));
+#ifdef PBRT_SPECTRUM_USE_SSE
+        _mm_storeu_ps(values.data(),
+                      _mm_div_ps(_mm_loadu_ps(values.data()), _mm_set1_ps(a)));
+#else
         for (int i = 0; i < NSpectrumSamples; ++i)
             values[i] /= a;
+#endif
         return *this;
     }
     PBRT_CPU_GPU
@@ -176,23 +226,47 @@ class SampledSpectrum {
     PBRT_CPU_GPU
     SampledSpectrum operator-() const {
         SampledSpectrum ret;
+#ifdef PBRT_SPECTRUM_USE_SSE
+        _mm_storeu_ps(ret.values.data(),
+                      _mm_sub_ps(_mm_setzero_ps(), _mm_loadu_ps(values.data())));
+#else
         for (int i = 0; i < NSpectrumSamples; ++i)
             ret.values[i] = -values[i];
+#endif
         return ret;
     }
     PBRT_CPU_GPU
-    bool operator==(const SampledSpectrum &s) const { return values == s.values; }
+    bool operator==(const SampledSpectrum &s) const {
+#ifdef PBRT_SPECTRUM_USE_SSE
+        return _mm_movemask_ps(_mm_cmpeq_ps(_mm_loadu_ps(values.data()),
+                                            _mm_loadu_ps(s.values.data()))) == 0xF;
+#else
+        return values == s.values;
+#endif
+    }
     PBRT_CPU_GPU
-    bool operator!=(const SampledSpectrum &s) const { return values != s.values; }
+    bool operator!=(const SampledSpectrum &s) const {
+#ifdef PBRT_SPECTRUM_USE_SSE
+        return _mm_movemask_ps(_mm_cmpeq_ps(_mm_loadu_ps(values.data()),
+                                            _mm_loadu_ps(s.values.data()))) != 0xF;
+#else
+        return values != s.values;
+#endif
+    }
 
     std::string ToString() const;
 
     PBRT_CPU_GPU
     bool HasNaNs() const {
+#ifdef PBRT_SPECTRUM_USE_SSE
+        __m128 v = _mm_loadu_ps(values.data());
+        return _mm_movemask_ps(_mm_cmpunord_ps(v, v)) != 0;
+#else
         for (int i = 0; i < NSpectrumSamples; ++i)
             if (IsNaN(values[i]))
                 return true;
         return false;
+#endif
     }
 
     PBRT_CPU_GPU
@@ -204,7 +278,13 @@ class SampledSpectrum {
 
     SampledSpectrum() = default;
     PBRT_CPU_GPU
-    explicit SampledSpectrum(Float c) { values.fill(c); }
+    explicit SampledSpectrum(Float c) {
+#ifdef PBRT_SPECTRUM_USE_SSE
+        _mm_storeu_ps(values.data(), _mm_set1_ps(c));
+#else
+        values.fill(c);
+#endif
+    }
     PBRT_CPU_GPU
     SampledSpectrum(pstd::span<const Float> v) {
         DCHECK_EQ(NSpectrumSamples, v.size());
@@ -213,7 +293,7 @@ class SampledSpectrum {
     }
 
     PBRT_CPU_GPU
-    Float operator[](int i) const {
+    const Float &operator[](int i) const {
         DCHECK(i >= 0 && i < NSpectrumSamples);
         return values[i];
     }
@@ -225,39 +305,73 @@ class SampledSpectrum {
 
     PBRT_CPU_GPU
     explicit operator bool() const {
+#ifdef PBRT_SPECTRUM_USE_SSE
+        return _mm_movemask_ps(_mm_cmpneq_ps(_mm_loadu_ps(values.data()),
+                                             _mm_setzero_ps())) != 0;
+#else
         for (int i = 0; i < NSpectrumSamples; ++i)
             if (values[i] != 0)
                 return true;
         return false;
+#endif
     }
 
     PBRT_CPU_GPU
     SampledSpectrum &operator+=(const SampledSpectrum &s) {
+#ifdef PBRT_SPECTRUM_USE_SSE
+        _mm_storeu_ps(values.data(),
+                      _mm_add_ps(_mm_loadu_ps(values.data()),
+                                 _mm_loadu_ps(s.values.data())));
+#else
         for (int i = 0; i < NSpectrumSamples; ++i)
             values[i] += s.values[i];
+#endif
         return *this;
     }
 
     PBRT_CPU_GPU
     Float MinComponentValue() const {
+#ifdef PBRT_SPECTRUM_USE_SSE
+        __m128 v = _mm_loadu_ps(values.data());
+        __m128 v1 = _mm_shuffle_ps(v, v, _MM_SHUFFLE(2, 3, 0, 1));
+        __m128 m1 = _mm_min_ps(v, v1);
+        __m128 m2 = _mm_shuffle_ps(m1, m1, _MM_SHUFFLE(1, 0, 3, 2));
+        return _mm_cvtss_f32(_mm_min_ps(m1, m2));
+#else
         Float m = values[0];
         for (int i = 1; i < NSpectrumSamples; ++i)
             m = std::min(m, values[i]);
         return m;
+#endif
     }
     PBRT_CPU_GPU
     Float MaxComponentValue() const {
+#ifdef PBRT_SPECTRUM_USE_SSE
+        __m128 v = _mm_loadu_ps(values.data());
+        __m128 v1 = _mm_shuffle_ps(v, v, _MM_SHUFFLE(2, 3, 0, 1));
+        __m128 m1 = _mm_max_ps(v, v1);
+        __m128 m2 = _mm_shuffle_ps(m1, m1, _MM_SHUFFLE(1, 0, 3, 2));
+        return _mm_cvtss_f32(_mm_max_ps(m1, m2));
+#else
         Float m = values[0];
         for (int i = 1; i < NSpectrumSamples; ++i)
             m = std::max(m, values[i]);
         return m;
+#endif
     }
     PBRT_CPU_GPU
     Float Average() const {
+#ifdef PBRT_SPECTRUM_USE_SSE
+        __m128 v = _mm_loadu_ps(values.data());
+        __m128 s1 = _mm_add_ps(v, _mm_shuffle_ps(v, v, _MM_SHUFFLE(2, 3, 0, 1)));
+        __m128 s2 = _mm_add_ps(s1, _mm_shuffle_ps(s1, s1, _MM_SHUFFLE(1, 0, 3, 2)));
+        return _mm_cvtss_f32(s2) / NSpectrumSamples;
+#else
         Float sum = values[0];
         for (int i = 1; i < NSpectrumSamples; ++i)
             sum += values[i];
         return sum / NSpectrumSamples;
+#endif
     }
 
   private:
@@ -630,16 +744,33 @@ class RGBIlluminantSpectrum {
 // SampledSpectrum Inline Functions
 PBRT_CPU_GPU inline SampledSpectrum SafeDiv(SampledSpectrum a, SampledSpectrum b) {
     SampledSpectrum r;
+#ifdef PBRT_SPECTRUM_USE_SSE
+    __m128 va = _mm_loadu_ps(&a[0]);
+    __m128 vb = _mm_loadu_ps(&b[0]);
+    __m128 zero = _mm_setzero_ps();
+    __m128 mask = _mm_cmpneq_ps(vb, zero);
+    __m128 safe_b = _mm_or_ps(_mm_and_ps(mask, vb),
+                              _mm_andnot_ps(mask, _mm_set1_ps(1.0f)));
+    _mm_storeu_ps(&r[0], _mm_and_ps(mask, _mm_div_ps(va, safe_b)));
+#else
     for (int i = 0; i < NSpectrumSamples; ++i)
         r[i] = (b[i] != 0) ? a[i] / b[i] : 0.;
+#endif
     return r;
 }
 
 template <typename U, typename V>
 PBRT_CPU_GPU inline SampledSpectrum Clamp(const SampledSpectrum &s, U low, V high) {
     SampledSpectrum ret;
+#ifdef PBRT_SPECTRUM_USE_SSE
+    __m128 v = _mm_loadu_ps(&s[0]);
+    __m128 lo = _mm_set1_ps(Float(low));
+    __m128 hi = _mm_set1_ps(Float(high));
+    _mm_storeu_ps(&ret[0], _mm_min_ps(_mm_max_ps(v, lo), hi));
+#else
     for (int i = 0; i < NSpectrumSamples; ++i)
         ret[i] = pbrt::Clamp(s[i], low, high);
+#endif
     DCHECK(!ret.HasNaNs());
     return ret;
 }
@@ -647,8 +778,12 @@ PBRT_CPU_GPU inline SampledSpectrum Clamp(const SampledSpectrum &s, U low, V hig
 PBRT_CPU_GPU
 inline SampledSpectrum ClampZero(const SampledSpectrum &s) {
     SampledSpectrum ret;
+#ifdef PBRT_SPECTRUM_USE_SSE
+    _mm_storeu_ps(&ret[0], _mm_max_ps(_mm_setzero_ps(), _mm_loadu_ps(&s[0])));
+#else
     for (int i = 0; i < NSpectrumSamples; ++i)
         ret[i] = std::max<Float>(0, s[i]);
+#endif
     DCHECK(!ret.HasNaNs());
     return ret;
 }
@@ -656,8 +791,12 @@ inline SampledSpectrum ClampZero(const SampledSpectrum &s) {
 PBRT_CPU_GPU
 inline SampledSpectrum Sqrt(const SampledSpectrum &s) {
     SampledSpectrum ret;
+#ifdef PBRT_SPECTRUM_USE_SSE
+    _mm_storeu_ps(&ret[0], _mm_sqrt_ps(_mm_loadu_ps(&s[0])));
+#else
     for (int i = 0; i < NSpectrumSamples; ++i)
         ret[i] = std::sqrt(s[i]);
+#endif
     DCHECK(!ret.HasNaNs());
     return ret;
 }
@@ -665,8 +804,13 @@ inline SampledSpectrum Sqrt(const SampledSpectrum &s) {
 PBRT_CPU_GPU
 inline SampledSpectrum SafeSqrt(const SampledSpectrum &s) {
     SampledSpectrum ret;
+#ifdef PBRT_SPECTRUM_USE_SSE
+    _mm_storeu_ps(&ret[0],
+                  _mm_sqrt_ps(_mm_max_ps(_mm_setzero_ps(), _mm_loadu_ps(&s[0]))));
+#else
     for (int i = 0; i < NSpectrumSamples; ++i)
         ret[i] = SafeSqrt(s[i]);
+#endif
     DCHECK(!ret.HasNaNs());
     return ret;
 }

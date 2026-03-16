@@ -18,7 +18,80 @@
 #include <algorithm>
 #include <tuple>
 
+#if !defined(PBRT_FLOAT_AS_DOUBLE) && \
+    (defined(__SSE2__) || defined(_M_AMD64) || defined(_M_X64) || \
+     (defined(_M_IX86_FP) && _M_IX86_FP >= 2))
+#define PBRT_BVH_USE_SSE
+#include <immintrin.h>
+#endif
+
 namespace pbrt {
+
+#ifdef PBRT_BVH_USE_SSE
+static inline bool BVHBoundsIntersectSSE(const float *boundsFloats,
+                                         __m128 sse_o, __m128 sse_invDir,
+                                         __m128 sse_gamma, Float raytMax,
+                                         const int nearOfs[3],
+                                         const int farOfs[3]) {
+    __m128 tNear = _mm_mul_ps(
+        _mm_sub_ps(_mm_set_ps(0.f, boundsFloats[nearOfs[2]],
+                               boundsFloats[nearOfs[1]], boundsFloats[nearOfs[0]]),
+                   sse_o),
+        sse_invDir);
+    __m128 tFar = _mm_mul_ps(
+        _mm_mul_ps(
+            _mm_sub_ps(_mm_set_ps(0.f, boundsFloats[farOfs[2]],
+                                   boundsFloats[farOfs[1]], boundsFloats[farOfs[0]]),
+                       sse_o),
+            sse_invDir),
+        sse_gamma);
+
+    // Set 4th element: tNear[3]=0 (already), tFar[3] = raytMax
+    // tFar[3] is currently 0*0*gamma = 0 or NaN; replace with raytMax
+    __m128 mask3 = _mm_castsi128_ps(_mm_set_epi32(-1, 0, 0, 0));
+    tFar = _mm_or_ps(_mm_andnot_ps(mask3, tFar),
+                     _mm_and_ps(mask3, _mm_set1_ps(raytMax)));
+
+    // Horizontal max of tNear → tMin
+    __m128 t1 = _mm_shuffle_ps(tNear, tNear, _MM_SHUFFLE(2, 3, 0, 1));
+    __m128 tMin = _mm_max_ps(tNear, t1);
+    __m128 t2 = _mm_shuffle_ps(tMin, tMin, _MM_SHUFFLE(1, 0, 3, 2));
+    tMin = _mm_max_ps(tMin, t2);
+
+    // Horizontal min of tFar → tMax
+    t1 = _mm_shuffle_ps(tFar, tFar, _MM_SHUFFLE(2, 3, 0, 1));
+    __m128 tMax_v = _mm_min_ps(tFar, t1);
+    t2 = _mm_shuffle_ps(tMax_v, tMax_v, _MM_SHUFFLE(1, 0, 3, 2));
+    tMax_v = _mm_min_ps(tMax_v, t2);
+
+    return _mm_comile_ss(tMin, tMax_v);
+}
+#endif
+
+static inline bool BVHBoundsIntersectScalar(const float *bp, const Point3f &o,
+                                            const Vector3f &invDir, Float raytMax,
+                                            const int nearOfs[3],
+                                            const int farOfs[3]) {
+    Float tMin  = (bp[nearOfs[0]] - o.x) * invDir.x;
+    Float tMax  = (bp[farOfs[0]]  - o.x) * invDir.x;
+    Float tyMin = (bp[nearOfs[1]] - o.y) * invDir.y;
+    Float tyMax = (bp[farOfs[1]]  - o.y) * invDir.y;
+    tMax  *= 1 + 2 * gamma(3);
+    tyMax *= 1 + 2 * gamma(3);
+    if (tMin > tyMax || tyMin > tMax)
+        return false;
+    if (tyMin > tMin) tMin = tyMin;
+    if (tyMax < tMax) tMax = tyMax;
+
+    Float tzMin = (bp[nearOfs[2]] - o.z) * invDir.z;
+    Float tzMax = (bp[farOfs[2]]  - o.z) * invDir.z;
+    tzMax *= 1 + 2 * gamma(3);
+    if (tMin > tzMax || tzMin > tMax)
+        return false;
+    if (tzMin > tMin) tMin = tzMin;
+    if (tzMax < tMax) tMax = tzMax;
+    return (tMin < raytMax) && (tMax > 0);
+}
 
 STAT_MEMORY_COUNTER("Memory/BVH", treeBytes);
 STAT_RATIO("BVH/Primitives per leaf node", totalPrimitives, totalLeafNodes);
@@ -533,6 +606,23 @@ pstd::optional<ShapeIntersection> BVHAggregate::Intersect(const Ray &ray,
     pstd::optional<ShapeIntersection> si;
     Vector3f invDir(1 / ray.d.x, 1 / ray.d.y, 1 / ray.d.z);
     int dirIsNeg[3] = {int(invDir.x < 0), int(invDir.y < 0), int(invDir.z < 0)};
+
+    // Precompute near/far bound offsets based on ray direction
+    // Bounds3f in memory: [pMin.x(0), pMin.y(1), pMin.z(2), pMax.x(3), pMax.y(4), pMax.z(5)]
+    int nearOfs[3] = {    dirIsNeg[0] * 3,
+                      1 + dirIsNeg[1] * 3,
+                      2 + dirIsNeg[2] * 3};
+    int farOfs[3]  = {3 - dirIsNeg[0] * 3,
+                      4 - dirIsNeg[1] * 3,
+                      5 - dirIsNeg[2] * 3};
+
+#ifdef PBRT_BVH_USE_SSE
+    __m128 sse_o = _mm_set_ps(0.f, ray.o.z, ray.o.y, ray.o.x);
+    __m128 sse_invDir = _mm_set_ps(0.f, invDir.z, invDir.y, invDir.x);
+    constexpr float g = 1 + 2 * gamma(3);
+    __m128 sse_gamma = _mm_set_ps(1.f, g, g, g);
+#endif
+
     // Follow ray through BVH nodes to find primitive intersections
     int toVisitOffset = 0, currentNodeIndex = 0;
     int nodesToVisit[64];
@@ -540,12 +630,19 @@ pstd::optional<ShapeIntersection> BVHAggregate::Intersect(const Ray &ray,
     while (true) {
         ++nodesVisited;
         const LinearBVHNode *node = &nodes[currentNodeIndex];
+        const float *boundsFloats = reinterpret_cast<const float *>(&node->bounds);
         // Check ray against BVH node
-        if (node->bounds.IntersectP(ray.o, ray.d, tMax, invDir, dirIsNeg)) {
+#ifdef PBRT_BVH_USE_SSE
+        bool hit = BVHBoundsIntersectSSE(boundsFloats, sse_o, sse_invDir,
+                                         sse_gamma, tMax, nearOfs, farOfs);
+#else
+        bool hit = BVHBoundsIntersectScalar(boundsFloats, ray.o, invDir, tMax,
+                                            nearOfs, farOfs);
+#endif
+        if (hit) {
             if (node->nPrimitives > 0) {
                 // Intersect ray with primitives in leaf BVH node
                 for (int i = 0; i < node->nPrimitives; ++i) {
-                    // Check for intersection with primitive in BVH node
                     pstd::optional<ShapeIntersection> primSi =
                         primitives[node->primitivesOffset + i].Intersect(ray, tMax);
                     if (primSi) {
@@ -559,13 +656,25 @@ pstd::optional<ShapeIntersection> BVHAggregate::Intersect(const Ray &ray,
 
             } else {
                 // Put far BVH node on _nodesToVisit_ stack, advance to near node
+                int nearChild, farChild;
                 if (dirIsNeg[node->axis]) {
-                    nodesToVisit[toVisitOffset++] = currentNodeIndex + 1;
-                    currentNodeIndex = node->secondChildOffset;
+                    nearChild = node->secondChildOffset;
+                    farChild = currentNodeIndex + 1;
                 } else {
-                    nodesToVisit[toVisitOffset++] = node->secondChildOffset;
-                    currentNodeIndex = currentNodeIndex + 1;
+                    nearChild = currentNodeIndex + 1;
+                    farChild = node->secondChildOffset;
                 }
+                nodesToVisit[toVisitOffset++] = farChild;
+                currentNodeIndex = nearChild;
+#ifdef PBRT_BVH_USE_SSE
+                _mm_prefetch(reinterpret_cast<const char *>(&nodes[nearChild]),
+                             _MM_HINT_T0);
+                _mm_prefetch(reinterpret_cast<const char *>(&nodes[farChild]),
+                             _MM_HINT_T1);
+#elif defined(__GNUC__)
+                __builtin_prefetch(&nodes[nearChild], 0, 3);
+                __builtin_prefetch(&nodes[farChild], 0, 2);
+#endif
             }
         } else {
             if (toVisitOffset == 0)
@@ -584,6 +693,21 @@ bool BVHAggregate::IntersectP(const Ray &ray, Float tMax) const {
     Vector3f invDir(1.f / ray.d.x, 1.f / ray.d.y, 1.f / ray.d.z);
     int dirIsNeg[3] = {static_cast<int>(invDir.x < 0), static_cast<int>(invDir.y < 0),
                        static_cast<int>(invDir.z < 0)};
+
+    int nearOfs[3] = {    dirIsNeg[0] * 3,
+                      1 + dirIsNeg[1] * 3,
+                      2 + dirIsNeg[2] * 3};
+    int farOfs[3]  = {3 - dirIsNeg[0] * 3,
+                      4 - dirIsNeg[1] * 3,
+                      5 - dirIsNeg[2] * 3};
+
+#ifdef PBRT_BVH_USE_SSE
+    __m128 sse_o = _mm_set_ps(0.f, ray.o.z, ray.o.y, ray.o.x);
+    __m128 sse_invDir = _mm_set_ps(0.f, invDir.z, invDir.y, invDir.x);
+    constexpr float g = 1 + 2 * gamma(3);
+    __m128 sse_gamma = _mm_set_ps(1.f, g, g, g);
+#endif
+
     int nodesToVisit[64];
     int toVisitOffset = 0, currentNodeIndex = 0;
     int nodesVisited = 0;
@@ -591,8 +715,15 @@ bool BVHAggregate::IntersectP(const Ray &ray, Float tMax) const {
     while (true) {
         ++nodesVisited;
         const LinearBVHNode *node = &nodes[currentNodeIndex];
-        if (node->bounds.IntersectP(ray.o, ray.d, tMax, invDir, dirIsNeg)) {
-            // Process BVH node _node_ for traversal
+        const float *boundsFloats = reinterpret_cast<const float *>(&node->bounds);
+#ifdef PBRT_BVH_USE_SSE
+        bool hit = BVHBoundsIntersectSSE(boundsFloats, sse_o, sse_invDir,
+                                         sse_gamma, tMax, nearOfs, farOfs);
+#else
+        bool hit = BVHBoundsIntersectScalar(boundsFloats, ray.o, invDir, tMax,
+                                            nearOfs, farOfs);
+#endif
+        if (hit) {
             if (node->nPrimitives > 0) {
                 for (int i = 0; i < node->nPrimitives; ++i) {
                     if (primitives[node->primitivesOffset + i].IntersectP(ray, tMax)) {
@@ -604,14 +735,25 @@ bool BVHAggregate::IntersectP(const Ray &ray, Float tMax) const {
                     break;
                 currentNodeIndex = nodesToVisit[--toVisitOffset];
             } else {
+                int nearChild, farChild;
                 if (dirIsNeg[node->axis] != 0) {
-                    /// second child first
-                    nodesToVisit[toVisitOffset++] = currentNodeIndex + 1;
-                    currentNodeIndex = node->secondChildOffset;
+                    nearChild = node->secondChildOffset;
+                    farChild = currentNodeIndex + 1;
                 } else {
-                    nodesToVisit[toVisitOffset++] = node->secondChildOffset;
-                    currentNodeIndex = currentNodeIndex + 1;
+                    nearChild = currentNodeIndex + 1;
+                    farChild = node->secondChildOffset;
                 }
+                nodesToVisit[toVisitOffset++] = farChild;
+                currentNodeIndex = nearChild;
+#ifdef PBRT_BVH_USE_SSE
+                _mm_prefetch(reinterpret_cast<const char *>(&nodes[nearChild]),
+                             _MM_HINT_T0);
+                _mm_prefetch(reinterpret_cast<const char *>(&nodes[farChild]),
+                             _MM_HINT_T1);
+#elif defined(__GNUC__)
+                __builtin_prefetch(&nodes[nearChild], 0, 3);
+                __builtin_prefetch(&nodes[farChild], 0, 2);
+#endif
             }
         } else {
             if (toVisitOffset == 0)

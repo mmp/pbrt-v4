@@ -30,6 +30,10 @@ inline Float4 Load4(const Float4 *p) {
 #if defined(PBRT_IS_GPU_CODE) && !defined(PBRT_FLOAT_AS_DOUBLE)
     float4 v = *(const float4 *)p;
     return {{v.x, v.y, v.z, v.w}};
+#elif defined(PBRT_SPECTRUM_USE_SSE)
+    Float4 result;
+    _mm_store_ps(result.v, _mm_load_ps(p->v));
+    return result;
 #else
     return *p;
 #endif
@@ -39,6 +43,8 @@ PBRT_CPU_GPU
 inline void Store4(Float4 *p, Float4 v) {
 #if defined(PBRT_IS_GPU_CODE) && !defined(PBRT_FLOAT_AS_DOUBLE)
     *(float4 *)p = make_float4(v.v[0], v.v[1], v.v[2], v.v[3]);
+#elif defined(PBRT_SPECTRUM_USE_SSE)
+    _mm_store_ps(p->v, _mm_load_ps(v.v));
 #else
     *p = v;
 #endif

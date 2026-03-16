@@ -168,70 +168,77 @@ STAT_MEMORY_COUNTER("Memory/Triangles", triangleBytes);
 PBRT_CPU_GPU pstd::optional<TriangleIntersection> IntersectTriangle(const Ray &ray, Float tMax,
                                                        Point3f p0, Point3f p1,
                                                        Point3f p2) {
-    // Return no intersection if triangle is degenerate
-    if (LengthSquared(Cross(p2 - p0, p1 - p0)) == 0)
-        return {};
+    constexpr uint32_t kAbsMask = 0x7FFFFFFFu;
+    constexpr Float kDetThreshold = 1.5e-4f;
+    constexpr Float kCE = 6 * gamma(3);
+    constexpr Float kCXY = 6 * (gamma(2) + 2 * gamma(5));
+    constexpr Float kCZ = 6 * gamma(5);
 
     // Transform triangle vertices to ray coordinate space
-    // Translate vertices based on ray origin
-    Point3f p0t = p0 - Vector3f(ray.o);
-    Point3f p1t = p1 - Vector3f(ray.o);
-    Point3f p2t = p2 - Vector3f(ray.o);
+    Float p0x = p0.x - ray.o.x, p0y = p0.y - ray.o.y, p0z = p0.z - ray.o.z;
+    Float p1x = p1.x - ray.o.x, p1y = p1.y - ray.o.y, p1z = p1.z - ray.o.z;
+    Float p2x = p2.x - ray.o.x, p2y = p2.y - ray.o.y, p2z = p2.z - ray.o.z;
 
-    // Permute components of triangle vertices and ray direction
-    int kz = MaxComponentIndex(Abs(ray.d));
-    int kx = kz + 1;
-    if (kx == 3)
-        kx = 0;
-    int ky = kx + 1;
-    if (ky == 3)
-        ky = 0;
-    Vector3f d = Permute(ray.d, {kx, ky, kz});
-    p0t = Permute(p0t, {kx, ky, kz});
-    p1t = Permute(p1t, {kx, ky, kz});
-    p2t = Permute(p2t, {kx, ky, kz});
+    // Inline permutation: pick the dominant direction component as z
+    Float adx = std::abs(ray.d.x), ady = std::abs(ray.d.y), adz = std::abs(ray.d.z);
+    Float kzD, kxD, kyD;
+    Float q0x, q0y, q0z, q1x, q1y, q1z, q2x, q2y, q2z;
+
+    if (adz >= adx && adz >= ady) {
+        kzD = ray.d.z; kxD = ray.d.x; kyD = ray.d.y;
+        q0x = p0x; q0y = p0y; q0z = p0z;
+        q1x = p1x; q1y = p1y; q1z = p1z;
+        q2x = p2x; q2y = p2y; q2z = p2z;
+    } else if (adx >= ady) {
+        kzD = ray.d.x; kxD = ray.d.y; kyD = ray.d.z;
+        q0x = p0y; q0y = p0z; q0z = p0x;
+        q1x = p1y; q1y = p1z; q1z = p1x;
+        q2x = p2y; q2y = p2z; q2z = p2x;
+    } else {
+        kzD = ray.d.y; kxD = ray.d.z; kyD = ray.d.x;
+        q0x = p0z; q0y = p0x; q0z = p0y;
+        q1x = p1z; q1y = p1x; q1z = p1y;
+        q2x = p2z; q2y = p2x; q2z = p2y;
+    }
 
     // Apply shear transformation to translated vertex positions
-    Float Sx = -d.x / d.z;
-    Float Sy = -d.y / d.z;
-    Float Sz = 1 / d.z;
-    p0t.x += Sx * p0t.z;
-    p0t.y += Sy * p0t.z;
-    p1t.x += Sx * p1t.z;
-    p1t.y += Sy * p1t.z;
-    p2t.x += Sx * p2t.z;
-    p2t.y += Sy * p2t.z;
+    Float invKzD = 1 / kzD;
+    Float Sx = -kxD * invKzD;
+    Float Sy = -kyD * invKzD;
+    Float Sz = invKzD;
+    Float s0x = q0x + Sx * q0z, s0y = q0y + Sy * q0z;
+    Float s1x = q1x + Sx * q1z, s1y = q1y + Sy * q1z;
+    Float s2x = q2x + Sx * q2z, s2y = q2y + Sy * q2z;
 
     // Compute edge function coefficients _e0_, _e1_, and _e2_
-    Float e0 = DifferenceOfProducts(p1t.x, p2t.y, p1t.y, p2t.x);
-    Float e1 = DifferenceOfProducts(p2t.x, p0t.y, p2t.y, p0t.x);
-    Float e2 = DifferenceOfProducts(p0t.x, p1t.y, p0t.y, p1t.x);
+    Float e0 = DifferenceOfProducts(s1x, s2y, s1y, s2x);
+    Float e1 = DifferenceOfProducts(s2x, s0y, s2y, s0x);
+    Float e2 = DifferenceOfProducts(s0x, s1y, s0y, s1x);
 
     // Fall back to double-precision test at triangle edges
-    if (sizeof(Float) == sizeof(float) && (e0 == 0.0f || e1 == 0.0f || e2 == 0.0f)) {
-        double p2txp1ty = (double)p2t.x * (double)p1t.y;
-        double p2typ1tx = (double)p2t.y * (double)p1t.x;
-        e0 = (float)(p2typ1tx - p2txp1ty);
-        double p0txp2ty = (double)p0t.x * (double)p2t.y;
-        double p0typ2tx = (double)p0t.y * (double)p2t.x;
-        e1 = (float)(p0typ2tx - p0txp2ty);
-        double p1txp0ty = (double)p1t.x * (double)p0t.y;
-        double p1typ0tx = (double)p1t.y * (double)p0t.x;
-        e2 = (float)(p1typ0tx - p1txp0ty);
+    if (sizeof(Float) == sizeof(float)) {
+        uint32_t degenerateMask = (FloatToBits(e0) & kAbsMask) |
+                                  (FloatToBits(e1) & kAbsMask) |
+                                  (FloatToBits(e2) & kAbsMask);
+        if (degenerateMask == 0u) {
+            e0 = (float)((double)s1x * (double)s2y - (double)s1y * (double)s2x);
+            e1 = (float)((double)s2x * (double)s0y - (double)s2y * (double)s0x);
+            e2 = (float)((double)s0x * (double)s1y - (double)s0y * (double)s1x);
+        }
     }
 
     // Perform triangle edge and determinant tests
-    if ((e0 < 0 || e1 < 0 || e2 < 0) && (e0 > 0 || e1 > 0 || e2 > 0))
+    uint32_t ie0 = FloatToBits(e0), ie1 = FloatToBits(e1), ie2 = FloatToBits(e2);
+    uint32_t signMismatch = ((ie0 ^ ie1) | (ie0 ^ ie2)) >> 31;
+    uint32_t anyNonZero = ((ie0 | ie1 | ie2) & kAbsMask) != 0u;
+    if (signMismatch & anyNonZero)
         return {};
     Float det = e0 + e1 + e2;
     if (det == 0)
         return {};
 
     // Compute scaled hit distance to triangle and test against ray $t$ range
-    p0t.z *= Sz;
-    p1t.z *= Sz;
-    p2t.z *= Sz;
-    Float tScaled = e0 * p0t.z + e1 * p1t.z + e2 * p2t.z;
+    Float tScaled = e0 * (q0z * Sz) + e1 * (q1z * Sz) + e2 * (q2z * Sz);
     if (det < 0 && (tScaled >= 0 || tScaled < tMax * det))
         return {};
     else if (det > 0 && (tScaled <= 0 || tScaled > tMax * det))
@@ -243,24 +250,30 @@ PBRT_CPU_GPU pstd::optional<TriangleIntersection> IntersectTriangle(const Ray &r
     Float t = tScaled * invDet;
     DCHECK(!IsNaN(t));
 
+    // Fast path: skip error bound when determinant is sufficiently large
+    if (BitsToFloat(FloatToBits(det) & kAbsMask) > kDetThreshold)
+        return TriangleIntersection{b0, b1, b2, t};
+
     // Ensure that computed triangle $t$ is conservatively greater than zero
-    // Compute $\delta_z$ term for triangle $t$ error bounds
-    Float maxZt = MaxComponentValue(Abs(Vector3f(p0t.z, p1t.z, p2t.z)));
-    Float deltaZ = gamma(3) * maxZt;
+    Float ae0 = BitsToFloat(ie0 & kAbsMask);
+    Float ae1 = BitsToFloat(ie1 & kAbsMask);
+    Float ae2 = BitsToFloat(ie2 & kAbsMask);
+    Float maxE = std::max(ae0, std::max(ae1, ae2));
 
-    // Compute $\delta_x$ and $\delta_y$ terms for triangle $t$ error bounds
-    Float maxXt = MaxComponentValue(Abs(Vector3f(p0t.x, p1t.x, p2t.x)));
-    Float maxYt = MaxComponentValue(Abs(Vector3f(p0t.y, p1t.y, p2t.y)));
-    Float deltaX = gamma(5) * (maxXt + maxZt);
-    Float deltaY = gamma(5) * (maxYt + maxZt);
+    Float sz0 = q0z * Sz, sz1 = q1z * Sz, sz2 = q2z * Sz;
+    Float maxZt = std::max(std::abs(sz0), std::max(std::abs(sz1), std::abs(sz2)));
+    Float absInvDet = std::abs(invDet);
+    Float mZiD = maxZt * absInvDet;
 
-    // Compute $\delta_e$ term for triangle $t$ error bounds
-    Float deltaE = 2 * (gamma(2) * maxXt * maxYt + deltaY * maxXt + deltaX * maxYt);
+    // Tier 1: simplified error bound
+    if (t > mZiD * (kCE * maxE + 2 * kCZ * maxZt))
+        return TriangleIntersection{b0, b1, b2, t};
 
-    // Compute $\delta_t$ term for triangle $t$ error bounds and check _t_
-    Float maxE = MaxComponentValue(Abs(Vector3f(e0, e1, e2)));
-    Float deltaT =
-        3 * (gamma(3) * maxE * maxZt + deltaE * maxZt + deltaZ * maxE) * std::abs(invDet);
+    // Tier 2: full error bound
+    Float maxXt = std::max(std::abs(s0x), std::max(std::abs(s1x), std::abs(s2x)));
+    Float maxYt = std::max(std::abs(s0y), std::max(std::abs(s1y), std::abs(s2y)));
+    Float deltaT = mZiD * (kCE * maxE + kCXY * maxXt * maxYt +
+                            kCZ * maxZt * (maxXt + maxYt));
     if (t <= deltaT)
         return {};
 

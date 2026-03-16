@@ -210,10 +210,13 @@ inline PBRT_CPU_GPU void TraceTransmittance(ShadowRayWorkItem sr,
                     r_l *= T_maj * sigma_maj / pr;
                     r_u *= T_maj * sigma_n / pr;
 
-                    // Possibly terminate transmittance computation using Russian roulette
-                    SampledSpectrum Tr = T_ray / (r_l + r_u).Average();
-                    if (Tr.MaxComponentValue() < 0.05f) {
-                        Float q = 0.75f;
+                    // Possibly terminate transmittance computation using Russian roulette.
+                    // Avoid constructing a temporary SampledSpectrum for the ratio:
+                    // instead compare MaxComponentValue directly.
+                    const Float rAvg = (r_l + r_u).Average();
+                    if (rAvg > 0 &&
+                        T_ray.MaxComponentValue() < 0.05f * rAvg) {
+                        const Float q = 0.75f;
                         if (rng.Uniform<Float>() < q)
                             T_ray = SampledSpectrum(0.);
                         else

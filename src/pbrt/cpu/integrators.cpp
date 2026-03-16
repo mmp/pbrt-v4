@@ -860,19 +860,19 @@ SampledSpectrum SimpleVolPathIntegrator::Li(RayDifferential ray,
                         [&](Point3f p, MediumProperties mp, SampledSpectrum sigma_maj,
                             SampledSpectrum T_maj) {
                             // Compute medium event probabilities for interaction
-                            Float pAbsorb = mp.sigma_a[0] / sigma_maj[0];
-                            Float pScatter = mp.sigma_s[0] / sigma_maj[0];
-                            Float pNull = std::max<Float>(0, 1 - pAbsorb - pScatter);
+                            const Float invSigmaMaj0 = 1.f / sigma_maj[0];
+                            const Float pAbsorb = mp.sigma_a[0] * invSigmaMaj0;
+                            const Float pScatter = mp.sigma_s[0] * invSigmaMaj0;
+                            const Float pAbsorbScatter = pAbsorb + pScatter;
 
                             // Randomly sample medium scattering event for delta tracking
-                            int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, uMode);
-                            if (mode == 0) {
+                            if (uMode < pAbsorb) {
                                 // Handle absorption event for medium sample
                                 L += beta * mp.Le;
                                 terminated = true;
                                 return false;
 
-                            } else if (mode == 1) {
+                            } else if (uMode < pAbsorbScatter) {
                                 // Handle regular scattering event for medium sample
                                 // Stop path sampling if maximum depth has been reached
                                 if (depth++ >= maxDepth) {
@@ -1001,20 +1001,20 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                     }
 
                     // Compute medium event probabilities for interaction
-                    Float pAbsorb = mp.sigma_a[0] / sigma_maj[0];
-                    Float pScatter = mp.sigma_s[0] / sigma_maj[0];
-                    Float pNull = std::max<Float>(0, 1 - pAbsorb - pScatter);
+                    const Float invSigmaMaj0 = 1.f / sigma_maj[0];
+                    const Float pAbsorb = mp.sigma_a[0] * invSigmaMaj0;
+                    const Float pScatter = mp.sigma_s[0] * invSigmaMaj0;
+                    const Float pAbsorbScatter = pAbsorb + pScatter;
 
-                    CHECK_GE(1 - pAbsorb - pScatter, -1e-6);
+                    CHECK_GE(1 - pAbsorbScatter, -1e-6);
                     // Sample medium scattering event type and update path
                     Float um = rng.Uniform<Float>();
-                    int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, um);
-                    if (mode == 0) {
+                    if (um < pAbsorb) {
                         // Handle absorption along ray path
                         terminated = true;
                         return false;
 
-                    } else if (mode == 1) {
+                    } else if (um < pAbsorbScatter) {
                         // Handle scattering along ray path
                         // Stop path sampling if maximum depth has been reached
                         if (depth++ >= maxDepth) {
@@ -1023,9 +1023,10 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                         }
 
                         // Update _beta_ and _r_u_ for real-scattering event
-                        Float pdf = T_maj[0] * mp.sigma_s[0];
-                        beta *= T_maj * mp.sigma_s / pdf;
-                        r_u *= T_maj * mp.sigma_s / pdf;
+                        const Float pdf = T_maj[0] * mp.sigma_s[0];
+                        SampledSpectrum wt = T_maj * mp.sigma_s / pdf;
+                        beta *= wt;
+                        r_u *= wt;
 
                         if (beta && r_u) {
                             // Sample direct lighting at volume-scattering event
@@ -1992,19 +1993,19 @@ int RandomWalk(const Integrator &integrator, SampledWavelengths &lambda,
                 [&](Point3f p, MediumProperties mp, SampledSpectrum sigma_maj,
                     SampledSpectrum T_maj) {
                     // Compute medium event probabilities for interaction
-                    Float pAbsorb = mp.sigma_a[0] / sigma_maj[0];
-                    Float pScatter = mp.sigma_s[0] / sigma_maj[0];
-                    Float pNull = std::max<Float>(0, 1 - pAbsorb - pScatter);
+                    const Float invSigmaMaj0 = 1.f / sigma_maj[0];
+                    const Float pAbsorb = mp.sigma_a[0] * invSigmaMaj0;
+                    const Float pScatter = mp.sigma_s[0] * invSigmaMaj0;
+                    const Float pAbsorbScatter = pAbsorb + pScatter;
 
-                    // Randomly sample medium event for _RandomRalk()_ ray
+                    // Randomly sample medium event for _RandomWalk()_ ray
                     Float um = sampler.Get1D();
-                    int mode = SampleDiscrete({pAbsorb, pScatter, pNull}, um);
-                    if (mode == 0) {
+                    if (um < pAbsorb) {
                         // Handle absorption for _RandomWalk()_ ray
                         terminated = true;
                         return false;
 
-                    } else if (mode == 1) {
+                    } else if (um < pAbsorbScatter) {
                         // Handle scattering for _RandomWalk()_ ray
                         beta *= T_maj * mp.sigma_s / (T_maj[0] * mp.sigma_s[0]);
                         // Record medium interaction in _path_ and compute forward density
