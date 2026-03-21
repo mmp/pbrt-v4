@@ -13,14 +13,56 @@
 #include <pbrt/util/log.h>
 #include <pbrt/util/math.h>
 #include <pbrt/util/print.h>
+#include <pbrt/util/parallel.h>
 #include <pbrt/util/stats.h>
 
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 namespace pbrt {
 
 STAT_MEMORY_COUNTER("Memory/Image maps", imageMapBytes);
+
+// Box-filter downsample by 2 in each dimension. Keeps the source pixel format (U256 / Half /
+// Float) so stored mip pyramids and Memory/Image maps reflect a real memory win; converting
+// everything to float here makes footprint ~unchanged (4× smaller area, ~4× larger texels).
+static Image HalveImageBoxFilter(Image image, Allocator alloc) {
+    Point2i res = image.Resolution();
+    Point2i half(std::max(1, res.x / 2), std::max(1, res.y / 2));
+    if (half.x == res.x && half.y == res.y)
+        return image;
+
+    int nc = image.NChannels();
+    CHECK_GE(nc, 1);
+    std::vector<std::string> chNames = image.ChannelNames();
+    Image dst(image.Format(), half, pstd::MakeSpan(chNames), image.Encoding(), alloc);
+
+    ParallelFor2D(Bounds2i({0, 0}, half), [&](Bounds2i tile) {
+        WrapMode2D clamp(WrapMode::Clamp);
+        for (int y = tile.pMin.y; y < tile.pMax.y; ++y)
+            for (int x = tile.pMin.x; x < tile.pMax.x; ++x) {
+                ImageChannelValues sum(nc, Float(0));
+                int count = 0;
+                for (int dy = 0; dy < 2; ++dy)
+                    for (int dx = 0; dx < 2; ++dx) {
+                        int sx = 2 * x + dx;
+                        int sy = 2 * y + dy;
+                        if (sx < res.x && sy < res.y) {
+                            for (int c = 0; c < nc; ++c)
+                                sum[c] += image.GetChannel({sx, sy}, c, clamp);
+                            ++count;
+                        }
+                    }
+                CHECK_GT(count, 0);
+                Float inv = 1 / Float(count);
+                for (int c = 0; c < nc; ++c)
+                    sum[c] *= inv;
+                dst.SetChannels({x, y}, sum);
+            }
+    });
+    return dst;
+}
 
 ///////////////////////////////////////////////////////////////////////////
 // MIPMap Helper Declarations
@@ -195,6 +237,10 @@ MIPMap::MIPMap(Image image, const RGBColorSpace *colorSpace, WrapMode wrapMode,
                Allocator alloc, const MIPMapFilterOptions &options)
     : colorSpace(colorSpace), wrapMode(wrapMode), options(options) {
     CHECK(colorSpace);
+    // Half-res load is applied here (not only in CreateFromFile) so GPU paths and any other
+    // MIPMap construction see the same behavior and memory accounting.
+    if (Options && Options->halfResolutionImageTextures)
+        image = HalveImageBoxFilter(std::move(image), alloc);
     pyramid = Image::GeneratePyramid(std::move(image), wrapMode, alloc);
     if (Options->disableImageTextures) {
         Image top = pyramid.back();

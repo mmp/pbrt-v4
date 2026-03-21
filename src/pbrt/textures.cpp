@@ -400,8 +400,9 @@ std::string FloatImageTexture::ToString() const {
 
 std::string TexInfo::ToString() const {
     return StringPrintf(
-        "[ TexInfo filename: %s filterOptions: %s wrapMode: %s encoding: %s ]", filename,
-        filterOptions, wrapMode, encoding);
+        "[ TexInfo filename: %s filterOptions: %s wrapMode: %s encoding: %s "
+        "halfResolutionImageTextures: %s ]",
+        filename, filterOptions, wrapMode, encoding, halfResolutionImageTextures);
 }
 
 std::mutex ImageTextureBase::textureCacheMutex;
@@ -1131,17 +1132,17 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
             textureCacheMutex.unlock();
 
             {
-                ImageAndMetadata immeta = Image::Read(filename);
+                ImageAndMetadata immeta = Image::Read(filename, alloc, encoding);
                 Image &image = immeta.image;
 
-                readMode = image.Format() == PixelFormat::U256
-                               ? cudaReadModeNormalizedFloat
-                               : cudaReadModeElementType;
                 colorSpace = immeta.metadata.GetColorSpace();
 
                 ImageChannelDesc rgbDesc = image.GetChannelDesc({"R", "G", "B"});
                 if (rgbDesc) {
                     image = image.SelectChannels(rgbDesc);
+                    readMode = image.Format() == PixelFormat::U256
+                                   ? cudaReadModeNormalizedFloat
+                                   : cudaReadModeElementType;
 
                     MIPMap mipmap(image, colorSpace, WrapMode::Clamp /* TODO */,
                                   Allocator(), MIPMapFilterOptions());
@@ -1269,6 +1270,9 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
                         mipArray, readMode, nMIPMapLevels, colorSpace};
                     textureCacheMutex.unlock();
                 } else if (image.NChannels() == 1) {
+                    readMode = image.Format() == PixelFormat::U256
+                                   ? cudaReadModeNormalizedFloat
+                                   : cudaReadModeElementType;
                     mipArray = createSingleChannelTextureArray(image, colorSpace,
                                                                &nMIPMapLevels);
 
@@ -1357,7 +1361,7 @@ GPUFloatImageTexture *GPUFloatImageTexture::Create(
     } else {
         textureCacheMutex.unlock();
 
-        ImageAndMetadata immeta = Image::Read(filename);
+        ImageAndMetadata immeta = Image::Read(filename, alloc, encoding);
         Image &image = immeta.image;
         const RGBColorSpace *colorSpace = immeta.metadata.GetColorSpace();
 

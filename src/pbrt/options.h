@@ -25,6 +25,9 @@ struct BasicPBRTOptions {
     bool disablePixelJitter = false, disableWavelengthJitter = false;
     bool disableTextureFiltering = false;
     bool disableImageTextures = false;
+    // When true (default), image textures are downsampled to half resolution at load (CPU and GPU).
+    // Use --fullres-imagetextures on the command line to load at native resolution for comparisons.
+    bool halfResolutionImageTextures = true;
     bool forceDiffuse = false;
     bool useGPU = false;
     bool wavefront = false;
