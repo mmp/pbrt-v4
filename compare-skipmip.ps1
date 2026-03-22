@@ -263,7 +263,7 @@ if (-not $ShowProgress) {
 Write-Host ""
 
 Write-Host "================================================================" -ForegroundColor Yellow
-Write-Host " Run 1/2  |  without --skipmip" -ForegroundColor Yellow
+Write-Host " Run 1/2  |  Full Mipmap Chain" -ForegroundColor Yellow
 Write-Host "================================================================" -ForegroundColor Yellow
 Write-Host ""
 $argsNoMip = $common + @("--outfile", $imgNoMip)
@@ -271,7 +271,7 @@ $runNoMip = Invoke-PbrtLogged -PbrtExe $PbrtExe -Arguments $argsNoMip -LogPath $
 
 Write-Host ""
 Write-Host "================================================================" -ForegroundColor Yellow
-Write-Host " Run 2/2  |  with --skipmip" -ForegroundColor Yellow
+Write-Host " Run 2/2  |  SkipMip" -ForegroundColor Yellow
 Write-Host "================================================================" -ForegroundColor Yellow
 Write-Host ""
 $argsSkipMip = $common + @("--skipmip", "--outfile", $imgSkipMip)
@@ -378,7 +378,10 @@ if ($ssimRes.Ok) {
     $ssimValStr = ([double]$ssimRes.Value).ToString(
         "N6", [System.Globalization.CultureInfo]::InvariantCulture)
     # Avoid -f with multiple placeholders (can throw FormatError with some hosts/encodings).
+    [void]$sb.AppendLine("-------------------------------------------")
     [void]$sb.AppendLine("SSIM (Full Mip vs SkipMip): $ssimValStr $ssimMark")
+    [void]$sb.AppendLine("-------------------------------------------")
+
 } else {
     $why = if ($ssimRes.Message) {
         ($ssimRes.Message -replace "[\r\n]+", " ").Trim()
@@ -386,7 +389,10 @@ if ($ssimRes.Ok) {
         "unknown"
     }
     if ($why.Length -gt 160) { $why = $why.Substring(0, 157) + "..." }
+    [void]$sb.AppendLine("-------------------------------------------")
     [void]$sb.AppendLine("SSIM (Full Mip vs SkipMip): n/a - $why")
+    [void]$sb.AppendLine("-------------------------------------------")
+
 }
 
 $summary = $sb.ToString()
