@@ -35,6 +35,10 @@ inline pstd::optional<FilterFunction> ParseFilter(const std::string &f) {
 
 std::string ToString(FilterFunction f);
 
+// Box-filter downsample steps before mip pyramid: 0 if --skipmip is off; if on, equals
+// kImageTextureSkipMipLevelsWhenSkipMipEnabled in mipmap.cpp (each step skips one mip level).
+int ImageTextureBaseMipDownsizeStepsForLoad();
+
 // MIPMapFilterOptions Definition
 struct MIPMapFilterOptions {
     FilterFunction filter = FilterFunction::EWA;
@@ -67,6 +71,8 @@ class MIPMap {
     int Levels() const { return int(pyramid.size()); }
     const RGBColorSpace *GetRGBColorSpace() const { return colorSpace; }
     const Image &GetLevel(int level) const { return pyramid[level]; }
+
+    int64_t TotalBytesUsed() const;
 
   private:
     // MIPMap Private Methods

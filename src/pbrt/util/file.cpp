@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <vector>
 #ifndef PBRT_IS_WINDOWS
 #include <dirent.h>
 #include <fcntl.h>
@@ -290,6 +291,53 @@ bool WriteFileContents(std::string filename, const std::string &contents) {
         return false;
     }
     return true;
+}
+
+static bool FilenameEqAsciiInsensitive(const std::string &a, const std::string &b) {
+    if (a.size() != b.size())
+        return false;
+    for (size_t i = 0; i < a.size(); ++i)
+        if (std::tolower(static_cast<unsigned char>(a[i])) !=
+            std::tolower(static_cast<unsigned char>(b[i])))
+            return false;
+    return true;
+}
+
+static void SplitPathComponents(const std::string &path,
+                                std::vector<std::string> *components) {
+    components->clear();
+    std::string cur;
+    for (unsigned char uc : path) {
+        char c = static_cast<char>(uc);
+        if (c == '/' || c == '\\') {
+            if (!cur.empty()) {
+                components->push_back(cur);
+                cur.clear();
+            }
+        } else
+            cur += c;
+    }
+    if (!cur.empty())
+        components->push_back(cur);
+}
+
+std::string PathForImageTextureStats(std::string path) {
+    std::vector<std::string> comps;
+    SplitPathComponents(path, &comps);
+    for (size_t i = 0; i < comps.size(); ++i) {
+        if (!FilenameEqAsciiInsensitive(comps[i], "pbrt-v4-scenes"))
+            continue;
+        std::string rel;
+        for (size_t j = i + 1; j < comps.size(); ++j) {
+            if (!rel.empty())
+                rel += '/';
+            rel += comps[j];
+        }
+        if (!rel.empty())
+            return rel;
+        break;
+    }
+    return path;
 }
 
 }  // namespace pbrt

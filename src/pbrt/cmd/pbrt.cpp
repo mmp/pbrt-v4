@@ -19,9 +19,11 @@
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/print.h>
 #include <pbrt/util/spectrum.h>
+#include <pbrt/util/stats.h>
 #include <pbrt/util/string.h>
 #include <pbrt/wavefront/wavefront.h>
 
+#include <chrono>
 #include <string>
 #include <vector>
 
@@ -40,8 +42,9 @@ Rendering options:
                                 faster debugging. (<values> are Integrator-specific
                                 and come from error message text.)
   --disable-image-textures      Always return the average value of image textures.
-  --fullres-imagetextures       Load image textures at full resolution (default is half
-                                resolution for lower memory and faster filtering).
+  --skipmip                     Skip the first k mip levels of image textures (box-filter
+                                downsample k times before building the mip pyramid). k is set
+                                in mipmap.cpp (kImageTextureSkipMipLevelsWhenSkipMipEnabled).
   --disable-pixel-jitter        Always sample pixels at their centers.
   --disable-texture-filtering   Point-sample all textures.
   --disable-wavelength-jitter   Always sample the same %d wavelengths of light.
@@ -75,7 +78,7 @@ Rendering options:
   --render-coord-sys <name>     Coordinate system to use for the scene when rendering,
                                 where name is "camera", "cameraworld", or "world".
   --seed <n>                    Set random number generator seed. Default: 0.
-  --stats                       Print various statistics after rendering completes.
+  --stats                       Print memory usage and render timing summaries after rendering.
   --spp <n>                     Override number of pixel samples specified in scene
                                 description file.
   --wavefront                   Use wavefront volumetric path integrator.
@@ -110,14 +113,10 @@ int main(int argc, char *argv[]) {
 
     // Declare variables for parsed command line
     PBRTOptions options;
-    // Ensure half-res image loads are enabled unless --fullres-imagetextures is passed (some
-    // toolchains have been observed not to apply base-class default member initializers as expected).
-    options.halfResolutionImageTextures = true;
     std::vector<std::string> filenames;
     std::string logLevel = "error";
     std::string renderCoordSys = "cameraworld";
     bool format = false, toPly = false;
-    bool fullResolutionImageTextures = false;
 
     // Process command-line arguments
     for (auto iter = args.begin(); iter != args.end(); ++iter) {
@@ -170,8 +169,7 @@ int main(int argc, char *argv[]) {
             ParseArg(&iter, args.end(), "debugstart", &options.debugStart, onError) ||
             ParseArg(&iter, args.end(), "disable-image-textures",
                      &options.disableImageTextures, onError) ||
-            ParseArg(&iter, args.end(), "fullres-imagetextures",
-                     &fullResolutionImageTextures, onError) ||
+            ParseArg(&iter, args.end(), "skipmip", &options.skipMipImageTextures, onError) ||
             ParseArg(&iter, args.end(), "disable-pixel-jitter",
                      &options.disablePixelJitter, onError) ||
             ParseArg(&iter, args.end(), "disable-texture-filtering",
@@ -275,9 +273,6 @@ int main(int argc, char *argv[]) {
         ErrorExit("The --quick option is not supported in interactive mode");
     }
 
-    if (fullResolutionImageTextures)
-        options.halfResolutionImageTextures = false;
-
     options.logLevel = LogLevelFromString(logLevel);
 
     // Initialize pbrt
@@ -293,10 +288,20 @@ int main(int argc, char *argv[]) {
         ParseFiles(&builder, filenames);
 
         // Render the scene
-        if (Options->useGPU || Options->wavefront)
-            RenderWavefront(scene);
-        else
-            RenderCPU(scene);
+        if (options.printStatistics) {
+            auto t0 = std::chrono::steady_clock::now();
+            if (Options->useGPU || Options->wavefront)
+                RenderWavefront(scene);
+            else
+                RenderCPU(scene);
+            auto t1 = std::chrono::steady_clock::now();
+            SetStatsRenderWallSeconds(std::chrono::duration<Float>(t1 - t0).count());
+        } else {
+            if (Options->useGPU || Options->wavefront)
+                RenderWavefront(scene);
+            else
+                RenderCPU(scene);
+        }
 
         LOG_VERBOSE("Memory used after post-render cleanup: %s", GetCurrentRSS());
         // Clean up after rendering the scene

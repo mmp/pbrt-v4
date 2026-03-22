@@ -32,6 +32,10 @@ void StatsReportPixelStart(Point2i p);
 void StatsReportPixelEnd(Point2i p);
 
 void PrintStats(FILE *dest);
+// Wall-clock seconds for the RenderCPU / RenderWavefront call; shown under --stats timing.
+void SetStatsRenderWallSeconds(Float seconds);
+// Per loaded imagemap: _where_ is "CPU" (host MIPMap pyramids) or "GPU" (device mip arrays).
+void ReportImageTextureMemory(const std::string &path, int64_t bytes, const char *where);
 void StatsWritePixelImages();
 bool PrintCheckRare(FILE *dest);
 void ClearStats();

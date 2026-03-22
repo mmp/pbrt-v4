@@ -5,6 +5,7 @@
 #include <pbrt/util/mipmap.h>
 
 #include <pbrt/options.h>
+#include <pbrt/util/stats.h>
 #include <pbrt/util/check.h>
 #include <pbrt/util/color.h>
 #include <pbrt/util/colorspace.h>
@@ -14,7 +15,6 @@
 #include <pbrt/util/math.h>
 #include <pbrt/util/print.h>
 #include <pbrt/util/parallel.h>
-#include <pbrt/util/stats.h>
 
 #include <algorithm>
 #include <cmath>
@@ -23,6 +23,11 @@
 namespace pbrt {
 
 STAT_MEMORY_COUNTER("Memory/Image maps", imageMapBytes);
+
+// Used only when Options->skipMipImageTextures (--skipmip): each unit is one 2× box-filter
+// downsample before GeneratePyramid (i.e. that many mips skipped; new level 0 is old mip k).
+// Replace with a computed safe level when ready.
+static constexpr int kImageTextureSkipMipLevelsWhenSkipMipEnabled = 3;
 
 // Box-filter downsample by 2 in each dimension. Keeps the source pixel format (U256 / Half /
 // Float) so stored mip pyramids and Memory/Image maps reflect a real memory win; converting
@@ -62,6 +67,19 @@ static Image HalveImageBoxFilter(Image image, Allocator alloc) {
             }
     });
     return dst;
+}
+
+int ImageTextureBaseMipDownsizeStepsForLoad() {
+    if (!Options || !Options->skipMipImageTextures)
+        return 0;
+    return std::max(0, kImageTextureSkipMipLevelsWhenSkipMipEnabled);
+}
+
+// Apply _mipDownsizeSteps_ consecutive half-res box filters (each ~2× smaller per axis).
+static Image ApplyBaseMipDownsize(Image image, int mipDownsizeSteps, Allocator alloc) {
+    for (int i = 0; i < mipDownsizeSteps; ++i)
+        image = HalveImageBoxFilter(std::move(image), alloc);
+    return image;
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -237,10 +255,11 @@ MIPMap::MIPMap(Image image, const RGBColorSpace *colorSpace, WrapMode wrapMode,
                Allocator alloc, const MIPMapFilterOptions &options)
     : colorSpace(colorSpace), wrapMode(wrapMode), options(options) {
     CHECK(colorSpace);
-    // Half-res load is applied here (not only in CreateFromFile) so GPU paths and any other
-    // MIPMap construction see the same behavior and memory accounting.
-    if (Options && Options->halfResolutionImageTextures)
-        image = HalveImageBoxFilter(std::move(image), alloc);
+    // Base mip downsize is applied here (not only in CreateFromFile) so GPU paths and any
+    // other MIPMap construction see the same behavior and memory accounting.
+    int baseSteps = ImageTextureBaseMipDownsizeStepsForLoad();
+    if (baseSteps > 0)
+        image = ApplyBaseMipDownsize(std::move(image), baseSteps, alloc);
     pyramid = Image::GeneratePyramid(std::move(image), wrapMode, alloc);
     if (Options->disableImageTextures) {
         Image top = pyramid.back();
@@ -249,6 +268,13 @@ MIPMap::MIPMap(Image image, const RGBColorSpace *colorSpace, WrapMode wrapMode,
     }
     std::for_each(pyramid.begin(), pyramid.end(),
                   [](const Image &im) { imageMapBytes += im.BytesUsed(); });
+}
+
+int64_t MIPMap::TotalBytesUsed() const {
+    int64_t sum = 0;
+    for (const Image &im : pyramid)
+        sum += int64_t(im.BytesUsed());
+    return sum;
 }
 
 template <>
@@ -424,8 +450,10 @@ MIPMap *MIPMap::CreateFromFile(const std::string &filename,
     }
 
     const RGBColorSpace *colorSpace = imageAndMetadata.metadata.GetColorSpace();
-    return alloc.new_object<MIPMap>(std::move(image), colorSpace, wrapMode, alloc,
-                                    options);
+    MIPMap *mipmap =
+        alloc.new_object<MIPMap>(std::move(image), colorSpace, wrapMode, alloc, options);
+    ReportImageTextureMemory(filename, mipmap->TotalBytesUsed(), "CPU");
+    return mipmap;
 }
 
 template <typename T>

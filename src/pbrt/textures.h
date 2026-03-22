@@ -506,18 +506,17 @@ class FBmTexture {
 struct TexInfo {
     // TexInfo Public Methods
     TexInfo(const std::string &f, MIPMapFilterOptions filterOptions, WrapMode wm,
-            ColorEncoding encoding, bool halfResolutionImageTextures)
+            ColorEncoding encoding, int baseMipDownsizeSteps)
         : filename(f),
           filterOptions(filterOptions),
           wrapMode(wm),
           encoding(encoding),
-          halfResolutionImageTextures(halfResolutionImageTextures) {}
+          baseMipDownsizeSteps(baseMipDownsizeSteps) {}
 
     bool operator<(const TexInfo &t) const {
-        return std::tie(filename, filterOptions, encoding, wrapMode,
-                        halfResolutionImageTextures) <
+        return std::tie(filename, filterOptions, encoding, wrapMode, baseMipDownsizeSteps) <
                std::tie(t.filename, t.filterOptions, t.encoding, t.wrapMode,
-                        t.halfResolutionImageTextures);
+                        t.baseMipDownsizeSteps);
     }
 
     std::string ToString() const;
@@ -526,7 +525,7 @@ struct TexInfo {
     MIPMapFilterOptions filterOptions;
     WrapMode wrapMode;
     ColorEncoding encoding;
-    bool halfResolutionImageTextures;
+    int baseMipDownsizeSteps;
 };
 
 // ImageTextureBase Definition
@@ -536,11 +535,10 @@ class ImageTextureBase {
     ImageTextureBase(TextureMapping2D mapping, std::string filename,
                      MIPMapFilterOptions filterOptions, WrapMode wrapMode, Float scale,
                      bool invert, ColorEncoding encoding, Allocator alloc,
-                     bool halfResolutionImageTextures)
+                     int baseMipDownsizeSteps)
         : mapping(mapping), filename(filename), scale(scale), invert(invert) {
         // Get _MIPMap_ from texture cache if present
-        TexInfo texInfo(filename, filterOptions, wrapMode, encoding,
-                        halfResolutionImageTextures);
+        TexInfo texInfo(filename, filterOptions, wrapMode, encoding, baseMipDownsizeSteps);
         std::unique_lock<std::mutex> lock(textureCacheMutex);
         if (auto iter = textureCache.find(texInfo); iter != textureCache.end()) {
             mipmap = iter->second;
@@ -583,7 +581,7 @@ class FloatImageTexture : public ImageTextureBase {
                       MIPMapFilterOptions filterOptions, WrapMode wm, Float scale,
                       bool invert, ColorEncoding encoding, Allocator alloc)
         : ImageTextureBase(m, filename, filterOptions, wm, scale, invert, encoding, alloc,
-                           Options && Options->halfResolutionImageTextures) {}
+                           ImageTextureBaseMipDownsizeStepsForLoad()) {}
     PBRT_CPU_GPU
     Float Evaluate(TextureEvalContext ctx) const {
 #ifdef PBRT_IS_GPU_CODE
@@ -615,7 +613,7 @@ class SpectrumImageTexture : public ImageTextureBase {
                          Float scale, bool invert, ColorEncoding encoding,
                          SpectrumType spectrumType, Allocator alloc)
         : ImageTextureBase(mapping, filename, filterOptions, wrapMode, scale, invert,
-                           encoding, alloc, Options && Options->halfResolutionImageTextures),
+                           encoding, alloc, ImageTextureBaseMipDownsizeStepsForLoad()),
           spectrumType(spectrumType) {}
 
     PBRT_CPU_GPU

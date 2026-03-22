@@ -36,7 +36,7 @@ std::string PBRTOptions::ToString() const {
     return StringPrintf(
         "[ PBRTOptions seed: %s quiet: %s disablePixelJitter: %s "
         "disableWavelengthJitter: %s disableTextureFiltering: %s disableImageTextures: %s "
-        "halfResolutionImageTextures: %s "
+        "skipMipImageTextures: %s "
         "forceDiffuse: %s useGPU: %s wavefront: %s interactive: %s fullscreen %s "
         "renderingSpace: %s nThreads: %s logLevel: %s logFile: %s logUtilization: %s "
         "writePartialImages: %s recordPixelStatistics: %s "
@@ -45,7 +45,7 @@ std::string PBRTOptions::ToString() const {
         "displayServer: %s cropWindow: %s pixelBounds: %s pixelMaterial: %s "
         "displacementEdgeScale: %f ]",
         seed, quiet, disablePixelJitter, disableWavelengthJitter, disableTextureFiltering,
-        disableImageTextures, halfResolutionImageTextures, forceDiffuse, useGPU, wavefront,
+        disableImageTextures, skipMipImageTextures, forceDiffuse, useGPU, wavefront,
         interactive, fullscreen,
         renderingSpace, nThreads, logLevel, logFile, logUtilization, writePartialImages,
         recordPixelStatistics, printStatistics, pixelSamples, gpuDevice, quickRender, upgrade,
