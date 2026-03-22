@@ -394,7 +394,8 @@ int ComputeImageTextureSafeDownsizesFromPreprocess(
     Printf("[mip preprocess] texture \"%s\"\n", texLog);
 
     int textureMinSafeDownsizes = std::numeric_limits<int>::max();
-    for (const ImageTextureGeometryUse &use : usesForTexture) {
+    for (size_t ui = 0; ui < usesForTexture.size(); ++ui) {
+        const ImageTextureGeometryUse &use = usesForTexture[ui];
         Float minLod =
             MinPrimaryContinuousLodForUse(camera, samplesPerPixel, use, mipmapPyramidLevels, alloc);
         Float lodClamped = std::max<Float>(0, minLod);
@@ -409,6 +410,14 @@ int ComputeImageTextureSafeDownsizesFromPreprocess(
                minLod);
 
         textureMinSafeDownsizes = std::min(textureMinSafeDownsizes, pairSafe);
+        // Min across geometries: any geometry with 0 safe downsizes fixes the texture at 0.
+        if (textureMinSafeDownsizes == 0) {
+            size_t remaining = usesForTexture.size() - ui - 1;
+            if (remaining > 0)
+                Printf("  (... skipping %zu more geometries; cannot increase safe downsizes above 0)\n",
+                       remaining);
+            break;
+        }
     }
 
     if (textureMinSafeDownsizes == std::numeric_limits<int>::max())
