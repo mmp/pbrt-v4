@@ -26,7 +26,8 @@ struct BasicPBRTOptions {
     bool disableTextureFiltering = false;
     bool disableImageTextures = false;
     // When true (--skipmip), load textures with the first k mips skipped (see
-    // kImageTextureSkipMipLevelsWhenSkipMipEnabled in mipmap.cpp). When false, full-res base.
+    // kDefaultImageTextureSkipMipLevelsWhenSkipMipEnabled in mipmap.cpp unless overridden
+    // per file by RunImageTextureMipPreprocess). When false, full-res base.
     bool skipMipImageTextures = false;
     bool forceDiffuse = false;
     bool useGPU = false;

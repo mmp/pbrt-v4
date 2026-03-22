@@ -15,6 +15,7 @@
 #include <pbrt/samplers.h>
 #include <pbrt/scene.h>
 #include <pbrt/shapes.h>
+#include <pbrt/texture_mip_preprocess.h>
 #include <pbrt/textures.h>
 #include <pbrt/util/colorspace.h>
 #include <pbrt/util/parallel.h>
@@ -27,6 +28,11 @@ void RenderCPU(BasicScene &parsedScene) {
 
     // Create media first (so have them for the camera...)
     std::map<std::string, Medium> media = parsedScene.CreateMedia();
+
+    Camera camera = parsedScene.GetCamera();
+
+    LOG_VERBOSE("Image texture mip preprocess");
+    RunImageTextureMipPreprocess(parsedScene, camera);
 
     // Textures
     LOG_VERBOSE("Starting textures");
@@ -47,7 +53,6 @@ void RenderCPU(BasicScene &parsedScene) {
     Primitive accel = parsedScene.CreateAggregate(textures, shapeIndexToAreaLights, media,
                                                   namedMaterials, materials);
 
-    Camera camera = parsedScene.GetCamera();
     Film film = camera.GetFilm();
     Sampler sampler = parsedScene.GetSampler();
 

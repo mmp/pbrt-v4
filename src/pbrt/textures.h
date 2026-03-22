@@ -547,7 +547,8 @@ class ImageTextureBase {
         lock.unlock();
 
         // Create _MIPMap_ for _filename_ and add to texture cache
-        mipmap = MIPMap::CreateFromFile(filename, filterOptions, wrapMode, encoding, alloc);
+        mipmap = MIPMap::CreateFromFile(filename, filterOptions, wrapMode, encoding, alloc,
+                                        baseMipDownsizeSteps);
         lock.lock();
         // This is actually ok, but if it hits, it means we've wastefully
         // loaded this texture. (Note that in that case, should just return
@@ -581,7 +582,7 @@ class FloatImageTexture : public ImageTextureBase {
                       MIPMapFilterOptions filterOptions, WrapMode wm, Float scale,
                       bool invert, ColorEncoding encoding, Allocator alloc)
         : ImageTextureBase(m, filename, filterOptions, wm, scale, invert, encoding, alloc,
-                           ImageTextureBaseMipDownsizeStepsForLoad()) {}
+                           ImageTextureMipDownsizeStepsForFile(filename)) {}
     PBRT_CPU_GPU
     Float Evaluate(TextureEvalContext ctx) const {
 #ifdef PBRT_IS_GPU_CODE
@@ -613,7 +614,7 @@ class SpectrumImageTexture : public ImageTextureBase {
                          Float scale, bool invert, ColorEncoding encoding,
                          SpectrumType spectrumType, Allocator alloc)
         : ImageTextureBase(mapping, filename, filterOptions, wrapMode, scale, invert,
-                           encoding, alloc, ImageTextureBaseMipDownsizeStepsForLoad()),
+                           encoding, alloc, ImageTextureMipDownsizeStepsForFile(filename)),
           spectrumType(spectrumType) {}
 
     PBRT_CPU_GPU

@@ -324,6 +324,9 @@ class BasicScene {
                                                  Primitive accel,
                                                  std::vector<Light> lights) const;
 
+    // Resolved paths for imagemap textures (including deferred async loads not yet started).
+    std::vector<std::string> CollectResolvedImageTextureFilenames();
+
     NamedTextures CreateTextures();
 
     // BasicScene Public Members
@@ -339,6 +342,8 @@ class BasicScene {
     Medium GetMedium(const std::string &name, const FileLoc *loc);
 
     void startLoadingNormalMaps(const ParameterDictionary &parameters);
+
+    void LaunchDeferredImageTextureJobs();
 
     // BasicScene Private Members
     AsyncJob<Sampler> *samplerJob = nullptr;
@@ -369,6 +374,8 @@ class BasicScene {
     std::vector<std::pair<std::string, TextureSceneEntity>> serialFloatTextures;
     std::vector<std::pair<std::string, TextureSceneEntity>> serialSpectrumTextures;
     std::vector<std::pair<std::string, TextureSceneEntity>> asyncSpectrumTextures;
+    std::vector<std::pair<std::string, TextureSceneEntity>> deferredFloatImageTextureJobs;
+    std::vector<std::pair<std::string, TextureSceneEntity>> deferredSpectrumImageTextureJobs;
     std::set<std::string> loadingTextureFilenames;
     std::map<std::string, AsyncJob<FloatTexture> *> floatTextureJobs;
     std::map<std::string, AsyncJob<SpectrumTexture> *> spectrumTextureJobs;

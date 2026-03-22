@@ -18,16 +18,40 @@
 
 #include <algorithm>
 #include <cmath>
+#include <mutex>
+#include <unordered_map>
 #include <vector>
 
 namespace pbrt {
 
 STAT_MEMORY_COUNTER("Memory/Image maps", imageMapBytes);
 
-// Used only when Options->skipMipImageTextures (--skipmip): each unit is one 2× box-filter
-// downsample before GeneratePyramid (i.e. that many mips skipped; new level 0 is old mip k).
-// Replace with a computed safe level when ready.
-static constexpr int kImageTextureSkipMipLevelsWhenSkipMipEnabled = 3;
+// Used when Options->skipMipImageTextures (--skipmip) and no per-file override was installed
+// by RunImageTextureMipPreprocess (see texture_mip_preprocess.cpp).
+static constexpr int kDefaultImageTextureSkipMipLevelsWhenSkipMipEnabled = 3;
+
+static std::mutex imageTextureMipOverrideMutex;
+static std::unordered_map<std::string, int> imageTextureMipOverrides;
+
+void ClearImageTextureMipDownsizeOverrides() {
+    std::lock_guard<std::mutex> lock(imageTextureMipOverrideMutex);
+    imageTextureMipOverrides.clear();
+}
+
+void SetImageTextureMipDownsizeOverrideForFile(const std::string &resolvedFilename, int steps) {
+    std::lock_guard<std::mutex> lock(imageTextureMipOverrideMutex);
+    imageTextureMipOverrides[resolvedFilename] = steps;
+}
+
+int ImageTextureMipDownsizeStepsForFile(const std::string &resolvedFilename) {
+    if (!Options || !Options->skipMipImageTextures)
+        return 0;
+    std::lock_guard<std::mutex> lock(imageTextureMipOverrideMutex);
+    if (auto it = imageTextureMipOverrides.find(resolvedFilename);
+        it != imageTextureMipOverrides.end())
+        return std::max(0, it->second);
+    return std::max(0, kDefaultImageTextureSkipMipLevelsWhenSkipMipEnabled);
+}
 
 // Box-filter downsample by 2 in each dimension. Keeps the source pixel format (U256 / Half /
 // Float) so stored mip pyramids and Memory/Image maps reflect a real memory win; converting
@@ -67,12 +91,6 @@ static Image HalveImageBoxFilter(Image image, Allocator alloc) {
             }
     });
     return dst;
-}
-
-int ImageTextureBaseMipDownsizeStepsForLoad() {
-    if (!Options || !Options->skipMipImageTextures)
-        return 0;
-    return std::max(0, kImageTextureSkipMipLevelsWhenSkipMipEnabled);
 }
 
 // Apply _mipDownsizeSteps_ consecutive half-res box filters (each ~2× smaller per axis).
@@ -251,13 +269,13 @@ static PBRT_CONST Float MIPFilterLUT[MIPFilterLUTSize] = {
 };
 
 // MIPMap Method Definitions
-MIPMap::MIPMap(Image image, const RGBColorSpace *colorSpace, WrapMode wrapMode,
-               Allocator alloc, const MIPMapFilterOptions &options)
+MIPMap::MIPMap(Image image, const RGBColorSpace *colorSpace, WrapMode wrapMode, Allocator alloc,
+               const MIPMapFilterOptions &options, int baseMipDownsizeSteps)
     : colorSpace(colorSpace), wrapMode(wrapMode), options(options) {
     CHECK(colorSpace);
-    // Base mip downsize is applied here (not only in CreateFromFile) so GPU paths and any
-    // other MIPMap construction see the same behavior and memory accounting.
-    int baseSteps = ImageTextureBaseMipDownsizeStepsForLoad();
+    // Base mip downsize is applied here (not only in CreateFromFile) so all MIPMap
+    // construction paths share the same behavior and memory accounting.
+    int baseSteps = std::max(0, baseMipDownsizeSteps);
     if (baseSteps > 0)
         image = ApplyBaseMipDownsize(std::move(image), baseSteps, alloc);
     pyramid = Image::GeneratePyramid(std::move(image), wrapMode, alloc);
@@ -422,7 +440,8 @@ T MIPMap::EWA(int level, Point2f st, Vector2f dst0, Vector2f dst1) const {
 
 MIPMap *MIPMap::CreateFromFile(const std::string &filename,
                                const MIPMapFilterOptions &options, WrapMode wrapMode,
-                               ColorEncoding encoding, Allocator alloc) {
+                               ColorEncoding encoding, Allocator alloc,
+                               int baseMipDownsizeSteps) {
     ImageAndMetadata imageAndMetadata = Image::Read(filename, alloc, encoding);
 
     Image &image = imageAndMetadata.image;
@@ -450,8 +469,8 @@ MIPMap *MIPMap::CreateFromFile(const std::string &filename,
     }
 
     const RGBColorSpace *colorSpace = imageAndMetadata.metadata.GetColorSpace();
-    MIPMap *mipmap =
-        alloc.new_object<MIPMap>(std::move(image), colorSpace, wrapMode, alloc, options);
+    MIPMap *mipmap = alloc.new_object<MIPMap>(std::move(image), colorSpace, wrapMode, alloc,
+                                              options, baseMipDownsizeSteps);
     ReportImageTextureMemory(filename, mipmap->TotalBytesUsed(), "CPU");
     return mipmap;
 }

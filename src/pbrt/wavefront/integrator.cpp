@@ -27,6 +27,7 @@
 #include <pbrt/util/spectrum.h>
 #include <pbrt/util/stats.h>
 #include <pbrt/util/string.h>
+#include <pbrt/texture_mip_preprocess.h>
 #include <pbrt/util/taggedptr.h>
 #include <pbrt/wavefront/aggregate.h>
 
@@ -110,6 +111,11 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
                 haveMedia = true;
     }
 
+    camera = scene.GetCamera();
+
+    LOG_VERBOSE("Image texture mip preprocess");
+    RunImageTextureMipPreprocess(scene, camera);
+
     // Textures
     LOG_VERBOSE("Starting to create textures");
     NamedTextures textures = scene.CreateTextures();
@@ -149,7 +155,6 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
     // Retrieve these here so that the CPU isn't writing to managed memory
     // concurrently with the OptiX acceleration-structure construction work
     // that follows. (Verbotten on Windows.)
-    camera = scene.GetCamera();
     film = camera.GetFilm();
     filter = film.GetFilter();
     sampler = scene.GetSampler();

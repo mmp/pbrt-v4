@@ -551,6 +551,7 @@ set (PBRT_SOURCE
   src/pbrt/ray.cpp
   src/pbrt/samplers.cpp
   src/pbrt/scene.cpp
+  src/pbrt/texture_mip_preprocess.cpp
   src/pbrt/shapes.cpp
   src/pbrt/textures.cpp
 
@@ -581,6 +582,7 @@ set (PBRT_SOURCE_HEADERS
   src/pbrt/ray.h
   src/pbrt/samplers.h
   src/pbrt/scene.h
+  src/pbrt/texture_mip_preprocess.h
   src/pbrt/shapes.h
   src/pbrt/textures.h
   )  

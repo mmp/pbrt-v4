@@ -35,9 +35,12 @@ inline pstd::optional<FilterFunction> ParseFilter(const std::string &f) {
 
 std::string ToString(FilterFunction f);
 
-// Box-filter downsample steps before mip pyramid: 0 if --skipmip is off; if on, equals
-// kImageTextureSkipMipLevelsWhenSkipMipEnabled in mipmap.cpp (each step skips one mip level).
-int ImageTextureBaseMipDownsizeStepsForLoad();
+// Per-file mip downsize steps for --skipmip (each step is one 2× box-filter halving before the
+// mip pyramid). When --skipmip is off, always 0. When on, uses preprocess overrides if set,
+// otherwise kDefaultImageTextureSkipMipLevelsWhenSkipMipEnabled in mipmap.cpp.
+void ClearImageTextureMipDownsizeOverrides();
+void SetImageTextureMipDownsizeOverrideForFile(const std::string &resolvedFilename, int steps);
+int ImageTextureMipDownsizeStepsForFile(const std::string &resolvedFilename);
 
 // MIPMapFilterOptions Definition
 struct MIPMapFilterOptions {
@@ -53,11 +56,12 @@ struct MIPMapFilterOptions {
 class MIPMap {
   public:
     // MIPMap Public Methods
-    MIPMap(Image image, const RGBColorSpace *colorSpace, WrapMode wrapMode,
-           Allocator alloc, const MIPMapFilterOptions &options);
+    MIPMap(Image image, const RGBColorSpace *colorSpace, WrapMode wrapMode, Allocator alloc,
+           const MIPMapFilterOptions &options, int baseMipDownsizeSteps);
     static MIPMap *CreateFromFile(const std::string &filename,
                                   const MIPMapFilterOptions &options, WrapMode wrapMode,
-                                  ColorEncoding encoding, Allocator alloc);
+                                  ColorEncoding encoding, Allocator alloc,
+                                  int baseMipDownsizeSteps);
 
     template <typename T>
     T Filter(Point2f st, Vector2f dstdx, Vector2f dstdy) const;

@@ -28,6 +28,7 @@
 
 #include <iostream>
 #include <mutex>
+#include <set>
 
 namespace pbrt {
 
@@ -941,17 +942,8 @@ void BasicScene::AddFloatTexture(std::string name, TextureSceneEntity texture) {
     }
     loadingTextureFilenames.insert(filename);
 
-    auto create = [=](TextureSceneEntity texture) {
-        Allocator alloc = threadAllocators.Get();
-
-        pbrt::Transform renderFromTexture = texture.renderFromObject.startTransform;
-        // Pass nullptr for the textures, since they shouldn't be accessed
-        // anyway.
-        TextureParameterDictionary texDict(&texture.parameters, nullptr);
-        return FloatTexture::Create(texture.name, renderFromTexture, texDict,
-                                    &texture.loc, alloc, Options->useGPU);
-    };
-    floatTextureJobs[name] = RunAsync(create, texture);
+    deferredFloatImageTextureJobs.push_back(
+        std::make_pair(std::move(name), std::move(texture)));
 }
 
 void BasicScene::AddSpectrumTexture(std::string name, TextureSceneEntity texture) {
@@ -984,20 +976,8 @@ void BasicScene::AddSpectrumTexture(std::string name, TextureSceneEntity texture
     loadingTextureFilenames.insert(filename);
 
     asyncSpectrumTextures.push_back(std::make_pair(name, texture));
-
-    auto create = [=](TextureSceneEntity texture) {
-        Allocator alloc = threadAllocators.Get();
-
-        pbrt::Transform renderFromTexture = texture.renderFromObject.startTransform;
-        // nullptr for the textures, as with float textures.
-        TextureParameterDictionary texDict(&texture.parameters, nullptr);
-        // Only create SpectrumType::Albedo for now; will get the other two
-        // types in CreateTextures().
-        return SpectrumTexture::Create(texture.name, renderFromTexture, texDict,
-                                       SpectrumType::Albedo, &texture.loc, alloc,
-                                       Options->useGPU);
-    };
-    spectrumTextureJobs[name] = RunAsync(create, texture);
+    deferredSpectrumImageTextureJobs.push_back(
+        std::make_pair(std::move(name), std::move(texture)));
 }
 
 void BasicScene::AddLight(LightSceneEntity light) {
@@ -1170,8 +1150,70 @@ void BasicScene::CreateMaterials(const NamedTextures &textures,
     }
 }
 
+std::vector<std::string> BasicScene::CollectResolvedImageTextureFilenames() {
+    std::set<std::string> paths;
+    auto addImagemapFilename = [&](const TextureSceneEntity &t) {
+        if (t.name != "imagemap")
+            return;
+        std::string fn = ResolveFilename(t.parameters.GetOneString("filename", ""));
+        if (!fn.empty())
+            paths.insert(fn);
+    };
+
+    std::lock_guard<std::mutex> lock(textureMutex);
+    for (const auto &fn : loadingTextureFilenames)
+        paths.insert(fn);
+    for (const auto &p : deferredFloatImageTextureJobs)
+        addImagemapFilename(p.second);
+    for (const auto &p : deferredSpectrumImageTextureJobs)
+        addImagemapFilename(p.second);
+    for (const auto &p : serialFloatTextures)
+        addImagemapFilename(p.second);
+    for (const auto &p : serialSpectrumTextures)
+        addImagemapFilename(p.second);
+    for (const auto &p : asyncSpectrumTextures)
+        addImagemapFilename(p.second);
+
+    return std::vector<std::string>(paths.begin(), paths.end());
+}
+
+void BasicScene::LaunchDeferredImageTextureJobs() {
+    std::lock_guard<std::mutex> lock(textureMutex);
+
+    for (auto &p : deferredFloatImageTextureJobs) {
+        const std::string &name = p.first;
+        TextureSceneEntity texture = std::move(p.second);
+        auto create = [=](TextureSceneEntity tex) {
+            Allocator alloc = threadAllocators.Get();
+            pbrt::Transform renderFromTexture = tex.renderFromObject.startTransform;
+            TextureParameterDictionary texDict(&tex.parameters, nullptr);
+            return FloatTexture::Create(tex.name, renderFromTexture, texDict, &tex.loc, alloc,
+                                        Options->useGPU);
+        };
+        floatTextureJobs[name] = RunAsync(create, texture);
+    }
+    deferredFloatImageTextureJobs.clear();
+
+    for (auto &p : deferredSpectrumImageTextureJobs) {
+        const std::string &name = p.first;
+        TextureSceneEntity texture = std::move(p.second);
+        auto create = [=](TextureSceneEntity tex) {
+            Allocator alloc = threadAllocators.Get();
+            pbrt::Transform renderFromTexture = tex.renderFromObject.startTransform;
+            TextureParameterDictionary texDict(&tex.parameters, nullptr);
+            return SpectrumTexture::Create(tex.name, renderFromTexture, texDict,
+                                           SpectrumType::Albedo, &tex.loc, alloc,
+                                           Options->useGPU);
+        };
+        spectrumTextureJobs[name] = RunAsync(create, texture);
+    }
+    deferredSpectrumImageTextureJobs.clear();
+}
+
 NamedTextures BasicScene::CreateTextures() {
     NamedTextures textures;
+
+    LaunchDeferredImageTextureJobs();
 
     if (nMissingTextures > 0)
         ErrorExit("%d missing textures", nMissingTextures);

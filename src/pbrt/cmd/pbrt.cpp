@@ -43,8 +43,8 @@ Rendering options:
                                 and come from error message text.)
   --disable-image-textures      Always return the average value of image textures.
   --skipmip                     Skip the first k mip levels of image textures (box-filter
-                                downsample k times before building the mip pyramid). k is set
-                                in mipmap.cpp (kImageTextureSkipMipLevelsWhenSkipMipEnabled).
+                                downsample k times before building the mip pyramid). k defaults
+                                in mipmap.cpp or is chosen per texture by preprocess.
   --disable-pixel-jitter        Always sample pixels at their centers.
   --disable-texture-filtering   Point-sample all textures.
   --disable-wavelength-jitter   Always sample the same %d wavelengths of light.
