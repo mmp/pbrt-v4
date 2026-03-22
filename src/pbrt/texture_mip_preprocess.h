@@ -7,6 +7,7 @@
 
 #include <pbrt/pbrt.h>
 
+#include <pbrt/util/mipmap.h>
 #include <pbrt/util/vecmath.h>
 
 #include <string>
@@ -17,30 +18,35 @@ namespace pbrt {
 class BasicScene;
 class Camera;
 
-// Geometry that contributes to mip-level bounds for one image texture. A single file may
-// appear in several uses (different meshes / instances / materials); the texture-wide
-// safe downsizes count (box-filter halvings before the mip pyramid) is the minimum over
-// those uses so no shared image is downsampled more than the tightest geometry allows.
-// Future SIMD paths can batch many positions per use (e.g. SoA layout) while still
-// treating uses as separate buckets when UV layouts or mappings differ.
-struct ImageTextureGeometryUse {
-    std::string resolvedImageFilename;
-    // Identifies this mesh / instance / material use for debug logs (shape name, index, …).
-    std::string geometryDebugLabel;
-    // Triangle corner positions in render space (stub; extend with UVs, normals, mapping).
-    std::vector<Point3f> positionsRenderSpace;
+// One shaded triangle in render space with parametric UVs (matches TriangleMesh usage).
+struct ImageTextureMeshTriangle {
+    Point3f p0, p1, p2;
+    Point2f uv0, uv1, uv2;
 };
 
-// Per-geometry safe downsizes are combined with min (shared texture = tightest geometry
-// wins). Stub ignores camera/geometry data (same units as --skipmip).
+// Geometry using one named imagemap on diffuse materials (UV mapping only for now).
+struct ImageTextureGeometryUse {
+    std::string resolvedImageFilename;
+    std::string geometryDebugLabel;
+    std::vector<ImageTextureMeshTriangle> triangles;
+    Float su = 1, sv = 1, du = 0, dv = 0;
+    Float maxAnisotropy = 8.f;
+    FilterFunction filter = FilterFunction::Bilinear;
+};
+
+// Per-geometry safe downsizes = floor(min primary-ray continuous LOD); texture override =
+// min over geometries. Primary visibility only; UV imagemap on reflectance for diffuse /
+// coateddiffuse / diffusetransmission and mix thereof; trianglemesh + plymesh; includes
+// ObjectInstance placements (transformed into render space).
 int ComputeImageTextureSafeDownsizesFromPreprocess(
-    const Camera &camera, const std::vector<ImageTextureGeometryUse> &usesForTexture);
+    const Camera &camera, int samplesPerPixel,
+    const std::vector<ImageTextureGeometryUse> &usesForTexture, int mipmapPyramidLevels,
+    Allocator alloc);
 
 // Clears prior overrides, then assigns per-file safe downsizes before image loads.
 // No-op when --skipmip is off (aside from clearing stale overrides).
-// Wall time is printed at the end; with --stats it is also part of "Wall-clock render time"
-// (the timer in pbrt.cpp wraps the full RenderCPU / RenderWavefront call).
-void RunImageTextureMipPreprocess(BasicScene &scene, const Camera &camera);
+void RunImageTextureMipPreprocess(BasicScene &scene, const Camera &camera,
+                                   int samplesPerPixel);
 
 }  // namespace pbrt
 

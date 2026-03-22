@@ -31,6 +31,14 @@ namespace pbrt {
 
 class Integrator;
 
+// Declared spectrum imagemap textures (name -> file + UV scale), for preprocess / analysis.
+struct SpectrumImagemapDeclarationInfo {
+    std::string resolvedFilename;
+    Float su = 1, sv = 1, du = 0, dv = 0;
+    Float maxAnisotropy = 8.f;
+    std::string filter = "bilinear";
+};
+
 // SceneEntity Definition
 struct SceneEntity {
     // SceneEntity Public Methods
@@ -327,6 +335,15 @@ class BasicScene {
     // Resolved paths for imagemap textures (including deferred async loads not yet started).
     std::vector<std::string> CollectResolvedImageTextureFilenames();
 
+    // Parameter names -> imagemap paths (spectrum + float declarations).
+    std::map<std::string, SpectrumImagemapDeclarationInfo> SpectrumImagemapDeclarations() const;
+
+    // Resolve material for a world-block shape (named material or material index).
+    bool LookupShapeMaterial(const ShapeSceneEntity &shape, SceneEntity *mtlOut) const;
+
+    // Named material from Attribute "material" / MakeNamedMaterial (for preprocess, etc.).
+    bool LookupNamedMaterial(const std::string &name, SceneEntity *mtlOut) const;
+
     NamedTextures CreateTextures();
 
     // BasicScene Public Members
@@ -370,7 +387,7 @@ class BasicScene {
     std::mutex areaLightMutex;
     std::vector<SceneEntity> areaLights;
 
-    std::mutex textureMutex;
+    mutable std::mutex textureMutex;
     std::vector<std::pair<std::string, TextureSceneEntity>> serialFloatTextures;
     std::vector<std::pair<std::string, TextureSceneEntity>> serialSpectrumTextures;
     std::vector<std::pair<std::string, TextureSceneEntity>> asyncSpectrumTextures;

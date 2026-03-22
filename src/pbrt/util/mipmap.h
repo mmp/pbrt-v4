@@ -42,6 +42,17 @@ void ClearImageTextureMipDownsizeOverrides();
 void SetImageTextureMipDownsizeOverrideForFile(const std::string &resolvedFilename, int steps);
 int ImageTextureMipDownsizeStepsForFile(const std::string &resolvedFilename);
 
+// Continuous EWA LOD matching MIPMap::Filter (EWA branch): level 0 is finest. Returns a value
+// >= 0; use with pyramidLevels from MipmapPyramidLevelsForImageResolution.
+Float EWAContinuousLOD(Vector2f dst0, Vector2f dst1, Float maxAnisotropy, int pyramidLevels);
+
+// Continuous LOD for imagemap filtering (EWA or non-EWA mip selection in MIPMap::Filter).
+Float ImageTextureContinuousLOD(FilterFunction filter, Vector2f dst0, Vector2f dst1,
+                                Float maxAnisotropy, int pyramidLevels);
+
+// Pyramid level count after Image::GeneratePyramid's power-of-two resize (matches runtime).
+int MipmapPyramidLevelsForImageResolution(Point2i resolution);
+
 // MIPMapFilterOptions Definition
 struct MIPMapFilterOptions {
     FilterFunction filter = FilterFunction::EWA;

@@ -1150,6 +1150,64 @@ void BasicScene::CreateMaterials(const NamedTextures &textures,
     }
 }
 
+bool BasicScene::LookupShapeMaterial(const ShapeSceneEntity &shape, SceneEntity *mtlOut) const {
+    if (!shape.materialName.empty()) {
+        for (const auto &nm : namedMaterials)
+            if (nm.first == shape.materialName) {
+                *mtlOut = nm.second;
+                return true;
+            }
+        return false;
+    }
+    if (shape.materialIndex < 0 || size_t(shape.materialIndex) >= materials.size())
+        return false;
+    *mtlOut = materials[shape.materialIndex];
+    return true;
+}
+
+bool BasicScene::LookupNamedMaterial(const std::string &name, SceneEntity *mtlOut) const {
+    for (const auto &nm : namedMaterials)
+        if (nm.first == name) {
+            *mtlOut = nm.second;
+            return true;
+        }
+    return false;
+}
+
+std::map<std::string, SpectrumImagemapDeclarationInfo> BasicScene::SpectrumImagemapDeclarations()
+    const {
+    std::map<std::string, SpectrumImagemapDeclarationInfo> out;
+    auto add = [&](const std::pair<std::string, TextureSceneEntity> &p) {
+        if (p.second.name != "imagemap")
+            return;
+        std::string fn = ResolveFilename(p.second.parameters.GetOneString("filename", ""));
+        if (fn.empty())
+            return;
+        SpectrumImagemapDeclarationInfo info;
+        info.resolvedFilename = std::move(fn);
+        info.su = p.second.parameters.GetOneFloat("uscale", 1.f);
+        info.sv = p.second.parameters.GetOneFloat("vscale", 1.f);
+        info.du = p.second.parameters.GetOneFloat("udelta", 0.f);
+        info.dv = p.second.parameters.GetOneFloat("vdelta", 0.f);
+        info.maxAnisotropy = p.second.parameters.GetOneFloat("maxanisotropy", 8.f);
+        info.filter = p.second.parameters.GetOneString("filter", "bilinear");
+        out[p.first] = std::move(info);
+    };
+
+    std::lock_guard<std::mutex> lock(textureMutex);
+    for (const auto &p : serialFloatTextures)
+        add(p);
+    for (const auto &p : serialSpectrumTextures)
+        add(p);
+    for (const auto &p : asyncSpectrumTextures)
+        add(p);
+    for (const auto &p : deferredFloatImageTextureJobs)
+        add(p);
+    for (const auto &p : deferredSpectrumImageTextureJobs)
+        add(p);
+    return out;
+}
+
 std::vector<std::string> BasicScene::CollectResolvedImageTextureFilenames() {
     std::set<std::string> paths;
     auto addImagemapFilename = [&](const TextureSceneEntity &t) {

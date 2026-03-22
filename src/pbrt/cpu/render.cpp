@@ -30,9 +30,10 @@ void RenderCPU(BasicScene &parsedScene) {
     std::map<std::string, Medium> media = parsedScene.CreateMedia();
 
     Camera camera = parsedScene.GetCamera();
+    Sampler sampler = parsedScene.GetSampler();
 
     LOG_VERBOSE("Image texture mip preprocess");
-    RunImageTextureMipPreprocess(parsedScene, camera);
+    RunImageTextureMipPreprocess(parsedScene, camera, sampler.SamplesPerPixel());
 
     // Textures
     LOG_VERBOSE("Starting textures");
@@ -54,7 +55,6 @@ void RenderCPU(BasicScene &parsedScene) {
                                                   namedMaterials, materials);
 
     Film film = camera.GetFilm();
-    Sampler sampler = parsedScene.GetSampler();
 
     // Integrator
     LOG_VERBOSE("Starting to create integrator");

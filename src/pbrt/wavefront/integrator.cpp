@@ -112,9 +112,10 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
     }
 
     camera = scene.GetCamera();
+    sampler = scene.GetSampler();
 
     LOG_VERBOSE("Image texture mip preprocess");
-    RunImageTextureMipPreprocess(scene, camera);
+    RunImageTextureMipPreprocess(scene, camera, sampler.SamplesPerPixel());
 
     // Textures
     LOG_VERBOSE("Starting to create textures");
@@ -157,7 +158,6 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
     // that follows. (Verbotten on Windows.)
     film = camera.GetFilm();
     filter = film.GetFilter();
-    sampler = scene.GetSampler();
 
     if (Options->useGPU) {
 #ifdef PBRT_BUILD_GPU_RENDERER

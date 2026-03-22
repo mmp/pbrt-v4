@@ -124,6 +124,37 @@ std::string MIPMapFilterOptions::ToString() const {
                         maxAnisotropy);
 }
 
+int MipmapPyramidLevelsForImageResolution(Point2i resolution) {
+    int w = RoundUpPow2(resolution.x);
+    int h = RoundUpPow2(resolution.y);
+    return 1 + Log2Int(std::max(w, h));
+}
+
+Float EWAContinuousLOD(Vector2f dst0, Vector2f dst1, Float maxAnisotropy, int pyramidLevels) {
+    if (pyramidLevels < 2)
+        return 0;
+    if (LengthSquared(dst0) < LengthSquared(dst1))
+        std::swap(dst0, dst1);
+    Float longerVecLength = Length(dst0), shorterVecLength = Length(dst1);
+    if (shorterVecLength * maxAnisotropy < longerVecLength && shorterVecLength > 0) {
+        Float scale = longerVecLength / (shorterVecLength * maxAnisotropy);
+        dst1 *= scale;
+        shorterVecLength *= scale;
+    }
+    if (shorterVecLength == 0)
+        return 0;
+    return std::max<Float>(0, pyramidLevels - 1 + Log2(shorterVecLength));
+}
+
+Float ImageTextureContinuousLOD(FilterFunction filter, Vector2f dst0, Vector2f dst1,
+                                Float maxAnisotropy, int pyramidLevels) {
+    if (filter == FilterFunction::EWA)
+        return EWAContinuousLOD(dst0, dst1, maxAnisotropy, pyramidLevels);
+    Float width =
+        2 * std::max({std::abs(dst0[0]), std::abs(dst0[1]), std::abs(dst1[0]), std::abs(dst1[1])});
+    return pyramidLevels - 1 + Log2(std::max<Float>(width, 1e-8f));
+}
+
 ///////////////////////////////////////////////////////////////////////////
 
 /*
