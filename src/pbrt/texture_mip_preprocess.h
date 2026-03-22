@@ -38,6 +38,8 @@ int ComputeImageTextureSafeDownsizesFromPreprocess(
 
 // Clears prior overrides, then assigns per-file safe downsizes before image loads.
 // No-op when --skipmip is off (aside from clearing stale overrides).
+// Wall time is printed at the end; with --stats it is also part of "Wall-clock render time"
+// (the timer in pbrt.cpp wraps the full RenderCPU / RenderWavefront call).
 void RunImageTextureMipPreprocess(BasicScene &scene, const Camera &camera);
 
 }  // namespace pbrt

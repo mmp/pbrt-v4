@@ -287,7 +287,8 @@ int main(int argc, char *argv[]) {
         BasicSceneBuilder builder(&scene);
         ParseFiles(&builder, filenames);
 
-        // Render the scene
+        // Render the scene (includes scene setup inside RenderCPU / RenderWavefront: media,
+        // camera, mip preprocess when --skipmip, textures, aggregate, integrator::Render, …).
         if (options.printStatistics) {
             auto t0 = std::chrono::steady_clock::now();
             if (Options->useGPU || Options->wavefront)

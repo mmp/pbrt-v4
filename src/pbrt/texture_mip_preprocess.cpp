@@ -9,6 +9,7 @@
 #include <pbrt/scene.h>
 #include <pbrt/util/mipmap.h>
 #include <pbrt/util/print.h>
+#include <pbrt/util/progressreporter.h>
 
 #include <algorithm>
 #include <cctype>
@@ -71,6 +72,8 @@ void RunImageTextureMipPreprocess(BasicScene &scene, const Camera &camera) {
     if (!Options || !Options->skipMipImageTextures)
         return;
 
+    Timer preprocessTimer;
+
     std::vector<std::string> files = scene.CollectResolvedImageTextureFilenames();
     for (const std::string &fn : files) {
         std::vector<ImageTextureGeometryUse> uses;
@@ -85,6 +88,8 @@ void RunImageTextureMipPreprocess(BasicScene &scene, const Camera &camera) {
         Printf("  final safe downsizes %d\n", safeDownsizes);
         SetImageTextureMipDownsizeOverrideForFile(fn, safeDownsizes);
     }
+
+    Printf("[mip preprocess] wall time %.3f s\n", preprocessTimer.ElapsedSeconds());
 }
 
 }  // namespace pbrt
