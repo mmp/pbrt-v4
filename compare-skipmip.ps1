@@ -1,10 +1,12 @@
 # Compare pbrt runs with and without --skipmip: full logs on disk + timing/memory summary.
 #
 # Usage (from repo root):
+#   .\compare-skipmip.ps1 -Scene "path\to\scene.pbrt"
 #   .\compare-skipmip.ps1 -Scene "path\to\scene.pbrt" -Spp 16
-#   .\compare-skipmip.ps1 -Scene "path\to\scene.pbrt" -Spp 16 -PbrtExe "C:\...\pbrt.exe"
-#   .\compare-skipmip.ps1 -Scene "scene.pbrt" -Spp 8 -LogDir ".\logs" -ExtraPbrtArgs @('--wavefront')
+#   .\compare-skipmip.ps1 "scene.pbrt" 16
+# Omit -Spp to use Integrator "integer pixelsamples" from the .pbrt file (same as pbrt.exe without --spp).
 #
+# Render progress: stdout is written to the .txt log live while pbrt runs (poll ~8 Hz for console echo).
 # Optional -ExtraPbrtArgs is appended for both runs (e.g. --gpu, --wavefront).
 # By default, repetitive "Rendering:" lines are not echoed (full log files unchanged); use -ShowProgress for all lines.
 # SSIM: compare_ssim.py needs pip install numpy scikit-image pillow (full-res skimage SSIM).
@@ -14,8 +16,8 @@ param(
     [Parameter(Mandatory = $true, Position = 0)]
     [string] $Scene,
 
-    [Parameter(Mandatory = $true, Position = 1)]
-    [int] $Spp,
+    [Parameter(Mandatory = $false, Position = 1)]
+    [int] $Spp = 0,
 
     [string] $PbrtExe = "",
     [string] $LogDir = "",
@@ -127,42 +129,76 @@ function Invoke-PbrtLogged {
         [switch] $ShowProgress
     )
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
-    # Do not use `& pbrt 2>&1` here: with $ErrorActionPreference=Stop (and PS7+ native error
-    # prefs), stderr from pbrt becomes ErrorRecord and is reported as a script error even for
-    # benign "Warning:" lines. Start-Process captures raw stdout/stderr to temp files instead.
-    $outTemp = Join-Path ([System.IO.Path]::GetTempPath()) ("pbrt-compare-out-" + [guid]::NewGuid() + ".txt")
+    # Stdout -> log file directly so the log grows live (render progress, etc.). Stderr -> temp,
+    # then append (avoids mixing two writers on one file). Do not use `& pbrt 2>&1` (stderr
+    # becomes ErrorRecord under $ErrorActionPreference Stop).
+    $utf8 = New-Object System.Text.UTF8Encoding $false
+    if (Test-Path -LiteralPath $LogPath) {
+        Remove-Item -LiteralPath $LogPath -Force
+    }
     $errTemp = Join-Path ([System.IO.Path]::GetTempPath()) ("pbrt-compare-err-" + [guid]::NewGuid() + ".txt")
-    $exitCode = -1
+    $proc = Start-Process -FilePath $PbrtExe -ArgumentList $Arguments -PassThru -NoNewWindow `
+        -RedirectStandardOutput $LogPath -RedirectStandardError $errTemp
+
+    $seenLines = 0
+    $nProgress = 0
+    while (-not $proc.HasExited) {
+        if (Test-Path -LiteralPath $LogPath) {
+            try {
+                $all = [System.IO.File]::ReadAllLines($LogPath, $utf8)
+            } catch {
+                $all = @()
+            }
+            while ($seenLines -lt $all.Length) {
+                $line = $all[$seenLines]
+                $seenLines++
+                if ($line -match '^\s*Rendering:') { $nProgress++ }
+                Write-PbrtLineToHost -Line $line -ShowProgress:$ShowProgress
+            }
+        }
+        Start-Sleep -Milliseconds 120
+    }
+    $null = $proc.WaitForExit()
+    $exitCode = $proc.ExitCode
+    Start-Sleep -Milliseconds 80
+    if (Test-Path -LiteralPath $LogPath) {
+        try {
+            $all = [System.IO.File]::ReadAllLines($LogPath, $utf8)
+        } catch {
+            $all = @()
+        }
+        while ($seenLines -lt $all.Length) {
+            $line = $all[$seenLines]
+            $seenLines++
+            if ($line -match '^\s*Rendering:') { $nProgress++ }
+            Write-PbrtLineToHost -Line $line -ShowProgress:$ShowProgress
+        }
+    }
+
     try {
-        $proc = Start-Process -FilePath $PbrtExe -ArgumentList $Arguments -Wait -PassThru `
-            -NoNewWindow -RedirectStandardOutput $outTemp -RedirectStandardError $errTemp
-        $exitCode = $proc.ExitCode
-        $outLines = @()
-        if (Test-Path -LiteralPath $outTemp) {
-            $outLines = [System.IO.File]::ReadAllLines($outTemp, [System.Text.UTF8Encoding]::new($false))
-        }
-        $errLines = @()
         if (Test-Path -LiteralPath $errTemp) {
-            $errLines = [System.IO.File]::ReadAllLines($errTemp, [System.Text.UTF8Encoding]::new($false))
-        }
-        $lines = New-Object System.Collections.Generic.List[string]
-        foreach ($l in $outLines) { [void]$lines.Add($l) }
-        if ($errLines.Count -gt 0) {
-            [void]$lines.Add("")
-            [void]$lines.Add("--- stderr ---")
-            foreach ($l in $errLines) { [void]$lines.Add($l) }
+            $errLines = [System.IO.File]::ReadAllLines($errTemp, $utf8)
+            if ($errLines.Count -gt 0) {
+                $swErr = New-Object System.IO.StreamWriter($LogPath, $true, $utf8)
+                try {
+                    $swErr.WriteLine("")
+                    $swErr.WriteLine("--- stderr ---")
+                    foreach ($el in $errLines) {
+                        $swErr.WriteLine($el)
+                    }
+                } finally {
+                    $swErr.Close()
+                }
+                foreach ($el in $errLines) {
+                    Write-PbrtLineToHost -Line $el -ShowProgress:$ShowProgress
+                }
+            }
         }
     } finally {
-        Remove-Item -LiteralPath $outTemp, $errTemp -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $errTemp -Force -ErrorAction SilentlyContinue
     }
-    $sw.Stop()
-    $utf8 = New-Object System.Text.UTF8Encoding $false
-    [System.IO.File]::WriteAllLines($LogPath, $lines.ToArray(), $utf8)
 
-    $nProgress = ($lines | Where-Object { $_ -match '^\s*Rendering:' }).Count
-    foreach ($line in $lines) {
-        Write-PbrtLineToHost -Line $line -ShowProgress:$ShowProgress
-    }
+    $sw.Stop()
     if (-not $ShowProgress -and $nProgress -gt 0) {
         Write-Host ("  ({0} progress lines omitted here; see log file)" -f $nProgress) -ForegroundColor DarkGray
     }
@@ -246,16 +282,27 @@ $logNoMip = Join-Path $LogDir ("{0}-{1}-nomip.txt" -f $base, $stamp)
 $logSkipMip = Join-Path $LogDir ("{0}-{1}-skipmip.txt" -f $base, $stamp)
 $summaryPath = Join-Path $LogDir ("{0}-{1}-comparison.txt" -f $base, $stamp)
 
+if ($PSBoundParameters.ContainsKey('Spp')) {
+    if ($Spp -lt 1) {
+        throw "Spp must be >= 1 when specified (omit -Spp to use the scene file default)."
+    }
+}
+
 $common = @(
     $sceneFull,
-    "--spp", "$Spp",
     "--stats"
-) + $ExtraPbrtArgs
+)
+if ($PSBoundParameters.ContainsKey('Spp')) {
+    $common += @("--spp", "$Spp")
+}
+$common += $ExtraPbrtArgs
+
+$sppLabel = if ($PSBoundParameters.ContainsKey('Spp')) { "$Spp" } else { "(scene file default)" }
 
 Write-Host "=== pbrt compare-skipmip ===" -ForegroundColor Cyan
 Write-Host "pbrt:    $PbrtExe"
 Write-Host "scene:   $sceneFull"
-Write-Host "spp:     $Spp"
+Write-Host "spp:     $sppLabel"
 Write-Host "log dir: $LogDir"
 if (-not $ShowProgress) {
     Write-Host "(progress lines hidden; use -ShowProgress to print every Rendering: line)" -ForegroundColor DarkGray
@@ -314,7 +361,7 @@ $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine("================================")
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("Scene : $sceneFull")
-[void]$sb.AppendLine("SPP   : $Spp")
+[void]$sb.AppendLine("SPP   : $sppLabel")
 [void]$sb.AppendLine("Stamp : $stamp")
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("-------------------------------------------")
