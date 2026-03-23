@@ -1611,6 +1611,112 @@ static int readWord(FILE *fp, char *buffer, int bufferLength) {
     return -1;
 }
 
+static Point2i ReadPFMResolution(const std::string &filename) {
+    char buffer[BUFFER_SIZE];
+    FILE *fp = FOpenRead(filename);
+    if (!fp)
+        ErrorExit("%s: unable to open PFM file", filename);
+
+    if (readWord(fp, buffer, BUFFER_SIZE) == -1)
+        ErrorExit("%s: unable to read PFM file", filename);
+    if (strcmp(buffer, "Pf") != 0 && strcmp(buffer, "PF") != 0)
+        ErrorExit("%s: unable to decode PFM file type \"%c%c\"", filename, buffer[0],
+                  buffer[1]);
+
+    int width, height;
+    if (readWord(fp, buffer, BUFFER_SIZE) == -1 || !Atoi(buffer, &width))
+        ErrorExit("%s: unable to decode PFM width", filename);
+    if (readWord(fp, buffer, BUFFER_SIZE) == -1 || !Atoi(buffer, &height))
+        ErrorExit("%s: unable to decode PFM height", filename);
+
+    fclose(fp);
+    return Point2i(width, height);
+}
+
+#ifndef PBRT_IS_GPU_CODE
+static Point2i ReadEXRResolution(const std::string &name) {
+    try {
+        Imf::InputFile file(name.c_str());
+        Imath::Box2i dw = file.header().dataWindow();
+        int width = dw.max.x - dw.min.x + 1;
+        int height = dw.max.y - dw.min.y + 1;
+        return Point2i(width, height);
+    } catch (const std::exception &e) {
+        ErrorExit("Unable to read EXR image dimensions \"%s\": %s", name, e.what());
+    }
+}
+#endif
+
+static Point2i ReadPNGResolution(const std::string &name) {
+    constexpr size_t kInspectBytes = 262144;
+    FILE *fp = FOpenRead(name);
+    if (!fp)
+        ErrorExit("%s: unable to open PNG file", name);
+    pstd::vector<unsigned char> buf(kInspectBytes);
+    size_t n = fread(buf.data(), 1, buf.size(), fp);
+    fclose(fp);
+    if (n < 29)
+        ErrorExit("%s: truncated PNG file", name);
+
+    LodePNGState state;
+    lodepng_state_init(&state);
+    unsigned width = 0, height = 0;
+    unsigned int error =
+        lodepng_inspect(&width, &height, &state, buf.data(), n);
+    lodepng_state_cleanup(&state);
+    if (error != 0)
+        ErrorExit("%s: %s", name, lodepng_error_text(error));
+    return Point2i(int(width), int(height));
+}
+
+static Point2i ReadQOIResolution(const std::string &filename) {
+    FILE *fp = FOpenRead(filename);
+    if (!fp)
+        ErrorExit("%s: unable to open QOI file", filename);
+    unsigned char b[12];
+    if (fread(b, 1, 12, fp) != 12) {
+        fclose(fp);
+        ErrorExit("%s: truncated QOI file", filename);
+    }
+    fclose(fp);
+    if (memcmp(b, "qoif", 4) != 0)
+        ErrorExit("%s: invalid QOI magic", filename);
+    unsigned w = (unsigned(b[4]) << 24) | (unsigned(b[5]) << 16) | (unsigned(b[6]) << 8) |
+                   unsigned(b[7]);
+    unsigned h = (unsigned(b[8]) << 24) | (unsigned(b[9]) << 16) | (unsigned(b[10]) << 8) |
+                   unsigned(b[11]);
+    if (w == 0 || h == 0)
+        ErrorExit("%s: invalid QOI dimensions", filename);
+    return Point2i(int(w), int(h));
+}
+
+Point2i Image::ReadResolution(const std::string &name) {
+    if (HasExtension(name, "exr")) {
+#ifndef PBRT_IS_GPU_CODE
+        return ReadEXRResolution(name);
+#else
+        ErrorExit("%s: ReadResolution(EXR) not supported in this build.", name);
+#endif
+    }
+    if (HasExtension(name, "png"))
+        return ReadPNGResolution(name);
+    if (HasExtension(name, "pfm"))
+        return ReadPFMResolution(name);
+    if (HasExtension(name, "hdr")) {
+        int x, y, comp;
+        if (!stbi_info(name.c_str(), &x, &y, &comp))
+            ErrorExit("%s: %s", name, stbi_failure_reason());
+        return Point2i(x, y);
+    }
+    if (HasExtension(name, "qoi"))
+        return ReadQOIResolution(name);
+
+    int x, y, n;
+    if (!stbi_info(name.c_str(), &x, &y, &n))
+        ErrorExit("%s: %s", name, stbi_failure_reason());
+    return Point2i(x, y);
+}
+
 static ImageAndMetadata ReadPFM(const std::string &filename, Allocator alloc) {
     pstd::vector<float> rgb32(alloc);
     char buffer[BUFFER_SIZE];

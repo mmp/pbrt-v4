@@ -9,7 +9,6 @@
 #include <pbrt/options.h>
 #include <pbrt/scene.h>
 #include <pbrt/textures.h>
-#include <pbrt/util/colorspace.h>
 #include <pbrt/util/file.h>
 #include <pbrt/util/image.h>
 #include <pbrt/util/math.h>
@@ -302,17 +301,26 @@ static void MultiplyMatrixPointHomogeneous(const SquareMatrix<4> &m, Point3f p, 
     *ow = m[3][0] * x + m[3][1] * y + m[3][2] * z + m[3][3];
 }
 
-// For scalar values linear on a 2D triangle, return constant (∂f/∂x, ∂f/∂y).
-static bool AffineScalarGradient2D(Float x0, Float y0, Float x1, Float y1, Float x2, Float y2,
-                                   Float f0, Float f1, Float f2, Float *gx, Float *gy) {
+// One 2×2 inverse for u/w, v/w, and 1/w on the same screen-space triangle.
+static bool AffineTripleScalarGradients2D(Float x0, Float y0, Float x1, Float y1, Float x2,
+                                          Float y2, Float fU0, Float fU1, Float fU2, Float *gxU,
+                                          Float *gyU, Float fV0, Float fV1, Float fV2, Float *gxV,
+                                          Float *gyV, Float fI0, Float fI1, Float fI2, Float *gxI,
+                                          Float *gyI) {
     Float s0x = x1 - x0, s0y = y1 - y0;
     Float s1x = x2 - x0, s1y = y2 - y0;
     Float det = s0x * s1y - s0y * s1x;
-    if (std::abs(det) < 1e-30f)
+    if (std::abs(det) < 1e-20f)
         return false;
-    Float df0 = f1 - f0, df1 = f2 - f0;
-    *gx = (df0 * s1y - df1 * s0y) / det;
-    *gy = (df1 * s0x - df0 * s1x) / det;
+    Float inv00 = s1y / det, inv01 = -s0y / det, inv10 = -s1x / det, inv11 = s0x / det;
+    auto grad = [&](Float a0, Float a1, Float a2, Float *gx, Float *gy) {
+        Float d0 = a1 - a0, d1 = a2 - a0;
+        *gx = d0 * inv00 + d1 * inv10;
+        *gy = d0 * inv01 + d1 * inv11;
+    };
+    grad(fU0, fU1, fU2, gxU, gyU);
+    grad(fV0, fV1, fV2, gxV, gyV);
+    grad(fI0, fI1, fI2, gxI, gyI);
     return true;
 }
 
@@ -333,21 +341,20 @@ static Float MinPrimaryContinuousLodForUse(const Camera &camera, int samplesPerP
 
     Transform rasterFromCamera = proj->GetRasterFromCameraTransform();
     const SquareMatrix<4> &M = rasterFromCamera.GetMatrix();
-    const CameraTransform &camXf = proj->GetCameraTransform();
-    Float time = proj->SampleTime(0.5f);
+    Transform cameraFromRender = proj->GetCameraTransform().CameraFromRender(
+        proj->SampleTime(0.5f));
     Bounds2i pb = proj->GetFilm().PixelBounds();
 
     Float sppScale = 1.f;
     if (!Options->disablePixelJitter)
         sppScale = std::max<Float>(0.125f, 1.f / std::sqrt(Float(samplesPerPixel)));
 
-    Float minLod = Infinity;
     constexpr Float kMinW = 1e-6f;
 
-    for (const ImageTextureMeshTriangle &tri : use.triangles) {
-        Point3f pc0 = camXf.CameraFromRender(tri.p0, time);
-        Point3f pc1 = camXf.CameraFromRender(tri.p1, time);
-        Point3f pc2 = camXf.CameraFromRender(tri.p2, time);
+    auto lodForTriangle = [&](const ImageTextureMeshTriangle &tri) -> Float {
+        Point3f pc0 = cameraFromRender(tri.p0);
+        Point3f pc1 = cameraFromRender(tri.p1);
+        Point3f pc2 = cameraFromRender(tri.p2);
 
         Float qx0, qy0, qw0, qx1, qy1, qw1, qx2, qy2, qw2;
         MultiplyMatrixPointHomogeneous(M, pc0, &qx0, &qy0, &qw0);
@@ -355,7 +362,7 @@ static Float MinPrimaryContinuousLodForUse(const Camera &camera, int samplesPerP
         MultiplyMatrixPointHomogeneous(M, pc2, &qx2, &qy2, &qw2);
 
         if (qw0 <= kMinW || qw1 <= kMinW || qw2 <= kMinW)
-            continue;
+            return Infinity;
 
         Float xr0 = qx0 / qw0, yr0 = qy0 / qw0;
         Float xr1 = qx1 / qw1, yr1 = qy1 / qw1;
@@ -367,13 +374,7 @@ static Float MinPrimaryContinuousLodForUse(const Camera &camera, int samplesPerP
         Float triMaxY = std::max({yr0, yr1, yr2});
         if (triMaxX < Float(pb.pMin.x) || triMinX >= Float(pb.pMax.x) ||
             triMaxY < Float(pb.pMin.y) || triMinY >= Float(pb.pMax.y))
-            continue;
-
-        Float s0x = xr1 - xr0, s0y = yr1 - yr0;
-        Float s1x = xr2 - xr0, s1y = yr2 - yr0;
-        Float detS = s0x * s1y - s0y * s1x;
-        if (std::abs(detS) < 1e-20f)
-            continue;
+            return Infinity;
 
         Float u0 = tri.uv0.x, v0 = tri.uv0.y;
         Float u1 = tri.uv1.x, v1 = tri.uv1.y;
@@ -384,23 +385,20 @@ static Float MinPrimaryContinuousLodForUse(const Camera &camera, int samplesPerP
         Float Vow0 = v0 * Iw0, Vow1 = v1 * Iw1, Vow2 = v2 * Iw2;
 
         Float dUow_dx, dUow_dy, dVow_dx, dVow_dy, dIw_dx, dIw_dy;
-        if (!AffineScalarGradient2D(xr0, yr0, xr1, yr1, xr2, yr2, Uow0, Uow1, Uow2, &dUow_dx,
-                                   &dUow_dy) ||
-            !AffineScalarGradient2D(xr0, yr0, xr1, yr1, xr2, yr2, Vow0, Vow1, Vow2, &dVow_dx,
-                                   &dVow_dy) ||
-            !AffineScalarGradient2D(xr0, yr0, xr1, yr1, xr2, yr2, Iw0, Iw1, Iw2, &dIw_dx,
-                                   &dIw_dy))
-            continue;
+        if (!AffineTripleScalarGradients2D(xr0, yr0, xr1, yr1, xr2, yr2, Uow0, Uow1, Uow2,
+                                           &dUow_dx, &dUow_dy, Vow0, Vow1, Vow2, &dVow_dx,
+                                           &dVow_dy, Iw0, Iw1, Iw2, &dIw_dx, &dIw_dy))
+            return Infinity;
 
         Float inv_w = (Iw0 + Iw1 + Iw2) / 3.f;
         if (!(inv_w >= kMinW) || !IsFinite(inv_w))
-            continue;
+            return Infinity;
 
         Float sumUow = Uow0 + Uow1 + Uow2;
         Float sumVow = Vow0 + Vow1 + Vow2;
         Float sumIw = Iw0 + Iw1 + Iw2;
         if (sumIw <= kMinW)
-            continue;
+            return Infinity;
         Float u = sumUow / sumIw;
         Float v = sumVow / sumIw;
 
@@ -415,15 +413,20 @@ static Float MinPrimaryContinuousLodForUse(const Camera &camera, int samplesPerP
         dvdy *= sppScale;
 
         if (!IsFinite(dudx) || !IsFinite(dvdx) || !IsFinite(dudy) || !IsFinite(dvdy))
-            continue;
+            return Infinity;
 
         Float dsdx = use.su * dudx, dsdy = use.su * dudy;
         Float dtdx = use.sv * dvdx, dtdy = use.sv * dvdy;
 
-        Float lod = ImageTextureContinuousLOD(use.filter, Vector2f(dsdx, dtdx),
-                                              Vector2f(dsdy, dtdy), use.maxAnisotropy,
-                                              pyramidLevels);
-        minLod = std::min(minLod, lod);
+        return ImageTextureContinuousLOD(use.filter, Vector2f(dsdx, dtdx),
+                                         Vector2f(dsdy, dtdy), use.maxAnisotropy, pyramidLevels);
+    };
+
+    Float minLod = Infinity;
+    for (const ImageTextureMeshTriangle &tri : use.triangles) {
+        Float lod = lodForTriangle(tri);
+        if (IsFinite(lod))
+            minLod = std::min(minLod, lod);
     }
 
     if (!IsFinite(minLod))
@@ -440,7 +443,7 @@ int ComputeImageTextureSafeDownsizesFromPreprocess(
 
     const std::string texLog =
         ShortScenePathForMipLog(usesForTexture[0].resolvedImageFilename);
-    Printf("[mip preprocess] texture \"%s\"\n", texLog);
+    Printf("[mip preprocess] texture \"%s\"\n", texLog.c_str());
 
     int textureMinSafeDownsizes = std::numeric_limits<int>::max();
     for (size_t ui = 0; ui < usesForTexture.size(); ++ui) {
@@ -459,7 +462,6 @@ int ComputeImageTextureSafeDownsizesFromPreprocess(
                minLod);
 
         textureMinSafeDownsizes = std::min(textureMinSafeDownsizes, pairSafe);
-        // Min across geometries: any geometry with 0 safe downsizes fixes the texture at 0.
         if (textureMinSafeDownsizes == 0) {
             size_t remaining = usesForTexture.size() - ui - 1;
             if (remaining > 0)
@@ -490,10 +492,7 @@ void RunImageTextureMipPreprocess(BasicScene &scene, const Camera &camera,
         std::vector<ImageTextureGeometryUse> uses =
             GatherImageTextureUsesForFile(scene, fn, decls);
 
-        const char *defaultEncoding = HasExtension(fn, "png") ? "sRGB" : "linear";
-        ColorEncoding encoding = ColorEncoding::Get(defaultEncoding, alloc);
-        ImageAndMetadata imMeta = Image::Read(fn, alloc, encoding);
-        Point2i res = imMeta.image.Resolution();
+        Point2i res = Image::ReadResolution(fn);
         int pyramidLevels = MipmapPyramidLevelsForImageResolution(res);
 
         int safeDownsizes = 0;
