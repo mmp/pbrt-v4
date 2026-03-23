@@ -26,6 +26,7 @@
 #include <cstring>
 #include <limits>
 #include <map>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace pbrt {
@@ -70,6 +71,16 @@ static bool ResolvedImageTexturePathsEqual(const std::string &a, const std::stri
 #else
     return false;
 #endif
+}
+
+// Map a declaration's resolved path to the canonical string from CollectResolvedImageTextureFilenames
+// so uses bucket with the same keys we iterate in RunImageTextureMipPreprocess.
+static std::string CanonicalTextureFileKey(const std::string &resolvedFilename,
+                                           const std::vector<std::string> &files) {
+    for (const std::string &fn : files)
+        if (ResolvedImageTexturePathsEqual(resolvedFilename, fn))
+            return fn;
+    return resolvedFilename;
 }
 
 static Transform InstanceWorldFromObject(const InstanceSceneEntity &inst) {
@@ -156,12 +167,19 @@ static void CollectReflectanceSpectrumTextureNames(const BasicScene &scene, cons
 
 static void ExtractTrianglesFromPlyMeshShape(const ShapeSceneEntity &sh,
                                              const Transform &worldFromShape,
+                                             std::unordered_map<std::string, TriQuadMesh> *plyCache,
                                              std::vector<ImageTextureMeshTriangle> *out) {
-    std::string plyFile = ResolveFilename(sh.parameters.GetOneString("filename", ""));
-    if (plyFile.empty())
+    std::string resolvedPly = ResolveFilename(sh.parameters.GetOneString("filename", ""));
+    if (resolvedPly.empty())
         return;
-    TriQuadMesh mesh = TriQuadMesh::ReadPLY(plyFile);
-    mesh.ConvertToOnlyTriangles();
+
+    auto it = plyCache->find(resolvedPly);
+    if (it == plyCache->end()) {
+        TriQuadMesh mesh = TriQuadMesh::ReadPLY(resolvedPly);
+        mesh.ConvertToOnlyTriangles();
+        it = plyCache->emplace(std::move(resolvedPly), std::move(mesh)).first;
+    }
+    const TriQuadMesh &mesh = it->second;
     if (mesh.triIndices.empty())
         return;
 
@@ -192,18 +210,20 @@ static void ExtractTrianglesFromPlyMeshShape(const ShapeSceneEntity &sh,
 }
 
 static void FillTrianglesForMeshShape(const ShapeSceneEntity &sh, const Transform &worldFromShape,
+                                      std::unordered_map<std::string, TriQuadMesh> *plyCache,
                                       std::vector<ImageTextureMeshTriangle> *tris) {
     if (sh.name == "trianglemesh")
         ExtractTrianglesFromShape(sh, worldFromShape, tris);
     else if (sh.name == "plymesh")
-        ExtractTrianglesFromPlyMeshShape(sh, worldFromShape, tris);
+        ExtractTrianglesFromPlyMeshShape(sh, worldFromShape, plyCache, tris);
 }
 
 static void AppendReflectanceImagemapUsesForMeshShape(
     const BasicScene &scene, const ShapeSceneEntity &sh, const Transform &worldFromShape,
-    const std::string &geometryDebugLabel, const std::string &targetFilename,
-    const std::vector<std::pair<std::string, SpectrumImagemapDeclarationInfo>> &texForFile,
-    std::vector<ImageTextureGeometryUse> *uses) {
+    const std::string &geometryDebugLabel, const std::map<std::string, SpectrumImagemapDeclarationInfo> &decls,
+    const std::vector<std::string> &textureFiles,
+    std::unordered_map<std::string, std::vector<ImageTextureGeometryUse>> *usesByFile,
+    std::unordered_map<std::string, TriQuadMesh> *plyCache) {
     if (sh.name != "trianglemesh" && sh.name != "plymesh")
         return;
 
@@ -222,43 +242,38 @@ static void AppendReflectanceImagemapUsesForMeshShape(
         if (!dedup.insert(refTex).second)
             continue;
 
-        const SpectrumImagemapDeclarationInfo *info = nullptr;
-        for (const auto &tf : texForFile) {
-            if (tf.first == refTex) {
-                info = &tf.second;
-                break;
-            }
-        }
-        if (!info)
+        auto declIt = decls.find(refTex);
+        if (declIt == decls.end())
             continue;
+        const SpectrumImagemapDeclarationInfo &info = declIt->second;
 
-        pstd::optional<FilterFunction> ff = ParseFilter(info->filter);
+        pstd::optional<FilterFunction> ff = ParseFilter(info.filter);
         FilterFunction filter = ff.value_or(FilterFunction::Bilinear);
 
+        std::string fileKey = CanonicalTextureFileKey(info.resolvedFilename, textureFiles);
+
         ImageTextureGeometryUse use;
-        use.resolvedImageFilename = targetFilename;
+        use.resolvedImageFilename = fileKey;
         use.geometryDebugLabel = geometryDebugLabel;
-        use.su = info->su;
-        use.sv = info->sv;
-        use.du = info->du;
-        use.dv = info->dv;
-        use.maxAnisotropy = info->maxAnisotropy;
+        use.su = info.su;
+        use.sv = info.sv;
+        use.du = info.du;
+        use.dv = info.dv;
+        use.maxAnisotropy = info.maxAnisotropy;
         use.filter = filter;
-        FillTrianglesForMeshShape(sh, worldFromShape, &use.triangles);
+        FillTrianglesForMeshShape(sh, worldFromShape, plyCache, &use.triangles);
         if (!use.triangles.empty())
-            uses->push_back(std::move(use));
+            (*usesByFile)[fileKey].push_back(std::move(use));
     }
 }
 
-static std::vector<ImageTextureGeometryUse> GatherImageTextureUsesForFile(
-    const BasicScene &scene, const std::string &targetFilename,
-    const std::map<std::string, SpectrumImagemapDeclarationInfo> &decls) {
-    std::vector<ImageTextureGeometryUse> uses;
-
-    std::vector<std::pair<std::string, SpectrumImagemapDeclarationInfo>> texForFile;
-    for (const auto &kv : decls)
-        if (ResolvedImageTexturePathsEqual(kv.second.resolvedFilename, targetFilename))
-            texForFile.push_back(kv);
+// One scene pass: collect geometry uses per texture file (canonical keys from textureFiles).
+static std::unordered_map<std::string, std::vector<ImageTextureGeometryUse>>
+GatherImageTextureUsesByFile(const BasicScene &scene,
+                             const std::map<std::string, SpectrumImagemapDeclarationInfo> &decls,
+                             const std::vector<std::string> &textureFiles,
+                             std::unordered_map<std::string, TriQuadMesh> *plyCache) {
+    std::unordered_map<std::string, std::vector<ImageTextureGeometryUse>> usesByFile;
 
     for (size_t si = 0; si < scene.shapes.size(); ++si) {
         const ShapeSceneEntity &sh = scene.shapes[si];
@@ -266,8 +281,8 @@ static std::vector<ImageTextureGeometryUse> GatherImageTextureUsesForFile(
             sh.renderFromObject ? *sh.renderFromObject : Transform();
         AppendReflectanceImagemapUsesForMeshShape(
             scene, sh, worldFromShape,
-            StringPrintf("shape[%zu]_%s", si, std::string(sh.name).c_str()), targetFilename,
-            texForFile, &uses);
+            StringPrintf("shape[%zu]_%s", si, std::string(sh.name).c_str()), decls, textureFiles,
+            &usesByFile, plyCache);
     }
 
     for (size_t ii = 0; ii < scene.instances.size(); ++ii) {
@@ -286,11 +301,11 @@ static std::vector<ImageTextureGeometryUse> GatherImageTextureUsesForFile(
                 scene, sh, worldFromShape,
                 StringPrintf("instance[%zu]_def_%s_shape[%zu]_%s", ii,
                              std::string(inst.name).c_str(), si, std::string(sh.name).c_str()),
-                targetFilename, texForFile, &uses);
+                decls, textureFiles, &usesByFile, plyCache);
         }
     }
 
-    return uses;
+    return usesByFile;
 }
 
 static void MultiplyMatrixPointHomogeneous(const SquareMatrix<4> &m, Point3f p, Float *ox,
@@ -488,16 +503,34 @@ void RunImageTextureMipPreprocess(BasicScene &scene, const Camera &camera,
     std::vector<std::string> files = scene.CollectResolvedImageTextureFilenames();
     Allocator alloc;
 
-    for (const std::string &fn : files) {
-        std::vector<ImageTextureGeometryUse> uses =
-            GatherImageTextureUsesForFile(scene, fn, decls);
+    std::unordered_map<std::string, TriQuadMesh> plyCache;
+    std::unordered_map<std::string, std::vector<ImageTextureGeometryUse>> usesByFile =
+        GatherImageTextureUsesByFile(scene, decls, files, &plyCache);
 
-        Point2i res = Image::ReadResolution(fn);
+    // One LOD computation per path-equivalence class (Windows may list the same path twice with
+    // different spellings); apply the result to every matching entry in files.
+    std::vector<char> fileDone(files.size(), 0);
+    for (size_t fi = 0; fi < files.size(); ++fi) {
+        if (fileDone[fi])
+            continue;
+        const std::string &repFn = files[fi];
+
+        std::vector<ImageTextureGeometryUse> uses;
+        for (auto it = usesByFile.begin(); it != usesByFile.end();) {
+            if (ResolvedImageTexturePathsEqual(it->first, repFn)) {
+                uses = std::move(it->second);
+                it = usesByFile.erase(it);
+                break;
+            }
+            ++it;
+        }
+
+        Point2i res = Image::ReadResolution(repFn);
         int pyramidLevels = MipmapPyramidLevelsForImageResolution(res);
 
         int safeDownsizes = 0;
         if (uses.empty()) {
-            Printf("[mip preprocess] texture \"%s\"\n", ShortScenePathForMipLog(fn));
+            Printf("[mip preprocess] texture \"%s\"\n", ShortScenePathForMipLog(repFn));
             Printf("  (no trianglemesh/plymesh reflectance imagemap uses found; safe downsizes 0)\n");
         } else {
             safeDownsizes = ComputeImageTextureSafeDownsizesFromPreprocess(
@@ -505,7 +538,15 @@ void RunImageTextureMipPreprocess(BasicScene &scene, const Camera &camera,
         }
 
         Printf("  final safe downsizes %d\n", safeDownsizes);
-        SetImageTextureMipDownsizeOverrideForFile(fn, safeDownsizes);
+
+        for (size_t fj = fi; fj < files.size(); ++fj) {
+            if (fileDone[fj])
+                continue;
+            if (!ResolvedImageTexturePathsEqual(repFn, files[fj]))
+                continue;
+            fileDone[fj] = 1;
+            SetImageTextureMipDownsizeOverrideForFile(files[fj], safeDownsizes);
+        }
     }
 
     Printf("[mip preprocess] wall time %.3f s\n", preprocessTimer.ElapsedSeconds());
