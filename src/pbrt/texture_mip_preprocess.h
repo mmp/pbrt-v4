@@ -34,10 +34,11 @@ struct ImageTextureGeometryUse {
     FilterFunction filter = FilterFunction::Bilinear;
 };
 
-// Per-geometry safe downsizes = floor(min primary-ray continuous LOD); texture override =
-// min over geometries. Primary visibility only; UV imagemap on reflectance for diffuse /
-// coateddiffuse / diffusetransmission and mix thereof; trianglemesh + plymesh; includes
-// ObjectInstance placements (transformed into render space).
+// Per-geometry safe downsizes = floor(min primary continuous LOD); texture override =
+// min over geometries. Primary visibility only (analytic screen-space UV derivatives for
+// perspective/orthographic; spherical/realistic cameras yield 0 safe downsizes). UV imagemap
+// on reflectance for diffuse / coateddiffuse / diffusetransmission and mix thereof;
+// trianglemesh + plymesh; includes ObjectInstance placements (transformed into render space).
 int ComputeImageTextureSafeDownsizesFromPreprocess(
     const Camera &camera, int samplesPerPixel,
     const std::vector<ImageTextureGeometryUse> &usesForTexture, int mipmapPyramidLevels,

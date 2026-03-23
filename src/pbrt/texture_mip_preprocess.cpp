@@ -6,10 +6,8 @@
 
 #include <pbrt/cameras.h>
 #include <pbrt/film.h>
-#include <pbrt/interaction.h>
 #include <pbrt/options.h>
 #include <pbrt/scene.h>
-#include <pbrt/shapes.h>
 #include <pbrt/textures.h>
 #include <pbrt/util/colorspace.h>
 #include <pbrt/util/file.h>
@@ -296,83 +294,136 @@ static std::vector<ImageTextureGeometryUse> GatherImageTextureUsesForFile(
     return uses;
 }
 
+static void MultiplyMatrixPointHomogeneous(const SquareMatrix<4> &m, Point3f p, Float *ox,
+                                           Float *oy, Float *ow) {
+    Float x = p.x, y = p.y, z = p.z;
+    *ox = m[0][0] * x + m[0][1] * y + m[0][2] * z + m[0][3];
+    *oy = m[1][0] * x + m[1][1] * y + m[1][2] * z + m[1][3];
+    *ow = m[3][0] * x + m[3][1] * y + m[3][2] * z + m[3][3];
+}
+
+// For scalar values linear on a 2D triangle, return constant (∂f/∂x, ∂f/∂y).
+static bool AffineScalarGradient2D(Float x0, Float y0, Float x1, Float y1, Float x2, Float y2,
+                                   Float f0, Float f1, Float f2, Float *gx, Float *gy) {
+    Float s0x = x1 - x0, s0y = y1 - y0;
+    Float s1x = x2 - x0, s1y = y2 - y0;
+    Float det = s0x * s1y - s0y * s1x;
+    if (std::abs(det) < 1e-30f)
+        return false;
+    Float df0 = f1 - f0, df1 = f2 - f0;
+    *gx = (df0 * s1y - df1 * s0y) / det;
+    *gy = (df1 * s0x - df0 * s1x) / det;
+    return true;
+}
+
 static Float MinPrimaryContinuousLodForUse(const Camera &camera, int samplesPerPixel,
                                            const ImageTextureGeometryUse &use,
                                            int pyramidLevels, Allocator alloc) {
+    (void)alloc;
     if (!Options || Options->disableTextureFiltering || use.triangles.empty())
         return 0;
 
-    std::vector<int> indices;
-    std::vector<Point3f> p;
-    std::vector<Point2f> uv;
-    int vBase = 0;
-    for (const ImageTextureMeshTriangle &t : use.triangles) {
-        p.push_back(t.p0);
-        p.push_back(t.p1);
-        p.push_back(t.p2);
-        uv.push_back(t.uv0);
-        uv.push_back(t.uv1);
-        uv.push_back(t.uv2);
-        indices.push_back(vBase);
-        indices.push_back(vBase + 1);
-        indices.push_back(vBase + 2);
-        vBase += 3;
-    }
+    const PerspectiveCamera *persp = camera.Cast<PerspectiveCamera>();
+    const OrthographicCamera *ortho = camera.Cast<OrthographicCamera>();
+    const ProjectiveCamera *proj = persp ? static_cast<const ProjectiveCamera *>(persp)
+                                         : ortho ? static_cast<const ProjectiveCamera *>(ortho)
+                                                  : nullptr;
+    if (!proj)
+        return 0;
 
-    const TriangleMesh *mesh = alloc.new_object<TriangleMesh>(
-        Transform(), false, std::move(indices), std::move(p), std::vector<Vector3f>{},
-        std::vector<Normal3f>{}, std::move(uv), std::vector<int>{}, alloc);
+    Transform rasterFromCamera = proj->GetRasterFromCameraTransform();
+    const SquareMatrix<4> &M = rasterFromCamera.GetMatrix();
+    const CameraTransform &camXf = proj->GetCameraTransform();
+    Float time = proj->SampleTime(0.5f);
+    Bounds2i pb = proj->GetFilm().PixelBounds();
 
-    Bounds2i pb = camera.GetFilm().PixelBounds();
-    int fw = pb.pMax.x - pb.pMin.x, fh = pb.pMax.y - pb.pMin.y;
-    int stride = std::max(1, std::max(fw, fh) / 64);
+    Float sppScale = 1.f;
+    if (!Options->disablePixelJitter)
+        sppScale = std::max<Float>(0.125f, 1.f / std::sqrt(Float(samplesPerPixel)));
 
     Float minLod = Infinity;
-    SampledWavelengths lambda = SampledWavelengths::SampleUniform(0.5f);
-    UVMapping uvm(use.su, use.sv, use.du, use.dv);
+    constexpr Float kMinW = 1e-6f;
 
-    for (int py = pb.pMin.y; py < pb.pMax.y; py += stride) {
-        for (int px = pb.pMin.x; px < pb.pMax.x; px += stride) {
-            CameraSample cs;
-            cs.pFilm = Point2f(Float(px) + 0.5f, Float(py) + 0.5f);
-            cs.time = 0.5f;
-            cs.pLens = Point2f(0.5f, 0.5f);
-            cs.filterWeight = 1;
-            pstd::optional<CameraRayDifferential> crd =
-                camera.GenerateRayDifferential(cs, lambda);
-            if (!crd)
-                continue;
-            RayDifferential ray = crd->ray;
-            Float scale = std::max<Float>(0.125f, 1.f / std::sqrt(Float(samplesPerPixel)));
-            if (!Options->disablePixelJitter)
-                ray.ScaleDifferentials(scale);
+    for (const ImageTextureMeshTriangle &tri : use.triangles) {
+        Point3f pc0 = camXf.CameraFromRender(tri.p0, time);
+        Point3f pc1 = camXf.CameraFromRender(tri.p1, time);
+        Point3f pc2 = camXf.CameraFromRender(tri.p2, time);
 
-            Float tBest = Infinity;
-            int bestTri = -1;
-            pstd::optional<TriangleIntersection> bestIsct;
-            for (int ti = 0; ti < mesh->nTriangles; ++ti) {
-                const int *vv = &mesh->vertexIndices[3 * ti];
-                Point3f p0 = mesh->p[vv[0]], p1 = mesh->p[vv[1]], p2 = mesh->p[vv[2]];
-                auto isct = IntersectTriangle(ray, tBest, p0, p1, p2);
-                if (isct && isct->t < tBest) {
-                    tBest = isct->t;
-                    bestTri = ti;
-                    bestIsct = isct;
-                }
-            }
-            if (!bestIsct || bestTri < 0)
-                continue;
+        Float qx0, qy0, qw0, qx1, qy1, qw1, qx2, qy2, qw2;
+        MultiplyMatrixPointHomogeneous(M, pc0, &qx0, &qy0, &qw0);
+        MultiplyMatrixPointHomogeneous(M, pc1, &qx1, &qy1, &qw1);
+        MultiplyMatrixPointHomogeneous(M, pc2, &qx2, &qy2, &qw2);
 
-            SurfaceInteraction si = Triangle::InteractionFromIntersection(
-                mesh, bestTri, *bestIsct, ray.time, -ray.d);
-            si.ComputeDifferentials(ray, camera, samplesPerPixel);
-            TextureEvalContext ctx(si);
-            TexCoord2D tc = uvm.Map(ctx);
-            Float lod = ImageTextureContinuousLOD(use.filter, Vector2f(tc.dsdx, tc.dtdx),
-                                                  Vector2f(tc.dsdy, tc.dtdy), use.maxAnisotropy,
-                                                  pyramidLevels);
-            minLod = std::min(minLod, lod);
-        }
+        if (qw0 <= kMinW || qw1 <= kMinW || qw2 <= kMinW)
+            continue;
+
+        Float xr0 = qx0 / qw0, yr0 = qy0 / qw0;
+        Float xr1 = qx1 / qw1, yr1 = qy1 / qw1;
+        Float xr2 = qx2 / qw2, yr2 = qy2 / qw2;
+
+        Float triMinX = std::min({xr0, xr1, xr2});
+        Float triMaxX = std::max({xr0, xr1, xr2});
+        Float triMinY = std::min({yr0, yr1, yr2});
+        Float triMaxY = std::max({yr0, yr1, yr2});
+        if (triMaxX < Float(pb.pMin.x) || triMinX >= Float(pb.pMax.x) ||
+            triMaxY < Float(pb.pMin.y) || triMinY >= Float(pb.pMax.y))
+            continue;
+
+        Float s0x = xr1 - xr0, s0y = yr1 - yr0;
+        Float s1x = xr2 - xr0, s1y = yr2 - yr0;
+        Float detS = s0x * s1y - s0y * s1x;
+        if (std::abs(detS) < 1e-20f)
+            continue;
+
+        Float u0 = tri.uv0.x, v0 = tri.uv0.y;
+        Float u1 = tri.uv1.x, v1 = tri.uv1.y;
+        Float u2 = tri.uv2.x, v2 = tri.uv2.y;
+
+        Float Iw0 = 1.f / qw0, Iw1 = 1.f / qw1, Iw2 = 1.f / qw2;
+        Float Uow0 = u0 * Iw0, Uow1 = u1 * Iw1, Uow2 = u2 * Iw2;
+        Float Vow0 = v0 * Iw0, Vow1 = v1 * Iw1, Vow2 = v2 * Iw2;
+
+        Float dUow_dx, dUow_dy, dVow_dx, dVow_dy, dIw_dx, dIw_dy;
+        if (!AffineScalarGradient2D(xr0, yr0, xr1, yr1, xr2, yr2, Uow0, Uow1, Uow2, &dUow_dx,
+                                   &dUow_dy) ||
+            !AffineScalarGradient2D(xr0, yr0, xr1, yr1, xr2, yr2, Vow0, Vow1, Vow2, &dVow_dx,
+                                   &dVow_dy) ||
+            !AffineScalarGradient2D(xr0, yr0, xr1, yr1, xr2, yr2, Iw0, Iw1, Iw2, &dIw_dx,
+                                   &dIw_dy))
+            continue;
+
+        Float inv_w = (Iw0 + Iw1 + Iw2) / 3.f;
+        if (!(inv_w >= kMinW) || !IsFinite(inv_w))
+            continue;
+
+        Float sumUow = Uow0 + Uow1 + Uow2;
+        Float sumVow = Vow0 + Vow1 + Vow2;
+        Float sumIw = Iw0 + Iw1 + Iw2;
+        if (sumIw <= kMinW)
+            continue;
+        Float u = sumUow / sumIw;
+        Float v = sumVow / sumIw;
+
+        Float dudx = (dUow_dx - u * dIw_dx) / inv_w;
+        Float dvdx = (dVow_dx - v * dIw_dx) / inv_w;
+        Float dudy = (dUow_dy - u * dIw_dy) / inv_w;
+        Float dvdy = (dVow_dy - v * dIw_dy) / inv_w;
+
+        dudx *= sppScale;
+        dvdx *= sppScale;
+        dudy *= sppScale;
+        dvdy *= sppScale;
+
+        if (!IsFinite(dudx) || !IsFinite(dvdx) || !IsFinite(dudy) || !IsFinite(dvdy))
+            continue;
+
+        Float dsdx = use.su * dudx, dsdy = use.su * dudy;
+        Float dtdx = use.sv * dvdx, dtdy = use.sv * dvdy;
+
+        Float lod = ImageTextureContinuousLOD(use.filter, Vector2f(dsdx, dtdx),
+                                              Vector2f(dsdy, dtdy), use.maxAnisotropy,
+                                              pyramidLevels);
+        minLod = std::min(minLod, lod);
     }
 
     if (!IsFinite(minLod))
@@ -384,8 +435,6 @@ int ComputeImageTextureSafeDownsizesFromPreprocess(
     const Camera &camera, int samplesPerPixel,
     const std::vector<ImageTextureGeometryUse> &usesForTexture, int mipmapPyramidLevels,
     Allocator alloc) {
-    (void)camera;
-
     if (usesForTexture.empty())
         return 0;
 
