@@ -29,6 +29,9 @@ struct BasicPBRTOptions {
     // kDefaultImageTextureSkipMipLevelsWhenSkipMipEnabled in mipmap.cpp unless overridden
     // per file by RunImageTextureMipPreprocess). When false, full-res base.
     bool skipMipImageTextures = false;
+    // With --skipmip: log each texture and geometry use for mip analysis (can be very slow).
+    // Default false: one summary line with texture count and wall time.
+    bool verboseMipPreprocess = false;
     bool forceDiffuse = false;
     bool useGPU = false;
     bool wavefront = false;

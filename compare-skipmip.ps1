@@ -9,6 +9,7 @@
 # Render progress: stdout is written to the .txt log live while pbrt runs (poll ~8 Hz for console echo).
 # Optional -ExtraPbrtArgs is appended for both runs (e.g. --gpu, --wavefront).
 # By default, repetitive "Rendering:" lines are not echoed (full log files unchanged); use -ShowProgress for all lines.
+# SkipMip mip preprocess logs one summary line by default; use -VerboseMipPreprocess for per-texture/per-geometry lines (slow).
 # SSIM: compare_ssim.py needs pip install numpy scikit-image pillow (full-res skimage SSIM).
 
 [CmdletBinding()]
@@ -25,7 +26,10 @@ param(
     [string[]] $ExtraPbrtArgs = @(),
 
     # If set, every "Rendering:" progress line is printed; otherwise only a short note (full log unchanged).
-    [switch] $ShowProgress
+    [switch] $ShowProgress,
+
+    # If set, SkipMip run adds --verbose-mip-preprocess (large mip analysis log; default is quiet).
+    [switch] $VerboseMipPreprocess
 )
 
 Set-StrictMode -Version Latest
@@ -307,6 +311,9 @@ Write-Host "log dir: $LogDir"
 if (-not $ShowProgress) {
     Write-Host "(progress lines hidden; use -ShowProgress to print every Rendering: line)" -ForegroundColor DarkGray
 }
+if ($VerboseMipPreprocess) {
+    Write-Host "(SkipMip run: --verbose-mip-preprocess enabled)" -ForegroundColor DarkGray
+}
 Write-Host ""
 
 Write-Host "================================================================" -ForegroundColor Yellow
@@ -322,6 +329,9 @@ Write-Host " Run 2/2  |  SkipMip" -ForegroundColor Yellow
 Write-Host "================================================================" -ForegroundColor Yellow
 Write-Host ""
 $argsSkipMip = $common + @("--skipmip", "--outfile", $imgSkipMip)
+if ($VerboseMipPreprocess) {
+    $argsSkipMip += "--verbose-mip-preprocess"
+}
 $runSkipMip = Invoke-PbrtLogged -PbrtExe $PbrtExe -Arguments $argsSkipMip -LogPath $logSkipMip -ShowProgress:$ShowProgress
 
 $textNo = Read-LogText $logNoMip

@@ -45,6 +45,8 @@ Rendering options:
   --skipmip                     Skip the first k mip levels of image textures (box-filter
                                 downsample k times before building the mip pyramid). k defaults
                                 in mipmap.cpp or is chosen per texture by preprocess.
+  --verbose-mip-preprocess      With --skipmip, print per-texture/per-geometry mip analysis.
+                                Default is a single summary line (large logs are costly).
   --disable-pixel-jitter        Always sample pixels at their centers.
   --disable-texture-filtering   Point-sample all textures.
   --disable-wavelength-jitter   Always sample the same %d wavelengths of light.
@@ -170,6 +172,8 @@ int main(int argc, char *argv[]) {
             ParseArg(&iter, args.end(), "disable-image-textures",
                      &options.disableImageTextures, onError) ||
             ParseArg(&iter, args.end(), "skipmip", &options.skipMipImageTextures, onError) ||
+            ParseArg(&iter, args.end(), "verbose-mip-preprocess",
+                     &options.verboseMipPreprocess, onError) ||
             ParseArg(&iter, args.end(), "disable-pixel-jitter",
                      &options.disablePixelJitter, onError) ||
             ParseArg(&iter, args.end(), "disable-texture-filtering",

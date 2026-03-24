@@ -9,11 +9,13 @@
 #include <pbrt/options.h>
 #include <pbrt/scene.h>
 #include <pbrt/textures.h>
+#include <pbrt/util/check.h>
 #include <pbrt/util/file.h>
 #include <pbrt/util/image.h>
 #include <pbrt/util/math.h>
 #include <pbrt/util/mesh.h>
 #include <pbrt/util/mipmap.h>
+#include <pbrt/util/parallel.h>
 #include <pbrt/util/print.h>
 #include <pbrt/util/progressreporter.h>
 #include <pbrt/util/spectrum.h>
@@ -21,15 +23,23 @@
 #include <pbrt/util/transform.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <cmath>
 #include <cstring>
 #include <limits>
 #include <map>
 #include <unordered_map>
+#include <vector>
 #include <unordered_set>
 
 namespace pbrt {
+
+// Per-geometry mip analysis logging (--verbose-mip-preprocess). Default is quiet: one summary
+// line in RunImageTextureMipPreprocess (large Printf volume dominates wall time otherwise).
+static bool MipPreprocessLogDetail() {
+    return Options && Options->verboseMipPreprocess;
+}
 
 // Log path relative to a .../pbrt-v4-scenes/ root when present (any slash style, case fold).
 static std::string ShortScenePathForMipLog(const std::string &fullPath) {
@@ -458,31 +468,68 @@ int ComputeImageTextureSafeDownsizesFromPreprocess(
 
     const std::string texLog =
         ShortScenePathForMipLog(usesForTexture[0].resolvedImageFilename);
-    Printf("[mip preprocess] texture \"%s\"\n", texLog.c_str());
+    if (MipPreprocessLogDetail())
+        Printf("[mip preprocess] texture \"%s\"\n", texLog.c_str());
+
+    const size_t n = usesForTexture.size();
+    // ParallelFor + early bail rarely cut wall time here: most geometries yield pairSafe > 0 so
+    // all LOD paths still run; when verbose logging is on, console I/O often dominates anyway.
+    auto pairSafeFromMinLod = [&](Float minLod) {
+        Float lodClamped = std::max<Float>(0, minLod);
+        int ps = (int)std::floor(lodClamped + 1e-5f);
+        if (mipmapPyramidLevels > 0)
+            ps = std::min(ps, mipmapPyramidLevels - 1);
+        return std::max(0, ps);
+    };
+
+    std::vector<Float> minLods(n);
+    std::vector<unsigned char> lodComputed(n, 0);
+    std::atomic<bool> bailForZeroPairSafe{false};
+
+    ParallelFor(0, (int64_t)n, [&](int64_t ui) {
+        size_t i = (size_t)ui;
+        if (bailForZeroPairSafe.load(std::memory_order_relaxed))
+            return;
+        Float minLod = MinPrimaryContinuousLodForUse(
+            camera, samplesPerPixel, usesForTexture[i], mipmapPyramidLevels, alloc);
+        minLods[i] = minLod;
+        lodComputed[i] = 1;
+        if (pairSafeFromMinLod(minLod) == 0)
+            bailForZeroPairSafe.store(true, std::memory_order_relaxed);
+    });
 
     int textureMinSafeDownsizes = std::numeric_limits<int>::max();
-    for (size_t ui = 0; ui < usesForTexture.size(); ++ui) {
-        const ImageTextureGeometryUse &use = usesForTexture[ui];
-        Float minLod =
-            MinPrimaryContinuousLodForUse(camera, samplesPerPixel, use, mipmapPyramidLevels, alloc);
-        Float lodClamped = std::max<Float>(0, minLod);
-        int pairSafe = (int)std::floor(lodClamped + 1e-5f);
-        if (mipmapPyramidLevels > 0)
-            pairSafe = std::min(pairSafe, mipmapPyramidLevels - 1);
-        pairSafe = std::max(0, pairSafe);
+    if (bailForZeroPairSafe.load(std::memory_order_acquire))
+        textureMinSafeDownsizes = 0;
+    else {
+        for (size_t ui = 0; ui < n; ++ui) {
+            CHECK(lodComputed[ui]);
+            textureMinSafeDownsizes =
+                std::min(textureMinSafeDownsizes, pairSafeFromMinLod(minLods[ui]));
+        }
+    }
 
-        const std::string &geom =
-            use.geometryDebugLabel.empty() ? std::string("(no label)") : use.geometryDebugLabel;
-        Printf("  geometry \"%s\" -> safe downsizes %d (min primary LOD %.4f)\n", geom, pairSafe,
-               minLod);
+    if (MipPreprocessLogDetail()) {
+        for (size_t ui = 0; ui < n; ++ui) {
+            if (!lodComputed[ui])
+                continue;
+            const ImageTextureGeometryUse &use = usesForTexture[ui];
+            Float minLod = minLods[ui];
+            int pairSafe = pairSafeFromMinLod(minLod);
 
-        textureMinSafeDownsizes = std::min(textureMinSafeDownsizes, pairSafe);
-        if (textureMinSafeDownsizes == 0) {
-            size_t remaining = usesForTexture.size() - ui - 1;
-            if (remaining > 0)
-                Printf("  (... skipping %zu more geometries; cannot increase safe downsizes above 0)\n",
-                       remaining);
-            break;
+            const std::string &geom =
+                use.geometryDebugLabel.empty() ? std::string("(no label)") : use.geometryDebugLabel;
+            Printf("  geometry \"%s\" -> safe downsizes %d (min primary LOD %.4f)\n", geom, pairSafe,
+                   minLod);
+
+            if (pairSafe == 0) {
+                size_t remaining = n - ui - 1;
+                if (remaining > 0)
+                    Printf(
+                        "  (... skipping %zu more geometries; cannot increase safe downsizes above 0)\n",
+                        remaining);
+                break;
+            }
         }
     }
 
@@ -530,14 +577,18 @@ void RunImageTextureMipPreprocess(BasicScene &scene, const Camera &camera,
 
         int safeDownsizes = 0;
         if (uses.empty()) {
-            Printf("[mip preprocess] texture \"%s\"\n", ShortScenePathForMipLog(repFn));
-            Printf("  (no trianglemesh/plymesh reflectance imagemap uses found; safe downsizes 0)\n");
+            if (MipPreprocessLogDetail()) {
+                Printf("[mip preprocess] texture \"%s\"\n", ShortScenePathForMipLog(repFn));
+                Printf(
+                    "  (no trianglemesh/plymesh reflectance imagemap uses found; safe downsizes 0)\n");
+            }
         } else {
             safeDownsizes = ComputeImageTextureSafeDownsizesFromPreprocess(
                 camera, samplesPerPixel, uses, pyramidLevels, alloc);
         }
 
-        Printf("  final safe downsizes %d\n", safeDownsizes);
+        if (MipPreprocessLogDetail())
+            Printf("  final safe downsizes %d\n", safeDownsizes);
 
         for (size_t fj = fi; fj < files.size(); ++fj) {
             if (fileDone[fj])
@@ -549,7 +600,12 @@ void RunImageTextureMipPreprocess(BasicScene &scene, const Camera &camera,
         }
     }
 
-    Printf("[mip preprocess] wall time %.3f s\n", preprocessTimer.ElapsedSeconds());
+    if (MipPreprocessLogDetail())
+        Printf("[mip preprocess] wall time %.3f s\n", preprocessTimer.ElapsedSeconds());
+    else
+        // Keep "wall time" in the line so compare-skipmip.ps1 can parse preprocess duration.
+        Printf("[mip preprocess] wall time %.3f s (%zu image textures)\n",
+               preprocessTimer.ElapsedSeconds(), files.size());
 }
 
 }  // namespace pbrt
