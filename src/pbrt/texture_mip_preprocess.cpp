@@ -20,8 +20,6 @@
 #include <pbrt/util/progressreporter.h>
 #include <pbrt/util/spectrum.h>
 
-#include <pbrt/util/transform.h>
-
 #include <algorithm>
 #include <atomic>
 #include <cctype>
@@ -29,6 +27,7 @@
 #include <cstring>
 #include <limits>
 #include <map>
+#include <memory>
 #include <unordered_map>
 #include <vector>
 #include <unordered_set>
@@ -128,7 +127,7 @@ static Transform InstanceWorldFromObject(const InstanceSceneEntity &inst) {
     return Transform();
 }
 
-static void ExtractTrianglesFromShape(const ShapeSceneEntity &sh, const Transform &worldFromShape,
+static void ExtractTrianglesFromShape(const ShapeSceneEntity &sh,
                                       std::vector<ImageTextureMeshTriangle> *out) {
     std::vector<int> vi = sh.parameters.GetIntArray("indices");
     std::vector<Point3f> P = sh.parameters.GetPoint3fArray("P");
@@ -140,7 +139,6 @@ static void ExtractTrianglesFromShape(const ShapeSceneEntity &sh, const Transfor
     if (vi.empty() || (vi.size() % 3) != 0)
         return;
 
-    const Transform &xf = worldFromShape;
     const bool haveUvPerVertex = (uvs.size() == P.size());
 
     for (size_t t = 0; t + 2 < vi.size(); t += 3) {
@@ -149,9 +147,9 @@ static void ExtractTrianglesFromShape(const ShapeSceneEntity &sh, const Transfor
             size_t(i2) >= P.size())
             continue;
         ImageTextureMeshTriangle tri;
-        tri.p0 = xf(P[i0]);
-        tri.p1 = xf(P[i1]);
-        tri.p2 = xf(P[i2]);
+        tri.p0 = P[i0];
+        tri.p1 = P[i1];
+        tri.p2 = P[i2];
         if (haveUvPerVertex) {
             tri.uv0 = uvs[i0];
             tri.uv1 = uvs[i1];
@@ -203,7 +201,6 @@ static void CollectReflectanceSpectrumTextureNames(const BasicScene &scene, cons
 }
 
 static void ExtractTrianglesFromPlyMeshShape(const ShapeSceneEntity &sh,
-                                             const Transform &worldFromShape,
                                              std::unordered_map<std::string, TriQuadMesh> *plyCache,
                                              std::vector<ImageTextureMeshTriangle> *out) {
     std::string resolvedPly = ResolveFilename(sh.parameters.GetOneString("filename", ""));
@@ -220,7 +217,6 @@ static void ExtractTrianglesFromPlyMeshShape(const ShapeSceneEntity &sh,
     if (mesh.triIndices.empty())
         return;
 
-    const Transform &xf = worldFromShape;
     const bool haveUvPerVertex =
         !mesh.uv.empty() && mesh.uv.size() == mesh.p.size();
 
@@ -230,9 +226,9 @@ static void ExtractTrianglesFromPlyMeshShape(const ShapeSceneEntity &sh,
             size_t(i1) >= mesh.p.size() || size_t(i2) >= mesh.p.size())
             continue;
         ImageTextureMeshTriangle tri;
-        tri.p0 = xf(mesh.p[i0]);
-        tri.p1 = xf(mesh.p[i1]);
-        tri.p2 = xf(mesh.p[i2]);
+        tri.p0 = mesh.p[i0];
+        tri.p1 = mesh.p[i1];
+        tri.p2 = mesh.p[i2];
         if (haveUvPerVertex) {
             tri.uv0 = mesh.uv[i0];
             tri.uv1 = mesh.uv[i1];
@@ -246,19 +242,22 @@ static void ExtractTrianglesFromPlyMeshShape(const ShapeSceneEntity &sh,
     }
 }
 
-static void FillTrianglesForMeshShape(const ShapeSceneEntity &sh, const Transform &worldFromShape,
-                                      std::unordered_map<std::string, TriQuadMesh> *plyCache,
-                                      std::vector<ImageTextureMeshTriangle> *tris) {
+static void FillLocalMeshTrianglesForShape(const ShapeSceneEntity &sh,
+                                           std::unordered_map<std::string, TriQuadMesh> *plyCache,
+                                           std::vector<ImageTextureMeshTriangle> *tris) {
     if (sh.name == "trianglemesh")
-        ExtractTrianglesFromShape(sh, worldFromShape, tris);
+        ExtractTrianglesFromShape(sh, tris);
     else if (sh.name == "plymesh")
-        ExtractTrianglesFromPlyMeshShape(sh, worldFromShape, plyCache, tris);
+        ExtractTrianglesFromPlyMeshShape(sh, plyCache, tris);
 }
 
 static void AppendReflectanceImagemapUsesForMeshShape(
     const BasicScene &scene, const ShapeSceneEntity &sh, const Transform &worldFromShape,
     const std::string &geometryDebugLabel, const std::map<std::string, SpectrumImagemapDeclarationInfo> &decls,
     const std::unordered_map<std::string, std::string> &pathKeyToCanonical,
+    const std::string *instanceMeshCacheKey,
+    std::unordered_map<std::string, std::shared_ptr<const std::vector<ImageTextureMeshTriangle>>>
+        *instanceMeshCache,
     std::unordered_map<std::string, std::vector<ImageTextureGeometryUse>> *usesByFile,
     std::unordered_map<std::string, TriQuadMesh> *plyCache) {
     if (sh.name != "trianglemesh" && sh.name != "plymesh")
@@ -272,6 +271,26 @@ static void AppendReflectanceImagemapUsesForMeshShape(
     std::unordered_set<std::string> mixVisit;
     CollectReflectanceSpectrumTextureNames(scene, mtl, &mixVisit, &refTexNames);
     if (refTexNames.empty())
+        return;
+
+    std::shared_ptr<const std::vector<ImageTextureMeshTriangle>> meshTris;
+    if (instanceMeshCacheKey) {
+        CHECK(instanceMeshCache != nullptr);
+        auto it = instanceMeshCache->find(*instanceMeshCacheKey);
+        if (it == instanceMeshCache->end()) {
+            auto tris = std::make_shared<std::vector<ImageTextureMeshTriangle>>();
+            FillLocalMeshTrianglesForShape(sh, plyCache, tris.get());
+            meshTris = std::move(tris);
+            (*instanceMeshCache)[*instanceMeshCacheKey] = meshTris;
+        } else
+            meshTris = it->second;
+    } else {
+        auto tris = std::make_shared<std::vector<ImageTextureMeshTriangle>>();
+        FillLocalMeshTrianglesForShape(sh, plyCache, tris.get());
+        meshTris = std::move(tris);
+    }
+
+    if (!meshTris || meshTris->empty())
         return;
 
     std::unordered_set<std::string> dedup;
@@ -292,15 +311,15 @@ static void AppendReflectanceImagemapUsesForMeshShape(
         ImageTextureGeometryUse use;
         use.resolvedImageFilename = fileKey;
         use.geometryDebugLabel = geometryDebugLabel;
+        use.localTriangles = meshTris;
+        use.worldFromShape = worldFromShape;
         use.su = info.su;
         use.sv = info.sv;
         use.du = info.du;
         use.dv = info.dv;
         use.maxAnisotropy = info.maxAnisotropy;
         use.filter = filter;
-        FillTrianglesForMeshShape(sh, worldFromShape, plyCache, &use.triangles);
-        if (!use.triangles.empty())
-            (*usesByFile)[fileKey].push_back(std::move(use));
+        (*usesByFile)[fileKey].push_back(std::move(use));
     }
 }
 
@@ -311,6 +330,8 @@ GatherImageTextureUsesByFile(const BasicScene &scene,
                              const std::unordered_map<std::string, std::string> &pathKeyToCanonical,
                              std::unordered_map<std::string, TriQuadMesh> *plyCache) {
     std::unordered_map<std::string, std::vector<ImageTextureGeometryUse>> usesByFile;
+    std::unordered_map<std::string, std::shared_ptr<const std::vector<ImageTextureMeshTriangle>>>
+        instanceMeshCache;
 
     for (size_t si = 0; si < scene.shapes.size(); ++si) {
         const ShapeSceneEntity &sh = scene.shapes[si];
@@ -319,7 +340,7 @@ GatherImageTextureUsesByFile(const BasicScene &scene,
         AppendReflectanceImagemapUsesForMeshShape(
             scene, sh, worldFromShape,
             StringPrintf("shape[%zu]_%s", si, std::string(sh.name).c_str()), decls, pathKeyToCanonical,
-            &usesByFile, plyCache);
+            nullptr, nullptr, &usesByFile, plyCache);
     }
 
     for (size_t ii = 0; ii < scene.instances.size(); ++ii) {
@@ -334,11 +355,13 @@ GatherImageTextureUsesByFile(const BasicScene &scene,
             Transform shapeLocalFromMesh =
                 sh.renderFromObject ? *sh.renderFromObject : Transform();
             Transform worldFromShape = worldFromObject * shapeLocalFromMesh;
+            std::string meshKey =
+                StringPrintf("idef:%s:%zu", std::string(inst.name).c_str(), si);
             AppendReflectanceImagemapUsesForMeshShape(
                 scene, sh, worldFromShape,
                 StringPrintf("instance[%zu]_def_%s_shape[%zu]_%s", ii,
                              std::string(inst.name).c_str(), si, std::string(sh.name).c_str()),
-                decls, pathKeyToCanonical, &usesByFile, plyCache);
+                decls, pathKeyToCanonical, &meshKey, &instanceMeshCache, &usesByFile, plyCache);
         }
     }
 
@@ -380,7 +403,8 @@ static Float MinPrimaryContinuousLodForUse(const Camera &camera, int samplesPerP
                                            const ImageTextureGeometryUse &use,
                                            int pyramidLevels, Allocator alloc) {
     (void)alloc;
-    if (!Options || Options->disableTextureFiltering || use.triangles.empty())
+    if (!Options || Options->disableTextureFiltering || !use.localTriangles ||
+        use.localTriangles->empty())
         return 0;
 
     const PerspectiveCamera *persp = camera.Cast<PerspectiveCamera>();
@@ -395,6 +419,7 @@ static Float MinPrimaryContinuousLodForUse(const Camera &camera, int samplesPerP
     const SquareMatrix<4> &M = rasterFromCamera.GetMatrix();
     Transform cameraFromRender = proj->GetCameraTransform().CameraFromRender(
         proj->SampleTime(0.5f));
+    const Transform &worldFromShape = use.worldFromShape;
     Bounds2i pb = proj->GetFilm().PixelBounds();
 
     Float sppScale = 1.f;
@@ -404,9 +429,9 @@ static Float MinPrimaryContinuousLodForUse(const Camera &camera, int samplesPerP
     constexpr Float kMinW = 1e-6f;
 
     auto lodForTriangle = [&](const ImageTextureMeshTriangle &tri) -> Float {
-        Point3f pc0 = cameraFromRender(tri.p0);
-        Point3f pc1 = cameraFromRender(tri.p1);
-        Point3f pc2 = cameraFromRender(tri.p2);
+        Point3f pc0 = cameraFromRender(worldFromShape(tri.p0));
+        Point3f pc1 = cameraFromRender(worldFromShape(tri.p1));
+        Point3f pc2 = cameraFromRender(worldFromShape(tri.p2));
 
         Float qx0, qy0, qw0, qx1, qy1, qw1, qx2, qy2, qw2;
         MultiplyMatrixPointHomogeneous(M, pc0, &qx0, &qy0, &qw0);
@@ -474,11 +499,31 @@ static Float MinPrimaryContinuousLodForUse(const Camera &camera, int samplesPerP
                                          Vector2f(dsdy, dtdy), use.maxAnisotropy, pyramidLevels);
     };
 
+    const std::vector<ImageTextureMeshTriangle> &tris = *use.localTriangles;
+    const int64_t nTris = (int64_t)tris.size();
+    static constexpr int64_t kParallelMinTrianglesForLod = 4096;
     Float minLod = Infinity;
-    for (const ImageTextureMeshTriangle &tri : use.triangles) {
-        Float lod = lodForTriangle(tri);
-        if (IsFinite(lod))
-            minLod = std::min(minLod, lod);
+
+    if (nTris >= kParallelMinTrianglesForLod && RunningThreads() > 1) {
+        std::atomic<Float> minLodAtomic{Infinity};
+        ParallelFor(0, nTris, [&](int64_t ti) {
+            Float lod = lodForTriangle(tris[(size_t)ti]);
+            if (!IsFinite(lod))
+                return;
+            Float cur = minLodAtomic.load(std::memory_order_relaxed);
+            while (lod < cur) {
+                if (minLodAtomic.compare_exchange_weak(cur, lod, std::memory_order_relaxed,
+                                                       std::memory_order_relaxed))
+                    break;
+            }
+        });
+        minLod = minLodAtomic.load(std::memory_order_relaxed);
+    } else {
+        for (const ImageTextureMeshTriangle &tri : tris) {
+            Float lod = lodForTriangle(tri);
+            if (IsFinite(lod))
+                minLod = std::min(minLod, lod);
+        }
     }
 
     if (!IsFinite(minLod))

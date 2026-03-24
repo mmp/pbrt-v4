@@ -8,8 +8,10 @@
 #include <pbrt/pbrt.h>
 
 #include <pbrt/util/mipmap.h>
+#include <pbrt/util/transform.h>
 #include <pbrt/util/vecmath.h>
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -25,10 +27,14 @@ struct ImageTextureMeshTriangle {
 };
 
 // Geometry using one named imagemap on diffuse materials (UV mapping only for now).
+// Mesh vertices are in shape/object space; worldFromShape maps to render space (same convention
+// as before when triangles were stored world-transformed). Multiple uses may share localTriangles
+// (several textures on one mesh, or many instances of one definition shape).
 struct ImageTextureGeometryUse {
     std::string resolvedImageFilename;
     std::string geometryDebugLabel;
-    std::vector<ImageTextureMeshTriangle> triangles;
+    std::shared_ptr<const std::vector<ImageTextureMeshTriangle>> localTriangles;
+    Transform worldFromShape;
     Float su = 1, sv = 1, du = 0, dv = 0;
     Float maxAnisotropy = 8.f;
     FilterFunction filter = FilterFunction::Bilinear;
