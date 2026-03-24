@@ -83,14 +83,41 @@ static bool ResolvedImageTexturePathsEqual(const std::string &a, const std::stri
 #endif
 }
 
-// Map a declaration's resolved path to the canonical string from CollectResolvedImageTextureFilenames
-// so uses bucket with the same keys we iterate in RunImageTextureMipPreprocess.
-static std::string CanonicalTextureFileKey(const std::string &resolvedFilename,
-                                           const std::vector<std::string> &files) {
-    for (const std::string &fn : files)
-        if (ResolvedImageTexturePathsEqual(resolvedFilename, fn))
-            return fn;
-    return resolvedFilename;
+// Hash map key consistent with ResolvedImageTexturePathsEqual on Windows.
+static std::string PathLookupKey(const std::string &path) {
+#ifdef PBRT_IS_WINDOWS
+    std::string key = path;
+    for (char &c : key) {
+        if (c == '/')
+            c = '\\';
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    return key;
+#else
+    return path;
+#endif
+}
+
+// First spelling in `files` order wins; used for O(1) canonical paths instead of scanning all files
+// per imagemap use and per texture in RunImageTextureMipPreprocess.
+static std::unordered_map<std::string, std::string> BuildPathKeyToCanonicalMap(
+    const std::vector<std::string> &files) {
+    std::unordered_map<std::string, std::string> pathKeyToCanonical;
+    pathKeyToCanonical.reserve(files.size() * 2);
+    for (const std::string &fn : files) {
+        std::string key = PathLookupKey(fn);
+        if (pathKeyToCanonical.find(key) == pathKeyToCanonical.end())
+            pathKeyToCanonical.emplace(std::move(key), fn);
+    }
+    return pathKeyToCanonical;
+}
+
+static std::string CanonicalTexturePathForMip(const std::string &path,
+                                              const std::unordered_map<std::string, std::string> &pathKeyToCanonical) {
+    auto it = pathKeyToCanonical.find(PathLookupKey(path));
+    if (it != pathKeyToCanonical.end())
+        return it->second;
+    return path;
 }
 
 static Transform InstanceWorldFromObject(const InstanceSceneEntity &inst) {
@@ -231,7 +258,7 @@ static void FillTrianglesForMeshShape(const ShapeSceneEntity &sh, const Transfor
 static void AppendReflectanceImagemapUsesForMeshShape(
     const BasicScene &scene, const ShapeSceneEntity &sh, const Transform &worldFromShape,
     const std::string &geometryDebugLabel, const std::map<std::string, SpectrumImagemapDeclarationInfo> &decls,
-    const std::vector<std::string> &textureFiles,
+    const std::unordered_map<std::string, std::string> &pathKeyToCanonical,
     std::unordered_map<std::string, std::vector<ImageTextureGeometryUse>> *usesByFile,
     std::unordered_map<std::string, TriQuadMesh> *plyCache) {
     if (sh.name != "trianglemesh" && sh.name != "plymesh")
@@ -260,7 +287,7 @@ static void AppendReflectanceImagemapUsesForMeshShape(
         pstd::optional<FilterFunction> ff = ParseFilter(info.filter);
         FilterFunction filter = ff.value_or(FilterFunction::Bilinear);
 
-        std::string fileKey = CanonicalTextureFileKey(info.resolvedFilename, textureFiles);
+        std::string fileKey = CanonicalTexturePathForMip(info.resolvedFilename, pathKeyToCanonical);
 
         ImageTextureGeometryUse use;
         use.resolvedImageFilename = fileKey;
@@ -277,11 +304,11 @@ static void AppendReflectanceImagemapUsesForMeshShape(
     }
 }
 
-// One scene pass: collect geometry uses per texture file (canonical keys from textureFiles).
+// One scene pass: collect geometry uses per texture file (canonical keys from pathKeyToCanonical).
 static std::unordered_map<std::string, std::vector<ImageTextureGeometryUse>>
 GatherImageTextureUsesByFile(const BasicScene &scene,
                              const std::map<std::string, SpectrumImagemapDeclarationInfo> &decls,
-                             const std::vector<std::string> &textureFiles,
+                             const std::unordered_map<std::string, std::string> &pathKeyToCanonical,
                              std::unordered_map<std::string, TriQuadMesh> *plyCache) {
     std::unordered_map<std::string, std::vector<ImageTextureGeometryUse>> usesByFile;
 
@@ -291,7 +318,7 @@ GatherImageTextureUsesByFile(const BasicScene &scene,
             sh.renderFromObject ? *sh.renderFromObject : Transform();
         AppendReflectanceImagemapUsesForMeshShape(
             scene, sh, worldFromShape,
-            StringPrintf("shape[%zu]_%s", si, std::string(sh.name).c_str()), decls, textureFiles,
+            StringPrintf("shape[%zu]_%s", si, std::string(sh.name).c_str()), decls, pathKeyToCanonical,
             &usesByFile, plyCache);
     }
 
@@ -311,7 +338,7 @@ GatherImageTextureUsesByFile(const BasicScene &scene,
                 scene, sh, worldFromShape,
                 StringPrintf("instance[%zu]_def_%s_shape[%zu]_%s", ii,
                              std::string(inst.name).c_str(), si, std::string(sh.name).c_str()),
-                decls, textureFiles, &usesByFile, plyCache);
+                decls, pathKeyToCanonical, &usesByFile, plyCache);
         }
     }
 
@@ -548,11 +575,12 @@ void RunImageTextureMipPreprocess(BasicScene &scene, const Camera &camera,
 
     std::map<std::string, SpectrumImagemapDeclarationInfo> decls = scene.SpectrumImagemapDeclarations();
     std::vector<std::string> files = scene.CollectResolvedImageTextureFilenames();
+    std::unordered_map<std::string, std::string> pathKeyToCanonical = BuildPathKeyToCanonicalMap(files);
     Allocator alloc;
 
     std::unordered_map<std::string, TriQuadMesh> plyCache;
     std::unordered_map<std::string, std::vector<ImageTextureGeometryUse>> usesByFile =
-        GatherImageTextureUsesByFile(scene, decls, files, &plyCache);
+        GatherImageTextureUsesByFile(scene, decls, pathKeyToCanonical, &plyCache);
 
     // One LOD computation per path-equivalence class (Windows may list the same path twice with
     // different spellings); apply the result to every matching entry in files.
@@ -562,14 +590,12 @@ void RunImageTextureMipPreprocess(BasicScene &scene, const Camera &camera,
             continue;
         const std::string &repFn = files[fi];
 
+        std::string canonicalFn = CanonicalTexturePathForMip(repFn, pathKeyToCanonical);
         std::vector<ImageTextureGeometryUse> uses;
-        for (auto it = usesByFile.begin(); it != usesByFile.end();) {
-            if (ResolvedImageTexturePathsEqual(it->first, repFn)) {
-                uses = std::move(it->second);
-                it = usesByFile.erase(it);
-                break;
-            }
-            ++it;
+        auto useIt = usesByFile.find(canonicalFn);
+        if (useIt != usesByFile.end()) {
+            uses = std::move(useIt->second);
+            usesByFile.erase(useIt);
         }
 
         Point2i res = Image::ReadResolution(repFn);
