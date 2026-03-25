@@ -4,10 +4,12 @@
 #   .\compare-skipmip.ps1 -Scene "path\to\scene.pbrt"
 #   .\compare-skipmip.ps1 -Scene "path\to\scene.pbrt" -Spp 16
 #   .\compare-skipmip.ps1 "scene.pbrt" 16
+#   .\compare-skipmip.ps1 "scene.pbrt" 16 -ShowProgress --gpu
 # Omit -Spp to use Integrator "integer pixelsamples" from the .pbrt file (same as pbrt.exe without --spp).
 #
 # Render progress: stdout is written to the .txt log live while pbrt runs (poll ~8 Hz for console echo).
-# Optional -ExtraPbrtArgs is appended for both runs (e.g. --gpu, --wavefront).
+# Optional -ExtraPbrtArgs is appended for both runs (e.g. --wavefront).
+# Pass -Gpu or a trailing --gpu (after other args) to add pbrt's --gpu for both runs.
 # By default, repetitive "Rendering:" lines are not echoed (full log files unchanged); use -ShowProgress for all lines.
 # SkipMip mip preprocess logs one summary line by default; use -VerboseMipPreprocess for per-texture/per-geometry lines (slow).
 # SSIM: compare_ssim.py needs pip install numpy scikit-image pillow (full-res skimage SSIM).
@@ -29,7 +31,14 @@ param(
     [switch] $ShowProgress,
 
     # If set, SkipMip run adds --verbose-mip-preprocess (large mip analysis log; default is quiet).
-    [switch] $VerboseMipPreprocess
+    [switch] $VerboseMipPreprocess,
+
+    # If set (or pass trailing --gpu), both runs invoke pbrt with --gpu.
+    [switch] $Gpu,
+
+    # Catches e.g. trailing --gpu when not using -ExtraPbrtArgs; other tokens are forwarded to pbrt after --gpu.
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]] $RemainingArguments = @()
 )
 
 Set-StrictMode -Version Latest
@@ -42,9 +51,9 @@ function Resolve-PbrtExe {
     }
     $repoRoot = $PSScriptRoot
     $candidates = @(
-        (Join-Path $repoRoot "build\Release\pbrt.exe"),
-        (Join-Path $repoRoot "build\Debug\pbrt.exe"),
-        (Join-Path $repoRoot "build\pbrt.exe")
+        (Join-Path $repoRoot "build-gpu\Release\pbrt.exe"),
+        (Join-Path $repoRoot "build-gpu\Debug\pbrt.exe"),
+        (Join-Path $repoRoot "build-gpu\pbrt.exe")
     )
     foreach ($c in $candidates) {
         if (Test-Path -LiteralPath $c) { return (Resolve-Path -LiteralPath $c).Path }
@@ -301,6 +310,24 @@ if ($PSBoundParameters.ContainsKey('Spp')) {
 }
 $common += $ExtraPbrtArgs
 
+$gpuWanted = [bool]$Gpu
+$tailPbrt = New-Object System.Collections.Generic.List[string]
+if ($RemainingArguments) {
+    foreach ($a in $RemainingArguments) {
+        if ($a -eq '--gpu') {
+            $gpuWanted = $true
+        } else {
+            $tailPbrt.Add($a)
+        }
+    }
+}
+if ($gpuWanted -and ($common -notcontains '--gpu')) {
+    $common += '--gpu'
+}
+if ($tailPbrt.Count -gt 0) {
+    $common += [string[]]$tailPbrt.ToArray()
+}
+
 $sppLabel = if ($PSBoundParameters.ContainsKey('Spp')) { "$Spp" } else { "(scene file default)" }
 
 Write-Host "=== pbrt compare-skipmip ===" -ForegroundColor Cyan
@@ -308,6 +335,9 @@ Write-Host "pbrt:    $PbrtExe"
 Write-Host "scene:   $sceneFull"
 Write-Host "spp:     $sppLabel"
 Write-Host "log dir: $LogDir"
+if ($gpuWanted) {
+    Write-Host "gpu:     --gpu (both runs)" -ForegroundColor DarkGray
+}
 if (-not $ShowProgress) {
     Write-Host "(progress lines hidden; use -ShowProgress to print every Rendering: line)" -ForegroundColor DarkGray
 }
@@ -372,6 +402,7 @@ $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("Scene : $sceneFull")
 [void]$sb.AppendLine("SPP   : $sppLabel")
+[void]$sb.AppendLine("GPU   : $(if ($gpuWanted) { '--gpu (yes)' } else { '(no)' })")
 [void]$sb.AppendLine("Stamp : $stamp")
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("-------------------------------------------")
