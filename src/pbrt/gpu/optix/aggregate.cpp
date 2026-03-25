@@ -90,6 +90,7 @@ struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) OptiXAggregate::HitgroupRecord {
 
 extern "C" {
 extern const unsigned char PBRT_EMBEDDED_PTX[];
+extern const size_t PBRT_EMBEDDED_PTX_SIZE;
 }
 
 template <typename T>
@@ -1064,7 +1065,8 @@ OptixPipelineCompileOptions OptiXAggregate::getPipelineCompileOptions() {
 }
 
 OptixModule OptiXAggregate::createOptiXModule(OptixDeviceContext optixContext,
-                                              const char *ptx) {
+                                              const char *moduleInput,
+                                              size_t moduleInputSize) {
     OptixModuleCompileOptions moduleCompileOptions = {};
     // TODO: REVIEW THIS
     moduleCompileOptions.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
@@ -1099,7 +1101,7 @@ OptixModule OptiXAggregate::createOptiXModule(OptixDeviceContext optixContext,
     OPTIX_CHECK_WITH_LOG(
         OPTIX_MODULE_CREATE_FN(
             optixContext, &moduleCompileOptions, &pipelineCompileOptions,
-            ptx, strlen(ptx), log, &logSize, &optixModule
+            moduleInput, moduleInputSize, log, &logSize, &optixModule
         ),
         log
     );
@@ -1234,7 +1236,8 @@ OptiXAggregate::OptiXAggregate(
                 (OPTIX_VERSION % 10000) / 100, OPTIX_VERSION % 100);
 
     // OptiX module
-    optixModule = createOptiXModule(optixContext, (const char *)PBRT_EMBEDDED_PTX);
+    optixModule = createOptiXModule(optixContext, (const char *)PBRT_EMBEDDED_PTX,
+                                    PBRT_EMBEDDED_PTX_SIZE);
 
     // Optix program groups...
     char log[4096];

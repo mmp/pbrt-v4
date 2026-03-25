@@ -1032,7 +1032,8 @@ static cudaMipmappedArray_t createSingleChannelTextureArray(
     }
 
     MIPMap mipmap(image, colorSpace, WrapMode::Clamp /* TODO */, Allocator(),
-                  MIPMapFilterOptions());
+                    MIPMapFilterOptions(),
+                    ImageTextureMipDownsizeStepsForFile(reportGPUPathForStats));
     *nMIPMapLevels = mipmap.Levels();
 
     const Image &baseImage = mipmap.GetLevel(0);
@@ -1152,7 +1153,8 @@ GPUSpectrumImageTexture *GPUSpectrumImageTexture::Create(
                                    : cudaReadModeElementType;
 
                     MIPMap mipmap(image, colorSpace, WrapMode::Clamp /* TODO */,
-                                  Allocator(), MIPMapFilterOptions());
+                                    Allocator(), MIPMapFilterOptions(),
+                                    ImageTextureMipDownsizeStepsForFile(filename));
                     nMIPMapLevels = mipmap.Levels();
                     const Image &baseImage = mipmap.GetLevel(0);
 

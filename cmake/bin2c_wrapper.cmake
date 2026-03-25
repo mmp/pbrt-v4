@@ -27,12 +27,13 @@
 # Taken from https://github.com/robertmaynard/code-samples/blob/master/posts/cmake_ptx/bin2c_wrapper.cmake
 # Modified to take a custom name instead of using the object name.
 
-set(file_contents)
+set(file_contents "#include <stddef.h>\n\n")
 foreach(obj ${OBJECTS})
   get_filename_component(obj_ext ${obj} EXT)
   get_filename_component(obj_dir ${obj} DIRECTORY)
 
-  if(obj_ext MATCHES ".ptx")
+  string(TOLOWER "${obj_ext}" obj_ext_lower)
+  if(obj_ext_lower STREQUAL ".ptx" OR obj_ext_lower STREQUAL ".optixir")
     set(args --name ${VAR_NAME} ${obj})
     execute_process(COMMAND "${BIN_TO_C_COMMAND}" ${args}
                     WORKING_DIRECTORY ${obj_dir}
@@ -43,4 +44,5 @@ foreach(obj ${OBJECTS})
     set(file_contents "${file_contents} \n${output}")
   endif()
 endforeach()
+set(file_contents "${file_contents}\nconst size_t ${VAR_NAME}_SIZE = sizeof(${VAR_NAME});\n")
 file(WRITE "${OUTPUT}" "${file_contents}")

@@ -151,6 +151,8 @@ add_library (pbrt_warnings INTERFACE)
 target_compile_options (
     pbrt_warnings
     INTERFACE
+        # CCCL headers (CUDA 13.x): MSVC must use the conforming preprocessor when nvcc forwards to cl.exe.
+        "$<$<CXX_COMPILER_ID:MSVC>:$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcompiler >/Zc:preprocessor>"
         "$<$<CXX_COMPILER_ID:MSVC>:$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcompiler >/wd4244>" # int -> float conversion
         "$<$<CXX_COMPILER_ID:MSVC>:$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcompiler >/wd4267>" # size_t -> int conversion
         "$<$<CXX_COMPILER_ID:MSVC>:$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcompiler >/wd4305>" # double constant assigned to float
@@ -211,6 +213,9 @@ of CUDA installed, please update your PATH.")
         message (WARNING "Found CUDA but PBRT_OPTIX_PATH is not set. Disabling GPU compilation.")
     else ()
         enable_language (CUDA)
+        if (POLICY CMP0104)
+          cmake_policy (SET CMP0104 NEW)
+        endif ()
         list (APPEND PBRT_DEFINITIONS "PBRT_BUILD_GPU_RENDERER")
         if (PBRT_NVTX)
             list (APPEND PBRT_DEFINITIONS "NVTX")
@@ -219,6 +224,16 @@ of CUDA installed, please update your PATH.")
             list (APPEND PBRT_DEFINITIONS "PBRT_USE_NVML")
         endif ()
         set (PBRT_CUDA_ENABLED ON)
+
+        # CUDA 13+ nvcc emits Nvvm IR (e.g. v114) newer than OptiX 9.0/9.1's embedded compiler
+        # (expects ~v107), so optixModuleCreate fails with 7200 / COMPILE ERROR. Embed PTX instead.
+        set (_pbrt_embed_optix_ir_default ON)
+        if (CUDA_VERSION_MAJOR GREATER_EQUAL 13)
+          set (_pbrt_embed_optix_ir_default OFF)
+        endif ()
+        option (PBRT_EMBED_OPTIX_IR
+          "Embed OptiX IR for optix.cu (OFF: PTX; set ON only with an OptiX/SDK version that matches your CUDA nvcc IR)"
+          ${_pbrt_embed_optix_ir_default})
 
         # FIXME
         include_directories (${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})  # for regular c++ compiles
@@ -242,9 +257,13 @@ of CUDA installed, please update your PATH.")
         target_compile_options (
             cuda_build_configuration
             INTERFACE
-                "$<$<COMPILE_LANGUAGE:CUDA>:--std=c++17;--use_fast_math;--expt-relaxed-constexpr;--extended-lambda;--forward-unknown-to-host-compiler>"
-                # The "$<NOT:$<BOOL:$<TARGET_PROPERTY:CUDA_PTX_COMPILATION>>>" part is to not add debugging symbols when generating PTX files for OptiX; see https://github.com/mmp/pbrt-v4/issues/69#issuecomment-715499748.
-                "$<$<COMPILE_LANGUAGE:CUDA>:$<IF:$<AND:$<CONFIG:Debug>,$<NOT:$<BOOL:$<TARGET_PROPERTY:CUDA_PTX_COMPILATION>>>>,-G;-g,-lineinfo;-maxrregcount;128>>"
+                # Use SHELL: so MSVC CUDA targets do not split on ';' and splice cl flags (/EHsc /MP)
+                # into the middle of the nvcc line (nvcc then errors: single input file required).
+                # C++ standard comes from CMAKE_CUDA_STANDARD; only extra device flags here.
+                "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:--use_fast_math --expt-relaxed-constexpr --extended-lambda --forward-unknown-to-host-compiler>"
+                # Skip device debug flags when emitting OptiX PTX or OptiX IR; see https://github.com/mmp/pbrt-v4/issues/69#issuecomment-715499748.
+                # Commas inside $<IF:cond,then,else> must be escaped (\,) when cond uses $<AND:...> with multiple args.
+                "$<$<COMPILE_LANGUAGE:CUDA>:$<IF:$<AND:$<CONFIG:Debug>\,$<NOT:$<BOOL:$<TARGET_PROPERTY:CUDA_PTX_COMPILATION>>>\,$<NOT:$<BOOL:$<TARGET_PROPERTY:CUDA_OPTIX_COMPILATION>>>>,SHELL:-G -g,SHELL:-lineinfo -maxrregcount 128>>"
         )
 
         if (PBRT_GPU_SHADER_MODEL STREQUAL "")
@@ -270,14 +289,42 @@ of CUDA installed, please update your PATH.")
             if (NOT ${CUDA_RETURN_CODE} EQUAL 0)
                 message (SEND_ERROR ${CHECK_CUDA_OUTPUT})
               else ()
-                set(ARCH "${CHECK_CUDA_OUTPUT}")
+                set (ARCH "${CHECK_CUDA_OUTPUT}")
                 message (STATUS "Detected CUDA Architecture: ${ARCH}")
-                string (APPEND CMAKE_CUDA_FLAGS " --gpu-architecture=${ARCH}")
             endif ()
         else ()
-            set(ARCH "${PBRT_GPU_SHADER_MODEL}")
+            set (ARCH "${PBRT_GPU_SHADER_MODEL}")
             message (STATUS "Specified CUDA Architecture: ${ARCH}")
-            string (APPEND CMAKE_CUDA_FLAGS " --gpu-architecture=${ARCH}")
+        endif ()
+
+        # OptiX device code: CUDA 11.7+ can compile to OptiX IR (CMake CUDA_OPTIX_COMPILATION,
+        # nvcc --optix-ir), which avoids ptxas on PTX entirely. Newer nvcc still runs ptxas on
+        # PTX when using --generate-code=...,code=[compute_XX], which breaks on _optix_*.
+        unset (PBRT_CUDA_ARCH_NUMBER)
+        if (ARCH MATCHES "^sm_([0-9]+)$")
+            set (PBRT_CUDA_ARCH_NUMBER "${CMAKE_MATCH_1}")
+        elseif (ARCH MATCHES "^compute_([0-9]+)$")
+            set (PBRT_CUDA_ARCH_NUMBER "${CMAKE_MATCH_1}")
+        elseif (ARCH)
+            message (FATAL_ERROR
+                "PBRT_GPU_SHADER_MODEL must look like sm_89 or compute_89 (got '${ARCH}')")
+        endif ()
+        if (PBRT_CUDA_ARCH_NUMBER)
+            if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.18")
+                set (CMAKE_CUDA_ARCHITECTURES "${PBRT_CUDA_ARCH_NUMBER}")
+                message (STATUS "CMAKE_CUDA_ARCHITECTURES: ${CMAKE_CUDA_ARCHITECTURES}")
+            else ()
+                string (APPEND CMAKE_CUDA_FLAGS " --gpu-architecture=${ARCH}")
+            endif ()
+        endif ()
+
+        # VS + CUDA_ARCHITECTURES OFF (see pbrt_lib): device link must still get --gpu-architecture.
+        if (MSVC AND ${CMAKE_GENERATOR} MATCHES "^Visual Studio" AND PBRT_CUDA_ARCH_NUMBER)
+          set (PBRT_MSVC_CUDA_GPU_ARCHITECTURE "sm_${PBRT_CUDA_ARCH_NUMBER}")
+          configure_file (
+            "${CMAKE_CURRENT_SOURCE_DIR}/cmake/pbrt_cuda_vs.props.in"
+            "${CMAKE_CURRENT_BINARY_DIR}/pbrt_cuda_vs.props"
+            @ONLY)
         endif ()
 
         set (PBRT_CUDA_LIB cuda)
@@ -301,18 +348,40 @@ of CUDA installed, please update your PATH.")
         endif ()
 
         # this macro defines cmake rules that execute the following four steps:
-        # 1) compile the given cuda file ${cuda_file} to an intermediary PTX file
+        # 1) compile the given cuda file ${cuda_file} to PTX or OptiX IR (.optixir)
         # 2) use the 'bin2c' tool (that comes with CUDA) to
-        #    create a second intermediary (.c-)file which defines a const string variable
-        #    (named '${c_var_name}') whose (constant) value is the PTX output
+        #    create a second intermediary (.c-)file which defines a const byte array variable
+        #    (named '${c_var_name}') whose value is the module output
         #    from the previous step.
         # 3) compile the given .c file to an intermediary object file (why thus has
         #    that PTX string 'embedded' as a global constant.
         # 4) assign the name of the intermediary .o file to the cmake variable
         #    'output_var', which can then be added to cmake targets.
         macro (cuda_compile_and_embed output_var cuda_file lib_name)
+          set (_pbrt_cuda_117_plus FALSE)
+          if (CUDA_VERSION_MAJOR GREATER 11 OR (CUDA_VERSION_MAJOR EQUAL 11 AND CUDA_VERSION_MINOR GREATER_EQUAL 7))
+            set (_pbrt_cuda_117_plus TRUE)
+          endif ()
           add_library ("${lib_name}" OBJECT "${cuda_file}")
-          set_property (TARGET "${lib_name}" PROPERTY CUDA_PTX_COMPILATION ON)
+          if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.27" AND _pbrt_cuda_117_plus AND PBRT_EMBED_OPTIX_IR)
+            set_property (TARGET "${lib_name}" PROPERTY CUDA_OPTIX_COMPILATION ON)
+            message (STATUS "Embedding OptiX IR (not PTX) for ${cuda_file} (CUDA ${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR}+ / CMake 3.27+)")
+          else ()
+            set_property (TARGET "${lib_name}" PROPERTY CUDA_PTX_COMPILATION ON)
+            message (STATUS "Embedding PTX for ${cuda_file} (PBRT_EMBED_OPTIX_IR=${PBRT_EMBED_OPTIX_IR})")
+            if (MSVC AND ${CMAKE_GENERATOR} MATCHES "^Visual Studio" AND PBRT_CUDA_ARCH_NUMBER)
+              # Same MSBuild/comma issue as pbrt_lib: use virtual arch for PTX, no comma in -gencode.
+              set_property (TARGET "${lib_name}" PROPERTY CUDA_ARCHITECTURES OFF)
+              target_compile_options ("${lib_name}" PRIVATE
+                "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-gpu-architecture=compute_${PBRT_CUDA_ARCH_NUMBER}>")
+            elseif (PBRT_CUDA_ARCH_NUMBER AND CMAKE_VERSION VERSION_GREATER_EQUAL "3.23")
+              set_property (TARGET "${lib_name}" PROPERTY CUDA_ARCHITECTURES "${PBRT_CUDA_ARCH_NUMBER}-virtual")
+            elseif (PBRT_CUDA_ARCH_NUMBER)
+              target_compile_options ("${lib_name}" PRIVATE
+                "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-gpu-architecture=compute_${PBRT_CUDA_ARCH_NUMBER}>")
+            endif ()
+          endif ()
+          unset (_pbrt_cuda_117_plus)
 
           # disable "extern declaration... is treated as a static definition" warning
           if (CUDA_VERSION_MAJOR EQUAL 11 AND CUDA_VERSION_MINOR LESS 2)
@@ -347,6 +416,11 @@ of CUDA installed, please update your PATH.")
           target_include_directories ("${lib_name}" SYSTEM PRIVATE ${NANOVDB_INCLUDE})
           target_link_libraries ("${lib_name}" PRIVATE cuda_build_configuration pbrt_opt pbrt_warnings)
           add_dependencies ("${lib_name}" pbrt_soa_generated)
+          # See generated build tree pbrt_cuda_vs.props (CMake configures from cmake/pbrt_cuda_vs.props.in).
+          if (MSVC AND ${CMAKE_GENERATOR} MATCHES "Visual Studio" AND PBRT_CUDA_ARCH_NUMBER)
+            set_target_properties ("${lib_name}" PROPERTIES
+              VS_USER_PROPS "${CMAKE_CURRENT_BINARY_DIR}/pbrt_cuda_vs.props")
+          endif ()
           set (c_var_name ${output_var})
           set (embedded_file ${cuda_file}.ptx_embedded.c)
           add_custom_command (
@@ -887,7 +961,15 @@ if (PBRT_CUDA_ENABLED AND PBRT_OPTIX_PATH)
     target_include_directories (pbrt_lib SYSTEM PUBLIC ${PBRT_OPTIX_PATH}/include)
 endif ()
 
-target_compile_options (pbrt_lib PUBLIC ${PBRT_CXX_FLAGS})
+# With LANGUAGE CUDA .cpp files, PUBLIC MSVC flags (/EHsc, /MP) must not apply to nvcc;
+# they end up as bare nvcc args and break CUDA 13 + VS (fatal: single input file required).
+if (PBRT_CUDA_ENABLED)
+  foreach (_pbrt_cxx_flag IN LISTS PBRT_CXX_FLAGS)
+    target_compile_options (pbrt_lib PUBLIC "$<$<COMPILE_LANGUAGE:CXX>:${_pbrt_cxx_flag}>")
+  endforeach ()
+else ()
+  target_compile_options (pbrt_lib PUBLIC ${PBRT_CXX_FLAGS})
+endif ()
 
 target_link_libraries (pbrt_lib PRIVATE OpenEXR::OpenEXR pbrt_warnings pbrt_opt $<$<BOOL:PBRT_CUDA_ENABLED>:cuda_build_configuration>)
 
@@ -897,6 +979,18 @@ if (WIN32)
   # Avoid a name clash when building on Visual Studio
   set_target_properties (pbrt_lib PROPERTIES OUTPUT_NAME libpbrt)
 endif()
+
+if (PBRT_CUDA_ENABLED AND MSVC AND ${CMAKE_GENERATOR} MATCHES "Visual Studio" AND PBRT_CUDA_ARCH_NUMBER)
+  # CMake emits --generate-code=...,code=[compute_N,sm_N]. MSBuild splits CudaCompile
+  # AdditionalOptions on commas, leaving bare /EHsc /MP as nvcc args (nvcc fatal).
+  # OFF disables CMake's arch flags; --gpu-architecture=sm_N has no comma for MSBuild.
+  # Build tree pbrt_cuda_vs.props (from .in) strips /EHsc /MP and appends device-link sm_N.
+  set_target_properties (pbrt_lib PROPERTIES CUDA_ARCHITECTURES OFF)
+  target_compile_options (pbrt_lib PRIVATE
+    "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:--gpu-architecture=sm_${PBRT_CUDA_ARCH_NUMBER}>")
+  set_target_properties (pbrt_lib PROPERTIES
+    VS_USER_PROPS "${CMAKE_CURRENT_BINARY_DIR}/pbrt_cuda_vs.props")
+endif ()
 
 set (ALL_PBRT_LIBS
   pbrt_lib
