@@ -369,8 +369,10 @@ of CUDA installed, please update your PATH.")
           else ()
             set_property (TARGET "${lib_name}" PROPERTY CUDA_PTX_COMPILATION ON)
             message (STATUS "Embedding PTX for ${cuda_file} (PBRT_EMBED_OPTIX_IR=${PBRT_EMBED_OPTIX_IR})")
-            if (MSVC AND ${CMAKE_GENERATOR} MATCHES "^Visual Studio" AND PBRT_CUDA_ARCH_NUMBER)
-              # Same MSBuild/comma issue as pbrt_lib: use virtual arch for PTX, no comma in -gencode.
+            # MSVC + nvcc: always use compute_N for embedded PTX. Visual Studio needs this to avoid
+            # MSBuild splitting -gencode on commas; Ninja needs it too so we do not rely on
+            # CUDA_ARCHITECTURES=N-virtual (fragile for newer architectures like sm_120).
+            if (MSVC AND PBRT_CUDA_ARCH_NUMBER)
               set_property (TARGET "${lib_name}" PROPERTY CUDA_ARCHITECTURES OFF)
               target_compile_options ("${lib_name}" PRIVATE
                 "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-gpu-architecture=compute_${PBRT_CUDA_ARCH_NUMBER}>")
@@ -392,13 +394,10 @@ of CUDA installed, please update your PATH.")
                                       -Xcudafe=--display_error_number -Xcudafe=--diag_suppress=20044)
           endif ()
 
-          # CUDA integration in Visual Studio seems broken as even if "Use
-          # Host Preprocessor Definitions" is checked, the host preprocessor
-          # definitions are still not used when compiling device code.
-          # To work around that, define the macros using --define-macro to
-          # avoid CMake identifying those as macros and using the proper (but
-          # broken) way of specifying them.
-          if (${CMAKE_GENERATOR} MATCHES "^Visual Studio")
+          # With MSVC as nvcc's host compiler, host preprocessor definitions are not
+          # reliably applied to device code (VS IDE integration; same symptom with Ninja).
+          # Pass PBRT_* macros via --define-macro instead of target_compile_definitions.
+          if (MSVC)
             # As PBRT_DEBUG_BUILD is specified globally as a definition, we need to
             # manually add it due to the bug mentioned earlier and due to it
             # not being found in PBRT_DEFINITIONS.
