@@ -399,8 +399,7 @@ static bool AffineTripleScalarGradients2D(Float x0, Float y0, Float x1, Float y1
     return true;
 }
 
-static Float MinPrimaryContinuousLodForUse(const Camera &camera, int samplesPerPixel,
-                                           const ImageTextureGeometryUse &use,
+static Float MinPrimaryContinuousLodForUse(const Camera &camera, const ImageTextureGeometryUse &use,
                                            int pyramidLevels, Allocator alloc) {
     (void)alloc;
     if (!Options || Options->disableTextureFiltering || !use.localTriangles ||
@@ -421,10 +420,6 @@ static Float MinPrimaryContinuousLodForUse(const Camera &camera, int samplesPerP
         proj->SampleTime(0.5f));
     const Transform &worldFromShape = use.worldFromShape;
     Bounds2i pb = proj->GetFilm().PixelBounds();
-
-    Float sppScale = 1.f;
-    if (!Options->disablePixelJitter)
-        sppScale = std::max<Float>(0.125f, 1.f / std::sqrt(Float(samplesPerPixel)));
 
     constexpr Float kMinW = 1e-6f;
 
@@ -484,11 +479,6 @@ static Float MinPrimaryContinuousLodForUse(const Camera &camera, int samplesPerP
         Float dudy = (dUow_dy - u * dIw_dy) / inv_w;
         Float dvdy = (dVow_dy - v * dIw_dy) / inv_w;
 
-        dudx *= sppScale;
-        dvdx *= sppScale;
-        dudy *= sppScale;
-        dvdy *= sppScale;
-
         if (!IsFinite(dudx) || !IsFinite(dvdx) || !IsFinite(dudy) || !IsFinite(dvdy))
             return Infinity;
 
@@ -532,9 +522,8 @@ static Float MinPrimaryContinuousLodForUse(const Camera &camera, int samplesPerP
 }
 
 int ComputeImageTextureSafeDownsizesFromPreprocess(
-    const Camera &camera, int samplesPerPixel,
-    const std::vector<ImageTextureGeometryUse> &usesForTexture, int mipmapPyramidLevels,
-    Allocator alloc) {
+    const Camera &camera, const std::vector<ImageTextureGeometryUse> &usesForTexture,
+    int mipmapPyramidLevels, Allocator alloc) {
     if (usesForTexture.empty())
         return 0;
 
@@ -562,8 +551,8 @@ int ComputeImageTextureSafeDownsizesFromPreprocess(
         size_t i = (size_t)ui;
         if (bailForZeroPairSafe.load(std::memory_order_relaxed))
             return;
-        Float minLod = MinPrimaryContinuousLodForUse(
-            camera, samplesPerPixel, usesForTexture[i], mipmapPyramidLevels, alloc);
+        Float minLod =
+            MinPrimaryContinuousLodForUse(camera, usesForTexture[i], mipmapPyramidLevels, alloc);
         minLods[i] = minLod;
         lodComputed[i] = 1;
         if (pairSafeFromMinLod(minLod) == 0)
@@ -610,8 +599,7 @@ int ComputeImageTextureSafeDownsizesFromPreprocess(
     return std::max(0, textureMinSafeDownsizes);
 }
 
-void RunImageTextureMipPreprocess(BasicScene &scene, const Camera &camera,
-                                   int samplesPerPixel) {
+void RunImageTextureMipPreprocess(BasicScene &scene, const Camera &camera) {
     ClearImageTextureMipDownsizeOverrides();
     if (!Options || !Options->skipMipImageTextures)
         return;
@@ -654,8 +642,8 @@ void RunImageTextureMipPreprocess(BasicScene &scene, const Camera &camera,
                     "  (no trianglemesh/plymesh reflectance imagemap uses found; safe downsizes 0)\n");
             }
         } else {
-            safeDownsizes = ComputeImageTextureSafeDownsizesFromPreprocess(
-                camera, samplesPerPixel, uses, pyramidLevels, alloc);
+            safeDownsizes =
+                ComputeImageTextureSafeDownsizesFromPreprocess(camera, uses, pyramidLevels, alloc);
         }
 
         if (MipPreprocessLogDetail())

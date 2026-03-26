@@ -45,15 +45,14 @@ struct ImageTextureGeometryUse {
 // perspective/orthographic; spherical/realistic cameras yield 0 safe downsizes). UV imagemap
 // on reflectance for diffuse / coateddiffuse / diffusetransmission and mix thereof;
 // trianglemesh + plymesh; includes ObjectInstance placements (transformed into render space).
+// Independent of integrator samples per pixel (screen-to-texture footprint uses the pixel grid).
 int ComputeImageTextureSafeDownsizesFromPreprocess(
-    const Camera &camera, int samplesPerPixel,
-    const std::vector<ImageTextureGeometryUse> &usesForTexture, int mipmapPyramidLevels,
-    Allocator alloc);
+    const Camera &camera, const std::vector<ImageTextureGeometryUse> &usesForTexture,
+    int mipmapPyramidLevels, Allocator alloc);
 
 // Clears prior overrides, then assigns per-file safe downsizes before image loads.
 // No-op when --skipmip is off (aside from clearing stale overrides).
-void RunImageTextureMipPreprocess(BasicScene &scene, const Camera &camera,
-                                   int samplesPerPixel);
+void RunImageTextureMipPreprocess(BasicScene &scene, const Camera &camera);
 
 }  // namespace pbrt
 

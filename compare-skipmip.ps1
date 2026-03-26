@@ -5,7 +5,8 @@
 #   .\compare-skipmip.ps1 -Scene "path\to\scene.pbrt" -Spp 16
 #   .\compare-skipmip.ps1 "scene.pbrt" 16
 #   .\compare-skipmip.ps1 "scene.pbrt" 16 -ShowProgress --gpu
-# Omit -Spp to use Integrator "integer pixelsamples" from the .pbrt file (same as pbrt.exe without --spp).
+#   .\compare-skipmip.ps1 "scene.pbrt" -ShowProgress --gpu   (--gpu is not parsed as Spp; use -Gpu or trailing --gpu)
+# Omit -Spp and any leading digits-only tail so pbrt.exe does not get --spp (scene Integrator "integer pixelsamples" applies).
 #
 # Render progress: stdout is written to the .txt log live while pbrt runs (poll ~8 Hz for console echo).
 # Optional -ExtraPbrtArgs is appended for both runs (e.g. --wavefront).
@@ -19,8 +20,10 @@ param(
     [Parameter(Mandatory = $true, Position = 0)]
     [string] $Scene,
 
-    [Parameter(Mandatory = $false, Position = 1)]
-    [int] $Spp = 0,
+    # Named only (no Position): so trailing tokens like --gpu go to RemainingArguments, not here.
+    # Optional positional spp: first RemainingArguments token that is all-digits (>= 1) when -Spp omitted.
+    [Parameter(Mandatory = $false)]
+    $Spp = $null,
 
     [string] $PbrtExe = "",
     [string] $LogDir = "",
@@ -295,9 +298,37 @@ $logNoMip = Join-Path $LogDir ("{0}-{1}-nomip.txt" -f $base, $stamp)
 $logSkipMip = Join-Path $LogDir ("{0}-{1}-skipmip.txt" -f $base, $stamp)
 $summaryPath = Join-Path $LogDir ("{0}-{1}-comparison.txt" -f $base, $stamp)
 
+$sppForCli = $null
+$sppFromNamed = $false
 if ($PSBoundParameters.ContainsKey('Spp')) {
-    if ($Spp -lt 1) {
+    $sppFromNamed = $true
+    if ($null -eq $Spp -or "$Spp" -eq '') {
+        throw "Spp was specified but is empty; omit -Spp to use the scene file default."
+    }
+    try {
+        $sppForCli = [int]$Spp
+    } catch {
+        throw "Invalid Spp value (expected positive integer): $Spp"
+    }
+    if ($sppForCli -lt 1) {
         throw "Spp must be >= 1 when specified (omit -Spp to use the scene file default)."
+    }
+}
+
+$tailPbrt = New-Object System.Collections.Generic.List[string]
+if ($RemainingArguments) {
+    foreach ($a in $RemainingArguments) {
+        $tailPbrt.Add($a)
+    }
+}
+if (-not $sppFromNamed -and $tailPbrt.Count -gt 0) {
+    $head = $tailPbrt[0]
+    if ($head -match '^\d+$') {
+        $trySpp = [int]$head
+        if ($trySpp -ge 1) {
+            $sppForCli = $trySpp
+            $tailPbrt.RemoveAt(0)
+        }
     }
 }
 
@@ -305,22 +336,21 @@ $common = @(
     $sceneFull,
     "--stats"
 )
-if ($PSBoundParameters.ContainsKey('Spp')) {
-    $common += @("--spp", "$Spp")
+if ($null -ne $sppForCli) {
+    $common += @("--spp", "$sppForCli")
 }
 $common += $ExtraPbrtArgs
 
 $gpuWanted = [bool]$Gpu
-$tailPbrt = New-Object System.Collections.Generic.List[string]
-if ($RemainingArguments) {
-    foreach ($a in $RemainingArguments) {
-        if ($a -eq '--gpu') {
-            $gpuWanted = $true
-        } else {
-            $tailPbrt.Add($a)
-        }
+$finalTail = New-Object System.Collections.Generic.List[string]
+foreach ($a in $tailPbrt) {
+    if ($a -eq '--gpu') {
+        $gpuWanted = $true
+    } else {
+        $finalTail.Add($a)
     }
 }
+$tailPbrt = $finalTail
 if ($gpuWanted -and ($common -notcontains '--gpu')) {
     $common += '--gpu'
 }
@@ -328,7 +358,7 @@ if ($tailPbrt.Count -gt 0) {
     $common += [string[]]$tailPbrt.ToArray()
 }
 
-$sppLabel = if ($PSBoundParameters.ContainsKey('Spp')) { "$Spp" } else { "(scene file default)" }
+$sppLabel = if ($null -ne $sppForCli) { "$sppForCli" } else { "(scene file default)" }
 
 Write-Host "=== pbrt compare-skipmip ===" -ForegroundColor Cyan
 Write-Host "pbrt:    $PbrtExe"

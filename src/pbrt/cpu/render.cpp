@@ -33,7 +33,7 @@ void RenderCPU(BasicScene &parsedScene) {
     Sampler sampler = parsedScene.GetSampler();
 
     LOG_VERBOSE("Image texture mip preprocess");
-    RunImageTextureMipPreprocess(parsedScene, camera, sampler.SamplesPerPixel());
+    RunImageTextureMipPreprocess(parsedScene, camera);
 
     // Textures
     LOG_VERBOSE("Starting textures");

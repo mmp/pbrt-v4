@@ -115,7 +115,7 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
     sampler = scene.GetSampler();
 
     LOG_VERBOSE("Image texture mip preprocess");
-    RunImageTextureMipPreprocess(scene, camera, sampler.SamplesPerPixel());
+    RunImageTextureMipPreprocess(scene, camera);
 
     // Textures
     LOG_VERBOSE("Starting to create textures");
