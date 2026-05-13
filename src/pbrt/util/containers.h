@@ -835,7 +835,7 @@ class SampledGrid {
     }
 
     template <typename F>
-    Float MaxValue(const Bounds3f &bounds, F convert) const {
+    auto MaxValue(const Bounds3f &bounds, F convert) const {
         Point3f ps[2] = {Point3f(bounds.pMin.x * nx - .5f, bounds.pMin.y * ny - .5f,
                                  bounds.pMin.z * nz - .5f),
                          Point3f(bounds.pMax.x * nx - .5f, bounds.pMax.y * ny - .5f,
@@ -844,7 +844,7 @@ class SampledGrid {
                          Min(Point3i(Floor(ps[1])) + Vector3i(1, 1, 1),
                              Point3i(nx - 1, ny - 1, nz - 1))};
 
-        Float maxValue = Lookup(Point3i(pi[0]), convert);
+        auto maxValue = Lookup(Point3i(pi[0]), convert);
         for (int z = pi[0].z; z <= pi[1].z; ++z)
             for (int y = pi[0].y; y <= pi[1].y; ++y)
                 for (int x = pi[0].x; x <= pi[1].x; ++x)
