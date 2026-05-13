@@ -31,7 +31,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: jimver/cuda-toolkit@v0.2.28
+    - uses: jimver/cuda-toolkit@v0.2.35
       id: cuda-toolkit
       with:
         cuda: ${{ matrix.cuda }}
