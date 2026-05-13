@@ -40,12 +40,12 @@ jobs:
 
     steps:
     - name: Checkout pbrt
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         submodules: true
 
     - name: Checkout rgb2spectrum tables
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         repository: mmp/rgb2spectrum
         path: build

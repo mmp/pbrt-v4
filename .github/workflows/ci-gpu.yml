@@ -23,8 +23,8 @@ jobs:
       fail-fast: false
       matrix:
         optix: [ optix-7.7.0, optix-8.1.0, optix-9.0.0 ]
-        cuda: [ '12.2.2', '12.6.3', '12.8.0', '12.9.1', '13.0.1' ]
-        os: [ ubuntu-24.04, ubuntu-20.04, windows-latest ]
+        cuda: [ '12.6.3', '12.8.0', '12.9.1', '13.0.1', '13.1.1', '13.2.0' ]
+        os: [ ubuntu-24.04, windows-latest ]
 
     name: GPU Build Only (${{ matrix.os }}, CUDA ${{ matrix.cuda }}, ${{ matrix.optix }})
 
@@ -42,18 +42,18 @@ jobs:
       run: nvcc -V
 
     - name: Checkout pbrt
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         submodules: true
 
     - name: Checkout rgb2spectrum tables
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         repository: mmp/rgb2spectrum
         path: build
 
     - name: Checkout OptiX headers
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         ssh-key: ${{ secrets.CHECKOUT_KEY }}
         repository: mmp/optix-headers
