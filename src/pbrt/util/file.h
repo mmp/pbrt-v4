@@ -27,6 +27,10 @@ bool RemoveFile(std::string filename);
 std::string ResolveFilename(std::string filename);
 void SetSearchDirectory(std::string filename);
 
+// If _path_ contains a path component named "pbrt-v4-scenes" (ASCII case-insensitive on
+// Windows), return the remainder using generic '/' separators; otherwise return _path_.
+std::string PathForImageTextureStats(std::string path);
+
 bool HasExtension(std::string filename, std::string ext);
 std::string RemoveExtension(std::string filename);
 

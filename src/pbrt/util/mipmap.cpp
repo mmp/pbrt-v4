@@ -5,6 +5,7 @@
 #include <pbrt/util/mipmap.h>
 
 #include <pbrt/options.h>
+#include <pbrt/util/stats.h>
 #include <pbrt/util/check.h>
 #include <pbrt/util/color.h>
 #include <pbrt/util/colorspace.h>
@@ -13,14 +14,91 @@
 #include <pbrt/util/log.h>
 #include <pbrt/util/math.h>
 #include <pbrt/util/print.h>
-#include <pbrt/util/stats.h>
+#include <pbrt/util/parallel.h>
 
 #include <algorithm>
 #include <cmath>
+#include <mutex>
+#include <unordered_map>
+#include <vector>
 
 namespace pbrt {
 
 STAT_MEMORY_COUNTER("Memory/Image maps", imageMapBytes);
+
+// Used when Options->skipMipImageTextures (--skipmip) and no per-file override was installed
+// by RunImageTextureMipPreprocess (see texture_mip_preprocess.cpp).
+static constexpr int kDefaultImageTextureSkipMipLevelsWhenSkipMipEnabled = 3;
+
+static std::mutex imageTextureMipOverrideMutex;
+static std::unordered_map<std::string, int> imageTextureMipOverrides;
+
+void ClearImageTextureMipDownsizeOverrides() {
+    std::lock_guard<std::mutex> lock(imageTextureMipOverrideMutex);
+    imageTextureMipOverrides.clear();
+}
+
+void SetImageTextureMipDownsizeOverrideForFile(const std::string &resolvedFilename, int steps) {
+    std::lock_guard<std::mutex> lock(imageTextureMipOverrideMutex);
+    imageTextureMipOverrides[resolvedFilename] = steps;
+}
+
+int ImageTextureMipDownsizeStepsForFile(const std::string &resolvedFilename) {
+    if (!Options || !Options->skipMipImageTextures)
+        return 0;
+    std::lock_guard<std::mutex> lock(imageTextureMipOverrideMutex);
+    if (auto it = imageTextureMipOverrides.find(resolvedFilename);
+        it != imageTextureMipOverrides.end())
+        return std::max(0, it->second);
+    return std::max(0, kDefaultImageTextureSkipMipLevelsWhenSkipMipEnabled);
+}
+
+// Box-filter downsample by 2 in each dimension. Keeps the source pixel format (U256 / Half /
+// Float) so stored mip pyramids and Memory/Image maps reflect a real memory win; converting
+// everything to float here makes footprint ~unchanged (4× smaller area, ~4× larger texels).
+static Image HalveImageBoxFilter(Image image, Allocator alloc) {
+    Point2i res = image.Resolution();
+    Point2i half(std::max(1, res.x / 2), std::max(1, res.y / 2));
+    if (half.x == res.x && half.y == res.y)
+        return image;
+
+    int nc = image.NChannels();
+    CHECK_GE(nc, 1);
+    std::vector<std::string> chNames = image.ChannelNames();
+    Image dst(image.Format(), half, pstd::MakeSpan(chNames), image.Encoding(), alloc);
+
+    ParallelFor2D(Bounds2i({0, 0}, half), [&](Bounds2i tile) {
+        WrapMode2D clamp(WrapMode::Clamp);
+        for (int y = tile.pMin.y; y < tile.pMax.y; ++y)
+            for (int x = tile.pMin.x; x < tile.pMax.x; ++x) {
+                ImageChannelValues sum(nc, Float(0));
+                int count = 0;
+                for (int dy = 0; dy < 2; ++dy)
+                    for (int dx = 0; dx < 2; ++dx) {
+                        int sx = 2 * x + dx;
+                        int sy = 2 * y + dy;
+                        if (sx < res.x && sy < res.y) {
+                            for (int c = 0; c < nc; ++c)
+                                sum[c] += image.GetChannel({sx, sy}, c, clamp);
+                            ++count;
+                        }
+                    }
+                CHECK_GT(count, 0);
+                Float inv = 1 / Float(count);
+                for (int c = 0; c < nc; ++c)
+                    sum[c] *= inv;
+                dst.SetChannels({x, y}, sum);
+            }
+    });
+    return dst;
+}
+
+// Apply _mipDownsizeSteps_ consecutive half-res box filters (each ~2× smaller per axis).
+static Image ApplyBaseMipDownsize(Image image, int mipDownsizeSteps, Allocator alloc) {
+    for (int i = 0; i < mipDownsizeSteps; ++i)
+        image = HalveImageBoxFilter(std::move(image), alloc);
+    return image;
+}
 
 ///////////////////////////////////////////////////////////////////////////
 // MIPMap Helper Declarations
@@ -44,6 +122,37 @@ std::string ToString(FilterFunction f) {
 std::string MIPMapFilterOptions::ToString() const {
     return StringPrintf("[ MIPMapFilterOptions filter: %s maxAnisotropy: %f ]", filter,
                         maxAnisotropy);
+}
+
+int MipmapPyramidLevelsForImageResolution(Point2i resolution) {
+    int w = RoundUpPow2(resolution.x);
+    int h = RoundUpPow2(resolution.y);
+    return 1 + Log2Int(std::max(w, h));
+}
+
+Float EWAContinuousLOD(Vector2f dst0, Vector2f dst1, Float maxAnisotropy, int pyramidLevels) {
+    if (pyramidLevels < 2)
+        return 0;
+    if (LengthSquared(dst0) < LengthSquared(dst1))
+        std::swap(dst0, dst1);
+    Float longerVecLength = Length(dst0), shorterVecLength = Length(dst1);
+    if (shorterVecLength * maxAnisotropy < longerVecLength && shorterVecLength > 0) {
+        Float scale = longerVecLength / (shorterVecLength * maxAnisotropy);
+        dst1 *= scale;
+        shorterVecLength *= scale;
+    }
+    if (shorterVecLength == 0)
+        return 0;
+    return std::max<Float>(0, pyramidLevels - 1 + Log2(shorterVecLength));
+}
+
+Float ImageTextureContinuousLOD(FilterFunction filter, Vector2f dst0, Vector2f dst1,
+                                Float maxAnisotropy, int pyramidLevels) {
+    if (filter == FilterFunction::EWA)
+        return EWAContinuousLOD(dst0, dst1, maxAnisotropy, pyramidLevels);
+    Float width =
+        2 * std::max({std::abs(dst0[0]), std::abs(dst0[1]), std::abs(dst1[0]), std::abs(dst1[1])});
+    return pyramidLevels - 1 + Log2(std::max<Float>(width, 1e-8f));
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -191,10 +300,15 @@ static PBRT_CONST Float MIPFilterLUT[MIPFilterLUTSize] = {
 };
 
 // MIPMap Method Definitions
-MIPMap::MIPMap(Image image, const RGBColorSpace *colorSpace, WrapMode wrapMode,
-               Allocator alloc, const MIPMapFilterOptions &options)
+MIPMap::MIPMap(Image image, const RGBColorSpace *colorSpace, WrapMode wrapMode, Allocator alloc,
+               const MIPMapFilterOptions &options, int baseMipDownsizeSteps)
     : colorSpace(colorSpace), wrapMode(wrapMode), options(options) {
     CHECK(colorSpace);
+    // Base mip downsize is applied here (not only in CreateFromFile) so all MIPMap
+    // construction paths share the same behavior and memory accounting.
+    int baseSteps = std::max(0, baseMipDownsizeSteps);
+    if (baseSteps > 0)
+        image = ApplyBaseMipDownsize(std::move(image), baseSteps, alloc);
     pyramid = Image::GeneratePyramid(std::move(image), wrapMode, alloc);
     if (Options->disableImageTextures) {
         Image top = pyramid.back();
@@ -203,6 +317,13 @@ MIPMap::MIPMap(Image image, const RGBColorSpace *colorSpace, WrapMode wrapMode,
     }
     std::for_each(pyramid.begin(), pyramid.end(),
                   [](const Image &im) { imageMapBytes += im.BytesUsed(); });
+}
+
+int64_t MIPMap::TotalBytesUsed() const {
+    int64_t sum = 0;
+    for (const Image &im : pyramid)
+        sum += int64_t(im.BytesUsed());
+    return sum;
 }
 
 template <>
@@ -350,7 +471,8 @@ T MIPMap::EWA(int level, Point2f st, Vector2f dst0, Vector2f dst1) const {
 
 MIPMap *MIPMap::CreateFromFile(const std::string &filename,
                                const MIPMapFilterOptions &options, WrapMode wrapMode,
-                               ColorEncoding encoding, Allocator alloc) {
+                               ColorEncoding encoding, Allocator alloc,
+                               int baseMipDownsizeSteps) {
     ImageAndMetadata imageAndMetadata = Image::Read(filename, alloc, encoding);
 
     Image &image = imageAndMetadata.image;
@@ -378,8 +500,10 @@ MIPMap *MIPMap::CreateFromFile(const std::string &filename,
     }
 
     const RGBColorSpace *colorSpace = imageAndMetadata.metadata.GetColorSpace();
-    return alloc.new_object<MIPMap>(std::move(image), colorSpace, wrapMode, alloc,
-                                    options);
+    MIPMap *mipmap = alloc.new_object<MIPMap>(std::move(image), colorSpace, wrapMode, alloc,
+                                              options, baseMipDownsizeSteps);
+    ReportImageTextureMemory(filename, mipmap->TotalBytesUsed(), "CPU");
+    return mipmap;
 }
 
 template <typename T>

@@ -49,9 +49,6 @@ void RenderWavefront(BasicScene &scene) {
         if (Options->useGPU)
             ReportKernelStats();
 #endif  // PBRT_BUILD_GPU_RENDERER
-
-        Printf("Wavefront integrator statistics:\n");
-        Printf("%s\n", integrator->stats->Print());
     }
 
 #ifdef PBRT_BUILD_GPU_RENDERER

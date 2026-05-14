@@ -272,6 +272,11 @@ class ProjectiveCamera : public CameraBase {
         cameraFromRaster = Inverse(screenFromCamera) * screenFromRaster;
     }
 
+    // Homogeneous camera-space point to raster (before perspective divide on x/y). Used by
+    // texture mip preprocess for analytic primary visibility UV differentials.
+    PBRT_CPU_GPU
+    Transform GetRasterFromCameraTransform() const { return rasterFromScreen * screenFromCamera; }
+
   protected:
     // ProjectiveCamera Protected Members
     Transform screenFromCamera, cameraFromRaster;

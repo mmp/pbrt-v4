@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated in build tree by CMake (@ONLY). MSBuild comma issues: see PBRT Wiki / CMakeLists. -->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemDefinitionGroup>
+    <CudaCompile>
+      <MultiProcessorCompilation>false</MultiProcessorCompilation>
+    </CudaCompile>
+  </ItemDefinitionGroup>
+
+  <!-- CMake's vcxproj replaces CudaLink AdditionalOptions without inheriting earlier defaults;
+       append arch before nvcc -dlink so RDC matches sm_N (fixes "no kernel image" at runtime). -->
+  <Target Name="PbrtAppendCudaLinkArchitecture" BeforeTargets="CudaLink">
+    <ItemGroup>
+      <CudaLink>
+        <AdditionalOptions>%(AdditionalOptions) --gpu-architecture=@PBRT_MSVC_CUDA_GPU_ARCHITECTURE@</AdditionalOptions>
+      </CudaLink>
+    </ItemGroup>
+  </Target>
+
+  <Target Name="PbrtStripMsvcFlagsFromNvccAdditionalOptions" BeforeTargets="CudaBuild">
+    <ItemGroup>
+      <CudaCompile>
+        <AdditionalOptions>$([System.Text.RegularExpressions.Regex]::Replace('%(CudaCompile.AdditionalOptions)', '\s+/EHsc\s+/MP\s+', ' '))</AdditionalOptions>
+      </CudaCompile>
+    </ItemGroup>
+  </Target>
+</Project>

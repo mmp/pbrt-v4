@@ -4,6 +4,7 @@
 
 #include <pbrt/util/stats.h>
 
+#include <pbrt/util/file.h>
 #include <pbrt/util/check.h>
 #include <pbrt/util/image.h>
 #include <pbrt/util/memory.h>
@@ -22,6 +23,31 @@
 #include <string>
 
 namespace pbrt {
+
+static bool haveStatsRenderWallSeconds = false;
+static Float statsRenderWallSeconds = 0;
+
+void SetStatsRenderWallSeconds(Float seconds) {
+    haveStatsRenderWallSeconds = true;
+    statsRenderWallSeconds = seconds;
+}
+
+struct ImageTextureMemEntry {
+    std::string path;
+    int64_t bytes = 0;
+    const char *where = "CPU";
+};
+
+static std::mutex imageTextureMemMutex;
+static std::vector<ImageTextureMemEntry> imageTextureMemoryEntries;
+
+void ReportImageTextureMemory(const std::string &path, int64_t bytes, const char *where) {
+    if (bytes <= 0)
+        return;
+    std::lock_guard<std::mutex> lock(imageTextureMemMutex);
+    imageTextureMemoryEntries.push_back(ImageTextureMemEntry{
+        PathForImageTextureStats(path), bytes, where ? where : "CPU"});
+}
 
 // ThreadStatsState Definition
 struct ThreadStatsState {
@@ -331,6 +357,8 @@ bool PrintCheckRare(FILE *dest) {
 
 void ClearStats() {
     statsAccumulator.Clear();
+    std::lock_guard<std::mutex> lock(imageTextureMemMutex);
+    imageTextureMemoryEntries.clear();
 }
 
 static void getCategoryAndTitle(const std::string &str, std::string *category,
@@ -349,16 +377,6 @@ void StatsAccumulator::Print(FILE *dest) {
     fprintf(dest, "Statistics:\n");
     std::map<std::string, std::vector<std::string>> toPrint;
 
-    for (auto &counter : stats->counters) {
-        if (counter.second == 0)
-            continue;
-        std::string category, title;
-        getCategoryAndTitle(counter.first, &category, &title);
-        toPrint[category].push_back(
-            StringPrintf("%-42s               %12" PRIu64, title, counter.second));
-    }
-
-    size_t totalMemoryReported = 0;
     auto printBytes = [](size_t bytes) -> std::string {
         float kb = (double)bytes / 1024.;
         if (std::abs(kb) < 1024.)
@@ -372,65 +390,56 @@ void StatsAccumulator::Print(FILE *dest) {
         return StringPrintf("%9.2f GiB", gib);
     };
 
+    // --stats: image texture memory (CPU host mipmaps + GPU device arrays) and per-file breakdown.
+    int64_t cpuImageMapBytes = 0, gpuImageTexBytes = 0;
     for (auto &counter : stats->memoryCounters) {
-        if (counter.second == 0)
-            continue;
-        totalMemoryReported += counter.second;
+        if (counter.first == "Memory/Image maps")
+            cpuImageMapBytes = counter.second;
+        else if (counter.first == "Memory/ImageTextures")
+            gpuImageTexBytes = counter.second;
+    }
 
-        std::string category, title;
-        getCategoryAndTitle(counter.first, &category, &title);
-        toPrint[category].push_back(
-            StringPrintf("%-42s                  %s", title, printBytes(counter.second)));
-    }
-    int64_t unreportedBytes = GetCurrentRSS() - totalMemoryReported;
-    if (unreportedBytes > 0)
-        toPrint["Memory"].push_back(StringPrintf("%-42s                  %s",
-                                                 "Unreported / unused",
-                                                 printBytes(unreportedBytes)));
+    toPrint["Image textures"].push_back(StringPrintf(
+        "%-6s  %-58s  %s", "", "CPU host (Image maps counter)", printBytes(cpuImageMapBytes)));
+    if (gpuImageTexBytes > 0)
+        toPrint["Image textures"].push_back(StringPrintf(
+            "%-6s  %-58s  %s", "", "GPU device (ImageTextures counter)",
+            printBytes(gpuImageTexBytes)));
+    int64_t imageTexTotal = cpuImageMapBytes + gpuImageTexBytes;
+    toPrint["Image textures"].push_back(StringPrintf(
+        "%-6s  %-58s  %s", "", "Total (counters)", printBytes(imageTexTotal)));
 
-    for (auto &distrib : stats->intDistributions) {
-        const std::string &name = distrib.first;
-        if (distrib.second.count == 0)
-            continue;
-        std::string category, title;
-        getCategoryAndTitle(name, &category, &title);
-        double avg = (double)distrib.second.sum / (double)distrib.second.count;
-        toPrint[category].push_back(StringPrintf(
-            "%-42s                      %.3f avg [range %" PRIu64 " - %" PRIu64 "]",
-            title, avg, distrib.second.min, distrib.second.max));
+    std::vector<ImageTextureMemEntry> entriesCopy;
+    {
+        std::lock_guard<std::mutex> lock(imageTextureMemMutex);
+        entriesCopy = imageTextureMemoryEntries;
     }
-    for (auto &distrib : stats->floatDistributions) {
-        const std::string &name = distrib.first;
-        if (distrib.second.count == 0)
-            continue;
-        std::string category, title;
-        getCategoryAndTitle(name, &category, &title);
-        double avg = (double)distrib.second.sum / (double)distrib.second.count;
-        toPrint[category].push_back(
-            StringPrintf("%-42s                      %.3f avg [range %f - %f]", title,
-                         avg, distrib.second.min, distrib.second.max));
+    std::sort(entriesCopy.begin(), entriesCopy.end(),
+              [](const ImageTextureMemEntry &a, const ImageTextureMemEntry &b) {
+                  return a.bytes > b.bytes;
+              });
+    int64_t sumEntries = 0;
+    for (const ImageTextureMemEntry &e : entriesCopy)
+        sumEntries += e.bytes;
+    if (!entriesCopy.empty()) {
+        toPrint["Image textures"].push_back(StringPrintf(
+            "%-6s  %-58s  %s", "", "Sum of per-path entries", printBytes(sumEntries)));
+        toPrint["Image textures (by path)"].push_back(StringPrintf(
+            "%-6s  %-58s  %s", "Where", "Path", "Size"));
+        for (const ImageTextureMemEntry &e : entriesCopy) {
+            std::string whereTag = StringPrintf("[%s]", e.where);
+            toPrint["Image textures (by path)"].push_back(StringPrintf(
+                "%-6s  %-58s  %s", whereTag.c_str(), e.path.c_str(), printBytes(e.bytes)));
+        }
     }
-    for (auto &percentage : stats->percentages) {
-        if (percentage.second.second == 0)
-            continue;
-        int64_t num = percentage.second.first;
-        int64_t denom = percentage.second.second;
-        std::string category, title;
-        getCategoryAndTitle(percentage.first, &category, &title);
-        toPrint[category].push_back(
-            StringPrintf("%-42s%12" PRIu64 " / %12" PRIu64 " (%.2f%%)", title, num, denom,
-                         (100.f * num) / denom));
-    }
-    for (auto &ratio : stats->ratios) {
-        if (ratio.second.second == 0)
-            continue;
-        int64_t num = ratio.second.first;
-        int64_t denom = ratio.second.second;
-        std::string category, title;
-        getCategoryAndTitle(ratio.first, &category, &title);
-        toPrint[category].push_back(
-            StringPrintf("%-42s%12" PRIu64 " / %12" PRIu64 " (%.2fx)", title, num, denom,
-                         (double)num / (double)denom));
+
+    int64_t rss = GetCurrentRSS();
+    toPrint["Process"].push_back(StringPrintf(
+        "%-42s                  %s", "RSS (current)", printBytes(size_t(std::max<int64_t>(rss, 0)))));
+
+    if (haveStatsRenderWallSeconds) {
+        toPrint["Timing"].push_back(StringPrintf(
+            "%-42s               %10.3f s", "Wall-clock render time", statsRenderWallSeconds));
     }
 
     for (auto &categories : toPrint) {
@@ -509,6 +518,7 @@ void StatsAccumulator::Clear() {
     stats->floatDistributions.clear();
     stats->percentages.clear();
     stats->ratios.clear();
+    haveStatsRenderWallSeconds = false;
 }
 
 }  // namespace pbrt

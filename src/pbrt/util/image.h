@@ -342,6 +342,9 @@ class Image {
     static ImageAndMetadata Read(std::string filename, Allocator alloc = {},
                                  ColorEncoding encoding = nullptr);
 
+    // Image dimensions only (no pixel decode). Used by mip preprocess and similar.
+    static Point2i ReadResolution(const std::string &filename);
+
     bool Write(std::string name, const ImageMetadata &metadata = {}) const;
 
     Image ConvertToFormat(PixelFormat format, ColorEncoding encoding = nullptr) const;

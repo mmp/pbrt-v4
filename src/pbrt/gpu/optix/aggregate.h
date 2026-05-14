@@ -119,7 +119,7 @@ class OptiXAggregate : public WavefrontAggregate {
     int addHGRecords(const BVH &bvh);
 
     static OptixModule createOptiXModule(OptixDeviceContext optixContext,
-                                         const char *ptx);
+                                         const char *moduleInput, size_t moduleInputSize);
     static OptixPipelineCompileOptions getPipelineCompileOptions();
 
     OptixProgramGroup createRaygenPG(const char *entrypoint) const;

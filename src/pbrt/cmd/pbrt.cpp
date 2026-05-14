@@ -19,9 +19,11 @@
 #include <pbrt/util/parallel.h>
 #include <pbrt/util/print.h>
 #include <pbrt/util/spectrum.h>
+#include <pbrt/util/stats.h>
 #include <pbrt/util/string.h>
 #include <pbrt/wavefront/wavefront.h>
 
+#include <chrono>
 #include <string>
 #include <vector>
 
@@ -40,6 +42,11 @@ Rendering options:
                                 faster debugging. (<values> are Integrator-specific
                                 and come from error message text.)
   --disable-image-textures      Always return the average value of image textures.
+  --skipmip                     Skip the first k mip levels of image textures (box-filter
+                                downsample k times before building the mip pyramid). k defaults
+                                in mipmap.cpp or is chosen per texture by preprocess.
+  --verbose-mip-preprocess      With --skipmip, print per-texture/per-geometry mip analysis.
+                                Default is a single summary line (large logs are costly).
   --disable-pixel-jitter        Always sample pixels at their centers.
   --disable-texture-filtering   Point-sample all textures.
   --disable-wavelength-jitter   Always sample the same %d wavelengths of light.
@@ -73,7 +80,7 @@ Rendering options:
   --render-coord-sys <name>     Coordinate system to use for the scene when rendering,
                                 where name is "camera", "cameraworld", or "world".
   --seed <n>                    Set random number generator seed. Default: 0.
-  --stats                       Print various statistics after rendering completes.
+  --stats                       Print memory usage and render timing summaries after rendering.
   --spp <n>                     Override number of pixel samples specified in scene
                                 description file.
   --wavefront                   Use wavefront volumetric path integrator.
@@ -164,6 +171,9 @@ int main(int argc, char *argv[]) {
             ParseArg(&iter, args.end(), "debugstart", &options.debugStart, onError) ||
             ParseArg(&iter, args.end(), "disable-image-textures",
                      &options.disableImageTextures, onError) ||
+            ParseArg(&iter, args.end(), "skipmip", &options.skipMipImageTextures, onError) ||
+            ParseArg(&iter, args.end(), "verbose-mip-preprocess",
+                     &options.verboseMipPreprocess, onError) ||
             ParseArg(&iter, args.end(), "disable-pixel-jitter",
                      &options.disablePixelJitter, onError) ||
             ParseArg(&iter, args.end(), "disable-texture-filtering",
@@ -281,11 +291,22 @@ int main(int argc, char *argv[]) {
         BasicSceneBuilder builder(&scene);
         ParseFiles(&builder, filenames);
 
-        // Render the scene
-        if (Options->useGPU || Options->wavefront)
-            RenderWavefront(scene);
-        else
-            RenderCPU(scene);
+        // Render the scene (includes scene setup inside RenderCPU / RenderWavefront: media,
+        // camera, mip preprocess when --skipmip, textures, aggregate, integrator::Render, …).
+        if (options.printStatistics) {
+            auto t0 = std::chrono::steady_clock::now();
+            if (Options->useGPU || Options->wavefront)
+                RenderWavefront(scene);
+            else
+                RenderCPU(scene);
+            auto t1 = std::chrono::steady_clock::now();
+            SetStatsRenderWallSeconds(std::chrono::duration<Float>(t1 - t0).count());
+        } else {
+            if (Options->useGPU || Options->wavefront)
+                RenderWavefront(scene);
+            else
+                RenderCPU(scene);
+        }
 
         LOG_VERBOSE("Memory used after post-render cleanup: %s", GetCurrentRSS());
         // Clean up after rendering the scene

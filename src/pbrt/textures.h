@@ -7,6 +7,7 @@
 
 #include <pbrt/pbrt.h>
 
+#include <pbrt/options.h>
 #include <pbrt/base/texture.h>
 #include <pbrt/interaction.h>
 #include <pbrt/paramdict.h>
@@ -505,12 +506,17 @@ class FBmTexture {
 struct TexInfo {
     // TexInfo Public Methods
     TexInfo(const std::string &f, MIPMapFilterOptions filterOptions, WrapMode wm,
-            ColorEncoding encoding)
-        : filename(f), filterOptions(filterOptions), wrapMode(wm), encoding(encoding) {}
+            ColorEncoding encoding, int baseMipDownsizeSteps)
+        : filename(f),
+          filterOptions(filterOptions),
+          wrapMode(wm),
+          encoding(encoding),
+          baseMipDownsizeSteps(baseMipDownsizeSteps) {}
 
     bool operator<(const TexInfo &t) const {
-        return std::tie(filename, filterOptions, encoding, wrapMode) <
-               std::tie(t.filename, t.filterOptions, t.encoding, t.wrapMode);
+        return std::tie(filename, filterOptions, encoding, wrapMode, baseMipDownsizeSteps) <
+               std::tie(t.filename, t.filterOptions, t.encoding, t.wrapMode,
+                        t.baseMipDownsizeSteps);
     }
 
     std::string ToString() const;
@@ -519,6 +525,7 @@ struct TexInfo {
     MIPMapFilterOptions filterOptions;
     WrapMode wrapMode;
     ColorEncoding encoding;
+    int baseMipDownsizeSteps;
 };
 
 // ImageTextureBase Definition
@@ -527,10 +534,11 @@ class ImageTextureBase {
     // ImageTextureBase Public Methods
     ImageTextureBase(TextureMapping2D mapping, std::string filename,
                      MIPMapFilterOptions filterOptions, WrapMode wrapMode, Float scale,
-                     bool invert, ColorEncoding encoding, Allocator alloc)
+                     bool invert, ColorEncoding encoding, Allocator alloc,
+                     int baseMipDownsizeSteps)
         : mapping(mapping), filename(filename), scale(scale), invert(invert) {
         // Get _MIPMap_ from texture cache if present
-        TexInfo texInfo(filename, filterOptions, wrapMode, encoding);
+        TexInfo texInfo(filename, filterOptions, wrapMode, encoding, baseMipDownsizeSteps);
         std::unique_lock<std::mutex> lock(textureCacheMutex);
         if (auto iter = textureCache.find(texInfo); iter != textureCache.end()) {
             mipmap = iter->second;
@@ -539,8 +547,8 @@ class ImageTextureBase {
         lock.unlock();
 
         // Create _MIPMap_ for _filename_ and add to texture cache
-        mipmap =
-            MIPMap::CreateFromFile(filename, filterOptions, wrapMode, encoding, alloc);
+        mipmap = MIPMap::CreateFromFile(filename, filterOptions, wrapMode, encoding, alloc,
+                                        baseMipDownsizeSteps);
         lock.lock();
         // This is actually ok, but if it hits, it means we've wastefully
         // loaded this texture. (Note that in that case, should just return
@@ -573,8 +581,8 @@ class FloatImageTexture : public ImageTextureBase {
     FloatImageTexture(TextureMapping2D m, const std::string &filename,
                       MIPMapFilterOptions filterOptions, WrapMode wm, Float scale,
                       bool invert, ColorEncoding encoding, Allocator alloc)
-        : ImageTextureBase(m, filename, filterOptions, wm, scale, invert, encoding,
-                           alloc) {}
+        : ImageTextureBase(m, filename, filterOptions, wm, scale, invert, encoding, alloc,
+                           ImageTextureMipDownsizeStepsForFile(filename)) {}
     PBRT_CPU_GPU
     Float Evaluate(TextureEvalContext ctx) const {
 #ifdef PBRT_IS_GPU_CODE
@@ -606,7 +614,7 @@ class SpectrumImageTexture : public ImageTextureBase {
                          Float scale, bool invert, ColorEncoding encoding,
                          SpectrumType spectrumType, Allocator alloc)
         : ImageTextureBase(mapping, filename, filterOptions, wrapMode, scale, invert,
-                           encoding, alloc),
+                           encoding, alloc, ImageTextureMipDownsizeStepsForFile(filename)),
           spectrumType(spectrumType) {}
 
     PBRT_CPU_GPU
