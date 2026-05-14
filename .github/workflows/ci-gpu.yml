@@ -25,6 +25,11 @@ jobs:
         optix: [ optix-7.7.0, optix-8.1.0, optix-9.0.0 ]
         cuda: [ '12.6.3', '12.8.0', '12.9.1', '13.0.1', '13.1.1', '13.2.0' ]
         os: [ ubuntu-24.04, windows-latest ]
+        include:
+          - os: windows-latest
+            cuda: '13.2.0'
+            optix: optix-9.0.0
+            upload_binary: true
 
     name: GPU Build Only (${{ matrix.os }}, CUDA ${{ matrix.cuda }}, ${{ matrix.optix }})
 
@@ -37,6 +42,7 @@ jobs:
         cuda: ${{ matrix.cuda }}
         use-github-cache: false
         use-local-cache: false
+        log-file-suffix: ${{ matrix.os }}-${{ matrix.cuda }}-${{ matrix.optix }}.txt
    
     - name: Check NVCC
       run: nvcc -V
@@ -90,7 +96,7 @@ jobs:
       run: cmake --build build --parallel 3 --config Release
 
     - name: Save Windows executable
-      if: ${{ matrix.os == 'windows-latest' }}
+      if: ${{ matrix.upload_binary }}
       uses: actions/upload-artifact@v4
       with:
         name: pbrt.exe
