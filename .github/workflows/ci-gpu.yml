@@ -23,23 +23,10 @@ jobs:
       fail-fast: false
       matrix:
         optix: [ optix-7.7.0, optix-8.1.0, optix-9.0.0 ]
-        cuda: [ '12.6.3', '12.8.0', '12.9.1', '13.0.1', '13.1.1', '13.2.0' ]
-        os: [ ubuntu-22.04, ubuntu-24.04, windows-latest ]
-        exclude:
-          - os: ubuntu-24.04
-            cuda: '12.6.3'
-          - os: ubuntu-24.04
-            cuda: '12.8.0'
-          - os: ubuntu-22.04
-            cuda: '12.9.1'
-          - os: ubuntu-22.04
-            cuda: '13.0.1'
-          - os: ubuntu-22.04
-            cuda: '13.1.1'
-          - os: ubuntu-22.04
-            cuda: '13.2.0'
+        cuda: [ '12.9.1', '13.0.1', '13.1.1', '13.2.0' ]
+        os: [ ubuntu-24.04, windows-2022 ]
         include:
-          - os: windows-latest
+          - os: windows-2022
             cuda: '13.2.0'
             optix: optix-9.0.0
             upload_binary: true
@@ -82,7 +69,7 @@ jobs:
       uses: lukka/get-cmake@latest
 
     - name: Install pkgconfig and zlib
-      if: ${{ matrix.os == 'windows-latest' }}
+      if: ${{ startsWith(matrix.os, 'windows-') }}
       run: |
         choco install pkgconfiglite
 
@@ -93,11 +80,16 @@ jobs:
         sudo apt-get install -y --no-install-recommends libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxext-dev libxfixes-dev libgl1-mesa-dev libwayland-bin libwayland-dev wayland-protocols libxkbcommon-dev libxkbcommon-x11-0
 
     - name: Configure (Windows)
-      if: ${{ matrix.os == 'windows-latest' }}
+      if: ${{ startsWith(matrix.os, 'windows-') }}
       run: |
         cd build
         $env:CUDACXX = "$env:CUDA_PATH\bin\nvcc.exe"
-        cmake .. -T "cuda=$env:CUDA_PATH" -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT"/scripts/buildsystems/vcpkg.cmake -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True -DPBRT_OPTIX_PATH=../optix/${{ matrix.optix }} -DPBRT_GPU_SHADER_MODEL=sm_80
+        cmake .. `
+          -T "cuda=$env:CUDA_PATH" `
+          "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+          "-DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True" `
+          "-DPBRT_OPTIX_PATH=../optix/${{ matrix.optix }}" `
+          "-DPBRT_GPU_SHADER_MODEL=sm_80"
 
     - name: Configure (Linux)
       if: ${{ startsWith(matrix.os, 'ubuntu-') }}
@@ -115,4 +107,3 @@ jobs:
       with:
         name: pbrt.exe
         path: build/Release/pbrt.exe
-
