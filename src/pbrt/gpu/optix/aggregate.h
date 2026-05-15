@@ -69,6 +69,12 @@ class OptiXAggregate : public WavefrontAggregate {
         BVH() = default;
         BVH(size_t size);
 
+        BVH(const BVH&) = delete;
+        BVH& operator=(const BVH&) = delete;
+        BVH(BVH&&);
+        BVH& operator=(BVH&&);
+        ~BVH();
+
         OptixTraversableHandle traversableHandle = {};
         std::vector<HitgroupRecord> intersectHGRecords;
         std::vector<HitgroupRecord> shadowHGRecords;

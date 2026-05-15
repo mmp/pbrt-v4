@@ -63,6 +63,10 @@ OptiXAggregate::BVH::BVH(size_t size) {
     randomHitHGRecords.resize(size);
 }
 
+OptiXAggregate::BVH::BVH(BVH&&) = default;
+OptiXAggregate::BVH &OptiXAggregate::BVH::operator=(BVH&&) = default;
+OptiXAggregate::BVH::~BVH() = default;
+
 struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) RaygenRecord {
     __align__(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
 };
@@ -1390,32 +1394,32 @@ OptiXAggregate::OptiXAggregate(
         BVH bvh;
         int sbtOffset;
     };
-    AsyncJob<GAS> *triJob = RunAsync([&]() {
+    AsyncJob<GAS *> *triJob = RunAsync([&]() {
         BVH triangleBVH = buildBVHForTriangles(
             scene.shapes, plyMeshes, optixContext, hitPGTriangle, anyhitPGShadowTriangle,
             hitPGRandomHitTriangle, textures.floatTextures, namedMaterials, materials,
             media, shapeIndexToAreaLights, threadAllocators, threadCUDAStreams);
         int sbtOffset = addHGRecords(triangleBVH);
-        return GAS{triangleBVH, sbtOffset};
+        return new GAS{std::move(triangleBVH), sbtOffset};
     });
 
-    AsyncJob<GAS> *blpJob = RunAsync([&]() {
+    AsyncJob<GAS *> *blpJob = RunAsync([&]() {
         BVH blpBVH =
             buildBVHForBLPs(scene.shapes, optixContext, hitPGBilinearPatch,
                             anyhitPGShadowBilinearPatch, hitPGRandomHitBilinearPatch,
                             textures.floatTextures, namedMaterials, materials, media,
                             shapeIndexToAreaLights, threadAllocators, threadCUDAStreams);
         int bilinearSBTOffset = addHGRecords(blpBVH);
-        return GAS{blpBVH, bilinearSBTOffset};
+        return new GAS{std::move(blpBVH), bilinearSBTOffset};
     });
 
-    AsyncJob<GAS> *quadricJob = RunAsync([&]() {
+    AsyncJob<GAS *> *quadricJob = RunAsync([&]() {
         BVH quadricBVH = buildBVHForQuadrics(
             scene.shapes, optixContext, hitPGQuadric, anyhitPGShadowQuadric,
             hitPGRandomHitQuadric, textures.floatTextures, namedMaterials, materials,
             media, shapeIndexToAreaLights, threadAllocators, threadCUDAStreams);
         int quadricSBTOffset = addHGRecords(quadricBVH);
-        return GAS{quadricBVH, quadricSBTOffset};
+        return new GAS{std::move(quadricBVH), quadricSBTOffset};
     });
 
     ///////////////////////////////////////////////////////////////////////////
@@ -1535,15 +1539,16 @@ OptiXAggregate::OptiXAggregate(
     gasInstance.flags =
         OPTIX_INSTANCE_FLAG_NONE;  // TODO: OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT
     LOG_VERBOSE("Starting to consume top-level GAS futures");
-    for (AsyncJob<GAS> *job : {triJob, blpJob, quadricJob}) {
-        GAS gas = job->GetResult();
-        if (gas.bvh.traversableHandle) {
-            gasInstance.traversableHandle = gas.bvh.traversableHandle;
-            gasInstance.sbtOffset = gas.sbtOffset;
+    for (AsyncJob<GAS *> *job : {triJob, blpJob, quadricJob}) {
+        GAS *gas = job->GetResult();
+        if (gas->bvh.traversableHandle) {
+            gasInstance.traversableHandle = gas->bvh.traversableHandle;
+            gasInstance.sbtOffset = gas->sbtOffset;
             iasInstances.push_back(gasInstance);
 
-            bounds = Union(bounds, gas.bvh.bounds);
+            bounds = Union(bounds, gas->bvh.bounds);
         }
+        delete gas;
     }
     LOG_VERBOSE("Finished consuming top-level GAS futures");
 
