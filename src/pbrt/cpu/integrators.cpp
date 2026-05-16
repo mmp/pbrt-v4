@@ -2679,12 +2679,33 @@ void MLTIntegrator::Render() {
             // Compute acceptance probability for proposed sample
             Float cProposed = c(LProposed, lambdaProposed);
             Float cCurrent = c(LCurrent, lambdaCurrent);
-            Float accept = std::min<Float>(1, cProposed / cCurrent);
 
-            // Splat both current and proposed samples to _film_
-            if (accept > 0)
-                film.AddSplat(pProposed, LProposed * accept / cProposed, lambdaProposed);
-            film.AddSplat(pCurrent, LCurrent * (1 - accept) / cCurrent, lambdaCurrent);
+            Float accept = NAN;
+            if (cProposed == 0 && cCurrent == 0) {
+                // neither current path or the proposed found a light source
+                accept = 0.5;
+
+            } else if (cProposed == 0) {
+                // current path found a light source but the proposed didn't
+                accept = 0;
+                film.AddSplat(pCurrent, LCurrent / cCurrent, lambdaCurrent);
+
+            } else if (cCurrent == 0) {
+                // current path didn't find a light source but the proposed did
+                accept = 1;
+                film.AddSplat(pProposed, LProposed / cProposed, lambdaProposed);
+
+            } else {
+                // both paths found a light source
+                 accept = std::min<Float>(1, cProposed / cCurrent);
+                // Splat both current and proposed samples to _film_
+                if (accept > 0) {
+                    film.AddSplat(pProposed, LProposed * accept / cProposed, lambdaProposed);
+                }
+                if (accept < 1) {
+                    film.AddSplat(pCurrent, LCurrent * (1 - accept) / cCurrent, lambdaCurrent);
+                }
+            }
 
             // Accept or reject the proposal
             if (rng.Uniform<Float>() < accept) {
