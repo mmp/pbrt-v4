@@ -68,7 +68,7 @@ jobs:
         env CC=${{ matrix.compilers.cc }} CXX=${{ matrix.compilers.cxx }} cmake .. -DPBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES=True ${{ matrix.config }}
       
     - name: Build
-      run: cmake --build build --parallel --config Release
+      run: cmake --build build --parallel 3 --config Release
       
     - name: Test
       if: ${{ matrix.config == '' }}
