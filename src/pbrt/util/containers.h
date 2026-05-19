@@ -591,7 +591,7 @@ class InlinedVector {
 
     void resize(size_type n) {
         if (n < size()) {
-            for (size_t i = n; n < size(); ++i)
+            for (size_t i = n; i < size(); ++i)
                 alloc.destroy(begin() + i);
         } else if (n > size()) {
             reserve(n);
