@@ -659,7 +659,7 @@ class HashMap {
         PBRT_CPU_GPU
         std::pair<Key, Value> *operator->() { return &ptr->value(); }
         PBRT_CPU_GPU
-        const std::pair<Key, Value> *operator->() const { return ptr->value(); }
+        const std::pair<Key, Value> *operator->() const { return &ptr->value(); }
 
       private:
         friend class HashMap;
