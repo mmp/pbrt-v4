@@ -226,6 +226,7 @@ class Array2D {
             values = allocator.allocate_object<T>(no);
             for (int i = 0; i < no; ++i)
                 allocator.construct(values + i, other.values[i]);
+            extent = other.extent;
         }
         return *this;
     }
