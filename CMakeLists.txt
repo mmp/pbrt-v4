@@ -1150,3 +1150,21 @@ install (TARGETS
   DESTINATION
   lib
   )
+
+###############################
+# Neural Radiance Caching (tiny-cuda-nn integration)
+
+add_subdirectory(external/tiny-cuda-nn EXCLUDE_FROM_ALL)
+
+add_executable(nrc_milestone1
+    src/nrc/milestone1.cu
+)
+
+target_link_libraries(nrc_milestone1 PRIVATE tiny-cuda-nn)
+
+target_compile_features(nrc_milestone1 PRIVATE cxx_std_17 cuda_std_17)
+
+# RTX 3090 / RTX 3070 = sm_86
+set_target_properties(nrc_milestone1 PROPERTIES
+    CUDA_ARCHITECTURES 86
+)

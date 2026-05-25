@@ -6,3 +6,15 @@ src/build
 .ipynb_checkpoints/
 *build*/
 .cache/
+
+.DS_Store
+*.egg-info
+*.o
+__pycache__
+build*
+dist
+rtc
+/.cache
+/.vscode
+/.direnv
+/*.jpg
