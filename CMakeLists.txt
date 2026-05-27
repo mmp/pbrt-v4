@@ -22,6 +22,7 @@ option (PBRT_DBG_LOGGING "Enable (very verbose!) debug logging" OFF)
 option (PBRT_NVTX "Insert NVTX annotations for NVIDIA Profiling and Debugging Tools" OFF)
 option (PBRT_NVML "Use NVML for GPU performance measurement" OFF)
 option (PBRT_USE_PREGENERATED_RGB_TO_SPECTRUM_TABLES "Use pregenerated rgbspectrum_*.cpp files rather than running rgb2spec_opt to generate them at build time" OFF)
+option (PBRT_BUILD_NRC "Build the tiny-cuda-nn-backed Neural Radiance Cache hooks into the wavefront integrator (requires CUDA)" OFF)
 set (PBRT_OPTIX_PATH $ENV{PBRT_OPTIX_PATH} CACHE PATH "Path to OptiX SDK")
 set (PBRT_GPU_SHADER_MODEL "" CACHE STRING "")
 
@@ -1154,17 +1155,27 @@ install (TARGETS
 ###############################
 # Neural Radiance Caching (tiny-cuda-nn integration)
 
-add_subdirectory(external/tiny-cuda-nn EXCLUDE_FROM_ALL)
+if (PBRT_BUILD_NRC)
+  if (NOT PBRT_CUDA_ENABLED)
+    message (FATAL_ERROR "PBRT_BUILD_NRC=ON requires CUDA, but PBRT_CUDA_ENABLED is OFF.")
+  endif ()
 
-add_executable(nrc_milestone1
-    src/nrc/milestone1.cu
-)
+  add_subdirectory(external/tiny-cuda-nn EXCLUDE_FROM_ALL)
 
-target_link_libraries(nrc_milestone1 PRIVATE tiny-cuda-nn)
+  # Standalone sanity test from milestone 1 (kept for regression checks).
+  add_executable(nrc_milestone1 src/nrc/milestone1.cu)
+  target_link_libraries(nrc_milestone1 PRIVATE tiny-cuda-nn)
+  target_compile_features(nrc_milestone1 PRIVATE cxx_std_17 cuda_std_17)
+  set_target_properties(nrc_milestone1 PROPERTIES CUDA_ARCHITECTURES 86)
 
-target_compile_features(nrc_milestone1 PRIVATE cxx_std_17 cuda_std_17)
+  # Milestone 2: wire src/nrc/nrc.cu into pbrt_lib and let downstream targets
+  # see PBRT_BUILD_NRC so the wavefront integrator activates its NRC hooks.
+  set_source_files_properties (src/nrc/nrc.cu PROPERTIES LANGUAGE CUDA)
+  target_sources (pbrt_lib PRIVATE src/nrc/nrc.cu)
+  target_link_libraries (pbrt_lib PRIVATE tiny-cuda-nn)
+  target_compile_definitions (pbrt_lib PUBLIC PBRT_BUILD_NRC)
+  # tcnn lives in external/; nrc.cu includes <tiny-cuda-nn/...>. The
+  # tiny-cuda-nn target already exposes its include dirs publicly so this is
+  # picked up via target_link_libraries above.
+endif ()
 
-# RTX 3090 / RTX 3070 = sm_86
-set_target_properties(nrc_milestone1 PROPERTIES
-    CUDA_ARCHITECTURES 86
-)

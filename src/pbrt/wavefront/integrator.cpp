@@ -40,6 +40,10 @@
 #include <cuda_runtime.h>
 #endif  // PBRT_BUILD_GPU_RENDERER
 
+#ifdef PBRT_BUILD_NRC
+#include <nrc/nrc.h>
+#endif
+
 namespace pbrt {
 
 STAT_MEMORY_COUNTER("Memory/Wavefront integrator pixel state", pathIntegratorBytes);
@@ -284,6 +288,34 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
         pathIntegratorBytes += endSize - startSize;
     }
 #endif  // PBRT_BUILD_GPU_RENDERER
+
+#ifdef PBRT_BUILD_NRC
+    // Allocate NRC training staging buffers in CUDA-managed memory so that
+    // both the (GPU) kernels and the (host-side) tcnn callbacks can read/write
+    // them without explicit transfers. Sized to a tcnn-compatible padding of
+    // the per-pass pixel batch.
+    if (Options->useGPU) {
+        nrcBatchSize = nrc::NeuralRadianceCache::RoundUpBatch(maxQueueSize);
+        cudaMallocManaged(&nrcInputs,
+                          sizeof(float) * kNRCInputDims * nrcBatchSize);
+        cudaMallocManaged(&nrcTargets,
+                          sizeof(float) * kNRCOutputDims * nrcBatchSize);
+        cudaMallocManaged(&nrcValid, sizeof(uint8_t) * nrcBatchSize);
+        cudaMemset(nrcInputs, 0,
+                   sizeof(float) * kNRCInputDims * nrcBatchSize);
+        cudaMemset(nrcTargets, 0,
+                   sizeof(float) * kNRCOutputDims * nrcBatchSize);
+        cudaMemset(nrcValid, 0, sizeof(uint8_t) * nrcBatchSize);
+        cudaMallocManaged(&nrcInferenceOutputs,
+                          sizeof(float) * kNRCOutputDims * nrcBatchSize);
+        cudaMemset(nrcInferenceOutputs, 0,
+                   sizeof(float) * kNRCOutputDims * nrcBatchSize);
+        nrcCache = new nrc::NeuralRadianceCache(nrcBatchSize, kNRCInputDims,
+                                                kNRCOutputDims);
+        LOG_VERBOSE("NRC: created cache batchSize=%d nParams=%zu", nrcBatchSize,
+                    nrcCache->NumParams());
+    }
+#endif  // PBRT_BUILD_NRC
 }
 
 // WavefrontPathIntegrator Method Definitions
@@ -311,6 +343,18 @@ Float WavefrontPathIntegrator::Render() {
     if (Options->useGPU)
         PrefetchGPUAllocations();
 #endif  // PBRT_BUILD_GPU_RENDERER
+
+#ifdef PBRT_BUILD_NRC
+    // Lazily allocate the per-pixel NRC prediction image now that we know
+    // the film resolution. Initialised to zero so areas the network never
+    // sees first-hit data for remain black.
+    if (Options->useGPU && nrcCache && nrcPredictedRGB == nullptr) {
+        nrcResolution = Point2i(resolution.x, resolution.y);
+        size_t nPixels = size_t(nrcResolution.x) * nrcResolution.y;
+        cudaMallocManaged(&nrcPredictedRGB, sizeof(float) * 3 * nPixels);
+        cudaMemset(nrcPredictedRGB, 0, sizeof(float) * 3 * nPixels);
+    }
+#endif
 
     // Launch thread to copy image for display server, if enabled
     if (!Options->displayServer.empty())
@@ -360,6 +404,10 @@ Float WavefrontPathIntegrator::Render() {
                                 sampleIndex, samplesPerPixel);
                        cameraRayQueue->Reset();
                    });
+
+#ifdef PBRT_BUILD_NRC
+                NRCResetSampleBuffers();
+#endif
 
                 Transform cameraMotion;
                 if (gui)
@@ -432,6 +480,10 @@ Float WavefrontPathIntegrator::Render() {
                 }
 
                 UpdateFilm();
+
+#ifdef PBRT_BUILD_NRC
+                NRCTrainAndInferStep();
+#endif
             }
 
             // Copy updated film pixels to buffer for the display server.
@@ -479,6 +531,14 @@ Float WavefrontPathIntegrator::Render() {
     }
 
     progress.Done();
+
+#ifdef PBRT_BUILD_NRC
+    if (Options->useGPU && nrcCache && nrcPredictedRGB) {
+        cudaDeviceSynchronize();
+        NRCDumpPredictedImage("nrc_predicted.exr");
+        LOG_VERBOSE("NRC: final loss %f", nrcLastLoss);
+    }
+#endif
 
 #ifdef PBRT_BUILD_GPU_RENDERER
     if (Options->useGPU)
@@ -771,5 +831,100 @@ void WavefrontPathIntegrator::UpdateFramebufferFromFilm(Bounds2i pixelBounds,
             rgb[index] = exposure * film.GetPixelRGB(p + film.PixelBounds().pMin);
         });
 }
+
+#ifdef PBRT_BUILD_NRC
+// ============================================================================
+// NRC milestone 2 hooks
+// ============================================================================
+
+void WavefrontPathIntegrator::NRCResetSampleBuffers() {
+    // Zero the validity mask and the (column-major) input/target staging
+    // buffers for this scanline pass.
+    if (!nrcCache)
+        return;
+    float *inputs = nrcInputs;
+    float *targets = nrcTargets;
+    uint8_t *valid = nrcValid;
+    const uint32_t batch = nrcBatchSize;
+    ParallelFor(
+        "NRC reset", batch, PBRT_CPU_GPU_LAMBDA(int i) {
+            valid[i] = 0;
+            for (int c = 0; c < (int)kNRCInputDims; ++c)
+                inputs[i * (int)kNRCInputDims + c] = 0.f;
+            for (int c = 0; c < (int)kNRCOutputDims; ++c)
+                targets[i * (int)kNRCOutputDims + c] = 0.f;
+        });
+}
+
+void WavefrontPathIntegrator::NRCTrainAndInferStep() {
+    if (!nrcCache)
+        return;
+    // Ensure all device writes (first-hit capture in surfscatter, target RGB
+    // capture in UpdateFilm) are visible before tcnn reads the buffers.
+    cudaDeviceSynchronize();
+
+    // One Adam/L2 training step over the entire padded batch. Invalid slots
+    // contribute (zero-input -> zero-target) pairs which act as mild
+    // regularization toward 0. For a preliminary milestone this is fine; a
+    // future revision should compact valid samples first.
+    nrcLastLoss = nrcCache->Train(nrcInputs, nrcTargets);
+
+    // Inference pass over the same inputs, writing predicted RGB back into
+    // the persistent per-pixel framebuffer for whichever pixels were touched
+    // by this scanline pass.
+    float *outputs = nrcInferenceOutputs;
+    nrcCache->Inference(nrcInputs, outputs);
+    cudaDeviceSynchronize();
+
+    // Scatter predictions into the persistent image, indexed by pPixel of
+    // each pixel sample state slot.
+    const uint8_t *valid = nrcValid;
+    float *predImg = nrcPredictedRGB;
+    const Point2i res = nrcResolution;
+    const uint32_t batch = nrcBatchSize;
+    auto *psState = &pixelSampleState;
+    Bounds2i pixelBounds = film.PixelBounds();
+    Point2i pMin = pixelBounds.pMin;
+    ParallelFor(
+        "NRC scatter predicted RGB", batch, PBRT_CPU_GPU_LAMBDA(int i) {
+            if (!valid[i])
+                return;
+            Point2i pPixel = psState->pPixel[i];
+            int x = pPixel.x - pMin.x;
+            int y = pPixel.y - pMin.y;
+            if (x < 0 || y < 0 || x >= res.x || y >= res.y)
+                return;
+            int pix = y * res.x + x;
+            predImg[pix * 3 + 0] = outputs[i * (int)kNRCOutputDims + 0];
+            predImg[pix * 3 + 1] = outputs[i * (int)kNRCOutputDims + 1];
+            predImg[pix * 3 + 2] = outputs[i * (int)kNRCOutputDims + 2];
+        });
+
+    ++nrcSampleCounter;
+    if ((nrcSampleCounter & 31) == 0)
+        LOG_VERBOSE("NRC: step %d loss %f", nrcSampleCounter, nrcLastLoss);
+}
+
+void WavefrontPathIntegrator::NRCDumpPredictedImage(const std::string &filename) {
+    if (!nrcPredictedRGB)
+        return;
+    const int W = nrcResolution.x;
+    const int H = nrcResolution.y;
+    std::string chNames[3] = {"R", "G", "B"};
+    Image img(PixelFormat::Float, Point2i(W, H),
+              pstd::span<const std::string>(chNames, 3));
+    for (int y = 0; y < H; ++y)
+        for (int x = 0; x < W; ++x)
+            for (int c = 0; c < 3; ++c)
+                img.SetChannel({x, y}, c,
+                               nrcPredictedRGB[(y * W + x) * 3 + c]);
+    ImageMetadata metadata;
+    if (img.Write(filename, metadata))
+        LOG_VERBOSE("NRC: wrote predicted image %s (%dx%d)", filename.c_str(),
+                    W, H);
+    else
+        LOG_ERROR("NRC: failed to write predicted image %s", filename.c_str());
+}
+#endif  // PBRT_BUILD_NRC
 
 }  // namespace pbrt

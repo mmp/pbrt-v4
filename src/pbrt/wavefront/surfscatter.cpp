@@ -144,6 +144,24 @@ void WavefrontPathIntegrator::EvaluateMaterialAndBSDF(MaterialEvalQueue *evalQue
             if (regularize && w.anyNonSpecularBounces)
                 bsdf.Regularize();
 
+#ifdef PBRT_BUILD_NRC
+            // NRC milestone 2: capture first-hit (pos, dir) feature vector.
+            // Inputs are stored column-major: kNRCInputDims floats per slot,
+            // pixelIndex==slot. Only the first 6 dims are populated; the
+            // remaining (16-6=10) were pre-zeroed in NRCResetSampleBuffers.
+            if (w.depth == 0 && nrcInputs != nullptr) {
+                Point3f p(w.pi);
+                float *row = nrcInputs + size_t(w.pixelIndex) * kNRCInputDims;
+                row[0] = float(p.x);
+                row[1] = float(p.y);
+                row[2] = float(p.z);
+                row[3] = float(w.wo.x);
+                row[4] = float(w.wo.y);
+                row[5] = float(w.wo.z);
+                nrcValid[w.pixelIndex] = 1;
+            }
+#endif
+
             // Initialize _VisibleSurface_ at first intersection if necessary
             if (w.depth == 0 && initializeVisibleSurface) {
                 SurfaceInteraction isect;

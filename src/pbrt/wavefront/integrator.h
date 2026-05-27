@@ -23,7 +23,16 @@
 #include <pbrt/wavefront/workitems.h>
 #include <pbrt/wavefront/workqueue.h>
 
+#include <cstdint>
+#include <string>
+
 namespace pbrt {
+
+#ifdef PBRT_BUILD_NRC
+namespace nrc {
+class NeuralRadianceCache;
+}
+#endif
 
 class BasicScene;
 class GUI;
@@ -187,6 +196,34 @@ class WavefrontPathIntegrator {
     RGB *displayRGB = nullptr, *displayRGBHost = nullptr;
     std::atomic<bool> *exitCopyThread;
     std::thread *copyThread;
+
+#ifdef PBRT_BUILD_NRC
+    // ---------------- Neural Radiance Cache (milestone 2) ----------------
+    // Buffers are CUDA-managed and indexed by pixelIndex in [0, maxQueueSize).
+    // Layouts are column-major to match tcnn::GPUMatrix:
+    //   nrcInputs:  16 floats per slot (pos.xyz, dir.xyz, then zero-padded)
+    //   nrcTargets: 3 floats per slot (RGB radiance)
+    //   nrcValid:   1 byte per slot, set at depth==0 first-hit
+    static constexpr uint32_t kNRCInputDims = 16;
+    static constexpr uint32_t kNRCOutputDims = 3;
+    uint32_t nrcBatchSize = 0;  // = NeuralRadianceCache::RoundUpBatch(maxQueueSize)
+    float *nrcInputs = nullptr;
+    float *nrcTargets = nullptr;
+    uint8_t *nrcValid = nullptr;
+    float *nrcInferenceOutputs = nullptr;  // scratch for per-step inference
+    // Persistent per-pixel predicted RGB image (sized to film resolution).
+    // Populated by per-sample inference passes; written to EXR at end of Render().
+    float *nrcPredictedRGB = nullptr;
+    Point2i nrcResolution = {0, 0};
+    nrc::NeuralRadianceCache *nrcCache = nullptr;
+    int nrcSampleCounter = 0;
+    float nrcLastLoss = 0.f;
+
+    void NRCResetSampleBuffers();
+    void NRCCaptureFinalRadiance();
+    void NRCTrainAndInferStep();
+    void NRCDumpPredictedImage(const std::string &filename);
+#endif  // PBRT_BUILD_NRC
 };
 
 }  // namespace pbrt
