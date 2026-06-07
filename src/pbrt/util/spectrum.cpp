@@ -228,20 +228,20 @@ PBRT_CPU_GPU RGB SampledSpectrum::ToRGB(const SampledWavelengths &lambda,
 }
 
 PBRT_CPU_GPU RGBAlbedoSpectrum::RGBAlbedoSpectrum(const RGBColorSpace &cs, RGB rgb) {
-    DCHECK_LE(std::max({rgb.r, rgb.g, rgb.b}), 1);
-    DCHECK_GE(std::min({rgb.r, rgb.g, rgb.b}), 0);
+    DCHECK_LE(std::max(rgb.r, std::max(rgb.g, rgb.b)), 1);
+    DCHECK_GE(std::min(rgb.r, std::min(rgb.g, rgb.b)), 0);
     rsp = cs.ToRGBCoeffs(rgb);
 }
 
 PBRT_CPU_GPU RGBUnboundedSpectrum::RGBUnboundedSpectrum(const RGBColorSpace &cs, RGB rgb) {
-    Float m = std::max({rgb.r, rgb.g, rgb.b});
+    Float m = std::max(rgb.r, std::max(rgb.g, rgb.b));
     scale = 2 * m;
     rsp = cs.ToRGBCoeffs(scale ? rgb / scale : RGB(0, 0, 0));
 }
 
 PBRT_CPU_GPU RGBIlluminantSpectrum::RGBIlluminantSpectrum(const RGBColorSpace &cs, RGB rgb)
     : illuminant(&cs.illuminant) {
-    Float m = std::max({rgb.r, rgb.g, rgb.b});
+    Float m = std::max(rgb.r, std::max(rgb.g, rgb.b));
     scale = 2 * m;
     rsp = cs.ToRGBCoeffs(scale ? rgb / scale : RGB(0, 0, 0));
 }
