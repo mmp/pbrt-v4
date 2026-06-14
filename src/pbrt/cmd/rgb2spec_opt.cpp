@@ -791,7 +791,7 @@ int main(int argc, char **argv) {
     if (argc < 3) {
         printf("Syntax: rgb2spec_opt <resolution> <output> [<gamut>]\n"
                "where <gamut> is one of "
-               "sRGB,eRGB,XYZ,ProPhotoRGB,ACES2065_1,REC2020\n");
+               "sRGB,eRGB,XYZ,ProPhotoRGB,ACES2065_1,REC2020,DCI_P3\n");
         exit(-1);
     }
     Gamut gamut = SRGB;
