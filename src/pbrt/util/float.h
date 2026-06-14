@@ -196,6 +196,11 @@ inline constexpr Float gamma(int n) {
     return (n * MachineEpsilon) / (1 - n * MachineEpsilon);
 }
 
+// Forward declarations so AddRound*/SubRound* select the correct overload
+// when Float=double (otherwise only NextFloat*Up/Down(float) is in scope).
+PBRT_CPU_GPU inline double NextFloatUp(double v);
+PBRT_CPU_GPU inline double NextFloatDown(double v);
+
 inline PBRT_CPU_GPU Float AddRoundUp(Float a, Float b) {
 #ifdef PBRT_IS_GPU_CODE
 #ifdef PBRT_FLOAT_AS_DOUBLE
