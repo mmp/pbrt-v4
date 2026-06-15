@@ -60,6 +60,8 @@ PBRT_CPU_GPU inline Float HenyeyGreenstein(Float cosTheta, Float g) {
 // Fresnel Inline Functions
 PBRT_CPU_GPU inline Float FrDielectric(Float cosTheta_i, Float eta) {
     cosTheta_i = Clamp(cosTheta_i, -1, 1);
+    // Allow negative IOR values
+    eta = Abs(eta);
     // Potentially flip interface orientation for Fresnel equations
     if (cosTheta_i < 0) {
         eta = 1 / eta;
