@@ -1121,7 +1121,7 @@ PBRT_CPU_GPU DirectionCone BilinearPatch::NormalBounds() const {
 
     // Compute average normal and return normal bounds for patch
     Vector3f n = Normalize(n00 + n10 + n01 + n11);
-    Float cosTheta = std::min({Dot(n, n00), Dot(n, n01), Dot(n, n10), Dot(n, n11)});
+    Float cosTheta = std::min(std::min(Dot(n, n00), Dot(n, n01)), std::min(Dot(n, n10), Dot(n, n11)));
     return DirectionCone(n, Clamp(cosTheta, -1, 1));
 }
 

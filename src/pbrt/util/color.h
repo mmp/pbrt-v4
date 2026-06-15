@@ -364,13 +364,18 @@ class RGBSigmoidPolynomial {
     Float c0, c1, c2;
 };
 
+// Namespace scope, not a class member: recent MSVC build tools reject a member
+// used as an array extent in a member type-alias (CoefficientArray below).
+inline constexpr int RGBToSpectrumTableRes = 64;
+
 // RGBToSpectrumTable Definition
 class RGBToSpectrumTable {
   public:
     // RGBToSpectrumTable Public Constants
-    static constexpr int res = 64;
+    static constexpr int res = RGBToSpectrumTableRes;
 
-    using CoefficientArray = float[3][res][res][res][3];
+    using CoefficientArray = float[3][RGBToSpectrumTableRes][RGBToSpectrumTableRes]
+                                  [RGBToSpectrumTableRes][3];
 
     // RGBToSpectrumTable Public Methods
     RGBToSpectrumTable(const float *zNodes, const CoefficientArray *coeffs)

@@ -229,8 +229,8 @@ template <typename T>
 T MIPMap::Filter(Point2f st, Vector2f dst0, Vector2f dst1) const {
     if (options.filter != FilterFunction::EWA) {
         // Handle non-EWA MIP Map filter
-        Float width = 2 * std::max({std::abs(dst0[0]), std::abs(dst0[1]),
-                                    std::abs(dst1[0]), std::abs(dst1[1])});
+        Float width = 2 * std::max(std::max(std::abs(dst0[0]), std::abs(dst0[1])),
+                                    std::max(std::abs(dst1[0]), std::abs(dst1[1])));
         // Compute MIP Map level for _width_ and handle very wide filter
         int nLevels = Levels();
         Float level = nLevels - 1 + Log2(std::max<Float>(width, 1e-8));
