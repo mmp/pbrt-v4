@@ -385,8 +385,9 @@ pstd::optional<LightBounds> ProjectionLight::Bounds() const {
     Float sum = 0;
     for (int v = 0; v < image.Resolution().y; ++v)
         for (int u = 0; u < image.Resolution().x; ++u)
-            sum += std::max({image.GetChannel({u, v}, 0), image.GetChannel({u, v}, 1),
-                             image.GetChannel({u, v}, 2)});
+            sum += std::max(image.GetChannel({u, v}, 0),
+                            std::max(image.GetChannel({u, v}, 1),
+                                     image.GetChannel({u, v}, 2)));
     Float phi = scale * sum / (image.Resolution().x * image.Resolution().y);
 
     Point3f pCorner(screenBounds.pMax.x, screenBounds.pMax.y, 0);

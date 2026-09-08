@@ -223,7 +223,7 @@ PBRT_CPU_GPU inline C<T> Min(Tuple2<C, T> t0, Tuple2<C, T> t1) {
 template <template <class> class C, typename T>
 PBRT_CPU_GPU inline T MinComponentValue(Tuple2<C, T> t) {
     using std::min;
-    return min({t.x, t.y});
+    return min(t.x, t.y);
 }
 
 template <template <class> class C, typename T>
@@ -240,7 +240,7 @@ PBRT_CPU_GPU inline C<T> Max(Tuple2<C, T> t0, Tuple2<C, T> t1) {
 template <template <class> class C, typename T>
 PBRT_CPU_GPU inline T MaxComponentValue(Tuple2<C, T> t) {
     using std::max;
-    return max({t.x, t.y});
+    return max(t.x, t.y);
 }
 
 template <template <class> class C, typename T>
@@ -430,7 +430,7 @@ PBRT_CPU_GPU inline C<T> Min(Tuple3<C, T> t1, Tuple3<C, T> t2) {
 template <template <class> class C, typename T>
 PBRT_CPU_GPU inline T MinComponentValue(Tuple3<C, T> t) {
     using std::min;
-    return min({t.x, t.y, t.z});
+    return min(t.x, min(t.y, t.z));
 }
 
 template <template <class> class C, typename T>
@@ -447,7 +447,7 @@ PBRT_CPU_GPU inline C<T> Max(Tuple3<C, T> t1, Tuple3<C, T> t2) {
 template <template <class> class C, typename T>
 PBRT_CPU_GPU inline T MaxComponentValue(Tuple3<C, T> t) {
     using std::max;
-    return max({t.x, t.y, t.z});
+    return max(t.x, max(t.y, t.z));
 }
 
 template <template <class> class C, typename T>
@@ -1770,7 +1770,7 @@ class OctahedralVector {
   private:
     // OctahedralVector Private Methods
     PBRT_CPU_GPU
-    static Float Sign(Float v) { return std::copysign(1.f, v); }
+    static Float Sign(Float v) { return pstd::copysign(Float(1), v); }
 
     PBRT_CPU_GPU
     static uint16_t Encode(Float f) {

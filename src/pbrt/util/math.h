@@ -885,8 +885,11 @@ class Interval {
                        MulRoundDown(low, i.high), MulRoundDown(high, i.high)};
         Float hp[4] = {MulRoundUp(low, i.low), MulRoundUp(high, i.low),
                        MulRoundUp(low, i.high), MulRoundUp(high, i.high)};
-        return {std::min({lp[0], lp[1], lp[2], lp[3]}),
-                std::max({hp[0], hp[1], hp[2], hp[3]})};
+        // std::min/max's initializer_list overload (std::min({...})) miscompiles
+        // in device code on recent MSVC build tools causing black GPU
+        // image; Use binary min/max. See mmp/pbrt-v4#495.
+        return {std::min(std::min(lp[0], lp[1]), std::min(lp[2], lp[3])),
+                std::max(std::max(hp[0], hp[1]), std::max(hp[2], hp[3]))};
     }
 
     PBRT_CPU_GPU
@@ -966,8 +969,8 @@ PBRT_CPU_GPU inline Interval Interval::operator/(Interval i) const {
                         DivRoundDown(low, i.high), DivRoundDown(high, i.high)};
     Float highQuot[4] = {DivRoundUp(low, i.low), DivRoundUp(high, i.low),
                          DivRoundUp(low, i.high), DivRoundUp(high, i.high)};
-    return {std::min({lowQuot[0], lowQuot[1], lowQuot[2], lowQuot[3]}),
-            std::max({highQuot[0], highQuot[1], highQuot[2], highQuot[3]})};
+    return {std::min(std::min(lowQuot[0], lowQuot[1]), std::min(lowQuot[2], lowQuot[3])),
+            std::max(std::max(highQuot[0], highQuot[1]), std::max(highQuot[2], highQuot[3]))};
 }
 
 PBRT_CPU_GPU inline Interval Sqr(Interval i) {
@@ -1075,14 +1078,16 @@ PBRT_CPU_GPU inline Interval sqrt(Interval i) {
 }
 
 PBRT_CPU_GPU inline Interval FMA(Interval a, Interval b, Interval c) {
-    Float low = std::min({FMARoundDown(a.LowerBound(), b.LowerBound(), c.LowerBound()),
-                          FMARoundDown(a.UpperBound(), b.LowerBound(), c.LowerBound()),
-                          FMARoundDown(a.LowerBound(), b.UpperBound(), c.LowerBound()),
-                          FMARoundDown(a.UpperBound(), b.UpperBound(), c.LowerBound())});
-    Float high = std::max({FMARoundUp(a.LowerBound(), b.LowerBound(), c.UpperBound()),
-                           FMARoundUp(a.UpperBound(), b.LowerBound(), c.UpperBound()),
-                           FMARoundUp(a.LowerBound(), b.UpperBound(), c.UpperBound()),
-                           FMARoundUp(a.UpperBound(), b.UpperBound(), c.UpperBound())});
+    Float low = std::min(
+        std::min(FMARoundDown(a.LowerBound(), b.LowerBound(), c.LowerBound()),
+                 FMARoundDown(a.UpperBound(), b.LowerBound(), c.LowerBound())),
+        std::min(FMARoundDown(a.LowerBound(), b.UpperBound(), c.LowerBound()),
+                 FMARoundDown(a.UpperBound(), b.UpperBound(), c.LowerBound())));
+    Float high = std::max(
+        std::max(FMARoundUp(a.LowerBound(), b.LowerBound(), c.UpperBound()),
+                 FMARoundUp(a.UpperBound(), b.LowerBound(), c.UpperBound())),
+        std::max(FMARoundUp(a.LowerBound(), b.UpperBound(), c.UpperBound()),
+                 FMARoundUp(a.UpperBound(), b.UpperBound(), c.UpperBound())));
     return Interval(low, high);
 }
 
@@ -1090,16 +1095,16 @@ PBRT_CPU_GPU inline Interval DifferenceOfProducts(Interval a, Interval b, Interv
                                                   Interval d) {
     Float ab[4] = {a.LowerBound() * b.LowerBound(), a.UpperBound() * b.LowerBound(),
                    a.LowerBound() * b.UpperBound(), a.UpperBound() * b.UpperBound()};
-    Float abLow = std::min({ab[0], ab[1], ab[2], ab[3]});
-    Float abHigh = std::max({ab[0], ab[1], ab[2], ab[3]});
+    Float abLow = std::min(std::min(ab[0], ab[1]), std::min(ab[2], ab[3]));
+    Float abHigh = std::max(std::max(ab[0], ab[1]), std::max(ab[2], ab[3]));
     int abLowIndex = abLow == ab[0] ? 0 : (abLow == ab[1] ? 1 : (abLow == ab[2] ? 2 : 3));
     int abHighIndex =
         abHigh == ab[0] ? 0 : (abHigh == ab[1] ? 1 : (abHigh == ab[2] ? 2 : 3));
 
     Float cd[4] = {c.LowerBound() * d.LowerBound(), c.UpperBound() * d.LowerBound(),
                    c.LowerBound() * d.UpperBound(), c.UpperBound() * d.UpperBound()};
-    Float cdLow = std::min({cd[0], cd[1], cd[2], cd[3]});
-    Float cdHigh = std::max({cd[0], cd[1], cd[2], cd[3]});
+    Float cdLow = std::min(std::min(cd[0], cd[1]), std::min(cd[2], cd[3]));
+    Float cdHigh = std::max(std::max(cd[0], cd[1]), std::max(cd[2], cd[3]));
     int cdLowIndex = cdLow == cd[0] ? 0 : (cdLow == cd[1] ? 1 : (cdLow == cd[2] ? 2 : 3));
     int cdHighIndex =
         cdHigh == cd[0] ? 0 : (cdHigh == cd[1] ? 1 : (cdHigh == cd[2] ? 2 : 3));
