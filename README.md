@@ -1,5 +1,5 @@
-pbrt, Version 4 (Early Release)
-===============================
+pbrt, Version 4
+==================
 
 [<img src="https://github.com/mmp/pbrt-v4/workflows/cpu-linux-build-and-test/badge.svg">](https://github.com/mmp/pbrt-v4/actions?query=workflow%3Acpu-linux-build-and-test)
 [<img src="https://github.com/mmp/pbrt-v4/workflows/cpu-macos-build-and-test/badge.svg">](https://github.com/mmp/pbrt-v4/actions?query=workflow%3Acpu-macos-build-and-test)
@@ -8,20 +8,10 @@ pbrt, Version 4 (Early Release)
 
 ![Transparent Machines frame, via @beeple](images/teaser-transparent-machines.png)
 
-This is an early release of pbrt-v4, the rendering system that will be
-described in the forthcoming fourth edition of *Physically Based Rendering:
-From Theory to Implementation*.  (The printed book will be available in
-mid-February 2023; a few chapters will be made available in late Fall of
-2022; and the full contents of the book will be freely available six months
-after the book's release, like the [third edition](https://pbr-book.org) is
-already.)
-
-We are making this code available for hardy adventurers; it's not yet
-extensively documented, but if you are familiar with previous versions of
-pbrt, you should be able to make your way around it.  Our hope is that the
-system will be useful to some people in its current form and that any bugs
-in the current implementation might be found now, allowing us to correct
-them before the book is final.
+This is pbrt-v4, the rendering system that is
+described in the fourth edition of *Physically Based Rendering:
+From Theory to Implementation*. The printed edition can be
+bought from all of the usual places and the [full contents of the book are freely available online](https://pbr-book.org).
 
 Resources
 ---------
@@ -91,12 +81,13 @@ Major changes include:
 We have also made a refactoring pass throughout the entire system, cleaning
 up various APIs and data types to improve both readability and usability.
 
-Finally, pbrt-v4 can work together with the
-[tev](https://github.com/Tom94/tev) image viewer to display the image as
-it's being rendered.  As of recent versions, *tev* can display images
-provided to it via a network socket; by default, it listens to port 14158,
-though this can be changed via its ``--hostname`` command-line option.  If
-you have an instance of *tev* running, you can run pbrt like:
+Finally, pbrt-v4 can work together with both the
+[tev](https://github.com/Tom94/tev) and [hdrview](https://github.com/wkjarosz/hdrview)
+images viewer to display the image as
+it's being rendered.  Both can display images
+provided to it via a network socket; by default, they listens to port 14158,
+though this can be changed via command-line options.  If
+you have an instance of *tev* or *hdrview*, you can run pbrt like:
 ```bash
 $ pbrt --display-server localhost:14158 scene.pbrt
 ```
@@ -124,8 +115,8 @@ release build is the default; provide `-DCMAKE_BUILD_TYPE=Debug` to cmake
 for a debug build.
 
 pbrt should build on any system that has C++ compiler with support for
-C++17; we have verified that it builds on Ubuntu 20.04, MacOS 10.14, and
-Windows 10.  We welcome PRs that fix any issues that prevent it from
+C++17; we have verified that it builds on Ubuntu 20.04, MacOS 10.14+, and
+Windows 10 and 11.  We welcome PRs that fix any issues that prevent it from
 building on other systems.
 
 Bug Reports and PRs
@@ -140,14 +131,6 @@ We are always happy to receive pull requests that fix bugs, including bugs
 you find yourself or fixes for open issues in the issue tracker.  We are
 also happy to hear suggestions about improvements to the implementations of
 the various algorithms we have implemented.
-
-Note, however, that in the interests of finishing the book in a finite
-amount of time, the functionality of pbrt-v4 is basically fixed at this
-point.  We therefore will not be accepting PRs that make major changes to the
-system's operation or structure (but feel free to keep them in your own
-forks!).  Also, don't bother sending PRs for anything marked "TODO" or
-"FIXME" in the source code; we'll take care of those as we finish polishing
-things up.
 
 Updating pbrt-v3 scenes
 -----------------------
@@ -172,7 +155,7 @@ Converting scenes to pbrt's file format
 ---------------------------------------
 
 The best option for importing scenes to pbrt is to use
-[assimp](https://www.assimp.org/), which as of January 21, 2021 includes
+[assimp](https://www.assimp.org/), recent versions of which include
 support for exporting to pbrt-v4's file format:
 ```bash
 $ assimp export scene.fbx scene.pbrt
