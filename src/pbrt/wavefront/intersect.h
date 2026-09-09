@@ -206,6 +206,10 @@ inline PBRT_CPU_GPU void TraceTransmittance(ShadowRayWorkItem sr,
 
                     // ratio-tracking: only evaluate null scattering
                     Float pr = T_maj[0] * sigma_maj[0];
+                    if (pr == 0) {
+                        T_ray = SampledSpectrum(0.f);
+                        return false;
+                    }
                     T_ray *= T_maj * sigma_n / pr;
                     r_l *= T_maj * sigma_maj / pr;
                     r_u *= T_maj * sigma_n / pr;
