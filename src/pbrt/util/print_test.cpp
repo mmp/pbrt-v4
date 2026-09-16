@@ -11,7 +11,7 @@
 #include <pbrt/util/transform.h>
 #include <pbrt/util/vecmath.h>
 
-#include <double-conversion/double-conversion.h>
+#include <fast_float/fast_float.h>
 #include <array>
 #include <sstream>
 #include <typeinfo>
@@ -84,20 +84,16 @@ TEST(StringPrintf, FancyPctD) {
 }
 
 TEST(StringPrintf, Precision) {
-    double_conversion::StringToDoubleConverter floatParser(
-        double_conversion::StringToDoubleConverter::ALLOW_HEX,
-        0. /* empty string value */, 0. /* junk string value */,
-        nullptr /* infinity symbol */, nullptr /* NaN symbol */);
-
     std::string pi = StringPrintf("%f", float(Pi));
-    int length;
-    float val = floatParser.StringToFloat(pi.data(), pi.size(), &length);
-    EXPECT_NE(0, length);
+    float val;
+    auto r1 = fast_float::from_chars(pi.data(), pi.data() + pi.size(), val);
+    EXPECT_EQ(r1.ec, std::errc{});
     EXPECT_EQ(val, Pi);
 
     std::string e = StringPrintf("%f", std::exp(1.));
-    double dval = floatParser.StringToDouble(e.data(), e.size(), &length);
-    EXPECT_NE(0, length);
+    double dval;
+    auto r2 = fast_float::from_chars(e.data(), e.data() + e.size(), dval);
+    EXPECT_EQ(r2.ec, std::errc{});
     EXPECT_EQ(dval, std::exp(1.));
 }
 
