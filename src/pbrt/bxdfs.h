@@ -587,8 +587,11 @@ class LayeredBxDF {
                             // Account for scattering through _exitInterface_
                             SampledSpectrum fExit = exitInterface.f(-w, wi, mode);
                             if (fExit) {
+                                // The competing strategy is _wis_, which samples
+                                // this inside direction from _wi_; weight against
+                                // its density, not the density of _wi_ given -w.
                                 Float exitPDF = exitInterface.PDF(
-                                    -w, wi, mode, BxDFReflTransFlags::Transmission);
+                                    wi, -w, !mode, BxDFReflTransFlags::Transmission);
                                 Float wt = PowerHeuristic(1, ps->pdf, 1, exitPDF);
                                 f += beta * Tr(zp - exitZ, ps->wi) * fExit * wt;
                             }
@@ -638,8 +641,10 @@ class LayeredBxDF {
                         if (fExit) {
                             Float wt = 1;
                             if (!IsSpecular(nonExitInterface.Flags())) {
+                                // As above: _wis_'s density of this inside
+                                // direction, sampled from _wi_.
                                 Float exitPDF = exitInterface.PDF(
-                                    -w, wi, mode, BxDFReflTransFlags::Transmission);
+                                    wi, -w, !mode, BxDFReflTransFlags::Transmission);
                                 wt = PowerHeuristic(1, bs->pdf, 1, exitPDF);
                             }
                             f += beta * Tr(thickness, bs->wi) * fExit * wt;
