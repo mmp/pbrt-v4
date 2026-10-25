@@ -1457,7 +1457,7 @@ pstd::vector<Shape> Shape::Create(
         if (!plyMesh.triIndices.empty()) {
             TriangleMesh *mesh = alloc.new_object<TriangleMesh>(
                 *renderFromObject, reverseOrientation, plyMesh.triIndices, plyMesh.p,
-                std::vector<Vector3f>(), plyMesh.n, plyMesh.uv, plyMesh.faceIndices,
+                std::vector<Vector3f>(), plyMesh.n, plyMesh.uv, plyMesh.triFaceIndices,
                 alloc);
             shapes = Triangle::CreateTriangles(mesh, alloc);
         }
@@ -1465,7 +1465,7 @@ pstd::vector<Shape> Shape::Create(
         if (!plyMesh.quadIndices.empty()) {
             BilinearPatchMesh *mesh = alloc.new_object<BilinearPatchMesh>(
                 *renderFromObject, reverseOrientation, plyMesh.quadIndices, plyMesh.p,
-                plyMesh.n, plyMesh.uv, plyMesh.faceIndices, nullptr /* image dist */,
+                plyMesh.n, plyMesh.uv, plyMesh.quadFaceIndices, nullptr /* image dist */,
                 alloc);
             pstd::vector<Shape> quadMesh = BilinearPatch::CreatePatches(mesh, alloc);
             shapes.insert(shapes.end(), quadMesh.begin(), quadMesh.end());
