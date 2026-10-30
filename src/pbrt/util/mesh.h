@@ -101,13 +101,20 @@ struct TriQuadMesh {
             outputMesh.ComputeNormals();
         std::vector<int> oldTriIndices(outputMesh.triIndices);
         outputMesh.triIndices.clear();
+        std::vector<int> oldTriFaceIndices = std::move(outputMesh.triFaceIndices);
+        outputMesh.triFaceIndices.clear();
 
         // Refine
         HashMap<std::pair<int, int>, int, HashIntPair> edgeSplit({});
-        for (int i = 0; i < oldTriIndices.size() / 3; ++i)
+        for (int i = 0; i < oldTriIndices.size() / 3; ++i) {
             outputMesh.Refine(dist, maxDist, oldTriIndices[3 * i],
                               oldTriIndices[3 * i + 1], oldTriIndices[3 * i + 2],
                               edgeSplit);
+            // All triangles generated from this one inherit its face index.
+            if (!oldTriFaceIndices.empty())
+                outputMesh.triFaceIndices.resize(outputMesh.triIndices.size() / 3,
+                                                 oldTriFaceIndices[i]);
+        }
 
         // Displace
         displace(outputMesh.p.data(), outputMesh.n.data(), outputMesh.uv.data(),
@@ -121,8 +128,11 @@ struct TriQuadMesh {
     std::vector<Point3f> p;
     std::vector<Normal3f> n;
     std::vector<Point2f> uv;
-    std::vector<int> faceIndices;
     std::vector<int> triIndices, quadIndices;
+    // Per-face indices from the PLY file's optional "face_indices" property,
+    // split to match triIndices (one per triangle) and quadIndices (one per
+    // quad). Both are empty if the file doesn't provide them.
+    std::vector<int> triFaceIndices, quadFaceIndices;
 
   private:
     // TriQuadMesh Private Methods
