@@ -2202,7 +2202,7 @@ Float MISWeight(const Integrator &integrator, Camera camera, Vertex *lightVertic
     }
 
     // See https://github.com/mmp/pbrt-v4/issues/347
-    if (t == 1) sumRi /= splatScale;
+    if (t == 1) sumRi *= splatScale;
     return 1 / (1 + sumRi);
 }
 
