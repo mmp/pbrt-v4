@@ -226,6 +226,7 @@ class Array2D {
             values = allocator.allocate_object<T>(no);
             for (int i = 0; i < no; ++i)
                 allocator.construct(values + i, other.values[i]);
+            extent = other.extent;
         }
         return *this;
     }
@@ -591,7 +592,7 @@ class InlinedVector {
 
     void resize(size_type n) {
         if (n < size()) {
-            for (size_t i = n; n < size(); ++i)
+            for (size_t i = n; i < size(); ++i)
                 alloc.destroy(begin() + i);
         } else if (n > size()) {
             reserve(n);
@@ -658,7 +659,7 @@ class HashMap {
         PBRT_CPU_GPU
         std::pair<Key, Value> *operator->() { return &ptr->value(); }
         PBRT_CPU_GPU
-        const std::pair<Key, Value> *operator->() const { return ptr->value(); }
+        const std::pair<Key, Value> *operator->() const { return &ptr->value(); }
 
       private:
         friend class HashMap;
