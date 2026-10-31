@@ -75,16 +75,10 @@ set_property (TARGET Ptex_static ptxinfo halftest ftest rtest wtest PROPERTY FOL
 set (PTEX_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/ptex/src/ptex PARENT_SCOPE)
 
 ###########################################################################
-# double-conversion
+# fast_float
 
-add_subdirectory (double-conversion)
-
-set (DOUBLE_CONVERSION_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/double-conversion PARENT_SCOPE)
-
-set_property (TARGET double-conversion PROPERTY FOLDER "ext")
-if (TARGET cctest)
-  set_property (TARGET cctest PROPERTY FOLDER "ext")
-endif()
+add_library (fast_float INTERFACE)
+target_include_directories (fast_float INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/fast_float/include)
 
 ###########################################################################
 # nanovdb

@@ -18,7 +18,7 @@
 #include <pbrt/util/stats.h>
 #include <pbrt/util/string.h>
 
-#include <double-conversion/double-conversion.h>
+#include <fast_float/fast_float.h>
 
 #include <cctype>
 #include <cstdio>
@@ -123,9 +123,6 @@ static char decodeEscaped(int ch, const FileLoc &loc) {
     return 0;  // NOTREACHED
 }
 
-static double_conversion::StringToDoubleConverter floatParser(
-    double_conversion::StringToDoubleConverter::ALLOW_HEX, 0. /* empty string value */,
-    0. /* junk string value */, nullptr /* infinity symbol */, nullptr /* NaN symbol */);
 
 std::unique_ptr<Tokenizer> Tokenizer::CreateFromFile(
     const std::string &filename,
@@ -402,10 +399,22 @@ static double parseFloat(const Token &t) {
         char *endptr;
         val = double(strtol(bufp, &endptr, 10));
         length = endptr - bufp;
-    } else if (sizeof(Float) == sizeof(float))
-        val = floatParser.StringToFloat(bufp, t.token.size(), &length);
-    else
-        val = floatParser.StringToDouble(bufp, t.token.size(), &length);
+    } else {
+        const char *end = bufp + t.token.size();
+        const bool isHex = t.token.size() >= 2 && bufp[0] == '0' && (bufp[1] == 'x' || bufp[1] == 'X');
+        const char *start = isHex ? bufp + 2 : bufp;
+        const auto fmt = isHex ? fast_float::chars_format::hex : fast_float::chars_format::general;
+        fast_float::from_chars_result result;
+        if (sizeof(Float) == sizeof(float)) {
+            float fval;
+            result = fast_float::from_chars(start, end, fval, fmt);
+            val = fval;
+        } else {
+            result = fast_float::from_chars(start, end, val, fmt);
+        }
+        if (result.ec == std::errc{})
+            length = result.ptr - bufp;
+    }
 
     if (length == 0)
         ErrorExit(&t.loc, "%s: expected a number", toString(t.token));
