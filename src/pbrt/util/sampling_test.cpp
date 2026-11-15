@@ -1317,8 +1317,6 @@ TEST(SummedArea, NonCellAligned) {
 }
 
 TEST(Sampling, HGExtremes) {
-    Float cosTheta;
-
     for (Float g : { -.999f, .999f, -1.f, 1.f }) {
         for (Float u : { Float(0), OneMinusEpsilon }) {
             Float pdf;
