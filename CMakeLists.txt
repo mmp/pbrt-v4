@@ -1087,6 +1087,7 @@ set_property (TARGET cyhair2pbrt PROPERTY FOLDER "cmd")
 
 set (PBRT_TEST_SOURCE
   src/pbrt/bsdfs_test.cpp
+  src/pbrt/film_test.cpp
   src/pbrt/filters_test.cpp
   src/pbrt/lights_test.cpp
   src/pbrt/lightsamplers_test.cpp
