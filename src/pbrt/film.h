@@ -447,7 +447,8 @@ class SpectralFilm : public FilmBase {
         L *= weight * CIE_Y_integral;
 
         // Accumulate contributions in spectral buckets.
-        for (int i = 0; i < NSpectrumSamples; ++i) {
+        const int numberOfWavelengths = lambda.SecondaryTerminated() ? 1 : NSpectrumSamples;
+        for (int i = 0; i < numberOfWavelengths; ++i) {
             int b = LambdaToBucket(lambda[i]);
             pixel.bucketSums[b] += L[i];
             pixel.weightSums[b] += weight;
