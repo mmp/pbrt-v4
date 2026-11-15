@@ -999,14 +999,16 @@ Image SpectralFilm::GetImage(ImageMetadata *metadata, Float splatScale) {
         // Set spectral channels. Hardcoded assuming that they come
         // immediately after RGB, as is currently specified above.
         for (int i = 0; i < nBuckets; ++i) {
-            Float c = 0;
-            if (pixel.weightSums[i] > 0) {
-                c = pixel.bucketSums[i] / pixel.weightSums[i] +
-                    splatScale * pixel.bucketSplats[i] / filterIntegral;
-                if (writeFP16 && c > 65504) {
-                    c = 65504;
-                    ++nClamped;
-                }
+            // Splat term in the same units as the sample mean (sum(L/pdf)/N per
+            // splat integrates L over the bucket; AddSample stores mean L * CIE_Y_integral),
+            // and kept even when the bucket received no camera samples (lightpath).
+            Float c = splatScale * pixel.bucketSplats[i] * CIE_Y_integral * nBuckets /
+                      ((lambdaMax - lambdaMin) * filterIntegral);
+            if (pixel.weightSums[i] > 0)
+                c += pixel.bucketSums[i] / pixel.weightSums[i];
+            if (writeFP16 && c > 65504) {
+                c = 65504;
+                ++nClamped;
             }
             image.SetChannel(pOffset, 3 + i, c);
         }
