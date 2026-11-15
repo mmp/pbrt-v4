@@ -112,7 +112,7 @@ TEST(SpectralFilm, TerminatedSecondaryWavelengths) {
 
     // A finite maxComponentValue that is larger than all of the valid
     // radiance values should not cause any clamping.
-    for (Float maxComponentValue : {Infinity, 100.f}) {
+    for (Float maxComponentValue : {Float(Infinity), Float(100)}) {
         for (int nBuckets : {1, 15, 30, 64}) {
             SpectralFilm film(fp, lambdaMin, lambdaMax, nBuckets, RGBColorSpace::sRGB,
                               maxComponentValue, false /* writeFP16 */);
