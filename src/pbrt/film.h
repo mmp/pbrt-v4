@@ -430,28 +430,40 @@ class SpectralFilm : public FilmBase {
             pixel.rgbSum[c] += weight * rgb[c];
         pixel.rgbWeightSum += weight;
 
-        // Spectral processing starts here.
+        // Spectral processing starts here. If the secondary wavelengths have
+        // been terminated, only the radiance value for lambda[0] is valid.
+        bool terminated = lambda.SecondaryTerminated();
+
         // Optionally clamp spectral value. (TODO: for spectral should we
         // just clamp channels individually?)
-        Float lm = L.MaxComponentValue();
+        Float lm = terminated ? L[0] : L.MaxComponentValue();
         if (lm > maxComponentValue)
             L *= maxComponentValue / lm;
 
         // The CIE_Y_integral factor effectively cancels out the effect of
         // the conversion of light sources to use photometric units for
-        // specification.  We then do *not* divide by the PDF in |lambda|
-        // but take advantage of the fact that we know that it is uniform
-        // in SampleWavelengths(), the fact that the buckets all have the
-        // same extend, and can then just average radiance in buckets
+        // specification.  We then do *not* divide by the PDFs in |lambda|
+        // but take advantage of the fact that SampleWavelengths() samples
+        // wavelengths uniformly and the fact that the buckets all have the
+        // same extent, and can then just average radiance in buckets
         // below.
         L *= weight * CIE_Y_integral;
 
         // Accumulate contributions in spectral buckets.
-        const int numberOfWavelengths = lambda.SecondaryTerminated() ? 1 : NSpectrumSamples;
-        for (int i = 0; i < numberOfWavelengths; ++i) {
-            int b = LambdaToBucket(lambda[i]);
-            pixel.bucketSums[b] += L[i];
-            pixel.weightSums[b] += weight;
+        if (terminated) {
+            // Only lambda[0] is valid; TerminateSecondary() divides its
+            // PDF by NSpectrumSamples, so give it NSpectrumSamples times
+            // the weight in order to not under-weight it in the bucket's
+            // average relative to non-terminated samples.
+            int b = LambdaToBucket(lambda[0]);
+            pixel.bucketSums[b] += NSpectrumSamples * L[0];
+            pixel.weightSums[b] += NSpectrumSamples * weight;
+        } else {
+            for (int i = 0; i < NSpectrumSamples; ++i) {
+                int b = LambdaToBucket(lambda[i]);
+                pixel.bucketSums[b] += L[i];
+                pixel.weightSums[b] += weight;
+            }
         }
     }
 

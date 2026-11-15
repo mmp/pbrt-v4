@@ -87,3 +87,68 @@ TEST(SpectralFilm, SplatMatchesSample) {
         }
     }
 }
+
+// When a path's secondary wavelengths have been terminated (e.g., due to
+// dispersion), only lambda[0] carries a valid radiance estimate. Check that
+// SpectralFilm ignores the radiance values at the terminated wavelengths,
+// including when clamping, and that it weights lambda[0]'s value correctly
+// relative to non-terminated samples in the spectral bucket averages.
+// (https://github.com/mmp/pbrt-v4/pull/550)
+TEST(SpectralFilm, TerminatedSecondaryWavelengths) {
+    const Float lambdaMin = 400, lambdaMax = 700;
+    // Radiance for samples with and without terminated secondary
+    // wavelengths, respectively. Both are linear in wavelength, so that
+    // their averages over a bucket are their values at the bucket's center.
+    auto t = [&](Float lambda) { return (lambda - lambdaMin) / (lambdaMax - lambdaMin); };
+    auto LTerminated = [&](Float lambda) { return 2 + 2 * t(lambda); };
+    auto LFull = [&](Float lambda) { return 1 - 0.5f * t(lambda); };
+    // Radiance at terminated wavelengths; it should have no effect.
+    const Float LIgnored = 1000;
+
+    BoxFilter boxFilter(Vector2f(0.5, 0.5));
+    Point2i resolution(1, 1);
+    FilmBaseParameters fp(resolution, Bounds2i(Point2i(0, 0), resolution), &boxFilter,
+                          1., PixelSensor::CreateDefault(), "test.exr");
+
+    // A finite maxComponentValue that is larger than all of the valid
+    // radiance values should not cause any clamping.
+    for (Float maxComponentValue : {Infinity, 100.f}) {
+        for (int nBuckets : {1, 15, 30, 64}) {
+            SpectralFilm film(fp, lambdaMin, lambdaMax, nBuckets, RGBColorSpace::sRGB,
+                              maxComponentValue, false /* writeFP16 */);
+
+            // Provide pairs of samples, one with terminated secondary
+            // wavelengths and one without, so that the pixel's radiance is
+            // the average of LTerminated and LFull. As in the
+            // SplatMatchesSample test, stratify the wavelengths so that each
+            // bucket's estimate is exact for linear radiance functions.
+            int nSamples = 64 * nBuckets * NSpectrumSamples;
+            for (int i = 0; i < nSamples; ++i) {
+                SampledWavelengths lambda = film.SampleWavelengths((i + 0.5f) / nSamples);
+                SampledSpectrum L;
+                for (int j = 0; j < NSpectrumSamples; ++j)
+                    L[j] = LFull(lambda[j]);
+                film.AddSample(Point2i(0, 0), L, lambda, nullptr, 1);
+
+                lambda.TerminateSecondary();
+                L = SampledSpectrum(LIgnored);
+                L[0] = LTerminated(lambda[0]);
+                film.AddSample(Point2i(0, 0), L, lambda, nullptr, 1);
+            }
+
+            ImageMetadata metadata;
+            Image image = film.GetImage(&metadata);
+            ASSERT_EQ(3 + nBuckets, image.NChannels());
+
+            for (int b = 0; b < nBuckets; ++b) {
+                Float lambdaCenter = Lerp((b + 0.5f) / nBuckets, lambdaMin, lambdaMax);
+                Float expected = CIE_Y_integral *
+                                 (LTerminated(lambdaCenter) + LFull(lambdaCenter)) / 2;
+                Float v = image.GetChannel(Point2i(0, 0), 3 + b);
+                EXPECT_NEAR(expected, v, 1e-3f * expected)
+                    << "nBuckets " << nBuckets << ", maxComponentValue "
+                    << maxComponentValue << ", bucket " << b;
+            }
+        }
+    }
+}
