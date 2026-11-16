@@ -708,7 +708,7 @@ bool Curve::RecursiveIntersect(const Ray &ray, Float tMax, pstd::span<const Poin
                 if (common->type == CurveType::Cylinder) {
                     // Rotate _dpdvPlane_ to give cylindrical appearance
                     Float theta = Lerp(v, -90, 90);
-                    Transform rot = Rotate(-theta, dpduPlane);
+                    Transform rot = Rotate(theta, dpduPlane);
                     dpdvPlane = rot(dpdvPlane);
                 }
                 dpdv = objectFromRay(dpdvPlane);
