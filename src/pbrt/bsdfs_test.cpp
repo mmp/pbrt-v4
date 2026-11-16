@@ -650,6 +650,45 @@ TEST(BSDFEnergyConservation,
 }
 #endif
 
+///////////////////////////////////////////////////////////////////////////
+// Layered BSDF Tests
+
+// f() and Sample_f() are two estimators of the same BSDF; the directional
+// albedo computed from each must agree. A rough coat exercises the MIS
+// between the random walk's two NEE strategies inside f().
+TEST(LayeredBxDF, SamplingConsistency) {
+    for (Float roughness : {0.1f, 0.3f}) {
+        Float alpha = TrowbridgeReitzDistribution::RoughnessToAlpha(roughness);
+        TrowbridgeReitzDistribution distrib(alpha, alpha);
+        CoatedDiffuseBxDF bxdf(DielectricBxDF(1.5, distrib),
+                               DiffuseBxDF(SampledSpectrum(1.f)), 0.01,
+                               SampledSpectrum(0.f), 0.f, 10, 1);
+        for (Float cosTheta : {0.95f, 0.6f, 0.3f}) {
+            Vector3f wo(SafeSqrt(1 - Sqr(cosTheta)), 0, cosTheta);
+            RNG rng;
+            const int count = 256 * 1024;
+            Float fSampled = 0, fUniform = 0;
+            for (int i = 0; i < count; ++i) {
+                Float uc = rng.Uniform<Float>();
+                Point2f u(rng.Uniform<Float>(), rng.Uniform<Float>());
+                pstd::optional<BSDFSample> bs =
+                    bxdf.Sample_f(wo, uc, u, TransportMode::Radiance);
+                if (bs && bs->pdf > 0)
+                    fSampled += bs->f[0] * AbsCosTheta(bs->wi) / bs->pdf;
+                Vector3f wi = SampleUniformHemisphere(
+                    Point2f(rng.Uniform<Float>(), rng.Uniform<Float>()));
+                fUniform += bxdf.f(wo, wi, TransportMode::Radiance)[0] *
+                            AbsCosTheta(wi) / UniformHemispherePDF();
+            }
+            fSampled /= count;
+            fUniform /= count;
+            EXPECT_LT(std::abs(fSampled - fUniform) / fSampled, 0.02)
+                << "roughness " << roughness << ", cos theta " << cosTheta
+                << ": albedo from Sample_f() " << fSampled << ", from f() " << fUniform;
+        }
+    }
+}
+
 // Hair Tests
 #if 0
 TEST(Hair, Reciprocity) {
