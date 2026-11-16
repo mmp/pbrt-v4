@@ -248,6 +248,9 @@ std::string BilinearPatchMesh::ToString() const {
 struct FaceCallbackContext {
     int face[4];
     std::vector<int> triIndices, quadIndices;
+    // Vertex count of each face in file order (0 for skipped faces), used
+    // to route face_indices values to triangles or quads.
+    std::vector<uint8_t> faceKinds;
 };
 
 void rply_message_callback(p_ply ply, const char *message) {
@@ -279,17 +282,21 @@ int rply_face_callback(p_ply_argument argument) {
     long length, value_index;
     ply_get_argument_property(argument, nullptr, &length, &value_index);
 
-    if (length != 3 && length != 4) {
-        Warning("plymesh: Ignoring face with %i vertices (only triangles and quads "
-                "are supported!)",
-                (int)length);
+    if (value_index < 0) {
+        // Called once per face with the list length before its values.
+        if (length == 3 || length == 4)
+            context->faceKinds.push_back(uint8_t(length));
+        else {
+            context->faceKinds.push_back(0);
+            Warning("plymesh: Ignoring face with %i vertices (only triangles and quads "
+                    "are supported!)",
+                    (int)length);
+        }
         return 1;
-    } else if (value_index < 0) {
+    } else if (length != 3 && length != 4)
         return 1;
-    }
 
-    if (value_index >= 0)
-        context->face[value_index] = (int)ply_get_argument_value(argument);
+    context->face[value_index] = (int)ply_get_argument_value(argument);
 
     if (value_index == length - 1) {
         if (length == 3)
@@ -396,9 +403,11 @@ TriQuadMesh TriQuadMesh::ReadPLY(const std::string &filename) {
         0)
         ErrorExit("%s: vertex indices not found in PLY file", filename);
 
+    std::vector<int> faceIndices;
+    context.faceKinds.reserve(faceCount);
     if (ply_set_read_cb(ply, "face", "face_indices", rply_faceindex_callback,
-                        &mesh.faceIndices, 0) != 0)
-        mesh.faceIndices.reserve(faceCount);
+                        &faceIndices, 0) != 0)
+        faceIndices.reserve(faceCount);
 
     if (ply_read(ply) == 0)
         ErrorExit("%s: unable to read the contents of PLY file", filename);
@@ -407,6 +416,23 @@ TriQuadMesh TriQuadMesh::ReadPLY(const std::string &filename) {
     mesh.quadIndices = std::move(context.quadIndices);
 
     ply_close(ply);
+
+    // Split the face indices between triangles and quads, dropping those
+    // of faces that were skipped.
+    if (!faceIndices.empty()) {
+        if (faceIndices.size() != context.faceKinds.size())
+            Warning("%s: number of face indices %d doesn't match number of faces %d. "
+                    "Discarding face indices.",
+                    filename, int(faceIndices.size()), int(context.faceKinds.size()));
+        else {
+            for (size_t i = 0; i < faceIndices.size(); ++i) {
+                if (context.faceKinds[i] == 3)
+                    mesh.triFaceIndices.push_back(faceIndices[i]);
+                else if (context.faceKinds[i] == 4)
+                    mesh.quadFaceIndices.push_back(faceIndices[i]);
+            }
+        }
+    }
 
     for (int idx : mesh.triIndices)
         if (idx < 0 || idx >= mesh.p.size())
@@ -438,7 +464,14 @@ void TriQuadMesh::ConvertToOnlyTriangles() {
         triIndices.push_back(quadIndices[i + 2]);
     }
 
+    // Both triangles from a quad get the quad's face index.
+    for (int fi : quadFaceIndices) {
+        triFaceIndices.push_back(fi);
+        triFaceIndices.push_back(fi);
+    }
+
     quadIndices.clear();
+    quadFaceIndices.clear();
 }
 
 void TriQuadMesh::ComputeNormals() {
@@ -467,9 +500,10 @@ void TriQuadMesh::ComputeNormals() {
 }
 
 std::string TriQuadMesh::ToString() const {
-    return StringPrintf("[ TriQuadMesh p: %s n: %s uv: %s faceIndices: %s triIndices: %s "
-                        "quadIndices: %s ]",
-                        p, n, uv, faceIndices, triIndices, quadIndices);
+    return StringPrintf("[ TriQuadMesh p: %s n: %s uv: %s triIndices: %s "
+                        "quadIndices: %s triFaceIndices: %s quadFaceIndices: %s ]",
+                        p, n, uv, triIndices, quadIndices, triFaceIndices,
+                        quadFaceIndices);
 }
 
 }  // namespace pbrt

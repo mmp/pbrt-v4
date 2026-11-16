@@ -423,7 +423,7 @@ OptiXAggregate::BVH OptiXAggregate::buildBVHForTriangles(
             mesh = alloc.new_object<TriangleMesh>(
                 *shape.renderFromObject, shape.reverseOrientation, plyMesh.triIndices,
                 plyMesh.p, std::vector<Vector3f>(), plyMesh.n, plyMesh.uv,
-                plyMesh.faceIndices, alloc);
+                plyMesh.triFaceIndices, alloc);
         } else
             LOG_FATAL("Logic error in GPUAggregate::buildBVHForTriangles()");
 

@@ -137,7 +137,8 @@ int info(std::vector<std::string> args) {
         Printf("\tVertex positions: %d\n", mesh.p.size());
         Printf("\tVertex normals: %d\n", mesh.n.size());
         Printf("\tVertex uvs: %d\n", mesh.uv.size());
-        Printf("\tFace indices: %d\n", mesh.faceIndices.size());
+        Printf("\tFace indices: %d\n",
+               mesh.triFaceIndices.size() + mesh.quadFaceIndices.size());
 
         std::vector<bool> vertexUsed(mesh.p.size(), false);
         for (int v : mesh.triIndices) {
@@ -240,7 +241,7 @@ int split(std::vector<std::string> args) {
                 inPLY.c_str());
         return 1;
     }
-    if (mesh.faceIndices.size() > 0) {
+    if (mesh.triFaceIndices.size() > 0) {
         fprintf(stderr,
                 "%s: sorry, mesh has faceIndices, which are not currently "
                 "supported by plytool.\n",

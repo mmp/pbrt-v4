@@ -156,6 +156,7 @@ std::unique_ptr<Tokenizer> Tokenizer::CreateFromFile(
     struct stat stat;
     if (fstat(fd, &stat) != 0) {
         errorCallback(StringPrintf("%s: %s", filename, ErrorString()).c_str(), nullptr);
+        close(fd);
         return nullptr;
     }
 
@@ -169,11 +170,15 @@ std::unique_ptr<Tokenizer> Tokenizer::CreateFromFile(
     }
 
     void *ptr = mmap(nullptr, len, PROT_READ, MAP_PRIVATE | MAP_NORESERVE, fd, 0);
-    if (ptr == MAP_FAILED)
+    if (ptr == MAP_FAILED) {
         errorCallback(StringPrintf("%s: %s", filename, ErrorString()).c_str(), nullptr);
+        close(fd);
+        return nullptr;
+    }
 
     if (close(fd) != 0) {
         errorCallback(StringPrintf("%s: %s", filename, ErrorString()).c_str(), nullptr);
+        munmap(ptr, len);
         return nullptr;
     }
 
@@ -198,7 +203,21 @@ std::unique_ptr<Tokenizer> Tokenizer::CreateFromFile(
     if (fileHandle == INVALID_HANDLE_VALUE)
         return errorReportLambda();
 
-    size_t len = GetFileSize(fileHandle, 0);
+    // GetFileSize() only returns the low 32 bits of the size.
+    LARGE_INTEGER fileSize;
+    if (!GetFileSizeEx(fileHandle, &fileSize)) {
+        std::unique_ptr<Tokenizer> result = errorReportLambda();
+        CloseHandle(fileHandle);
+        return result;
+    }
+    size_t len = size_t(fileSize.QuadPart);
+
+    // CreateFileMapping() fails for empty files, so handle them directly.
+    if (len == 0) {
+        CloseHandle(fileHandle);
+        return std::make_unique<Tokenizer>(std::string(), filename,
+                                           std::move(errorCallback));
+    }
 
     HANDLE mapping = CreateFileMapping(fileHandle, 0, PAGE_READONLY, 0, 0, 0);
     CloseHandle(fileHandle);
@@ -347,7 +366,11 @@ static int parseInt(const Token &t) {
     int index = 0;
     if (t.token[0] == '+' || t.token[0] == '-')
         ++index;
+    if (index == t.token.size())
+        ErrorExit(&t.loc, "\"%s\": expected a number", toString(t.token));
 
+    // The magnitude of the most negative int is one more than the maximum.
+    int64_t maxMagnitude = int64_t(std::numeric_limits<int>::max()) + (negate ? 1 : 0);
     int64_t value = 0;
     while (index < t.token.size()) {
         if (!(t.token[index] >= '0' && t.token[index] <= '9'))
@@ -355,11 +378,10 @@ static int parseInt(const Token &t) {
         value = 10 * value + (t.token[index] - '0');
         ++index;
 
-        if (value > std::numeric_limits<int>::max())
-            ErrorExit(&t.loc,
-                      "Numeric value too large to represent as a 32-bit integer.");
-        else if (value < std::numeric_limits<int>::lowest())
-            Warning(&t.loc, "Numeric value %d too low to represent as a 32-bit integer.");
+        if (value > maxMagnitude)
+            ErrorExit(&t.loc, "%s: numeric value can't be represented as a 32-bit "
+                              "integer.",
+                      toString(t.token));
     }
 
     return negate ? -value : value;
@@ -400,7 +422,8 @@ static double parseFloat(const Token &t) {
     double val;
     if (isInteger(t.token)) {
         char *endptr;
-        val = double(strtol(bufp, &endptr, 10));
+        // strtoll, since long is only 32 bits on Windows.
+        val = double(strtoll(bufp, &endptr, 10));
         length = endptr - bufp;
     } else if (sizeof(Float) == sizeof(float))
         val = floatParser.StringToFloat(bufp, t.token.size(), &length);
@@ -503,10 +526,13 @@ static ParsedParameterVector parseParameters(
                     break;
                 case Float:
                     errorCallback(t, "expected floating-point value");
+                    return;
                 case Int:
                     errorCallback(t, "expected integer value");
+                    return;
                 case Bool:
                     errorCallback(t, "expected Boolean value");
+                    return;
                 }
 
                 param->AddString(dequoteString(t));
@@ -517,10 +543,13 @@ static ParsedParameterVector parseParameters(
                     break;
                 case String:
                     errorCallback(t, "expected string value");
+                    return;
                 case Float:
                     errorCallback(t, "expected floating-point value");
+                    return;
                 case Int:
                     errorCallback(t, "expected integer value");
+                    return;
                 case Bool:
                     break;
                 }
@@ -533,10 +562,13 @@ static ParsedParameterVector parseParameters(
                     break;
                 case String:
                     errorCallback(t, "expected string value");
+                    return;
                 case Float:
                     errorCallback(t, "expected floating-point value");
+                    return;
                 case Int:
                     errorCallback(t, "expected integer value");
+                    return;
                 case Bool:
                     break;
                 }
@@ -549,12 +581,14 @@ static ParsedParameterVector parseParameters(
                     break;
                 case String:
                     errorCallback(t, "expected string value");
+                    return;
                 case Float:
                     break;
                 case Int:
                     break;
                 case Bool:
                     errorCallback(t, "expected Boolean value");
+                    return;
                 }
 
                 if (valType == Int)
@@ -759,6 +793,12 @@ void parse(ParserTarget *target, std::unique_ptr<Tokenizer> t) {
                            filename);
                 else {
                     filename = ResolveFilename(filename);
+                    // Catch Include cycles, which would otherwise recurse
+                    // until memory is exhausted.
+                    for (const auto &f : fileStack)
+                        if (f->loc.filename == filename)
+                            ErrorExit(&tok->loc, "%s: recursive Include of file",
+                                      filename);
                     std::unique_ptr<Tokenizer> tinc =
                         Tokenizer::CreateFromFile(filename, parseError);
                     if (tinc) {
