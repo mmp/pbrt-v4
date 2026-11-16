@@ -1088,8 +1088,7 @@ SampledSpectrum VolPathIntegrator::Li(RayDifferential ray, SampledWavelengths &l
                         // Add infinite light contribution using both PDFs with MIS
                         Float p_l = lightSampler.PMF(prevIntrContext, light) *
                                     light.PDF_Li(prevIntrContext, ray.d, true);
-                        r_l *= p_l;
-                        L += beta * Le / (r_u + r_l).Average();
+                        L += beta * Le / (r_u + r_l * p_l).Average();
                     }
                 }
             }
