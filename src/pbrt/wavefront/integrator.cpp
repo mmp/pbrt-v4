@@ -226,8 +226,47 @@ WavefrontPathIntegrator::WavefrontPathIntegrator(
 
     // Compute number of scanlines to render per pass
     Vector2i resolution = film.PixelBounds().Diagonal();
-    // TODO: make this configurable. Base it on the amount of GPU memory?
+
     int maxSamples = 1024 * 1024;
+
+#ifdef PBRT_BUILD_GPU_RENDERER
+    if (Options->useGPU) {
+        size_t freeBytes, totalBytes;
+        CUDA_CHECK(cudaMemGetInfo(&freeBytes, &totalBytes));
+        freeBytes = freeBytes * 0.9;
+        freeBytes = std::max(freeBytes, (size_t)100000000);
+
+        const int numberOfBasicEvalMaterials =
+            std::count(haveBasicEvalMaterial.begin(), haveBasicEvalMaterial.end(), true);
+        const int numberOfUniversalEvalMaterials = std::count(
+            haveUniversalEvalMaterial.begin(), haveUniversalEvalMaterial.end(), true);
+
+        int bytesOfOneSampleInAllQueues =
+            sizeof(PixelSampleState) + sizeof(RayWorkItem) * 2 +
+            sizeof(ShadowRayWorkItem) + sizeof(HitAreaLightWorkItem) +
+            sizeof(MaterialEvalWorkItem<void>) * numberOfBasicEvalMaterials +
+            sizeof(MaterialEvalWorkItem<void>) * numberOfUniversalEvalMaterials;
+
+        if (haveSubsurface) {
+            bytesOfOneSampleInAllQueues +=
+                sizeof(GetBSSRDFAndProbeRayWorkItem) + sizeof(SubsurfaceScatterWorkItem);
+        }
+
+        if (infiniteLights->size()) {
+            bytesOfOneSampleInAllQueues += sizeof(EscapedRayWorkItem);
+        }
+
+        if (haveMedia) {
+            bytesOfOneSampleInAllQueues +=
+                sizeof(MediumSampleWorkItem) + sizeof(MediumScatterWorkItem<void>);
+        }
+
+        maxSamples = freeBytes / bytesOfOneSampleInAllQueues;
+        maxSamples = std::min(maxSamples, resolution.x * resolution.y);
+    }
+
+#endif  // PBRT_BUILD_GPU_RENDERER
+
     scanlinesPerPass = std::max(1, maxSamples / resolution.x);
     int nPasses = (resolution.y + scanlinesPerPass - 1) / scanlinesPerPass;
     scanlinesPerPass = (resolution.y + nPasses - 1) / nPasses;
