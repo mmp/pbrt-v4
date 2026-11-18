@@ -6,36 +6,22 @@
 
 #include <pbrt/util/check.h>
 
-#include <double-conversion/double-conversion.h>
+#include <charconv>
 
 namespace pbrt {
 
 namespace detail {
 
 std::string FloatToString(float v) {
-    double_conversion::DoubleToStringConverter doubleConverter(
-        double_conversion::DoubleToStringConverter::NO_FLAGS, "Inf", "NaN", 'e',
-        -6 /* decimal_in_shortest_low */, 9 /* decimal_in_shortest_high */,
-        5 /* max_leading_padding_zeroes_in_precision_mode */,
-        5 /*  max_trailing_padding_zeroes_in_precision_mode */);
     char buf[64];
-    double_conversion::StringBuilder result(buf, PBRT_ARRAYSIZE(buf));
-    doubleConverter.ToShortestSingle(v, &result);
-    int length = result.position();
-    return std::string(buf, length);
+    auto [ptr, ec] = std::to_chars(buf, buf + sizeof(buf), v);
+    return std::string(buf, ptr);
 }
 
 std::string DoubleToString(double v) {
-    double_conversion::DoubleToStringConverter doubleConverter(
-        double_conversion::DoubleToStringConverter::NO_FLAGS, "Inf", "NaN", 'e',
-        -6 /* decimal_in_shortest_low */, 9 /* decimal_in_shortest_high */,
-        5 /* max_leading_padding_zeroes_in_precision_mode */,
-        5 /*  max_trailing_padding_zeroes_in_precision_mode */);
     char buf[64];
-    double_conversion::StringBuilder result(buf, PBRT_ARRAYSIZE(buf));
-    doubleConverter.ToShortest(v, &result);
-    int length = result.position();
-    return std::string(buf, length);
+    auto [ptr, ec] = std::to_chars(buf, buf + sizeof(buf), v);
+    return std::string(buf, ptr);
 }
 
 void stringPrintfRecursive(std::string *s, const char *fmt) {
