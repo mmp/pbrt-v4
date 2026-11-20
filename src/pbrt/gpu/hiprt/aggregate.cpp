@@ -160,7 +160,7 @@ HiprtAggregate::HiprtAggregate(
     HIPRT_CHECK(hiprtCreateContext(HIPRT_API_VERSION, ctxInput, context));
 
 #ifdef NDEBUG
-    hiprtSetLogLevel(hiprtLogLevelError);
+    HIPRT_CHECK(hiprtSetLogLevel(context, hiprtLogLevelError));
 #endif
     LOG_VERBOSE("HIPRT version %d.%d.%x successfully initialized", HIPRT_MAJOR_VERSION,
                 HIPRT_MINOR_VERSION, HIPRT_PATCH_VERSION);
@@ -326,13 +326,6 @@ HiprtAggregate::HiprtAggregate(
     HIPRT_CHECK(
         hiprtCreateGlobalStackBuffer(context, stackBufferInput, globalStackBuffer));
 
-    constexpr uint32_t InstanceStackSize = 1;
-    hiprtGlobalStackBufferInput instanceStackBufferInput{
-        hiprtStackTypeGlobal, hiprtStackEntryTypeInstance, InstanceStackSize,
-        (uint32_t)maxQueueSize};
-    HIPRT_CHECK(hiprtCreateGlobalStackBuffer(context, instanceStackBufferInput,
-                                             globalInstanceStackBuffer));
-
 #if defined(PBRT_IS_WINDOWS)
     if (Options->useGPU)
         ReenableThreadPool();
@@ -362,7 +355,6 @@ void HiprtAggregate::IntersectClosest(int maxRays, const RayQueue *rayQueue,
         params.universalEvalMaterialQueue = universalEvalMaterialQueue;
         params.mediumSampleQueue = mediumSampleQueue;
         params.globalStackBuffer = globalStackBuffer;
-        params.globalInstanceStackBuffer = globalInstanceStackBuffer;
         params.funcTable = module.funcTable;
         params.hgRecords = hgRecords;
         params.offsets = offsets;
@@ -405,7 +397,6 @@ void HiprtAggregate::IntersectShadow(int maxRays, ShadowRayQueue *shadowRayQueue
         params.shadowRayQueue = shadowRayQueue;
         params.pixelSampleState = *pixelSampleState;
         params.globalStackBuffer = globalStackBuffer;
-        params.globalInstanceStackBuffer = globalInstanceStackBuffer;
         params.funcTable = module.funcTable;
         params.hgRecords = hgRecords;
         params.offsets = offsets;
@@ -448,7 +439,6 @@ void HiprtAggregate::IntersectShadowTr(int maxRays, ShadowRayQueue *shadowRayQue
         params.shadowRayQueue = shadowRayQueue;
         params.pixelSampleState = *pixelSampleState;
         params.globalStackBuffer = globalStackBuffer;
-        params.globalInstanceStackBuffer = globalInstanceStackBuffer;
         params.funcTable = module.funcTable;
         params.hgRecords = hgRecords;
         params.offsets = offsets;
@@ -490,7 +480,6 @@ void HiprtAggregate::IntersectOneRandom(
         params.traversable = scene;
         params.subsurfaceScatterQueue = subsurfaceScatterQueue;
         params.globalStackBuffer = globalStackBuffer;
-        params.globalInstanceStackBuffer = globalInstanceStackBuffer;
         params.funcTable = module.funcTable;
         params.hgRecords = hgRecords;
         params.offsets = offsets;
@@ -1191,12 +1180,10 @@ HiprtAggregate::GeometryContainer HiprtAggregate::buildBVHForBLPs(
             for (int i = 0; i < 4; ++i)
                 patchBounds =
                     Union(patchBounds, mesh->p[mesh->vertexIndices[4 * patchIndex + i]]);
-            hiprtFloat4 aabbMin =
-                make_hiprtFloat4(float(patchBounds.pMin.x), float(patchBounds.pMin.y),
-                                 float(patchBounds.pMin.z), 0.0f);
-            hiprtFloat4 aabbMax =
-                make_hiprtFloat4(float(patchBounds.pMax.x), float(patchBounds.pMax.y),
-                                 float(patchBounds.pMax.z), 0.0f);
+            hiprtFloat4 aabbMin{float(patchBounds.pMin.x), float(patchBounds.pMin.y),
+                                float(patchBounds.pMin.z), 0.0f};
+            hiprtFloat4 aabbMax{float(patchBounds.pMax.x), float(patchBounds.pMax.y),
+                                float(patchBounds.pMax.z), 0.0f};
             aabbBuffer[2 * aabbIndex + 0] = aabbMin;
             aabbBuffer[2 * aabbIndex + 1] = aabbMax;
             ++aabbIndex;
@@ -1290,12 +1277,10 @@ HiprtAggregate::GeometryContainer HiprtAggregate::buildBVHForQuadrics(
         Shape shape = shapes[0];
 
         Bounds3f shapeBounds = shape.Bounds();
-        hiprtFloat4 aabbMin =
-            make_hiprtFloat4(float(shapeBounds.pMin.x), float(shapeBounds.pMin.y),
-                             float(shapeBounds.pMin.z), 0.0f);
-        hiprtFloat4 aabbMax =
-            make_hiprtFloat4(float(shapeBounds.pMax.x), float(shapeBounds.pMax.y),
-                             float(shapeBounds.pMax.z), 0.0f);
+        hiprtFloat4 aabbMin{float(shapeBounds.pMin.x), float(shapeBounds.pMin.y),
+                            float(shapeBounds.pMin.z), 0.0f};
+        hiprtFloat4 aabbMax{float(shapeBounds.pMax.x), float(shapeBounds.pMax.y),
+                            float(shapeBounds.pMax.z), 0.0f};
         aabbBuffer[2 * quadricIndex + 0] = aabbMin;
         aabbBuffer[2 * quadricIndex + 1] = aabbMax;
 

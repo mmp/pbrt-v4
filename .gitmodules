@@ -37,3 +37,6 @@
 	path = src/ext/glfw
 	url = https://github.com/glfw/glfw.git
 
+[submodule "src/ext/hiprt"]
+	path = src/ext/hiprt
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/HIPRT.git

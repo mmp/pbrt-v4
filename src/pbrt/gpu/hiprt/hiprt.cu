@@ -92,18 +92,18 @@ __device__ inline hiprtHit Trace(hiprtScene scene, Ray ray, Float tMax, uint32_t
     hiprtSharedStackBuffer sharedStackBuffer{SHARED_STACK_SIZE, sharedStackCache};
     hiprtGlobalStack stack(params.globalStackBuffer, sharedStackBuffer);
 
-    hiprtSharedStackBuffer sharedInstanceStackBuffer{};
-    hiprtGlobalInstanceStack instanceStack(params.globalInstanceStackBuffer,
-                                           sharedInstanceStackBuffer);
+    // HIPRT's bitcode library does not instantiate scene traversal with a global
+    // instance stack; the private one is plenty for pbrt's two instance levels
+    hiprtPrivateInstanceStack instanceStack;
 
     hiprtHit hit;
     if constexpr (!AnyHit) {
-        hiprtSceneTraversalClosestCustomStack<hiprtGlobalStack, hiprtGlobalInstanceStack>
+        hiprtSceneTraversalClosestCustomStack<hiprtGlobalStack, hiprtPrivateInstanceStack>
             tr(scene, hiprtRay, stack, instanceStack, hiprtFullRayMask,
                hiprtTraversalHintDefault, payload, params.funcTable, 0, ray.time);
         hit = tr.getNextHit();
     } else {
-        hiprtSceneTraversalAnyHitCustomStack<hiprtGlobalStack, hiprtGlobalInstanceStack>
+        hiprtSceneTraversalAnyHitCustomStack<hiprtGlobalStack, hiprtPrivateInstanceStack>
             tr(scene, hiprtRay, stack, instanceStack, hiprtFullRayMask,
                hiprtTraversalHintDefault, payload, params.funcTable, 0, ray.time);
         hit = tr.getNextHit();

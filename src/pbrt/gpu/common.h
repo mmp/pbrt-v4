@@ -95,9 +95,8 @@ struct RayIntersectParameters {
     SubsurfaceScatterQueue *subsurfaceScatterQueue;
 
 #if defined(__HIP_PLATFORM_AMD__)
-    // Stack buffers
+    // Stack buffer
     hiprtGlobalStackBuffer globalStackBuffer;
-    hiprtGlobalStackBuffer globalInstanceStackBuffer;
     // Custom function table
     hiprtFuncTable funcTable;
     // Hitgroup records

@@ -176,7 +176,6 @@ class HiprtAggregate : public WavefrontAggregate {
 
     hiprtScene scene;
     hiprtGlobalStackBuffer globalStackBuffer;
-    hiprtGlobalStackBuffer globalInstanceStackBuffer;
     std::vector<GeometryGroup> geomGroups;
     HitgroupRecord *hgRecords;
     uint32_t *offsets;

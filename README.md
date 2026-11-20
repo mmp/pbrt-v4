@@ -232,14 +232,19 @@ $ imgtool denoise-optix noisy.exr --outfile denoised.exr
 Instructions to build the HIP port
 --------
 
-HIPRT:
-* Download [HIPRT-v2.2](https://gpuopen.com/hiprt/)
-* Extract the zip file and copy files from `hiprt/` to `src/ext/hiprtSdk`
-
 Clone:
 * `git clone --recursive https://github.com/GPUOpen-Effects/pbrt-v4.git`
 * `git checkout hip`
-* `cd build`
+* `git submodule update --init --recursive`
+
+HIPRT:
+[HIPRT 3.2](https://github.com/GPUOpen-LibrariesAndSDKs/HIPRT) is included as the `src/ext/hiprt` submodule and has to be built first, with precompiled bitcode and with the same HIP SDK as pbrt. `HIP_PATH` has to point to the HIP SDK (e.g., `/opt/rocm`; the Windows HIP SDK installer sets it); alternatively, pass `-DHIP_PATH=...` to cmake.
+* `cd src/ext/hiprt`
+* `cmake -DCMAKE_BUILD_TYPE=Release -DBITCODE=ON -DPRECOMPILE=ON -DNO_UNITTEST=ON -DFORCE_DISABLE_CUDA=ON -S . -B build`
+* `cmake --build build --config Release`
+* `cd ../../../build`
+
+On Windows, run these from `cmd` or PowerShell (HIPRT's kernel precompilation does not work in git bash). The HIPRT library, kernels, and bitcode end up in `src/ext/hiprt/dist/bin/Release`, where the pbrt build picks them up.
 
 Linux:
 * `cmake -DCMAKE_C_COMPILER=/opt/rocm/llvm/bin/clang -DCMAKE_CXX_COMPILER=/opt/rocm/llvm/bin/clang++ -DPBRT_HIPRT=ON ..`
@@ -260,5 +265,5 @@ GPU architecture and ROCm version
 --------
 
 The instructions above assume the `gfx1100` architecture. You can specify other architectures via the CMake `AMDGPU_TARGETS` variable. You also need to change the architecture in `hiprt.sh` and `hiprt.bat`. 
-Note that PBRT must be compiled with the same version as HIPRT binaries (e.g., `hiprt02002_5.7_amd_lib_linux.bc`). If you use a different version of ROCm other than 5.7, you need to adjust it in `hiprt.sh` and `hiprt.bat`.
+Note that PBRT must be compiled with the same HIP SDK as HIPRT. The HIPRT bitcode (e.g., `hiprt03002_6.4_amd_lib_linux.bc`) is picked up from `src/ext/hiprt/dist/bin/Release` automatically.
 
