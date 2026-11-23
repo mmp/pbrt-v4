@@ -145,6 +145,8 @@ PBRT_CPU_GPU inline Float BilinearPDF(Point2f p, pstd::span<const Float> w) {
 
 PBRT_CPU_GPU inline Point2f SampleBilinear(Point2f u, pstd::span<const Float> w) {
     DCHECK_EQ(4, w.size());
+    if (w[0] + w[1] + w[2] + w[3] == 0)
+        return u;
     Point2f p;
     // Sample $y$ for bilinear marginal distribution
     p.y = SampleLinear(u[1], w[0] + w[1], w[2] + w[3]);
@@ -156,6 +158,9 @@ PBRT_CPU_GPU inline Point2f SampleBilinear(Point2f u, pstd::span<const Float> w)
 }
 
 PBRT_CPU_GPU inline Point2f InvertBilinearSample(Point2f p, pstd::span<const Float> w) {
+    DCHECK_EQ(4, w.size());
+    if (w[0] + w[1] + w[2] + w[3] == 0)
+        return p;
     return {InvertLinearSample(p.x, Lerp(p.y, w[0], w[2]), Lerp(p.y, w[1], w[3])),
             InvertLinearSample(p.y, w[0] + w[1], w[2] + w[3])};
 }

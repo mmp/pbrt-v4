@@ -741,6 +741,19 @@ TEST(Sampling, CatmullRom) {
     }
 }
 
+TEST(Sampling, BilinearZeroWeights) {
+    Float weights[] = {0, 0, 0, 0};
+    for (Point2f u : {Point2f(0, 0), Point2f(.25, .75), Point2f(.75, .25)}) {
+        Point2f p = SampleBilinear(u, weights);
+        EXPECT_EQ(u.x, p.x);
+        EXPECT_EQ(u.y, p.y);
+        EXPECT_EQ(1, BilinearPDF(u, weights));
+        Point2f inverse = InvertBilinearSample(u, weights);
+        EXPECT_EQ(u.x, inverse.x);
+        EXPECT_EQ(u.y, inverse.y);
+    }
+}
+
 TEST(Sampling, Bilinear) {
     RNG rng;
     Float quads[][4] = {{0, .5, 1.3, 4.7}, {1, 1, 1, 1}, {11, .25, 1, 20}};
